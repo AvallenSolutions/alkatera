@@ -28,7 +28,7 @@ interface OrganizationContextType {
   userRole: string | null
   switchOrganization: (orgId: string) => Promise<void>
   refreshOrganizations: () => Promise<void>
-  mutate: () => Promise<void>
+  mutate: (newOrganization?: { organization: Organization; role: string }) => Promise<void>
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
@@ -120,6 +120,17 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     await fetchOrganizations()
   }
 
+  const mutate = async (newOrganization?: { organization: Organization; role: string }) => {
+    if (newOrganization) {
+      setOrganizations(prev => [...prev, newOrganization.organization])
+      setCurrentOrganization(newOrganization.organization)
+      setUserRole(newOrganization.role)
+      localStorage.setItem('currentOrganizationId', newOrganization.organization.id)
+    } else {
+      await refreshOrganizations()
+    }
+  }
+
   useEffect(() => {
     fetchOrganizations()
 
@@ -148,7 +159,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         userRole,
         switchOrganization,
         refreshOrganizations,
-        mutate: refreshOrganizations,
+        mutate,
       }}
     >
       {children}

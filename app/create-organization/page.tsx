@@ -62,7 +62,10 @@ export default function CreateOrganizationPage() {
         throw new Error(result.error || 'Failed to create organisation')
       }
 
-      await mutate()
+      await mutate({
+        organization: result.organization,
+        role: result.role
+      })
 
       toast({
         title: 'Success',

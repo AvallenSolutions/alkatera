@@ -114,7 +114,17 @@ Deno.serve(async (req: Request) => {
         user_id: user.id,
         role_id: ownerRole.id,
       })
-      .select()
+      .select(`
+        id,
+        organization_id,
+        user_id,
+        role_id,
+        joined_at,
+        roles (
+          id,
+          name
+        )
+      `)
       .single();
 
     if (memberError) {
@@ -130,7 +140,11 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ organization: orgData, membership: memberData }),
+      JSON.stringify({
+        organization: orgData,
+        membership: memberData,
+        role: (memberData as any)?.roles?.name || "owner"
+      }),
       {
         status: 201,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
