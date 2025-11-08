@@ -16,7 +16,7 @@ export default function CreateOrganizationPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { refreshOrganizations } = useOrganization()
+  const { mutate } = useOrganization()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,12 +62,12 @@ export default function CreateOrganizationPage() {
         throw new Error(result.error || 'Failed to create organisation')
       }
 
+      await mutate()
+
       toast({
         title: 'Success',
         description: 'Your organisation has been created successfully.',
       })
-
-      await refreshOrganizations()
 
       router.push('/dashboard')
       router.refresh()

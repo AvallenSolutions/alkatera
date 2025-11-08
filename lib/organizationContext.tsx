@@ -28,6 +28,7 @@ interface OrganizationContextType {
   userRole: string | null
   switchOrganization: (orgId: string) => Promise<void>
   refreshOrganizations: () => Promise<void>
+  mutate: () => Promise<void>
 }
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
@@ -147,6 +148,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         userRole,
         switchOrganization,
         refreshOrganizations,
+        mutate: refreshOrganizations,
       }}
     >
       {children}
