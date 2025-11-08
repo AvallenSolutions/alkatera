@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
 import { useOrganization } from "@/lib/organizationContext"
+import { ProtectedLayout } from "@/components/layouts/ProtectedLayout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -15,7 +16,6 @@ export default function DashboardPage() {
   const router = useRouter()
   const { currentOrganization, userRole } = useOrganization()
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [loading, setLoading] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
@@ -24,7 +24,6 @@ export default function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser()
       setUser(user)
-      setLoading(false)
     }
 
     getUser()
@@ -45,14 +44,6 @@ export default function DashboardPage() {
     router.refresh()
   }
 
-  if (loading) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </main>
-    )
-  }
-
   const getInitials = (email: string) => {
     return email.charAt(0).toUpperCase()
   }
@@ -60,8 +51,9 @@ export default function DashboardPage() {
   const fullName = user?.user_metadata?.full_name
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-      <div className="container mx-auto p-8">
+    <ProtectedLayout>
+      <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+        <div className="container mx-auto p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
@@ -191,5 +183,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </main>
+    </ProtectedLayout>
   )
 }

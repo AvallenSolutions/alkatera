@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { ProtectedLayout } from '@/components/layouts/ProtectedLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -59,6 +60,14 @@ interface TeamMember {
 }
 
 export default function TeamManagementPage() {
+  return (
+    <ProtectedLayout>
+      <TeamManagementContent />
+    </ProtectedLayout>
+  )
+}
+
+function TeamManagementContent() {
   const { currentOrganization, userRole } = useOrganization()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
