@@ -24,6 +24,12 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization")!;
 
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+      },
+    });
+
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false,
@@ -36,7 +42,7 @@ Deno.serve(async (req: Request) => {
     });
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    
+
     if (authError || !user) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
@@ -65,13 +71,7 @@ Deno.serve(async (req: Request) => {
       .replace(/^-+|-+$/g, "")
       .substring(0, 50);
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-      },
-    });
-
-    const { data: orgData, error: orgError } = await supabaseClient
+    const { data: orgData, error: orgError } = await supabaseAdmin
       .from("organizations")
       .insert({
         name: name.trim(),
