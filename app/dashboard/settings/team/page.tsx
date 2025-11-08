@@ -47,16 +47,12 @@ import {
 } from '@/components/ui/alert-dialog'
 
 interface TeamMember {
-  id: string
+  membership_id: string
   user_id: string
   role_id: string
-  profiles: {
-    email: string
-    full_name: string | null
-  }
-  roles: {
-    name: string
-  }
+  email: string
+  full_name: string | null
+  role: string
 }
 
 export default function TeamManagementPage() {
@@ -87,14 +83,8 @@ function TeamManagementContent() {
     try {
       setIsLoading(true)
       const { data, error } = await supabase
-        .from('organization_members')
-        .select(`
-          id,
-          user_id,
-          role_id,
-          profiles!inner (email, full_name),
-          roles!inner (name)
-        `)
+        .from('member_profiles')
+        .select('*')
         .eq('organization_id', currentOrganization.id)
 
       if (error) throw error
@@ -186,7 +176,7 @@ function TeamManagementContent() {
       const { error } = await supabase
         .from('organization_members')
         .delete()
-        .eq('id', memberToDelete.id)
+        .eq('id', memberToDelete.membership_id)
 
       if (error) throw error
 
@@ -349,19 +339,19 @@ function TeamManagementContent() {
                 </TableHeader>
                 <TableBody>
                   {members.map((member) => (
-                    <TableRow key={member.id}>
+                    <TableRow key={member.membership_id}>
                       <TableCell className="font-medium">
-                        {member.profiles.full_name || 'No name'}
+                        {member.full_name || 'No name'}
                       </TableCell>
-                      <TableCell>{member.profiles.email}</TableCell>
+                      <TableCell>{member.email}</TableCell>
                       <TableCell>
-                        <Badge variant={getRoleBadgeVariant(member.roles.name)}>
-                          {getRoleDisplayName(member.roles.name)}
+                        <Badge variant={getRoleBadgeVariant(member.role)}>
+                          {getRoleDisplayName(member.role)}
                         </Badge>
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
-                          {member.roles.name !== 'owner' && (
+                          {member.role !== 'owner' && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -386,7 +376,7 @@ function TeamManagementContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Team Member?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to remove {memberToDelete?.profiles.full_name || memberToDelete?.profiles.email} from your organisation?
+              Are you sure you want to remove {memberToDelete?.full_name || memberToDelete?.email} from your organisation?
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
