@@ -134,8 +134,7 @@ function TeamManagementContent() {
           'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          organization_id: currentOrganization.id,
-          invitee_email: inviteeEmail,
+          email: inviteeEmail,
           role: inviteeRole,
         }),
       })

@@ -8,10 +8,12 @@ const corsHeaders = {
 };
 
 interface InviteMemberRequest {
-  organization_id: string;
-  invitee_email: string;
-  role: 'company_admin' | 'company_user';
+  email: string;
+  role: string;
 }
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const allowedRoles = ['company_admin', 'company_user'];
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -22,11 +24,32 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const authHeader = req.headers.get("Authorization")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const authHeader = req.headers.get("Authorization");
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
+      console.error("Missing environment variables");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const userClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
       auth: {
         persistSession: false,
       },
@@ -37,11 +60,11 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({ error: "Unauthorized - Invalid or expired token" }),
         {
           status: 401,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -49,11 +72,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { organization_id, invitee_email, role }: InviteMemberRequest = await req.json();
+    const requestBody = await req.json();
+    const { email, role }: InviteMemberRequest = requestBody;
 
-    if (!organization_id || !invitee_email || !role) {
+    if (!email || typeof email !== 'string') {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Email is required and must be a string" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -61,16 +85,45 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: currentUserMembership } = await supabase
-      .from("organization_members")
-      .select("role_id, roles(name)")
-      .eq("organization_id", organization_id)
-      .eq("user_id", user.id)
-      .single();
-
-    if (!currentUserMembership) {
+    if (!emailRegex.test(email)) {
       return new Response(
-        JSON.stringify({ error: "You are not a member of this organization" }),
+        JSON.stringify({ error: "Invalid email format" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!role || !allowedRoles.includes(role)) {
+      return new Response(
+        JSON.stringify({
+          error: `Invalid role. Must be one of: ${allowedRoles.join(', ')}`
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    const { data: orgIdData, error: orgIdError } = await adminClient.rpc(
+      'get_current_organization_id'
+    );
+
+    if (orgIdError || !orgIdData) {
+      console.error("Error getting organization ID:", orgIdError);
+      return new Response(
+        JSON.stringify({
+          error: "You must be a member of an organization to invite others"
+        }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -78,10 +131,17 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const userRole = (currentUserMembership as any).roles?.name;
-    if (userRole !== 'owner' && userRole !== 'admin') {
+    const organizationId = orgIdData;
+
+    const { data: userRole } = await adminClient.rpc('get_my_organization_role', {
+      org_id: organizationId
+    });
+
+    if (!userRole || (userRole !== 'owner' && userRole !== 'admin')) {
       return new Response(
-        JSON.stringify({ error: "You must be an admin to invite members" }),
+        JSON.stringify({
+          error: "Only organization owners and admins can invite members"
+        }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -89,53 +149,22 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: inviteeProfile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", invitee_email.toLowerCase())
-      .single();
-
-    if (!inviteeProfile) {
-      return new Response(
-        JSON.stringify({ error: "User not found. Please ask them to create an account first." }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const { data: existingMember } = await supabase
-      .from("organization_members")
-      .select("id")
-      .eq("organization_id", organization_id)
-      .eq("user_id", inviteeProfile.id)
-      .single();
-
-    if (existingMember) {
-      return new Response(
-        JSON.stringify({ error: "User is already a member of this organization" }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const roleMapping = {
+    const roleMapping: Record<string, string> = {
       'company_admin': 'admin',
       'company_user': 'member'
     };
 
-    const { data: roleData } = await supabase
+    const mappedRole = roleMapping[role];
+
+    const { data: roleData } = await adminClient
       .from("roles")
       .select("id")
-      .eq("name", roleMapping[role])
+      .eq("name", mappedRole)
       .single();
 
     if (!roleData) {
       return new Response(
-        JSON.stringify({ error: "Invalid role specified" }),
+        JSON.stringify({ error: "Invalid role mapping" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -143,28 +172,37 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: memberData, error: memberError } = await supabase
-      .from("organization_members")
-      .insert({
-        organization_id: organization_id,
-        user_id: inviteeProfile.id,
-        role_id: roleData.id,
-        invited_by: user.id,
-      })
-      .select(`
-        id,
-        organization_id,
-        user_id,
-        role_id,
-        profiles (email, full_name),
-        roles (name)
-      `)
-      .single();
+    const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
+      email,
+      {
+        data: {
+          organization_id: organizationId,
+          role_id: roleData.id,
+          invited_by: user.id,
+        },
+        redirectTo: `${Deno.env.get("SITE_URL") || supabaseUrl}/dashboard`,
+      }
+    );
 
-    if (memberError) {
-      console.error("Error creating organization member:", memberError);
+    if (inviteError) {
+      console.error("Error inviting user:", inviteError);
+
+      if (inviteError.message.includes("already") || inviteError.message.includes("exists")) {
+        return new Response(
+          JSON.stringify({
+            error: "User already exists or is already a member of your organization"
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ error: "Failed to add member to organization" }),
+        JSON.stringify({
+          error: inviteError.message || "Failed to invite user"
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -173,16 +211,24 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ member: memberData }),
+      JSON.stringify({
+        success: true,
+        message: "Invitation sent successfully",
+        user: inviteData.user
+      }),
       {
-        status: 201,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
+
   } catch (error) {
-    console.error("Unexpected error:", error);
+    console.error("Unexpected error in invite-member function:", error);
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
+      JSON.stringify({
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : String(error)
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
