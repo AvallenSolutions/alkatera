@@ -3,15 +3,17 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
+import { useOrganization } from "@/lib/organizationContext"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { LogOut, Loader2, User } from "lucide-react"
+import { LogOut, Loader2, User, Users, Building2 } from "lucide-react"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { currentOrganization, userRole } = useOrganization()
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [loading, setLoading] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
@@ -63,7 +65,9 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground mt-2">Welcome to AlkaTera</p>
+            <p className="text-muted-foreground mt-2">
+              {currentOrganization ? `${currentOrganization.name}` : 'Welcome to AlkaTera'}
+            </p>
           </div>
           <Button
             onClick={handleSignOut}
@@ -132,20 +136,37 @@ export default function DashboardPage() {
 
           <Card className="col-span-full md:col-span-1">
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
-              <CardDescription>Common tasks and settings</CardDescription>
+              <CardTitle>Organisation</CardTitle>
+              <CardDescription>Manage your organisation settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start">
-                <User className="mr-2 h-4 w-4" />
-                Edit Profile
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                Change Password
-              </Button>
-              <Button variant="outline" className="w-full justify-start">
-                Security Settings
-              </Button>
+            <CardContent className="space-y-4">
+              {currentOrganization && (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <div className="h-10 w-10 bg-slate-900 rounded-lg flex items-centre justify-centre">
+                    <Building2 className="h-5 w-5 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium">{currentOrganization.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Role: {userRole || 'Member'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => router.push('/dashboard/settings/team')}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Manage Team
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <User className="mr-2 h-4 w-4" />
+                  Edit Profile
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
