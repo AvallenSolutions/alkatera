@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 
 const publicRoutes = ['/login', '/signup', '/password-reset', '/update-password']
+const onboardingRoutes = ['/create-organization']
 
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
@@ -16,6 +17,10 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   )
 
+  const isOnboardingRoute = onboardingRoutes.some((route) =>
+    request.nextUrl.pathname.startsWith(route)
+  )
+
   if (!session && !isPublicRoute && request.nextUrl.pathname !== '/') {
     const redirectUrl = new URL('/login', request.url)
     redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname)
@@ -24,6 +29,32 @@ export async function middleware(request: NextRequest) {
 
   if (session && isPublicRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  if (session && !isPublicRoute && !isOnboardingRoute) {
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .limit(1)
+
+    if (!memberships || memberships.length === 0) {
+      if (request.nextUrl.pathname !== '/create-organization') {
+        return NextResponse.redirect(new URL('/create-organization', request.url))
+      }
+    }
+  }
+
+  if (session && isOnboardingRoute) {
+    const { data: memberships } = await supabase
+      .from('organization_members')
+      .select('id')
+      .eq('user_id', session.user.id)
+      .limit(1)
+
+    if (memberships && memberships.length > 0) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
   }
 
   return response

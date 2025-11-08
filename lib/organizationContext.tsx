@@ -89,8 +89,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setUserRole(membership?.roles?.name || null)
 
         localStorage.setItem('currentOrganizationId', orgToSet.id)
-      } else {
-        router.push('/create-organization')
       }
     } catch (error) {
       console.error('Error in fetchOrganizations:', error)
