@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { useOrganization } from '@/lib/organizationContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,6 +16,7 @@ export default function CreateOrganizationPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
+  const { refreshOrganizations } = useOrganization()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,6 +66,8 @@ export default function CreateOrganizationPage() {
         title: 'Success',
         description: 'Your organisation has been created successfully.',
       })
+
+      await refreshOrganizations()
 
       router.push('/dashboard')
       router.refresh()

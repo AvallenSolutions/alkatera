@@ -21,10 +21,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const authHeader = req.headers.get("Authorization")!;
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         persistSession: false,
       },
@@ -35,7 +35,7 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     
     if (authError || !user) {
       return new Response(
@@ -65,7 +65,13 @@ Deno.serve(async (req: Request) => {
       .replace(/^-+|-+$/g, "")
       .substring(0, 50);
 
-    const { data: orgData, error: orgError } = await supabase
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+      },
+    });
+
+    const { data: orgData, error: orgError } = await supabaseClient
       .from("organizations")
       .insert({
         name: name.trim(),
@@ -77,7 +83,7 @@ Deno.serve(async (req: Request) => {
     if (orgError) {
       console.error("Error creating organization:", orgError);
       return new Response(
-        JSON.stringify({ error: "Failed to create organization" }),
+        JSON.stringify({ error: "Failed to create organization", details: orgError.message }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -85,7 +91,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: ownerRole } = await supabase
+    const { data: ownerRole } = await supabaseAdmin
       .from("roles")
       .select("id")
       .eq("name", "owner")
@@ -101,7 +107,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: memberData, error: memberError } = await supabase
+    const { data: memberData, error: memberError } = await supabaseAdmin
       .from("organization_members")
       .insert({
         organization_id: orgData.id,
@@ -113,9 +119,9 @@ Deno.serve(async (req: Request) => {
 
     if (memberError) {
       console.error("Error creating organization member:", memberError);
-      await supabase.from("organizations").delete().eq("id", orgData.id);
+      await supabaseAdmin.from("organizations").delete().eq("id", orgData.id);
       return new Response(
-        JSON.stringify({ error: "Failed to add user as organization owner" }),
+        JSON.stringify({ error: "Failed to add user as organization owner", details: memberError.message }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
