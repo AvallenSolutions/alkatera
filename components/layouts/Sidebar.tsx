@@ -38,7 +38,7 @@ const navigationItems: NavItem[] = [
   },
   {
     name: 'Facilities',
-    path: '/facilities',
+    path: '/company/facilities',
     icon: Package,
   },
   {
