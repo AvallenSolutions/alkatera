@@ -1,5 +1,4 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
 
 // === GOVERNANCE: CALCULATION UTILITIES START ===
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -230,13 +229,6 @@ export { corsHeaders };
 
 // === GOVERNANCE: CALCULATION UTILITIES END ===
 
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
-
 interface ActivityData {
   fuel_type: string;
   fuel_energy_kwh: number;
@@ -258,49 +250,11 @@ interface EmissionsFactor {
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return createOptionsResponse();
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const authHeader = req.headers.get("Authorization");
-
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    });
-
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const { user, organisationId, supabaseClient } = await enforceRLS(req);
 
     let requestBody: CalculationRequest;
     try {
@@ -319,8 +273,8 @@ Deno.serve(async (req: Request) => {
 
     if (!provenance_id || typeof provenance_id !== "string") {
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid input: provenance_id is required and must be a UUID string" 
+        JSON.stringify({
+          error: "Invalid input: provenance_id is required and must be a UUID string"
         }),
         {
           status: 400,
@@ -331,8 +285,8 @@ Deno.serve(async (req: Request) => {
 
     if (!activity_data || typeof activity_data !== "object") {
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid input: activity_data is required and must be an object" 
+        JSON.stringify({
+          error: "Invalid input: activity_data is required and must be an object"
         }),
         {
           status: 400,
@@ -343,8 +297,8 @@ Deno.serve(async (req: Request) => {
 
     if (!activity_data.fuel_type || typeof activity_data.fuel_type !== "string") {
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid input: activity_data.fuel_type is required and must be a string" 
+        JSON.stringify({
+          error: "Invalid input: activity_data.fuel_type is required and must be a string"
         }),
         {
           status: 400,
@@ -355,8 +309,8 @@ Deno.serve(async (req: Request) => {
 
     if (typeof activity_data.fuel_energy_kwh !== "number" || activity_data.fuel_energy_kwh <= 0) {
       return new Response(
-        JSON.stringify({ 
-          error: "Invalid input: activity_data.fuel_energy_kwh is required and must be a positive number" 
+        JSON.stringify({
+          error: "Invalid input: activity_data.fuel_energy_kwh is required and must be a positive number"
         }),
         {
           status: 400,
@@ -365,37 +319,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: provenanceData, error: provenanceError } = await supabaseClient
-      .from("data_provenance_trail")
-      .select("provenance_id, organization_id")
-      .eq("provenance_id", provenance_id)
-      .maybeSingle();
-
-    if (provenanceError) {
-      console.error("Error querying provenance:", provenanceError);
-      return new Response(
-        JSON.stringify({ 
-          error: "Failed to validate provenance_id",
-          details: provenanceError.message 
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (!provenanceData) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Invalid provenance_id: No matching evidence record found or access denied" 
-        }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    await validateProvenance(supabaseClient, provenance_id, organisationId);
 
     const { data: emissionsFactor, error: factorError } = await supabaseClient
       .from("emissions_factors")
@@ -410,9 +334,9 @@ Deno.serve(async (req: Request) => {
     if (factorError) {
       console.error("Error querying emissions factor:", factorError);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: "Failed to query emissions factors",
-          details: factorError.message 
+          details: factorError.message
         }),
         {
           status: 500,
@@ -423,9 +347,9 @@ Deno.serve(async (req: Request) => {
 
     if (!emissionsFactor) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: `No Scope 1 Stationary Combustion emissions factor found for fuel type: ${activity_data.fuel_type}`,
-          message: "Please ensure emissions factors are loaded for this fuel type or contact support" 
+          message: "Please ensure emissions factors are loaded for this fuel type or contact support"
         }),
         {
           status: 404,
@@ -452,65 +376,37 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    const { data: calculationLog, error: logError } = await supabaseClient
-      .from("calculation_logs")
-      .insert({
-        organization_id: provenanceData.organization_id,
-        user_id: user.id,
-        input_data: inputPayload,
-        output_value: emissions_tco2e,
-        output_unit: "tCO2e",
-        methodology_version: "V2 Beverage Company GHG Protocol",
-        factor_ids_used: [emissionsFactor.factor_id],
-      })
-      .select("log_id")
-      .single();
+    const outputData = {
+      emissions_tco2e: emissions_tco2e,
+      metadata: {
+        factor_name: emissionsFactor.name,
+        factor_value: emissionsFactor.value,
+        factor_unit: emissionsFactor.unit,
+        factor_source: emissionsFactor.source,
+        factor_year: emissionsFactor.year_of_publication,
+        methodology: "V2 Beverage Company GHG Protocol",
+        engine_version: "1.0.0",
+        calculation_type: "Scope 1: Stationary Combustion - Energy",
+      },
+    };
 
-    if (logError) {
-      console.error("Error creating calculation log:", logError);
-      return new Response(
-        JSON.stringify({ 
-          error: "Failed to create calculation log",
-          details: logError.message 
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const calculationLogId = await createLogEntry(supabaseClient, {
+      userId: user.id,
+      organisationId: organisationId,
+      inputData: inputPayload,
+      outputData: outputData,
+      emissionsFactorId: emissionsFactor.factor_id,
+      methodologyVersion: "V2 Beverage Company GHG Protocol",
+      calculationFunctionName: "calculate-scope1-stationary-combustion-energy",
+      dataProvenanceId: provenance_id,
+    });
 
-    return new Response(
-      JSON.stringify({
-        emissions_tco2e: emissions_tco2e,
-        calculation_log_id: calculationLog.log_id,
-        metadata: {
-          factor_name: emissionsFactor.name,
-          factor_value: emissionsFactor.value,
-          factor_unit: emissionsFactor.unit,
-          factor_source: emissionsFactor.source,
-          factor_year: emissionsFactor.year_of_publication,
-          methodology: "V2 Beverage Company GHG Protocol",
-          engine_version: "1.0.0",
-          calculation_type: "Scope 1: Stationary Combustion",
-        },
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return createSuccessResponse({
+      emissions_tco2e: emissions_tco2e,
+      calculation_log_id: calculationLogId,
+      metadata: outputData.metadata,
+    });
   } catch (error) {
-    console.error("Unexpected error:", error);
-    return new Response(
-      JSON.stringify({ 
-        error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error" 
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return createErrorResponse(error);
   }
 });
