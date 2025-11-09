@@ -13,6 +13,7 @@ import {
   GHGEmissionsSummaryWidget,
   RecentActivityWidget,
   ActionItemsWidget,
+  SupplierEngagementWidget,
 } from "@/components/dashboard/widgets"
 
 export default function DashboardPage() {
@@ -104,6 +105,8 @@ export default function DashboardPage() {
             <KPISnapshotWidget />
 
             <GHGEmissionsSummaryWidget />
+
+            <SupplierEngagementWidget />
 
             <RecentActivityWidget />
 
