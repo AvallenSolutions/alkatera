@@ -118,11 +118,11 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => router.push('/profile')}
+                onClick={() => router.push('/dashboard/settings/profile')}
                 className="cursor-pointer"
               >
                 <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                <span>Profile Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
