@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
-import { ProtectedLayout } from '@/components/layouts/ProtectedLayout'
+import { AppLayout } from '@/components/layouts/AppLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,9 +57,9 @@ interface TeamMember {
 
 export default function TeamManagementPage() {
   return (
-    <ProtectedLayout>
+    <AppLayout>
       <TeamManagementContent />
-    </ProtectedLayout>
+    </AppLayout>
   )
 }
 
