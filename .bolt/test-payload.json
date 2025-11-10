@@ -5,4 +5,3 @@ cat > test-payload.json <<EOF
   "fuel_usage": 1250.5,
   "unit": "litres"
 }
-EOF
