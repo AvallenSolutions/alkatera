@@ -1,4 +1,3 @@
-[PRIVATE]
 // Standard Edge Functions import.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // The one and only Supabase client import for this file.
