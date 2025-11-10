@@ -1,19 +1,8 @@
+cat > test-payload.json <<EOF
 {
-  "organization_id": "YOUR_ORG_ID",
-  "activities": [
-    {
-      "source_name": "Grid Electricity",
-      "activity_type": "purchased_electricity",
-      "amount": 1500,
-      "unit": "kWh",
-      "country_code": "USA"
-    },
-    {
-      "source_name": "Company Fleet",
-      "activity_type": "mobile_combustion",
-      "amount": 500,
-      "unit": "litres",
-      "fuel_type": "diesel"
-    }
-  ]
+  "activity_type": "mobile_combustion",
+  "fuel_source": "Diesel",
+  "fuel_usage": 1250.5,
+  "unit": "litres"
 }
+EOF
