@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { createClient } from '@/utils/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
 
 // Define the structure of the API response
 interface ApiResponse {
@@ -38,8 +38,6 @@ export default function TestHarnessPage() {
   const [calculationLogs, setCalculationLogs] = useState<CalculationLog[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const supabase = createClient()
 
   const handleRunTest = async () => {
     setIsLoading(true)

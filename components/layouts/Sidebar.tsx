@@ -12,6 +12,7 @@ import {
   Settings,
   TrendingUp,
   Package,
+  Database,
 } from 'lucide-react'
 
 interface NavItem {
@@ -20,46 +21,69 @@ interface NavItem {
   icon: any
 }
 
-const navigationItems: NavItem[] = [
+interface NavSection {
+  title?: string
+  items: NavItem[]
+}
+
+const navigationSections: NavSection[] = [
   {
-    name: 'Dashboard',
-    path: '/dashboard',
-    icon: LayoutDashboard,
+    items: [
+      {
+        name: 'Dashboard',
+        path: '/dashboard',
+        icon: LayoutDashboard,
+      },
+      {
+        name: 'Emissions',
+        path: '/emissions',
+        icon: Leaf,
+      },
+      {
+        name: 'Suppliers',
+        path: '/suppliers',
+        icon: Building2,
+      },
+      {
+        name: 'Facilities',
+        path: '/company/facilities',
+        icon: Package,
+      },
+      {
+        name: 'KPIs',
+        path: '/kpis',
+        icon: TrendingUp,
+      },
+      {
+        name: 'Reports',
+        path: '/reports',
+        icon: FileText,
+      },
+    ],
   },
   {
-    name: 'Emissions',
-    path: '/emissions',
-    icon: Leaf,
+    title: 'Data Management',
+    items: [
+      {
+        name: 'Ingest Activity Data',
+        path: '/data/ingest',
+        icon: Database,
+      },
+    ],
   },
   {
-    name: 'Suppliers',
-    path: '/suppliers',
-    icon: Building2,
-  },
-  {
-    name: 'Facilities',
-    path: '/company/facilities',
-    icon: Package,
-  },
-  {
-    name: 'KPIs',
-    path: '/kpis',
-    icon: TrendingUp,
-  },
-  {
-    name: 'Reports',
-    path: '/reports',
-    icon: FileText,
-  },
-  {
-    name: 'Team',
-    path: '/dashboard/settings/team',
-    icon: Users,
-  },
-  {
-    name: 'Settings',
-    path: '/settings',
-    icon: Settings,
+    items: [
+      {
+        name: 'Team',
+        path: '/dashboard/settings/team',
+        icon: Users,
+      },
+      {
+        name: 'Settings',
+        path: '/settings',
+        icon: Settings,
+      },
+    ],
   },
 ]
 
@@ -91,27 +115,36 @@ export function Sidebar({ className }: SidebarProps) {
         <p className="text-xs text-muted-foreground">Carbon Management</p>
       </div>
 
-      <nav className="flex-1 space-y-1">
-        {navigationItems.map((item) => {
-          const IconComponent = item.icon
-          const active = isActive(item.path)
+      <nav className="flex-1 space-y-4">
+        {navigationSections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="space-y-1">
+            {section.title && (
+              <h3 className="px-3 mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {section.title}
+              </h3>
+            )}
+            {section.items.map((item) => {
+              const IconComponent = item.icon
+              const active = isActive(item.path)
 
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={cn(
-                'flex items-centre gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-                active
-                  ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
-                  : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
-              )}
-            >
-              <IconComponent className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{item.name}</span>
-            </Link>
-          )
-        })}
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={cn(
+                    'flex items-centre gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
+                    active
+                      ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
+                      : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
+                  )}
+                >
+                  <IconComponent className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{item.name}</span>
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
     </aside>
   )
