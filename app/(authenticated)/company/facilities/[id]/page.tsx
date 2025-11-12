@@ -51,11 +51,10 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient';
-import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { DqiAwareKpi } from '@/components/ui/dqi-aware-kpi';
 import { Separator } from '@/components/ui/separator';
-import type { Facility } from '@/hooks/data/useFacilities';
+import { useFacilities, type Facility } from '@/hooks/data/useFacilities';
 
 const FACILITY_TYPE_OPTIONS = ['Agriculture', 'Production', 'Packing', 'Warehousing', 'Office'];
 
@@ -98,7 +97,7 @@ interface ActivityDataRecord {
 export default function FacilityDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { currentOrganization } = useOrganization();
+  const { getFacilityById } = useFacilities();
   const facilityId = params.id as string;
 
   const [facility, setFacility] = useState<Facility | null>(null);
@@ -123,31 +122,25 @@ export default function FacilityDetailPage() {
   });
 
   useEffect(() => {
-    if (facilityId && currentOrganization?.id) {
+    if (facilityId) {
       fetchFacilityDetails();
       fetchActivityData();
     }
-  }, [facilityId, currentOrganization?.id]);
+  }, [facilityId]);
 
   const fetchFacilityDetails = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('facilities')
-        .select(`
-          *,
-          facility_type:facility_types(name)
-        `)
-        .eq('id', facilityId)
-        .eq('organization_id', currentOrganization?.id)
-        .single();
+      const data = await getFacilityById(facilityId);
 
-      if (error) throw error;
+      if (!data) {
+        throw new Error('Facility not found');
+      }
 
       setFacility(data);
       form.reset({
         name: data.name,
-        facility_type: data.facility_type?.name || '',
+        facility_type: data.facility_type_name || '',
         address: data.address || '',
         city: data.city || '',
         country: data.country || '',
@@ -213,7 +206,7 @@ export default function FacilityDetailPage() {
   };
 
   const onSubmit = async (data: FacilityEditFormValues) => {
-    if (!currentOrganization?.id || !facilityId) {
+    if (!facilityId) {
       toast.error('Missing required information');
       return;
     }
@@ -276,8 +269,7 @@ export default function FacilityDetailPage() {
       const { error } = await supabase
         .from('facilities')
         .update({ is_archived: true, updated_at: new Date().toISOString() })
-        .eq('id', facilityId)
-        .eq('organization_id', currentOrganization?.id);
+        .eq('id', facilityId);
 
       if (error) throw error;
 
@@ -298,8 +290,7 @@ export default function FacilityDetailPage() {
       const { error } = await supabase
         .from('facilities')
         .delete()
-        .eq('id', facilityId)
-        .eq('organization_id', currentOrganization?.id);
+        .eq('id', facilityId);
 
       if (error) throw error;
 
@@ -361,8 +352,8 @@ export default function FacilityDetailPage() {
                 Supplier
               </Badge>
             )}
-            {facility.facility_type && (
-              <Badge variant="outline">{facility.facility_type.name}</Badge>
+            {facility.facility_type_name && (
+              <Badge variant="outline">{facility.facility_type_name}</Badge>
             )}
           </div>
         </div>
