@@ -67,6 +67,11 @@ const navigationSections: NavSection[] = [
     title: 'Data Entry',
     items: [
       {
+        name: 'Scope 1 & 2',
+        path: '/data/scope-1-2',
+        icon: Leaf,
+      },
+      {
         name: 'Waste & Circularity',
         path: '/data/waste-and-circularity',
         icon: Trash2,
