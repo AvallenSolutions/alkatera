@@ -100,6 +100,16 @@ const navigationSections: NavSection[] = [
     ],
   },
   {
+    title: 'Supplier Portal',
+    items: [
+      {
+        name: 'Submit Data',
+        path: '/supplier-portal/submit-data',
+        icon: Database,
+      },
+    ],
+  },
+  {
     items: [
       {
         name: 'Team',
