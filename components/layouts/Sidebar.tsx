@@ -15,6 +15,7 @@ import {
   Database,
   Calculator,
   Trash2,
+  Droplets,
 } from 'lucide-react'
 
 interface NavItem {
@@ -70,6 +71,11 @@ const navigationSections: NavSection[] = [
         name: 'Scope 1 & 2',
         path: '/data/scope-1-2',
         icon: Leaf,
+      },
+      {
+        name: 'Water Footprint',
+        path: '/data/water-footprint',
+        icon: Droplets,
       },
       {
         name: 'Waste & Circularity',
