@@ -181,18 +181,20 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Bulk insert calculation results
+    // Bulk insert calculation results and retrieve the created records
+    let insertedRecords: any[] = [];
     if (calculationResults.length > 0) {
-      const { error: insertError } = await supabaseAdmin
+      const { data: insertedData, error: insertError } = await supabaseAdmin
         .from("calculated_emissions")
-        .insert(calculationResults);
+        .insert(calculationResults)
+        .select("id");
 
       if (insertError) {
         console.error("Error inserting calculated emissions:", insertError);
         return new Response(
-          JSON.stringify({ 
-            error: "Failed to save calculation results", 
-            details: insertError.message 
+          JSON.stringify({
+            error: "Failed to save calculation results",
+            details: insertError.message
           }),
           {
             status: 500,
@@ -200,11 +202,69 @@ Deno.serve(async (req: Request) => {
           }
         );
       }
+
+      insertedRecords = insertedData || [];
+    }
+
+    // Create calculation logs for each inserted record
+    if (insertedRecords.length > 0) {
+      const createLogUrl = `${supabaseUrl}/functions/v1/create-calculation-log`;
+
+      for (let i = 0; i < insertedRecords.length; i++) {
+        const record = insertedRecords[i];
+
+        try {
+          const logResponse = await fetch(createLogUrl, {
+            method: "POST",
+            headers: {
+              "Authorization": authHeader,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              calculationId: record.id,
+            }),
+          });
+
+          if (!logResponse.ok) {
+            const errorData = await logResponse.json();
+            console.error(`Failed to create log for calculation ${record.id}:`, errorData);
+            return new Response(
+              JSON.stringify({
+                error: "Calculation succeeded but logging failed",
+                details: `Failed to create cryptographic log for calculation record ${record.id}. Error: ${errorData.error || "Unknown error"}`,
+                calculations_saved: insertedRecords.length,
+                failed_at_log_index: i + 1,
+              }),
+              {
+                status: 500,
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+
+          const logResult = await logResponse.json();
+          console.log(`Successfully created log for calculation ${record.id}:`, logResult);
+        } catch (logError) {
+          console.error(`Exception while creating log for calculation ${record.id}:`, logError);
+          return new Response(
+            JSON.stringify({
+              error: "Calculation succeeded but logging failed",
+              details: `Exception while creating cryptographic log for calculation record ${record.id}. Error: ${logError instanceof Error ? logError.message : "Unknown error"}`,
+              calculations_saved: insertedRecords.length,
+              failed_at_log_index: i + 1,
+            }),
+            {
+              status: 500,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+      }
     }
 
     // Prepare summary message
-    let message = `Successfully calculated emissions for ${calculationResults.length} activity record(s).`;
-    
+    let message = `Successfully calculated emissions for ${calculationResults.length} activity record(s) and created ${insertedRecords.length} cryptographic log(s).`;
+
     if (unmatchedActivities.length > 0) {
       message += ` ${unmatchedActivities.length} activity record(s) could not be matched to emissions factors.`;
     }
@@ -214,6 +274,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         message,
         calculations_performed: calculationResults.length,
+        logs_created: insertedRecords.length,
         unmatched_activities: unmatchedActivities.length,
         details: {
           total_activities: activityData.length,
