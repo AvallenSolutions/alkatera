@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { AppLayout } from '@/components/layouts/AppLayout'
 import { useProfile } from '@/hooks/data/useProfile'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,11 +12,7 @@ import { useToast } from '@/hooks/use-toast'
 import { User, Mail, Phone, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function ProfilePage() {
-  return (
-    <AppLayout>
-      <ProfileContent />
-    </AppLayout>
-  )
+  return <ProfileContent />
 }
 
 function ProfileContent() {
