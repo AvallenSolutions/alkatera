@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -8,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -31,62 +33,62 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Loader2, Building2, Pencil, Trash2, Plus, AlertCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Plus, AlertCircle, Building2, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { useFacilityTypes } from '@/hooks/data/useFacilityTypes';
+import { useFacilities } from '@/hooks/data/useFacilities';
+
+const FACILITY_TYPE_OPTIONS = ['Agriculture', 'Production', 'Packing', 'Warehousing', 'Office'];
+
+const COUNTRY_OPTIONS = [
+  'United Kingdom',
+  'United States',
+  'France',
+  'Germany',
+  'Spain',
+  'Italy',
+  'Netherlands',
+  'Belgium',
+  'Ireland',
+  'China',
+  'India',
+  'Other',
+];
 
 const createFacilitySchema = (dataSourceType: 'internal' | 'supplier_managed') => {
   return z.object({
     name: z.string().min(1, 'Facility name is required').max(255),
-    location: z.string().optional(),
-    facility_type_id: z.string().optional(),
+    facility_type: z.string().min(1, 'Facility type is required'),
+    address: z.string().optional(),
+    city: z.string().optional(),
+    country: z.string().min(1, 'Country is required'),
     supplier_id: dataSourceType === 'supplier_managed'
-      ? z.string().min(1, 'Supplier is required when selecting third-party management')
+      ? z.string().min(1, 'Supplier is required when selecting supplier management')
       : z.string().optional(),
   });
 };
 
 type FacilityFormValues = {
   name: string;
-  location?: string;
-  facility_type_id?: string;
+  facility_type: string;
+  address?: string;
+  city?: string;
+  country: string;
   supplier_id?: string;
 };
 
-interface Facility {
-  id: string;
-  name: string;
-  location: string | null;
-  facility_type_id: string | null;
-  facility_type?: { name: string } | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export default function FacilitiesPage() {
+  const router = useRouter();
   const { currentOrganization } = useOrganization();
-  const { facilityTypes, isLoading: isLoadingTypes } = useFacilityTypes();
-  const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { facilities, isLoading, refetch } = useFacilities(currentOrganization?.id);
+  const { facilityTypes } = useFacilityTypes();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editingFacility, setEditingFacility] = useState<Facility | null>(null);
-  const [facilityToDelete, setFacilityToDelete] = useState<Facility | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [dataSourceType, setDataSourceType] = useState<'internal' | 'supplier_managed'>('internal');
 
   const form = useForm<FacilityFormValues>({
@@ -94,8 +96,10 @@ export default function FacilitiesPage() {
     mode: 'onChange',
     defaultValues: {
       name: '',
-      location: '',
-      facility_type_id: '',
+      facility_type: '',
+      address: '',
+      city: '',
+      country: '',
       supplier_id: '',
     },
   });
@@ -106,65 +110,8 @@ export default function FacilitiesPage() {
     form.reset(currentValues, { keepValues: true });
   }, [dataSourceType]);
 
-  const fetchFacilities = useCallback(async () => {
-    if (!currentOrganization?.id) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('facilities')
-        .select(`
-          *,
-          facility_type:facility_types(name)
-        `)
-        .eq('organization_id', currentOrganization.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching facilities:', error);
-        toast.error('Failed to load facilities');
-      } else {
-        setFacilities(data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching facilities:', error);
-      toast.error('Failed to load facilities');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentOrganization?.id]);
-
-  useEffect(() => {
-    fetchFacilities();
-  }, [fetchFacilities]);
-
-  const handleOpenDialog = (facility?: Facility) => {
-    if (facility) {
-      setEditingFacility(facility);
-      form.reset({
-        name: facility.name,
-        location: facility.location || '',
-        facility_type_id: facility.facility_type_id || '',
-        supplier_id: '',
-      });
-    } else {
-      setEditingFacility(null);
-      form.reset({
-        name: '',
-        location: '',
-        facility_type_id: '',
-        supplier_id: '',
-      });
-      setDataSourceType('internal');
-    }
-    setIsDialogOpen(true);
-  };
-
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
-    setEditingFacility(null);
     setDataSourceType('internal');
     form.reset();
   };
@@ -188,27 +135,23 @@ export default function FacilitiesPage() {
       const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-facility`;
 
       const payload: any = {
-        action: editingFacility ? 'update' : 'create',
+        action: 'create',
         name: data.name.trim(),
+        facility_type: data.facility_type,
+        country: data.country,
+        data_source_type: dataSourceType,
       };
 
-      if (editingFacility) {
-        payload.facility_id = editingFacility.id;
+      if (data.address && data.address.trim()) {
+        payload.address = data.address.trim();
       }
 
-      if (data.location && data.location.trim()) {
-        payload.location = data.location.trim();
+      if (data.city && data.city.trim()) {
+        payload.city = data.city.trim();
       }
 
-      if (data.facility_type_id) {
-        payload.facility_type_id = data.facility_type_id;
-      }
-
-      if (!editingFacility) {
-        payload.data_source_type = dataSourceType;
-        if (dataSourceType === 'supplier_managed' && data.supplier_id) {
-          payload.supplier_id = data.supplier_id;
-        }
+      if (dataSourceType === 'supplier_managed' && data.supplier_id) {
+        payload.supplier_id = data.supplier_id;
       }
 
       const response = await fetch(apiUrl, {
@@ -220,163 +163,103 @@ export default function FacilitiesPage() {
         body: JSON.stringify(payload),
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to save facility');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create facility');
       }
 
-      toast.success(
-        editingFacility
-          ? 'Facility updated successfully'
-          : 'Facility created successfully'
-      );
+      const result = await response.json();
 
+      toast.success('Facility created successfully');
       handleCloseDialog();
-      await fetchFacilities();
-    } catch (error) {
-      console.error('Error saving facility:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to save facility'
-      );
+      refetch();
+    } catch (error: any) {
+      console.error('Error creating facility:', error);
+      toast.error(error.message || 'Failed to create facility');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteFacility = async () => {
-    if (!facilityToDelete || !currentOrganization?.id) {
-      return;
-    }
-
-    setIsDeleting(true);
-
-    try {
-      const { data: session } = await supabase.auth.getSession();
-
-      if (!session.session) {
-        toast.error('You must be logged in');
-        return;
-      }
-
-      const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/manage-facility`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'delete',
-          facility_id: facilityToDelete.id,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to delete facility');
-      }
-
-      toast.success('Facility deleted successfully');
-      setFacilityToDelete(null);
-      await fetchFacilities();
-    } catch (error) {
-      console.error('Error deleting facility:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to delete facility'
-      );
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+  const handleRowClick = (facilityId: string) => {
+    router.push(`/company/facilities/${facilityId}`);
   };
 
   if (isLoading) {
-    return <PageLoader message="Loading facilities..." />;
+    return <PageLoader />;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Manage Facilities</h1>
-          <p className="text-muted-foreground mt-2">
-            Add and manage your organisation's operational facilities
+          <h1 className="text-3xl font-bold tracking-tight">Facilities</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your company and supplier facilities
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()} size="lg" className="gap-2">
-          <Plus className="h-5 w-5" />
+        <Button onClick={() => setIsDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" />
           Add New Facility
         </Button>
       </div>
 
       {facilities.length === 0 ? (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            No facilities found. Create your first facility to get started.
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-4">
+            <div className="rounded-full bg-muted p-4 inline-block">
+              <Building2 className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-lg">No facilities yet</h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Create your first facility to start tracking emissions and activity data.
+              </p>
+            </div>
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Facility
+            </Button>
+          </div>
+        </div>
       ) : (
-        <div className="rounded-md border">
+        <div className="border rounded-lg">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Location/Address</TableHead>
+                <TableHead>Facility Name</TableHead>
+                <TableHead>Location</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Data Source</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {facilities.map((facility) => (
-                <TableRow key={facility.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      {facility.name}
+                <TableRow
+                  key={facility.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleRowClick(facility.id)}
+                >
+                  <TableCell className="font-medium">{facility.name}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {[facility.city, facility.country].filter(Boolean).join(', ') || 'Not specified'}
                     </div>
                   </TableCell>
                   <TableCell>
-                    {facility.location || (
-                      <span className="text-muted-foreground italic">Not specified</span>
-                    )}
+                    {facility.facility_type?.name || 'Not specified'}
                   </TableCell>
                   <TableCell>
-                    {facility.facility_type?.name || (
-                      <span className="text-muted-foreground italic">Not specified</span>
+                    {facility.data_source_type === 'internal' ? (
+                      <Badge variant="default" className="bg-blue-600">
+                        Owned
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        Supplier
+                      </Badge>
                     )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(facility.created_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleOpenDialog(facility)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setFacilityToDelete(facility)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -386,15 +269,11 @@ export default function FacilitiesPage() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingFacility ? 'Edit Facility' : 'Add New Facility'}
-            </DialogTitle>
+            <DialogTitle>Add New Facility</DialogTitle>
             <DialogDescription>
-              {editingFacility
-                ? 'Update the facility details below'
-                : 'Enter the facility details below'}
+              Enter the facility details below to create a new facility
             </DialogDescription>
           </DialogHeader>
 
@@ -414,126 +293,148 @@ export default function FacilitiesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location">Location/Address</Label>
-              <Input
-                id="location"
-                placeholder="e.g., 123 Industrial Estate, Manchester"
-                {...form.register('location')}
-              />
+              <Label htmlFor="facility_type">Facility Type *</Label>
+              <Select
+                value={form.watch('facility_type')}
+                onValueChange={(value) => {
+                  form.setValue('facility_type', value, { shouldValidate: true });
+                }}
+              >
+                <SelectTrigger id="facility_type">
+                  <SelectValue placeholder="Select facility type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FACILITY_TYPE_OPTIONS.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.facility_type && (
+                <p className="text-sm text-red-600">
+                  {form.formState.errors.facility_type.message}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="facility_type_id">Facility Type</Label>
-              <Select
-                value={form.watch('facility_type_id') || '__none__'}
-                onValueChange={(value) => {
-                  const finalValue = value === '__none__' ? '' : value;
-                  form.setValue('facility_type_id', finalValue, {
-                    shouldValidate: true,
-                  });
-                }}
-                disabled={isLoadingTypes}
-              >
-                <SelectTrigger id="facility_type_id">
-                  <SelectValue placeholder="Select facility type (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {isLoadingTypes ? (
-                    <SelectItem value="__loading__" disabled>
-                      Loading types...
-                    </SelectItem>
-                  ) : facilityTypes.length === 0 ? (
-                    <SelectItem value="__no_types__" disabled>
-                      No facility types available
-                    </SelectItem>
-                  ) : (
-                    <>
-                      <SelectItem value="__none__">No type</SelectItem>
-                      {facilityTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          {type.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="address">Address</Label>
+              <Textarea
+                id="address"
+                placeholder="e.g., 123 Industrial Estate, Manchester"
+                rows={3}
+                {...form.register('address')}
+              />
             </div>
 
-            {!editingFacility && (
-              <>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  placeholder="e.g., Manchester"
+                  {...form.register('city')}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country">Country *</Label>
+                <Select
+                  value={form.watch('country')}
+                  onValueChange={(value) => {
+                    form.setValue('country', value, { shouldValidate: true });
+                  }}
+                >
+                  <SelectTrigger id="country">
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <SelectItem key={country} value={country}>
+                        {country}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.country && (
+                  <p className="text-sm text-red-600">
+                    {form.formState.errors.country.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Who operates this facility?</Label>
+              <ToggleGroup
+                type="single"
+                value={dataSourceType}
+                onValueChange={(value) => {
+                  if (value) {
+                    setDataSourceType(value as 'internal' | 'supplier_managed');
+                    if (value === 'internal') {
+                      form.setValue('supplier_id', '');
+                    }
+                  }
+                }}
+                className="justify-start"
+              >
+                <ToggleGroupItem value="internal" className="flex-1">
+                  My Company
+                </ToggleGroupItem>
+                <ToggleGroupItem value="supplier_managed" className="flex-1">
+                  A Third-Party Supplier
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+
+            {dataSourceType === 'internal' && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Next Steps</AlertTitle>
+                <AlertDescription>
+                  You will be responsible for providing the activity data (e.g., energy, water, waste) for this facility.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {dataSourceType === 'supplier_managed' && (
+              <div className="space-y-3">
                 <div className="space-y-2">
-                  <Label>Who operates this facility?</Label>
-                  <ToggleGroup
-                    type="single"
-                    value={dataSourceType}
+                  <Label htmlFor="supplier_id">Select the supplier who operates this facility *</Label>
+                  <Select
+                    value={form.watch('supplier_id') || '__none__'}
                     onValueChange={(value) => {
-                      if (value) {
-                        setDataSourceType(value as 'internal' | 'supplier_managed');
-                        if (value === 'internal') {
-                          form.setValue('supplier_id', '');
-                        }
-                      }
+                      const finalValue = value === '__none__' ? '' : value;
+                      form.setValue('supplier_id', finalValue, {
+                        shouldValidate: true,
+                      });
                     }}
-                    className="justify-start"
                   >
-                    <ToggleGroupItem value="internal" className="flex-1">
-                      My Company
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="supplier_managed" className="flex-1">
-                      A Third-Party Supplier
-                    </ToggleGroupItem>
-                  </ToggleGroup>
+                    <SelectTrigger id="supplier_id">
+                      <SelectValue placeholder="Search for a supplier..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Select a supplier</SelectItem>
+                      <SelectItem value="supplier-placeholder-1">Supplier Network (Coming Soon)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {form.formState.errors.supplier_id && (
+                    <p className="text-sm text-red-600">
+                      {form.formState.errors.supplier_id.message}
+                    </p>
+                  )}
                 </div>
 
-                {dataSourceType === 'internal' && (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Next Steps</AlertTitle>
-                    <AlertDescription>
-                      You will be responsible for providing the activity data (e.g., energy, water, waste) for this facility.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {dataSourceType === 'supplier_managed' && (
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="supplier_id">Select the supplier who operates this facility *</Label>
-                      <Select
-                        value={form.watch('supplier_id') || '__none__'}
-                        onValueChange={(value) => {
-                          const finalValue = value === '__none__' ? '' : value;
-                          form.setValue('supplier_id', finalValue, {
-                            shouldValidate: true,
-                          });
-                        }}
-                      >
-                        <SelectTrigger id="supplier_id">
-                          <SelectValue placeholder="Search for a supplier..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Select a supplier</SelectItem>
-                          <SelectItem value="supplier-placeholder-1">Supplier Network (Coming Soon)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {form.formState.errors.supplier_id && (
-                        <p className="text-sm text-red-600">
-                          {form.formState.errors.supplier_id.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <Alert>
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>Next Steps</AlertTitle>
-                      <AlertDescription>
-                        The selected supplier will be invited to provide data for this facility via the Supplier Portal.
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                )}
-              </>
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Next Steps</AlertTitle>
+                  <AlertDescription>
+                    The selected supplier will be invited to provide data for this facility via the Supplier Portal.
+                  </AlertDescription>
+                </Alert>
+              </div>
             )}
 
             <DialogFooter>
@@ -552,10 +453,8 @@ export default function FacilitiesPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Creating...
                   </>
-                ) : editingFacility ? (
-                  'Update Facility'
                 ) : (
                   'Create Facility'
                 )}
@@ -564,38 +463,6 @@ export default function FacilitiesPage() {
           </form>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog
-        open={!!facilityToDelete}
-        onOpenChange={(open) => !open && setFacilityToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Facility</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{facilityToDelete?.name}"? This action
-              cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteFacility}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
