@@ -31,9 +31,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, Droplets, Calculator } from 'lucide-react';
+import { Loader2, AlertCircle, Droplets, Calculator, Building2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import { PageLoader } from '@/components/ui/page-loader';
+import { EmptyState } from '@/components/ui/empty-state';
 
 const waterSchema = z.object({
   facility_id: z.string().optional(),
@@ -283,6 +285,22 @@ export default function WaterFootprintPage() {
     }
     return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/20 dark:text-cyan-400';
   };
+
+  if (isLoadingFacilities) {
+    return <PageLoader message="Loading facilities..." />;
+  }
+
+  if (!facilities || facilities.length === 0) {
+    return (
+      <EmptyState
+        icon={Building2}
+        title="No Facilities Found"
+        description="You must create a facility before you can add water data. Facilities help organise your water consumption data by location."
+        actionLabel="Go to Facilities"
+        actionHref="/company/facilities"
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
