@@ -105,24 +105,28 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Cache miss for: ${normalizedSearchTerm}, querying OpenLCA API`);
 
+    // Retrieve the OpenLCA API key from Supabase secrets
     const openLcaApiKey = Deno.env.get("OPENLCA_API_KEY");
 
+    // TEMPORARY: Mock data mode (remove when OPENLCA_API_KEY is configured)
     if (!openLcaApiKey) {
+      // Mock data structure matching OpenLCA API response format
+      // These are static results used during development
       const mockResults: OpenLcaProcess[] = [
         {
-          id: `mock-${Date.now()}-1`,
-          name: `${searchTerm} - Production Process (Mock)`,
-          category: "Materials/Packaging",
+          id: "a1b2-c3d4",
+          name: "Apple, at farm gate",
+          category: "Fruit/Agriculture",
         },
         {
-          id: `mock-${Date.now()}-2`,
-          name: `${searchTerm} - Transport (Mock)`,
-          category: "Transport/Road",
+          id: "e5f6-g7h8",
+          name: "Glass bottle, 750ml, green",
+          category: "Packaging/Containers",
         },
         {
-          id: `mock-${Date.now()}-3`,
-          name: `${searchTerm} - End of Life (Mock)`,
-          category: "Waste Management",
+          id: "i9j0-k1l2",
+          name: "Transport, lorry >16t",
+          category: "Logistics/Road",
         },
       ];
 
@@ -150,6 +154,10 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    // REAL API MODE: Query the OpenLCA database
+    // This code executes when OPENLCA_API_KEY is configured in Supabase secrets
+    console.log(`Querying OpenLCA API for: ${searchTerm}`);
 
     const openLcaResponse = await fetch(
       `https://api.openlca.org/search?q=${encodeURIComponent(searchTerm)}`,

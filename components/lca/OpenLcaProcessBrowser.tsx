@@ -40,7 +40,7 @@ export function OpenLcaProcessBrowser({
   const [error, setError] = useState<string | null>(null);
   const [isMockData, setIsMockData] = useState(false);
 
-  const debouncedSearchTerm = useDebounce(searchTerm, 400);
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
   useEffect(() => {
     if (debouncedSearchTerm.trim().length < 3) {

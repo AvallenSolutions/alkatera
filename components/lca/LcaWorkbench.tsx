@@ -107,13 +107,15 @@ export function LcaWorkbench({
   };
 
   const getSourceTypeBadge = (sourceType: string) => {
+    // Visual compliance mandate: Platform estimates must be visually distinct
     switch (sourceType) {
       case 'linked_lca_report':
         return <Badge className="bg-green-600">Tier 1: LCA Report</Badge>;
       case 'supplier_provided':
         return <Badge className="bg-amber-500">Tier 2: Supplier Data</Badge>;
       case 'platform_estimate':
-        return <Badge variant="secondary">Tier 3: Platform Estimate</Badge>;
+        // Muted grey styling for platform estimates (compliance requirement)
+        return <Badge variant="secondary" className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300">Platform Estimate</Badge>;
       case 'user_provided':
         return <Badge variant="outline">Tier 3: Manual Entry</Badge>;
       default:
