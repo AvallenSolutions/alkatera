@@ -407,12 +407,20 @@ export default function FacilitiesPage() {
                   <SelectValue placeholder="Select facility type (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No type</SelectItem>
-                  {facilityTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.name}
+                  {isLoadingTypes ? (
+                    <SelectItem value="loading" disabled>
+                      Loading types...
                     </SelectItem>
-                  ))}
+                  ) : (
+                    <>
+                      <SelectItem value="">No type</SelectItem>
+                      {facilityTypes.map((type) => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
