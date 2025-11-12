@@ -137,20 +137,35 @@ You should see a response indicating the OpenLCA IPC server is running.
 
 Run this command in your terminal:
 ```bash
-curl http://localhost:8080/search?q=glass
+curl -X POST http://localhost:8080 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "find",
+    "params": {
+      "type": "Process",
+      "query": "glass"
+    }
+  }'
 ```
 
 Expected response (example):
 ```json
-[
-  {
-    "@id": "abc-123-def-456",
-    "name": "Glass bottle production",
-    "categoryPath": "Materials/Packaging"
-  },
-  ...
-]
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    {
+      "@id": "abc-123-def-456",
+      "name": "Glass bottle production",
+      "categoryPath": "Materials/Packaging"
+    }
+  ]
+}
 ```
+
+**Note:** The OpenLCA IPC server uses JSON-RPC 2.0 protocol, not REST endpoints.
 
 ### Method 3: Application Test
 
@@ -271,6 +286,26 @@ The CTO will provide the production URL once the containerized server is deploye
 3. **Check Database Activation**
    - Ensure correct database is activated
    - Status bar should show: "Database: [YourDatabaseName]"
+
+### Issue: "JSON-RPC error from OpenLCA"
+
+**Symptoms:**
+- Error message mentioning "JSON-RPC"
+- Invalid method or params errors
+
+**Solutions:**
+
+1. **Update OpenLCA Version**
+   - Ensure you're running OpenLCA 2.0 or later
+   - Older versions may have different IPC implementations
+
+2. **Verify IPC Server is JSON-RPC Compatible**
+   - Test with the cURL command provided in Method 2 above
+   - Response should have `jsonrpc`, `id`, and `result` fields
+
+3. **Check Method Support**
+   - The `find` method with `type: "Process"` is standard
+   - If unsupported, consult OpenLCA IPC documentation
 
 ### Issue: "Search is very slow"
 
@@ -455,6 +490,13 @@ When deploying to production:
 **Docker Networking:**
 - `localhost:8080` - Direct access from your host machine (browser, cURL)
 - `host.docker.internal:8080` - Access from Docker container (Edge Function)
+
+**JSON-RPC Protocol:**
+- OpenLCA IPC server uses JSON-RPC 2.0 (not REST)
+- Method: `POST` to base URL (no path parameters)
+- Request body: `{ "jsonrpc": "2.0", "id": 1, "method": "find", "params": {...} }`
+- Response: `{ "jsonrpc": "2.0", "id": 1, "result": [...] }`
+- Edge Function automatically handles JSON-RPC wrapping/unwrapping
 
 **Developer Checklist:**
 - [ ] OpenLCA desktop app installed
