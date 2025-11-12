@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Package,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { NAV_ITEMS } from '@/app/config/sidebarNav';
@@ -22,6 +23,7 @@ const iconMap: Record<string, any> = {
   TruckIcon: Truck,
   ChartBarIcon: BarChart3,
   CogIcon: Settings,
+  BoxIcon: Package,
 };
 
 interface NavItemConfig {

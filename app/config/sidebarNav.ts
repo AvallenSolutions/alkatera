@@ -11,6 +11,13 @@ export const NAV_ITEMS = [
     ],
   },
   {
+    label: 'Product LCA',
+    icon: 'BoxIcon',
+    children: [
+      { href: '/lca-workbench', label: 'LCA Workbench' },
+    ],
+  },
+  {
     label: 'Supply Chain',
     icon: 'TruckIcon',
     children: [
