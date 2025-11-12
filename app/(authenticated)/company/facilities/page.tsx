@@ -395,12 +395,13 @@ export default function FacilitiesPage() {
             <div className="space-y-2">
               <Label htmlFor="facility_type_id">Facility Type</Label>
               <Select
-                value={form.watch('facility_type_id') || ''}
-                onValueChange={(value) =>
-                  form.setValue('facility_type_id', value, {
+                value={form.watch('facility_type_id') || '__none__'}
+                onValueChange={(value) => {
+                  const finalValue = value === '__none__' ? '' : value;
+                  form.setValue('facility_type_id', finalValue, {
                     shouldValidate: true,
-                  })
-                }
+                  });
+                }}
                 disabled={isLoadingTypes}
               >
                 <SelectTrigger id="facility_type_id">
@@ -408,12 +409,16 @@ export default function FacilitiesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {isLoadingTypes ? (
-                    <SelectItem value="loading" disabled>
+                    <SelectItem value="__loading__" disabled>
                       Loading types...
+                    </SelectItem>
+                  ) : facilityTypes.length === 0 ? (
+                    <SelectItem value="__no_types__" disabled>
+                      No facility types available
                     </SelectItem>
                   ) : (
                     <>
-                      <SelectItem value="">No type</SelectItem>
+                      <SelectItem value="__none__">No type</SelectItem>
                       {facilityTypes.map((type) => (
                         <SelectItem key={type.id} value={type.id}>
                           {type.name}
