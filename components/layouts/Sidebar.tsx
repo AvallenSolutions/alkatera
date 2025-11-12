@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Package,
   Database,
+  Calculator,
 } from 'lucide-react'
 
 interface NavItem {
@@ -68,6 +69,16 @@ const navigationSections: NavSection[] = [
         name: 'Ingest Activity Data',
         path: '/data/ingest',
         icon: Database,
+      },
+    ],
+  },
+  {
+    title: 'Reporting',
+    items: [
+      {
+        name: 'Run Calculations',
+        path: '/reporting/calculations',
+        icon: Calculator,
       },
     ],
   },
