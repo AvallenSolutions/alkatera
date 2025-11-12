@@ -14,6 +14,7 @@ import {
   Package,
   Database,
   Calculator,
+  Trash2,
 } from 'lucide-react'
 
 interface NavItem {
@@ -63,10 +64,15 @@ const navigationSections: NavSection[] = [
     ],
   },
   {
-    title: 'Data Management',
+    title: 'Data Entry',
     items: [
       {
-        name: 'Ingest Activity Data',
+        name: 'Waste & Circularity',
+        path: '/data/waste-and-circularity',
+        icon: Trash2,
+      },
+      {
+        name: 'Activity Data (Dev)',
         path: '/data/ingest',
         icon: Database,
       },
