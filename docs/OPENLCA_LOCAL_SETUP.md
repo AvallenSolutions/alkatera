@@ -10,12 +10,15 @@ Our application uses a **self-hosted OpenLCA architecture** instead of a third-p
 
 ### Development Environment (Phase 1 - Current)
 ```
-┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
-│   Next.js App   │────────▶│  Edge Function   │────────▶│  OpenLCA IPC    │
-│   (Browser)     │         │  (Supabase)      │         │  localhost:8080 │
-└─────────────────┘         └──────────────────┘         └─────────────────┘
-                                   Proxy                   Desktop App
+┌─────────────────┐         ┌──────────────────────┐         ┌─────────────────┐
+│   Next.js App   │────────▶│  Edge Function       │────────▶│  OpenLCA IPC    │
+│   (Browser)     │         │  (Docker Container)  │────────▶│  Host:8080      │
+└─────────────────┘         └──────────────────────┘         └─────────────────┘
+                            host.docker.internal:8080         Desktop App
 ```
+
+**Note:** The Edge Function runs in a Docker container and uses `host.docker.internal:8080`
+to access the OpenLCA IPC server running on your host machine.
 
 ### Production Environment (Phase 2 - Future)
 ```
@@ -118,7 +121,7 @@ When the IPC server is running correctly, you should see:
 
 ## Testing the Connection
 
-### Method 1: Browser Test
+### Method 1: Browser Test (Direct Host Access)
 
 Open your browser and navigate to:
 ```
@@ -127,7 +130,10 @@ http://localhost:8080/
 
 You should see a response indicating the OpenLCA IPC server is running.
 
-### Method 2: cURL Test
+**Note:** This tests direct access from your host machine. The Edge Function uses
+`host.docker.internal:8080` to access the same server from within its Docker container.
+
+### Method 2: cURL Test (Direct Host Access)
 
 Run this command in your terminal:
 ```bash
@@ -175,7 +181,23 @@ Add this environment variable to your `.env.local` file:
 ENV_MODE=local
 ```
 
-This tells the Edge Function to proxy requests to `http://localhost:8080`.
+This tells the Edge Function to proxy requests to `http://host.docker.internal:8080`.
+
+### Docker Networking Explanation
+
+The Supabase Edge Functions run in Docker containers. When you run `supabase start`, the
+Edge Function container needs to access the OpenLCA IPC server running on your host machine.
+
+**Network Architecture:**
+- Your browser connects to: `http://localhost:3000` (Next.js)
+- Next.js calls Edge Function at: Supabase URL
+- Edge Function (in Docker) connects to: `http://host.docker.internal:8080`
+- `host.docker.internal` is Docker's special DNS name for the host machine
+- OpenLCA IPC server listens on: `localhost:8080` (on your host)
+
+**Why not just `localhost`?**
+Inside the Docker container, `localhost` refers to the container itself, not your host
+machine. Docker provides `host.docker.internal` as a reliable way to reach the host.
 
 ### Production Deployment (.env.production)
 
@@ -421,13 +443,18 @@ When deploying to production:
 **Key Points:**
 - OpenLCA desktop app must be running with IPC server on port 8080
 - Edge Function automatically proxies to local server in development
+- Edge Function uses `host.docker.internal:8080` for Docker networking
 - Production deployment will use containerized headless server
 - No code changes needed when transitioning to production
 - Cache reduces load on local OpenLCA instance
 
 **Environment Variables:**
-- `ENV_MODE=local` → Proxy to `localhost:8080`
+- `ENV_MODE=local` → Proxy to `host.docker.internal:8080` (from Docker container)
 - `ENV_MODE=production` → Proxy to `PRODUCTION_OPENLCA_URL`
+
+**Docker Networking:**
+- `localhost:8080` - Direct access from your host machine (browser, cURL)
+- `host.docker.internal:8080` - Access from Docker container (Edge Function)
 
 **Developer Checklist:**
 - [ ] OpenLCA desktop app installed

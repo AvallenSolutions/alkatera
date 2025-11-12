@@ -136,7 +136,8 @@ Deno.serve(async (req: Request) => {
 
     if (envMode === "local") {
       // LOCAL MODE: Proxy to local OpenLCA desktop IPC server
-      openLcaHost = "http://localhost:8080";
+      // Use Docker's special DNS for accessing host machine from within container
+      openLcaHost = "http://host.docker.internal:8080";
       console.log(`[LOCAL MODE] Proxying to OpenLCA desktop at ${openLcaHost}`);
     } else if (envMode === "production") {
       // PRODUCTION MODE: Proxy to containerized headless server
