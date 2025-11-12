@@ -14,8 +14,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Database, Loader2 } from 'lucide-react';
+import { Plus, Database, Loader2, TrendingUp } from 'lucide-react';
 import { OpenLcaProcessBrowser, type OpenLcaProcess } from './OpenLcaProcessBrowser';
+import { SupplierLcaLinker } from './SupplierLcaLinker';
 
 interface ActivityDataPoint {
   id: string;
@@ -45,6 +46,8 @@ export function LcaWorkbench({
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [localActivityData, setLocalActivityData] = useState<ActivityDataPoint[]>(activityData);
+  const [isLinkerOpen, setIsLinkerOpen] = useState(false);
+  const [selectedDataPointForUpgrade, setSelectedDataPointForUpgrade] = useState<ActivityDataPoint | null>(null);
 
   const handleProcessSelect = async (selectedProcess: OpenLcaProcess) => {
     setIsCreating(true);
@@ -104,6 +107,22 @@ export function LcaWorkbench({
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleUpgradeClick = (dataPoint: ActivityDataPoint) => {
+    setSelectedDataPointForUpgrade(dataPoint);
+    setIsLinkerOpen(true);
+  };
+
+  const handleLinkSuccess = () => {
+    // Refresh data after successful link
+    if (onDataPointAdded) {
+      onDataPointAdded();
+    }
+  };
+
+  const canUpgrade = (sourceType: string) => {
+    return sourceType === 'platform_estimate' || sourceType === 'user_provided';
   };
 
   const getSourceTypeBadge = (sourceType: string) => {
@@ -169,6 +188,7 @@ export function LcaWorkbench({
                 <TableHead>Quantity</TableHead>
                 <TableHead>Data Source</TableHead>
                 <TableHead>Date</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -185,6 +205,19 @@ export function LcaWorkbench({
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(dataPoint.activity_date).toLocaleDateString()}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {canUpgrade(dataPoint.source_type) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-green-600 border-green-600 hover:bg-green-50"
+                        onClick={() => handleUpgradeClick(dataPoint)}
+                      >
+                        <TrendingUp className="h-3 w-3 mr-1" />
+                        Upgrade
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -197,6 +230,19 @@ export function LcaWorkbench({
         onClose={() => setIsBrowserOpen(false)}
         onProcessSelect={handleProcessSelect}
       />
+
+      {selectedDataPointForUpgrade && (
+        <SupplierLcaLinker
+          isOpen={isLinkerOpen}
+          onClose={() => {
+            setIsLinkerOpen(false);
+            setSelectedDataPointForUpgrade(null);
+          }}
+          activityDataPointId={selectedDataPointForUpgrade.id}
+          currentDataPointName={selectedDataPointForUpgrade.name}
+          onLinkSuccess={handleLinkSuccess}
+        />
+      )}
     </Card>
   );
 }

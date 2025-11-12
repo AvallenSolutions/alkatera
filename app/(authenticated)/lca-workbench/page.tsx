@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { LcaWorkbench } from '@/components/lca/LcaWorkbench';
+import { DqiJourneyCard } from '@/components/lca/DqiJourneyCard';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
@@ -59,7 +60,14 @@ export default function LcaWorkbenchPage() {
         </Alert>
       )}
 
-      <LcaWorkbench activityData={activityData} onDataPointAdded={fetchActivityData} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <LcaWorkbench activityData={activityData} onDataPointAdded={fetchActivityData} />
+        </div>
+        <div>
+          <DqiJourneyCard />
+        </div>
+      </div>
     </div>
   );
 }
