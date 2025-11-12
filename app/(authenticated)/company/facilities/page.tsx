@@ -9,6 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -39,11 +46,12 @@ import { Loader2, Building2, Pencil, Trash2, Plus, AlertCircle } from 'lucide-re
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
+import { useFacilityTypes } from '@/hooks/data/useFacilityTypes';
 
 const facilitySchema = z.object({
   name: z.string().min(1, 'Facility name is required').max(255),
   location: z.string().optional(),
-  facility_type: z.string().optional(),
+  facility_type_id: z.string().optional(),
 });
 
 type FacilityFormValues = z.infer<typeof facilitySchema>;
@@ -52,13 +60,15 @@ interface Facility {
   id: string;
   name: string;
   location: string | null;
-  facility_type: string | null;
+  facility_type_id: string | null;
+  facility_type?: { name: string } | null;
   created_at: string;
   updated_at: string;
 }
 
 export default function FacilitiesPage() {
   const { currentOrganization } = useOrganization();
+  const { facilityTypes, isLoading: isLoadingTypes } = useFacilityTypes();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -73,7 +83,7 @@ export default function FacilitiesPage() {
     defaultValues: {
       name: '',
       location: '',
-      facility_type: '',
+      facility_type_id: '',
     },
   });
 
@@ -86,7 +96,10 @@ export default function FacilitiesPage() {
     try {
       const { data, error } = await supabase
         .from('facilities')
-        .select('*')
+        .select(`
+          *,
+          facility_type:facility_types(name)
+        `)
         .eq('organization_id', currentOrganization.id)
         .order('created_at', { ascending: false });
 
@@ -114,14 +127,14 @@ export default function FacilitiesPage() {
       form.reset({
         name: facility.name,
         location: facility.location || '',
-        facility_type: facility.facility_type || '',
+        facility_type_id: facility.facility_type_id || '',
       });
     } else {
       setEditingFacility(null);
       form.reset({
         name: '',
         location: '',
-        facility_type: '',
+        facility_type_id: '',
       });
     }
     setIsDialogOpen(true);
@@ -164,8 +177,8 @@ export default function FacilitiesPage() {
         payload.location = data.location.trim();
       }
 
-      if (data.facility_type && data.facility_type.trim()) {
-        payload.facility_type = data.facility_type.trim();
+      if (data.facility_type_id) {
+        payload.facility_type_id = data.facility_type_id;
       }
 
       const response = await fetch(apiUrl, {
@@ -310,7 +323,7 @@ export default function FacilitiesPage() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {facility.facility_type || (
+                    {facility.facility_type?.name || (
                       <span className="text-muted-foreground italic">Not specified</span>
                     )}
                   </TableCell>
@@ -380,12 +393,28 @@ export default function FacilitiesPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="facility_type">Facility Type</Label>
-              <Input
-                id="facility_type"
-                placeholder="e.g., Manufacturing, Office, Warehouse"
-                {...form.register('facility_type')}
-              />
+              <Label htmlFor="facility_type_id">Facility Type</Label>
+              <Select
+                value={form.watch('facility_type_id') || ''}
+                onValueChange={(value) =>
+                  form.setValue('facility_type_id', value, {
+                    shouldValidate: true,
+                  })
+                }
+                disabled={isLoadingTypes}
+              >
+                <SelectTrigger id="facility_type_id">
+                  <SelectValue placeholder="Select facility type (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No type</SelectItem>
+                  {facilityTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <DialogFooter>

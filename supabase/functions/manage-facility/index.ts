@@ -11,7 +11,7 @@ interface CreateFacilityRequest {
   action: "create";
   name: string;
   location?: string;
-  facility_type?: string;
+  facility_type_id?: string;
 }
 
 interface UpdateFacilityRequest {
@@ -19,7 +19,7 @@ interface UpdateFacilityRequest {
   facility_id: string;
   name?: string;
   location?: string;
-  facility_type?: string;
+  facility_type_id?: string;
 }
 
 interface DeleteFacilityRequest {
@@ -103,7 +103,7 @@ Deno.serve(async (req: Request) => {
     const organizationId = memberData.organization_id;
 
     if (action === "create") {
-      const { name, location, facility_type } = requestData as CreateFacilityRequest;
+      const { name, location, facility_type_id } = requestData as CreateFacilityRequest;
 
       if (!name || name.trim() === "") {
         return new Response(
@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
           organization_id: organizationId,
           name: name.trim(),
           location: location?.trim() || null,
-          facility_type: facility_type?.trim() || null,
+          facility_type_id: facility_type_id || null,
         })
         .select()
         .single();
@@ -154,7 +154,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "update") {
-      const { facility_id, name, location, facility_type } = requestData as UpdateFacilityRequest;
+      const { facility_id, name, location, facility_type_id } = requestData as UpdateFacilityRequest;
 
       if (!facility_id) {
         return new Response(
@@ -204,8 +204,8 @@ Deno.serve(async (req: Request) => {
         updateData.location = location.trim() || null;
       }
 
-      if (facility_type !== undefined) {
-        updateData.facility_type = facility_type.trim() || null;
+      if (facility_type_id !== undefined) {
+        updateData.facility_type_id = facility_type_id || null;
       }
 
       const { data: updatedFacility, error: updateError } = await supabaseAdmin
