@@ -41,20 +41,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Loader2, Building2, Pencil, Trash2, Plus, AlertCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { useFacilityTypes } from '@/hooks/data/useFacilityTypes';
 
-const facilitySchema = z.object({
-  name: z.string().min(1, 'Facility name is required').max(255),
-  location: z.string().optional(),
-  facility_type_id: z.string().optional(),
-});
+const createFacilitySchema = (dataSourceType: 'internal' | 'supplier_managed') => {
+  return z.object({
+    name: z.string().min(1, 'Facility name is required').max(255),
+    location: z.string().optional(),
+    facility_type_id: z.string().optional(),
+    supplier_id: dataSourceType === 'supplier_managed'
+      ? z.string().min(1, 'Supplier is required when selecting third-party management')
+      : z.string().optional(),
+  });
+};
 
-type FacilityFormValues = z.infer<typeof facilitySchema>;
+type FacilityFormValues = {
+  name: string;
+  location?: string;
+  facility_type_id?: string;
+  supplier_id?: string;
+};
 
 interface Facility {
   id: string;
@@ -76,16 +87,24 @@ export default function FacilitiesPage() {
   const [editingFacility, setEditingFacility] = useState<Facility | null>(null);
   const [facilityToDelete, setFacilityToDelete] = useState<Facility | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [dataSourceType, setDataSourceType] = useState<'internal' | 'supplier_managed'>('internal');
 
   const form = useForm<FacilityFormValues>({
-    resolver: zodResolver(facilitySchema),
+    resolver: zodResolver(createFacilitySchema(dataSourceType)),
     mode: 'onChange',
     defaultValues: {
       name: '',
       location: '',
       facility_type_id: '',
+      supplier_id: '',
     },
   });
+
+  useEffect(() => {
+    form.clearErrors();
+    const currentValues = form.getValues();
+    form.reset(currentValues, { keepValues: true });
+  }, [dataSourceType]);
 
   const fetchFacilities = useCallback(async () => {
     if (!currentOrganization?.id) {
@@ -128,6 +147,7 @@ export default function FacilitiesPage() {
         name: facility.name,
         location: facility.location || '',
         facility_type_id: facility.facility_type_id || '',
+        supplier_id: '',
       });
     } else {
       setEditingFacility(null);
@@ -135,7 +155,9 @@ export default function FacilitiesPage() {
         name: '',
         location: '',
         facility_type_id: '',
+        supplier_id: '',
       });
+      setDataSourceType('internal');
     }
     setIsDialogOpen(true);
   };
@@ -143,6 +165,7 @@ export default function FacilitiesPage() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingFacility(null);
+    setDataSourceType('internal');
     form.reset();
   };
 
@@ -179,6 +202,13 @@ export default function FacilitiesPage() {
 
       if (data.facility_type_id) {
         payload.facility_type_id = data.facility_type_id;
+      }
+
+      if (!editingFacility) {
+        payload.data_source_type = dataSourceType;
+        if (dataSourceType === 'supplier_managed' && data.supplier_id) {
+          payload.supplier_id = data.supplier_id;
+        }
       }
 
       const response = await fetch(apiUrl, {
@@ -429,6 +459,82 @@ export default function FacilitiesPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {!editingFacility && (
+              <>
+                <div className="space-y-2">
+                  <Label>Who operates this facility?</Label>
+                  <ToggleGroup
+                    type="single"
+                    value={dataSourceType}
+                    onValueChange={(value) => {
+                      if (value) {
+                        setDataSourceType(value as 'internal' | 'supplier_managed');
+                        if (value === 'internal') {
+                          form.setValue('supplier_id', '');
+                        }
+                      }
+                    }}
+                    className="justify-start"
+                  >
+                    <ToggleGroupItem value="internal" className="flex-1">
+                      My Company
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="supplier_managed" className="flex-1">
+                      A Third-Party Supplier
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+
+                {dataSourceType === 'internal' && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Next Steps</AlertTitle>
+                    <AlertDescription>
+                      You will be responsible for providing the activity data (e.g., energy, water, waste) for this facility.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {dataSourceType === 'supplier_managed' && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="supplier_id">Select the supplier who operates this facility *</Label>
+                      <Select
+                        value={form.watch('supplier_id') || '__none__'}
+                        onValueChange={(value) => {
+                          const finalValue = value === '__none__' ? '' : value;
+                          form.setValue('supplier_id', finalValue, {
+                            shouldValidate: true,
+                          });
+                        }}
+                      >
+                        <SelectTrigger id="supplier_id">
+                          <SelectValue placeholder="Search for a supplier..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Select a supplier</SelectItem>
+                          <SelectItem value="supplier-placeholder-1">Supplier Network (Coming Soon)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {form.formState.errors.supplier_id && (
+                        <p className="text-sm text-red-600">
+                          {form.formState.errors.supplier_id.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Next Steps</AlertTitle>
+                      <AlertDescription>
+                        The selected supplier will be invited to provide data for this facility via the Supplier Portal.
+                      </AlertDescription>
+                    </Alert>
+                  </div>
+                )}
+              </>
+            )}
 
             <DialogFooter>
               <Button
