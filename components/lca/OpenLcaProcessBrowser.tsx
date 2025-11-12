@@ -81,9 +81,21 @@ export function OpenLcaProcessBrowser({
         const data = await response.json();
         setResults(data.results || []);
         setIsMockData(data.mock || false);
+
+        // Log environment information for debugging
+        if (data.environment) {
+          console.log(`OpenLCA Environment: ${data.environment} | Host: ${data.host}`);
+        }
       } catch (err: any) {
         console.error('Error searching OpenLCA:', err);
-        setError(err.message || 'Failed to search OpenLCA database');
+
+        // Check if this is a connection error to local OpenLCA
+        const errorMessage = err.message || 'Failed to search OpenLCA database';
+        if (errorMessage.includes('local OpenLCA')) {
+          setError('Cannot connect to local OpenLCA server. Please start OpenLCA desktop app and enable IPC server on port 8080.');
+        } else {
+          setError(errorMessage);
+        }
         setResults([]);
       } finally {
         setIsLoading(false);

@@ -17,6 +17,23 @@ interface QueryRequest {
   searchTerm: string;
 }
 
+/**
+ * Environment-Aware OpenLCA Proxy
+ *
+ * This Edge Function acts as a secure proxy to the OpenLCA database.
+ * It supports two execution modes:
+ *
+ * 1. LOCAL MODE (Development):
+ *    - Proxies requests to http://localhost:8080 (OpenLCA desktop IPC server)
+ *    - Requires developer to have OpenLCA desktop app running with IPC enabled
+ *
+ * 2. PRODUCTION MODE (Deployed):
+ *    - Proxies requests to containerized OpenLCA headless server
+ *    - URL configured via PRODUCTION_OPENLCA_URL environment variable
+ *
+ * The function determines mode via ENV_MODE environment variable.
+ */
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -33,6 +50,7 @@ Deno.serve(async (req: Request) => {
       throw new Error("Missing Supabase configuration");
     }
 
+    // Authentication: Verify user is authenticated
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -62,6 +80,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Parse request payload
     const { searchTerm }: QueryRequest = await req.json();
 
     if (!searchTerm || searchTerm.trim().length < 3) {
@@ -76,8 +95,10 @@ Deno.serve(async (req: Request) => {
 
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
 
+    // Cleanup old cache entries (older than 24 hours)
     await supabase.rpc("cleanup_openlca_cache");
 
+    // Check cache for existing results
     const { data: cachedEntry, error: cacheError } = await supabase
       .from("openlca_process_cache")
       .select("results, created_at")
@@ -103,86 +124,102 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log(`Cache miss for: ${normalizedSearchTerm}, querying OpenLCA API`);
+    console.log(`Cache miss for: ${normalizedSearchTerm}, querying OpenLCA`);
 
-    // Retrieve the OpenLCA API key from Supabase secrets
-    const openLcaApiKey = Deno.env.get("OPENLCA_API_KEY");
+    // ========================================================================
+    // ENVIRONMENT-AWARE PROXY LOGIC
+    // ========================================================================
 
-    // TEMPORARY: Mock data mode (remove when OPENLCA_API_KEY is configured)
-    if (!openLcaApiKey) {
-      // Mock data structure matching OpenLCA API response format
-      // These are static results used during development
-      const mockResults: OpenLcaProcess[] = [
-        {
-          id: "a1b2-c3d4",
-          name: "Apple, at farm gate",
-          category: "Fruit/Agriculture",
-        },
-        {
-          id: "e5f6-g7h8",
-          name: "Glass bottle, 750ml, green",
-          category: "Packaging/Containers",
-        },
-        {
-          id: "i9j0-k1l2",
-          name: "Transport, lorry >16t",
-          category: "Logistics/Road",
-        },
-      ];
+    // Determine execution environment
+    const envMode = Deno.env.get("ENV_MODE") || "local";
+    let openLcaHost: string;
 
-      const { error: insertError } = await supabase
-        .from("openlca_process_cache")
-        .insert({
-          search_term: normalizedSearchTerm,
-          results: mockResults,
-        });
-
-      if (insertError) {
-        console.error("Failed to cache mock results:", insertError);
+    if (envMode === "local") {
+      // LOCAL MODE: Proxy to local OpenLCA desktop IPC server
+      openLcaHost = "http://localhost:8080";
+      console.log(`[LOCAL MODE] Proxying to OpenLCA desktop at ${openLcaHost}`);
+    } else if (envMode === "production") {
+      // PRODUCTION MODE: Proxy to containerized headless server
+      const productionUrl = Deno.env.get("PRODUCTION_OPENLCA_URL");
+      if (!productionUrl) {
+        throw new Error("PRODUCTION_OPENLCA_URL not configured");
       }
-
-      return new Response(
-        JSON.stringify({
-          results: mockResults,
-          cached: false,
-          mock: true,
-          message: "Using mock data - OpenLCA API key not configured",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      openLcaHost = productionUrl;
+      console.log(`[PRODUCTION MODE] Proxying to headless server at ${openLcaHost}`);
+    } else {
+      throw new Error(`Invalid ENV_MODE: ${envMode}. Must be 'local' or 'production'`);
     }
 
-    // REAL API MODE: Query the OpenLCA database
-    // This code executes when OPENLCA_API_KEY is configured in Supabase secrets
-    console.log(`Querying OpenLCA API for: ${searchTerm}`);
+    // ========================================================================
+    // PROXY REQUEST TO OPENLCA
+    // ========================================================================
 
-    const openLcaResponse = await fetch(
-      `https://api.openlca.org/search?q=${encodeURIComponent(searchTerm)}`,
-      {
+    // Construct the search endpoint URL
+    // OpenLCA IPC server search endpoint: GET /search?q=<term>
+    const openLcaUrl = `${openLcaHost}/search?q=${encodeURIComponent(searchTerm)}`;
+
+    console.log(`Fetching from OpenLCA: ${openLcaUrl}`);
+
+    let openLcaResponse: Response;
+
+    try {
+      openLcaResponse = await fetch(openLcaUrl, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${openLcaApiKey}`,
+          "Accept": "application/json",
           "Content-Type": "application/json",
         },
+        // Timeout for local connections
+        signal: AbortSignal.timeout(envMode === "local" ? 5000 : 30000),
+      });
+    } catch (fetchError: any) {
+      // Handle connection errors (e.g., OpenLCA not running locally)
+      console.error(`Failed to connect to OpenLCA at ${openLcaHost}:`, fetchError);
+
+      if (envMode === "local") {
+        return new Response(
+          JSON.stringify({
+            error: "Cannot connect to local OpenLCA server",
+            details: "Please ensure OpenLCA desktop app is running with IPC server enabled on port 8080",
+            hint: "Start OpenLCA → Tools → Developer Tools → Start IPC Server",
+          }),
+          {
+            status: 503,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      } else {
+        throw new Error(`OpenLCA production server unavailable: ${fetchError.message}`);
       }
-    );
+    }
 
     if (!openLcaResponse.ok) {
+      console.error(`OpenLCA returned error: ${openLcaResponse.status} ${openLcaResponse.statusText}`);
       throw new Error(`OpenLCA API error: ${openLcaResponse.status} ${openLcaResponse.statusText}`);
     }
 
+    // Parse OpenLCA response
     const openLcaData = await openLcaResponse.json();
 
-    const sanitizedResults: OpenLcaProcess[] = (openLcaData.processes || [])
-      .slice(0, 20)
+    // ========================================================================
+    // SANITIZE AND TRANSFORM RESPONSE
+    // ========================================================================
+
+    // OpenLCA IPC server returns array of process objects
+    // Expected structure: [{ "@id": "...", "name": "...", "categoryPath": "..." }]
+    const sanitizedResults: OpenLcaProcess[] = (openLcaData || [])
+      .slice(0, 50)  // Limit to 50 results
       .map((process: any) => ({
-        id: process.id || process["@id"] || `unknown-${Date.now()}`,
+        id: process["@id"] || process.id || `unknown-${Date.now()}`,
         name: process.name || "Unnamed Process",
-        category: process.category || process.categoryPath || "Uncategorised",
+        category: process.categoryPath || process.category || "Uncategorised",
       }));
+
+    console.log(`Retrieved ${sanitizedResults.length} processes from OpenLCA`);
+
+    // ========================================================================
+    // CACHE THE RESULTS
+    // ========================================================================
 
     const { error: insertError } = await supabase
       .from("openlca_process_cache")
@@ -193,18 +230,26 @@ Deno.serve(async (req: Request) => {
 
     if (insertError) {
       console.error("Failed to cache results:", insertError);
+      // Non-fatal: continue without caching
     }
+
+    // ========================================================================
+    // RETURN RESPONSE TO CLIENT
+    // ========================================================================
 
     return new Response(
       JSON.stringify({
         results: sanitizedResults,
         cached: false,
+        environment: envMode,
+        host: openLcaHost,
       }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
+
   } catch (error: any) {
     console.error("Error in query-openlca-processes:", error);
 

@@ -2,9 +2,22 @@
 
 ## Overview
 
-This document describes the complete implementation of the "Estimate" workflow for the Composable LCA Engine. This workflow enables users to create Product LCAs by searching and adding secondary data points from the OpenLCA database, marked as 'Platform Estimates'.
+This document describes the complete implementation of the "Estimate" workflow for the Composable LCA Engine. This workflow enables users to create Product LCAs by searching and adding secondary data points from a **self-hosted OpenLCA database**, marked as 'Platform Estimates'.
 
 This is the first half of our "Estimate-then-Upgrade" core value proposition, allowing users to start with generic estimates and progressively improve data quality over time.
+
+## Architectural Decision
+
+We use a **self-hosted OpenLCA architecture** instead of a third-party SaaS API:
+
+- **Development:** Edge Function proxies to OpenLCA desktop app's IPC server (`http://localhost:8080`)
+- **Production:** Edge Function proxies to containerized OpenLCA headless server
+
+This approach provides:
+- Complete data control and privacy
+- No external API dependencies or costs
+- Custom database content
+- Compliance with data residency requirements
 
 ## Architecture
 
@@ -14,13 +27,15 @@ This is the first half of our "Estimate-then-Upgrade" core value proposition, al
 
 **Location:** `supabase/functions/query-openlca-processes/index.ts`
 
-**Purpose:** Secure, server-side proxy for searching the OpenLCA database with intelligent caching.
+**Purpose:** Environment-aware proxy for searching the self-hosted OpenLCA database with intelligent caching.
 
 **Features:**
 - **Authentication Required:** All requests must include valid Supabase JWT
+- **Environment-Aware Proxy:** Automatically routes to local or production OpenLCA server
+- **Local Development:** Proxies to `http://localhost:8080` (OpenLCA desktop IPC server)
+- **Production Mode:** Proxies to containerized headless server
 - **Caching Layer:** 24-hour cache in `openlca_process_cache` table
-- **Mock Data Mode:** Returns static data when `OPENLCA_API_KEY` is not configured
-- **Real API Support:** Ready to seamlessly accept OpenLCA API key
+- **Connection Error Handling:** Helpful messages when OpenLCA is not running
 
 **Request Contract:**
 ```typescript
@@ -39,14 +54,16 @@ This is the first half of our "Estimate-then-Upgrade" core value proposition, al
 }
 ```
 
-**Mock Data:**
-When `OPENLCA_API_KEY` is not configured, returns:
-```json
-[
-  { "id": "a1b2-c3d4", "name": "Apple, at farm gate", "category": "Fruit/Agriculture" },
-  { "id": "e5f6-g7h8", "name": "Glass bottle, 750ml, green", "category": "Packaging/Containers" },
-  { "id": "i9j0-k1l2", "name": "Transport, lorry >16t", "category": "Logistics/Road" }
-]
+**Environment Configuration:**
+```env
+# Local development (default)
+ENV_MODE=local
+# Proxies to: http://localhost:8080
+
+# Production deployment
+ENV_MODE=production
+PRODUCTION_OPENLCA_URL=https://openlca-server.yourdomain.com
+# Proxies to: configured production URL
 ```
 
 **Production Readiness:**
