@@ -92,6 +92,7 @@ interface ActivityDataRecord {
   unit: string;
   allocation_method: 'direct_apportionment' | 'economic_allocation' | 'spend_based';
   evidence_url?: string;
+  justification_text?: string;
 }
 
 export default function FacilityDetailPage() {
@@ -180,6 +181,8 @@ export default function FacilityDetailPage() {
           value: 250,
           unit: 'kg',
           allocation_method: 'economic_allocation',
+          justification_text: 'Represents our share of total production volume for the month (35% of facility output)',
+          evidence_url: 'https://example.com/facility-report.pdf',
         },
         {
           id: '3',
@@ -188,6 +191,15 @@ export default function FacilityDetailPage() {
           value: 500,
           unit: 'm³',
           allocation_method: 'spend_based',
+        },
+        {
+          id: '4',
+          reporting_period: '2025-09-01',
+          data_type: 'Water Consumption',
+          value: 12500,
+          unit: 'L',
+          allocation_method: 'economic_allocation',
+          justification_text: 'Based on our percentage of total revenue for this supplier (42% of annual spend)',
         },
       ];
 
@@ -548,7 +560,7 @@ export default function FacilityDetailPage() {
                       <TableHead>Data Type</TableHead>
                       <TableHead>Value</TableHead>
                       <TableHead>DQI</TableHead>
-                      <TableHead>Evidence</TableHead>
+                      <TableHead>Justification / Details</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -563,25 +575,36 @@ export default function FacilityDetailPage() {
                         </TableCell>
                         <TableCell>{getDqiBadge(record.allocation_method)}</TableCell>
                         <TableCell>
-                          {record.evidence_url ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              asChild
-                            >
-                              <a
-                                href={record.evidence_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                          <div className="space-y-2">
+                            {record.allocation_method === 'economic_allocation' && record.justification_text && (
+                              <div className="text-sm">
+                                <span className="font-medium text-muted-foreground">Allocation Basis: </span>
+                                <span>{record.justification_text}</span>
+                              </div>
+                            )}
+                            {record.evidence_url && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                asChild
+                                className="h-auto p-0 text-blue-600 hover:text-blue-800"
                               >
-                                <FileText className="mr-2 h-4 w-4" />
-                                View File
-                                <ExternalLink className="ml-1 h-3 w-3" />
-                              </a>
-                            </Button>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">No evidence</span>
-                          )}
+                                <a
+                                  href={record.evidence_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1"
+                                >
+                                  <FileText className="h-3 w-3" />
+                                  View Evidence
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </Button>
+                            )}
+                            {!record.justification_text && !record.evidence_url && (
+                              <span className="text-sm text-muted-foreground">No additional details</span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
