@@ -1,81 +1,138 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { cn } from '@/lib/utils'
 import {
-  Home,
+  LayoutDashboard,
+  Leaf,
+  Users,
   Building2,
-  Truck,
-  BarChart3,
+  FileText,
   Settings,
-  ChevronDown,
-  ChevronRight,
+  TrendingUp,
   Package,
-} from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { NAV_ITEMS } from '@/app/config/sidebarNav';
+  Database,
+  Calculator,
+  Trash2,
+  Droplets,
+} from 'lucide-react'
 
-const iconMap: Record<string, any> = {
-  HomeIcon: Home,
-  BuildingIcon: Building2,
-  TruckIcon: Truck,
-  ChartBarIcon: BarChart3,
-  CogIcon: Settings,
-  BoxIcon: Package,
-};
-
-interface NavItemConfig {
-  href?: string;
-  label: string;
-  icon?: string;
-  children?: { href: string; label: string }[];
+interface NavItem {
+  name: string
+  path: string
+  icon: any
 }
 
+interface NavSection {
+  title?: string
+  items: NavItem[]
+}
+
+const navigationSections: NavSection[] = [
+  {
+    items: [
+      {
+        name: 'Dashboard',
+        path: '/dashboard',
+        icon: LayoutDashboard,
+      },
+      {
+        name: 'Emissions',
+        path: '/emissions',
+        icon: Leaf,
+      },
+      {
+        name: 'Suppliers',
+        path: '/suppliers',
+        icon: Building2,
+      },
+      {
+        name: 'Facilities',
+        path: '/company/facilities',
+        icon: Package,
+      },
+      {
+        name: 'KPIs',
+        path: '/kpis',
+        icon: TrendingUp,
+      },
+      {
+        name: 'Reports',
+        path: '/reports',
+        icon: FileText,
+      },
+    ],
+  },
+  {
+    title: 'Data Entry',
+    items: [
+      {
+        name: 'Scope 1 & 2',
+        path: '/data/scope-1-2',
+        icon: Leaf,
+      },
+      {
+        name: 'Water Footprint',
+        path: '/data/water-footprint',
+        icon: Droplets,
+      },
+      {
+        name: 'Waste & Circularity',
+        path: '/data/waste-and-circularity',
+        icon: Trash2,
+      },
+      {
+        name: 'Activity Data (Dev)',
+        path: '/data/ingest',
+        icon: Database,
+      },
+    ],
+  },
+  {
+    title: 'Reporting',
+    items: [
+      {
+        name: 'Run Calculations',
+        path: '/reporting/calculations',
+        icon: Calculator,
+      },
+    ],
+  },
+  {
+    items: [
+      {
+        name: 'Team',
+        path: '/dashboard/settings/team',
+        icon: Users,
+      },
+      {
+        name: 'Settings',
+        path: '/settings',
+        icon: Settings,
+      },
+    ],
+  },
+]
+
 interface SidebarProps {
-  className?: string;
+  className?: string
 }
 
 export function Sidebar({ className }: SidebarProps) {
-  const pathname = usePathname();
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const pathname = usePathname()
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
-      return pathname === path;
+      return pathname === path
     }
-    return pathname.startsWith(path);
-  };
-
-  const isParentActive = (children?: { href: string; label: string }[]) => {
-    if (!children) return false;
-    return children.some((child) => isActive(child.href));
-  };
-
-  useEffect(() => {
-    const initialOpenState: Record<string, boolean> = {};
-
-    NAV_ITEMS.forEach((item) => {
-      if (item.children && isParentActive(item.children)) {
-        initialOpenState[item.label] = true;
-      }
-    });
-
-    setOpenSections(initialOpenState);
-  }, [pathname]);
-
-  const toggleSection = (label: string) => {
-    setOpenSections((prev) => ({
-      ...prev,
-      [label]: !prev[label],
-    }));
-  };
+    return pathname.startsWith(path)
+  }
 
   return (
     <aside
       className={cn(
-        'flex flex-col gap-2 border-r bg-slate-50/50 dark:bg-slate-900/50 px-3 py-4 w-64',
+        'flex flex-col gap-2 border-r bg-slate-50/50 dark:bg-slate-900/50 px-3 py-4',
         className
       )}
     >
@@ -86,79 +143,37 @@ export function Sidebar({ className }: SidebarProps) {
         <p className="text-xs text-muted-foreground">Carbon Management</p>
       </div>
 
-      <nav className="flex-1 space-y-1">
-        {NAV_ITEMS.map((item: NavItemConfig) => {
-          if (!item.children) {
-            const IconComponent = item.icon ? iconMap[item.icon] : null;
-            const active = item.href ? isActive(item.href) : false;
+      <nav className="flex-1 space-y-4">
+        {navigationSections.map((section, sectionIndex) => (
+          <div key={sectionIndex} className="space-y-1">
+            {section.title && (
+              <h3 className="px-3 mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                {section.title}
+              </h3>
+            )}
+            {section.items.map((item) => {
+              const IconComponent = item.icon
+              const active = isActive(item.path)
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href!}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-                  active
-                    ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
-                    : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
-                )}
-              >
-                {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0" />}
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          }
-
-          const IconComponent = item.icon ? iconMap[item.icon] : null;
-          const isOpen = openSections[item.label];
-          const hasActiveChild = isParentActive(item.children);
-
-          return (
-            <Collapsible
-              key={item.label}
-              open={isOpen}
-              onOpenChange={() => toggleSection(item.label)}
-            >
-              <CollapsibleTrigger
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-                  hasActiveChild
-                    ? 'bg-slate-200/70 text-slate-900 dark:bg-slate-800/70 dark:text-slate-100'
-                    : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
-                )}
-              >
-                {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0" />}
-                <span className="flex-1 truncate text-left">{item.label}</span>
-                {isOpen ? (
-                  <ChevronDown className="h-4 w-4 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 flex-shrink-0" />
-                )}
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-1 space-y-1">
-                {item.children?.map((child) => {
-                  const active = isActive(child.href);
-
-                  return (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2 pl-10 text-sm font-medium transition-all',
-                        active
-                          ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
-                          : 'text-slate-600 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800/50'
-                      )}
-                    >
-                      <span className="truncate">{child.label}</span>
-                    </Link>
-                  );
-                })}
-              </CollapsibleContent>
-            </Collapsible>
-          );
-        })}
+              return (
+                <Link
+                  key={item.path}
+                  href={item.path}
+                  className={cn(
+                    'flex items-centre gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
+                    active
+                      ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
+                      : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
+                  )}
+                >
+                  <IconComponent className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{item.name}</span>
+                </Link>
+              )
+            })}
+          </div>
+        ))}
       </nav>
     </aside>
-  );
+  )
 }
