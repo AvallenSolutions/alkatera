@@ -199,7 +199,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setOrganizations([])
         setUserRole(null)
         setIsLoading(false)
-        router.push('/login')
+        // Don't redirect here - middleware handles it
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         setUser(session.user)
       }

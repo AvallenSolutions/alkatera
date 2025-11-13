@@ -86,11 +86,13 @@ export function SignupForm() {
 
       if (data.user && data.session) {
         setSuccess(true)
-        // Wait for user to see success message, then navigate
-        setTimeout(() => {
-          router.refresh()
-          router.push("/dashboard")
-        }, 2000)
+
+        // Give the session cookie time to be set
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Use router navigation instead of window.location
+        router.push("/dashboard")
+        router.refresh()
       }
     } catch (err: any) {
       setError(err.message || "Failed to create account. Please try again.")

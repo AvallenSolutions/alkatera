@@ -44,7 +44,7 @@ export function LoginForm() {
     setLoading(true)
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -53,7 +53,16 @@ export function LoginForm() {
         throw signInError
       }
 
-      window.location.href = "/dashboard"
+      if (!data.session) {
+        throw new Error("No session created")
+      }
+
+      // Give the session cookie time to be set
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Use router navigation instead of window.location
+      router.push("/dashboard")
+      router.refresh()
     } catch (err: any) {
       console.error("Login error:", err)
       setError(err.message || "Failed to sign in. Please check your credentials.")
