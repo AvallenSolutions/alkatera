@@ -50,7 +50,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 import { PageLoader } from '@/components/ui/page-loader';
 import { DqiAwareKpi } from '@/components/ui/dqi-aware-kpi';
 import { Separator } from '@/components/ui/separator';
@@ -214,6 +214,7 @@ export default function FacilityDetailPage() {
     setIsSaving(true);
 
     try {
+      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {
@@ -266,6 +267,7 @@ export default function FacilityDetailPage() {
   const handleArchive = async () => {
     setIsProcessing(true);
     try {
+      const supabase = createClient();
       const { error } = await supabase
         .from('facilities')
         .update({ is_archived: true, updated_at: new Date().toISOString() })
@@ -287,6 +289,7 @@ export default function FacilityDetailPage() {
   const handleDelete = async () => {
     setIsProcessing(true);
     try {
+      const supabase = createClient();
       const { error } = await supabase
         .from('facilities')
         .delete()

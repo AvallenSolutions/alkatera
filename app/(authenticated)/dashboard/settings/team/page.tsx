@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { useOrganization } from '@/lib/organizationContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,6 +77,7 @@ function TeamManagementContent() {
 
     try {
       setIsLoading(true)
+      const supabase = createClient()
       const { data, error } = await supabase
         .from('member_profiles')
         .select('*')
@@ -114,6 +115,7 @@ function TeamManagementContent() {
     setIsInviting(true)
 
     try {
+      const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
@@ -167,6 +169,7 @@ function TeamManagementContent() {
     setIsDeleting(true)
 
     try {
+      const supabase = createClient()
       const { error } = await supabase
         .from('organization_members')
         .delete()

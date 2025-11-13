@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, Droplets, Calculator, Building2 } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -97,6 +97,7 @@ export default function WaterFootprintPage() {
     }
 
     try {
+      const supabase = createClient();
       const { data, error } = await supabase
         .from('facilities')
         .select('id, name, location')
@@ -124,6 +125,7 @@ export default function WaterFootprintPage() {
     }
 
     try {
+      const supabase = createClient();
       const { data, error } = await supabase
         .from('activity_data')
         .select('id, name, quantity, unit, activity_date, created_at')
@@ -160,6 +162,7 @@ export default function WaterFootprintPage() {
     setIsSubmitting(true);
 
     try {
+      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {
@@ -226,6 +229,7 @@ export default function WaterFootprintPage() {
     setIsCalculating(true);
 
     try {
+      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {

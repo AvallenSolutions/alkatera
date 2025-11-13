@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 
 // Define the structure of the API response
 interface ApiResponse {
@@ -46,6 +46,7 @@ export default function TestHarnessPage() {
     setCalculationLogs([])
 
     try {
+      const supabase = createClient();
       // 1. Invoke the Edge Function
       const { data, error: functionError } = await supabase.functions.invoke(
         'invoke-corporate-calculations',

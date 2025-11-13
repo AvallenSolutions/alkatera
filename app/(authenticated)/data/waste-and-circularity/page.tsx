@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 import { useOrganization } from '@/lib/organizationContext';
 
 const wasteActivitySchema = z.object({
@@ -97,6 +97,7 @@ export default function WasteAndCircularityPage() {
     }
 
     try {
+      const supabase = createClient();
       const { data, error } = await supabase
         .from('activity_data')
         .select('id, name, category, quantity, unit, activity_date, created_at')
@@ -132,6 +133,7 @@ export default function WasteAndCircularityPage() {
     setShowSuccess(false);
 
     try {
+      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {
