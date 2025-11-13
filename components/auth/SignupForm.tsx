@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createClient } from "@/lib/supabase-browser"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,7 +11,7 @@ import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
 
 export function SignupForm() {
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -87,8 +87,7 @@ export function SignupForm() {
       if (data.user) {
         setSuccess(true)
         setTimeout(() => {
-          router.refresh()
-          router.push("/dashboard")
+          window.location.href = "/dashboard"
         }, 2000)
       }
     } catch (err: any) {

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { createClient } from './supabase-browser'
 import { useRouter } from 'next/navigation'
 
 interface Organization {
@@ -34,7 +34,7 @@ interface OrganizationContextType {
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
 
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClientComponentClient()
+  const supabase = createClient()
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
