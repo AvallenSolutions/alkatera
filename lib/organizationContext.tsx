@@ -40,16 +40,33 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
   const router = useRouter()
 
   const fetchOrganizations = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
+    const timeoutId = setTimeout(() => {
+      console.warn('Organization fetch timeout - stopping loading state')
+      setIsLoading(false)
+    }, 10000)
 
-      if (!user) {
+    try {
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
+
+      if (userError) {
+        console.error('Error fetching user:', userError)
+        clearTimeout(timeoutId)
         setIsLoading(false)
         return
       }
+
+      if (!currentUser) {
+        setUser(null)
+        clearTimeout(timeoutId)
+        setIsLoading(false)
+        return
+      }
+
+      setUser(currentUser)
 
       const { data: memberships, error } = await supabase
         .from('organization_members')
@@ -64,7 +81,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             created_at
           )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', currentUser.id)
+
+      clearTimeout(timeoutId)
 
       if (error) {
         console.error('Error fetching organizations:', error)
@@ -79,7 +98,13 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       setOrganizations(orgs || [])
 
       if (orgs && orgs.length > 0) {
-        const savedOrgId = localStorage.getItem('currentOrganizationId')
+        let savedOrgId: string | null = null
+        try {
+          savedOrgId = localStorage.getItem('currentOrganizationId')
+        } catch (e) {
+          console.warn('localStorage not available:', e)
+        }
+
         const orgToSet = savedOrgId
           ? orgs.find(o => o.id === savedOrgId) || orgs[0]
           : orgs[0]
@@ -91,10 +116,18 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         ) as any
         setUserRole(membership?.roles?.name || null)
 
-        localStorage.setItem('currentOrganizationId', orgToSet.id)
+        try {
+          localStorage.setItem('currentOrganizationId', orgToSet.id)
+        } catch (e) {
+          console.warn('localStorage not available:', e)
+        }
+      } else {
+        setCurrentOrganization(null)
+        setUserRole(null)
       }
     } catch (error) {
       console.error('Error in fetchOrganizations:', error)
+      clearTimeout(timeoutId)
     } finally {
       setIsLoading(false)
     }
@@ -104,7 +137,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     const org = organizations.find(o => o.id === orgId)
     if (org) {
       setCurrentOrganization(org)
-      localStorage.setItem('currentOrganizationId', orgId)
+      try {
+        localStorage.setItem('currentOrganizationId', orgId)
+      } catch (e) {
+        console.warn('localStorage not available:', e)
+      }
 
       const { data: membership } = await supabase
         .from('organization_members')
@@ -127,7 +164,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       setOrganizations(prev => [...prev, newOrganization.organization])
       setCurrentOrganization(newOrganization.organization)
       setUserRole(newOrganization.role)
-      localStorage.setItem('currentOrganizationId', newOrganization.organization.id)
+      try {
+        localStorage.setItem('currentOrganizationId', newOrganization.organization.id)
+      } catch (e) {
+        console.warn('localStorage not available:', e)
+      }
     } else {
       await refreshOrganizations()
     }
@@ -137,20 +178,25 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     fetchOrganizations()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      if (event === 'SIGNED_IN') {
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser(session.user)
         fetchOrganizations()
       } else if (event === 'SIGNED_OUT') {
+        setUser(null)
         setCurrentOrganization(null)
         setOrganizations([])
         setUserRole(null)
         setIsLoading(false)
+        router.push('/login')
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        setUser(session.user)
       }
     })
 
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [router])
 
   return (
     <OrganizationContext.Provider

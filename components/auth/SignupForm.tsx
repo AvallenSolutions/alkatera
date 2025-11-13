@@ -88,8 +88,8 @@ export function SignupForm() {
         setSuccess(true)
         // Wait for user to see success message, then navigate
         setTimeout(() => {
-          // Force a full page reload to ensure middleware processes the session
-          window.location.href = "/dashboard"
+          router.refresh()
+          router.push("/dashboard")
         }, 2000)
       }
     } catch (err: any) {

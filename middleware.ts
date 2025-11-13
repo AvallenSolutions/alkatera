@@ -70,39 +70,54 @@ export async function middleware(request: NextRequest) {
     request.nextUrl.pathname.startsWith(route)
   )
 
+  // Redirect unauthenticated users to login (except for public routes and root)
   if (!session && !isPublicRoute && request.nextUrl.pathname !== '/') {
     const redirectUrl = new URL('/login', request.url)
     redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
+  // Redirect authenticated users away from public routes (login, signup, etc.) to dashboard
   if (session && isPublicRoute) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
+  // Check if authenticated user has organization membership
   if (session && !isPublicRoute && !isOnboardingRoute) {
-    const { data: memberships } = await supabase
-      .from('organization_members')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .limit(1)
+    try {
+      const { data: memberships, error } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .limit(1)
 
-    if (!memberships || memberships.length === 0) {
-      if (request.nextUrl.pathname !== '/create-organization') {
-        return NextResponse.redirect(new URL('/create-organization', request.url))
+      // If error or no memberships, redirect to onboarding
+      if (error || !memberships || memberships.length === 0) {
+        if (request.nextUrl.pathname !== '/create-organization') {
+          return NextResponse.redirect(new URL('/create-organization', request.url))
+        }
       }
+    } catch (error) {
+      console.error('Error checking organization membership:', error)
+      // On error, allow the request to proceed rather than blocking the user
     }
   }
 
+  // If user is on onboarding route but already has an organization, redirect to dashboard
   if (session && isOnboardingRoute) {
-    const { data: memberships } = await supabase
-      .from('organization_members')
-      .select('id')
-      .eq('user_id', session.user.id)
-      .limit(1)
+    try {
+      const { data: memberships } = await supabase
+        .from('organization_members')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .limit(1)
 
-    if (memberships && memberships.length > 0) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (memberships && memberships.length > 0) {
+        return NextResponse.redirect(new URL('/dashboard', request.url))
+      }
+    } catch (error) {
+      console.error('Error checking organization membership:', error)
+      // On error, allow the request to proceed
     }
   }
 

@@ -54,11 +54,10 @@ export function LoginForm() {
       }
 
       if (data.user && data.session) {
-        // Wait a brief moment for the session to be fully established
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        // Force a full page reload to ensure middleware processes the session
-        window.location.href = "/dashboard"
+        // Use router.refresh() to update the router cache and ensure middleware re-evaluates
+        router.refresh()
+        // Navigate using Next.js router for proper middleware processing
+        router.push("/dashboard")
       }
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.")
