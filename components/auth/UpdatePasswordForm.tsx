@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabaseClient"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,6 +11,7 @@ import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
 
 export function UpdatePasswordForm() {
   const router = useRouter()
+  const supabase = createClientComponentClient()
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -67,8 +68,8 @@ export function UpdatePasswordForm() {
 
       setSuccess(true)
       setTimeout(() => {
-        router.push("/dashboard")
         router.refresh()
+        router.push("/dashboard")
       }, 2000)
     } catch (err: any) {
       setError(err.message || "Failed to update password. Please try again.")

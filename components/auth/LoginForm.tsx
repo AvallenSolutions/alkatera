@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabaseClient"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,6 +11,7 @@ import { AlertCircle, Loader2 } from "lucide-react"
 
 export function LoginForm() {
   const router = useRouter()
+  const supabase = createClientComponentClient()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -53,8 +54,9 @@ export function LoginForm() {
       }
 
       if (data.user) {
-        router.push("/dashboard")
+        // Refresh the page to trigger middleware with updated cookies
         router.refresh()
+        router.push("/dashboard")
       }
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.")
