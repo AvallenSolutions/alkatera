@@ -51,10 +51,20 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
 
   const handleSignOut = async () => {
     setSigningOut(true)
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    try {
+      const formData = new FormData()
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      })
+      if (response.ok) {
+        router.push('/login')
+        router.refresh()
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      setSigningOut(false)
+    }
   }
 
   const getUserInitials = () => {

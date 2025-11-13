@@ -1,78 +1,32 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
+import { useState } from 'react'
+import { updatePassword } from '@/app/actions/auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, Loader2 } from 'lucide-react'
 
 export function UpdatePasswordForm() {
-  const router = useRouter()
-  const supabase = createClient()
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const validatePassword = (password: string) => {
-    if (password.length < 8) {
-      return "Password must be at least 8 characters long"
-    }
-    if (!/[A-Z]/.test(password)) {
-      return "Password must contain at least one uppercase letter"
-    }
-    if (!/[a-z]/.test(password)) {
-      return "Password must contain at least one lowercase letter"
-    }
-    if (!/[0-9]/.test(password)) {
-      return "Password must contain at least one number"
-    }
-    return null
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
-    setSuccess(false)
-
-    if (!password || !confirmPassword) {
-      setError("Please fill in all fields")
-      return
-    }
-
-    const passwordError = validatePassword(password)
-    if (passwordError) {
-      setError(passwordError)
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
     setLoading(true)
 
+    const formData = new FormData(e.currentTarget)
+
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password,
-      })
-
-      if (updateError) {
-        throw updateError
+      const result = await updatePassword(formData)
+      if (result?.error) {
+        setError(result.error)
+        setLoading(false)
       }
-
-      setSuccess(true)
-      setTimeout(() => {
-        // Force a full page reload to ensure middleware processes the session
-        window.location.href = "/dashboard"
-      }, 2000)
-    } catch (err: any) {
-      setError(err.message || "Failed to update password. Please try again.")
+    } catch (err) {
+      setError('An unexpected error occurred')
       setLoading(false)
     }
   }
@@ -86,42 +40,21 @@ export function UpdatePasswordForm() {
         </Alert>
       )}
 
-      {success && (
-        <Alert>
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>
-            Password updated successfully! Redirecting to dashboard...
-          </AlertDescription>
-        </Alert>
-      )}
-
       <div className="space-y-2">
         <Label htmlFor="password">New Password</Label>
         <Input
           id="password"
+          name="password"
           type="password"
           placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={loading}
           required
+          minLength={8}
+          autoComplete="new-password"
+          disabled={loading}
         />
         <p className="text-xs text-muted-foreground">
-          Must be at least 8 characters with uppercase, lowercase, and number
+          Must be at least 8 characters
         </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm New Password</Label>
-        <Input
-          id="confirmPassword"
-          type="password"
-          placeholder="••••••••"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={loading}
-          required
-        />
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
@@ -131,7 +64,7 @@ export function UpdatePasswordForm() {
             Updating password...
           </>
         ) : (
-          "Update Password"
+          'Update Password'
         )}
       </Button>
     </form>

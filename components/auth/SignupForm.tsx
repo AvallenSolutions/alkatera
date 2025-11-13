@@ -1,101 +1,37 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
+import { useState } from 'react'
+import { signup } from '@/app/actions/auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 
 export function SignupForm() {
-  const router = useRouter()
-  const supabase = createClient()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [fullName, setFullName] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
-
-  const validatePassword = (password: string) => {
-    if (password.length < 8) {
-      return "Password must be at least 8 characters long"
-    }
-    if (!/[A-Z]/.test(password)) {
-      return "Password must contain at least one uppercase letter"
-    }
-    if (!/[a-z]/.test(password)) {
-      return "Password must contain at least one lowercase letter"
-    }
-    if (!/[0-9]/.test(password)) {
-      return "Password must contain at least one number"
-    }
-    return null
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
-    setSuccess(false)
-
-    if (!email || !password || !confirmPassword || !fullName) {
-      setError("Please fill in all fields")
-      return
-    }
-
-    if (!validateEmail(email)) {
-      setError("Please enter a valid email address")
-      return
-    }
-
-    const passwordError = validatePassword(password)
-    if (passwordError) {
-      setError(passwordError)
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
+    setSuccess(null)
     setLoading(true)
 
+    const formData = new FormData(e.currentTarget)
+
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-          },
-        },
-      })
-
-      if (signUpError) {
-        throw signUpError
+      const result = await signup(formData)
+      if (result?.error) {
+        setError(result.error)
+        setLoading(false)
+      } else if (result?.success && result?.message) {
+        setSuccess(result.message)
+        setLoading(false)
       }
-
-      if (data.user && data.session) {
-        setSuccess(true)
-
-        // Give the session cookie time to be set
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        // Use router navigation instead of window.location
-        router.push("/dashboard")
-        router.refresh()
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to create account. Please try again.")
+    } catch (err) {
+      setError('An unexpected error occurred')
       setLoading(false)
     }
   }
@@ -112,9 +48,7 @@ export function SignupForm() {
       {success && (
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>
-            Account created successfully! Redirecting to dashboard...
-          </AlertDescription>
+          <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
 
@@ -122,12 +56,12 @@ export function SignupForm() {
         <Label htmlFor="fullName">Full Name</Label>
         <Input
           id="fullName"
+          name="fullName"
           type="text"
           placeholder="John Smith"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          disabled={loading}
           required
+          autoComplete="name"
+          disabled={loading}
         />
       </div>
 
@@ -135,12 +69,12 @@ export function SignupForm() {
         <Label htmlFor="email">Email Address</Label>
         <Input
           id="email"
+          name="email"
           type="email"
           placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={loading}
           required
+          autoComplete="email"
+          disabled={loading}
         />
       </div>
 
@@ -148,29 +82,17 @@ export function SignupForm() {
         <Label htmlFor="password">Password</Label>
         <Input
           id="password"
+          name="password"
           type="password"
           placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={loading}
           required
+          minLength={8}
+          autoComplete="new-password"
+          disabled={loading}
         />
         <p className="text-xs text-muted-foreground">
-          Must be at least 8 characters with uppercase, lowercase, and number
+          Must be at least 8 characters
         </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <Input
-          id="confirmPassword"
-          type="password"
-          placeholder="••••••••"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={loading}
-          required
-        />
       </div>
 
       <Button type="submit" className="w-full" disabled={loading}>
@@ -180,7 +102,7 @@ export function SignupForm() {
             Creating account...
           </>
         ) : (
-          "Create Account"
+          'Create Account'
         )}
       </Button>
     </form>

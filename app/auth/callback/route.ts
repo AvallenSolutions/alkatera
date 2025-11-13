@@ -6,6 +6,13 @@ import type { NextRequest } from 'next/server'
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const error = requestUrl.searchParams.get('error')
+  const error_description = requestUrl.searchParams.get('error_description')
+
+  if (error) {
+    console.error('Auth callback error:', error, error_description)
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(error_description || error)}`, request.url))
+  }
 
   if (code) {
     const cookieStore = cookies()
@@ -21,23 +28,27 @@ export async function GET(request: NextRequest) {
             try {
               cookieStore.set({ name, value, ...options })
             } catch (error) {
-              // Handle cookie setting errors
+              console.error('Error setting cookie:', error)
             }
           },
           remove(name: string, options: CookieOptions) {
             try {
               cookieStore.set({ name, value: '', ...options })
             } catch (error) {
-              // Handle cookie removal errors
+              console.error('Error removing cookie:', error)
             }
           },
         },
       }
     )
 
-    await supabase.auth.exchangeCodeForSession(code)
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (exchangeError) {
+      console.error('Error exchanging code for session:', exchangeError)
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(exchangeError.message)}`, request.url))
+    }
   }
 
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(requestUrl.origin + '/dashboard')
+  return NextResponse.redirect(new URL('/dashboard', request.url))
 }

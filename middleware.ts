@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 
-const publicRoutes = ['/login', '/signup', '/password-reset', '/update-password']
+const PUBLIC_ROUTES = ['/login', '/signup', '/password-reset', '/update-password', '/auth/callback']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -61,14 +61,19 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession()
 
-  const isPublicRoute = publicRoutes.some((route) =>
+  const isPublicRoute = PUBLIC_ROUTES.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   )
 
-  // Redirect unauthenticated users to login (except for public routes and root)
-  if (!session && !isPublicRoute && request.nextUrl.pathname !== '/') {
+  const isRootPath = request.nextUrl.pathname === '/'
+
+  if (!session && !isPublicRoute && !isRootPath) {
     const redirectUrl = new URL('/login', request.url)
-    redirectUrl.searchParams.set('redirectedFrom', request.nextUrl.pathname)
+    return NextResponse.redirect(redirectUrl)
+  }
+
+  if (session && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup')) {
+    const redirectUrl = new URL('/dashboard', request.url)
     return NextResponse.redirect(redirectUrl)
   }
 

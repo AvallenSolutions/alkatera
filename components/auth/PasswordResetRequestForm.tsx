@@ -1,56 +1,36 @@
-"use client"
+'use client'
 
-import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
+import { useState } from 'react'
+import { requestPasswordReset } from '@/app/actions/auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 
 export function PasswordResetRequestForm() {
-  const supabase = createClient()
-  const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError(null)
-    setSuccess(false)
-
-    if (!email) {
-      setError("Please enter your email address")
-      return
-    }
-
-    if (!validateEmail(email)) {
-      setError("Please enter a valid email address")
-      return
-    }
-
+    setSuccess(null)
     setLoading(true)
 
+    const formData = new FormData(e.currentTarget)
+
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
-      })
-
-      if (resetError) {
-        throw resetError
+      const result = await requestPasswordReset(formData)
+      if (result?.error) {
+        setError(result.error)
+      } else if (result?.success && result?.message) {
+        setSuccess(result.message)
       }
-
-      setSuccess(true)
-      setEmail("")
-    } catch (err: any) {
-      setError(err.message || "Failed to send reset email. Please try again.")
-    } finally {
+      setLoading(false)
+    } catch (err) {
+      setError('An unexpected error occurred')
       setLoading(false)
     }
   }
@@ -67,9 +47,7 @@ export function PasswordResetRequestForm() {
       {success && (
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>
-            Password reset email sent! Please check your inbox.
-          </AlertDescription>
+          <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
 
@@ -77,15 +55,15 @@ export function PasswordResetRequestForm() {
         <Label htmlFor="email">Email Address</Label>
         <Input
           id="email"
+          name="email"
           type="email"
           placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={loading}
           required
+          autoComplete="email"
+          disabled={loading}
         />
         <p className="text-xs text-muted-foreground">
-          Enter the email address associated with your account
+          Enter your email address and we'll send you instructions to reset your password.
         </p>
       </div>
 
@@ -93,10 +71,10 @@ export function PasswordResetRequestForm() {
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Sending reset email...
+            Sending instructions...
           </>
         ) : (
-          "Send Reset Email"
+          'Send Reset Instructions'
         )}
       </Button>
     </form>

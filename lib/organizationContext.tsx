@@ -2,24 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter, usePathname } from 'next/navigation'
-import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 interface Organization {
   id: string
   name: string
   slug: string
   created_at: string
-}
-
-interface OrganizationMember {
-  id: string
-  organization_id: string
-  user_id: string
-  role_id: string
-  roles: {
-    name: string
-  }
 }
 
 interface OrganizationContextType {
@@ -34,45 +22,24 @@ interface OrganizationContextType {
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
 
-const PUBLIC_ROUTES = ['/login', '/signup', '/password-reset', '/update-password', '/auth/callback', '/']
-
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null)
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
-  const router = useRouter()
-  const pathname = usePathname()
 
   const fetchOrganizations = async () => {
-    if (PUBLIC_ROUTES.includes(pathname)) {
-      setIsLoading(false)
-      return
-    }
-
-    const timeoutId = setTimeout(() => {
-      console.warn('Organization fetch timeout - stopping loading state')
-      setIsLoading(false)
-    }, 10000)
-
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { user } } = await supabase.auth.getUser()
 
-      if (!session) {
-        setUser(null)
+      if (!user) {
         setCurrentOrganization(null)
         setOrganizations([])
         setUserRole(null)
-        clearTimeout(timeoutId)
         setIsLoading(false)
         return
       }
-
-      const currentUser = session.user
-
-      setUser(currentUser)
 
       const { data: memberships, error } = await supabase
         .from('organization_members')
@@ -87,9 +54,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             created_at
           )
         `)
-        .eq('user_id', currentUser.id)
-
-      clearTimeout(timeoutId)
+        .eq('user_id', user.id)
 
       if (error) {
         console.error('Error fetching organizations:', error)
@@ -133,7 +98,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       }
     } catch (error) {
       console.error('Error in fetchOrganizations:', error)
-      clearTimeout(timeoutId)
     } finally {
       setIsLoading(false)
     }
@@ -149,11 +113,14 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         console.warn('localStorage not available:', e)
       }
 
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
       const { data: membership } = await supabase
         .from('organization_members')
         .select('role_id, roles!inner (name)')
         .eq('organization_id', orgId)
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('user_id', user.id)
         .maybeSingle()
 
       setUserRole((membership as any)?.roles?.name || null)
@@ -181,34 +148,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }
 
   useEffect(() => {
-    if (!PUBLIC_ROUTES.includes(pathname)) {
-      fetchOrganizations()
-    } else {
-      setIsLoading(false)
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        setUser(session.user)
-        if (!PUBLIC_ROUTES.includes(pathname)) {
-          fetchOrganizations()
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null)
-        setCurrentOrganization(null)
-        setOrganizations([])
-        setUserRole(null)
-        setIsLoading(false)
-        // Don't redirect here - middleware handles it
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        setUser(session.user)
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [router, pathname])
+    fetchOrganizations()
+  }, [])
 
   return (
     <OrganizationContext.Provider
