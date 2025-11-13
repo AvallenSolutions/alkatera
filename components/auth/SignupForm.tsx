@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase-browser"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -87,7 +87,8 @@ export function SignupForm() {
       if (data.user) {
         setSuccess(true)
         setTimeout(() => {
-          window.location.href = "/dashboard"
+          router.refresh()
+          router.push("/dashboard")
         }, 2000)
       }
     } catch (err: any) {

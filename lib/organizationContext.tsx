@@ -1,8 +1,9 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { createClient } from './supabase-browser'
+import { createClient } from './supabase/client'
 import { useRouter } from 'next/navigation'
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 interface Organization {
   id: string
@@ -135,7 +136,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     fetchOrganizations()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (event === 'SIGNED_IN') {
         fetchOrganizations()
       } else if (event === 'SIGNED_OUT') {

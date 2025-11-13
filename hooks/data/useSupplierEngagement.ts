@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 
 export interface SupplierEngagement {
   organization_id: string
@@ -26,6 +26,7 @@ export function useSupplierEngagement(): UseSupplierEngagementResult {
       setIsLoading(true)
       setError(null)
 
+      const supabase = createClient();
       const { data: engagementData, error: engagementError } = await supabase
         .from('supplier_engagement_view')
         .select('*')

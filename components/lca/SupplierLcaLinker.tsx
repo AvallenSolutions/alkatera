@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +39,7 @@ interface SupplierLcaLinkerProps {
   onLinkSuccess: () => void;
 }
 
+  const supabase = createClient()
 export function SupplierLcaLinker({
   isOpen,
   onClose,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/lib/supabase/client';
 
 export interface Facility {
   id: string;
@@ -40,6 +40,7 @@ export function useFacilities() {
     setError(null);
 
     try {
+      const supabase = createClient();
       const { data, error } = await supabase.rpc('get_all_facilities_list');
 
       if (error) throw error;
@@ -56,6 +57,7 @@ export function useFacilities() {
 
   const getFacilityById = useCallback(async (facilityId: string): Promise<FacilityDetails | null> => {
     try {
+      const supabase = createClient();
       const { data, error } = await supabase.rpc('get_facility_details', {
         p_facility_id: facilityId,
       });
@@ -71,6 +73,7 @@ export function useFacilities() {
 
   const createFacility = useCallback(async (facilityData: CreateFacilityData) => {
     try {
+      const supabase = createClient();
       const { data, error } = await supabase.rpc('create_facility', {
         p_name: facilityData.name,
         p_facility_type: facilityData.facility_type,

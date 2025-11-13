@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 
 export interface GhgHotspot {
   organization_id: string
@@ -28,6 +28,7 @@ export function useGhgHotspots(): UseGhgHotspotsResult {
       setIsLoading(true)
       setError(null)
 
+      const supabase = createClient();
       const { data: hotspotsData, error: hotspotsError } = await supabase
         .from('ghg_hotspots_view')
         .select('*')

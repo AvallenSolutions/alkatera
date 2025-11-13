@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 
 export interface KpiSummary {
   kpi_id: string
@@ -31,6 +31,7 @@ export function useKpiSummary(): UseKpiSummaryResult {
       setIsLoading(true)
       setError(null)
 
+      const supabase = createClient();
       const { data: kpiData, error: kpiError } = await supabase
         .from('kpi_summary_view')
         .select('*')

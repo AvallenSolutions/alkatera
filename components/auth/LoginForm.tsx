@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase-browser"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,8 +54,8 @@ export function LoginForm() {
       }
 
       if (data.user) {
-        // Force a hard navigation to trigger middleware
-        window.location.href = "/dashboard"
+        router.refresh()
+        router.push("/dashboard")
       }
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.")

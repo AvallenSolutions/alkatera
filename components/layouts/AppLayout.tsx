@@ -2,13 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
+import { createClient } from '@/lib/supabase/client'
 import { useOrganization } from '@/lib/organizationContext'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { User } from '@supabase/supabase-js'
+import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -23,6 +23,8 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
+    const supabase = createClient()
+
     const checkAuth = async () => {
       const {
         data: { user },
@@ -35,7 +37,7 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (event === 'SIGNED_OUT') {
         setUser(null)
         router.push('/login')
