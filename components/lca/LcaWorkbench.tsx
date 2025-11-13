@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -37,7 +37,6 @@ interface LcaWorkbenchProps {
   onDataPointAdded?: () => void;
 }
 
-  const supabase = createClient()
 export function LcaWorkbench({
   facilityId,
   lcaReportId,

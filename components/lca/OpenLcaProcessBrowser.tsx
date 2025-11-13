@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import {
   Dialog,
   DialogContent,
@@ -56,7 +56,6 @@ export function OpenLcaProcessBrowser({
       setIsMockData(false);
 
       try {
-        const supabase = createClient()
         const { data: session } = await supabase.auth.getSession();
 
         if (!session.session) {

@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 import { Loader2 } from 'lucide-react'
-import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 
 interface ProtectedLayoutProps {
   children: React.ReactNode
@@ -19,8 +19,6 @@ export function ProtectedLayout({ children, requireOrganization = true }: Protec
   const [isAuthLoading, setIsAuthLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
-
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
@@ -29,7 +27,7 @@ export function ProtectedLayout({ children, requireOrganization = true }: Protec
 
     checkAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setUser(null)
         router.push('/login')

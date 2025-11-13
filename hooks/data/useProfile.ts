@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
 import type { User } from '@supabase/supabase-js'
 
 export interface Profile {
@@ -38,7 +38,6 @@ export function useProfile(): UseProfileResult {
 
   useEffect(() => {
     const getUser = async () => {
-      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -58,7 +57,6 @@ export function useProfile(): UseProfileResult {
       setIsLoading(true)
       setError(null)
 
-      const supabase = createClient();
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -99,7 +97,6 @@ export function useProfile(): UseProfileResult {
         updated_at: new Date().toISOString(),
       }
 
-      const supabase = createClient();
       const { data: updatedProfile, error: updateError } = await supabase
         .from('profiles')
         .update(updateData)

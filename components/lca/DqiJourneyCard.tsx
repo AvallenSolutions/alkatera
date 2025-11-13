@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, History, Award, AlertCircle } from 'lucide-react';
@@ -32,7 +32,6 @@ export function DqiJourneyCard({ organizationId }: DqiJourneyCardProps) {
     setIsLoading(true);
 
     try {
-      const supabase = createClient()
       // Fetch activity data points grouped by source type
       const { data: activityData, error } = await supabase
         .from('activity_data')
@@ -53,10 +52,10 @@ export function DqiJourneyCard({ organizationId }: DqiJourneyCardProps) {
       }
 
       // Count data points by tier
-      const tier1Count = activityData.filter((d: any) => d.source_type === 'linked_lca_report').length;
-      const tier2Count = activityData.filter((d: any) => d.source_type === 'supplier_provided').length;
+      const tier1Count = activityData.filter(d => d.source_type === 'linked_lca_report').length;
+      const tier2Count = activityData.filter(d => d.source_type === 'supplier_provided').length;
       const tier3Count = activityData.filter(
-        (d: any) => d.source_type === 'platform_estimate' || d.source_type === 'user_provided'
+        d => d.source_type === 'platform_estimate' || d.source_type === 'user_provided'
       ).length;
 
       const totalDataPoints = activityData.length;

@@ -18,31 +18,20 @@ interface QueryRequest {
 }
 
 /**
- * Environment-Aware OpenLCA Proxy with JSON-RPC Support
+ * Environment-Aware OpenLCA Proxy
  *
- * This Edge Function acts as a secure proxy to the OpenLCA database using
- * the JSON-RPC 2.0 protocol. It supports two execution modes:
+ * This Edge Function acts as a secure proxy to the OpenLCA database.
+ * It supports two execution modes:
  *
  * 1. LOCAL MODE (Development):
- *    - Proxies requests to http://host.docker.internal:8080 (OpenLCA desktop IPC server)
- *    - Uses Docker's special DNS to access host machine from container
+ *    - Proxies requests to http://localhost:8080 (OpenLCA desktop IPC server)
  *    - Requires developer to have OpenLCA desktop app running with IPC enabled
  *
  * 2. PRODUCTION MODE (Deployed):
  *    - Proxies requests to containerized OpenLCA headless server
  *    - URL configured via PRODUCTION_OPENLCA_URL environment variable
  *
- * JSON-RPC Protocol:
- * - Request: POST with body { "jsonrpc": "2.0", "id": 1, "method": "find", "params": {...} }
- * - Response: { "jsonrpc": "2.0", "id": 1, "result": [...] }
- *
- * The function:
- * - Wraps search terms in JSON-RPC format
- * - Unwraps results from JSON-RPC response
- * - Caches results for 1 hour to reduce load on OpenLCA
- * - Handles Docker networking (host.docker.internal for local dev)
- *
- * Environment variable: ENV_MODE (local or production)
+ * The function determines mode via ENV_MODE environment variable.
  */
 
 Deno.serve(async (req: Request) => {
@@ -147,8 +136,7 @@ Deno.serve(async (req: Request) => {
 
     if (envMode === "local") {
       // LOCAL MODE: Proxy to local OpenLCA desktop IPC server
-      // Use Docker's special DNS for accessing host machine from within container
-      openLcaHost = "http://host.docker.internal:8080";
+      openLcaHost = "http://localhost:8080";
       console.log(`[LOCAL MODE] Proxying to OpenLCA desktop at ${openLcaHost}`);
     } else if (envMode === "production") {
       // PRODUCTION MODE: Proxy to containerized headless server
@@ -166,31 +154,21 @@ Deno.serve(async (req: Request) => {
     // PROXY REQUEST TO OPENLCA
     // ========================================================================
 
-    // Construct the JSON-RPC request payload for a process search
-    // OpenLCA IPC server uses JSON-RPC 2.0 protocol
-    const requestBody = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "find",
-      params: {
-        type: "Process",
-        query: searchTerm,
-      },
-    };
+    // Construct the search endpoint URL
+    // OpenLCA IPC server search endpoint: GET /search?q=<term>
+    const openLcaUrl = `${openLcaHost}/search?q=${encodeURIComponent(searchTerm)}`;
 
-    console.log(`Fetching from OpenLCA: ${openLcaHost}`);
-    console.log(`Search query: "${searchTerm}"`);
+    console.log(`Fetching from OpenLCA: ${openLcaUrl}`);
 
     let openLcaResponse: Response;
 
     try {
-      openLcaResponse = await fetch(openLcaHost, {
-        method: "POST",
+      openLcaResponse = await fetch(openLcaUrl, {
+        method: "GET",
         headers: {
           "Accept": "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(requestBody),
         // Timeout for local connections
         signal: AbortSignal.timeout(envMode === "local" ? 5000 : 30000),
       });
@@ -220,26 +198,15 @@ Deno.serve(async (req: Request) => {
       throw new Error(`OpenLCA API error: ${openLcaResponse.status} ${openLcaResponse.statusText}`);
     }
 
-    // Parse JSON-RPC response
-    const jsonRpcResponse = await openLcaResponse.json();
-
-    // JSON-RPC 2.0 error handling
-    if (jsonRpcResponse.error) {
-      console.error("JSON-RPC error from OpenLCA:", jsonRpcResponse.error);
-      throw new Error(`OpenLCA error: ${jsonRpcResponse.error.message || "Unknown error"}`);
-    }
-
-    // Extract the result array from JSON-RPC response
-    const openLcaData = jsonRpcResponse.result || [];
-
-    console.log(`OpenLCA returned ${openLcaData.length} raw results`);
+    // Parse OpenLCA response
+    const openLcaData = await openLcaResponse.json();
 
     // ========================================================================
     // SANITIZE AND TRANSFORM RESPONSE
     // ========================================================================
 
-    // OpenLCA IPC server returns array of process objects via JSON-RPC
-    // Expected structure: { jsonrpc: "2.0", id: 1, result: [{ "@id": "...", "name": "...", "categoryPath": "..." }] }
+    // OpenLCA IPC server returns array of process objects
+    // Expected structure: [{ "@id": "...", "name": "...", "categoryPath": "..." }]
     const sanitizedResults: OpenLcaProcess[] = (openLcaData || [])
       .slice(0, 50)  // Limit to 50 results
       .map((process: any) => ({

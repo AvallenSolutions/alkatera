@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
 
 export interface ActivityEvent {
   event_id: string
@@ -28,7 +28,6 @@ export function useActivityStream(limit: number = 10): UseActivityStreamResult {
       setIsLoading(true)
       setError(null)
 
-      const supabase = createClient()
       const { data: activityData, error: activityError } = await supabase
         .from('activity_stream_view')
         .select('*')

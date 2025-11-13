@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Calculator, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 
 interface CalculationResult {
@@ -42,7 +42,6 @@ export default function CalculationsPage() {
     setLastResult(null);
 
     try {
-      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {
@@ -88,7 +87,6 @@ export default function CalculationsPage() {
     setScope12Error(null);
 
     try {
-      const supabase = createClient();
       if (!currentOrganization?.id) {
         setScope12Error('No organization selected. Please select an organization first.');
         return;

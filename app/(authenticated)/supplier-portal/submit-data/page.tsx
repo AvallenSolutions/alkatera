@@ -42,7 +42,7 @@ import {
   X,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { cn } from '@/lib/utils';
 
@@ -104,7 +104,6 @@ export default function SupplierDataSubmissionPage() {
 
     setIsLoadingRuns(true);
     try {
-      const supabase = createClient();
       const formattedPeriod = format(reportingPeriod, 'yyyy-MM-dd');
 
       const runsData: ProductionRun[] = [
@@ -127,7 +126,6 @@ export default function SupplierDataSubmissionPage() {
     setUploadingFiles(prev => ({ ...prev, [uploadKey]: true }));
 
     try {
-      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) {
         toast.error('You must be logged in to upload files');
@@ -221,7 +219,6 @@ export default function SupplierDataSubmissionPage() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
       if (!session.session) {
         toast.error('You must be logged in');

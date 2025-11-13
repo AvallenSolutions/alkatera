@@ -33,7 +33,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle2, Calculator, Flame, Zap } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 
 const scope1Schema = z.object({
@@ -107,7 +107,6 @@ export default function Scope12DataPage() {
     }
 
     try {
-      const supabase = createClient();
       const { data, error } = await supabase
         .from('facilities')
         .select('id, name, location')
@@ -135,7 +134,6 @@ export default function Scope12DataPage() {
     }
 
     try {
-      const supabase = createClient();
       const { data, error } = await supabase
         .from('activity_data')
         .select('id, name, category, quantity, unit, activity_date, created_at')
@@ -172,7 +170,6 @@ export default function Scope12DataPage() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {
@@ -228,7 +225,6 @@ export default function Scope12DataPage() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {
@@ -284,7 +280,6 @@ export default function Scope12DataPage() {
     setIsCalculating(true);
 
     try {
-      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {

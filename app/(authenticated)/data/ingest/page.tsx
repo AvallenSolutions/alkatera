@@ -22,7 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 
 const activityDataSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -59,7 +59,6 @@ export default function IngestActivityDataPage() {
     setIsSubmitting(true);
 
     try {
-      const supabase = createClient();
       const { data: session } = await supabase.auth.getSession();
 
       if (!session.session) {

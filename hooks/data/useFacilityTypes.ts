@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 
 export interface FacilityType {
   id: string;
@@ -18,7 +18,6 @@ export function useFacilityTypes() {
         setIsLoading(true);
         setError(null);
 
-      const supabase = createClient();
         const { data, error: fetchError } = await supabase
           .from('facility_types')
           .select('*')

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { supabase } from '@/lib/supabaseClient';
 import { LcaWorkbench } from '@/components/lca/LcaWorkbench';
 import { DqiJourneyCard } from '@/components/lca/DqiJourneyCard';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -18,7 +18,6 @@ export default function LcaWorkbenchPage() {
     setError(null);
 
     try {
-      const supabase = createClient();
       const { data, error } = await supabase
         .from('activity_data')
         .select('*')

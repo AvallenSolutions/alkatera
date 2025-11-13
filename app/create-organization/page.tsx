@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,7 +33,6 @@ export default function CreateOrganizationPage() {
     setIsLoading(true)
 
     try {
-      const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
