@@ -54,16 +54,8 @@ export function LoginForm() {
       }
 
       if (data.user && data.session) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        const { data: { session: verifiedSession } } = await supabase.auth.getSession()
-
-        if (verifiedSession) {
-          router.refresh()
-          router.push("/dashboard")
-        } else {
-          throw new Error("Session not established")
-        }
+        router.refresh()
+        router.push("/dashboard")
       }
     } catch (err: any) {
       console.error("Login error:", err)
