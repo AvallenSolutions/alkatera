@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { updatePassword } from '@/app/actions/auth'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Loader2 } from 'lucide-react'
 
 export function UpdatePasswordForm() {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -20,11 +21,21 @@ export function UpdatePasswordForm() {
     const formData = new FormData(e.currentTarget)
 
     try {
-      const result = await updatePassword(formData)
-      if (result?.error) {
-        setError(result.error)
+      const response = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to update password')
         setLoading(false)
+        return
       }
+
+      router.push('/dashboard')
+      router.refresh()
     } catch (err) {
       setError('An unexpected error occurred')
       setLoading(false)

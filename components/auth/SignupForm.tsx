@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { signup } from '@/app/actions/auth'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 
 export function SignupForm() {
+  const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -22,13 +23,25 @@ export function SignupForm() {
     const formData = new FormData(e.currentTarget)
 
     try {
-      const result = await signup(formData)
-      if (result?.error) {
-        setError(result.error)
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to create account')
         setLoading(false)
-      } else if (result?.success && result?.message) {
-        setSuccess(result.message)
+        return
+      }
+
+      if (data.requiresConfirmation) {
+        setSuccess(data.message)
         setLoading(false)
+      } else {
+        router.push('/dashboard')
+        router.refresh()
       }
     } catch (err) {
       setError('An unexpected error occurred')

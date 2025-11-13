@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { requestPasswordReset } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,11 +21,17 @@ export function PasswordResetRequestForm() {
     const formData = new FormData(e.currentTarget)
 
     try {
-      const result = await requestPasswordReset(formData)
-      if (result?.error) {
-        setError(result.error)
-      } else if (result?.success && result?.message) {
-        setSuccess(result.message)
+      const response = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || 'Failed to send reset instructions')
+      } else {
+        setSuccess(data.message)
       }
       setLoading(false)
     } catch (err) {
