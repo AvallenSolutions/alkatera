@@ -84,16 +84,16 @@ export function SignupForm() {
         throw signUpError
       }
 
-      if (data.user) {
+      if (data.user && data.session) {
         setSuccess(true)
+        // Wait for user to see success message, then navigate
         setTimeout(() => {
-          router.refresh()
-          router.push("/dashboard")
+          // Force a full page reload to ensure middleware processes the session
+          window.location.href = "/dashboard"
         }, 2000)
       }
     } catch (err: any) {
       setError(err.message || "Failed to create account. Please try again.")
-    } finally {
       setLoading(false)
     }
   }

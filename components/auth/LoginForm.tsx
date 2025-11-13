@@ -53,9 +53,12 @@ export function LoginForm() {
         throw signInError
       }
 
-      if (data.user) {
-        router.refresh()
-        router.push("/dashboard")
+      if (data.user && data.session) {
+        // Wait a brief moment for the session to be fully established
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // Force a full page reload to ensure middleware processes the session
+        window.location.href = "/dashboard"
       }
     } catch (err: any) {
       setError(err.message || "Failed to sign in. Please check your credentials.")

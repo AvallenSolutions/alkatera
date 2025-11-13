@@ -68,12 +68,11 @@ export function UpdatePasswordForm() {
 
       setSuccess(true)
       setTimeout(() => {
-        router.refresh()
-        router.push("/dashboard")
+        // Force a full page reload to ensure middleware processes the session
+        window.location.href = "/dashboard"
       }, 2000)
     } catch (err: any) {
       setError(err.message || "Failed to update password. Please try again.")
-    } finally {
       setLoading(false)
     }
   }
