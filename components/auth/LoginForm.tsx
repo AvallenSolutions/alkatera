@@ -37,7 +37,12 @@ export function LoginForm() {
       router.push('/dashboard')
       router.refresh()
     } catch (err) {
-      setError('An unexpected error occurred')
+      console.error('[LoginForm] Error:', err)
+      if (err instanceof TypeError && err.message.includes('fetch')) {
+        setError('Could not connect to server. Please check your connection and try again.')
+      } else {
+        setError('An unexpected error occurred. Please try again.')
+      }
       setLoading(false)
     }
   }

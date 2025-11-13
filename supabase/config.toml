@@ -1,0 +1,19 @@
+# Supabase Configuration File
+# Note: For managed Supabase instances, CORS settings must be configured in the Supabase Dashboard
+# This file is provided for local development reference
+
+[http.cors]
+# Allow requests from development and production origins
+allowed_origins = ["http://localhost:3000", "https://*.stackblitz.io", "https://*.bolt.new"]
+
+# HTTP methods that can be used
+allowed_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
+# Headers that can be included in requests
+allowed_headers = ["authorization", "x-client-info", "apikey", "content-type"]
+
+# Allow credentials (cookies, authorization headers)
+allow_credentials = true
+
+# Cache preflight requests for 24 hours
+max_age_secs = 86400
