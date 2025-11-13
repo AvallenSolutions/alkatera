@@ -14,8 +14,23 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, User, Menu, X } from 'lucide-react'
+import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Plus } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { cn } from '@/lib/utils'
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -24,9 +39,10 @@ interface HeaderProps {
 
 export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   const router = useRouter()
-  const { currentOrganization } = useOrganization()
+  const { currentOrganization, organizations, switchOrganization } = useOrganization()
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [signingOut, setSigningOut] = useState(false)
+  const [orgPopoverOpen, setOrgPopoverOpen] = useState(false)
 
   useEffect(() => {
     const getUser = async () => {
@@ -81,14 +97,68 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
             <span className="sr-only">Toggle menu</span>
           </Button>
 
-          <div className="flex flex-col">
-            <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {currentOrganization?.name || 'AlkaTera'}
-            </h1>
-            <p className="text-xs text-muted-foreground hidden sm:block">
-              Carbon Management Platform
-            </p>
-          </div>
+          {organizations.length > 0 && (
+            <Popover open={orgPopoverOpen} onOpenChange={setOrgPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={orgPopoverOpen}
+                  className="w-[200px] justify-between"
+                >
+                  <div className="flex items-centre gap-2 overflow-hidden">
+                    <Building2 className="h-4 w-4 shrink-0" />
+                    <span className="truncate text-sm">
+                      {currentOrganization?.name || 'Select organisation'}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[240px] p-0">
+                <Command>
+                  <CommandInput placeholder="Search organisations..." />
+                  <CommandList>
+                    <CommandEmpty>No organisations found.</CommandEmpty>
+                    <CommandGroup heading="Your Organisations">
+                      {organizations.map((org) => (
+                        <CommandItem
+                          key={org.id}
+                          value={org.name}
+                          onSelect={() => {
+                            switchOrganization(org.id)
+                            setOrgPopoverOpen(false)
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              'mr-2 h-4 w-4',
+                              currentOrganization?.id === org.id
+                                ? 'opacity-100'
+                                : 'opacity-0'
+                            )}
+                          />
+                          {org.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    <CommandSeparator />
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={() => {
+                          router.push('/create-organization')
+                          setOrgPopoverOpen(false)
+                        }}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create organisation
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
 
         <div className="flex items-centre gap-4">
