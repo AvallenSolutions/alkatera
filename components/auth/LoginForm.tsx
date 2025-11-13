@@ -44,7 +44,7 @@ export function LoginForm() {
     setLoading(true)
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -53,10 +53,7 @@ export function LoginForm() {
         throw signInError
       }
 
-      if (data.user && data.session) {
-        router.refresh()
-        router.push("/dashboard")
-      }
+      window.location.href = "/dashboard"
     } catch (err: any) {
       console.error("Login error:", err)
       setError(err.message || "Failed to sign in. Please check your credentials.")

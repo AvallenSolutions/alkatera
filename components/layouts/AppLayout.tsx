@@ -13,7 +13,7 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, requireOrganization = true }: AppLayoutProps) {
-  const { currentOrganization, isLoading: isOrganizationLoading } = useOrganization()
+  const { isLoading: isOrganizationLoading } = useOrganization()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -33,17 +33,6 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-slate-600 dark:text-slate-400" />
           <p className="text-sm text-muted-foreground">Loading...</p>
-        </div>
-      </main>
-    )
-  }
-
-  if (requireOrganization && !currentOrganization) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-slate-600 dark:text-slate-400" />
-          <p className="text-sm text-muted-foreground">Setting up your workspace...</p>
         </div>
       </main>
     )
