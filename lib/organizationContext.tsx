@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
 interface Organization {
@@ -34,6 +34,8 @@ interface OrganizationContextType {
 
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined)
 
+const PUBLIC_ROUTES = ['/login', '/signup', '/password-reset', '/update-password', '/auth/callback', '/']
+
 export function OrganizationProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
   const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null)
@@ -42,29 +44,33 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
+  const pathname = usePathname()
 
   const fetchOrganizations = async () => {
+    if (PUBLIC_ROUTES.includes(pathname)) {
+      setIsLoading(false)
+      return
+    }
+
     const timeoutId = setTimeout(() => {
       console.warn('Organization fetch timeout - stopping loading state')
       setIsLoading(false)
     }, 10000)
 
     try {
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
 
-      if (userError) {
-        console.error('Error fetching user:', userError)
-        clearTimeout(timeoutId)
-        setIsLoading(false)
-        return
-      }
-
-      if (!currentUser) {
+      if (!session) {
         setUser(null)
+        setCurrentOrganization(null)
+        setOrganizations([])
+        setUserRole(null)
         clearTimeout(timeoutId)
         setIsLoading(false)
         return
       }
+
+      const currentUser = session.user
 
       setUser(currentUser)
 
@@ -175,12 +181,18 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }
 
   useEffect(() => {
-    fetchOrganizations()
+    if (!PUBLIC_ROUTES.includes(pathname)) {
+      fetchOrganizations()
+    } else {
+      setIsLoading(false)
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
-        fetchOrganizations()
+        if (!PUBLIC_ROUTES.includes(pathname)) {
+          fetchOrganizations()
+        }
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setCurrentOrganization(null)
@@ -196,7 +208,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     return () => {
       subscription.unsubscribe()
     }
-  }, [router])
+  }, [router, pathname])
 
   return (
     <OrganizationContext.Provider

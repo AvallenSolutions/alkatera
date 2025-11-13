@@ -54,12 +54,19 @@ export function LoginForm() {
       }
 
       if (data.user && data.session) {
-        // Use router.refresh() to update the router cache and ensure middleware re-evaluates
-        router.refresh()
-        // Navigate using Next.js router for proper middleware processing
-        router.push("/dashboard")
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        const { data: { session: verifiedSession } } = await supabase.auth.getSession()
+
+        if (verifiedSession) {
+          router.refresh()
+          router.push("/dashboard")
+        } else {
+          throw new Error("Session not established")
+        }
       }
     } catch (err: any) {
+      console.error("Login error:", err)
       setError(err.message || "Failed to sign in. Please check your credentials.")
       setLoading(false)
     }

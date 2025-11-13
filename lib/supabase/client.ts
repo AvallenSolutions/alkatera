@@ -1,12 +1,6 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-let client: ReturnType<typeof createBrowserClient> | null = null
-
 export function createClient() {
-  if (client) {
-    return client
-  }
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -14,7 +8,11 @@ export function createClient() {
     throw new Error('Missing Supabase environment variables. Please check your .env file.')
   }
 
-  client = createBrowserClient(supabaseUrl, supabaseAnonKey)
-
-  return client
+  return createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  })
 }
