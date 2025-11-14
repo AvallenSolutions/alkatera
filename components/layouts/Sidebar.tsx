@@ -5,112 +5,66 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
-  Leaf,
-  Users,
+  Database,
   Building2,
   FileText,
-  Settings,
-  TrendingUp,
-  Package,
-  Database,
-  Calculator,
-  Trash2,
-  Droplets,
+  Target,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
+import { useState } from 'react'
+
+interface NavLink {
+  name: string
+  href: string
+}
 
 interface NavItem {
   name: string
-  path: string
-  icon: any
+  href?: string
+  icon?: any
+  links?: NavLink[]
 }
 
-interface NavSection {
-  title?: string
-  items: NavItem[]
-}
-
-const navigationSections: NavSection[] = [
+const navigationStructure: NavItem[] = [
   {
-    items: [
-      {
-        name: 'Dashboard',
-        path: '/dashboard',
-        icon: LayoutDashboard,
-      },
-      {
-        name: 'Emissions',
-        path: '/emissions',
-        icon: Leaf,
-      },
-      {
-        name: 'Suppliers',
-        path: '/suppliers',
-        icon: Building2,
-      },
-      {
-        name: 'Facilities',
-        path: '/company/facilities',
-        icon: Package,
-      },
-      {
-        name: 'KPIs',
-        path: '/kpis',
-        icon: TrendingUp,
-      },
-      {
-        name: 'Reports',
-        path: '/reports',
-        icon: FileText,
-      },
+    name: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    name: 'Data Hub',
+    icon: Database,
+    links: [
+      { name: 'Scope 1: Direct Emissions', href: '/dashboard/data-hub/scope-1' },
+      { name: 'Scope 2: Purchased Energy', href: '/dashboard/data-hub/scope-2' },
+      { name: 'Scope 3: Value Chain', href: '/dashboard/data-hub/scope-3' },
     ],
   },
   {
-    title: 'Data Entry',
-    items: [
-      {
-        name: 'Scope 1 & 2',
-        path: '/data/scope-1-2',
-        icon: Leaf,
-      },
-      {
-        name: 'Water Footprint',
-        path: '/data/water-footprint',
-        icon: Droplets,
-      },
-      {
-        name: 'Waste & Circularity',
-        path: '/data/waste-and-circularity',
-        icon: Trash2,
-      },
-      {
-        name: 'Activity Data (Dev)',
-        path: '/data/ingest',
-        icon: Database,
-      },
+    name: 'Company Settings',
+    icon: Building2,
+    links: [
+      { name: 'Facilities', href: '/company/facilities' },
+      { name: 'Suppliers', href: '/dashboard/company/suppliers' },
+      { name: 'Products', href: '/dashboard/company/products' },
+      { name: 'Team Members', href: '/dashboard/settings/team' },
     ],
   },
   {
-    title: 'Reporting',
-    items: [
-      {
-        name: 'Run Calculations',
-        path: '/reporting/calculations',
-        icon: Calculator,
-      },
+    name: 'Reports',
+    icon: FileText,
+    links: [
+      { name: 'Sustainability Reports', href: '/dashboard/reports/sustainability' },
+      { name: 'Product LCA Reports', href: '/dashboard/reports/product-lca' },
     ],
   },
   {
-    items: [
-      {
-        name: 'Team',
-        path: '/dashboard/settings/team',
-        icon: Users,
-      },
-      {
-        name: 'Settings',
-        path: '/settings',
-        icon: Settings,
-      },
+    name: 'Goals & KPIs',
+    icon: Target,
+    links: [
+      { name: 'SMART Goals', href: '/dashboard/goals/smart-goals' },
+      { name: 'KPI Management', href: '/dashboard/goals/kpi-management' },
     ],
   },
 ]
@@ -121,12 +75,29 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
+  const [expandedSections, setExpandedSections] = useState<string[]>([
+    'Data Hub',
+    'Company Settings',
+  ])
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
       return pathname === path
     }
     return pathname.startsWith(path)
+  }
+
+  const isAnySectionLinkActive = (links?: NavLink[]) => {
+    if (!links) return false
+    return links.some((link) => isActive(link.href))
+  }
+
+  const toggleSection = (sectionName: string) => {
+    setExpandedSections((prev) =>
+      prev.includes(sectionName)
+        ? prev.filter((name) => name !== sectionName)
+        : [...prev, sectionName]
+    )
   }
 
   return (
@@ -143,36 +114,79 @@ export function Sidebar({ className }: SidebarProps) {
         <p className="text-xs text-muted-foreground">Carbon Management</p>
       </div>
 
-      <nav className="flex-1 space-y-4">
-        {navigationSections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className="space-y-1">
-            {section.title && (
-              <h3 className="px-3 mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                {section.title}
-              </h3>
-            )}
-            {section.items.map((item) => {
-              const IconComponent = item.icon
-              const active = isActive(item.path)
+      <nav className="flex-1 space-y-1">
+        {navigationStructure.map((item) => {
+          const IconComponent = item.icon
+          const hasLinks = item.links && item.links.length > 0
+          const isExpanded = expandedSections.includes(item.name)
+          const isSectionActive = hasLinks && isAnySectionLinkActive(item.links)
 
-              return (
-                <Link
-                  key={item.path}
-                  href={item.path}
+          if (hasLinks) {
+            return (
+              <div key={item.name} className="space-y-1">
+                <button
+                  onClick={() => toggleSection(item.name)}
                   className={cn(
-                    'flex items-centre gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-                    active
-                      ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
+                    'flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
+                    isSectionActive
+                      ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-slate-100'
                       : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
                   )}
                 >
-                  <IconComponent className="h-4 w-4 flex-shrink-0" />
-                  <span className="truncate">{item.name}</span>
-                </Link>
-              )
-            })}
-          </div>
-        ))}
+                  <div className="flex items-center gap-3">
+                    {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0" />}
+                    <span className="truncate">{item.name}</span>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                  )}
+                </button>
+
+                {isExpanded && item.links && (
+                  <div className="ml-4 space-y-1 border-l border-slate-200 dark:border-slate-800 pl-3">
+                    {item.links.map((link) => {
+                      const active = isActive(link.href)
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          className={cn(
+                            'flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-all',
+                            active
+                              ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900 font-medium'
+                              : 'text-slate-600 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800/50'
+                          )}
+                        >
+                          <span className="truncate">{link.name}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
+          const active = item.href ? isActive(item.href) : false
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href || '#'}
+              className={cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
+                active
+                  ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
+                  : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
+              )}
+            >
+              {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0" />}
+              <span className="truncate">{item.name}</span>
+            </Link>
+          )
+        })}
       </nav>
     </aside>
   )
