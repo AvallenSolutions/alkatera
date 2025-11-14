@@ -149,6 +149,7 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const openLcaApiUrl = Deno.env.get("OPENLCA_API_URL");
     const openLcaApiKey = Deno.env.get("OPENLCA_API_KEY");
+    const executionEnvironment = Deno.env.get("EXECUTION_ENVIRONMENT") || "unknown";
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -240,6 +241,7 @@ Deno.serve(async (req: Request) => {
         product_lca_id: payload.product_lca_id,
         status: "pending",
         request_payload: openLcaPayload,
+        environment: executionEnvironment,
       })
       .select("id")
       .single();
@@ -271,12 +273,17 @@ Deno.serve(async (req: Request) => {
       };
       apiSuccess = true;
     } else {
+      const requestHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (openLcaApiKey && openLcaApiKey.trim() !== "") {
+        requestHeaders["Authorization"] = `Bearer ${openLcaApiKey}`;
+      }
+
       const apiResponseRaw = await fetch(openLcaApiUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${openLcaApiKey}`,
-        },
+        headers: requestHeaders,
         body: JSON.stringify(openLcaPayload),
       });
 
@@ -323,6 +330,7 @@ Deno.serve(async (req: Request) => {
           status: "success",
           response_data: apiResponse,
           calculation_duration_ms: calculationDuration,
+          environment: executionEnvironment,
         })
         .eq("id", logId);
     }
@@ -333,6 +341,7 @@ Deno.serve(async (req: Request) => {
         message: "LCA calculation completed successfully",
         results_count: resultsToInsert.length,
         calculation_duration_ms: calculationDuration,
+        environment: executionEnvironment,
       }),
       {
         status: 200,
@@ -346,6 +355,7 @@ Deno.serve(async (req: Request) => {
     console.error("Error in invoke-openlca:", error);
 
     const calculationDuration = Date.now() - startTime;
+    const executionEnvironment = Deno.env.get("EXECUTION_ENVIRONMENT") || "unknown";
 
     if (logId) {
       try {
@@ -359,6 +369,7 @@ Deno.serve(async (req: Request) => {
             status: "failed",
             error_message: error.message,
             calculation_duration_ms: calculationDuration,
+            environment: executionEnvironment,
           })
           .eq("id", logId);
 
@@ -382,6 +393,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: false,
         error: error.message || "An unexpected error occurred",
+        environment: executionEnvironment,
       }),
       {
         status: statusCode,
