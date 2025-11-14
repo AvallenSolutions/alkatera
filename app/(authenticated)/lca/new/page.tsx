@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +85,8 @@ export default function NewLCAPage() {
   const { currentOrganization } = useOrganization();
   const [step, setStep] = useState<number>(1);
   const [saving, setSaving] = useState(false);
+  const [calculating, setCalculating] = useState(false);
+  const [savedLcaId, setSavedLcaId] = useState<string | null>(null);
 
   const [lcaDefinition, setLcaDefinition] = useState<LCADefinition>({
     product_name: "",
@@ -203,7 +205,7 @@ export default function NewLCAPage() {
       }
 
       toast.success("LCA draft saved successfully");
-      router.push("/dashboard/reports/product-lca");
+      setSavedLcaId(result.lca_id);
     } catch (error: any) {
       console.error("Error saving LCA:", error);
       toast.error(error.message || "Failed to save LCA draft");
@@ -211,6 +213,51 @@ export default function NewLCAPage() {
       setSaving(false);
     }
   };
+
+  const handleCalculateLca = useCallback(async () => {
+    if (!savedLcaId) {
+      toast.error("Please save the draft first");
+      return;
+    }
+
+    setCalculating(true);
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+
+      if (!session.session) {
+        toast.error("You must be logged in");
+        return;
+      }
+
+      const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-openlca`;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product_lca_id: savedLcaId,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to calculate LCA");
+      }
+
+      toast.success("LCA calculation completed successfully!");
+      router.push("/dashboard/reports/product-lca");
+    } catch (error: any) {
+      console.error("Error calculating LCA:", error);
+      toast.error(error.message || "Failed to calculate LCA");
+    } finally {
+      setCalculating(false);
+    }
+  }, [savedLcaId, router]);
 
   const totalInputs = Object.values(inputs).flat().length;
 
@@ -453,28 +500,52 @@ export default function NewLCAPage() {
             <Separator />
 
             <div className="flex flex-col gap-3 pt-4">
-              <Button size="lg" onClick={handleSaveDraft} disabled={saving}>
-                {saving ? (
+              {!savedLcaId ? (
+                <Button size="lg" onClick={handleSaveDraft} disabled={saving}>
+                  {saving ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Saving Draft...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-5 w-5" />
+                      Save Draft
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Alert className="bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800">
+                  <AlertDescription className="text-green-700 dark:text-green-300">
+                    Draft saved successfully! You can now calculate the LCA.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                size="lg"
+                variant={savedLcaId ? "default" : "secondary"}
+                disabled={!savedLcaId || calculating}
+                onClick={handleCalculateLca}
+              >
+                {calculating ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Saving Draft...
+                    Calculating...
                   </>
                 ) : (
                   <>
-                    <Save className="mr-2 h-5 w-5" />
-                    Save Draft
+                    <Calculator className="mr-2 h-5 w-5" />
+                    Calculate LCA
                   </>
                 )}
               </Button>
 
-              <Button size="lg" variant="secondary" disabled={true}>
-                <Calculator className="mr-2 h-5 w-5" />
-                Calculate LCA (Available in Phase 2)
-              </Button>
-
-              <p className="text-xs text-center text-muted-foreground">
-                The calculation engine will be available in the next phase
-              </p>
+              {!savedLcaId && (
+                <p className="text-xs text-center text-muted-foreground">
+                  Save the draft first to enable calculation
+                </p>
+              )}
             </div>
 
             <div className="flex justify-start pt-4 border-t">
