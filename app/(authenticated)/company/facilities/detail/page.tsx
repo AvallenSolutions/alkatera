@@ -6,11 +6,17 @@ import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus, ArrowLeft } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Plus, ArrowLeft, Calculator, TrendingUp } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ActivityDataTable } from "@/components/facilities/ActivityDataTable";
 import { AddActivityDataModal } from "@/components/facilities/AddActivityDataModal";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface Facility {
   id: string;
@@ -56,12 +62,20 @@ export default function FacilityDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isScope1ModalOpen, setIsScope1ModalOpen] = useState(false);
   const [isScope2ModalOpen, setIsScope2ModalOpen] = useState(false);
+  const [isCalculateModalOpen, setIsCalculateModalOpen] = useState(false);
+  const [reportingPeriodStart, setReportingPeriodStart] = useState("");
+  const [reportingPeriodEnd, setReportingPeriodEnd] = useState("");
+  const [calculating, setCalculating] = useState(false);
+  const [calculationResults, setCalculationResults] = useState<any>(null);
+  const [existingCalculations, setExistingCalculations] = useState<any[]>([]);
+  const [loadingCalculations, setLoadingCalculations] = useState(false);
 
   useEffect(() => {
     if (facilityId) {
       fetchFacilityData();
       fetchEmissionSources();
       fetchActivityData();
+      fetchExistingCalculations();
     } else {
       setLoading(false);
       setError("No facility ID provided");
@@ -136,6 +150,95 @@ export default function FacilityDetailPage() {
     fetchActivityData();
     setIsScope1ModalOpen(false);
     setIsScope2ModalOpen(false);
+  };
+
+  const fetchExistingCalculations = async () => {
+    setLoadingCalculations(true);
+    try {
+      const { data, error } = await supabase
+        .from("facility_emissions_aggregated")
+        .select("*")
+        .eq("facility_id", facilityId)
+        .order("calculation_date", { ascending: false });
+
+      if (error) throw error;
+      setExistingCalculations(data || []);
+    } catch (err: any) {
+      console.error("Error fetching calculations:", err);
+    } finally {
+      setLoadingCalculations(false);
+    }
+  };
+
+  const handleCalculateEmissions = async () => {
+    if (!reportingPeriodStart || !reportingPeriodEnd) {
+      toast.error("Please select both start and end dates");
+      return;
+    }
+
+    if (new Date(reportingPeriodStart) > new Date(reportingPeriodEnd)) {
+      toast.error("Start date must be before end date");
+      return;
+    }
+
+    setCalculating(true);
+    setCalculationResults(null);
+
+    try {
+      const { data: session } = await supabase.auth.getSession();
+
+      if (!session.session) {
+        toast.error("You must be logged in");
+        return;
+      }
+
+      const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-corporate-calculations`;
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          facility_id: facilityId,
+          reporting_period: {
+            start: reportingPeriodStart,
+            end: reportingPeriodEnd,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to calculate emissions");
+      }
+
+      setCalculationResults(result);
+      toast.success("Emissions calculated successfully!");
+      await fetchExistingCalculations();
+    } catch (error: any) {
+      console.error("Error calculating emissions:", error);
+      toast.error(error.message || "Failed to calculate emissions");
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  const formatValue = (value: number) => {
+    if (value >= 1000) {
+      return value.toLocaleString("en-GB", { maximumFractionDigits: 0 });
+    }
+    return value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   if (loading) {
@@ -228,6 +331,71 @@ export default function FacilityDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Corporate Emissions Calculations</CardTitle>
+                  <CardDescription>
+                    Calculate total Scope 1 & 2 emissions for this facility by reporting period
+                  </CardDescription>
+                </div>
+                <Button onClick={() => setIsCalculateModalOpen(true)} size="lg" className="gap-2">
+                  <Calculator className="h-5 w-5" />
+                  Calculate Emissions
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingCalculations ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : existingCalculations.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    No calculations performed yet. Click "Calculate Emissions" to get started.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reporting Period</TableHead>
+                        <TableHead className="text-right">Total CO₂e</TableHead>
+                        <TableHead>Unit</TableHead>
+                        <TableHead>Calculated</TableHead>
+                        <TableHead className="text-right">Sources</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {existingCalculations.map((calc) => (
+                        <TableRow key={calc.id}>
+                          <TableCell className="font-medium">
+                            {formatDate(calc.reporting_period_start)} - {formatDate(calc.reporting_period_end)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-lg">
+                            {formatValue(calc.total_co2e)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{calc.unit}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(calc.calculation_date)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground">
+                            {Object.keys(calc.results_payload?.disaggregated_summary || {}).length} sources
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="scope1" className="space-y-4">
@@ -294,6 +462,142 @@ export default function FacilityDetailPage() {
             emissionSources={scope2Sources}
             onSuccess={handleDataAdded}
           />
+
+          <Dialog open={isCalculateModalOpen} onOpenChange={setIsCalculateModalOpen}>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Calculate Corporate Emissions</DialogTitle>
+                <DialogDescription>
+                  Calculate total Scope 1 and Scope 2 emissions for {facility.name}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="period-start">Reporting Period Start *</Label>
+                    <Input
+                      id="period-start"
+                      type="date"
+                      value={reportingPeriodStart}
+                      onChange={(e) => setReportingPeriodStart(e.target.value)}
+                      disabled={calculating}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="period-end">Reporting Period End *</Label>
+                    <Input
+                      id="period-end"
+                      type="date"
+                      value={reportingPeriodEnd}
+                      onChange={(e) => setReportingPeriodEnd(e.target.value)}
+                      disabled={calculating}
+                    />
+                  </div>
+                </div>
+
+                {calculationResults && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center gap-2 text-green-600">
+                      <TrendingUp className="h-5 w-5" />
+                      <span className="font-semibold">Calculation Complete</span>
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-6">
+                      <div className="text-center">
+                        <p className="text-sm text-muted-foreground mb-2">Total CO₂ Equivalent</p>
+                        <p className="text-4xl font-bold text-primary">
+                          {formatValue(calculationResults.total_co2e)}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">{calculationResults.unit}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h4 className="font-semibold mb-2">Disaggregated Summary by Source</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Emission Source</TableHead>
+                            <TableHead className="text-right">CO₂e</TableHead>
+                            <TableHead className="text-right">% of Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {Object.entries(calculationResults.disaggregated_summary || {}).map(
+                            ([source, value]: [string, any]) => {
+                              const percentage = (value / calculationResults.total_co2e) * 100;
+                              return (
+                                <TableRow key={source}>
+                                  <TableCell className="font-medium">{source}</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {formatValue(value)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-muted-foreground">
+                                    {percentage.toFixed(1)}%
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                      <div>
+                        <span className="font-medium">Activity Records:</span>{" "}
+                        {calculationResults.activity_records_processed}
+                      </div>
+                      <div>
+                        <span className="font-medium">Duration:</span>{" "}
+                        {calculationResults.calculation_duration_ms}ms
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                {!calculationResults ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsCalculateModalOpen(false)}
+                      disabled={calculating}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCalculateEmissions} disabled={calculating}>
+                      {calculating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Calculating...
+                        </>
+                      ) : (
+                        <>
+                          <Calculator className="mr-2 h-4 w-4" />
+                          Calculate
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      setIsCalculateModalOpen(false);
+                      setCalculationResults(null);
+                      setReportingPeriodStart("");
+                      setReportingPeriodEnd("");
+                    }}
+                  >
+                    Close
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>

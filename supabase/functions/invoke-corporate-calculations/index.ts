@@ -3,32 +3,27 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+interface InvokePayload {
+  facility_id: string;
+  reporting_period: {
+    start: string;
+    end: string;
+  };
+}
+
 interface ActivityDataRecord {
   id: string;
-  organization_id: string;
   quantity: number;
   unit: string;
-  name: string;
-  category: string;
-}
-
-interface EmissionsFactorRecord {
-  factor_id: string;
-  name: string;
-  value: number;
-  unit: string;
-  source: string;
-}
-
-interface CalculationResult {
-  organization_id: string;
-  activity_data_id: string;
-  emissions_factor_id: string;
-  calculated_value_co2e: number;
+  emission_source_id: string;
+  emission_source_name: string;
+  emission_factor_id: string;
+  emission_factor_value: number;
+  emission_factor_unit: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -39,265 +34,270 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const startTime = Date.now();
+  let logId: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const authHeader = req.headers.get("Authorization")!;
+    const executionEnvironment = Deno.env.get("EXECUTION_ENVIRONMENT") || "unknown";
 
-    // Create client to verify user authentication
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          Authorization: authHeader,
-        },
-      },
-    });
-
-    // Verify user is authenticated
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      throw new Error("Missing authorization header");
     }
 
-    // Get user's organization_id
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        persistSession: false,
+    const token = authHeader.replace("Bearer ", "");
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      global: {
+        headers: { Authorization: authHeader },
       },
     });
 
-    const { data: memberData, error: memberError } = await supabaseAdmin
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+    if (userError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const payload: InvokePayload = await req.json();
+
+    if (!payload.facility_id || !payload.reporting_period) {
+      throw new Error("Missing required fields: facility_id and reporting_period");
+    }
+
+    const { facility_id, reporting_period } = payload;
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(facility_id)) {
+      throw new Error("Invalid UUID format for facility_id");
+    }
+
+    if (!reporting_period.start || !reporting_period.end) {
+      throw new Error("Reporting period must include start and end dates");
+    }
+
+    const { data: facility, error: facilityError } = await supabase
+      .from("facilities")
+      .select("id, organization_id, name")
+      .eq("id", facility_id)
+      .single();
+
+    if (facilityError || !facility) {
+      throw new Error("Facility not found");
+    }
+
+    const { data: membership, error: membershipError } = await supabase
       .from("organization_members")
-      .select("organization_id")
+      .select("id, role")
+      .eq("organization_id", facility.organization_id)
       .eq("user_id", user.id)
       .single();
 
-    if (memberError || !memberData) {
-      return new Response(
-        JSON.stringify({ error: "User is not a member of any organization" }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (membershipError || !membership) {
+      throw new Error("User is not a member of the facility's organization");
     }
 
-    const organizationId = memberData.organization_id;
+    const { data: existingCalc } = await supabase
+      .from("facility_emissions_aggregated")
+      .select("id")
+      .eq("facility_id", facility_id)
+      .eq("reporting_period_start", reporting_period.start)
+      .eq("reporting_period_end", reporting_period.end)
+      .maybeSingle();
 
-    // Fetch all activity data for the organization
-    const { data: activityData, error: activityError } = await supabaseAdmin
-      .from("activity_data")
-      .select("id, organization_id, quantity, unit, name, category")
-      .eq("organization_id", organizationId);
+    if (existingCalc) {
+      throw new Error("Calculation already exists for this facility and reporting period");
+    }
+
+    const inputData = {
+      facility_id,
+      reporting_period,
+      user_id: user.id,
+      organization_id: facility.organization_id,
+    };
+
+    const { data: calcLog, error: logError } = await supabase
+      .from("calculation_logs")
+      .insert({
+        organization_id: facility.organization_id,
+        user_id: user.id,
+        input_data: inputData,
+        output_value: 0,
+        output_unit: "kg CO₂e",
+        methodology_version: "Corporate Calculation Engine v1.0",
+        factor_ids_used: [],
+      })
+      .select("log_id")
+      .single();
+
+    if (logError || !calcLog) {
+      console.error("Failed to create calculation log:", logError);
+    } else {
+      logId = calcLog.log_id;
+    }
+
+    const { data: activityData, error: activityError } = await supabase
+      .from("facility_activity_data")
+      .select(`
+        id,
+        quantity,
+        unit,
+        emission_source_id,
+        emissions_factors!facility_activity_data_emission_source_id_fkey (
+          factor_id,
+          name,
+          value,
+          unit
+        )
+      `)
+      .eq("facility_id", facility_id)
+      .gte("reporting_period_start", reporting_period.start)
+      .lte("reporting_period_end", reporting_period.end);
 
     if (activityError) {
-      console.error("Error fetching activity data:", activityError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch activity data", details: activityError.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      throw new Error(`Failed to fetch activity data: ${activityError.message}`);
     }
 
     if (!activityData || activityData.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "No activity data found for calculation",
-          calculations_performed: 0
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      throw new Error("No activity data found for this facility and reporting period");
     }
 
-    // Fetch all emissions factors
-    const { data: emissionsFactors, error: factorsError } = await supabaseAdmin
-      .from("emissions_factors")
-      .select("factor_id, name, value, unit, source");
+    let totalEmissions = 0;
+    const disaggregatedSummary: Record<string, number> = {};
+    const activityDataIds: string[] = [];
+    const emissionFactorIds: string[] = [];
 
-    if (factorsError) {
-      console.error("Error fetching emissions factors:", factorsError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch emissions factors", details: factorsError.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    if (!emissionsFactors || emissionsFactors.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: "No emissions factors found in database",
-          message: "Please ensure emissions factors are loaded before running calculations"
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    // Perform calculations
-    const calculationResults: CalculationResult[] = [];
-    const unmatchedActivities: string[] = [];
-
-    for (const activity of activityData as ActivityDataRecord[]) {
-      // Find matching emissions factor by unit
-      const matchingFactor = (emissionsFactors as EmissionsFactorRecord[]).find(
-        (factor) => factor.unit.toLowerCase() === activity.unit.toLowerCase()
-      );
-
-      if (matchingFactor) {
-        // Calculate emissions: quantity * emissions_factor_value
-        const calculatedValue = activity.quantity * matchingFactor.value;
-
-        calculationResults.push({
-          organization_id: activity.organization_id,
-          activity_data_id: activity.id,
-          emissions_factor_id: matchingFactor.factor_id,
-          calculated_value_co2e: calculatedValue,
-        });
-      } else {
-        unmatchedActivities.push(
-          `Activity "${activity.name}" (unit: ${activity.unit})`
-        );
-      }
-    }
-
-    // Bulk insert calculation results and retrieve the created records
-    let insertedRecords: any[] = [];
-    if (calculationResults.length > 0) {
-      const { data: insertedData, error: insertError } = await supabaseAdmin
-        .from("calculated_emissions")
-        .insert(calculationResults)
-        .select("id");
-
-      if (insertError) {
-        console.error("Error inserting calculated emissions:", insertError);
-        return new Response(
-          JSON.stringify({
-            error: "Failed to save calculation results",
-            details: insertError.message
-          }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+    for (const record of activityData) {
+      if (!record.emissions_factors) {
+        console.warn(`No emission factor found for activity data ${record.id}`);
+        continue;
       }
 
-      insertedRecords = insertedData || [];
-    }
+      const emissionFactor = Array.isArray(record.emissions_factors)
+        ? record.emissions_factors[0]
+        : record.emissions_factors;
 
-    // Create calculation logs for each inserted record
-    if (insertedRecords.length > 0) {
-      const createLogUrl = `${supabaseUrl}/functions/v1/create-calculation-log`;
-
-      for (let i = 0; i < insertedRecords.length; i++) {
-        const record = insertedRecords[i];
-
-        try {
-          const logResponse = await fetch(createLogUrl, {
-            method: "POST",
-            headers: {
-              "Authorization": authHeader,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              calculationId: record.id,
-            }),
-          });
-
-          if (!logResponse.ok) {
-            const errorData = await logResponse.json();
-            console.error(`Failed to create log for calculation ${record.id}:`, errorData);
-            return new Response(
-              JSON.stringify({
-                error: "Calculation succeeded but logging failed",
-                details: `Failed to create cryptographic log for calculation record ${record.id}. Error: ${errorData.error || "Unknown error"}`,
-                calculations_saved: insertedRecords.length,
-                failed_at_log_index: i + 1,
-              }),
-              {
-                status: 500,
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              }
-            );
-          }
-
-          const logResult = await logResponse.json();
-          console.log(`Successfully created log for calculation ${record.id}:`, logResult);
-        } catch (logError) {
-          console.error(`Exception while creating log for calculation ${record.id}:`, logError);
-          return new Response(
-            JSON.stringify({
-              error: "Calculation succeeded but logging failed",
-              details: `Exception while creating cryptographic log for calculation record ${record.id}. Error: ${logError instanceof Error ? logError.message : "Unknown error"}`,
-              calculations_saved: insertedRecords.length,
-              failed_at_log_index: i + 1,
-            }),
-            {
-              status: 500,
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            }
-          );
-        }
+      if (!emissionFactor) {
+        console.warn(`Invalid emission factor for activity data ${record.id}`);
+        continue;
       }
+
+      const calculatedEmission = record.quantity * emissionFactor.value;
+      totalEmissions += calculatedEmission;
+
+      if (!disaggregatedSummary[emissionFactor.name]) {
+        disaggregatedSummary[emissionFactor.name] = 0;
+      }
+      disaggregatedSummary[emissionFactor.name] += calculatedEmission;
+
+      activityDataIds.push(record.id);
+      emissionFactorIds.push(emissionFactor.factor_id);
+
+      await supabase.from("calculated_emissions").insert({
+        organization_id: facility.organization_id,
+        activity_data_id: record.id,
+        emissions_factor_id: emissionFactor.factor_id,
+        calculated_value_co2e: calculatedEmission,
+      });
     }
 
-    // Prepare summary message
-    let message = `Successfully calculated emissions for ${calculationResults.length} activity record(s) and created ${insertedRecords.length} cryptographic log(s).`;
+    const resultsPayload = {
+      disaggregated_summary: disaggregatedSummary,
+      activity_data_ids: activityDataIds,
+      emission_factor_ids: [...new Set(emissionFactorIds)],
+    };
 
-    if (unmatchedActivities.length > 0) {
-      message += ` ${unmatchedActivities.length} activity record(s) could not be matched to emissions factors.`;
+    const { data: aggregatedResult, error: aggregatedError } = await supabase
+      .from("facility_emissions_aggregated")
+      .insert({
+        facility_id,
+        organization_id: facility.organization_id,
+        reporting_period_start: reporting_period.start,
+        reporting_period_end: reporting_period.end,
+        total_co2e: totalEmissions,
+        unit: "kg CO₂e",
+        results_payload: resultsPayload,
+        calculated_by: user.id,
+      })
+      .select("id")
+      .single();
+
+    if (aggregatedError || !aggregatedResult) {
+      throw new Error(`Failed to save aggregated results: ${aggregatedError?.message}`);
+    }
+
+    const calculationDuration = Date.now() - startTime;
+
+    if (logId) {
+      await supabase
+        .from("calculation_logs")
+        .update({
+          output_value: totalEmissions,
+          factor_ids_used: [...new Set(emissionFactorIds)],
+          calculation_id: aggregatedResult.id,
+        })
+        .eq("log_id", logId);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message,
-        calculations_performed: calculationResults.length,
-        logs_created: insertedRecords.length,
-        unmatched_activities: unmatchedActivities.length,
-        details: {
-          total_activities: activityData.length,
-          matched: calculationResults.length,
-          unmatched: unmatchedActivities.length,
-          unmatched_list: unmatchedActivities,
-        },
+        message: "Corporate emissions calculation completed successfully",
+        calculation_id: aggregatedResult.id,
+        total_co2e: totalEmissions,
+        unit: "kg CO₂e",
+        disaggregated_summary: disaggregatedSummary,
+        activity_records_processed: activityData.length,
+        calculation_duration_ms: calculationDuration,
+        environment: executionEnvironment,
       }),
       {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
       }
     );
-  } catch (error) {
-    console.error("Unexpected error:", error);
+  } catch (error: any) {
+    console.error("Error in invoke-corporate-calculations:", error);
+
+    const calculationDuration = Date.now() - startTime;
+    const executionEnvironment = Deno.env.get("EXECUTION_ENVIRONMENT") || "unknown";
+
+    if (logId) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+        await supabase
+          .from("calculation_logs")
+          .update({
+            output_value: 0,
+          })
+          .eq("log_id", logId);
+      } catch (logError) {
+        console.error("Failed to update error log:", logError);
+      }
+    }
+
+    const statusCode = error.message === "Unauthorized" ? 401 :
+                       error.message.includes("already exists") ? 409 : 400;
+
     return new Response(
-      JSON.stringify({ 
-        error: "Internal server error", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+      JSON.stringify({
+        success: false,
+        error: error.message || "An unexpected error occurred",
+        environment: executionEnvironment,
       }),
       {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: statusCode,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
       }
     );
   }
