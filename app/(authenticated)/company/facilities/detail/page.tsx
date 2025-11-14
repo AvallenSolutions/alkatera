@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ActivityDataTable } from "@/components/facilities/ActivityDataTable";
 import { AddActivityDataModal } from "@/components/facilities/AddActivityDataModal";
+import Link from "next/link";
 
 interface Facility {
   id: string;
@@ -43,8 +44,8 @@ interface ActivityData {
 }
 
 export default function FacilityDetailPage() {
-  const params = useParams();
-  const facilityId = params.facilityId as string;
+  const searchParams = useSearchParams();
+  const facilityId = searchParams.get("id");
 
   const [facility, setFacility] = useState<Facility | null>(null);
   const [scope1Sources, setScope1Sources] = useState<EmissionSource[]>([]);
@@ -57,13 +58,13 @@ export default function FacilityDetailPage() {
   const [isScope2ModalOpen, setIsScope2ModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchFacilityData();
-    fetchEmissionSources();
-  }, [facilityId]);
-
-  useEffect(() => {
     if (facilityId) {
+      fetchFacilityData();
+      fetchEmissionSources();
       fetchActivityData();
+    } else {
+      setLoading(false);
+      setError("No facility ID provided");
     }
   }, [facilityId]);
 
@@ -145,12 +146,18 @@ export default function FacilityDetailPage() {
     );
   }
 
-  if (error) {
+  if (error || !facilityId) {
     return (
       <div className="container mx-auto p-6">
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{error || "No facility ID provided"}</AlertDescription>
         </Alert>
+        <Link href="/company/facilities" className="mt-4 inline-block">
+          <Button variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Facilities
+          </Button>
+        </Link>
       </div>
     );
   }
@@ -161,17 +168,30 @@ export default function FacilityDetailPage() {
         <Alert>
           <AlertDescription>Facility not found</AlertDescription>
         </Alert>
+        <Link href="/company/facilities" className="mt-4 inline-block">
+          <Button variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Facilities
+          </Button>
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{facility.name}</h1>
-        <p className="text-muted-foreground mt-1">
-          {facility.location} • {facility.facility_type}
-        </p>
+      <div className="flex items-center gap-4">
+        <Link href="/company/facilities">
+          <Button variant="outline" size="icon">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-3xl font-bold">{facility.name}</h1>
+          <p className="text-muted-foreground mt-1">
+            {facility.location} • {facility.facility_type}
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
@@ -255,23 +275,27 @@ export default function FacilityDetailPage() {
         </TabsContent>
       </Tabs>
 
-      <AddActivityDataModal
-        open={isScope1ModalOpen}
-        onOpenChange={setIsScope1ModalOpen}
-        facilityId={facilityId}
-        scope="Scope 1"
-        emissionSources={scope1Sources}
-        onSuccess={handleDataAdded}
-      />
+      {facilityId && (
+        <>
+          <AddActivityDataModal
+            open={isScope1ModalOpen}
+            onOpenChange={setIsScope1ModalOpen}
+            facilityId={facilityId}
+            scope="Scope 1"
+            emissionSources={scope1Sources}
+            onSuccess={handleDataAdded}
+          />
 
-      <AddActivityDataModal
-        open={isScope2ModalOpen}
-        onOpenChange={setIsScope2ModalOpen}
-        facilityId={facilityId}
-        scope="Scope 2"
-        emissionSources={scope2Sources}
-        onSuccess={handleDataAdded}
-      />
+          <AddActivityDataModal
+            open={isScope2ModalOpen}
+            onOpenChange={setIsScope2ModalOpen}
+            facilityId={facilityId}
+            scope="Scope 2"
+            emissionSources={scope2Sources}
+            onSuccess={handleDataAdded}
+          />
+        </>
+      )}
     </div>
   );
 }

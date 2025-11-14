@@ -42,11 +42,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Building2, Pencil, Trash2, Plus, AlertCircle } from 'lucide-react';
+import { Loader2, Building2, Pencil, Trash2, Plus, AlertCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { useFacilityTypes } from '@/hooks/data/useFacilityTypes';
+import Link from 'next/link';
 
 const facilitySchema = z.object({
   name: z.string().min(1, 'Facility name is required').max(255),
@@ -332,6 +333,11 @@ export default function FacilitiesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <Link href={`/company/facilities/detail?id=${facility.id}`}>
+                        <Button variant="ghost" size="sm">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Button
                         variant="ghost"
                         size="sm"
