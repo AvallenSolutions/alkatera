@@ -23,6 +23,7 @@ interface Material {
   country_of_origin: string;
   is_organic: boolean;
   is_regenerative: boolean;
+  lca_sub_stage_id: number;
 }
 
 interface RequestPayload {
@@ -170,6 +171,7 @@ Deno.serve(async (req: Request) => {
       country_of_origin: material.country_of_origin || null,
       is_organic: material.is_organic || false,
       is_regenerative: material.is_regenerative || false,
+      lca_sub_stage_id: material.lca_sub_stage_id,
     }));
 
     const { error: materialsError } = await supabaseClient

@@ -75,6 +75,7 @@ export interface ProductLcaMaterial {
   country_of_origin?: string | null;
   is_organic: boolean;
   is_regenerative: boolean;
+  lca_sub_stage_id?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -88,6 +89,8 @@ export interface MaterialWithDetails {
   country_of_origin: string;
   is_organic: boolean;
   is_regenerative: boolean;
+  lca_sub_stage_id: number;
+  lca_sub_stage_name?: string;
 }
 
 export interface CreateLcaPayload {
@@ -106,5 +109,6 @@ export interface CreateLcaPayload {
     country_of_origin: string;
     is_organic: boolean;
     is_regenerative: boolean;
+    lca_sub_stage_id: number;
   }>;
 }

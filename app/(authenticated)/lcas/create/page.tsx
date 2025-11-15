@@ -142,6 +142,7 @@ export default function CreateLcaPage() {
           country_of_origin: m.country_of_origin,
           is_organic: m.is_organic,
           is_regenerative: m.is_regenerative,
+          lca_sub_stage_id: m.lca_sub_stage_id,
         })),
         organization_id: organizationId,
       };
@@ -311,6 +312,7 @@ export default function CreateLcaPage() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Type</TableHead>
+                        <TableHead>Life Cycle Stage</TableHead>
                         <TableHead className="text-right">Quantity</TableHead>
                         <TableHead>Unit</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
@@ -343,6 +345,9 @@ export default function CreateLcaPage() {
                             <Badge variant={material.material_type === "ingredient" ? "default" : "secondary"}>
                               {material.material_type}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm">{material.lca_sub_stage_name || "Not specified"}</div>
                           </TableCell>
                           <TableCell className="text-right">{material.quantity}</TableCell>
                           <TableCell>{material.unit}</TableCell>

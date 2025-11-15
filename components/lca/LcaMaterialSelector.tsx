@@ -11,9 +11,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MaterialCombobox } from "./MaterialCombobox";
+import { LcaClassifier } from "./LcaClassifier";
 import { useIngredients } from "@/hooks/data/useIngredients";
 import { usePackagingTypes } from "@/hooks/data/usePackagingTypes";
 import { useOrganization } from "@/lib/organizationContext";
+import type { LcaSubStage } from "@/hooks/data/useLcaStages";
 import type { MaterialType, MaterialWithDetails } from "@/lib/types/lca";
 
 interface LcaMaterialSelectorProps {
@@ -37,6 +39,7 @@ export function LcaMaterialSelector({
   const [countryOfOrigin, setCountryOfOrigin] = useState<string>("");
   const [isOrganic, setIsOrganic] = useState<boolean>(false);
   const [isRegenerative, setIsRegenerative] = useState<boolean>(false);
+  const [selectedSubStage, setSelectedSubStage] = useState<LcaSubStage | null>(null);
 
   const { ingredients, isLoading: isLoadingIngredients, error: ingredientsError } = useIngredients(organizationId);
   const { packagingTypes, isLoading: isLoadingPackaging, error: packagingError } = usePackagingTypes(organizationId);
@@ -49,6 +52,10 @@ export function LcaMaterialSelector({
     setSelectedMaterialId(packagingId);
   }, []);
 
+  const handleSubStageSelect = useCallback((subStage: LcaSubStage | null) => {
+    setSelectedSubStage(subStage);
+  }, []);
+
   const handleTabChange = useCallback((value: string) => {
     const newTab = value as MaterialType;
     setActiveTab(newTab);
@@ -58,10 +65,11 @@ export function LcaMaterialSelector({
     setCountryOfOrigin("");
     setIsOrganic(false);
     setIsRegenerative(false);
+    setSelectedSubStage(null);
   }, []);
 
   const handleAddMaterial = useCallback(() => {
-    if (!selectedMaterialId || !quantity || parseFloat(quantity) <= 0) {
+    if (!selectedMaterialId || !quantity || parseFloat(quantity) <= 0 || !selectedSubStage) {
       return;
     }
 
@@ -84,6 +92,8 @@ export function LcaMaterialSelector({
       country_of_origin: countryOfOrigin.trim() || "Not specified",
       is_organic: isOrganic,
       is_regenerative: isRegenerative,
+      lca_sub_stage_id: selectedSubStage.id,
+      lca_sub_stage_name: selectedSubStage.name,
     };
 
     onAddMaterial(material);
@@ -94,6 +104,7 @@ export function LcaMaterialSelector({
     setCountryOfOrigin("");
     setIsOrganic(false);
     setIsRegenerative(false);
+    setSelectedSubStage(null);
   }, [
     selectedMaterialId,
     quantity,
@@ -101,6 +112,7 @@ export function LcaMaterialSelector({
     countryOfOrigin,
     isOrganic,
     isRegenerative,
+    selectedSubStage,
     activeTab,
     ingredients,
     packagingTypes,
@@ -109,7 +121,7 @@ export function LcaMaterialSelector({
 
   const isLoading = isLoadingIngredients || isLoadingPackaging;
   const hasError = ingredientsError || packagingError;
-  const canAdd = selectedMaterialId && quantity && parseFloat(quantity) > 0;
+  const canAdd = selectedMaterialId && quantity && parseFloat(quantity) > 0 && selectedSubStage;
 
   if (!organizationId) {
     return (
@@ -279,6 +291,15 @@ export function LcaMaterialSelector({
                   Regenerative practices
                 </Label>
               </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <LcaClassifier
+                onSubStageSelect={handleSubStageSelect}
+                selectedSubStageId={selectedSubStage?.id || null}
+                title="Life Cycle Stage *"
+                description="Select the LCA stage that best represents this material"
+              />
             </div>
 
             <Button
