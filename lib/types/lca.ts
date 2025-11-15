@@ -56,6 +56,8 @@ export interface ProductLca {
   id: string;
   organization_id: string;
   product_name: string;
+  product_description?: string | null;
+  product_image_url?: string | null;
   functional_unit: string;
   system_boundary: string;
   status: 'draft' | 'pending' | 'completed' | 'failed';
@@ -69,11 +71,40 @@ export interface ProductLcaMaterial {
   material_id: string;
   material_type: MaterialType;
   quantity: number;
+  unit?: string | null;
+  country_of_origin?: string | null;
+  is_organic: boolean;
+  is_regenerative: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export interface MaterialWithDetails extends MaterialSelectionOutput {
-  name?: string;
-  displayName?: string;
+export interface MaterialWithDetails {
+  material_id: string;
+  material_type: MaterialType;
+  name: string;
+  quantity: number;
+  unit: string;
+  country_of_origin: string;
+  is_organic: boolean;
+  is_regenerative: boolean;
+}
+
+export interface CreateLcaPayload {
+  productDetails: {
+    product_name: string;
+    product_description: string;
+    product_image_url: string;
+    functional_unit: string;
+    system_boundary: string;
+  };
+  materials: Array<{
+    material_id: string;
+    material_type: MaterialType;
+    quantity: number;
+    unit: string;
+    country_of_origin: string;
+    is_organic: boolean;
+    is_regenerative: boolean;
+  }>;
 }
