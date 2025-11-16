@@ -18,7 +18,7 @@ import type { UnitSizeUnit, Certification, Award } from "@/lib/types/products";
 
 export default function CreateProductPage() {
   const router = useRouter();
-  const { currentOrganization } = useOrganization();
+  const { currentOrganization, isLoading: isLoadingOrg } = useOrganization();
   const organizationId = currentOrganization?.id;
 
   const [name, setName] = useState("");
@@ -63,8 +63,13 @@ export default function CreateProductPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isLoadingOrg) {
+      setError("Please wait while organisation information loads");
+      return;
+    }
+
     if (!organizationId) {
-      setError("No organisation selected");
+      setError("No organisation selected. Please select or create an organisation first.");
       return;
     }
 
@@ -101,6 +106,18 @@ export default function CreateProductPage() {
       setIsSaving(false);
     }
   };
+
+  if (isLoadingOrg) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert>
+          <AlertDescription>
+            Loading organisation information...
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   if (!organizationId) {
     return (

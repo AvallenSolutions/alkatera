@@ -41,6 +41,26 @@ export async function insertProduct(
     throw new Error('User not authenticated');
   }
 
+  if (!organizationId) {
+    throw new Error('Organisation ID is required');
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error('Error verifying organisation membership:', membershipError);
+    throw new Error('Failed to verify organisation membership');
+  }
+
+  if (!membership) {
+    throw new Error('You are not a member of this organisation');
+  }
+
   const { data, error } = await supabase
     .from('products')
     .insert({
@@ -60,6 +80,9 @@ export async function insertProduct(
 
   if (error) {
     console.error('Error inserting product:', error);
+    if (error.message.includes('row-level security')) {
+      throw new Error('Permission denied: Unable to create product for this organisation. Please ensure you have the correct permissions.');
+    }
     throw new Error(error.message);
   }
 
