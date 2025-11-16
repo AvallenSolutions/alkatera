@@ -11,6 +11,7 @@ import {
   Target,
   ChevronDown,
   ChevronRight,
+  Package,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -42,12 +43,16 @@ const navigationStructure: NavItem[] = [
     ],
   },
   {
+    name: 'Products',
+    href: '/dashboard/products',
+    icon: Package,
+  },
+  {
     name: 'Company Settings',
     icon: Building2,
     links: [
       { name: 'Facilities', href: '/company/facilities' },
       { name: 'Suppliers', href: '/dashboard/company/suppliers' },
-      { name: 'Products', href: '/dashboard/company/products' },
       { name: 'Team Members', href: '/dashboard/settings/team' },
     ],
   },
