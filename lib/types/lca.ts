@@ -1,5 +1,5 @@
 export interface LcaLifeCycleStage {
-  id: string;
+  id: number;
   name: string;
   description: string | null;
   display_order: number;
@@ -7,12 +7,16 @@ export interface LcaLifeCycleStage {
 }
 
 export interface LcaSubStage {
-  id: string;
-  stage_id: string;
+  id: number;
+  stage_id: number;
   name: string;
   description: string | null;
   display_order: number;
   created_at: string;
+}
+
+export interface LcaStageWithSubStages extends LcaLifeCycleStage {
+  sub_stages: LcaSubStage[];
 }
 
 export interface Ingredient {
@@ -68,16 +72,25 @@ export interface ProductLca {
 export interface ProductLcaMaterial {
   id: string;
   product_lca_id: string;
-  material_id: string;
-  material_type: MaterialType;
+  material_id?: string | null;
+  material_type?: MaterialType | null;
+  name?: string | null;
   quantity: number;
   unit?: string | null;
   country_of_origin?: string | null;
-  is_organic: boolean;
-  is_regenerative: boolean;
+  is_organic?: boolean;
+  is_regenerative?: boolean;
   lca_sub_stage_id?: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface SimpleMaterialInput {
+  id?: string;
+  name: string;
+  quantity: number | string;
+  unit: string;
+  lca_sub_stage_id: number | string;
 }
 
 export interface MaterialWithDetails {
