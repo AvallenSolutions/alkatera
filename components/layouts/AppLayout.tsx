@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
+import { useAuth } from '@/hooks/useAuth'
 import { useOrganization } from '@/lib/organizationContext'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { User } from '@supabase/supabase-js'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -17,35 +16,9 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, requireOrganization = true }: AppLayoutProps) {
   const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const { currentOrganization, isLoading: isOrganizationLoading } = useOrganization()
-  const [user, setUser] = useState<User | null>(null)
-  const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-      setIsAuthLoading(false)
-    }
-
-    checkAuth()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setUser(null)
-        router.push('/login')
-      } else if (event === 'SIGNED_IN') {
-        setUser(session?.user ?? null)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [router])
 
   useEffect(() => {
     const handleResize = () => {
@@ -58,10 +31,25 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  if (isAuthLoading || isOrganizationLoading) {
+  useEffect(() => {
+    if (!authLoading && !user) {
+      console.log('🚪 AppLayout: No authenticated user, redirecting to login')
+      router.push('/login')
+    }
+  }, [user, authLoading, router])
+
+  useEffect(() => {
+    if (!authLoading && !isOrganizationLoading && user && requireOrganization && !currentOrganization) {
+      console.log('🏢 AppLayout: No organization found, redirecting to create organization')
+      router.push('/create-organization')
+    }
+  }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router])
+
+  if (authLoading || isOrganizationLoading) {
+    console.log('⏳ AppLayout: Loading...', { authLoading, isOrganizationLoading })
     return (
-      <main className="flex min-h-screen items-centre justify-centre bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-        <div className="flex flex-col items-centre gap-4">
+      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+        <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-slate-600 dark:text-slate-400" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
@@ -70,12 +58,10 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   }
 
   if (!user) {
-    router.push('/login')
     return null
   }
 
   if (requireOrganization && !currentOrganization) {
-    router.push('/create-organization')
     return null
   }
 

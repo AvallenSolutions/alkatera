@@ -45,8 +45,12 @@ export function SignupForm() {
     setError(null)
     setSuccess(false)
 
+    console.log('📝 SignupForm: Starting sign-up process...')
+
     if (!email || !password || !confirmPassword || !fullName) {
-      setError("Please fill in all fields")
+      const errorMsg = "Please fill in all fields"
+      console.warn('⚠️ SignupForm:', errorMsg)
+      setError(errorMsg)
       return
     }
 
@@ -69,6 +73,8 @@ export function SignupForm() {
     setLoading(true)
 
     try {
+      console.log('📧 SignupForm: Attempting sign-up for:', email)
+
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
@@ -80,20 +86,43 @@ export function SignupForm() {
       })
 
       if (signUpError) {
+        console.error('❌ SignupForm: Sign-up error:', {
+          message: signUpError.message,
+          status: signUpError.status,
+          name: signUpError.name,
+        })
         throw signUpError
       }
 
       if (data.user) {
+        console.log('✅ SignupForm: Sign-up successful!', {
+          userId: data.user.id,
+          email: data.user.email,
+        })
+
+        if (data.session) {
+          console.log('✅ SignupForm: Session created automatically')
+        } else {
+          console.log('ℹ️ SignupForm: No session created (email confirmation may be required)')
+        }
+
         setSuccess(true)
         setTimeout(() => {
+          console.log('🚀 SignupForm: Redirecting to dashboard...')
           router.push("/dashboard")
           router.refresh()
         }, 2000)
+      } else {
+        console.error('❌ SignupForm: No user returned from sign-up')
+        setError("Sign-up succeeded but no user data returned. Please try again.")
       }
     } catch (err: any) {
-      setError(err.message || "Failed to create account. Please try again.")
+      console.error('❌ SignupForm: Fatal error during sign-up:', err)
+      const errorMessage = err.message || "Failed to create account. Please try again."
+      setError(errorMessage)
     } finally {
       setLoading(false)
+      console.log('🏁 SignupForm: Sign-up process completed')
     }
   }
 
