@@ -20,13 +20,21 @@ export function createMiddlewareSupabaseClient(
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+      flowType: 'pkce',
       storageKey,
       storage: {
         getItem: (key: string) => {
           const cookie = request.cookies.get(key)
-          return cookie?.value ?? null
+          const value = cookie?.value ?? null
+          if (value) {
+            console.log('🍪 Middleware: Found cookie:', key)
+          } else {
+            console.log('⚠️ Middleware: Cookie not found:', key)
+          }
+          return value
         },
         setItem: (key: string, value: string) => {
+          console.log('🍪 Middleware: Setting cookie:', key)
           response.cookies.set(key, value, {
             path: '/',
             maxAge: 60 * 60 * 24 * 7,
@@ -35,6 +43,7 @@ export function createMiddlewareSupabaseClient(
           })
         },
         removeItem: (key: string) => {
+          console.log('🍪 Middleware: Removing cookie:', key)
           response.cookies.set(key, '', {
             path: '/',
             maxAge: 0,

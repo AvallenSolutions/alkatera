@@ -74,12 +74,14 @@ export function LoginForm() {
         })
 
         if (data.session) {
-          console.log('✅ LoginForm: Session created, letting middleware handle routing...')
+          console.log('✅ LoginForm: Session created, access token:', data.session.access_token.substring(0, 20) + '...')
+          console.log('🔄 LoginForm: Waiting for cookies to be set...')
 
-          await new Promise(resolve => setTimeout(resolve, 300))
+          await new Promise(resolve => setTimeout(resolve, 500))
 
+          console.log('🚀 LoginForm: Navigating to dashboard...')
+          router.push('/dashboard')
           router.refresh()
-          window.location.href = '/dashboard'
         } else {
           console.warn('⚠️ LoginForm: User authenticated but no session returned')
           setError("Authentication successful but session not created. Please try again.")
