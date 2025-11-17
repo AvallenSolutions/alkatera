@@ -26,9 +26,12 @@ export function getSupabaseBrowserClient() {
     )
   }
 
+  const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+
   console.log('✅ Supabase browser client initialising:', {
     url: supabaseUrl,
     hasAnonKey: !!supabaseAnonKey,
+    storageKey,
   })
 
   client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -37,6 +40,7 @@ export function getSupabaseBrowserClient() {
       autoRefreshToken: true,
       detectSessionInUrl: true,
       storage: createBrowserCookieStorage(),
+      storageKey,
       flowType: 'pkce',
     },
   })

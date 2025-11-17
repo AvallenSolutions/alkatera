@@ -13,11 +13,14 @@ export function createMiddlewareSupabaseClient(
     throw new Error('Missing Supabase environment variables in middleware')
   }
 
+  const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+
   return createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
+      storageKey,
       storage: {
         getItem: (key: string) => {
           const cookie = request.cookies.get(key)
