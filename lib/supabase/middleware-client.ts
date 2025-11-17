@@ -18,10 +18,26 @@ export function createMiddlewareSupabaseClient(
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
-    },
-    global: {
-      headers: {
-        cookie: request.cookies.toString(),
+      storage: {
+        getItem: (key: string) => {
+          const cookie = request.cookies.get(key)
+          return cookie?.value ?? null
+        },
+        setItem: (key: string, value: string) => {
+          response.cookies.set(key, value, {
+            path: '/',
+            maxAge: 60 * 60 * 24 * 7,
+            sameSite: 'lax',
+            secure: process.env.NODE_ENV === 'production',
+          })
+        },
+        removeItem: (key: string) => {
+          response.cookies.set(key, '', {
+            path: '/',
+            maxAge: 0,
+            sameSite: 'lax',
+          })
+        },
       },
     },
   })

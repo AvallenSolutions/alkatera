@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createMiddlewareSupabaseClient } from '@/lib/supabase/middleware-client'
 
 const publicRoutes = ['/login', '/signup', '/password-reset', '/update-password']
 const onboardingRoutes = ['/create-organization']
@@ -8,30 +8,7 @@ const onboardingRoutes = ['/create-organization']
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('❌ Middleware: Missing Supabase environment variables')
-    return response
-  }
-
-  const accessToken = request.cookies.get('alkatera-auth-token')?.value
-
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
-    },
-    global: {
-      headers: accessToken
-        ? {
-            Authorization: `Bearer ${accessToken}`,
-          }
-        : {},
-    },
-  })
+  const supabase = createMiddlewareSupabaseClient(request, response)
 
   let session = null
 

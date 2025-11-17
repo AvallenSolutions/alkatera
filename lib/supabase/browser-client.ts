@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/db_types'
+import { createBrowserCookieStorage } from './cookie-storage'
 
 let client: ReturnType<typeof createClient<Database>> | null = null
 
@@ -35,8 +36,8 @@ export function getSupabaseBrowserClient() {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'alkatera-auth',
-      storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+      storage: createBrowserCookieStorage(),
+      flowType: 'pkce',
     },
   })
 

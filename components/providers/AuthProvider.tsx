@@ -21,15 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  const setCookieToken = (accessToken: string) => {
-    const maxAge = 60 * 60 * 24 * 7
-    document.cookie = `alkatera-auth-token=${accessToken}; path=/; max-age=${maxAge}; SameSite=Lax`
-  }
-
-  const clearCookieToken = () => {
-    document.cookie = 'alkatera-auth-token=; path=/; max-age=0; SameSite=Lax'
-  }
-
   useEffect(() => {
     let mounted = true
 
@@ -56,19 +47,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           })
           setSession(initialSession)
           setUser(initialSession.user)
-          setCookieToken(initialSession.access_token)
         } else {
           console.log('ℹ️ AuthProvider: No active session')
           setSession(null)
           setUser(null)
-          clearCookieToken()
         }
       } catch (error) {
         console.error('❌ AuthProvider: Fatal error during initialization:', error)
         if (mounted) {
           setSession(null)
           setUser(null)
-          clearCookieToken()
         }
       } finally {
         if (mounted) {
@@ -91,19 +79,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(currentSession)
         setUser(currentSession.user)
         setLoading(false)
-        setCookieToken(currentSession.access_token)
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out')
         setSession(null)
         setUser(null)
         setLoading(false)
-        clearCookieToken()
         router.push('/login')
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {
         console.log('🔄 Token refreshed')
         setSession(currentSession)
         setUser(currentSession.user)
-        setCookieToken(currentSession.access_token)
       } else if (event === 'USER_UPDATED' && currentSession) {
         console.log('👤 User updated')
         setSession(currentSession)
@@ -112,7 +97,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(currentSession)
         setUser(currentSession.user)
         setLoading(false)
-        setCookieToken(currentSession.access_token)
       }
     })
 
@@ -132,12 +116,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error
       }
 
-      clearCookieToken()
       localStorage.removeItem('currentOrganizationId')
       console.log('✅ AuthProvider: Sign out successful')
     } catch (error) {
       console.error('❌ AuthProvider: Fatal sign out error:', error)
-      clearCookieToken()
       throw error
     }
   }
@@ -159,7 +141,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('✅ AuthProvider: Session refreshed successfully')
         setSession(refreshedSession)
         setUser(refreshedSession.user)
-        setCookieToken(refreshedSession.access_token)
       }
     } catch (error) {
       console.error('❌ AuthProvider: Fatal refresh error:', error)

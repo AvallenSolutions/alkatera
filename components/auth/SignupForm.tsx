@@ -101,9 +101,7 @@ export function SignupForm() {
         })
 
         if (data.session) {
-          console.log('✅ SignupForm: Session created automatically, setting cookie...')
-          const maxAge = 60 * 60 * 24 * 7
-          document.cookie = `alkatera-auth-token=${data.session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
+          console.log('✅ SignupForm: Session created automatically')
         } else {
           console.log('ℹ️ SignupForm: No session created (email confirmation may be required)')
         }
