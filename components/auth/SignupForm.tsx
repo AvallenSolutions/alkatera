@@ -101,15 +101,18 @@ export function SignupForm() {
         })
 
         if (data.session) {
-          console.log('✅ SignupForm: Session created automatically')
+          console.log('✅ SignupForm: Session created automatically, setting cookie...')
+          const maxAge = 60 * 60 * 24 * 7
+          document.cookie = `alkatera-auth-token=${data.session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
         } else {
           console.log('ℹ️ SignupForm: No session created (email confirmation may be required)')
         }
 
         setSuccess(true)
-        setTimeout(() => {
-          console.log('🚀 SignupForm: Redirecting to dashboard...')
-          router.push("/dashboard")
+        setTimeout(async () => {
+          console.log('🚀 SignupForm: Redirecting to create organization...')
+          await new Promise(resolve => setTimeout(resolve, 100))
+          router.push("/create-organization")
           router.refresh()
         }, 2000)
       } else {
@@ -139,7 +142,7 @@ export function SignupForm() {
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
           <AlertDescription>
-            Account created successfully! Redirecting to dashboard...
+            Account created successfully! Redirecting...
           </AlertDescription>
         </Alert>
       )}

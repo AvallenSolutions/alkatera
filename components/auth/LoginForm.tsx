@@ -74,7 +74,15 @@ export function LoginForm() {
         })
 
         if (data.session) {
-          console.log('✅ LoginForm: Session created, redirecting to dashboard...')
+          console.log('✅ LoginForm: Session created, setting cookie...')
+
+          const maxAge = 60 * 60 * 24 * 7
+          document.cookie = `alkatera-auth-token=${data.session.access_token}; path=/; max-age=${maxAge}; SameSite=Lax`
+
+          console.log('✅ LoginForm: Cookie set, redirecting to dashboard...')
+
+          await new Promise(resolve => setTimeout(resolve, 100))
+
           router.push("/dashboard")
           router.refresh()
         } else {
