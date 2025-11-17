@@ -72,7 +72,7 @@ function DonutChart({ data }: { data: { status: string; percentage: number; coun
           </g>
         ))}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-centre justify-centre">
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
         <p className="text-3xl font-bold">
           {data.reduce((sum, item) => sum + item.count, 0)}
         </p>
@@ -85,7 +85,7 @@ function DonutChart({ data }: { data: { status: string; percentage: number; coun
 function SupplierEngagementSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="flex justify-centre">
+      <div className="flex justify-center">
         <Skeleton className="w-[200px] h-[200px] rounded-full" />
       </div>
       <div className="space-y-3">
@@ -118,7 +118,7 @@ export function SupplierEngagementWidget() {
   return (
     <Card className="col-span-full lg:col-span-1">
       <CardHeader>
-        <CardTitle className="flex items-centre gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Users className="h-5 w-5" />
           Supplier Engagement
         </CardTitle>
@@ -128,13 +128,13 @@ export function SupplierEngagementWidget() {
         {isLoading ? (
           <SupplierEngagementSkeleton />
         ) : error ? (
-          <div className="flex flex-col items-centre justify-centre py-12 px-4 text-centre">
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Failed to Load Data</h3>
             <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
           </div>
         ) : totalSuppliers === 0 ? (
-          <div className="flex flex-col items-centre justify-centre py-12 px-4 text-centre">
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <Users className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Suppliers</h3>
             <p className="text-sm text-muted-foreground">
@@ -147,8 +147,8 @@ export function SupplierEngagementWidget() {
 
             <div className="space-y-3">
               {chartData.map((item) => (
-                <div key={item.status} className="flex items-centre justify-between">
-                  <div className="flex items-centre gap-2">
+                <div key={item.status} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
                     <div
                       className="h-3 w-3 rounded-full"
                       style={{ backgroundColor: statusColors[item.status] }}
@@ -157,7 +157,7 @@ export function SupplierEngagementWidget() {
                       {statusLabels[item.status] || item.status}
                     </span>
                   </div>
-                  <div className="flex items-centre gap-2">
+                  <div className="flex items-center gap-2">
                     <span className="text-sm font-bold">{item.count}</span>
                     <span className="text-xs text-muted-foreground">
                       ({item.percentage.toFixed(1)}%)
@@ -168,7 +168,7 @@ export function SupplierEngagementWidget() {
             </div>
 
             <div className="pt-4 border-t">
-              <div className="flex items-centre justify-between text-sm">
+              <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total Suppliers</span>
                 <span className="font-semibold">{totalSuppliers}</span>
               </div>

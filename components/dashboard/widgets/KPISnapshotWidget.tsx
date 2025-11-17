@@ -46,7 +46,7 @@ const categoryValueColors: Record<string, string> = {
 function KpiCardSkeleton() {
   return (
     <div className="space-y-2 p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-      <div className="flex items-centre justify-between">
+      <div className="flex items-center justify-between">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-4 w-4 rounded-full" />
       </div>
@@ -122,7 +122,7 @@ export function KPISnapshotWidget() {
   return (
     <Card className="col-span-full lg:col-span-2">
       <CardHeader>
-        <CardTitle className="flex items-centre gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5" />
           KPI Snapshot
         </CardTitle>
@@ -137,13 +137,13 @@ export function KPISnapshotWidget() {
             <KpiCardSkeleton />
           </div>
         ) : error ? (
-          <div className="flex flex-col items-centre justify-centre py-12 px-4 text-centre">
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Failed to Load KPIs</h3>
             <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
           </div>
         ) : !kpis || kpis.length === 0 ? (
-          <div className="flex flex-col items-centre justify-centre py-12 px-4 text-centre">
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <Activity className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No KPIs Configured</h3>
             <p className="text-sm text-muted-foreground">
@@ -164,7 +164,7 @@ export function KPISnapshotWidget() {
                   key={kpi.kpi_id}
                   className={`space-y-2 p-4 bg-gradient-to-br rounded-lg border ${colorClasses}`}
                 >
-                  <div className="flex items-centre justify-between">
+                  <div className="flex items-center justify-between">
                     <p className={`text-sm font-medium ${colorClasses.split(' ').slice(-2).join(' ')}`}>
                       {kpi.name}
                     </p>

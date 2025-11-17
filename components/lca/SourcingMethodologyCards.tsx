@@ -56,14 +56,14 @@ export function SourcingMethodologyCards({ lcaId }: SourcingMethodologyCardsProp
           }`}
           onClick={() => !isSubmitting && handleMethodologySelect("GROWN")}
         >
-          <CardHeader className="text-centre pb-4">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-centre justify-centre rounded-full bg-green-100 dark:bg-green-900">
+          <CardHeader className="text-center pb-4">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
               <Sprout className="h-10 w-10 text-green-600 dark:text-green-400" />
             </div>
             <CardTitle className="text-xl">We Grow Our Ingredients</CardTitle>
           </CardHeader>
           <CardContent>
-            <CardDescription className="text-centre">
+            <CardDescription className="text-center">
               Select this if your organisation is the primary producer of the core raw materials.
               You control the agricultural or cultivation processes.
             </CardDescription>
@@ -76,14 +76,14 @@ export function SourcingMethodologyCards({ lcaId }: SourcingMethodologyCardsProp
           }`}
           onClick={() => !isSubmitting && handleMethodologySelect("PURCHASED")}
         >
-          <CardHeader className="text-centre pb-4">
-            <div className="mx-auto mb-4 flex h-20 w-20 items-centre justify-centre rounded-full bg-blue-100 dark:bg-blue-900">
+          <CardHeader className="text-center pb-4">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900">
               <ShoppingCart className="h-10 w-10 text-blue-600 dark:text-blue-400" />
             </div>
             <CardTitle className="text-xl">We Purchase Our Ingredients</CardTitle>
           </CardHeader>
           <CardContent>
-            <CardDescription className="text-centre">
+            <CardDescription className="text-center">
               Select this if you source raw materials from third-party suppliers.
               You acquire pre-grown or pre-processed ingredients.
             </CardDescription>
@@ -91,7 +91,7 @@ export function SourcingMethodologyCards({ lcaId }: SourcingMethodologyCardsProp
         </Card>
       </div>
 
-      <div className="mt-8 flex justify-between items-centre">
+      <div className="mt-8 flex justify-between items-center">
         <Button
           variant="outline"
           onClick={() => router.push("/dashboard/products")}

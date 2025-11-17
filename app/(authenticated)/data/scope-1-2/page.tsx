@@ -327,7 +327,7 @@ export default function Scope12DataPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-centre justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             Scope 1 & 2 Data Ingestion
@@ -638,7 +638,7 @@ export default function Scope12DataPage() {
         </CardHeader>
         <CardContent>
           {isLoadingData ? (
-            <div className="flex items-centre justify-centre py-12">
+            <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : recentData.length === 0 ? (
@@ -666,7 +666,7 @@ export default function Scope12DataPage() {
                       <TableCell>{formatDate(record.activity_date)}</TableCell>
                       <TableCell className="font-medium">{record.name}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-centre gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                           record.category === 'Scope 1'
                             ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400'
                             : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'

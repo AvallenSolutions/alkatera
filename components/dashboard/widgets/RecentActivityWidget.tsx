@@ -86,7 +86,7 @@ function ActivitySkeleton() {
     <div className="flex gap-4 items-start p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
       <Skeleton className="h-8 w-8 rounded-full" />
       <div className="flex-1 space-y-2">
-        <div className="flex items-centre justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <Skeleton className="h-4 w-32" />
           <Skeleton className="h-5 w-16" />
         </div>
@@ -136,7 +136,7 @@ export function RecentActivityWidget() {
   return (
     <Card className="col-span-full lg:col-span-1">
       <CardHeader>
-        <CardTitle className="flex items-centre gap-2">
+        <CardTitle className="flex items-center gap-2">
           <Activity className="h-5 w-5" />
           Recent Activity
         </CardTitle>
@@ -153,13 +153,13 @@ export function RecentActivityWidget() {
             </div>
           </ScrollArea>
         ) : error ? (
-          <div className="flex flex-col items-centre justify-centre py-12 px-4 text-centre">
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Failed to Load Activity</h3>
             <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
           </div>
         ) : !activities || activities.length === 0 ? (
-          <div className="flex flex-col items-centre justify-centre py-12 px-4 text-centre">
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <Activity className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Activity Yet</h3>
             <p className="text-sm text-muted-foreground">
@@ -180,15 +180,15 @@ export function RecentActivityWidget() {
                 return (
                   <div
                     key={activity.event_id}
-                    className="flex gap-4 items-start p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colours"
+                    className="flex gap-4 items-start p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     <div className="mt-1">
-                      <div className={`h-8 w-8 rounded-full ${config.bgColor} flex items-centre justify-centre`}>
+                      <div className={`h-8 w-8 rounded-full ${config.bgColor} flex items-center justify-center`}>
                         <IconComponent className={`h-4 w-4 ${config.color}`} />
                       </div>
                     </div>
                     <div className="flex-1 space-y-1 min-w-0">
-                      <div className="flex items-centre justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-medium leading-none">{config.label}</p>
                         <Badge variant="secondary" className="text-xs whitespace-nowrap">
                           {timeAgo}

@@ -304,7 +304,7 @@ export default function WaterFootprintPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-centre justify-between">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             Water Footprint Data
@@ -335,7 +335,7 @@ export default function WaterFootprintPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-centre gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Droplets className="h-5 w-5 text-blue-600" />
             Water Consumption Data Entry
           </CardTitle>
@@ -512,7 +512,7 @@ export default function WaterFootprintPage() {
         </CardHeader>
         <CardContent>
           {isLoadingData ? (
-            <div className="flex items-centre justify-centre py-12">
+            <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : recentData.length === 0 ? (
@@ -550,7 +550,7 @@ export default function WaterFootprintPage() {
                         <TableCell className="font-medium">{record.name}</TableCell>
                         <TableCell>
                           <span
-                            className={`inline-flex items-centre gap-1 px-2 py-1 rounded-full text-xs font-medium ${getWaterTypeBadgeColor(
+                            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getWaterTypeBadgeColor(
                               waterType
                             )}`}
                           >

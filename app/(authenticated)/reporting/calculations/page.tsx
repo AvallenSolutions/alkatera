@@ -232,7 +232,7 @@ export default function CalculationsPage() {
             </Button>
 
             {isScope12Loading && (
-              <div className="flex items-centre justify-centre py-4">
+              <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             )}
@@ -258,7 +258,7 @@ export default function CalculationsPage() {
         {lastResult && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-centre gap-2">
+              <CardTitle className="flex items-center gap-2">
                 {lastResult.success ? (
                   <>
                     <CheckCircle2 className="h-5 w-5 text-green-600" />

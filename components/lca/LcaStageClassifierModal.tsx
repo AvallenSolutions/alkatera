@@ -90,7 +90,7 @@ export function LcaStageClassifierModal({
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center gap-3 text-left">
                       <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colours ${
+                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors ${
                           hasSelectedSubStage
                             ? "border-green-600 bg-green-50 text-green-700"
                             : "border-slate-300 bg-slate-50 text-slate-600"

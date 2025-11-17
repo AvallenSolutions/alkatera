@@ -87,10 +87,10 @@ export default function CreateOrganizationPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-centre justify-centre bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-3 text-centre">
-          <div className="mx-auto w-16 h-16 bg-slate-900 rounded-2xl flex items-centre justify-centre">
+        <CardHeader className="space-y-3 text-center">
+          <div className="mx-auto w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center">
             <Building2 className="w-8 h-8 text-white" />
           </div>
           <CardTitle className="text-2xl font-semibold">Create Your Company Account</CardTitle>

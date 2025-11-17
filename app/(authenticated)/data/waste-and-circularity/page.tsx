@@ -329,7 +329,7 @@ export default function WasteAndCircularityPage() {
               </CardHeader>
               <CardContent>
                 {isLoadingData ? (
-                  <div className="flex items-centre justify-centre py-12">
+                  <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : wasteData.length === 0 ? (

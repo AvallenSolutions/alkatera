@@ -263,7 +263,7 @@ export function EditProductForm({ productId }: EditProductFormProps) {
           <Separator />
 
           <div className="space-y-4">
-            <div className="flex items-centre justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold">Certifications</h3>
                 <p className="text-sm text-muted-foreground">
@@ -283,7 +283,7 @@ export function EditProductForm({ productId }: EditProductFormProps) {
             </div>
 
             {certifications.length === 0 ? (
-              <div className="text-centre py-6 border-2 border-dashed rounded-lg">
+              <div className="text-center py-6 border-2 border-dashed rounded-lg">
                 <p className="text-sm text-muted-foreground">
                   No certifications added yet
                 </p>
@@ -328,7 +328,7 @@ export function EditProductForm({ productId }: EditProductFormProps) {
           <Separator />
 
           <div className="space-y-4">
-            <div className="flex items-centre justify-between">
+            <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold">Awards</h3>
                 <p className="text-sm text-muted-foreground">
@@ -348,7 +348,7 @@ export function EditProductForm({ productId }: EditProductFormProps) {
             </div>
 
             {awards.length === 0 ? (
-              <div className="text-centre py-6 border-2 border-dashed rounded-lg">
+              <div className="text-center py-6 border-2 border-dashed rounded-lg">
                 <p className="text-sm text-muted-foreground">
                   No awards added yet
                 </p>

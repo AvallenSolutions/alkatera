@@ -59,7 +59,7 @@ export function ActionItemsWidget() {
   return (
     <Card className="col-span-full lg:col-span-1">
       <CardHeader>
-        <CardTitle className="flex items-centre gap-2">
+        <CardTitle className="flex items-center gap-2">
           <CheckSquare className="h-5 w-5" />
           Action Items
         </CardTitle>
@@ -71,12 +71,12 @@ export function ActionItemsWidget() {
             {placeholderItems.map((item) => (
               <div
                 key={item.id}
-                className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colours"
+                className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
               >
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="space-y-1 flex-1">
-                      <div className="flex items-centre gap-2">
+                      <div className="flex items-center gap-2">
                         <Circle className="h-4 w-4 text-muted-foreground" />
                         <h4 className="text-sm font-semibold leading-none">{item.title}</h4>
                       </div>
@@ -84,8 +84,8 @@ export function ActionItemsWidget() {
                     </div>
                   </div>
 
-                  <div className="flex items-centre justify-between pl-6">
-                    <div className="flex items-centre gap-2">
+                  <div className="flex items-center justify-between pl-6">
+                    <div className="flex items-center gap-2">
                       <Badge
                         variant="outline"
                         className={`text-xs ${getPriorityColor(item.priority)}`}

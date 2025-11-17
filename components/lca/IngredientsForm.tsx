@@ -145,7 +145,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
           return (
             <AccordionItem key={stage.id} value={`stage-${stage.id}`}>
               <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-centre justify-between w-full pr-4">
+                <div className="flex items-center justify-between w-full pr-4">
                   <span className="font-semibold">{stage.name}</span>
                   <span className="text-sm text-muted-foreground">
                     {stageMaterials.length} material{stageMaterials.length !== 1 ? "s" : ""}
@@ -160,7 +160,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
                 )}
 
                 {stageMaterials.length === 0 ? (
-                  <div className="text-centre py-8 border-2 border-dashed rounded-lg">
+                  <div className="text-center py-8 border-2 border-dashed rounded-lg">
                     <p className="text-sm text-muted-foreground mb-3">
                       No materials added for this stage yet
                     </p>
@@ -282,7 +282,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
         })}
       </Accordion>
 
-      <div className="flex justify-between items-centre pt-6 border-t">
+      <div className="flex justify-between items-center pt-6 border-t">
         <Button
           type="button"
           variant="outline"

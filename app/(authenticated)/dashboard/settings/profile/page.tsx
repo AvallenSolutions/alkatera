@@ -179,7 +179,7 @@ function ProfileContent() {
                 </div>
               </div>
 
-              <div className="flex items-centre gap-4 pt-4 border-t">
+              <div className="flex items-center gap-4 pt-4 border-t">
                 <Button type="submit" disabled={isUpdating}>
                   {isUpdating ? (
                     <>

@@ -48,7 +48,7 @@ export default function SettingsPage() {
               onClick={() => router.push(section.href)}
             >
               <CardHeader>
-                <div className="flex items-centre justify-between">
+                <div className="flex items-center justify-between">
                   <Icon className="h-8 w-8 text-slate-700" />
                   <ChevronRight className="h-5 w-5 text-muted-foreground" />
                 </div>

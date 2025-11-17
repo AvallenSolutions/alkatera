@@ -25,8 +25,8 @@ const scopeDescriptions: Record<number, string> = {
 function ScopeSkeleton() {
   return (
     <div className="space-y-3">
-      <div className="flex items-centre justify-between">
-        <div className="flex items-centre gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <Skeleton className="h-3 w-3 rounded-full" />
           <Skeleton className="h-4 w-48" />
         </div>
@@ -92,9 +92,9 @@ export function GHGEmissionsSummaryWidget() {
   return (
     <Card className="col-span-full lg:col-span-2">
       <CardHeader>
-        <div className="flex items-centre justify-between">
+        <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-centre gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Cloud className="h-5 w-5" />
               GHG Emissions Summary
             </CardTitle>
@@ -114,14 +114,14 @@ export function GHGEmissionsSummaryWidget() {
             <ScopeSkeleton />
             <ScopeSkeleton />
             <div className="pt-4 border-t">
-              <div className="flex items-centre justify-between">
+              <div className="flex items-center justify-between">
                 <Skeleton className="h-6 w-32" />
                 <Skeleton className="h-8 w-24" />
               </div>
             </div>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-centre justify-centre py-12 px-4 text-centre">
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Failed to Load Emissions Data</h3>
             <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
@@ -135,8 +135,8 @@ export function GHGEmissionsSummaryWidget() {
 
               return (
                 <div key={scope} className="space-y-3">
-                  <div className="flex items-centre justify-between">
-                    <div className="flex items-centre gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <div className={`h-3 w-3 rounded-full ${scopeColors[scope]}`} />
                       <span className="text-sm font-medium">{scopeLabels[scope]}</span>
                     </div>
@@ -158,17 +158,17 @@ export function GHGEmissionsSummaryWidget() {
             })}
 
             <div className="pt-4 border-t">
-              <div className="flex items-centre justify-between">
+              <div className="flex items-center justify-between">
                 <span className="font-semibold">Total Emissions</span>
                 <span className="text-2xl font-bold">{formatEmissions(totalEmissions)}</span>
               </div>
               {totalEmissions === 0 ? (
-                <div className="mt-2 flex items-centre gap-2 text-xs text-muted-foreground">
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <Info className="h-4 w-4" />
                   <span>Begin tracking emissions to see your organisation's carbon footprint</span>
                 </div>
               ) : (
-                <div className="mt-2 flex items-centre gap-2 text-xs text-muted-foreground">
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <Info className="h-4 w-4" />
                   <span>
                     {hotspots?.length || 0} emission {hotspots?.length === 1 ? 'category' : 'categories'} tracked

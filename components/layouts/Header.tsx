@@ -81,8 +81,8 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-slate-950/95 dark:supports-[backdrop-filter]:bg-slate-950/60">
-      <div className="flex h-16 items-centre justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-centre gap-4">
+      <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
@@ -106,7 +106,7 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
                   aria-expanded={orgPopoverOpen}
                   className="w-[200px] justify-between"
                 >
-                  <div className="flex items-centre gap-2 overflow-hidden">
+                  <div className="flex items-center gap-2 overflow-hidden">
                     <Building2 className="h-4 w-4 shrink-0" />
                     <span className="truncate text-sm">
                       {currentOrganization?.name || 'Select organisation'}
@@ -161,7 +161,7 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
           )}
         </div>
 
-        <div className="flex items-centre gap-4">
+        <div className="flex items-center gap-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

@@ -132,7 +132,7 @@ export default function ProductsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6 flex items-centre justify-between">
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Products</h1>
           <p className="text-muted-foreground mt-2">
@@ -166,7 +166,7 @@ export default function ProductsPage() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : products.length === 0 ? (
-            <div className="text-centre py-12">
+            <div className="text-center py-12">
               <p className="text-sm text-muted-foreground">No products found.</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Click "Add New Product" to create your first product.

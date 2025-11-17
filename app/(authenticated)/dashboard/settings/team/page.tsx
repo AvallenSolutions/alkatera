@@ -220,7 +220,7 @@ function TeamManagementContent() {
 
   if (!currentOrganization) {
     return (
-      <div className="flex items-centre justify-centre h-96">
+      <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
       </div>
     )
@@ -229,9 +229,9 @@ function TeamManagementContent() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       <Card>
-        <CardHeader className="flex flex-row items-centre justify-between space-y-0 pb-6">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6">
           <div className="space-y-1">
-            <CardTitle className="text-2xl font-semibold flex items-centre gap-2">
+            <CardTitle className="text-2xl font-semibold flex items-center gap-2">
               <Users className="h-6 w-6" />
               Team Members
             </CardTitle>
@@ -312,11 +312,11 @@ function TeamManagementContent() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="flex items-centre justify-centre h-64">
+            <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-slate-500" />
             </div>
           ) : members.length === 0 ? (
-            <div className="text-centre py-12">
+            <div className="text-center py-12">
               <AlertCircle className="h-12 w-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-500 text-lg">No team members found</p>
             </div>
