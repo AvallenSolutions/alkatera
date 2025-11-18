@@ -11,7 +11,7 @@ export async function createDraftLca(productId: string, organizationId: string) 
 
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("name")
+      .select("name, description, image_url")
       .eq("id", productId)
       .eq("organization_id", organizationId)
       .maybeSingle();
@@ -29,9 +29,8 @@ export async function createDraftLca(productId: string, organizationId: string) 
       .insert({
         organization_id: organizationId,
         product_name: product.name,
-        functional_unit: "1 unit",
-        system_boundary: "Cradle to gate",
-        status: "draft",
+        product_description: product.description || null,
+        product_image_url: product.image_url || null,
       })
       .select()
       .single();
