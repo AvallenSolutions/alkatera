@@ -39,7 +39,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [hasFetched, setHasFetched] = useState(false)
+  const [isFetching, setIsFetching] = useState(false)
   const { user, session, loading: authLoading } = useAuth()
 
   const fetchOrganizations = async () => {
@@ -67,6 +67,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       hasAccessToken: !!session.access_token
     })
 
+    if (isFetching) {
+      console.log('⏳ OrganizationContext: Already fetching, skipping...')
+      return
+    }
+
+    setIsFetching(true)
     setIsLoading(true)
     try {
       // Use the supabase client directly - it already has the session from AuthProvider
@@ -137,7 +143,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       console.error('❌ OrganizationContext: Fatal error in fetchOrganizations:', error)
     } finally {
       setIsLoading(false)
-      setHasFetched(true)
+      setIsFetching(false)
     }
   }
 
@@ -169,7 +175,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }
 
   const refreshOrganizations = async () => {
-    setHasFetched(false)
     await fetchOrganizations()
   }
 
@@ -191,16 +196,15 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         }
 
     } else {
-        setHasFetched(false)
         await fetchOrganizations();
     }
   };
 
   useEffect(() => {
-    if (!authLoading && !hasFetched && user) {
+    if (!authLoading && user && !isFetching) {
       fetchOrganizations()
     }
-  }, [user, authLoading, hasFetched])
+  }, [user, authLoading])
 
   const value = {
     currentOrganization,
