@@ -56,25 +56,42 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     console.log('🔍 OrganizationContext: Fetching organizations for user:', user.id)
     setIsLoading(true)
     try {
-      const { data: memberships, error } = await supabase
+      // First, get the user's organization memberships
+      const { data: memberships, error: membershipsError } = await supabase
         .from('organization_members')
-        .select(`
-          organization_id,
-          role_id,
-          roles!inner (name),
-          organizations!inner (*)
-        `)
+        .select('organization_id, role_id')
         .eq('user_id', user.id)
 
-      console.log('📊 OrganizationContext: Query result:', { memberships, error })
+      console.log('📊 OrganizationContext: Memberships result:', { memberships, error: membershipsError })
 
-      if (error) {
-        console.error('❌ OrganizationContext: Error fetching organizations:', error)
+      if (membershipsError) {
+        console.error('❌ OrganizationContext: Error fetching memberships:', membershipsError)
         setIsLoading(false)
         return
       }
 
-      const orgs = memberships?.map((m: any) => m.organizations).filter(Boolean) as Organization[]
+      if (!memberships || memberships.length === 0) {
+        console.log('ℹ️ OrganizationContext: No organization memberships found')
+        setOrganizations([])
+        setIsLoading(false)
+        return
+      }
+
+      // Then fetch the organizations
+      const orgIds = memberships.map(m => m.organization_id)
+      const { data: orgs, error: orgsError } = await supabase
+        .from('organizations')
+        .select('*')
+        .in('id', orgIds)
+
+      console.log('🏢 OrganizationContext: Organizations result:', { orgs, error: orgsError })
+
+      if (orgsError) {
+        console.error('❌ OrganizationContext: Error fetching organizations:', orgsError)
+        setIsLoading(false)
+        return
+      }
+
       console.log('🏢 OrganizationContext: Found organizations:', orgs?.length || 0)
       setOrganizations(orgs || [])
 
@@ -83,15 +100,25 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         const orgToSet = orgs.find(o => o.id === currentOrgIdFromSession) || orgs[0]
         setCurrentOrganization(orgToSet)
-        
+        console.log('✅ OrganizationContext: Set current organization:', orgToSet.name)
+
         if (orgToSet.id !== currentOrgIdFromSession) {
             console.log('🔧 OrganizationContext: Syncing session with default organization.')
             await supabase.auth.updateUser({ data: { current_organization_id: orgToSet.id } })
         }
 
-        const membership = memberships?.find((m: any) => m.organization_id === orgToSet.id) as any
-        setUserRole(membership?.roles?.name || null)
+        // Fetch the role for this organization
+        const membership = memberships.find(m => m.organization_id === orgToSet.id)
+        if (membership) {
+          const { data: roleData } = await supabase
+            .from('roles')
+            .select('name')
+            .eq('id', membership.role_id)
+            .single()
 
+          setUserRole(roleData?.name || null)
+          console.log('👤 OrganizationContext: User role:', roleData?.name)
+        }
       }
     } catch (error) {
       console.error('❌ OrganizationContext: Fatal error in fetchOrganizations:', error)
