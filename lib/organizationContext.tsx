@@ -43,14 +43,17 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
   const fetchOrganizations = async () => {
     if (authLoading) {
+      console.log('⏳ OrganizationContext: Waiting for auth to complete...')
       return
     }
 
     if (!user) {
+      console.log('ℹ️ OrganizationContext: No user found, skipping organization fetch')
       setIsLoading(false)
       return
     }
 
+    console.log('🔍 OrganizationContext: Fetching organizations for user:', user.id)
     setIsLoading(true)
     try {
       const { data: memberships, error } = await supabase
@@ -63,6 +66,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         `)
         .eq('user_id', user.id)
 
+      console.log('📊 OrganizationContext: Query result:', { memberships, error })
+
       if (error) {
         console.error('❌ OrganizationContext: Error fetching organizations:', error)
         setIsLoading(false)
@@ -70,6 +75,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       }
 
       const orgs = memberships?.map((m: any) => m.organizations).filter(Boolean) as Organization[]
+      console.log('🏢 OrganizationContext: Found organizations:', orgs?.length || 0)
       setOrganizations(orgs || [])
 
       if (orgs && orgs.length > 0) {

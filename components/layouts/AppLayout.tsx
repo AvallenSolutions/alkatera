@@ -39,6 +39,14 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   }, [user, authLoading, router])
 
   useEffect(() => {
+    console.log('🔍 AppLayout: Organization check:', {
+      authLoading,
+      isOrganizationLoading,
+      hasUser: !!user,
+      requireOrganization,
+      hasCurrentOrganization: !!currentOrganization,
+    })
+
     if (!authLoading && !isOrganizationLoading && user && requireOrganization && !currentOrganization) {
       console.log('🏢 AppLayout: No organization found, redirecting to create organization')
       router.push('/create-organization')
