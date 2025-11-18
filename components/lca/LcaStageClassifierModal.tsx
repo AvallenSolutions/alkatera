@@ -24,7 +24,7 @@ interface LcaStageClassifierModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (subStage: LcaSubStage) => void;
-  currentSubStageId?: number | null;
+  currentSubStageId?: string | null;
 }
 
 export function LcaStageClassifierModal({
@@ -34,7 +34,7 @@ export function LcaStageClassifierModal({
   currentSubStageId,
 }: LcaStageClassifierModalProps) {
   const { stages, isLoading, error } = useLcaStages();
-  const [selectedSubStageId, setSelectedSubStageId] = useState<number | null>(
+  const [selectedSubStageId, setSelectedSubStageId] = useState<string | null>(
     currentSubStageId || null
   );
 

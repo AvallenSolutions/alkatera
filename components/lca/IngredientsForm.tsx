@@ -46,21 +46,17 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getMaterialsByStage = (stageId: number) => {
+  const getMaterialsByStage = (stageId: string) => {
     return materials.filter((material) => {
-      const subStageId = typeof material.lca_sub_stage_id === 'string'
-        ? parseInt(material.lca_sub_stage_id)
-        : material.lca_sub_stage_id;
-
       const stage = stages.find((s) =>
-        s.sub_stages.some((sub) => sub.id === subStageId)
+        s.sub_stages.some((sub) => sub.id === material.lca_sub_stage_id)
       );
 
       return stage?.id === stageId;
     });
   };
 
-  const handleAddMaterial = (stageId: number) => {
+  const handleAddMaterial = (stageId: string) => {
     const firstSubStage = stages.find((s) => s.id === stageId)?.sub_stages[0];
     if (!firstSubStage) return;
 
@@ -120,7 +116,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
       }
 
       toast.success("Materials saved successfully");
-      router.push("/dashboard/products");
+      router.push(`/dashboard/lcas/${lcaId}/packaging`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save materials";
       setError(errorMessage);
@@ -231,7 +227,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
                         <div className="col-span-11 md:col-span-3">
                           <Label htmlFor={`sub-stage-${material.id}`}>Sub-Stage</Label>
                           <Select
-                            value={material.lca_sub_stage_id.toString()}
+                            value={material.lca_sub_stage_id}
                             onValueChange={(value) =>
                               handleUpdateMaterial(material.id!, "lca_sub_stage_id", value)
                             }
@@ -242,7 +238,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
                             </SelectTrigger>
                             <SelectContent>
                               {stage.sub_stages.map((subStage) => (
-                                <SelectItem key={subStage.id} value={subStage.id.toString()}>
+                                <SelectItem key={subStage.id} value={subStage.id}>
                                   {subStage.name}
                                 </SelectItem>
                               ))}

@@ -125,56 +125,55 @@ export async function saveOrUpdateMaterials(
       throw new Error("User not authenticated");
     }
 
-    const { data: existingMaterials, error: fetchError } = await supabase
+    const { data: lca, error: lcaError } = await supabase
+      .from('product_lcas')
+      .select('organization_id')
+      .eq('id', lcaId)
+      .maybeSingle();
+
+    if (lcaError) {
+      throw new Error(`Failed to verify LCA: ${lcaError.message}`);
+    }
+
+    if (!lca) {
+      throw new Error("LCA not found");
+    }
+
+    const { data: membership } = await supabase
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .eq('organization_id', lca.organization_id)
+      .maybeSingle();
+
+    if (!membership) {
+      throw new Error("Not authorized to modify this LCA");
+    }
+
+    const { error: deleteError } = await supabase
       .from('product_lca_materials')
-      .select('id')
+      .delete()
       .eq('product_lca_id', lcaId);
 
-    if (fetchError) {
-      throw new Error(`Failed to fetch existing materials: ${fetchError.message}`);
+    if (deleteError) {
+      throw new Error(`Failed to delete existing materials: ${deleteError.message}`);
     }
 
-    const existingIds = (existingMaterials || []).map((m) => m.id);
-    const incomingIds = materials.filter((m) => m.id).map((m) => m.id);
-    const toDelete = existingIds.filter((id) => !incomingIds.includes(id));
-
-    if (toDelete.length > 0) {
-      const { error: deleteError } = await supabase
-        .from('product_lca_materials')
-        .delete()
-        .in('id', toDelete);
-
-      if (deleteError) {
-        throw new Error(`Failed to delete materials: ${deleteError.message}`);
-      }
-    }
-
-    for (const material of materials) {
-      const materialData = {
+    if (materials.length > 0) {
+      const materialsToInsert = materials.map((material) => ({
         product_lca_id: lcaId,
         name: material.name,
         quantity: typeof material.quantity === 'string' ? parseFloat(material.quantity) : material.quantity,
         unit: material.unit,
-        lca_sub_stage_id: typeof material.lca_sub_stage_id === 'string' ? parseInt(material.lca_sub_stage_id) : material.lca_sub_stage_id,
-      };
+        lca_sub_stage_id: material.lca_sub_stage_id,
+      }));
 
-      if (material.id) {
-        const { error: updateError } = await supabase
-          .from('product_lca_materials')
-          .update(materialData)
-          .eq('id', material.id);
+      const { error: insertError } = await supabase
+        .from('product_lca_materials')
+        .insert(materialsToInsert);
 
-        if (updateError) {
-          throw new Error(`Failed to update material: ${updateError.message}`);
-        }
-      } else {
-        const { error: insertError } = await supabase
-          .from('product_lca_materials')
-          .insert(materialData);
-
-        if (insertError) {
-          throw new Error(`Failed to insert material: ${insertError.message}`);
-        }
+      if (insertError) {
+        throw new Error(`Failed to insert materials: ${insertError.message}`);
       }
     }
 

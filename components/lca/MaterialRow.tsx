@@ -13,7 +13,7 @@ export interface Material {
   name: string;
   quantity: number;
   unit: string;
-  lca_sub_stage_id: number | null;
+  lca_sub_stage_id: string | null;
   lca_sub_stage_name?: string;
 }
 

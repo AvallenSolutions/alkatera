@@ -1,5 +1,5 @@
 export interface LcaLifeCycleStage {
-  id: number;
+  id: string;
   name: string;
   description: string | null;
   display_order: number;
@@ -7,8 +7,8 @@ export interface LcaLifeCycleStage {
 }
 
 export interface LcaSubStage {
-  id: number;
-  stage_id: number;
+  id: string;
+  stage_id: string;
   name: string;
   description: string | null;
   display_order: number;
@@ -80,7 +80,7 @@ export interface ProductLcaMaterial {
   country_of_origin?: string | null;
   is_organic?: boolean;
   is_regenerative?: boolean;
-  lca_sub_stage_id?: number | null;
+  lca_sub_stage_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -90,7 +90,7 @@ export interface SimpleMaterialInput {
   name: string;
   quantity: number | string;
   unit: string;
-  lca_sub_stage_id: number | string;
+  lca_sub_stage_id: string;
 }
 
 export interface MaterialWithDetails {
@@ -102,7 +102,7 @@ export interface MaterialWithDetails {
   country_of_origin: string;
   is_organic: boolean;
   is_regenerative: boolean;
-  lca_sub_stage_id: number;
+  lca_sub_stage_id: string;
   lca_sub_stage_name?: string;
 }
 
@@ -122,6 +122,6 @@ export interface CreateLcaPayload {
     country_of_origin: string;
     is_organic: boolean;
     is_regenerative: boolean;
-    lca_sub_stage_id: number;
+    lca_sub_stage_id: string;
   }>;
 }
