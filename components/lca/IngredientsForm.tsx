@@ -116,7 +116,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
       }
 
       toast.success("Materials saved successfully");
-      router.push(`/dashboard/lcas/${lcaId}/packaging`);
+      router.push(`/dashboard/lcas/${lcaId}/calculate`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save materials";
       setError(errorMessage);
