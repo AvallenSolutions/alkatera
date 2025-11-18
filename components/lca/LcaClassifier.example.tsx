@@ -43,7 +43,7 @@ export function LcaClassifierExample() {
           {/* The LcaClassifier component */}
           <LcaClassifier
             onSubStageSelect={handleSubStageSelect}
-            selectedSubStageId={selectedSubStage?.id}
+            selectedSubStageId={selectedSubStage?.id ?? null}
             title="Classify Your Emissions Data"
             description="Select the life cycle stage that best describes this emissions activity"
           />

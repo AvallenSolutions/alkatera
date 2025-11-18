@@ -39,24 +39,24 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
       name: m.name || "",
       quantity: m.quantity,
       unit: m.unit || "",
-      lca_sub_stage_id: m.lca_sub_stage_id || "",
+      lca_sub_stage_id: m.lca_sub_stage_id || 0,
     }))
   );
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const getMaterialsByStage = (stageId: string) => {
+  const getMaterialsByStage = (stageId: number) => {
     return materials.filter((material) => {
       const stage = stages.find((s) =>
-        s.sub_stages.some((sub) => sub.id === material.lca_sub_stage_id)
+        s.sub_stages.some((sub) => sub.id === Number(material.lca_sub_stage_id))
       );
 
       return stage?.id === stageId;
     });
   };
 
-  const handleAddMaterial = (stageId: string) => {
+  const handleAddMaterial = (stageId: number) => {
     const firstSubStage = stages.find((s) => s.id === stageId)?.sub_stages[0];
     if (!firstSubStage) return;
 
@@ -227,9 +227,9 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
                         <div className="col-span-11 md:col-span-3">
                           <Label htmlFor={`sub-stage-${material.id}`}>Sub-Stage</Label>
                           <Select
-                            value={material.lca_sub_stage_id}
+                            value={String(material.lca_sub_stage_id)}
                             onValueChange={(value) =>
-                              handleUpdateMaterial(material.id!, "lca_sub_stage_id", value)
+                              handleUpdateMaterial(material.id!, "lca_sub_stage_id", Number(value))
                             }
                             disabled={isSaving}
                           >
@@ -238,7 +238,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
                             </SelectTrigger>
                             <SelectContent>
                               {stage.sub_stages.map((subStage) => (
-                                <SelectItem key={subStage.id} value={subStage.id}>
+                                <SelectItem key={subStage.id} value={String(subStage.id)}>
                                   {subStage.name}
                                 </SelectItem>
                               ))}

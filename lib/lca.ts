@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { getSupabaseServerClient } from './supabase/server-client';
 import type { SimpleMaterialInput, ProductLcaMaterial, LcaStageWithSubStages } from './types/lca';
 
 export async function createDraftLca(productId: string, organizationId: string) {
@@ -119,7 +120,9 @@ export async function updateSourcingMethodology(
 }
 
 export async function fetchLcaStagesWithSubStages(): Promise<LcaStageWithSubStages[]> {
-  const { data: stages, error: stagesError } = await supabase
+  const serverClient = getSupabaseServerClient();
+
+  const { data: stages, error: stagesError } = await serverClient
     .from('lca_life_cycle_stages')
     .select('*')
     .order('display_order');
@@ -128,7 +131,7 @@ export async function fetchLcaStagesWithSubStages(): Promise<LcaStageWithSubStag
     throw new Error(`Failed to fetch LCA stages: ${stagesError.message}`);
   }
 
-  const { data: subStages, error: subStagesError } = await supabase
+  const { data: subStages, error: subStagesError } = await serverClient
     .from('lca_sub_stages')
     .select('*')
     .order('display_order');
@@ -144,7 +147,9 @@ export async function fetchLcaStagesWithSubStages(): Promise<LcaStageWithSubStag
 }
 
 export async function fetchLcaMaterials(lcaId: string): Promise<ProductLcaMaterial[]> {
-  const { data, error } = await supabase
+  const serverClient = getSupabaseServerClient();
+
+  const { data, error } = await serverClient
     .from('product_lca_materials')
     .select('*')
     .eq('product_lca_id', lcaId)

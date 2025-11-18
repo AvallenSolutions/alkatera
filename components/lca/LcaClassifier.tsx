@@ -17,7 +17,7 @@ import { CheckCircle2, Layers } from "lucide-react";
 
 interface LcaClassifierProps {
   onSubStageSelect?: (subStage: LcaSubStage | null) => void;
-  selectedSubStageId?: string | null;
+  selectedSubStageId?: number | null;
   title?: string;
   description?: string;
 }
@@ -29,7 +29,7 @@ export function LcaClassifier({
   description = "Select the appropriate life cycle assessment stage for your emissions data",
 }: LcaClassifierProps) {
   const { stages, isLoading, error } = useLcaStages();
-  const [selectedSubStage, setSelectedSubStage] = useState<string | null>(selectedSubStageId);
+  const [selectedSubStage, setSelectedSubStage] = useState<number | null>(selectedSubStageId);
   const [expandedStage, setExpandedStage] = useState<string>("");
 
   const handleSubStageSelect = (subStage: LcaSubStage, isChecked: boolean) => {

@@ -54,11 +54,11 @@ export default async function CalculatePage({ params }: CalculatePageProps) {
     );
   }
 
-  const getSubStageName = (subStageId: string | null | undefined) => {
+  const getSubStageName = (subStageId: number | null | undefined) => {
     if (!subStageId || !stages) return "Not classified";
 
     for (const stage of stages) {
-      const subStage = stage.sub_stages.find(sub => sub.id === subStageId);
+      const subStage = stage.sub_stages.find(sub => sub.id === Number(subStageId));
       if (subStage) {
         return `${stage.name} > ${subStage.name}`;
       }
@@ -131,7 +131,7 @@ export default async function CalculatePage({ params }: CalculatePageProps) {
                               <TableCell>{material.quantity}</TableCell>
                               <TableCell>{material.unit || "-"}</TableCell>
                               <TableCell className="text-sm text-muted-foreground">
-                                {stage.sub_stages.find(sub => sub.id === material.lca_sub_stage_id)?.name || "Not classified"}
+                                {stage.sub_stages.find(sub => sub.id === Number(material.lca_sub_stage_id))?.name || "Not classified"}
                               </TableCell>
                             </TableRow>
                           ))}

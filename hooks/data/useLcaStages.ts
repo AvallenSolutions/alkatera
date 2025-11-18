@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
 export interface LcaSubStage {
-  id: string;
-  lca_stage_id: string;
+  id: number;
+  lca_stage_id: number;
   name: string;
   description: string | null;
   created_at: string;
 }
 
 export interface LcaLifeCycleStage {
-  id: string;
+  id: number;
   name: string;
   created_at: string;
   sub_stages: LcaSubStage[];
