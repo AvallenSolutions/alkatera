@@ -28,7 +28,6 @@ export async function createDraftLca(productId: string, organizationId: string) 
       .from("product_lcas")
       .insert({
         organization_id: organizationId,
-        product_id: productId,
         product_name: product.name,
         functional_unit: "1 unit",
         system_boundary: "Cradle to gate",
