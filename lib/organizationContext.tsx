@@ -56,6 +56,15 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     console.log('🔍 OrganizationContext: Fetching organizations for user:', user.id)
     setIsLoading(true)
     try {
+      // Debug: Check if supabase client has a session
+      const { data: { session: clientSession } } = await supabase.auth.getSession()
+      console.log('🔐 OrganizationContext: Supabase client session check:', {
+        hasSession: !!clientSession,
+        sessionUserId: clientSession?.user?.id,
+        contextUserId: user.id,
+        sessionMatch: clientSession?.user?.id === user.id
+      })
+
       // First, get the user's organization memberships
       const { data: memberships, error: membershipsError } = await supabase
         .from('organization_members')
