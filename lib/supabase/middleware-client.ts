@@ -13,44 +13,21 @@ export function createMiddlewareSupabaseClient(
     throw new Error('Missing Supabase environment variables in middleware')
   }
 
-  const storageKey = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-token`
+  const authHeader = request.headers.get('authorization')
+  const accessToken = authHeader?.replace('Bearer ', '')
+
+  console.log('🔍 Middleware client: Auth header present:', !!authHeader)
 
   return createClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
       detectSessionInUrl: false,
-      flowType: 'pkce',
-      storageKey,
-      storage: {
-        getItem: (key: string) => {
-          const cookie = request.cookies.get(key)
-          const value = cookie?.value ?? null
-          if (value) {
-            console.log('🍪 Middleware: Found cookie:', key)
-          } else {
-            console.log('⚠️ Middleware: Cookie not found:', key)
-          }
-          return value
-        },
-        setItem: (key: string, value: string) => {
-          console.log('🍪 Middleware: Setting cookie:', key)
-          response.cookies.set(key, value, {
-            path: '/',
-            maxAge: 60 * 60 * 24 * 7,
-            sameSite: 'lax',
-            secure: process.env.NODE_ENV === 'production',
-          })
-        },
-        removeItem: (key: string) => {
-          console.log('🍪 Middleware: Removing cookie:', key)
-          response.cookies.set(key, '', {
-            path: '/',
-            maxAge: 0,
-            sameSite: 'lax',
-          })
-        },
-      },
+    },
+    global: {
+      headers: accessToken ? {
+        Authorization: `Bearer ${accessToken}`
+      } : {},
     },
   })
 }

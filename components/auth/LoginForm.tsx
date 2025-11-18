@@ -67,28 +67,17 @@ export function LoginForm() {
         throw signInError
       }
 
-      if (data.user) {
+      if (data.user && data.session) {
         console.log('✅ LoginForm: Sign-in successful!', {
           userId: data.user.id,
           email: data.user.email,
         })
 
-        if (data.session) {
-          console.log('✅ LoginForm: Session created, access token:', data.session.access_token.substring(0, 20) + '...')
-          console.log('🔄 LoginForm: Waiting for cookies to be set...')
-
-          await new Promise(resolve => setTimeout(resolve, 500))
-
-          console.log('🚀 LoginForm: Navigating to dashboard...')
-          router.push('/dashboard')
-          router.refresh()
-        } else {
-          console.warn('⚠️ LoginForm: User authenticated but no session returned')
-          setError("Authentication successful but session not created. Please try again.")
-        }
+        console.log('🚀 LoginForm: Redirecting to dashboard...')
+        router.push('/dashboard')
       } else {
-        console.error('❌ LoginForm: No user returned from sign-in')
-        setError("Sign-in succeeded but no user data returned. Please try again.")
+        console.error('❌ LoginForm: Sign-in failed - no user or session')
+        setError("Sign-in failed. Please check your credentials and try again.")
       }
     } catch (err: any) {
       console.error('❌ LoginForm: Fatal error during sign-in:', err)
