@@ -166,7 +166,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   return (
     <OrganizationContext.Provider value={value}>
       {children}
-    </Organization-Context.Provider>
+    </OrganizationContext.Provider>
   )
 }
 

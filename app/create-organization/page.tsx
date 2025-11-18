@@ -64,7 +64,8 @@ export default function CreateOrganizationPage() {
 
       await mutate({
         organization: result.organization,
-        role: result.role
+        role: result.role,
+        user: session.user
       })
 
       toast({
