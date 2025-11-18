@@ -35,7 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useOrganization } from "@/lib/organizationContext";
 import { fetchProducts, deleteProduct } from "@/lib/products";
-import { createDraftLca } from "./actions";
+import { createDraftLca } from "@/lib/lca";
 import type { Product } from "@/lib/types/products";
 
 export default function ProductsPage() {
@@ -97,13 +97,23 @@ export default function ProductsPage() {
     }
   };
 
-  const handleCreateLca = async (productId: string) => {
+  const handleCreateLca = async (product: Product) => {
+    if (!organizationId) return;
+
     try {
       setIsCreatingLca(true);
-      await createDraftLca(productId);
+      const result = await createDraftLca(product.id, organizationId);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      toast.success(`LCA created for "${product.name}"`);
+      router.push(`/dashboard/lcas/${result.lcaId}/create/sourcing`);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create LCA";
       toast.error(errorMessage);
+    } finally {
       setIsCreatingLca(false);
     }
   };
@@ -191,7 +201,7 @@ export default function ProductsPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => handleCreateLca(product.id)}
+                            onClick={() => handleCreateLca(product)}
                             disabled={isCreatingLca}
                           >
                             <FileBarChart className="mr-2 h-4 w-4" />
