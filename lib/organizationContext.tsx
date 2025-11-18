@@ -39,6 +39,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasFetched, setHasFetched] = useState(false)
   const { user, session, loading: authLoading } = useAuth()
 
   const fetchOrganizations = async () => {
@@ -68,15 +69,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
     setIsLoading(true)
     try {
-      // Set the session on the supabase client explicitly
-      await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token
-      })
-
-      console.log('✅ OrganizationContext: Session set on Supabase client')
-
-      // Now use the supabase client with the session
+      // Use the supabase client directly - it already has the session from AuthProvider
       const { data: memberships, error: membershipsError } = await supabase
         .from('organization_members')
         .select('organization_id, role_id')
@@ -144,6 +137,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       console.error('❌ OrganizationContext: Fatal error in fetchOrganizations:', error)
     } finally {
       setIsLoading(false)
+      setHasFetched(true)
     }
   }
 
@@ -175,6 +169,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   }
 
   const refreshOrganizations = async () => {
+    setHasFetched(false)
     await fetchOrganizations()
   }
 
@@ -196,15 +191,16 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         }
 
     } else {
-        await refreshOrganizations();
+        setHasFetched(false)
+        await fetchOrganizations();
     }
   };
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading && !hasFetched && user) {
       fetchOrganizations()
     }
-  }, [user, authLoading])
+  }, [user, authLoading, hasFetched])
 
   const value = {
     currentOrganization,
