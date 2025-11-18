@@ -39,7 +39,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const { user, loading: authLoading } = useAuth()
+  const { user, session, loading: authLoading } = useAuth()
 
   const fetchOrganizations = async () => {
     if (authLoading) {
@@ -54,40 +54,42 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
 
     console.log('🔍 OrganizationContext: Fetching organizations for user:', user.id)
+
+    if (!session) {
+      console.error('❌ OrganizationContext: No session available from AuthProvider')
+      setIsLoading(false)
+      return
+    }
+
+    console.log('✅ OrganizationContext: Using session from AuthProvider:', {
+      userId: session.user.id,
+      hasAccessToken: !!session.access_token
+    })
+
     setIsLoading(true)
     try {
-      // Wait a tiny bit to ensure session is synced
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Use the session access token directly for authenticated requests
+      const authHeaders = {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      }
 
-      // Debug: Check if supabase client has a session
-      const { data: { session: clientSession } } = await supabase.auth.getSession()
-      console.log('🔐 OrganizationContext: Supabase client session check:', {
-        hasSession: !!clientSession,
-        sessionUserId: clientSession?.user?.id,
-        contextUserId: user.id,
-        sessionMatch: clientSession?.user?.id === user.id,
-        hasAccessToken: !!clientSession?.access_token
+      // First, get the user's organization memberships using fetch with explicit auth
+      const membershipsUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/organization_members?user_id=eq.${user.id}&select=organization_id,role_id`
+
+      const membershipsResponse = await fetch(membershipsUrl, {
+        headers: authHeaders
       })
 
-      if (!clientSession) {
-        console.error('❌ OrganizationContext: No session found in Supabase client!')
+      if (!membershipsResponse.ok) {
+        console.error('❌ OrganizationContext: Memberships fetch failed:', membershipsResponse.status, membershipsResponse.statusText)
         setIsLoading(false)
         return
       }
 
-      // First, get the user's organization memberships
-      const { data: memberships, error: membershipsError } = await supabase
-        .from('organization_members')
-        .select('organization_id, role_id')
-        .eq('user_id', user.id)
+      const memberships = await membershipsResponse.json()
 
-      console.log('📊 OrganizationContext: Memberships result:', { memberships, error: membershipsError })
-
-      if (membershipsError) {
-        console.error('❌ OrganizationContext: Error fetching memberships:', membershipsError)
-        setIsLoading(false)
-        return
-      }
+      console.log('📊 OrganizationContext: Memberships result:', memberships)
 
       if (!memberships || memberships.length === 0) {
         console.log('ℹ️ OrganizationContext: No organization memberships found')
@@ -96,20 +98,22 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         return
       }
 
-      // Then fetch the organizations
-      const orgIds = memberships.map(m => m.organization_id)
-      const { data: orgs, error: orgsError } = await supabase
-        .from('organizations')
-        .select('*')
-        .in('id', orgIds)
+      // Then fetch the organizations using fetch with explicit auth
+      const orgIds = memberships.map((m: any) => m.organization_id)
+      const orgsUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/organizations?id=in.(${orgIds.join(',')})`
 
-      console.log('🏢 OrganizationContext: Organizations result:', { orgs, error: orgsError })
+      const orgsResponse = await fetch(orgsUrl, {
+        headers: authHeaders
+      })
 
-      if (orgsError) {
-        console.error('❌ OrganizationContext: Error fetching organizations:', orgsError)
+      if (!orgsResponse.ok) {
+        console.error('❌ OrganizationContext: Organizations fetch failed:', orgsResponse.status, orgsResponse.statusText)
         setIsLoading(false)
         return
       }
+
+      const orgs = await orgsResponse.json()
+      console.log('🏢 OrganizationContext: Organizations result:', orgs)
 
       console.log('🏢 OrganizationContext: Found organizations:', orgs?.length || 0)
       setOrganizations(orgs || [])
@@ -117,7 +121,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       if (orgs && orgs.length > 0) {
         const currentOrgIdFromSession = user.user_metadata?.current_organization_id
 
-        const orgToSet = orgs.find(o => o.id === currentOrgIdFromSession) || orgs[0]
+        const orgToSet = orgs.find((o: any) => o.id === currentOrgIdFromSession) || orgs[0]
         setCurrentOrganization(orgToSet)
         console.log('✅ OrganizationContext: Set current organization:', orgToSet.name)
 
@@ -127,7 +131,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         }
 
         // Fetch the role for this organization
-        const membership = memberships.find(m => m.organization_id === orgToSet.id)
+        const membership = memberships.find((m: any) => m.organization_id === orgToSet.id)
         if (membership) {
           const { data: roleData } = await supabase
             .from('roles')
