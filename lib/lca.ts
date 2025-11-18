@@ -11,7 +11,7 @@ export async function createDraftLca(productId: string, organizationId: string) 
 
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("name, description, image_url")
+      .select("name, description, image_url, unit_size_value, unit_size_unit")
       .eq("id", productId)
       .eq("organization_id", organizationId)
       .maybeSingle();
@@ -24,13 +24,19 @@ export async function createDraftLca(productId: string, organizationId: string) 
       throw new Error("Product not found");
     }
 
+    const functionalUnit = product.unit_size_value && product.unit_size_unit
+      ? `${product.unit_size_value} ${product.unit_size_unit}`
+      : "1 unit";
+
     const { data: lca, error: lcaError } = await supabase
       .from("product_lcas")
       .insert({
         organization_id: organizationId,
+        product_id: productId,
         product_name: product.name,
         product_description: product.description || null,
         product_image_url: product.image_url || null,
+        functional_unit: functionalUnit,
       })
       .select()
       .single();

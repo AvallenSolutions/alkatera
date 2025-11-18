@@ -73,8 +73,32 @@ export default function CreateProductPage() {
       return;
     }
 
+    const missingFields: string[] = [];
+
     if (!name.trim()) {
-      setError("Product name is required");
+      missingFields.push("Product Name");
+    }
+
+    if (!sku.trim()) {
+      missingFields.push("SKU");
+    }
+
+    if (!unitSizeValue || parseFloat(unitSizeValue) <= 0) {
+      missingFields.push("Unit Size Value");
+    }
+
+    if (!unitSizeUnit) {
+      missingFields.push("Unit");
+    }
+
+    if (!description.trim()) {
+      missingFields.push("Product Description");
+    }
+
+    if (missingFields.length > 0) {
+      const errorMsg = `Please complete the following required fields: ${missingFields.join(", ")}`;
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
@@ -87,10 +111,10 @@ export default function CreateProductPage() {
 
       await insertProduct(organizationId, {
         name: name.trim(),
-        sku: sku.trim() || undefined,
-        unit_size_value: unitSizeValue ? parseFloat(unitSizeValue) : undefined,
-        unit_size_unit: unitSizeUnit || undefined,
-        product_description: description.trim() || undefined,
+        sku: sku.trim(),
+        unit_size_value: parseFloat(unitSizeValue),
+        unit_size_unit: unitSizeUnit as UnitSizeUnit,
+        product_description: description.trim(),
         product_image_url: imageUrl.trim() || undefined,
         certifications: validCertifications.length > 0 ? validCertifications : undefined,
         awards: validAwards.length > 0 ? validAwards : undefined,
@@ -171,37 +195,46 @@ export default function CreateProductPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU</Label>
+                <Label htmlFor="sku">
+                  SKU <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="sku"
                   value={sku}
                   onChange={(e) => setSku(e.target.value)}
                   placeholder="e.g., PCB-250-001"
+                  required
                   disabled={isSaving}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="unit-size-value">Unit Size Value</Label>
+                  <Label htmlFor="unit-size-value">
+                    Unit Size Value <span className="text-destructive">*</span>
+                  </Label>
                   <Input
                     id="unit-size-value"
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
                     value={unitSizeValue}
                     onChange={(e) => setUnitSizeValue(e.target.value)}
                     placeholder="250"
+                    required
                     disabled={isSaving}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="unit-size-unit">Unit</Label>
+                  <Label htmlFor="unit-size-unit">
+                    Unit <span className="text-destructive">*</span>
+                  </Label>
                   <Select
                     value={unitSizeUnit}
                     onValueChange={(value) => setUnitSizeUnit(value as UnitSizeUnit)}
                     disabled={isSaving}
+                    required
                   >
                     <SelectTrigger id="unit-size-unit">
                       <SelectValue placeholder="Select unit" />
@@ -231,13 +264,16 @@ export default function CreateProductPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="description">Product Description</Label>
+                <Label htmlFor="description">
+                  Product Description <span className="text-destructive">*</span>
+                </Label>
                 <Textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe the product..."
                   rows={4}
+                  required
                   disabled={isSaving}
                 />
               </div>
