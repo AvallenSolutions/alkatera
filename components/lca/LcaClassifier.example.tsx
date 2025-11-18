@@ -27,7 +27,7 @@ export function LcaClassifierExample() {
       console.log("Submitting with LCA classification:", {
         subStageId: selectedSubStage.id,
         subStageName: selectedSubStage.name,
-        stageId: selectedSubStage.stage_id,
+        stageId: selectedSubStage.lca_stage_id,
       });
       // Here you would typically save this to your database or pass it to a parent component
     }
@@ -61,7 +61,7 @@ export function LcaClassifierExample() {
                     </div>
                   )}
                   <div className="pt-2 text-xs text-muted-foreground">
-                    Sub-stage ID: {selectedSubStage.id} | Stage ID: {selectedSubStage.stage_id}
+                    Sub-stage ID: {selectedSubStage.id} | Stage ID: {selectedSubStage.lca_stage_id}
                   </div>
                 </div>
               </CardContent>

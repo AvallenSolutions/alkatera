@@ -139,7 +139,7 @@ export async function fetchLcaStagesWithSubStages(): Promise<LcaStageWithSubStag
 
   return (stages || []).map((stage) => ({
     ...stage,
-    sub_stages: (subStages || []).filter((sub) => sub.stage_id === stage.id),
+    sub_stages: (subStages || []).filter((sub) => sub.lca_stage_id === stage.id),
   }));
 }
 

@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabaseClient';
 
 export interface LcaSubStage {
   id: string;
-  stage_id: string;
+  lca_stage_id: string;
   name: string;
   description: string | null;
   created_at: string;
@@ -45,7 +45,7 @@ export function useLcaStages(): UseLcaStagesResult {
       const { data: subStagesData, error: subStagesError } = await supabase
         .from('lca_sub_stages')
         .select('*')
-        .order('stage_id, id');
+        .order('lca_stage_id, id');
 
       if (subStagesError) {
         throw new Error(subStagesError.message);
@@ -53,7 +53,7 @@ export function useLcaStages(): UseLcaStagesResult {
 
       const stagesWithSubStages: LcaLifeCycleStage[] = (stagesData || []).map((stage) => ({
         ...stage,
-        sub_stages: (subStagesData || []).filter((subStage) => subStage.stage_id === stage.id),
+        sub_stages: (subStagesData || []).filter((subStage) => subStage.lca_stage_id === stage.id),
       }));
 
       setStages(stagesWithSubStages);

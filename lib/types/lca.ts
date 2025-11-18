@@ -8,7 +8,7 @@ export interface LcaLifeCycleStage {
 
 export interface LcaSubStage {
   id: string;
-  stage_id: string;
+  lca_stage_id: string;
   name: string;
   description: string | null;
   display_order: number;
