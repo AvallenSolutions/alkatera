@@ -3,11 +3,21 @@ import type { SimpleMaterialInput, ProductLcaMaterial, LcaStageWithSubStages } f
 
 export async function createDraftLca(productId: string, organizationId: string) {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    console.log('[createDraftLca] Starting draft LCA creation', { productId, organizationId });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error('[createDraftLca] Auth error:', authError);
+      throw new Error(`Authentication failed: ${authError.message}`);
+    }
 
     if (!user) {
+      console.error('[createDraftLca] No authenticated user found');
       throw new Error("User not authenticated");
     }
+
+    console.log('[createDraftLca] User authenticated:', user.id);
 
     const { data: product, error: productError } = await supabase
       .from("products")
@@ -17,36 +27,65 @@ export async function createDraftLca(productId: string, organizationId: string) 
       .maybeSingle();
 
     if (productError) {
+      console.error('[createDraftLca] Product fetch error:', productError);
       throw new Error(`Failed to fetch product: ${productError.message}`);
     }
 
     if (!product) {
-      throw new Error("Product not found");
+      console.error('[createDraftLca] Product not found', { productId, organizationId });
+      throw new Error("Product not found or you don't have access to it");
     }
+
+    console.log('[createDraftLca] Product fetched successfully:', product.name);
 
     const functionalUnit = product.unit_size_value && product.unit_size_unit
       ? `${product.unit_size_value} ${product.unit_size_unit}`
       : "1 unit";
 
+    console.log('[createDraftLca] Functional unit determined:', functionalUnit);
+
+    const lcaData = {
+      organization_id: organizationId,
+      product_id: productId,
+      product_name: product.name,
+      product_description: product.description || null,
+      product_image_url: product.image_url || null,
+      functional_unit: functionalUnit,
+    };
+
+    console.log('[createDraftLca] Inserting LCA with data:', lcaData);
+
     const { data: lca, error: lcaError } = await supabase
       .from("product_lcas")
-      .insert({
-        organization_id: organizationId,
-        product_id: productId,
-        product_name: product.name,
-        product_description: product.description || null,
-        product_image_url: product.image_url || null,
-        functional_unit: functionalUnit,
-      })
+      .insert(lcaData)
       .select()
       .single();
 
     if (lcaError) {
+      console.error('[createDraftLca] LCA insert error:', lcaError);
+
+      if (lcaError.code === '23502') {
+        const match = lcaError.message.match(/column "([^"]+)"/);
+        const column = match ? match[1] : 'unknown';
+        throw new Error(`Missing required field: ${column}. Please ensure all product details are complete.`);
+      }
+
+      if (lcaError.code === '23503') {
+        throw new Error("Invalid organisation or product reference. Please try again.");
+      }
+
+      if (lcaError.code === '42501') {
+        throw new Error("Permission denied. You may not have access to create LCAs for this organisation.");
+      }
+
       throw new Error(`Failed to create LCA: ${lcaError.message}`);
     }
 
+    console.log('[createDraftLca] LCA created successfully:', lca.id);
+
     return { success: true, lcaId: lca.id };
   } catch (error) {
+    console.error('[createDraftLca] Unexpected error:', error);
     const message = error instanceof Error ? error.message : "Failed to create draft LCA";
     return { success: false, error: message };
   }

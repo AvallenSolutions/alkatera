@@ -98,19 +98,33 @@ export default function ProductsPage() {
   };
 
   const handleCreateLca = async (product: Product) => {
-    if (!organizationId) return;
+    if (!organizationId) {
+      toast.error("No organisation selected");
+      return;
+    }
+
+    console.log('[Products] Creating LCA for product:', product.name, product.id);
 
     try {
       setIsCreatingLca(true);
+
+      console.log('[Products] Calling createDraftLca...');
       const result = await createDraftLca(product.id, organizationId);
 
+      console.log('[Products] createDraftLca result:', result);
+
       if (!result.success) {
+        console.error('[Products] LCA creation failed:', result.error);
         throw new Error(result.error);
       }
 
+      console.log('[Products] LCA created successfully:', result.lcaId);
       toast.success(`LCA created for "${product.name}"`);
+
+      console.log('[Products] Navigating to sourcing page...');
       router.push(`/dashboard/lcas/${result.lcaId}/create/sourcing`);
     } catch (err) {
+      console.error('[Products] Error in handleCreateLca:', err);
       const errorMessage = err instanceof Error ? err.message : "Failed to create LCA";
       toast.error(errorMessage);
     } finally {
