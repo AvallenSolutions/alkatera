@@ -50,6 +50,8 @@ export interface PackagingType {
 
 export type MaterialType = 'ingredient' | 'packaging';
 
+export type DataSource = 'openlca' | 'supplier';
+
 export interface MaterialSelectionOutput {
   materialId: string;
   materialType: MaterialType;
@@ -81,6 +83,11 @@ export interface ProductLcaMaterial {
   is_organic?: boolean;
   is_regenerative?: boolean;
   lca_sub_stage_id?: number | null;
+  data_source?: DataSource | null;
+  data_source_id?: string | null;
+  supplier_product_id?: string | null;
+  origin_country?: string | null;
+  is_organic_certified?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +98,47 @@ export interface SimpleMaterialInput {
   quantity: number | string;
   unit: string;
   lca_sub_stage_id: number | string;
+  data_source?: DataSource;
+  data_source_id?: string;
+  supplier_product_id?: string;
+  origin_country?: string;
+  is_organic_certified?: boolean;
+}
+
+export interface OpenLCAProcess {
+  id: string;
+  name: string;
+  category: string;
+  unit?: string;
+}
+
+export interface SupplierProduct {
+  id: string;
+  supplier_id: string;
+  organization_id: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  unit: string;
+  carbon_intensity?: number | null;
+  product_code?: string | null;
+  supplier_name?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IngredientCardData {
+  tempId: string;
+  data_source: DataSource;
+  name: string;
+  quantity: number | string;
+  unit: string;
+  lca_sub_stage_id: number | null;
+  data_source_id?: string;
+  supplier_product_id?: string;
+  origin_country: string;
+  is_organic_certified: boolean;
 }
 
 export interface MaterialWithDetails {

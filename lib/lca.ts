@@ -198,6 +198,38 @@ export async function saveOrUpdateMaterials(
       throw new Error("Not authorized to modify this LCA");
     }
 
+    const validationErrors: string[] = [];
+    materials.forEach((material, index) => {
+      if (!material.name || material.name.trim() === '') {
+        validationErrors.push(`Material ${index + 1}: Name is required`);
+      }
+
+      const qty = typeof material.quantity === 'string' ? parseFloat(material.quantity) : material.quantity;
+      if (isNaN(qty) || qty <= 0) {
+        validationErrors.push(`Material ${index + 1}: Valid quantity is required`);
+      }
+
+      if (!material.unit || material.unit.trim() === '') {
+        validationErrors.push(`Material ${index + 1}: Unit is required`);
+      }
+
+      if (!material.lca_sub_stage_id) {
+        validationErrors.push(`Material ${index + 1}: Life cycle sub-stage is required`);
+      }
+
+      if (material.data_source === 'openlca' && !material.data_source_id) {
+        validationErrors.push(`Material ${index + 1}: OpenLCA data source ID is required when data source is OpenLCA`);
+      }
+
+      if (material.data_source === 'supplier' && !material.supplier_product_id) {
+        validationErrors.push(`Material ${index + 1}: Supplier product ID is required when data source is supplier network`);
+      }
+    });
+
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join('; ')}`);
+    }
+
     const { error: deleteError } = await supabase
       .from('product_lca_materials')
       .delete()
@@ -214,6 +246,11 @@ export async function saveOrUpdateMaterials(
         quantity: typeof material.quantity === 'string' ? parseFloat(material.quantity) : material.quantity,
         unit: material.unit,
         lca_sub_stage_id: material.lca_sub_stage_id,
+        data_source: material.data_source || null,
+        data_source_id: material.data_source_id || null,
+        supplier_product_id: material.supplier_product_id || null,
+        origin_country: material.origin_country || null,
+        is_organic_certified: material.is_organic_certified || false,
       }));
 
       const { error: insertError } = await supabase
