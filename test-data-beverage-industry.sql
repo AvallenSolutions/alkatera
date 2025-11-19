@@ -33,7 +33,7 @@
 
 DO $$
 DECLARE
-  v_org_id UUID := 'b960b43d-85e0-42a8-b6ab-bae48195b50a'::UUID;  -- REPLACE THIS WITH YOUR ACTUAL ORG ID
+  v_org_id UUID := '2d86de84-e24e-458b-84b9-fd4057998bda'::UUID;  -- REPLACE THIS WITH YOUR ACTUAL ORG ID
   
   -- Supplier IDs (will be generated)
   v_supplier_fruit_co UUID;
