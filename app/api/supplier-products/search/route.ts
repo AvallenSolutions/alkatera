@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
+export const dynamic = 'force-dynamic';
+
 interface SupplierProductSearchResult {
   id: string;
   name: string;
