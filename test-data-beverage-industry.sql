@@ -48,39 +48,39 @@ DECLARE
   v_lca_completed UUID;
   
   -- LCA Sub-stage IDs (will be fetched)
-  v_substage_agricultural UUID;
-  v_substage_ingredient_proc UUID;
-  v_substage_packaging_prod UUID;
-  v_substage_road_transport UUID;
-  v_substage_sea_freight UUID;
-  v_substage_warehousing UUID;
-  v_substage_recycling UUID;
+  v_substage_raw_material INTEGER;
+  v_substage_raw_processing INTEGER;
+  v_substage_packaging_prod INTEGER;
+  v_substage_beverage_prod INTEGER;
+  v_substage_inbound_logistics INTEGER;
+  v_substage_distribution INTEGER;
+  v_substage_waste_processing INTEGER;
 BEGIN
 
   -- ============================================================================
   -- STEP 1: FETCH LCA SUB-STAGE IDS
   -- ============================================================================
-  
-  SELECT id INTO v_substage_agricultural 
-  FROM lca_sub_stages WHERE name = 'Agricultural Production';
-  
-  SELECT id INTO v_substage_ingredient_proc 
-  FROM lca_sub_stages WHERE name = 'Ingredient Processing';
-  
-  SELECT id INTO v_substage_packaging_prod 
+
+  SELECT id INTO v_substage_raw_material
+  FROM lca_sub_stages WHERE name = 'Raw Material Acquisition';
+
+  SELECT id INTO v_substage_raw_processing
+  FROM lca_sub_stages WHERE name = 'Raw Material Processing';
+
+  SELECT id INTO v_substage_packaging_prod
   FROM lca_sub_stages WHERE name = 'Packaging Production';
-  
-  SELECT id INTO v_substage_road_transport 
-  FROM lca_sub_stages WHERE name = 'Road Transport';
-  
-  SELECT id INTO v_substage_sea_freight 
-  FROM lca_sub_stages WHERE name = 'Sea Freight';
-  
-  SELECT id INTO v_substage_warehousing 
-  FROM lca_sub_stages WHERE name = 'Warehousing';
-  
-  SELECT id INTO v_substage_recycling 
-  FROM lca_sub_stages WHERE name = 'Recycling';
+
+  SELECT id INTO v_substage_beverage_prod
+  FROM lca_sub_stages WHERE name = 'Beverage Production & Bottling';
+
+  SELECT id INTO v_substage_inbound_logistics
+  FROM lca_sub_stages WHERE name = 'Inbound Logistics';
+
+  SELECT id INTO v_substage_distribution
+  FROM lca_sub_stages WHERE name = 'Distribution & Warehousing';
+
+  SELECT id INTO v_substage_waste_processing
+  FROM lca_sub_stages WHERE name = 'Waste Processing, Recycling, or Disposal';
 
   -- ============================================================================
   -- STEP 2: CREATE SUPPLIERS
@@ -402,38 +402,38 @@ BEGIN
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, supplier_product_id, origin_country, is_organic_certified
   )
-  SELECT 
-    v_lca_pending, 'Organic Apple Juice Concentrate', 50, 'L', v_substage_ingredient_proc,
+  SELECT
+    v_lca_pending, 'Organic Apple Juice Concentrate', 50, 'L', v_substage_raw_processing,
     'supplier', sp.id, 'United Kingdom', true
   FROM supplier_products sp
   WHERE sp.name = 'Organic Apple Juice Concentrate' AND sp.organization_id = v_org_id;
-  
+
   INSERT INTO product_lca_materials (
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, supplier_product_id, origin_country, is_organic_certified
   )
-  SELECT 
-    v_lca_pending, 'Organic Lemon Juice', 15, 'L', v_substage_ingredient_proc,
+  SELECT
+    v_lca_pending, 'Organic Lemon Juice', 15, 'L', v_substage_raw_processing,
     'supplier', sp.id, 'Spain', true
   FROM supplier_products sp
   WHERE sp.name = 'Organic Lemon Juice' AND sp.organization_id = v_org_id;
-  
+
   INSERT INTO product_lca_materials (
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, supplier_product_id, origin_country, is_organic_certified
   )
-  SELECT 
-    v_lca_pending, 'Organic Agave Syrup', 25, 'kg', v_substage_ingredient_proc,
+  SELECT
+    v_lca_pending, 'Organic Agave Syrup', 25, 'kg', v_substage_raw_processing,
     'supplier', sp.id, 'Mexico', true
   FROM supplier_products sp
   WHERE sp.name = 'Organic Agave Syrup' AND sp.organization_id = v_org_id;
-  
+
   -- Water from OpenLCA (secondary data)
   INSERT INTO product_lca_materials (
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, data_source_id, origin_country
   ) VALUES (
-    v_lca_pending, 'Tap water | GB', 650, 'L', v_substage_ingredient_proc,
+    v_lca_pending, 'Tap water | GB', 650, 'L', v_substage_raw_material,
     'openlca', '7d1e5f6g-4h0i-87k5-gl78-h543jk907l32', 'United Kingdom'
   );
   
@@ -479,33 +479,33 @@ BEGIN
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, data_source_id, origin_country
   ) VALUES (
-    v_lca_completed, 'Sugar, from sugar beet | GB', 45, 'kg', v_substage_ingredient_proc,
+    v_lca_completed, 'Sugar, from sugar beet | GB', 45, 'kg', v_substage_raw_processing,
     'openlca', '1c5d7f9e-8b4a-21e9-af12-b987de341f76', 'United Kingdom'
   );
-  
+
   INSERT INTO product_lca_materials (
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, supplier_product_id, origin_country
   )
-  SELECT 
-    v_lca_completed, 'Organic Lemon Juice', 25, 'L', v_substage_ingredient_proc,
+  SELECT
+    v_lca_completed, 'Organic Lemon Juice', 25, 'L', v_substage_raw_processing,
     'supplier', sp.id, 'Spain'
   FROM supplier_products sp
   WHERE sp.name = 'Organic Lemon Juice' AND sp.organization_id = v_org_id;
-  
+
   INSERT INTO product_lca_materials (
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, data_source_id
   ) VALUES (
-    v_lca_completed, 'Citric acid | GLO', 2, 'kg', v_substage_ingredient_proc,
+    v_lca_completed, 'Citric acid | GLO', 2, 'kg', v_substage_raw_processing,
     'openlca', '3j7k1l2m-0n6o-43q1-mr34-n109pq563r98'
   );
-  
+
   INSERT INTO product_lca_materials (
     product_lca_id, name, quantity, unit, lca_sub_stage_id,
     data_source, data_source_id
   ) VALUES (
-    v_lca_completed, 'Carbonated water | GB', 850, 'L', v_substage_ingredient_proc,
+    v_lca_completed, 'Carbonated water | GB', 850, 'L', v_substage_raw_material,
     'openlca', '1r5s9t0u-8v4w-21y9-uz12-v987xy341z76'
   );
   
