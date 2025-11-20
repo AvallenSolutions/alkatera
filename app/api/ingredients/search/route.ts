@@ -40,12 +40,42 @@ export async function GET(request: NextRequest) {
     }
 
     const normalizedQuery = query.trim().toLowerCase();
-    const supabase = getSupabaseServerClient();
 
-    const { data: user } = await supabase.auth.getUser();
-    if (!user?.user) {
+    // Get auth token from Authorization header (same as supplier-products API)
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+
+    if (!token) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized - No token provided' },
+        { status: 401 }
+      );
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    // Create client with the user's access token
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+
+    const { data: user, error: userError } = await supabase.auth.getUser();
+    if (userError || !user?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Invalid token' },
         { status: 401 }
       );
     }
