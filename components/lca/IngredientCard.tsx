@@ -89,33 +89,51 @@ export function IngredientCard({
       // Get session token from browser
       const { getSupabaseBrowserClient } = await import('@/lib/supabase/browser-client');
       const supabase = getSupabaseBrowserClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      console.log('[IngredientCard] Search session check:', {
+        hasSession: !!session,
+        hasAccessToken: !!session?.access_token,
+        sessionError,
+      });
 
       const headers: HeadersInit = {};
       if (session?.access_token) {
         headers['Authorization'] = `Bearer ${session.access_token}`;
+      } else {
+        console.error('[IngredientCard] No access token available for search');
       }
 
       if (ingredient.data_source === "openlca") {
+        console.log('[IngredientCard] Searching OpenLCA for:', query);
         const response = await fetch(`/api/ingredients/search?q=${encodeURIComponent(query)}`, { headers });
+        console.log('[IngredientCard] OpenLCA search response:', response.status);
         if (response.ok) {
           const data = await response.json();
+          console.log('[IngredientCard] OpenLCA results:', data.results?.length || 0);
           setSearchResults(data.results || []);
+        } else {
+          const errorText = await response.text();
+          console.error('[IngredientCard] OpenLCA search failed:', response.status, errorText);
         }
       } else {
+        console.log('[IngredientCard] Searching supplier products for:', query);
         const response = await fetch(
           `/api/supplier-products/search?q=${encodeURIComponent(query)}&organization_id=${organizationId}`,
           { headers }
         );
+        console.log('[IngredientCard] Supplier search response:', response.status);
         if (response.ok) {
           const data = await response.json();
+          console.log('[IngredientCard] Supplier results:', data.results?.length || 0);
           setSearchResults(data.results || []);
         } else {
-          console.error("Supplier products search failed:", response.status, await response.text());
+          const errorText = await response.text();
+          console.error('[IngredientCard] Supplier products search failed:', response.status, errorText);
         }
       }
     } catch (error) {
-      console.error("Search error:", error);
+      console.error("[IngredientCard] Search error:", error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
@@ -133,8 +151,18 @@ export function IngredientCard({
   }, [searchQuery, searchIngredients]);
 
   const handleSelectItem = useCallback((item: OpenLCAProcess | SupplierProduct) => {
+    console.log('[IngredientCard] Item selected:', {
+      dataSource: ingredient.data_source,
+      item,
+    });
+
     if (ingredient.data_source === "openlca") {
       const openLCAItem = item as OpenLCAProcess;
+      console.log('[IngredientCard] Setting OpenLCA item:', {
+        name: openLCAItem.name,
+        id: openLCAItem.id,
+        unit: openLCAItem.unit,
+      });
       onUpdate(index, "name", openLCAItem.name);
       onUpdate(index, "data_source_id", openLCAItem.id);
       if (openLCAItem.unit) {
@@ -142,6 +170,11 @@ export function IngredientCard({
       }
     } else {
       const supplierItem = item as SupplierProduct;
+      console.log('[IngredientCard] Setting supplier item:', {
+        name: supplierItem.name,
+        id: supplierItem.id,
+        unit: supplierItem.unit,
+      });
       onUpdate(index, "name", supplierItem.name);
       onUpdate(index, "supplier_product_id", supplierItem.id);
       onUpdate(index, "unit", supplierItem.unit);
