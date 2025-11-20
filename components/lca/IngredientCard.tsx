@@ -86,19 +86,32 @@ export function IngredientCard({
 
     setIsSearching(true);
     try {
+      // Get session token from browser
+      const { getSupabaseBrowserClient } = await import('@/lib/supabase/browser-client');
+      const supabase = getSupabaseBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: HeadersInit = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       if (ingredient.data_source === "openlca") {
-        const response = await fetch(`/api/ingredients/search?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`/api/ingredients/search?q=${encodeURIComponent(query)}`, { headers });
         if (response.ok) {
           const data = await response.json();
           setSearchResults(data.results || []);
         }
       } else {
         const response = await fetch(
-          `/api/supplier-products/search?q=${encodeURIComponent(query)}&organization_id=${organizationId}`
+          `/api/supplier-products/search?q=${encodeURIComponent(query)}&organization_id=${organizationId}`,
+          { headers }
         );
         if (response.ok) {
           const data = await response.json();
           setSearchResults(data.results || []);
+        } else {
+          console.error("Supplier products search failed:", response.status, await response.text());
         }
       }
     } catch (error) {

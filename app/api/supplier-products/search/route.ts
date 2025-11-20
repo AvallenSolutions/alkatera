@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,12 +19,41 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get('q');
     const organizationId = searchParams.get('organization_id');
 
-    const supabase = getSupabaseServerClient();
+    // Get auth token from Authorization header
+    const authHeader = request.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
 
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData?.user) {
+    if (!token) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized - No token provided' },
+        { status: 401 }
+      );
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
+
+    // Create client with the user's access token
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    });
+
+    // Verify the token is valid
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Invalid token' },
         { status: 401 }
       );
     }
@@ -36,6 +65,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Verify user has access to the organization
     const { data: membership } = await supabase
       .from('organization_members')
       .select('organization_id')
@@ -50,6 +80,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Query supplier products - RLS will now work because we're using the user's token
     let supplierQuery = supabase
       .from('supplier_products')
       .select(`
@@ -76,7 +107,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error fetching supplier products:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch supplier products' },
+        { error: 'Failed to fetch supplier products', details: error.message },
         { status: 500 }
       );
     }
