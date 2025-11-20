@@ -50,20 +50,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Cache disabled - openlca_process_cache table not yet implemented
-    // const cacheResult = await supabase
-    //   .from('openlca_process_cache')
-    //   .select('*')
-    //   .eq('search_term', normalizedQuery)
-    //   .gte('created_at', new Date(Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString())
-    //   .maybeSingle();
+    // Check cache first
+    const { data: cacheResult } = await supabase
+      .from('openlca_process_cache')
+      .select('results, created_at')
+      .eq('search_term', normalizedQuery)
+      .gte('created_at', new Date(Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString())
+      .maybeSingle();
 
-    // if (cacheResult.data) {
-    //   return NextResponse.json({
-    //     results: cacheResult.data.results,
-    //     cached: true,
-    //   });
-    // }
+    if (cacheResult && cacheResult.results) {
+      return NextResponse.json({
+        results: cacheResult.results,
+        cached: true,
+      });
+    }
 
     if (!OPENLCA_API_KEY) {
       console.warn('OpenLCA API key not configured, returning mock data');
@@ -82,14 +82,14 @@ export async function GET(request: NextRequest) {
         },
       ];
 
-      // Cache disabled - openlca_process_cache table not yet implemented
-      // await supabase
-      //   .from('openlca_process_cache')
-      //   .insert({
-      //     search_term: normalizedQuery,
-      //     results: mockResults,
-      //   })
-      //   .select();
+      // Cache the mock results
+      await supabase
+        .from('openlca_process_cache')
+        .insert({
+          search_term: normalizedQuery,
+          results: mockResults,
+        })
+        .select();
 
       return NextResponse.json({
         results: mockResults,
@@ -126,16 +126,16 @@ export async function GET(request: NextRequest) {
       unit: item.unit || item.referenceUnit || 'unit',
     })).slice(0, 50);
 
-    // Cache disabled - openlca_process_cache table not yet implemented
-    // await supabase
-    //   .from('openlca_process_cache')
-    //   .insert({
-    //     search_term: normalizedQuery,
-    //     results: sanitizedResults,
-    //   })
-    //   .select();
+    // Cache the results
+    await supabase
+      .from('openlca_process_cache')
+      .insert({
+        search_term: normalizedQuery,
+        results: sanitizedResults,
+      })
+      .select();
 
-    // await supabase.rpc('cleanup_openlca_cache');
+    await supabase.rpc('cleanup_openlca_cache');
 
     return NextResponse.json({
       results: sanitizedResults,
