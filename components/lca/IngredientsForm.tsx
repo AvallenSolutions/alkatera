@@ -114,6 +114,8 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
     e.preventDefault();
     setError(null);
 
+    console.log('[IngredientsForm] Submit triggered', { ingredientsCount: ingredients.length, ingredients });
+
     if (ingredients.length === 0) {
       setError("Please add at least one ingredient");
       return;
@@ -121,6 +123,7 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
 
     const validationErrors = validateIngredients();
     if (validationErrors.length > 0) {
+      console.error('[IngredientsForm] Validation errors:', validationErrors);
       setError(validationErrors.join("; "));
       return;
     }
@@ -143,7 +146,11 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
         is_organic_certified: ingredient.is_organic_certified,
       }));
 
+      console.log('[IngredientsForm] Materials to save:', materialsToSave);
+
       const result = await saveOrUpdateMaterials(lcaId, materialsToSave);
+
+      console.log('[IngredientsForm] Save result:', result);
 
       if (!result.success) {
         throw new Error(result.error);

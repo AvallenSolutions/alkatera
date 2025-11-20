@@ -167,11 +167,15 @@ export async function saveOrUpdateMaterials(
   materials: SimpleMaterialInput[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    console.log('[saveOrUpdateMaterials] Starting save', { lcaId, materialCount: materials.length, materials });
+
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       throw new Error("User not authenticated");
     }
+
+    console.log('[saveOrUpdateMaterials] User authenticated:', user.id);
 
     const { data: lca, error: lcaError } = await supabase
       .from('product_lcas')
@@ -253,15 +257,22 @@ export async function saveOrUpdateMaterials(
         is_organic_certified: material.is_organic_certified || false,
       }));
 
-      const { error: insertError } = await supabase
+      console.log('[saveOrUpdateMaterials] Inserting materials:', materialsToInsert);
+
+      const { data: insertedData, error: insertError } = await supabase
         .from('product_lca_materials')
-        .insert(materialsToInsert);
+        .insert(materialsToInsert)
+        .select();
 
       if (insertError) {
+        console.error('[saveOrUpdateMaterials] Insert error:', insertError);
         throw new Error(`Failed to insert materials: ${insertError.message}`);
       }
+
+      console.log('[saveOrUpdateMaterials] Successfully inserted:', insertedData);
     }
 
+    console.log('[saveOrUpdateMaterials] Save completed successfully');
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to save materials";
