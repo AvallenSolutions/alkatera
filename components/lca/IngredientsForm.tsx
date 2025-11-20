@@ -77,7 +77,11 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
   const validateIngredients = useCallback(() => {
     const errors: string[] = [];
 
+    console.log('[IngredientsForm] Validating ingredients:', ingredients);
+
     ingredients.forEach((ingredient, index) => {
+      console.log(`[IngredientsForm] Validating ingredient ${index + 1}:`, ingredient);
+
       if (!ingredient.name) {
         errors.push(`Ingredient ${index + 1}: Name is required`);
       }
@@ -99,14 +103,17 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
       }
 
       if (ingredient.data_source === "openlca" && !ingredient.data_source_id) {
+        console.error(`[IngredientsForm] Ingredient ${index + 1} missing data_source_id:`, ingredient);
         errors.push(`Ingredient ${index + 1}: OpenLCA material must be selected from search results`);
       }
 
       if (ingredient.data_source === "supplier" && !ingredient.supplier_product_id) {
+        console.error(`[IngredientsForm] Ingredient ${index + 1} missing supplier_product_id:`, ingredient);
         errors.push(`Ingredient ${index + 1}: Supplier product must be selected from search results`);
       }
     });
 
+    console.log('[IngredientsForm] Validation complete. Errors:', errors);
     return errors;
   }, [ingredients]);
 
