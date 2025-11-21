@@ -86,7 +86,12 @@ export default function ResultsPage() {
             .eq('product_lca_id', lcaId)
             .order('created_at', { ascending: false });
 
-          console.log('[ResultsPage] Direct results query:', { results, resultsError });
+          console.log('[ResultsPage] Direct results query:', {
+            results,
+            resultsError,
+            resultsCount: results?.length,
+            firstResult: results?.[0]
+          });
 
           if (resultsError) {
             throw new Error(resultsError.message);
