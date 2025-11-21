@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { saveOrUpdateMaterials } from "@/lib/lca";
 import { IngredientCard } from "./IngredientCard";
+import { MaterialUpdatePrompt } from "./MaterialUpdatePrompt";
 import { useOrganization } from "@/lib/organizationContext";
 import type { IngredientCardData, LcaStageWithSubStages, ProductLcaMaterial, LcaSubStage } from "@/lib/types/lca";
+import { supabase } from "@/lib/supabaseClient";
 
 interface IngredientsFormProps {
   lcaId: string;
@@ -43,6 +45,76 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showUpdatePrompt, setShowUpdatePrompt] = useState(false);
+  const [productId, setProductId] = useState<number | null>(null);
+  const [materialsModified, setMaterialsModified] = useState(false);
+  const [hasLoadedFromMaster, setHasLoadedFromMaster] = useState(false);
+
+  useEffect(() => {
+    const loadMasterMaterials = async () => {
+      if (initialMaterials.length > 0 || hasLoadedFromMaster) {
+        return;
+      }
+
+      try {
+        const { data: lcaData } = await supabase
+          .from("product_lcas")
+          .select("product_id")
+          .eq("id", lcaId)
+          .single();
+
+        if (!lcaData?.product_id) return;
+
+        setProductId(lcaData.product_id);
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/copy-product-materials-to-lca`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              product_id: lcaData.product_id,
+              lca_id: lcaId,
+            }),
+          }
+        );
+
+        const result = await response.json();
+
+        if (result.copied > 0 && result.materials) {
+          const loadedMaterials = result.materials.map((m: any) => ({
+            tempId: m.id,
+            data_source: m.data_source || "openlca",
+            name: m.material_name || "",
+            quantity: m.quantity,
+            unit: m.unit || "",
+            lca_sub_stage_id: m.lca_sub_stage_id || null,
+            data_source_id: m.data_source_id || undefined,
+            supplier_product_id: m.supplier_product_id || undefined,
+            origin_country: m.origin_country || "",
+            is_organic_certified: m.is_organic_certified || false,
+          }));
+          setIngredients(loadedMaterials);
+          toast.success(`Loaded ${result.copied} materials from product template`);
+        }
+
+        setHasLoadedFromMaster(true);
+      } catch (error) {
+        console.error("Error loading master materials:", error);
+      }
+    };
+
+    loadMasterMaterials();
+  }, [lcaId, initialMaterials.length, hasLoadedFromMaster]);
+
+  useEffect(() => {
+    if (ingredients.length > 0 && !materialsModified) {
+      setMaterialsModified(true);
+    }
+  }, [ingredients, materialsModified]);
 
   const handleAddIngredient = useCallback(() => {
     const newIngredient: IngredientCardData = {
@@ -165,11 +237,15 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
 
       toast.success("Materials saved successfully");
 
-      // Small delay to ensure database transaction is committed
-      await new Promise(resolve => setTimeout(resolve, 300));
+      if (materialsModified && productId) {
+        setShowUpdatePrompt(true);
+      } else {
+        // Small delay to ensure database transaction is committed
+        await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Navigate with a full page reload to bypass cache
-      window.location.href = `/dashboard/lcas/${lcaId}/calculate`;
+        // Navigate with a full page reload to bypass cache
+        window.location.href = `/dashboard/lcas/${lcaId}/calculate`;
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save materials";
       setError(errorMessage);
@@ -261,6 +337,45 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
           {isSaving ? "Saving..." : "Save and Continue"}
         </Button>
       </div>
+
+      <MaterialUpdatePrompt
+        open={showUpdatePrompt}
+        onOpenChange={setShowUpdatePrompt}
+        onConfirm={async () => {
+          try {
+            const response = await fetch(
+              `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/update-product-materials-from-lca`,
+              {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  product_id: productId,
+                  lca_id: lcaId,
+                }),
+              }
+            );
+
+            const result = await response.json();
+
+            if (result.updated > 0) {
+              toast.success("Master product template updated successfully");
+            }
+          } catch (error) {
+            console.error("Error updating master materials:", error);
+            toast.error("Failed to update master template");
+          } finally {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            window.location.href = `/dashboard/lcas/${lcaId}/calculate`;
+          }
+        }}
+        onCancel={async () => {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          window.location.href = `/dashboard/lcas/${lcaId}/calculate`;
+        }}
+      />
     </form>
   );
 }
