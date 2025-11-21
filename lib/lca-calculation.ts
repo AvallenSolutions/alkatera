@@ -47,6 +47,12 @@ export async function runLcaCalculation(lcaId: string): Promise<{ success: boole
       throw new Error("No materials found. Please add materials before calculating.");
     }
 
+    console.log('[runLcaCalculation] Calling edge function with:', {
+      lcaId,
+      materialsCount: materials.length,
+      firstMaterial: materials[0],
+    });
+
     const { data, error: functionError } = await supabase.functions.invoke('invoke-calculation-engine', {
       body: {
         lcaId,
@@ -54,11 +60,15 @@ export async function runLcaCalculation(lcaId: string): Promise<{ success: boole
       },
     });
 
+    console.log('[runLcaCalculation] Edge function response:', { data, functionError });
+
     if (functionError) {
+      console.error('[runLcaCalculation] Edge function error:', functionError);
       throw new Error(`Calculation failed: ${functionError.message}`);
     }
 
     if (!data || !data.success) {
+      console.error('[runLcaCalculation] Edge function returned failure:', data);
       throw new Error(data?.error || "Calculation failed");
     }
 
