@@ -123,18 +123,17 @@ Deno.serve(async (req: Request) => {
       throw new Error("Missing authorization header");
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
+      console.error("Authentication failed:", userError);
       throw new Error("Unauthorized");
     }
+
+    console.log("User authenticated:", user.id);
 
     const payload: InvokePayload = await req.json();
 
