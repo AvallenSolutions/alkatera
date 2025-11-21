@@ -96,8 +96,17 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
       setProduct(productResult.data);
       setFacilities(facilitiesResult.data || []);
 
-      if (productResult.data.core_operations_data) {
-        setAllocatedImpacts(productResult.data.core_operations_data);
+      if (productResult.data.core_operations_data &&
+          typeof productResult.data.core_operations_data === 'object' &&
+          'co2e_per_unit' in productResult.data.core_operations_data) {
+        const data = productResult.data.core_operations_data;
+        setAllocatedImpacts({
+          co2e_per_unit: Number(data.co2e_per_unit) || 0,
+          water_per_unit: Number(data.water_per_unit) || 0,
+          waste_per_unit: Number(data.waste_per_unit) || 0,
+          allocation_ratio: Number(data.allocation_ratio) || 0,
+          facility_name: data.facility_name || 'Unknown',
+        });
         setProvenance(productResult.data.core_operations_provenance);
       }
     } catch (err: any) {
@@ -317,7 +326,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {allocatedImpacts.co2e_per_unit.toFixed(4)}
+                    {(allocatedImpacts.co2e_per_unit ?? 0).toFixed(4)}
                   </div>
                   <p className="text-xs text-muted-foreground">kg CO₂e per unit</p>
                 </CardContent>
@@ -329,7 +338,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {allocatedImpacts.water_per_unit.toFixed(4)}
+                    {(allocatedImpacts.water_per_unit ?? 0).toFixed(4)}
                   </div>
                   <p className="text-xs text-muted-foreground">litres per unit</p>
                 </CardContent>
@@ -341,7 +350,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {allocatedImpacts.waste_per_unit.toFixed(4)}
+                    {(allocatedImpacts.waste_per_unit ?? 0).toFixed(4)}
                   </div>
                   <p className="text-xs text-muted-foreground">kg per unit</p>
                 </CardContent>
@@ -360,10 +369,10 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
             <div className="text-sm text-muted-foreground">
               <p>
                 <strong>Allocation Ratio:</strong>{" "}
-                {(allocatedImpacts.allocation_ratio * 100).toFixed(2)}%
+                {((allocatedImpacts.allocation_ratio ?? 0) * 100).toFixed(2)}%
               </p>
               <p>
-                <strong>Facility:</strong> {allocatedImpacts.facility_name}
+                <strong>Facility:</strong> {allocatedImpacts.facility_name ?? 'Unknown'}
               </p>
             </div>
           </CardContent>
