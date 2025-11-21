@@ -1,5 +1,5 @@
 import { IngredientsForm } from "@/components/lca/IngredientsForm";
-import { fetchLcaStagesWithSubStages, fetchLcaMaterials } from "@/lib/lca";
+import { fetchLcaStagesWithSubStages, fetchLcaMaterials } from "@/lib/lca-server";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
