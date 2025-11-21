@@ -164,6 +164,11 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
       }
 
       toast.success("Materials saved successfully");
+
+      // Small delay to ensure database transaction is committed
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Navigate and force refresh
       router.push(`/dashboard/lcas/${lcaId}/calculate`);
       router.refresh();
     } catch (err) {

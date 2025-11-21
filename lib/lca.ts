@@ -149,6 +149,8 @@ export async function fetchLcaStagesWithSubStages(): Promise<LcaStageWithSubStag
 export async function fetchLcaMaterials(lcaId: string): Promise<ProductLcaMaterial[]> {
   const serverClient = getSupabaseServerClient();
 
+  console.log('[fetchLcaMaterials] Fetching materials for LCA:', lcaId);
+
   const { data, error } = await serverClient
     .from('product_lca_materials')
     .select('*')
@@ -156,9 +158,11 @@ export async function fetchLcaMaterials(lcaId: string): Promise<ProductLcaMateri
     .order('created_at');
 
   if (error) {
+    console.error('[fetchLcaMaterials] Error fetching materials:', error);
     throw new Error(`Failed to fetch materials: ${error.message}`);
   }
 
+  console.log('[fetchLcaMaterials] Fetched materials:', data?.length || 0, data);
   return data || [];
 }
 
