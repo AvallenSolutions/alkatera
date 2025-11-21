@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CalculationForm } from "./components/CalculationForm";
+import { MaterialsDebugger } from "./components/MaterialsDebugger";
 import Link from "next/link";
 import type { ProductLcaMaterial, LcaStageWithSubStages } from "@/lib/types/lca";
 
@@ -87,6 +88,8 @@ export default async function CalculatePage({ params }: CalculatePageProps) {
           Review your materials and run the LCA calculation
         </p>
       </div>
+
+      <MaterialsDebugger lcaId={params.lca_id} />
 
       <Card className="mb-6">
         <CardHeader>
