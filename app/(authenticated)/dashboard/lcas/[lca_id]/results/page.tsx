@@ -60,6 +60,8 @@ export default function ResultsPage() {
         setIsLoading(true);
         setError(null);
 
+        console.log('[ResultsPage] Fetching calculation logs for LCA:', lcaId);
+
         const { data, error: fetchError } = await supabase
           .from('product_lca_calculation_logs')
           .select('response_data, created_at, status')
@@ -69,8 +71,21 @@ export default function ResultsPage() {
           .limit(1)
           .maybeSingle();
 
+        console.log('[ResultsPage] Query result:', { data, fetchError });
+
         if (fetchError) {
           throw new Error(fetchError.message);
+        }
+
+        if (!data) {
+          console.warn('[ResultsPage] No calculation log found. Checking product_lca_results table...');
+
+          const { data: results, error: resultsError } = await supabase
+            .from('product_lca_results')
+            .select('*')
+            .eq('product_lca_id', lcaId);
+
+          console.log('[ResultsPage] Direct results query:', { results, resultsError });
         }
 
         setCalculationLog(data);
