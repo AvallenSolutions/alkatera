@@ -118,7 +118,7 @@ export default function ProductsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => (
-            <Link key={product.id} href={`/products/detail?id=${product.id}`}>
+            <Link key={product.id} href={`/products/${product.id}`}>
               <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
                 <CardHeader>
                   {product.product_image_url ? (

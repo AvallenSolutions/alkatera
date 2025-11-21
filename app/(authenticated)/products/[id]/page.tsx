@@ -1,29 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Package,
   AlertCircle,
-  Edit,
   Plus,
   FileText,
-  Boxes
+  Boxes,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useOrganization } from "@/lib/organizationContext";
+import { LatestLCAResults } from "@/components/products/LatestLCAResults";
+import { ProductActions } from "@/components/products/ProductActions";
+import { DownloadLCAButton } from "@/components/products/DownloadLCAButton";
 
 interface Product {
   id: string;
   name: string;
+  sku: string | null;
   product_description: string | null;
   product_image_url: string | null;
   functional_unit_type: string | null;
@@ -51,16 +54,36 @@ interface ProductLCA {
   product_name: string;
   created_at: string;
   status: string;
+  calculation_log?: {
+    response_data: any;
+    created_at: string;
+  } | null;
+}
+
+interface LatestLCAData {
+  lcaId: string | null;
+  totalCo2e: number | null;
+  unit: string | null;
+  calculatedAt: string | null;
+  status: string | null;
 }
 
 export default function ProductDetailPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const productId = searchParams.get("id");
+  const params = useParams();
+  const productId = params.id as string;
+  const { currentOrganization } = useOrganization();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [materials, setMaterials] = useState<ProductMaterial[]>([]);
   const [lcas, setLcas] = useState<ProductLCA[]>([]);
+  const [latestLca, setLatestLca] = useState<LatestLCAData>({
+    lcaId: null,
+    totalCo2e: null,
+    unit: null,
+    calculatedAt: null,
+    status: null,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,7 +98,7 @@ export default function ProductDetailPage() {
       setLoading(true);
       setError(null);
 
-      const [productRes, materialsRes, lcasRes] = await Promise.all([
+      const [productRes, materialsRes, lcasRes, latestLcaRes] = await Promise.all([
         supabase
           .from("products")
           .select("*")
@@ -90,7 +113,24 @@ export default function ProductDetailPage() {
           .from("product_lcas")
           .select("id, product_name, created_at, status")
           .eq("product_id", productId)
-          .order("created_at", { ascending: false })
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("product_lcas")
+          .select(`
+            id,
+            status,
+            product_lca_calculation_logs!inner(
+              response_data,
+              created_at,
+              status
+            )
+          `)
+          .eq("product_id", productId)
+          .eq("status", "completed")
+          .eq("product_lca_calculation_logs.status", "success")
+          .order("product_lca_calculation_logs.created_at", { ascending: false, foreignTable: "product_lca_calculation_logs" })
+          .limit(1)
+          .maybeSingle()
       ]);
 
       if (productRes.error) throw productRes.error;
@@ -100,6 +140,21 @@ export default function ProductDetailPage() {
       setProduct(productRes.data);
       setMaterials(materialsRes.data || []);
       setLcas(lcasRes.data || []);
+
+      if (latestLcaRes.data && latestLcaRes.data.product_lca_calculation_logs) {
+        const logs = latestLcaRes.data.product_lca_calculation_logs as any[];
+        if (logs.length > 0) {
+          const log = logs[0];
+          const summary = log.response_data?.summary;
+          setLatestLca({
+            lcaId: latestLcaRes.data.id,
+            totalCo2e: summary?.total_co2e || null,
+            unit: summary?.unit || null,
+            calculatedAt: log.created_at,
+            status: latestLcaRes.data.status,
+          });
+        }
+      }
     } catch (err: any) {
       console.error("Error fetching product data:", err);
       setError(err.message);
@@ -107,6 +162,46 @@ export default function ProductDetailPage() {
       setLoading(false);
     }
   };
+
+  const fetchLCAsWithResults = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("product_lcas")
+        .select(`
+          id,
+          product_name,
+          created_at,
+          status,
+          product_lca_calculation_logs(
+            response_data,
+            created_at,
+            status
+          )
+        `)
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const enrichedLcas = (data || []).map((lca: any) => ({
+        id: lca.id,
+        product_name: lca.product_name,
+        created_at: lca.created_at,
+        status: lca.status,
+        calculation_log: lca.product_lca_calculation_logs?.find((log: any) => log.status === "success") || null,
+      }));
+
+      setLcas(enrichedLcas);
+    } catch (err: any) {
+      console.error("Error fetching LCAs with results:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (productId && !loading) {
+      fetchLCAsWithResults();
+    }
+  }, [productId, loading]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-GB", {
@@ -156,20 +251,6 @@ export default function ProductDetailPage() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Products
         </Button>
-        <div className="flex gap-2">
-          <Link href={`/products/${productId}/materials`}>
-            <Button variant="outline">
-              <Boxes className="mr-2 h-4 w-4" />
-              Manage Materials
-            </Button>
-          </Link>
-          <Link href={`/products/${productId}/edit`}>
-            <Button>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit Product
-            </Button>
-          </Link>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -203,6 +284,12 @@ export default function ProductDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
+              {product.sku && (
+                <div>
+                  <p className="text-sm text-muted-foreground">SKU</p>
+                  <p className="text-base font-medium">{product.sku}</p>
+                </div>
+              )}
               <div>
                 <p className="text-sm text-muted-foreground">Functional Unit</p>
                 <p className="text-base font-medium">{formatFunctionalUnit(product)}</p>
@@ -222,6 +309,28 @@ export default function ProductDetailPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <LatestLCAResults
+            lcaId={latestLca.lcaId}
+            totalCo2e={latestLca.totalCo2e}
+            unit={latestLca.unit}
+            calculatedAt={latestLca.calculatedAt}
+            status={latestLca.status}
+          />
+        </div>
+
+        <div>
+          {currentOrganization && (
+            <ProductActions
+              productId={productId}
+              productName={product.name}
+              organizationId={currentOrganization.id}
+            />
+          )}
+        </div>
       </div>
 
       <Tabs defaultValue="materials" className="space-y-4">
@@ -318,23 +427,46 @@ export default function ProductDetailPage() {
                 </Alert>
               ) : (
                 <div className="space-y-2">
-                  {lcas.map((lca) => (
-                    <Link
-                      key={lca.id}
-                      href={`/dashboard/lcas/${lca.id}/results`}
-                      className="block"
-                    >
-                      <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent transition-colors cursor-pointer">
+                  {lcas.map((lca) => {
+                    const co2eValue = lca.calculation_log?.response_data?.summary?.total_co2e;
+                    const unit = lca.calculation_log?.response_data?.summary?.unit;
+
+                    return (
+                      <div
+                        key={lca.id}
+                        className="flex items-center justify-between p-3 rounded-lg border bg-card"
+                      >
                         <div className="flex-1">
                           <p className="font-medium">{lca.product_name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Created {formatDate(lca.created_at)}
-                          </p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                            <span>Created {formatDate(lca.created_at)}</span>
+                            {co2eValue && (
+                              <>
+                                <span>•</span>
+                                <span className="font-medium text-foreground">
+                                  {co2eValue.toFixed(2)} {unit || "kg CO2e"}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <Badge variant="secondary">{lca.status || "draft"}</Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">{lca.status || "draft"}</Badge>
+                          {lca.status === "completed" && (
+                            <DownloadLCAButton
+                              lcaId={lca.id}
+                              productName={product.name}
+                            />
+                          )}
+                          <Link href={`/dashboard/lcas/${lca.id}/results`}>
+                            <Button variant="ghost" size="sm">
+                              View
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
-                    </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
