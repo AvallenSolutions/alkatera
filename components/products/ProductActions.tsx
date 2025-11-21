@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileBarChart, Edit, Boxes, Trash2 } from "lucide-react";
+import { FileBarChart, Edit, Boxes, Trash2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { createDraftLca } from "@/lib/lca";
 import { deleteProduct } from "@/lib/products";
@@ -76,6 +76,13 @@ export function ProductActions({
           <CardDescription>Manage this product</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
+          <Link href={`/products/${productId}/hub`} className="block">
+            <Button className="w-full">
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Product Hub
+            </Button>
+          </Link>
+
           <Button
             className="w-full"
             onClick={handleCreateLca}
