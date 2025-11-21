@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, MoreVertical, Pencil, Trash2, FileBarChart } from "lucide-react";
+import { Plus, MoreVertical, Pencil, Trash2, FileBarChart, Eye } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -198,7 +198,11 @@ export default function ProductsPage() {
               </TableHeader>
               <TableBody>
                 {products.map((product) => (
-                  <TableRow key={product.id}>
+                  <TableRow
+                    key={product.id}
+                    className="cursor-pointer hover:bg-accent"
+                    onClick={() => router.push(`/products/${product.id}`)}
+                  >
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.sku || "-"}</TableCell>
                     <TableCell>
@@ -206,7 +210,7 @@ export default function ProductsPage() {
                         ? `${product.unit_size_value} ${product.unit_size_unit}`
                         : "-"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -214,6 +218,12 @@ export default function ProductsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => router.push(`/products/${product.id}`)}
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => handleCreateLca(product)}
                             disabled={isCreatingLca}
