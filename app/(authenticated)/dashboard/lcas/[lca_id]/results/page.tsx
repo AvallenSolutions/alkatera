@@ -80,6 +80,15 @@ export default function ResultsPage() {
         if (!data) {
           console.warn('[ResultsPage] No calculation log found. Checking product_lca_results table...');
 
+          // First, verify we can access the product_lcas table
+          const { data: lcaData, error: lcaError } = await supabase
+            .from('product_lcas')
+            .select('id, product_name, organization_id')
+            .eq('id', lcaId)
+            .maybeSingle();
+
+          console.log('[ResultsPage] LCA access test:', { lcaData, lcaError });
+
           const { data: results, error: resultsError } = await supabase
             .from('product_lca_results')
             .select('*')
