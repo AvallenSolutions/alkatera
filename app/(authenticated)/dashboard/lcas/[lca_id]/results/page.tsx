@@ -1,4 +1,7 @@
-import { getSupabaseServerClient } from "@/lib/supabase/server-client";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,16 +13,12 @@ import {
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle2, Calendar, FileText } from "lucide-react";
 import Link from "next/link";
 import { ResultsBreakdownChart } from "./components/ResultsBreakdownChart";
 import { format } from "date-fns";
-
-interface ResultsPageProps {
-  params: {
-    lca_id: string;
-  };
-}
+import { supabase } from "@/lib/supabaseClient";
 
 interface CalculationSummary {
   total_co2e: number;
@@ -42,32 +41,68 @@ interface CalculationResponse {
   }>;
 }
 
-export async function generateStaticParams() {
-  return [];
+interface CalculationLog {
+  response_data: CalculationResponse;
+  created_at: string;
+  status: string;
 }
 
-export default async function ResultsPage({ params }: ResultsPageProps) {
-  const supabase = getSupabaseServerClient();
-  let calculationLog;
-  let error: string | null = null;
+export default function ResultsPage() {
+  const params = useParams();
+  const lcaId = params.lca_id as string;
+  const [calculationLog, setCalculationLog] = useState<CalculationLog | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  try {
-    const { data, error: fetchError } = await supabase
-      .from('product_lca_calculation_logs')
-      .select('response_data, created_at, status')
-      .eq('product_lca_id', params.lca_id)
-      .eq('status', 'success')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  useEffect(() => {
+    async function fetchResults() {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-    if (fetchError) {
-      throw new Error(fetchError.message);
+        const { data, error: fetchError } = await supabase
+          .from('product_lca_calculation_logs')
+          .select('response_data, created_at, status')
+          .eq('product_lca_id', lcaId)
+          .eq('status', 'success')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (fetchError) {
+          throw new Error(fetchError.message);
+        }
+
+        setCalculationLog(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load calculation results");
+      } finally {
+        setIsLoading(false);
+      }
     }
 
-    calculationLog = data;
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Failed to load calculation results";
+    fetchResults();
+  }, [lcaId]);
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6 max-w-5xl">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Step 4: Calculation Results</h1>
+          <p className="text-muted-foreground mt-2">Loading results...</p>
+        </div>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-8 w-48" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-32 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   if (error || !calculationLog) {
@@ -87,7 +122,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         </Alert>
 
         <div className="mt-6 flex gap-4">
-          <Link href={`/dashboard/lcas/${params.lca_id}/calculate`}>
+          <Link href={`/dashboard/lcas/${lcaId}/calculate`}>
             <Button variant="outline">Back to Calculate</Button>
           </Link>
           <Link href="/dashboard">
@@ -98,7 +133,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
     );
   }
 
-  const responseData = calculationLog.response_data as CalculationResponse;
+  const responseData = calculationLog.response_data;
   const calculationDate = calculationLog.created_at;
 
   const summary = responseData.summary;
@@ -224,7 +259,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         </Accordion>
 
         <div className="flex justify-between items-center pt-6">
-          <Link href={`/dashboard/lcas/${params.lca_id}/calculate`}>
+          <Link href={`/dashboard/lcas/${lcaId}/calculate`}>
             <Button variant="outline">Back to Review</Button>
           </Link>
           <Link href="/dashboard">
