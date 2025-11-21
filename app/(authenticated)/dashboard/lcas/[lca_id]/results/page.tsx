@@ -83,9 +83,31 @@ export default function ResultsPage() {
           const { data: results, error: resultsError } = await supabase
             .from('product_lca_results')
             .select('*')
-            .eq('product_lca_id', lcaId);
+            .eq('product_lca_id', lcaId)
+            .order('created_at', { ascending: false });
 
           console.log('[ResultsPage] Direct results query:', { results, resultsError });
+
+          if (resultsError) {
+            throw new Error(resultsError.message);
+          }
+
+          if (results && results.length > 0) {
+            const syntheticLog: CalculationLog = {
+              response_data: {
+                results: results.map(r => ({
+                  impactCategory: r.impact_category,
+                  value: r.value,
+                  unit: r.unit,
+                  method: r.method,
+                })),
+              },
+              created_at: results[0].created_at,
+              status: 'success',
+            };
+            setCalculationLog(syntheticLog);
+            return;
+          }
         }
 
         setCalculationLog(data);
