@@ -151,6 +151,10 @@ export async function fetchLcaMaterials(lcaId: string): Promise<ProductLcaMateri
 
   console.log('[fetchLcaMaterials] Fetching materials for LCA:', lcaId);
 
+  // Add timestamp to ensure fresh fetch - bypass any potential caching
+  const timestamp = Date.now();
+  console.log('[fetchLcaMaterials] Fetch timestamp:', timestamp);
+
   const { data, error } = await serverClient
     .from('product_lca_materials')
     .select('*')

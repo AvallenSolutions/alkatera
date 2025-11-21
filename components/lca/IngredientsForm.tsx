@@ -166,11 +166,10 @@ export function IngredientsForm({ lcaId, stages, initialMaterials }: Ingredients
       toast.success("Materials saved successfully");
 
       // Small delay to ensure database transaction is committed
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 300));
 
-      // Navigate and force refresh
-      router.push(`/dashboard/lcas/${lcaId}/calculate`);
-      router.refresh();
+      // Navigate with a full page reload to bypass cache
+      window.location.href = `/dashboard/lcas/${lcaId}/calculate`;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save materials";
       setError(errorMessage);
