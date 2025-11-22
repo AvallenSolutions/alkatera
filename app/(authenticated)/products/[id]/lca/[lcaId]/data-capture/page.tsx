@@ -157,6 +157,10 @@ export default function LcaDataCapturePage() {
     supplier_name?: string;
     unit?: string;
     carbon_intensity?: number;
+    quantity?: number;
+    lca_sub_stage_id?: number;
+    origin_country?: string;
+    is_organic_certified?: boolean;
   }) => {
     if (!currentOrganization?.id || !lca) return;
 
@@ -177,15 +181,15 @@ export default function LcaDataCapturePage() {
         organizationId: currentOrganization.id,
         ingredient: {
           name: ingredient.name,
-          quantity: 1,
+          quantity: ingredient.quantity ?? 1,
           unit: ingredient.unit || 'kg',
-          lca_sub_stage_id: defaultSubStageId,
+          lca_sub_stage_id: ingredient.lca_sub_stage_id ?? defaultSubStageId,
           data_source: ingredient.data_source,
           data_source_id: ingredient.data_source_id,
           supplier_product_id: ingredient.supplier_product_id,
           supplier_name: ingredient.supplier_name,
-          origin_country: '',
-          is_organic_certified: false,
+          origin_country: ingredient.origin_country || '',
+          is_organic_certified: ingredient.is_organic_certified ?? false,
         },
       });
 

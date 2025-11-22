@@ -8,6 +8,8 @@ interface OpenLCASearchResult {
   name: string;
   category: string;
   unit?: string;
+  processType?: string;
+  location?: string;
 }
 
 interface CachedResult {
@@ -16,9 +18,133 @@ interface CachedResult {
   created_at: string;
 }
 
+interface JsonRpcRequest {
+  jsonrpc: string;
+  id: number;
+  method: string;
+  params: Record<string, any>;
+}
+
+interface JsonRpcResponse {
+  jsonrpc: string;
+  id: number;
+  result?: any;
+  error?: {
+    code: number;
+    message: string;
+    data?: any;
+  };
+}
+
 const CACHE_TTL_HOURS = 24;
-const OPENLCA_API_ENDPOINT = process.env.OPENLCA_API_ENDPOINT || 'https://api.openlca.org/v1';
-const OPENLCA_API_KEY = process.env.OPENLCA_API_KEY;
+const OPENLCA_SERVER_URL = process.env.OPENLCA_SERVER_URL;
+const OPENLCA_SERVER_ENABLED = process.env.OPENLCA_SERVER_ENABLED === 'true';
+
+async function searchOpenLCAProcesses(query: string): Promise<OpenLCASearchResult[]> {
+  if (!OPENLCA_SERVER_URL || !OPENLCA_SERVER_ENABLED) {
+    console.warn('⚠️ OpenLCA server not configured. Set OPENLCA_SERVER_URL and OPENLCA_SERVER_ENABLED=true');
+    console.warn('Returning mock data for development purposes.');
+
+    return [
+      {
+        id: `mock-${query.toLowerCase()}-1`,
+        name: `${query} - Organic Production`,
+        category: 'Food/Agriculture',
+        unit: 'kg',
+        processType: 'UNIT_PROCESS',
+        location: 'GB',
+      },
+      {
+        id: `mock-${query.toLowerCase()}-2`,
+        name: `${query} - Conventional Production`,
+        category: 'Food/Agriculture',
+        unit: 'kg',
+        processType: 'UNIT_PROCESS',
+        location: 'EU',
+      },
+      {
+        id: `mock-${query.toLowerCase()}-3`,
+        name: `${query} - Processing`,
+        category: 'Food/Manufacturing',
+        unit: 'kg',
+        processType: 'UNIT_PROCESS',
+        location: 'GB',
+      },
+    ];
+  }
+
+  const rpcRequest: JsonRpcRequest = {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "search/processes",
+    params: {
+      query: query,
+      pageSize: 20,
+    }
+  };
+
+  try {
+    const response = await fetch(`${OPENLCA_SERVER_URL}/data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(rpcRequest),
+    });
+
+    if (!response.ok) {
+      console.error('OpenLCA server error:', response.status, response.statusText);
+      throw new Error(`OpenLCA server returned ${response.status}`);
+    }
+
+    const rpcResponse: JsonRpcResponse = await response.json();
+
+    if (rpcResponse.error) {
+      console.error('OpenLCA JSON-RPC error:', rpcResponse.error);
+      throw new Error(`OpenLCA error: ${rpcResponse.error.message}`);
+    }
+
+    if (!rpcResponse.result) {
+      return [];
+    }
+
+    const processes = Array.isArray(rpcResponse.result) ? rpcResponse.result : [];
+
+    return processes.map((process: any) => ({
+      id: process['@id'] || process.id,
+      name: process.name || 'Unnamed Process',
+      category: process.category || 'Uncategorized',
+      unit: extractUnitFromProcess(process),
+      processType: process.processType || 'UNIT_PROCESS',
+      location: process.location?.code || process.location || '',
+    })).slice(0, 50);
+
+  } catch (error) {
+    console.error('Error fetching from OpenLCA server:', error);
+    throw error;
+  }
+}
+
+function extractUnitFromProcess(process: any): string {
+  if (process.referenceFlow?.unit?.name) {
+    return process.referenceFlow.unit.name;
+  }
+
+  if (process.quantitativeReference?.unit?.name) {
+    return process.quantitativeReference.unit.name;
+  }
+
+  if (process.exchanges && Array.isArray(process.exchanges)) {
+    const refExchange = process.exchanges.find((ex: any) =>
+      ex.isQuantitativeReference || ex.quantitativeReference
+    );
+    if (refExchange?.unit?.name) {
+      return refExchange.unit.name;
+    }
+  }
+
+  return 'kg';
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,7 +167,6 @@ export async function GET(request: NextRequest) {
 
     const normalizedQuery = query.trim().toLowerCase();
 
-    // Get auth token from Authorization header (same as supplier-products API)
     const authHeader = request.headers.get('authorization');
     const token = authHeader?.replace('Bearer ', '');
 
@@ -62,7 +187,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Create client with the user's access token
     const { createClient } = await import('@supabase/supabase-js');
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
@@ -80,7 +204,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check cache first
     const { data: cacheResult } = await supabase
       .from('openlca_process_cache')
       .select('results, created_at')
@@ -92,90 +215,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         results: cacheResult.results,
         cached: true,
+        source: 'cache',
       });
     }
 
-    if (!OPENLCA_API_KEY) {
-      console.warn('OpenLCA API key not configured, returning mock data');
-      const mockResults: OpenLCASearchResult[] = [
-        {
-          id: `mock-${normalizedQuery}-1`,
-          name: `${query} - Generic Process`,
-          category: 'Materials/Agriculture',
-          unit: 'kg',
-        },
-        {
-          id: `mock-${normalizedQuery}-2`,
-          name: `${query} - Production`,
-          category: 'Materials/Manufacturing',
-          unit: 'kg',
-        },
-      ];
+    const results = await searchOpenLCAProcesses(query);
 
-      // Cache the mock results
-      await supabase
-        .from('openlca_process_cache')
-        .insert({
-          search_term: normalizedQuery,
-          results: mockResults,
-        })
-        .select();
-
-      return NextResponse.json({
-        results: mockResults,
-        cached: false,
-        mock: true,
-      });
-    }
-
-    const openLCAResponse = await fetch(
-      `${OPENLCA_API_ENDPOINT}/processes/search?q=${encodeURIComponent(query)}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${OPENLCA_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!openLCAResponse.ok) {
-      console.error('OpenLCA API error:', openLCAResponse.status, openLCAResponse.statusText);
-      return NextResponse.json(
-        { error: 'Failed to fetch from OpenLCA API' },
-        { status: 502 }
-      );
-    }
-
-    const openLCAData = await openLCAResponse.json();
-
-    const sanitizedResults: OpenLCASearchResult[] = (openLCAData.data || []).map((item: any) => ({
-      id: item.id || item['@id'],
-      name: item.name,
-      category: item.category || 'Uncategorized',
-      unit: item.unit || item.referenceUnit || 'unit',
-    })).slice(0, 50);
-
-    // Cache the results
     await supabase
       .from('openlca_process_cache')
       .insert({
         search_term: normalizedQuery,
-        results: sanitizedResults,
+        results: results,
       })
       .select();
 
     await supabase.rpc('cleanup_openlca_cache');
 
     return NextResponse.json({
-      results: sanitizedResults,
+      results: results,
       cached: false,
+      source: OPENLCA_SERVER_ENABLED ? 'openlca_server' : 'mock_data',
+      mock: !OPENLCA_SERVER_ENABLED,
+      serverUrl: OPENLCA_SERVER_ENABLED ? OPENLCA_SERVER_URL : undefined,
     });
 
   } catch (error) {
     console.error('Error in OpenLCA search API:', error);
+
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    const isFetchError = errorMessage.includes('fetch') || errorMessage.includes('ECONNREFUSED');
+
+    if (isFetchError) {
+      return NextResponse.json(
+        {
+          error: 'OpenLCA server unreachable. Check OPENLCA_SERVER_URL configuration.',
+          details: errorMessage,
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

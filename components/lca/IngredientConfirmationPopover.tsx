@@ -69,7 +69,7 @@ export function IngredientConfirmationPopover({
 
               <div className="space-y-2">
                 <p className="text-sm">
-                  You're selecting <strong>{data.ingredientName}</strong> from the generic database.
+                  You're selecting <strong>{data.ingredientName}</strong> from the OpenLCA database.
                 </p>
                 <p className="text-sm text-muted-foreground">
                   This will use industry-average data instead of supplier-specific data,
@@ -77,9 +77,18 @@ export function IngredientConfirmationPopover({
                 </p>
               </div>
 
+              {data.unit && (
+                <div className="flex items-center justify-between p-2 rounded-md bg-grey-50 dark:bg-grey-900/20">
+                  <span className="text-xs text-muted-foreground">Unit:</span>
+                  <Badge variant="secondary" className="bg-grey-100 text-grey-800 dark:bg-grey-800 dark:text-grey-100">
+                    {data.unit}
+                  </Badge>
+                </div>
+              )}
+
               <div className="flex items-center gap-2 p-2 rounded-md bg-grey-50 dark:bg-grey-900/20">
                 <Database className="h-4 w-4 text-grey-600" />
-                <span className="text-xs text-muted-foreground">Generic Database</span>
+                <span className="text-xs text-muted-foreground">OpenLCA Database</span>
               </div>
             </>
           ) : (

@@ -110,6 +110,8 @@ export interface OpenLCAProcess {
   name: string;
   category: string;
   unit?: string;
+  processType?: string;
+  location?: string;
 }
 
 export interface SupplierProduct {

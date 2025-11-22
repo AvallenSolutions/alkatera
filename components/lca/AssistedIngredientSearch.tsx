@@ -41,6 +41,10 @@ interface AssistedIngredientSearchProps {
     supplier_name?: string;
     unit?: string;
     carbon_intensity?: number;
+    quantity?: number;
+    lca_sub_stage_id?: number;
+    origin_country?: string;
+    is_organic_certified?: boolean;
   }) => void;
   disabled?: boolean;
 }
@@ -141,6 +145,9 @@ export function AssistedIngredientSearch({
       ingredientName: process.name,
       dataSource: 'openlca',
       data_source_id: process.id,
+      unit: process.unit || 'kg',
+      location: process.location,
+      processType: process.processType,
     });
     setConfirmationOpen(true);
     setSearchOpen(false);
@@ -169,6 +176,7 @@ export function AssistedIngredientSearch({
         name: confirmationData.ingredientName,
         data_source: 'openlca',
         data_source_id: confirmationData.data_source_id,
+        unit: confirmationData.unit || 'kg',
       });
     }
 
@@ -177,10 +185,23 @@ export function AssistedIngredientSearch({
     setConfirmationData(null);
   };
 
-  const handlePrimarySave = async (data: any) => {
+  const handlePrimarySave = async (data: {
+    name: string;
+    quantity: number;
+    unit: string;
+    lca_sub_stage_id: number;
+    origin_country: string;
+    is_organic_certified: boolean;
+    notes?: string;
+  }) => {
     onIngredientConfirmed({
       name: data.name,
       data_source: 'primary',
+      quantity: data.quantity,
+      unit: data.unit,
+      lca_sub_stage_id: data.lca_sub_stage_id,
+      origin_country: data.origin_country,
+      is_organic_certified: data.is_organic_certified,
     });
 
     setSearchQuery("");
@@ -273,7 +294,7 @@ export function AssistedIngredientSearch({
                 <>
                   <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-2">
                     <Database className="h-3 w-3 text-grey-600" />
-                    From the Database (Generic) ({searchResults.database.length})
+                    From OpenLCA Database ({searchResults.database.length})
                   </div>
                   <CommandGroup>
                     {searchResults.database.slice(0, 5).map((process) => (
@@ -288,10 +309,12 @@ export function AssistedIngredientSearch({
                             <div className="font-medium">{process.name}</div>
                             <div className="text-xs text-muted-foreground">
                               {process.category}
+                              {process.unit && ` • ${process.unit}`}
+                              {process.location && ` • ${process.location}`}
                             </div>
                           </div>
                           <Badge className="bg-grey-100 text-grey-800 dark:bg-grey-800 dark:text-grey-100 text-xs">
-                            Generic
+                            OpenLCA
                           </Badge>
                         </div>
                       </CommandItem>
