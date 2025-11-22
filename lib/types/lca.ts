@@ -50,7 +50,7 @@ export interface PackagingType {
 
 export type MaterialType = 'ingredient' | 'packaging';
 
-export type DataSource = 'openlca' | 'supplier';
+export type DataSource = 'openlca' | 'supplier' | 'primary';
 
 export interface MaterialSelectionOutput {
   materialId: string;

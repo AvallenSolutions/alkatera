@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
+import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,16 +19,25 @@ import {
   Boxes,
   Factory,
   Info,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { saveDraftData, markTabComplete, getAllTabsComplete } from "@/lib/lcaWorkflow";
 import { toast } from "sonner";
+import { useOrganization } from "@/lib/organizationContext";
+import { AssistedIngredientSearch } from "@/components/lca/AssistedIngredientSearch";
+import { IngredientsList } from "@/components/lca/IngredientsList";
+import { IngredientsSummary } from "@/components/lca/IngredientsSummary";
+import { addIngredientToLCA, getIngredientsForLCA, updateIngredient, removeIngredient, type IngredientMaterial } from "@/lib/ingredientOperations";
+import { logIngredientSelection } from "@/lib/ingredientAudit";
+import type { LcaSubStage } from "@/lib/types/lca";
 
 interface LcaData {
   id: string;
   product_name: string;
   functional_unit: string;
   lca_scope_type: string;
+  organization_id: string;
   draft_data: {
     ingredients?: any[];
     packaging?: any[];
@@ -45,15 +55,26 @@ export default function LcaDataCapturePage() {
   const productId = params.id as string;
   const lcaId = params.lcaId as string;
 
+  const { currentOrganization } = useOrganization();
   const [lca, setLca] = useState<LcaData | null>(null);
   const [activeTab, setActiveTab] = useState("ingredients");
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [ingredients, setIngredients] = useState<(IngredientMaterial & { supplier_name?: string | null })[]>([]);
+  const [subStages, setSubStages] = useState<LcaSubStage[]>([]);
+  const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
 
   useEffect(() => {
     loadLcaData();
+    loadSubStages();
   }, [lcaId]);
+
+  useEffect(() => {
+    if (lca && currentOrganization?.id) {
+      loadIngredients();
+    }
+  }, [lca, currentOrganization]);
 
   const loadLcaData = async () => {
     try {
@@ -77,6 +98,40 @@ export default function LcaDataCapturePage() {
     }
   };
 
+  const loadSubStages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('lca_sub_stages')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      setSubStages(data || []);
+    } catch (error: any) {
+      console.error("Error loading sub stages:", error);
+    }
+  };
+
+  const loadIngredients = async () => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      setIsLoadingIngredients(true);
+      const result = await getIngredientsForLCA(lcaId, currentOrganization.id);
+
+      if (result.success) {
+        setIngredients(result.ingredients);
+      } else {
+        toast.error(result.error || "Failed to load ingredients");
+      }
+    } catch (error: any) {
+      console.error("Error loading ingredients:", error);
+    } finally {
+      setIsLoadingIngredients(false);
+    }
+  };
+
   const handleSaveDraft = async () => {
     try {
       setIsSaving(true);
@@ -91,6 +146,80 @@ export default function LcaDataCapturePage() {
       toast.error(error.message || "Failed to save draft");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleIngredientConfirmed = async (ingredient: {
+    name: string;
+    data_source: 'openlca' | 'supplier' | 'primary';
+    data_source_id?: string;
+    supplier_product_id?: string;
+    supplier_name?: string;
+    unit?: string;
+    carbon_intensity?: number;
+  }) => {
+    if (!currentOrganization?.id || !lca) return;
+
+    try {
+      const defaultSubStageId = subStages[0]?.id || 0;
+
+      await logIngredientSelection({
+        organizationId: currentOrganization.id,
+        lcaId: lcaId,
+        ingredientName: ingredient.name,
+        dataSource: ingredient.data_source,
+        sourceIdentifier: ingredient.data_source_id || ingredient.supplier_product_id,
+        sourceName: ingredient.data_source === 'supplier' ? ingredient.supplier_name : 'Generic Database',
+      });
+
+      const result = await addIngredientToLCA({
+        lcaId: lcaId,
+        organizationId: currentOrganization.id,
+        ingredient: {
+          name: ingredient.name,
+          quantity: 1,
+          unit: ingredient.unit || 'kg',
+          lca_sub_stage_id: defaultSubStageId,
+          data_source: ingredient.data_source,
+          data_source_id: ingredient.data_source_id,
+          supplier_product_id: ingredient.supplier_product_id,
+          supplier_name: ingredient.supplier_name,
+          origin_country: '',
+          is_organic_certified: false,
+        },
+      });
+
+      if (result.success) {
+        toast.success(`Added ${ingredient.name}`);
+        await loadIngredients();
+      } else {
+        toast.error(result.error || 'Failed to add ingredient');
+      }
+    } catch (error: any) {
+      console.error('Error adding ingredient:', error);
+      toast.error(error.message || 'Failed to add ingredient');
+    }
+  };
+
+  const handleEditIngredient = async (ingredient: IngredientMaterial & { supplier_name?: string | null }) => {
+    toast.info('Edit functionality coming soon');
+  };
+
+  const handleRemoveIngredient = async (ingredientId: string) => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      const result = await removeIngredient(ingredientId, lcaId, currentOrganization.id);
+
+      if (result.success) {
+        toast.success('Ingredient removed');
+        await loadIngredients();
+      } else {
+        toast.error(result.error || 'Failed to remove ingredient');
+      }
+    } catch (error: any) {
+      console.error('Error removing ingredient:', error);
+      toast.error(error.message || 'Failed to remove ingredient');
     }
   };
 
@@ -221,28 +350,55 @@ export default function LcaDataCapturePage() {
         </TabsList>
 
         <TabsContent value="ingredients" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ingredients & Raw Materials</CardTitle>
-              <CardDescription>
-                Add all liquid and dry ingredients used in this product
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  This section will integrate with your existing ingredient entry interface.
-                  Add materials, specify quantities, and assign to life cycle stages.
-                </AlertDescription>
-              </Alert>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Ingredients & Raw Materials</CardTitle>
+                  <CardDescription>
+                    Add all liquid and dry ingredients used in this product
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {currentOrganization && (
+                    <AssistedIngredientSearch
+                      lcaId={lcaId}
+                      organizationId={currentOrganization.id}
+                      subStages={subStages}
+                      onIngredientConfirmed={handleIngredientConfirmed}
+                      disabled={isLoadingIngredients}
+                    />
+                  )}
 
-              <div className="mt-4 text-center text-muted-foreground">
-                <p className="text-sm">Ingredient data capture interface coming soon</p>
-                <p className="text-xs mt-1">Will reuse existing UnifiedLcaDataCapture component</p>
-              </div>
-            </CardContent>
-          </Card>
+                  <Separator />
+
+                  {isLoadingIngredients ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-sm">Loading ingredients...</p>
+                    </div>
+                  ) : (
+                    <IngredientsList
+                      ingredients={ingredients}
+                      onEdit={handleEditIngredient}
+                      onRemove={handleRemoveIngredient}
+                      disabled={isLoadingIngredients}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div>
+              {currentOrganization && (
+                <IngredientsSummary
+                  ingredients={ingredients}
+                  lcaId={lcaId}
+                  organizationName={currentOrganization.name}
+                />
+              )}
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="packaging" className="space-y-4">
