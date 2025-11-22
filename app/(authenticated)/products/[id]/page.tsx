@@ -66,6 +66,13 @@ interface LatestLCAData {
   unit: string | null;
   calculatedAt: string | null;
   status: string | null;
+  lcaVersion: string | null;
+  scopeType: string | null;
+}
+
+interface DraftLCAData {
+  hasDraft: boolean;
+  draftLcaId: string | null;
 }
 
 export default function ProductDetailPage() {
@@ -83,6 +90,12 @@ export default function ProductDetailPage() {
     unit: null,
     calculatedAt: null,
     status: null,
+    lcaVersion: null,
+    scopeType: null,
+  });
+  const [draftLca, setDraftLca] = useState<DraftLCAData>({
+    hasDraft: false,
+    draftLcaId: null,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +111,7 @@ export default function ProductDetailPage() {
       setLoading(true);
       setError(null);
 
-      const [productRes, materialsRes, lcasRes, latestLcaRes] = await Promise.all([
+      const [productRes, materialsRes, lcasRes, latestLcaRes, draftLcaRes] = await Promise.all([
         supabase
           .from("products")
           .select("*")
@@ -119,6 +132,8 @@ export default function ProductDetailPage() {
           .select(`
             id,
             status,
+            lca_version,
+            lca_scope_type,
             product_lca_calculation_logs!inner(
               response_data,
               created_at,
@@ -129,6 +144,14 @@ export default function ProductDetailPage() {
           .eq("status", "completed")
           .eq("product_lca_calculation_logs.status", "success")
           .order("product_lca_calculation_logs.created_at", { ascending: false, foreignTable: "product_lca_calculation_logs" })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("product_lcas")
+          .select("id")
+          .eq("product_id", productId)
+          .eq("is_draft", true)
+          .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle()
       ]);
@@ -152,8 +175,17 @@ export default function ProductDetailPage() {
             unit: summary?.unit || null,
             calculatedAt: log.created_at,
             status: latestLcaRes.data.status,
+            lcaVersion: latestLcaRes.data.lca_version || null,
+            scopeType: latestLcaRes.data.lca_scope_type || null,
           });
         }
+      }
+
+      if (draftLcaRes.data) {
+        setDraftLca({
+          hasDraft: true,
+          draftLcaId: draftLcaRes.data.id,
+        });
       }
     } catch (err: any) {
       console.error("Error fetching product data:", err);
@@ -314,11 +346,16 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <LatestLCAResults
+            productId={productId}
             lcaId={latestLca.lcaId}
             totalCo2e={latestLca.totalCo2e}
             unit={latestLca.unit}
             calculatedAt={latestLca.calculatedAt}
             status={latestLca.status}
+            lcaVersion={latestLca.lcaVersion}
+            scopeType={latestLca.scopeType}
+            hasDraft={draftLca.hasDraft}
+            draftLcaId={draftLca.draftLcaId}
           />
         </div>
 

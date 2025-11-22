@@ -15,9 +15,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileBarChart, Edit, Boxes, Trash2, LayoutDashboard } from "lucide-react";
+import { Edit, Boxes, Trash2, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
-import { createDraftLca } from "@/lib/lca";
 import { deleteProduct } from "@/lib/products";
 
 interface ProductActionsProps {
@@ -33,27 +32,7 @@ export function ProductActions({
 }: ProductActionsProps) {
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isCreatingLca, setIsCreatingLca] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleCreateLca = async () => {
-    try {
-      setIsCreatingLca(true);
-      const result = await createDraftLca(productId, organizationId);
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
-
-      toast.success(`LCA created for "${productName}"`);
-      router.push(`/dashboard/lcas/${result.lcaId}/create/sourcing`);
-    } catch (error: any) {
-      console.error("Error creating LCA:", error);
-      toast.error(error.message || "Failed to create LCA");
-    } finally {
-      setIsCreatingLca(false);
-    }
-  };
 
   const handleDelete = async () => {
     try {
@@ -82,15 +61,6 @@ export function ProductActions({
               Product Hub
             </Button>
           </Link>
-
-          <Button
-            className="w-full"
-            onClick={handleCreateLca}
-            disabled={isCreatingLca}
-          >
-            <FileBarChart className="mr-2 h-4 w-4" />
-            {isCreatingLca ? "Creating..." : "Create New LCA"}
-          </Button>
 
           <Link href={`/dashboard/products/${productId}/edit`} className="block">
             <Button variant="outline" className="w-full">

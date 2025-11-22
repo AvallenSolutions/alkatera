@@ -3,25 +3,37 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, TrendingUp } from "lucide-react";
+import { CheckCircle2, TrendingUp, ShieldCheck, FileText } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface LatestLCAResultsProps {
+  productId: string;
   lcaId: string | null;
   totalCo2e: number | null;
   unit: string | null;
   calculatedAt: string | null;
   status: string | null;
+  lcaVersion?: string | null;
+  scopeType?: string | null;
+  hasDraft?: boolean;
+  draftLcaId?: string | null;
 }
 
 export function LatestLCAResults({
+  productId,
   lcaId,
   totalCo2e,
   unit,
   calculatedAt,
   status,
+  lcaVersion,
+  scopeType,
+  hasDraft,
+  draftLcaId,
 }: LatestLCAResultsProps) {
+  const router = useRouter();
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-GB", {
       day: "2-digit",
@@ -30,20 +42,61 @@ export function LatestLCAResults({
     });
   };
 
+  const getScopeLabel = (scope: string | null | undefined) => {
+    if (scope === "cradle-to-grave") return "Cradle-to-Grave";
+    return "Cradle-to-Gate";
+  };
+
   if (!lcaId || !totalCo2e) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Current LCA Results</CardTitle>
-          <CardDescription>Most recently completed life cycle assessment</CardDescription>
+      <Card className="border-2 border-dashed">
+        <CardHeader className="text-center pb-4">
+          <div className="flex justify-center mb-4">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
+              <ShieldCheck className="h-10 w-10 text-blue-600" />
+            </div>
+          </div>
+          <CardTitle className="text-2xl">Create Your First LCA</CardTitle>
+          <CardDescription className="text-base">
+            Start your ISO 14044 compliant life cycle assessment
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              No completed LCA calculations yet. Create and complete an LCA to see results here.
-            </AlertDescription>
-          </Alert>
+        <CardContent className="space-y-4 text-center">
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            A Life Cycle Assessment (LCA) measures the environmental impact of your product
+            from raw materials through manufacturing, following international standards.
+          </p>
+
+          {hasDraft && draftLcaId ? (
+            <div className="space-y-2">
+              <Button
+                onClick={() => router.push(`/products/${productId}/lca/${draftLcaId}/data-capture`)}
+                size="lg"
+                className="w-full max-w-sm"
+              >
+                <FileText className="mr-2 h-5 w-5" />
+                Resume Draft LCA
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                You have an LCA in progress
+              </p>
+            </div>
+          ) : (
+            <Button
+              onClick={() => router.push(`/products/${productId}/lca/initiate`)}
+              size="lg"
+              className="w-full max-w-sm"
+            >
+              <ShieldCheck className="mr-2 h-5 w-5" />
+              Create New LCA
+            </Button>
+          )}
+
+          <div className="pt-4 border-t">
+            <p className="text-xs text-muted-foreground">
+              You'll define your functional unit and system boundary first
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -57,12 +110,30 @@ export function LatestLCAResults({
             <CardTitle>Current LCA Results</CardTitle>
             <CardDescription>Most recently completed life cycle assessment</CardDescription>
           </div>
-          {status && (
-            <Badge className="bg-green-600">
-              <CheckCircle2 className="mr-1 h-3 w-3" />
-              {status}
-            </Badge>
-          )}
+          <div className="flex gap-2">
+            {lcaVersion && (
+              <Badge variant="secondary" className="text-xs">
+                v{lcaVersion}
+              </Badge>
+            )}
+            {scopeType && (
+              <Badge
+                className={
+                  scopeType === "cradle-to-grave"
+                    ? "bg-green-600"
+                    : "bg-amber-600"
+                }
+              >
+                {getScopeLabel(scopeType)}
+              </Badge>
+            )}
+            {status && (
+              <Badge className="bg-green-600">
+                <CheckCircle2 className="mr-1 h-3 w-3" />
+                {status}
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
