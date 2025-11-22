@@ -7,8 +7,8 @@ export interface LcaLifeCycleStage {
 }
 
 export interface LcaSubStage {
-  id: number;
-  lca_stage_id: number;
+  id: string;
+  lca_stage_id: string;
   name: string;
   description: string | null;
   display_order: number;
@@ -82,7 +82,7 @@ export interface ProductLcaMaterial {
   country_of_origin?: string | null;
   is_organic?: boolean;
   is_regenerative?: boolean;
-  lca_sub_stage_id?: number | null;
+  lca_sub_stage_id?: string | null;
   data_source?: DataSource | null;
   data_source_id?: string | null;
   supplier_product_id?: string | null;
@@ -136,7 +136,7 @@ export interface IngredientCardData {
   name: string;
   quantity: number | string;
   unit: string;
-  lca_sub_stage_id: number | null;
+  lca_sub_stage_id: string | null;
   data_source_id?: string;
   supplier_product_id?: string;
   origin_country: string;

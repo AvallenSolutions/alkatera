@@ -9,7 +9,7 @@ export interface AddIngredientParams {
     name: string;
     quantity: number;
     unit: string;
-    lca_sub_stage_id: number;
+    lca_sub_stage_id: string | null;
     data_source: DataSource;
     data_source_id?: string;
     supplier_product_id?: string;

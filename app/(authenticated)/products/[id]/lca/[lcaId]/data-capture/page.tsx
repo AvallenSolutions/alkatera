@@ -158,7 +158,7 @@ export default function LcaDataCapturePage() {
     unit?: string;
     carbon_intensity?: number;
     quantity?: number;
-    lca_sub_stage_id?: number;
+    lca_sub_stage_id?: string | null;
     origin_country?: string;
     is_organic_certified?: boolean;
   }) => {
@@ -173,7 +173,7 @@ export default function LcaDataCapturePage() {
     console.log('[handleIngredientConfirmed] Adding ingredient:', ingredient);
 
     try {
-      const defaultSubStageId = subStages[0]?.id || 0;
+      const defaultSubStageId = subStages[0]?.id || null;
 
       await logIngredientSelection({
         organizationId: currentOrganization.id,

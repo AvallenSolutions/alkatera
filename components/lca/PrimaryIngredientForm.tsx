@@ -29,7 +29,7 @@ interface PrimaryIngredientData {
   name: string;
   quantity: number;
   unit: string;
-  lca_sub_stage_id: number;
+  lca_sub_stage_id: string | null;
   origin_country: string;
   is_organic_certified: boolean;
   notes?: string;
@@ -66,7 +66,7 @@ export function PrimaryIngredientForm({
     name: initialName,
     quantity: 0,
     unit: "kg",
-    lca_sub_stage_id: 0,
+    lca_sub_stage_id: subStages[0]?.id || null,
     origin_country: "",
     is_organic_certified: false,
     notes: "",
@@ -85,7 +85,7 @@ export function PrimaryIngredientForm({
       newErrors.quantity = "Quantity must be greater than 0";
     }
 
-    if (!formData.lca_sub_stage_id || formData.lca_sub_stage_id === 0) {
+    if (!formData.lca_sub_stage_id) {
       newErrors.lca_sub_stage_id = "Please select a life cycle stage";
     }
 
@@ -106,7 +106,7 @@ export function PrimaryIngredientForm({
         name: "",
         quantity: 0,
         unit: "kg",
-        lca_sub_stage_id: 0,
+        lca_sub_stage_id: subStages[0]?.id || null,
         origin_country: "",
         is_organic_certified: false,
         notes: "",
@@ -125,7 +125,7 @@ export function PrimaryIngredientForm({
       name: "",
       quantity: 0,
       unit: "kg",
-      lca_sub_stage_id: 0,
+      lca_sub_stage_id: subStages[0]?.id || null,
       origin_country: "",
       is_organic_certified: false,
       notes: "",
@@ -216,15 +216,15 @@ export function PrimaryIngredientForm({
               Life Cycle Stage <span className="text-red-600">*</span>
             </Label>
             <Select
-              value={formData.lca_sub_stage_id.toString()}
-              onValueChange={(value) => setFormData({ ...formData, lca_sub_stage_id: parseInt(value) })}
+              value={formData.lca_sub_stage_id || ""}
+              onValueChange={(value) => setFormData({ ...formData, lca_sub_stage_id: value })}
             >
               <SelectTrigger id="lca_sub_stage" className={errors.lca_sub_stage_id ? "border-red-500" : ""}>
                 <SelectValue placeholder="Select stage" />
               </SelectTrigger>
               <SelectContent>
                 {subStages.map((stage) => (
-                  <SelectItem key={stage.id} value={stage.id.toString()}>
+                  <SelectItem key={stage.id} value={stage.id}>
                     {stage.name}
                   </SelectItem>
                 ))}

@@ -61,11 +61,11 @@ export function MaterialsSummary({ lcaId }: MaterialsSummaryProps) {
     fetchData();
   }, [lcaId]);
 
-  const getSubStageName = (subStageId: number | null | undefined) => {
+  const getSubStageName = (subStageId: string | null | undefined) => {
     if (!subStageId || !stages) return "Not classified";
 
     for (const stage of stages) {
-      const subStage = stage.sub_stages.find(sub => sub.id === Number(subStageId));
+      const subStage = stage.sub_stages.find(sub => sub.id === subStageId);
       if (subStage) {
         return `${stage.name} > ${subStage.name}`;
       }

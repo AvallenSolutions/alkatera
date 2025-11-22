@@ -43,7 +43,7 @@ interface AssistedIngredientSearchProps {
     unit?: string;
     carbon_intensity?: number;
     quantity?: number;
-    lca_sub_stage_id?: number;
+    lca_sub_stage_id?: string | null;
     origin_country?: string;
     is_organic_certified?: boolean;
   }) => void;
@@ -191,7 +191,7 @@ export function AssistedIngredientSearch({
     name: string;
     quantity: number;
     unit: string;
-    lca_sub_stage_id: number;
+    lca_sub_stage_id: string | null;
     origin_country: string;
     is_organic_certified: boolean;
     notes?: string;
