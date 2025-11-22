@@ -50,6 +50,10 @@ export interface PackagingType {
 
 export type MaterialType = 'ingredient' | 'packaging';
 
+export type PackagingCategory = 'container' | 'label' | 'closure' | 'secondary';
+
+export type LabelPrintingType = 'digital' | 'offset' | 'flexographic' | 'gravure' | 'screen' | 'letterpress' | 'other';
+
 export type DataSource = 'openlca' | 'supplier' | 'primary';
 
 export interface MaterialSelectionOutput {
@@ -88,6 +92,8 @@ export interface ProductLcaMaterial {
   supplier_product_id?: string | null;
   origin_country?: string | null;
   is_organic_certified?: boolean;
+  packaging_category?: PackagingCategory | null;
+  label_printing_type?: string | null;
   created_at: string;
   updated_at: string;
 }

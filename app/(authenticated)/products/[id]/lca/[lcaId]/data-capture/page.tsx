@@ -28,9 +28,13 @@ import { useOrganization } from "@/lib/organizationContext";
 import { AssistedIngredientSearch } from "@/components/lca/AssistedIngredientSearch";
 import { IngredientsList } from "@/components/lca/IngredientsList";
 import { IngredientsSummary } from "@/components/lca/IngredientsSummary";
+import { AssistedPackagingSearch } from "@/components/lca/AssistedPackagingSearch";
+import { PackagingList } from "@/components/lca/PackagingList";
+import { PackagingSummary } from "@/components/lca/PackagingSummary";
 import { addIngredientToLCA, getIngredientsForLCA, updateIngredient, removeIngredient, type IngredientMaterial } from "@/lib/ingredientOperations";
+import { addPackagingToLCA, getPackagingForLCA, updatePackaging, removePackaging, type PackagingMaterial } from "@/lib/packagingOperations";
 import { logIngredientSelection } from "@/lib/ingredientAudit";
-import type { LcaSubStage } from "@/lib/types/lca";
+import type { LcaSubStage, PackagingCategory } from "@/lib/types/lca";
 
 interface LcaData {
   id: string;
@@ -62,8 +66,10 @@ export default function LcaDataCapturePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [ingredients, setIngredients] = useState<(IngredientMaterial & { supplier_name?: string | null })[]>([]);
+  const [packaging, setPackaging] = useState<(PackagingMaterial & { supplier_name?: string | null })[]>([]);
   const [subStages, setSubStages] = useState<LcaSubStage[]>([]);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
+  const [isLoadingPackaging, setIsLoadingPackaging] = useState(false);
 
   useEffect(() => {
     loadLcaData();
@@ -73,6 +79,7 @@ export default function LcaDataCapturePage() {
   useEffect(() => {
     if (lca && currentOrganization?.id) {
       loadIngredients();
+      loadPackaging();
     }
   }, [lca, currentOrganization]);
 
@@ -129,6 +136,25 @@ export default function LcaDataCapturePage() {
       console.error("Error loading ingredients:", error);
     } finally {
       setIsLoadingIngredients(false);
+    }
+  };
+
+  const loadPackaging = async () => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      setIsLoadingPackaging(true);
+      const result = await getPackagingForLCA(lcaId, currentOrganization.id);
+
+      if (result.success) {
+        setPackaging(result.packaging);
+      } else {
+        toast.error(result.error || "Failed to load packaging");
+      }
+    } catch (error: any) {
+      console.error("Error loading packaging:", error);
+    } finally {
+      setIsLoadingPackaging(false);
     }
   };
 
@@ -241,6 +267,84 @@ export default function LcaDataCapturePage() {
     } catch (error: any) {
       console.error('Error removing ingredient:', error);
       toast.error(error.message || 'Failed to remove ingredient');
+    }
+  };
+
+  const handlePackagingConfirmed = async (packaging: {
+    name: string;
+    data_source: 'openlca' | 'supplier' | 'primary';
+    data_source_id?: string;
+    supplier_product_id?: string;
+    supplier_name?: string;
+    unit?: string;
+    carbon_intensity?: number;
+    quantity?: number;
+    lca_sub_stage_id?: string | null;
+    origin_country?: string;
+    is_organic_certified?: boolean;
+    packaging_category: PackagingCategory;
+    label_printing_type?: string;
+  }) => {
+    if (!currentOrganization?.id || !lca) {
+      console.error('[handlePackagingConfirmed] Missing requirements');
+      return;
+    }
+
+    try {
+      const defaultSubStageId = subStages[0]?.id || null;
+
+      const packagingData = {
+        name: packaging.name,
+        quantity: packaging.quantity ?? 1,
+        unit: packaging.unit || 'kg',
+        lca_sub_stage_id: packaging.lca_sub_stage_id ?? defaultSubStageId,
+        data_source: packaging.data_source,
+        data_source_id: packaging.data_source_id,
+        supplier_product_id: packaging.supplier_product_id,
+        supplier_name: packaging.supplier_name,
+        origin_country: packaging.origin_country || '',
+        is_organic_certified: packaging.is_organic_certified ?? false,
+        packaging_category: packaging.packaging_category,
+        label_printing_type: packaging.label_printing_type,
+      };
+
+      const result = await addPackagingToLCA({
+        lcaId: lcaId,
+        organizationId: currentOrganization.id,
+        packaging: packagingData,
+      });
+
+      if (result.success) {
+        toast.success(`Added ${packaging.name}`);
+        await loadPackaging();
+      } else {
+        toast.error(result.error || 'Failed to add packaging');
+      }
+    } catch (error: any) {
+      console.error('Error adding packaging:', error);
+      toast.error(error.message || 'Failed to add packaging');
+    }
+  };
+
+  const handleEditPackaging = async (packaging: PackagingMaterial & { supplier_name?: string | null }) => {
+    toast.info('Edit functionality coming soon');
+  };
+
+  const handleRemovePackaging = async (packagingId: string) => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      const result = await removePackaging(packagingId, lcaId, currentOrganization.id);
+
+      if (result.success) {
+        toast.success('Packaging removed');
+        await loadPackaging();
+      } else {
+        toast.error(result.error || 'Failed to remove packaging');
+      }
+    } catch (error: any) {
+      console.error('Error removing packaging:', error);
+      toast.error(error.message || 'Failed to remove packaging');
     }
   };
 
@@ -423,28 +527,57 @@ export default function LcaDataCapturePage() {
         </TabsContent>
 
         <TabsContent value="packaging" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Packaging Materials</CardTitle>
-              <CardDescription>
-                Add primary, secondary, and tertiary packaging materials
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Include all packaging that protects and presents your product:
-                  bottles, labels, caps, cartons, pallets, shrink wrap, etc.
-                </AlertDescription>
-              </Alert>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Packaging Materials</CardTitle>
+                  <CardDescription>
+                    Add containers, labels, closures, and secondary packaging
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {currentOrganization && (
+                    <AssistedPackagingSearch
+                      lcaId={lcaId}
+                      organizationId={currentOrganization.id}
+                      subStages={subStages}
+                      onPackagingConfirmed={handlePackagingConfirmed}
+                      disabled={isLoadingPackaging}
+                    />
+                  )}
 
-              <div className="mt-4 text-center text-muted-foreground">
-                <p className="text-sm">Packaging data capture interface coming soon</p>
-                <p className="text-xs mt-1">Will use same interface as ingredients</p>
-              </div>
-            </CardContent>
-          </Card>
+                  <Separator />
+
+                  {isLoadingPackaging ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                      <p className="text-sm">Loading packaging...</p>
+                    </div>
+                  ) : (
+                    <PackagingList
+                      packaging={packaging}
+                      onEdit={handleEditPackaging}
+                      onRemove={handleRemovePackaging}
+                      disabled={isLoadingPackaging}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div>
+              {currentOrganization && (
+                <PackagingSummary
+                  packaging={packaging}
+                  lcaId={lcaId}
+                  organizationId={currentOrganization.id}
+                  organizationName={currentOrganization.name}
+                  onMarkComplete={() => loadLcaData()}
+                />
+              )}
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="production" className="space-y-4">
