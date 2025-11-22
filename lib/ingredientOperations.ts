@@ -50,12 +50,16 @@ export interface IngredientMaterial {
 }
 
 export async function addIngredientToLCA(params: AddIngredientParams) {
+  console.log('[addIngredientToLCA] Called with params:', params);
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error('[addIngredientToLCA] Auth error:', authError);
       throw new Error("User not authenticated");
     }
+
+    console.log('[addIngredientToLCA] User authenticated:', user.id);
 
     const { data: lca, error: lcaError } = await supabase
       .from('product_lcas')
@@ -99,6 +103,8 @@ export async function addIngredientToLCA(params: AddIngredientParams) {
       is_organic_certified: params.ingredient.is_organic_certified,
     };
 
+    console.log('[addIngredientToLCA] Inserting material:', materialData);
+
     const { data, error } = await supabase
       .from('product_lca_materials')
       .insert(materialData)
@@ -106,8 +112,11 @@ export async function addIngredientToLCA(params: AddIngredientParams) {
       .single();
 
     if (error) {
+      console.error('[addIngredientToLCA] Insert error:', error);
       throw new Error(`Failed to add ingredient: ${error.message}`);
     }
+
+    console.log('[addIngredientToLCA] Insert successful:', data);
 
     const { data: existingMaterials } = await supabase
       .from('product_lca_materials')

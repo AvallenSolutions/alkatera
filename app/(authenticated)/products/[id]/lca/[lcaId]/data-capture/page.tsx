@@ -162,7 +162,15 @@ export default function LcaDataCapturePage() {
     origin_country?: string;
     is_organic_certified?: boolean;
   }) => {
-    if (!currentOrganization?.id || !lca) return;
+    if (!currentOrganization?.id || !lca) {
+      console.error('[handleIngredientConfirmed] Missing requirements:', {
+        hasOrganization: !!currentOrganization?.id,
+        hasLca: !!lca,
+      });
+      return;
+    }
+
+    console.log('[handleIngredientConfirmed] Adding ingredient:', ingredient);
 
     try {
       const defaultSubStageId = subStages[0]?.id || 0;
@@ -176,27 +184,36 @@ export default function LcaDataCapturePage() {
         sourceName: ingredient.data_source === 'supplier' ? ingredient.supplier_name : 'Generic Database',
       });
 
+      const ingredientData = {
+        name: ingredient.name,
+        quantity: ingredient.quantity ?? 1,
+        unit: ingredient.unit || 'kg',
+        lca_sub_stage_id: ingredient.lca_sub_stage_id ?? defaultSubStageId,
+        data_source: ingredient.data_source,
+        data_source_id: ingredient.data_source_id,
+        supplier_product_id: ingredient.supplier_product_id,
+        supplier_name: ingredient.supplier_name,
+        origin_country: ingredient.origin_country || '',
+        is_organic_certified: ingredient.is_organic_certified ?? false,
+      };
+
+      console.log('[handleIngredientConfirmed] Calling addIngredientToLCA with:', ingredientData);
+
       const result = await addIngredientToLCA({
         lcaId: lcaId,
         organizationId: currentOrganization.id,
-        ingredient: {
-          name: ingredient.name,
-          quantity: ingredient.quantity ?? 1,
-          unit: ingredient.unit || 'kg',
-          lca_sub_stage_id: ingredient.lca_sub_stage_id ?? defaultSubStageId,
-          data_source: ingredient.data_source,
-          data_source_id: ingredient.data_source_id,
-          supplier_product_id: ingredient.supplier_product_id,
-          supplier_name: ingredient.supplier_name,
-          origin_country: ingredient.origin_country || '',
-          is_organic_certified: ingredient.is_organic_certified ?? false,
-        },
+        ingredient: ingredientData,
       });
+
+      console.log('[handleIngredientConfirmed] Result:', result);
 
       if (result.success) {
         toast.success(`Added ${ingredient.name}`);
+        console.log('[handleIngredientConfirmed] Reloading ingredients...');
         await loadIngredients();
+        console.log('[handleIngredientConfirmed] Ingredients reloaded successfully');
       } else {
+        console.error('[handleIngredientConfirmed] Failed:', result.error);
         toast.error(result.error || 'Failed to add ingredient');
       }
     } catch (error: any) {

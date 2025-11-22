@@ -18,6 +18,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  PopoverAnchor,
 } from "@/components/ui/popover";
 import { Database, Building2, Sprout, Search, Info, Loader2 } from "lucide-react";
 import { IngredientConfirmationPopover } from "./IngredientConfirmationPopover";
@@ -183,6 +184,7 @@ export function AssistedIngredientSearch({
     setSearchQuery("");
     setSearchResults({ supplier: [], database: [] });
     setConfirmationData(null);
+    setConfirmationOpen(false);
   };
 
   const handlePrimarySave = async (data: {
@@ -221,15 +223,19 @@ export function AssistedIngredientSearch({
       </Alert>
 
       <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-        <PopoverTrigger asChild>
+        <PopoverAnchor asChild>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="Add an ingredient..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
-                setSearchOpen(e.target.value.length >= 2);
+                if (e.target.value.length >= 2) {
+                  setSearchOpen(true);
+                } else {
+                  setSearchOpen(false);
+                }
               }}
               onFocus={() => {
                 if (searchQuery.length >= 2) {
@@ -240,8 +246,8 @@ export function AssistedIngredientSearch({
               className="pl-10"
             />
           </div>
-        </PopoverTrigger>
-        <PopoverContent className="w-[500px] p-0" align="start">
+        </PopoverAnchor>
+        <PopoverContent className="w-[500px] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
           <Command>
             <CommandList>
               {isSearching ? (
