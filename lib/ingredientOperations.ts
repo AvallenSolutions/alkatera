@@ -301,20 +301,7 @@ export async function getIngredientsForLCA(lcaId: string, organizationId: string
 
     const { data, error } = await supabase
       .from('product_lca_materials')
-      .select(`
-        *,
-        lca_sub_stages!lca_sub_stage_id (
-          id,
-          name
-        ),
-        supplier_products!supplier_product_id (
-          id,
-          name,
-          suppliers (
-            name
-          )
-        )
-      `)
+      .select('*')
       .eq('product_lca_id', lcaId)
       .order('created_at', { ascending: true });
 
@@ -322,10 +309,42 @@ export async function getIngredientsForLCA(lcaId: string, organizationId: string
       throw new Error(`Failed to fetch ingredients: ${error.message}`);
     }
 
-    const enrichedIngredients = (data || []).map((material: any) => ({
-      ...material,
-      supplier_name: material.supplier_products?.suppliers?.name || null,
-      sub_stage_name: material.lca_sub_stages?.name || null,
+    // Manually fetch related data for non-null foreign keys
+    const enrichedIngredients = await Promise.all((data || []).map(async (material: any) => {
+      let supplier_name = null;
+      let sub_stage_name = null;
+
+      // Fetch supplier name if supplier_product_id exists
+      if (material.supplier_product_id) {
+        const { data: supplierProduct } = await supabase
+          .from('supplier_products')
+          .select('name, suppliers(name)')
+          .eq('id', material.supplier_product_id)
+          .maybeSingle();
+
+        if (supplierProduct) {
+          supplier_name = (supplierProduct as any).suppliers?.name || null;
+        }
+      }
+
+      // Fetch sub stage name if lca_sub_stage_id exists
+      if (material.lca_sub_stage_id) {
+        const { data: subStage } = await supabase
+          .from('lca_sub_stages')
+          .select('name')
+          .eq('id', material.lca_sub_stage_id)
+          .maybeSingle();
+
+        if (subStage) {
+          sub_stage_name = subStage.name;
+        }
+      }
+
+      return {
+        ...material,
+        supplier_name,
+        sub_stage_name,
+      };
     }));
 
     return {
