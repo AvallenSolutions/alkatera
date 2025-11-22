@@ -23,6 +23,7 @@ import {
 import { Database, Building2, Sprout, Search, Info, Loader2 } from "lucide-react";
 import { IngredientConfirmationPopover } from "./IngredientConfirmationPopover";
 import { PrimaryIngredientForm } from "./PrimaryIngredientForm";
+import { IngredientQuantityDialog } from "./IngredientQuantityDialog";
 import type { OpenLCAProcess, SupplierProduct, LcaSubStage } from "@/lib/types/lca";
 
 interface SearchResults {
@@ -68,6 +69,8 @@ export function AssistedIngredientSearch({
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const [primaryFormOpen, setPrimaryFormOpen] = useState(false);
   const [primaryFormName, setPrimaryFormName] = useState("");
+  const [quantityDialogOpen, setQuantityDialogOpen] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<any>(null);
 
   const debouncedSearch = useCallback(
     debounce(async (query: string) => {
@@ -129,28 +132,28 @@ export function AssistedIngredientSearch({
   }, [searchQuery, debouncedSearch]);
 
   const handleSupplierClick = (supplier: SupplierProduct) => {
-    setConfirmationData({
-      ingredientName: supplier.name,
-      dataSource: 'supplier',
-      supplierName: supplier.supplier_name || 'Unknown Supplier',
-      carbonIntensity: supplier.carbon_intensity,
+    setSelectedIngredient({
+      name: supplier.name,
+      data_source: 'supplier',
+      supplier_name: supplier.supplier_name || 'Unknown Supplier',
+      carbon_intensity: supplier.carbon_intensity,
       unit: supplier.unit,
       supplier_product_id: supplier.id,
     });
-    setConfirmationOpen(true);
+    setQuantityDialogOpen(true);
     setSearchOpen(false);
   };
 
   const handleDatabaseClick = (process: OpenLCAProcess) => {
-    setConfirmationData({
-      ingredientName: process.name,
-      dataSource: 'openlca',
+    setSelectedIngredient({
+      name: process.name,
+      data_source: 'openlca',
       data_source_id: process.id,
       unit: process.unit || 'kg',
       location: process.location,
       processType: process.processType,
     });
-    setConfirmationOpen(true);
+    setQuantityDialogOpen(true);
     setSearchOpen(false);
   };
 
@@ -206,6 +209,33 @@ export function AssistedIngredientSearch({
       is_organic_certified: data.is_organic_certified,
     });
 
+    setSearchQuery("");
+    setSearchResults({ supplier: [], database: [] });
+  };
+
+  const handleQuantityConfirm = (data: {
+    quantity: number;
+    unit: string;
+    lca_sub_stage_id: string | null;
+  }) => {
+    if (!selectedIngredient) return;
+
+    onIngredientConfirmed({
+      name: selectedIngredient.name,
+      data_source: selectedIngredient.data_source,
+      data_source_id: selectedIngredient.data_source_id,
+      supplier_product_id: selectedIngredient.supplier_product_id,
+      supplier_name: selectedIngredient.supplier_name,
+      unit: data.unit,
+      carbon_intensity: selectedIngredient.carbon_intensity,
+      quantity: data.quantity,
+      lca_sub_stage_id: data.lca_sub_stage_id,
+      origin_country: '',
+      is_organic_certified: false,
+    });
+
+    setSelectedIngredient(null);
+    setQuantityDialogOpen(false);
     setSearchQuery("");
     setSearchResults({ supplier: [], database: [] });
   };
@@ -379,6 +409,19 @@ export function AssistedIngredientSearch({
         initialName={primaryFormName}
         subStages={subStages}
         onSave={handlePrimarySave}
+      />
+
+      <IngredientQuantityDialog
+        open={quantityDialogOpen}
+        onOpenChange={setQuantityDialogOpen}
+        ingredientName={selectedIngredient?.name || ""}
+        defaultUnit={selectedIngredient?.unit || "kg"}
+        subStages={subStages}
+        onConfirm={handleQuantityConfirm}
+        onCancel={() => {
+          setSelectedIngredient(null);
+          setQuantityDialogOpen(false);
+        }}
       />
     </div>
   );

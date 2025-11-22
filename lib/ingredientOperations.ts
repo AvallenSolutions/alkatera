@@ -303,11 +303,11 @@ export async function getIngredientsForLCA(lcaId: string, organizationId: string
       .from('product_lca_materials')
       .select(`
         *,
-        lca_sub_stages:lca_sub_stage_id (
+        lca_sub_stages!lca_sub_stage_id (
           id,
           name
         ),
-        supplier_products:supplier_product_id (
+        supplier_products!supplier_product_id (
           id,
           name,
           suppliers (
