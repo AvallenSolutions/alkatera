@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -16,6 +16,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { COUNTRIES } from "@/lib/countries";
 import type { DataSource, PackagingCategory } from "@/lib/types/lca";
 
 export interface PackagingFormData {
@@ -28,7 +29,10 @@ export interface PackagingFormData {
   amount: number | string;
   unit: string;
   packaging_category: PackagingCategory | null;
-  label_printing_type: string;
+  recycled_content_percentage: number | string;
+  printing_process: string;
+  net_weight_g: number | string;
+  origin_country: string;
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   carbon_intensity?: number;
@@ -44,11 +48,11 @@ interface PackagingFormCardProps {
   canRemove: boolean;
 }
 
-const PACKAGING_CATEGORIES = [
-  { value: 'container', label: 'Container', icon: Package, description: 'Bottles, cans, packs' },
-  { value: 'label', label: 'Label', icon: Tag, description: 'Labels and printing' },
-  { value: 'closure', label: 'Closure', icon: Grip, description: 'Caps, corks, seals' },
-  { value: 'secondary', label: 'Secondary', icon: Box, description: 'Gift packs, delivery boxes' },
+const PACKAGING_TYPES = [
+  { value: 'container', label: 'Container', icon: Package },
+  { value: 'label', label: 'Label', icon: Tag },
+  { value: 'closure', label: 'Closure', icon: Grip },
+  { value: 'secondary', label: 'Secondary', icon: Box },
 ] as const;
 
 export function PackagingFormCard({
@@ -142,42 +146,41 @@ export function PackagingFormCard({
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor={`category-${packaging.tempId}`}>
-              Packaging Category <span className="text-destructive">*</span>
+            <Label className="mb-2 block">
+              Type <span className="text-destructive">*</span>
             </Label>
-            <Select
-              value={packaging.packaging_category || undefined}
-              onValueChange={(value: PackagingCategory) =>
-                onUpdate(packaging.tempId, { packaging_category: value })
-              }
-            >
-              <SelectTrigger id={`category-${packaging.tempId}`}>
-                <SelectValue placeholder="Select packaging category..." />
-              </SelectTrigger>
-              <SelectContent>
-                {PACKAGING_CATEGORIES.map((cat) => {
-                  const Icon = cat.icon;
-                  return (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" />
-                        <div>
-                          <div className="font-medium">{cat.label}</div>
-                          <div className="text-xs text-muted-foreground">{cat.description}</div>
-                        </div>
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-4 gap-2">
+              {PACKAGING_TYPES.map((type) => {
+                const Icon = type.icon;
+                const isSelected = packaging.packaging_category === type.value;
+                return (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => onUpdate(packaging.tempId, { packaging_category: type.value as PackagingCategory })}
+                    className={`
+                      flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all
+                      ${isSelected
+                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-950'
+                        : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      }
+                    `}
+                  >
+                    <Icon className={`h-5 w-5 ${isSelected ? 'text-orange-600' : 'text-slate-600 dark:text-slate-400'}`} />
+                    <span className={`text-xs font-medium ${isSelected ? 'text-orange-800 dark:text-orange-300' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {type.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {packaging.packaging_category && (
             <>
               <div>
                 <Label htmlFor={`search-${packaging.tempId}`} className="flex items-center gap-2">
-                  Search Packaging <span className="text-destructive">*</span>
+                  Search Material <span className="text-destructive">*</span>
                 </Label>
                 <InlineIngredientSearch
                   organizationId={organizationId}
@@ -190,99 +193,125 @@ export function PackagingFormCard({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {packaging.packaging_category === 'container' && (
                 <div>
-                  <Label htmlFor={`amount-${packaging.tempId}`}>
-                    Amount <span className="text-destructive">*</span>
+                  <Label htmlFor={`recycled-${packaging.tempId}`}>
+                    Recycled Content (%)
                   </Label>
                   <Input
-                    id={`amount-${packaging.tempId}`}
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0"
-                    value={packaging.amount}
-                    onChange={(e) => onUpdate(packaging.tempId, { amount: e.target.value })}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Quantity used per product unit
-                  </p>
-                </div>
-
-                <div>
-                  <Label htmlFor={`unit-${packaging.tempId}`}>
-                    Unit <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={packaging.unit}
-                    onValueChange={(value) => onUpdate(packaging.tempId, { unit: value })}
-                  >
-                    <SelectTrigger id={`unit-${packaging.tempId}`}>
-                      <SelectValue placeholder="Select unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="g">Grams (g)</SelectItem>
-                      <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                      <SelectItem value="unit">Units</SelectItem>
-                      <SelectItem value="m2">Square Metres (m²)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {packaging.packaging_category === 'label' && (
-                <div>
-                  <Label htmlFor={`printing-${packaging.tempId}`}>Printing Type (Optional)</Label>
-                  <Select
-                    value={packaging.label_printing_type}
-                    onValueChange={(value) => onUpdate(packaging.tempId, { label_printing_type: value })}
-                  >
-                    <SelectTrigger id={`printing-${packaging.tempId}`}>
-                      <SelectValue placeholder="Select printing type..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="digital">Digital</SelectItem>
-                      <SelectItem value="offset">Offset</SelectItem>
-                      <SelectItem value="flexographic">Flexographic</SelectItem>
-                      <SelectItem value="gravure">Gravure</SelectItem>
-                      <SelectItem value="screen">Screen</SelectItem>
-                      <SelectItem value="letterpress">Letterpress</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-                <div>
-                  <Label htmlFor={`transport-${packaging.tempId}`}>Transport Mode</Label>
-                  <Select
-                    value={packaging.transport_mode}
-                    onValueChange={(value: any) => onUpdate(packaging.tempId, { transport_mode: value })}
-                  >
-                    <SelectTrigger id={`transport-${packaging.tempId}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="truck">Truck</SelectItem>
-                      <SelectItem value="train">Train</SelectItem>
-                      <SelectItem value="ship">Ship</SelectItem>
-                      <SelectItem value="air">Air</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor={`distance-${packaging.tempId}`}>Distance (km)</Label>
-                  <Input
-                    id={`distance-${packaging.tempId}`}
+                    id={`recycled-${packaging.tempId}`}
                     type="number"
                     step="1"
                     min="0"
+                    max="100"
                     placeholder="0"
-                    value={packaging.distance_km}
-                    onChange={(e) => onUpdate(packaging.tempId, { distance_km: e.target.value })}
+                    value={packaging.recycled_content_percentage}
+                    onChange={(e) => onUpdate(packaging.tempId, { recycled_content_percentage: e.target.value })}
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Required for Plastic Tax calculation
+                  </p>
+                </div>
+              )}
+
+              {packaging.packaging_category === 'label' && (
+                <div>
+                  <Label htmlFor={`printing-${packaging.tempId}`}>Printing Process</Label>
+                  <Select
+                    value={packaging.printing_process || 'standard_ink'}
+                    onValueChange={(value) => onUpdate(packaging.tempId, { printing_process: value })}
+                  >
+                    <SelectTrigger id={`printing-${packaging.tempId}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="standard_ink">Standard Ink</SelectItem>
+                      <SelectItem value="foil_stamping">Foil Stamping</SelectItem>
+                      <SelectItem value="shrink_sleeve">Shrink Sleeve</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Select 'Foil' if metallic elements are used
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor={`net-weight-${packaging.tempId}`}>
+                  Net Weight (g) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id={`net-weight-${packaging.tempId}`}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0"
+                  value={packaging.net_weight_g}
+                  onChange={(e) => onUpdate(packaging.tempId, { net_weight_g: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  The weight of one unit
+                </p>
+              </div>
+
+              <div className="pt-2 border-t">
+                <h4 className="text-sm font-medium mb-3">Logistics</h4>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor={`origin-${packaging.tempId}`}>Origin Country</Label>
+                    <Select
+                      value={packaging.origin_country}
+                      onValueChange={(value) => onUpdate(packaging.tempId, { origin_country: value })}
+                    >
+                      <SelectTrigger id={`origin-${packaging.tempId}`}>
+                        <SelectValue placeholder="Select country..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRIES.map((country) => (
+                          <SelectItem key={country.value} value={country.label}>
+                            {country.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Country or region of origin
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`transport-${packaging.tempId}`}>Transport Mode</Label>
+                      <Select
+                        value={packaging.transport_mode}
+                        onValueChange={(value: any) => onUpdate(packaging.tempId, { transport_mode: value })}
+                      >
+                        <SelectTrigger id={`transport-${packaging.tempId}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="truck">Truck</SelectItem>
+                          <SelectItem value="train">Train</SelectItem>
+                          <SelectItem value="ship">Ship</SelectItem>
+                          <SelectItem value="air">Air</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor={`distance-${packaging.tempId}`}>Distance (km)</Label>
+                      <Input
+                        id={`distance-${packaging.tempId}`}
+                        type="number"
+                        step="1"
+                        min="0"
+                        placeholder="0"
+                        value={packaging.distance_km}
+                        onChange={(e) => onUpdate(packaging.tempId, { distance_km: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
