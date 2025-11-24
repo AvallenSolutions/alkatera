@@ -13,11 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { AlertTriangle, Upload, Loader2, Save, ArrowLeft, Image as ImageIcon } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
@@ -27,23 +25,17 @@ interface ProductFormData {
   name: string;
   sku: string;
   product_description: string;
-  functional_unit_type: string;
-  functional_unit_volume: string;
-  functional_unit_measure: string;
-  system_boundary: "cradle_to_gate" | "cradle_to_grave";
+  unit_size_value: string;
+  unit_size_unit: string;
   product_image_url: string;
 }
 
-const FUNCTIONAL_UNIT_TYPES = [
-  { value: "bottle", label: "Bottle" },
-  { value: "can", label: "Can" },
-  { value: "pack", label: "Pack" },
-  { value: "unit", label: "Unit" },
-];
-
-const FUNCTIONAL_UNIT_MEASURES = [
+const UNIT_OPTIONS = [
   { value: "ml", label: "Millilitres (ml)" },
   { value: "l", label: "Litres (l)" },
+  { value: "g", label: "Grams (g)" },
+  { value: "kg", label: "Kilograms (kg)" },
+  { value: "units", label: "Units" },
 ];
 
 export default function NewProductLCAPage() {
@@ -58,10 +50,8 @@ export default function NewProductLCAPage() {
     name: "",
     sku: "",
     product_description: "",
-    functional_unit_type: "",
-    functional_unit_volume: "",
-    functional_unit_measure: "",
-    system_boundary: "cradle_to_gate",
+    unit_size_value: "",
+    unit_size_unit: "",
     product_image_url: "",
   });
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -131,24 +121,19 @@ export default function NewProductLCAPage() {
     }
 
     if (!isDraft) {
-      if (!formData.functional_unit_type) {
+      if (!formData.unit_size_value) {
+        toast.error("Unit size is required");
+        return false;
+      }
+
+      const size = parseFloat(formData.unit_size_value);
+      if (isNaN(size) || size <= 0) {
+        toast.error("Unit size must be a positive number");
+        return false;
+      }
+
+      if (!formData.unit_size_unit) {
         toast.error("Unit type is required");
-        return false;
-      }
-
-      if (!formData.functional_unit_volume) {
-        toast.error("Volume is required");
-        return false;
-      }
-
-      const volume = parseFloat(formData.functional_unit_volume);
-      if (isNaN(volume) || volume <= 0) {
-        toast.error("Functional unit volume must be a positive number");
-        return false;
-      }
-
-      if (!formData.functional_unit_measure) {
-        toast.error("Measurement unit is required");
         return false;
       }
     }
@@ -175,12 +160,13 @@ export default function NewProductLCAPage() {
     try {
       let imageUrl = formData.product_image_url;
 
-      if (imageFile) {
-        const uploadedUrl = await uploadImage();
-        if (uploadedUrl) {
-          imageUrl = uploadedUrl;
-        }
-      }
+      // Skip image upload for now - storage bucket not configured
+      // if (imageFile) {
+      //   const uploadedUrl = await uploadImage();
+      //   if (uploadedUrl) {
+      //     imageUrl = uploadedUrl;
+      //   }
+      // }
 
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -188,27 +174,21 @@ export default function NewProductLCAPage() {
         throw new Error("User not authenticated");
       }
 
+      const functionalUnit = formData.unit_size_value && formData.unit_size_unit
+        ? `${formData.unit_size_value} ${formData.unit_size_unit}`
+        : null;
+
       const productData: any = {
         organization_id: currentOrganization.id,
         name: formData.name,
         sku: formData.sku || null,
         product_description: formData.product_description || null,
-        system_boundary: formData.system_boundary,
         product_image_url: imageUrl || null,
         created_by: user.id,
         is_draft: isDraft,
-      };
-
-      if (formData.functional_unit_type) {
-        productData.functional_unit_type = formData.functional_unit_type;
-      }
-
-      if (formData.functional_unit_volume) {
-        productData.functional_unit_volume = parseFloat(formData.functional_unit_volume);
-      }
-
-      if (formData.functional_unit_measure) {
-        productData.functional_unit_measure = formData.functional_unit_measure;
+        functional_unit: functionalUnit,
+        unit_size_value: formData.unit_size_value ? parseFloat(formData.unit_size_value) : null,
+        unit_size_unit: formData.unit_size_unit || null,
       }
 
       const { data, error } = await supabase
@@ -221,10 +201,12 @@ export default function NewProductLCAPage() {
 
       if (isDraft) {
         toast.success("Product draft saved successfully");
+        router.push(`/products/${data.id}`);
       } else {
         toast.success("Product created successfully");
+        // Redirect to recipe builder flow
+        router.push(`/products/${data.id}/recipe`);
       }
-      router.push(`/products/${data.id}`);
     } catch (error: any) {
       console.error("Error creating product:", error);
       toast.error(error.message || "Failed to create product");
@@ -249,8 +231,9 @@ export default function NewProductLCAPage() {
     return (
       <div className="container mx-auto p-6">
         <Alert>
+          <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Please select an organization to create a product LCA.
+            Please select an organisation to create a product.
           </AlertDescription>
         </Alert>
       </div>
@@ -371,61 +354,41 @@ export default function NewProductLCAPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Functional Unit Definition</CardTitle>
+          <CardTitle>Unit Size</CardTitle>
           <CardDescription>
-            Define the reference unit for your LCA calculations
+            Define the size and unit of measurement for your product
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="unit-type">Unit Type *</Label>
-            <Select
-              value={formData.functional_unit_type}
-              onValueChange={(value) => handleInputChange("functional_unit_type", value)}
-              disabled={isSubmitting || isSavingDraft}
-            >
-              <SelectTrigger id="unit-type">
-                <SelectValue placeholder="Select packaging type" />
-              </SelectTrigger>
-              <SelectContent>
-                {FUNCTIONAL_UNIT_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="volume">Volume *</Label>
+              <Label htmlFor="unit_size_value">Size *</Label>
               <Input
-                id="volume"
+                id="unit_size_value"
                 type="number"
                 step="0.01"
                 min="0"
                 placeholder="500"
-                value={formData.functional_unit_volume}
-                onChange={(e) => handleInputChange("functional_unit_volume", e.target.value)}
+                value={formData.unit_size_value}
+                onChange={(e) => handleInputChange("unit_size_value", e.target.value)}
                 disabled={isSubmitting || isSavingDraft}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="measure">Measurement Unit *</Label>
+              <Label htmlFor="unit_size_unit">Unit *</Label>
               <Select
-                value={formData.functional_unit_measure}
-                onValueChange={(value) => handleInputChange("functional_unit_measure", value)}
+                value={formData.unit_size_unit}
+                onValueChange={(value) => handleInputChange("unit_size_unit", value)}
                 disabled={isSubmitting || isSavingDraft}
               >
-                <SelectTrigger id="measure">
+                <SelectTrigger id="unit_size_unit">
                   <SelectValue placeholder="Select unit" />
                 </SelectTrigger>
                 <SelectContent>
-                  {FUNCTIONAL_UNIT_MEASURES.map((measure) => (
-                    <SelectItem key={measure.value} value={measure.value}>
-                      {measure.label}
+                  {UNIT_OPTIONS.map((unit) => (
+                    <SelectItem key={unit.value} value={unit.value}>
+                      {unit.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -434,128 +397,11 @@ export default function NewProductLCAPage() {
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Example: 1 bottle of 500ml represents the functional unit for this assessment
+            Example: 500 ml for a beverage bottle, 250 g for a snack pack
           </p>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>System Boundary Selection</CardTitle>
-          <CardDescription>
-            Define the scope of your LCA calculation
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <RadioGroup
-            value={formData.system_boundary}
-            onValueChange={(value) =>
-              handleInputChange("system_boundary", value as "cradle_to_gate" | "cradle_to_grave")
-            }
-            disabled={isSubmitting || isSavingDraft}
-          >
-            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
-              <RadioGroupItem value="cradle_to_gate" id="cradle-to-gate" />
-              <div className="space-y-1 leading-none">
-                <Label
-                  htmlFor="cradle-to-gate"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Cradle-to-Gate
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  From raw material extraction to factory gate (excludes distribution, use, and disposal)
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
-              <RadioGroupItem value="cradle_to_grave" id="cradle-to-grave" />
-              <div className="space-y-1 leading-none">
-                <Label
-                  htmlFor="cradle-to-grave"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Cradle-to-Grave
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  Complete lifecycle from raw material extraction through end-of-life disposal
-                </p>
-              </div>
-            </div>
-          </RadioGroup>
-
-          {formData.system_boundary === "cradle_to_gate" && (
-            <Alert variant="destructive" className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-900 dark:text-amber-200">
-                <strong>Warning:</strong> This boundary is suitable for internal benchmarking or B2B
-                reporting only. Using 'cradle-to-gate' data for public-facing marketing claims carries
-                a high risk of non-compliance with greenwashing regulations like the EU Green Claims
-                Directive and UK DMCC Act.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-      {formData.system_boundary === "cradle_to_grave" && (
-        <>
-          <Separator />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Lifecycle Stages</CardTitle>
-              <CardDescription>
-                Additional data capture sections for cradle-to-grave assessment
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Distribution</p>
-                    <p className="text-sm text-muted-foreground">
-                      Transport and logistics data
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Available after creation</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Retail</p>
-                    <p className="text-sm text-muted-foreground">
-                      Storage and refrigeration requirements
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Available after creation</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Consumer Use</p>
-                    <p className="text-sm text-muted-foreground">
-                      Usage patterns and energy consumption
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Available after creation</span>
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <p className="font-medium">End of Life</p>
-                    <p className="text-sm text-muted-foreground">
-                      Disposal, recycling, and waste management
-                    </p>
-                  </div>
-                  <span className="text-xs text-muted-foreground">Available after creation</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </>
-      )}
 
       <div className="flex items-center justify-between pt-6 border-t">
         <Link href="/products">
