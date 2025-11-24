@@ -41,8 +41,8 @@ const navigationStructure: NavItem[] = [
     icon: ClipboardList,
   },
   {
-    name: 'CCF Reports',
-    href: '/reports/ccf',
+    name: 'Company Footprint',
+    href: '/reports/company-footprint',
     icon: TrendingUp,
   },
   {
