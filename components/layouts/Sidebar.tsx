@@ -9,6 +9,7 @@ import {
   Package,
   ClipboardList,
   FileText,
+  TrendingUp,
   Settings,
 } from 'lucide-react'
 
@@ -40,9 +41,9 @@ const navigationStructure: NavItem[] = [
     icon: ClipboardList,
   },
   {
-    name: 'Reports',
-    href: '/reports',
-    icon: FileText,
+    name: 'CCF Reports',
+    href: '/reports/ccf',
+    icon: TrendingUp,
   },
   {
     name: 'Settings',
