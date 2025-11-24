@@ -18,9 +18,11 @@ import type { UnitSizeUnit, Certification, Award } from "@/lib/types/products";
 
 interface EditProductFormProps {
   productId: string;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export function EditProductForm({ productId }: EditProductFormProps) {
+export function EditProductForm({ productId, onSuccess, onCancel }: EditProductFormProps) {
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -123,7 +125,11 @@ export function EditProductForm({ productId }: EditProductFormProps) {
       });
 
       toast.success("Product updated successfully!");
-      router.push("/dashboard/products");
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/dashboard/products");
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update product";
       setError(errorMessage);
@@ -385,7 +391,7 @@ export function EditProductForm({ productId }: EditProductFormProps) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push("/dashboard/products")}
+              onClick={() => onCancel ? onCancel() : router.push("/dashboard/products")}
               disabled={isSaving}
             >
               Cancel
