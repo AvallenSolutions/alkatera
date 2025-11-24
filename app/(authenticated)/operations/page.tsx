@@ -4,23 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Trash2, Plus, AlertCircle, Zap, MapPin } from 'lucide-react';
+import { Building2, Plus, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AddFacilityWizard } from '@/components/facilities/AddFacilityWizard';
-import Link from 'next/link';
 
 interface Facility {
   id: string;
@@ -72,46 +62,44 @@ export default function FacilitiesPage() {
     fetchFacilities();
   }, [fetchFacilities]);
 
-  const handleDeleteFacility = async (facilityId: string, facilityName: string) => {
-    if (!confirm(`Are you sure you want to delete "${facilityName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('facilities')
-        .delete()
-        .eq('id', facilityId);
-
-      if (error) throw error;
-
-      toast.success('Facility deleted successfully');
-      await fetchFacilities();
-    } catch (error: any) {
-      console.error('Error deleting facility:', error);
-      toast.error(error.message || 'Failed to delete facility');
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  };
 
   if (isLoading) {
     return <PageLoader message="Loading facilities..." />;
   }
 
+  const getCountryFlag = (countryCode: string): string => {
+    const flagMap: Record<string, string> = {
+      'GB': '🇬🇧',
+      'UK': '🇬🇧',
+      'United Kingdom': '🇬🇧',
+      'US': '🇺🇸',
+      'USA': '🇺🇸',
+      'United States': '🇺🇸',
+      'DE': '🇩🇪',
+      'Germany': '🇩🇪',
+      'FR': '🇫🇷',
+      'France': '🇫🇷',
+      'ES': '🇪🇸',
+      'Spain': '🇪🇸',
+      'IT': '🇮🇹',
+      'Italy': '🇮🇹',
+      'NL': '🇳🇱',
+      'Netherlands': '🇳🇱',
+      'IE': '🇮🇪',
+      'Ireland': '🇮🇪',
+    };
+    return flagMap[countryCode] || '🏢';
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Manage Facilities</h1>
-          <p className="text-muted-foreground mt-2">
-            Track emissions from your operational facilities
+          <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            Operations
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Manage your facilities and track utility meter readings
           </p>
         </div>
         <Button onClick={() => setWizardOpen(true)} size="lg" className="gap-2">
@@ -126,7 +114,7 @@ export default function FacilitiesPage() {
             <Building2 className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">Connect Your Operations</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              To ensure accuracy, Scope 1 & 2 emissions are calculated automatically from your facility utility data. Add your facilities to generate reports.
+              Add your facilities and track utility meter readings to automatically calculate operational emissions
             </p>
             <Button onClick={() => setWizardOpen(true)} size="lg" className="gap-2">
               <Plus className="h-5 w-5" />
@@ -135,96 +123,72 @@ export default function FacilitiesPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Facility Name</TableHead>
-                <TableHead>Functions</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Control</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {facilities.map((facility) => (
-                <TableRow key={facility.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/company/facilities/${facility.id}`)}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      {facility.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {facility.functions && facility.functions.length > 0 ? (
-                        facility.functions.slice(0, 2).map((func: string) => (
-                          <Badge key={func} variant="secondary" className="text-xs">
-                            {func}
-                          </Badge>
-                        ))
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {facilities.map((facility) => (
+            <Card
+              key={facility.id}
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => router.push(`/operations/${facility.id}`)}
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{facility.name}</CardTitle>
+                    <CardDescription className="mt-1">
+                      {facility.address_city && facility.address_country ? (
+                        <span className="flex items-center gap-1 text-sm">
+                          <MapPin className="h-3 w-3" />
+                          {facility.address_city}, {facility.address_country}
+                        </span>
                       ) : (
-                        <span className="text-muted-foreground italic text-sm">No functions</span>
+                        <span className="text-muted-foreground italic text-sm">Location not specified</span>
                       )}
-                      {facility.functions && facility.functions.length > 2 && (
+                    </CardDescription>
+                  </div>
+                  <Badge
+                    variant="secondary"
+                    className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                  >
+                    Active
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center py-8">
+                    <span className="text-6xl">
+                      {getCountryFlag(facility.address_country)}
+                    </span>
+                  </div>
+
+                  {facility.functions && facility.functions.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {facility.functions.slice(0, 3).map((func: string) => (
+                        <Badge key={func} variant="outline" className="text-xs">
+                          {func}
+                        </Badge>
+                      ))}
+                      {facility.functions.length > 3 && (
                         <Badge variant="outline" className="text-xs">
-                          +{facility.functions.length - 2}
+                          +{facility.functions.length - 3}
                         </Badge>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-sm">
-                      {facility.address_city && facility.address_country ? (
-                        <>
-                          <MapPin className="h-3 w-3 text-muted-foreground" />
-                          {facility.address_city}, {facility.address_country}
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground italic">Not specified</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={facility.operational_control === 'owned' ? 'default' : 'secondary'}
-                      className={facility.operational_control === 'owned' ? 'bg-green-600' : 'bg-blue-600'}
-                    >
-                      {facility.operational_control === 'owned' ? 'Owned' : 'Third-Party'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {formatDate(facility.created_at)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/company/facilities/${facility.id}`);
-                        }}
-                      >
-                        <Zap className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteFacility(facility.id, facility.name);
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  )}
+
+                  <Button
+                    className="w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/operations/${facility.id}`);
+                    }}
+                  >
+                    View Dashboard
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
