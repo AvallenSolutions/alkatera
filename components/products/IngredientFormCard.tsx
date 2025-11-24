@@ -17,6 +17,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2, Building2, Database, Sprout, Info } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { COUNTRIES } from "@/lib/countries";
 import type { DataSource } from "@/lib/types/lca";
 
 export interface IngredientFormData {
@@ -195,12 +196,21 @@ export function IngredientFormCard({
 
           <div>
             <Label htmlFor={`origin-${ingredient.tempId}`}>Origin Country</Label>
-            <Input
-              id={`origin-${ingredient.tempId}`}
-              placeholder="e.g., Mauritius, France"
+            <Select
               value={ingredient.origin_country}
-              onChange={(e) => onUpdate(ingredient.tempId, { origin_country: e.target.value })}
-            />
+              onValueChange={(value) => onUpdate(ingredient.tempId, { origin_country: value })}
+            >
+              <SelectTrigger id={`origin-${ingredient.tempId}`}>
+                <SelectValue placeholder="Select country..." />
+              </SelectTrigger>
+              <SelectContent>
+                {COUNTRIES.map((country) => (
+                  <SelectItem key={country.value} value={country.label}>
+                    {country.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-muted-foreground mt-1">
               Country or region of origin
             </p>
