@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText } from "lucide-react";
+import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info } from "lucide-react";
 import { ProductHeader } from "@/components/products/ProductHeader";
+import { OverviewTab } from "@/components/products/OverviewTab";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
 import { ImpactReportsTab } from "@/components/products/ImpactReportsTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
@@ -24,7 +25,7 @@ export default function ProductDashboardPage() {
 
   const { product, ingredients, packaging, lcaReports, isHealthy, loading, error, refetch } = useProductData(productId);
 
-  const [activeTab, setActiveTab] = useState("specification");
+  const [activeTab, setActiveTab] = useState("overview");
   const [showEditDialog, setShowEditDialog] = useState(false);
 
   const handleCalculate = async () => {
@@ -140,7 +141,11 @@ export default function ProductDashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
+          <TabsList className="grid w-full grid-cols-4 max-w-3xl">
+            <TabsTrigger value="overview">
+              <Info className="mr-2 h-4 w-4" />
+              Overview
+            </TabsTrigger>
             <TabsTrigger value="specification">
               <FileBarChart className="mr-2 h-4 w-4" />
               Specification
@@ -154,6 +159,10 @@ export default function ProductDashboardPage() {
               Settings
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="overview" className="space-y-6">
+            <OverviewTab product={product} />
+          </TabsContent>
 
           <TabsContent value="specification" className="space-y-6">
             <SpecificationTab
