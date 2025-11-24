@@ -7,9 +7,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
-import { Plus, Package, AlertCircle } from "lucide-react";
+import { Plus, Package, AlertCircle, Trash2, MoreVertical } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 
 interface Product {
   id: string;
@@ -27,6 +44,9 @@ export default function ProductsPage() {
   const { currentOrganization } = useOrganization();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -83,6 +103,38 @@ export default function ProductsPage() {
     );
   };
 
+  const handleDeleteClick = (product: Product, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+
+    setIsDeleting(true);
+
+    try {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", productToDelete.id);
+
+      if (error) throw error;
+
+      toast.success(`Product "${productToDelete.name}" deleted successfully`);
+      await fetchProducts();
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
+    } catch (error: any) {
+      console.error("Error deleting product:", error);
+      toast.error(error.message || "Failed to delete product");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return <PageLoader message="Loading products..." />;
   }
@@ -118,8 +170,31 @@ export default function ProductsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => (
-            <Link key={product.id} href={`/products/${product.id}`}>
-              <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
+            <Card key={product.id} className="h-full hover:shadow-lg transition-shadow relative group">
+              <div className="absolute top-4 right-4 z-10">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 shadow-sm"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-red-600 focus:text-red-600"
+                      onClick={(e) => handleDeleteClick(product, e)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Product
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <Link href={`/products/${product.id}`}>
                 <CardHeader>
                   {product.product_image_url ? (
                     <div className="mb-4 aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
@@ -156,11 +231,32 @@ export default function ProductsPage() {
                     Created {formatDate(product.created_at)}
                   </div>
                 </CardContent>
-              </Card>
-            </Link>
+              </Link>
+            </Card>
           ))}
         </div>
       )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone and will remove all associated data including materials, LCA results, and calculations.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? "Deleting..." : "Delete Product"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
