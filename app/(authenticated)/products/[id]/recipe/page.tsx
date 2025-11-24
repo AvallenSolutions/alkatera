@@ -15,10 +15,19 @@ import {
   Leaf,
   Box,
   Info,
+  Trash2,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
+import { UnifiedLcaDataCapture, type IngredientData } from "@/components/lca/UnifiedLcaDataCapture";
 
 interface Product {
   id: string;
@@ -26,20 +35,22 @@ interface Product {
   sku: string | null;
   product_description: string | null;
   product_image_url: string | null;
-  functional_unit_type: string | null;
-  functional_unit_volume: number | null;
-  functional_unit_measure: string | null;
+  functional_unit: string | null;
+  unit_size_value: number | null;
+  unit_size_unit: string | null;
 }
 
 interface RecipeItem {
   id: string;
   material_name: string;
   quantity: number;
-  unit: string;
-  data_source: string;
-  supplier_name?: string;
-  transport_mode?: string;
-  transport_distance?: number;
+  unit: string | null;
+  material_type: string | null;
+  data_source: string | null;
+  supplier_product_id?: string | null;
+  origin_country?: string | null;
+  is_organic_certified?: boolean;
+  notes?: string | null;
 }
 
 export default function ProductRecipePage() {
@@ -53,6 +64,10 @@ export default function ProductRecipePage() {
   const [packaging, setPackaging] = useState<RecipeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<"ingredient" | "packaging">("ingredient");
+  const [modalData, setModalData] = useState<IngredientData[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (productId && currentOrganization?.id) {
@@ -79,8 +94,8 @@ export default function ProductRecipePage() {
 
       if (materialsError) throw materialsError;
 
-      const ingredientItems = materialsData?.filter(m => m.material_category === 'ingredient') || [];
-      const packagingItems = materialsData?.filter(m => m.material_category === 'packaging') || [];
+      const ingredientItems = materialsData?.filter(m => m.material_type === 'ingredient') || [];
+      const packagingItems = materialsData?.filter(m => m.material_type === 'packaging') || [];
 
       setIngredients(ingredientItems);
       setPackaging(packagingItems);
@@ -89,6 +104,77 @@ export default function ProductRecipePage() {
       toast.error("Failed to load product data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenModal = (type: "ingredient" | "packaging") => {
+    setModalType(type);
+    setModalData([]);
+    setIsModalOpen(true);
+  };
+
+  const handleDataChange = (ingredients: IngredientData[]) => {
+    setModalData(ingredients);
+  };
+
+  const handleSaveModal = async () => {
+    try {
+      setIsSaving(true);
+
+      const invalidItems = modalData.filter(
+        (item) => !item.name.trim() || item.weight_kg <= 0
+      );
+
+      if (invalidItems.length > 0) {
+        toast.error(`Please complete all ${modalType} names and weights`);
+        return;
+      }
+
+      // Transform the modal data to match product_materials schema
+      const materialsToInsert = modalData.map((item) => ({
+        product_id: parseInt(productId),
+        material_name: item.name,
+        quantity: item.weight_kg,
+        unit: "kg",
+        material_type: modalType,
+        data_source: "manual",
+        origin_country: null,
+        is_organic_certified: false,
+        notes: null,
+      }));
+
+      const { error: insertError } = await supabase
+        .from("product_materials")
+        .insert(materialsToInsert);
+
+      if (insertError) throw insertError;
+
+      toast.success(`Added ${modalData.length} ${modalType}${modalData.length > 1 ? 's' : ''}`);
+      setIsModalOpen(false);
+      setModalData([]);
+      await fetchProductData();
+    } catch (err: any) {
+      console.error("Error saving materials:", err);
+      toast.error(err.message || "Failed to save");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteMaterial = async (materialId: string) => {
+    try {
+      const { error } = await supabase
+        .from("product_materials")
+        .delete()
+        .eq("id", materialId);
+
+      if (error) throw error;
+
+      toast.success("Material deleted");
+      await fetchProductData();
+    } catch (err: any) {
+      console.error("Error deleting material:", err);
+      toast.error("Failed to delete material");
     }
   };
 
@@ -110,8 +196,11 @@ export default function ProductRecipePage() {
   }
 
   const formatFunctionalUnit = () => {
-    if (!product.functional_unit_type) return "Not specified";
-    return `${product.functional_unit_volume || "?"} ${product.functional_unit_measure || ""} ${product.functional_unit_type}`;
+    if (product.functional_unit) return product.functional_unit;
+    if (product.unit_size_value && product.unit_size_unit) {
+      return `${product.unit_size_value} ${product.unit_size_unit}`;
+    }
+    return "Not specified";
   };
 
   const getCompletenessPercentage = () => {
@@ -259,7 +348,7 @@ export default function ProductRecipePage() {
                   <CardTitle>Ingredients</CardTitle>
                   <CardDescription>Raw materials and components</CardDescription>
                 </div>
-                <Button>
+                <Button onClick={() => handleOpenModal("ingredient")}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Ingredient
                 </Button>
@@ -273,7 +362,7 @@ export default function ProductRecipePage() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Start building your recipe by adding ingredients from suppliers or the global database
                   </p>
-                  <Button>
+                  <Button onClick={() => handleOpenModal("ingredient")}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Your First Ingredient
                   </Button>
@@ -282,19 +371,33 @@ export default function ProductRecipePage() {
                 <div className="space-y-2">
                   {ingredients.map((item) => (
                     <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium">{item.material_name}</p>
-                        {item.supplier_name && (
-                          <p className="text-sm text-muted-foreground">
-                            Supplier: {item.supplier_name}
-                          </p>
+                        {item.data_source && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {item.data_source}
+                            </Badge>
+                            {item.origin_country && (
+                              <span className="text-xs text-muted-foreground">
+                                {item.origin_country}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">{item.quantity} {item.unit}</p>
-                        <Badge variant="outline" className="text-xs">
-                          {item.data_source}
-                        </Badge>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-medium">{item.quantity} {item.unit || 'kg'}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteMaterial(item.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -312,7 +415,7 @@ export default function ProductRecipePage() {
                   <CardTitle>Packaging</CardTitle>
                   <CardDescription>Containers and materials</CardDescription>
                 </div>
-                <Button>
+                <Button onClick={() => handleOpenModal("packaging")}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Packaging
                 </Button>
@@ -326,7 +429,7 @@ export default function ProductRecipePage() {
                   <p className="text-sm text-muted-foreground mb-4">
                     Define your packaging materials and components
                   </p>
-                  <Button>
+                  <Button onClick={() => handleOpenModal("packaging")}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Your First Packaging Item
                   </Button>
@@ -335,19 +438,33 @@ export default function ProductRecipePage() {
                 <div className="space-y-2">
                   {packaging.map((item) => (
                     <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium">{item.material_name}</p>
-                        {item.supplier_name && (
-                          <p className="text-sm text-muted-foreground">
-                            Supplier: {item.supplier_name}
-                          </p>
+                        {item.data_source && (
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {item.data_source}
+                            </Badge>
+                            {item.origin_country && (
+                              <span className="text-xs text-muted-foreground">
+                                {item.origin_country}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium">{item.quantity} {item.unit}</p>
-                        <Badge variant="outline" className="text-xs">
-                          {item.data_source}
-                        </Badge>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="font-medium">{item.quantity} {item.unit || 'kg'}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteMaterial(item.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -357,6 +474,36 @@ export default function ProductRecipePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Add {modalType === "ingredient" ? "Ingredients" : "Packaging Materials"}
+            </DialogTitle>
+            <DialogDescription>
+              Enter component details and environmental impact metrics
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <UnifiedLcaDataCapture
+              initialIngredients={modalData}
+              onDataChange={handleDataChange}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveModal}
+              disabled={modalData.length === 0 || isSaving}
+            >
+              {isSaving ? "Saving..." : `Save ${modalType === "ingredient" ? "Ingredients" : "Packaging"}`}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
