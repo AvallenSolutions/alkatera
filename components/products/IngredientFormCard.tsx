@@ -118,7 +118,7 @@ export function IngredientFormCard({
                 Ingredient {index + 1}
               </h3>
               <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-                Environmental data automatically calculated via OpenLCA ecoinvent database
+                Use smart search to find ingredients with environmental data
               </p>
             </div>
           </div>
@@ -141,12 +141,12 @@ export function IngredientFormCard({
             </Label>
             <InlineIngredientSearch
               organizationId={organizationId}
-              placeholder="Type to search OpenLCA database..."
+              placeholder="Search for ingredients..."
               onSelect={handleSearchSelect}
               value={ingredient.name}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Type to search 1,400+ ingredients from the OpenLCA ecoinvent database
+              Search by ingredient name to find matches from your supplier network or global database
             </p>
           </div>
 
@@ -267,7 +267,7 @@ export function IngredientFormCard({
             <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <Info className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>ISO-Compliant OpenLCA Integration:</strong> Environmental impact calculations are automated using the ecoinvent LCI database. Select from Supplier Network to use verified supplier LCA data instead.
+                <strong>Note:</strong> This ingredient uses secondary data from the global database. For more accurate results, consider using supplier-specific data from your network.
               </AlertDescription>
             </Alert>
           )}

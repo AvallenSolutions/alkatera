@@ -452,7 +452,7 @@ export default function ProductRecipePage() {
                 <div className="flex-1">
                   <CardTitle>Recipe & Ingredients</CardTitle>
                   <CardDescription>
-                    Select ingredients from our OpenLCA database for automated environmental impact calculations
+                    Build your product recipe with environmental impact data
                   </CardDescription>
                 </div>
               </div>
@@ -461,9 +461,13 @@ export default function ProductRecipePage() {
               <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
                 <Sparkles className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-sm text-green-800 dark:text-green-200">
-                  <strong>Automated Environmental Data</strong>
+                  <strong>How to Complete This Form</strong>
                   <br />
-                  Ingredients selected below will automatically use OpenLCA ecoinvent database for scientifically validated environmental impact calculations including water footprint, carbon emissions, and land use.
+                  1. Use the smart search bar to find ingredients from your supplier network (primary data) or the global database (secondary data)
+                  <br />
+                  2. Enter the quantity used per product unit
+                  <br />
+                  3. Specify the distance from your ingredient source to your processing site for accurate transport calculations
                 </AlertDescription>
               </Alert>
 
@@ -513,7 +517,7 @@ export default function ProductRecipePage() {
                 <div className="flex-1">
                   <CardTitle>Packaging Materials</CardTitle>
                   <CardDescription>
-                    Select packaging from our OpenLCA database for automated environmental impact calculations
+                    Define your packaging materials with environmental impact data
                   </CardDescription>
                 </div>
               </div>
@@ -522,9 +526,13 @@ export default function ProductRecipePage() {
               <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
                 <Sparkles className="h-4 w-4 text-green-600" />
                 <AlertDescription className="text-sm text-green-800 dark:text-green-200">
-                  <strong>Automated Environmental Data</strong>
+                  <strong>How to Complete This Form</strong>
                   <br />
-                  Packaging materials selected below will automatically use OpenLCA ecoinvent database for scientifically validated environmental impact calculations including carbon footprint and recyclability metrics.
+                  1. Select the packaging category (Container, Label, Closure, or Secondary)
+                  <br />
+                  2. Use the smart search bar to find materials from your supplier network or the global database
+                  <br />
+                  3. Enter the quantity and specify transport distance for accurate calculations
                 </AlertDescription>
               </Alert>
 

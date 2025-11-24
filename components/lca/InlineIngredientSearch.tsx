@@ -63,7 +63,7 @@ function debounce<T extends (...args: any[]) => any>(
 
 export function InlineIngredientSearch({
   organizationId,
-  placeholder = "Type to search OpenLCA database...",
+  placeholder = "Search for ingredients...",
   onSelect,
   disabled = false,
   value = "",
@@ -253,7 +253,7 @@ export function InlineIngredientSearch({
               <>
                 <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-2 bg-grey-50 dark:bg-grey-950">
                   <Database className="h-3 w-3 text-grey-600" />
-                  OpenLCA Database ({searchResults.database.length})
+                  Global Database ({searchResults.database.length})
                 </div>
                 <CommandGroup>
                   {searchResults.database.slice(0, 5).map((process) => (
