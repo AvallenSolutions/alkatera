@@ -8,21 +8,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   ArrowLeft,
   Leaf,
   Box,
   Info,
-  Trash2,
-  Building2,
-  Database,
-  Sprout,
+  Plus,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
-import { AssistedIngredientSearch } from "@/components/lca/AssistedIngredientSearch";
-import { AssistedPackagingSearch } from "@/components/lca/AssistedPackagingSearch";
+import { IngredientFormCard, IngredientFormData } from "@/components/products/IngredientFormCard";
+import { PackagingFormCard, PackagingFormData } from "@/components/products/PackagingFormCard";
 
 interface Product {
   id: string;
@@ -35,22 +34,6 @@ interface Product {
   unit_size_unit: string | null;
 }
 
-interface RecipeItem {
-  id: string;
-  material_name: string;
-  quantity: number;
-  unit: string | null;
-  material_type: string | null;
-  data_source: string | null;
-  supplier_product_id?: string | null;
-  supplier_name?: string | null;
-  carbon_intensity?: number | null;
-  origin_country?: string | null;
-  is_organic_certified?: boolean;
-  packaging_category?: string | null;
-  notes?: string | null;
-}
-
 export default function ProductRecipePage() {
   const router = useRouter();
   const params = useParams();
@@ -58,16 +41,41 @@ export default function ProductRecipePage() {
   const { currentOrganization } = useOrganization();
 
   const [product, setProduct] = useState<Product | null>(null);
-  const [ingredients, setIngredients] = useState<RecipeItem[]>([]);
-  const [packaging, setPackaging] = useState<RecipeItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const [subStages, setSubStages] = useState<any[]>([]);
+
+  const [ingredientForms, setIngredientForms] = useState<IngredientFormData[]>([
+    {
+      tempId: `temp-${Date.now()}`,
+      name: '',
+      data_source: null,
+      amount: '',
+      unit: 'kg',
+      origin_country: '',
+      is_organic_certified: false,
+      transport_mode: 'truck',
+      distance_km: '',
+    }
+  ]);
+
+  const [packagingForms, setPackagingForms] = useState<PackagingFormData[]>([
+    {
+      tempId: `temp-pkg-${Date.now()}`,
+      name: '',
+      data_source: null,
+      amount: '',
+      unit: 'kg',
+      packaging_category: null,
+      label_printing_type: '',
+      transport_mode: 'truck',
+      distance_km: '',
+    }
+  ]);
 
   useEffect(() => {
     if (productId && currentOrganization?.id) {
       fetchProductData();
-      fetchSubStages();
     }
   }, [productId, currentOrganization?.id]);
 
@@ -80,7 +88,6 @@ export default function ProductRecipePage() {
         .single();
 
       if (productError) throw productError;
-
       setProduct(productData);
 
       const { data: materialsData, error: materialsError } = await supabase
@@ -94,8 +101,41 @@ export default function ProductRecipePage() {
       const ingredientItems = materialsData?.filter(m => m.material_type === 'ingredient') || [];
       const packagingItems = materialsData?.filter(m => m.material_type === 'packaging') || [];
 
-      setIngredients(ingredientItems);
-      setPackaging(packagingItems);
+      if (ingredientItems.length > 0) {
+        setIngredientForms(ingredientItems.map(item => ({
+          tempId: item.id,
+          name: item.material_name,
+          data_source: item.data_source as any,
+          data_source_id: item.data_source_id,
+          supplier_product_id: item.supplier_product_id,
+          supplier_name: item.supplier_name,
+          amount: item.quantity,
+          unit: item.unit || 'kg',
+          origin_country: item.origin_country || '',
+          is_organic_certified: item.is_organic_certified || false,
+          transport_mode: 'truck',
+          distance_km: '',
+          carbon_intensity: item.carbon_intensity,
+        })));
+      }
+
+      if (packagingItems.length > 0) {
+        setPackagingForms(packagingItems.map(item => ({
+          tempId: item.id,
+          name: item.material_name,
+          data_source: item.data_source as any,
+          data_source_id: item.data_source_id,
+          supplier_product_id: item.supplier_product_id,
+          supplier_name: item.supplier_name,
+          amount: item.quantity,
+          unit: item.unit || 'kg',
+          packaging_category: item.packaging_category as any,
+          label_printing_type: item.label_printing_type || '',
+          transport_mode: 'truck',
+          distance_km: '',
+          carbon_intensity: item.carbon_intensity,
+        })));
+      }
     } catch (error: any) {
       console.error("Error fetching product data:", error);
       toast.error("Failed to load product data");
@@ -104,152 +144,157 @@ export default function ProductRecipePage() {
     }
   };
 
-  const fetchSubStages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("lca_sub_stages")
-        .select("*")
-        .order("display_order", { ascending: true });
+  const updateIngredient = (tempId: string, updates: Partial<IngredientFormData>) => {
+    setIngredientForms(prev =>
+      prev.map(form => form.tempId === tempId ? { ...form, ...updates } : form)
+    );
+  };
 
-      if (error) throw error;
-      setSubStages(data || []);
-    } catch (error: any) {
-      console.error("Error fetching sub-stages:", error);
+  const removeIngredient = (tempId: string) => {
+    if (ingredientForms.length > 1) {
+      setIngredientForms(prev => prev.filter(form => form.tempId !== tempId));
     }
   };
 
-  const handleIngredientConfirmed = async (ingredient: {
-    name: string;
-    data_source: 'openlca' | 'supplier' | 'primary';
-    data_source_id?: string;
-    supplier_product_id?: string;
-    supplier_name?: string;
-    unit?: string;
-    carbon_intensity?: number;
-    quantity?: number;
-    lca_sub_stage_id?: string | null;
-    origin_country?: string;
-    is_organic_certified?: boolean;
-  }) => {
+  const addIngredient = () => {
+    setIngredientForms(prev => [
+      ...prev,
+      {
+        tempId: `temp-${Date.now()}`,
+        name: '',
+        data_source: null,
+        amount: '',
+        unit: 'kg',
+        origin_country: '',
+        is_organic_certified: false,
+        transport_mode: 'truck',
+        distance_km: '',
+      }
+    ]);
+  };
+
+  const updatePackaging = (tempId: string, updates: Partial<PackagingFormData>) => {
+    setPackagingForms(prev =>
+      prev.map(form => form.tempId === tempId ? { ...form, ...updates } : form)
+    );
+  };
+
+  const removePackaging = (tempId: string) => {
+    if (packagingForms.length > 1) {
+      setPackagingForms(prev => prev.filter(form => form.tempId !== tempId));
+    }
+  };
+
+  const addPackaging = () => {
+    setPackagingForms(prev => [
+      ...prev,
+      {
+        tempId: `temp-pkg-${Date.now()}`,
+        name: '',
+        data_source: null,
+        amount: '',
+        unit: 'kg',
+        packaging_category: null,
+        label_printing_type: '',
+        transport_mode: 'truck',
+        distance_km: '',
+      }
+    ]);
+  };
+
+  const saveIngredients = async () => {
+    const validForms = ingredientForms.filter(f => f.name && f.amount && Number(f.amount) > 0);
+
+    if (validForms.length === 0) {
+      toast.error("Please add at least one valid ingredient");
+      return;
+    }
+
+    setSaving(true);
     try {
-      const materialData = {
+      await supabase
+        .from("product_materials")
+        .delete()
+        .eq("product_id", productId)
+        .eq("material_type", "ingredient");
+
+      const materialsToInsert = validForms.map(form => ({
         product_id: parseInt(productId),
-        material_name: ingredient.name,
-        quantity: ingredient.quantity || 0,
-        unit: ingredient.unit || 'kg',
+        material_name: form.name,
+        quantity: Number(form.amount),
+        unit: form.unit,
         material_type: 'ingredient',
-        data_source: ingredient.data_source,
-        data_source_id: ingredient.data_source_id || null,
-        supplier_product_id: ingredient.supplier_product_id || null,
-        supplier_name: ingredient.supplier_name || null,
-        carbon_intensity: ingredient.carbon_intensity || null,
-        lca_sub_stage_id: ingredient.lca_sub_stage_id || null,
-        origin_country: ingredient.origin_country || null,
-        is_organic_certified: ingredient.is_organic_certified || false,
-      };
+        data_source: form.data_source,
+        data_source_id: form.data_source_id || null,
+        supplier_product_id: form.supplier_product_id || null,
+        supplier_name: form.supplier_name || null,
+        carbon_intensity: form.carbon_intensity || null,
+        origin_country: form.origin_country || null,
+        is_organic_certified: form.is_organic_certified,
+      }));
 
       const { error } = await supabase
         .from("product_materials")
-        .insert(materialData);
+        .insert(materialsToInsert);
 
       if (error) throw error;
 
-      toast.success("Ingredient added successfully");
+      toast.success("Ingredients saved successfully");
       await fetchProductData();
     } catch (error: any) {
-      console.error("Error saving ingredient:", error);
-      toast.error("Failed to save ingredient");
+      console.error("Error saving ingredients:", error);
+      toast.error("Failed to save ingredients");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handlePackagingConfirmed = async (packaging: {
-    name: string;
-    data_source: 'openlca' | 'supplier' | 'primary';
-    data_source_id?: string;
-    supplier_product_id?: string;
-    supplier_name?: string;
-    unit?: string;
-    carbon_intensity?: number;
-    quantity?: number;
-    lca_sub_stage_id?: string | null;
-    origin_country?: string;
-    is_organic_certified?: boolean;
-    packaging_category: string;
-    label_printing_type?: string;
-  }) => {
+  const savePackaging = async () => {
+    const validForms = packagingForms.filter(
+      f => f.name && f.amount && Number(f.amount) > 0 && f.packaging_category
+    );
+
+    if (validForms.length === 0) {
+      toast.error("Please add at least one valid packaging item");
+      return;
+    }
+
+    setSaving(true);
     try {
-      const materialData = {
+      await supabase
+        .from("product_materials")
+        .delete()
+        .eq("product_id", productId)
+        .eq("material_type", "packaging");
+
+      const materialsToInsert = validForms.map(form => ({
         product_id: parseInt(productId),
-        material_name: packaging.name,
-        quantity: packaging.quantity || 0,
-        unit: packaging.unit || 'kg',
+        material_name: form.name,
+        quantity: Number(form.amount),
+        unit: form.unit,
         material_type: 'packaging',
-        data_source: packaging.data_source,
-        data_source_id: packaging.data_source_id || null,
-        supplier_product_id: packaging.supplier_product_id || null,
-        supplier_name: packaging.supplier_name || null,
-        carbon_intensity: packaging.carbon_intensity || null,
-        lca_sub_stage_id: packaging.lca_sub_stage_id || null,
-        packaging_category: packaging.packaging_category,
-        label_printing_type: packaging.label_printing_type || null,
-        origin_country: packaging.origin_country || null,
-        is_organic_certified: packaging.is_organic_certified || false,
-      };
+        data_source: form.data_source,
+        data_source_id: form.data_source_id || null,
+        supplier_product_id: form.supplier_product_id || null,
+        supplier_name: form.supplier_name || null,
+        carbon_intensity: form.carbon_intensity || null,
+        packaging_category: form.packaging_category,
+        label_printing_type: form.label_printing_type || null,
+      }));
 
       const { error } = await supabase
         .from("product_materials")
-        .insert(materialData);
+        .insert(materialsToInsert);
 
       if (error) throw error;
 
-      toast.success("Packaging added successfully");
+      toast.success("Packaging saved successfully");
       await fetchProductData();
     } catch (error: any) {
       console.error("Error saving packaging:", error);
       toast.error("Failed to save packaging");
-    }
-  };
-
-  const handleDeleteMaterial = async (materialId: string) => {
-    try {
-      const { error } = await supabase
-        .from("product_materials")
-        .delete()
-        .eq("id", materialId);
-
-      if (error) throw error;
-
-      toast.success("Material deleted");
-      await fetchProductData();
-    } catch (err: any) {
-      console.error("Error deleting material:", err);
-      toast.error("Failed to delete material");
-    }
-  };
-
-  const getDataSourceIcon = (source: string | null) => {
-    switch (source) {
-      case 'supplier':
-        return <Building2 className="h-3 w-3" />;
-      case 'openlca':
-        return <Database className="h-3 w-3" />;
-      case 'primary':
-        return <Sprout className="h-3 w-3" />;
-      default:
-        return null;
-    }
-  };
-
-  const getDataSourceBadge = (source: string | null) => {
-    switch (source) {
-      case 'supplier':
-        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 text-xs">Supplier</Badge>;
-      case 'openlca':
-        return <Badge className="bg-grey-100 text-grey-800 dark:bg-grey-800 dark:text-grey-100 text-xs">OpenLCA</Badge>;
-      case 'primary':
-        return <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 text-xs">Primary</Badge>;
-      default:
-        return <Badge variant="outline" className="text-xs">Manual</Badge>;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -278,16 +323,9 @@ export default function ProductRecipePage() {
     return "Not specified";
   };
 
-  const getCompletenessPercentage = () => {
-    const hasIngredients = ingredients.length > 0;
-    const hasPackaging = packaging.length > 0;
-
-    if (hasIngredients && hasPackaging) return 100;
-    if (hasIngredients || hasPackaging) return 50;
-    return 0;
-  };
-
-  const completenessPercent = getCompletenessPercentage();
+  const ingredientCount = ingredientForms.filter(f => f.name && f.amount).length;
+  const packagingCount = packagingForms.filter(f => f.name && f.amount && f.packaging_category).length;
+  const totalItems = ingredientCount + packagingCount;
 
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
@@ -313,22 +351,11 @@ export default function ProductRecipePage() {
               <CardTitle>Recipe Completeness</CardTitle>
               <CardDescription>Track your bill of materials progress</CardDescription>
             </div>
-            <Badge
-              variant={completenessPercent === 100 ? "default" : "secondary"}
-              className={completenessPercent === 100 ? "bg-green-600" : "bg-amber-600"}
-            >
-              {completenessPercent}% Complete
+            <Badge variant={totalItems > 0 ? "default" : "secondary"} className="bg-green-600">
+              {totalItems} {totalItems === 1 ? 'Item' : 'Items'} Added
             </Badge>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-            <div
-              className="bg-green-600 h-2 rounded-full transition-all"
-              style={{ width: `${completenessPercent}%` }}
-            />
-          </div>
-        </CardContent>
       </Card>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -401,7 +428,7 @@ export default function ProductRecipePage() {
                   <p className="font-medium">Ingredients</p>
                   <p className="text-sm text-muted-foreground">Raw materials and components</p>
                 </div>
-                <Badge variant="outline">{ingredients.length} items</Badge>
+                <Badge variant="outline">{ingredientCount} items</Badge>
               </div>
 
               <div className="flex justify-between items-center p-3 border rounded-lg">
@@ -409,147 +436,130 @@ export default function ProductRecipePage() {
                   <p className="font-medium">Packaging</p>
                   <p className="text-sm text-muted-foreground">Containers and materials</p>
                 </div>
-                <Badge variant="outline">{packaging.length} items</Badge>
+                <Badge variant="outline">{packagingCount} items</Badge>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="ingredients" className="space-y-4">
-          <Card>
+          <Card className="border-l-4 border-l-green-500">
             <CardHeader>
-              <CardTitle>Ingredients</CardTitle>
-              <CardDescription>
-                Search from suppliers, OpenLCA database, or add custom ingredients
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {currentOrganization?.id && (
-                <AssistedIngredientSearch
-                  lcaId=""
-                  organizationId={currentOrganization.id}
-                  subStages={subStages}
-                  onIngredientConfirmed={handleIngredientConfirmed}
-                />
-              )}
-
-              {ingredients.length > 0 && (
-                <div className="space-y-2 pt-4 border-t">
-                  <h4 className="font-medium text-sm text-muted-foreground mb-3">Added Ingredients ({ingredients.length})</h4>
-                  {ingredients.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                      <div className="flex-1 flex items-center gap-3">
-                        {getDataSourceIcon(item.data_source)}
-                        <div className="flex-1">
-                          <p className="font-medium">{item.material_name}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {getDataSourceBadge(item.data_source)}
-                            {item.supplier_name && (
-                              <span className="text-xs text-muted-foreground">
-                                {item.supplier_name}
-                              </span>
-                            )}
-                            {item.carbon_intensity && (
-                              <span className="text-xs text-muted-foreground">
-                                • {item.carbon_intensity.toFixed(2)} kg CO₂e/{item.unit}
-                              </span>
-                            )}
-                            {item.origin_country && (
-                              <span className="text-xs text-muted-foreground">
-                                • {item.origin_country}
-                              </span>
-                            )}
-                            {item.is_organic_certified && (
-                              <Badge variant="outline" className="text-xs">Organic</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-medium">{item.quantity} {item.unit || 'kg'}</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteMaterial(item.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Leaf className="h-5 w-5 text-white" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <CardTitle>Recipe & Ingredients</CardTitle>
+                  <CardDescription>
+                    Select ingredients from our OpenLCA database for automated environmental impact calculations
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                <Sparkles className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-sm text-green-800 dark:text-green-200">
+                  <strong>Automated Environmental Data</strong>
+                  <br />
+                  Ingredients selected below will automatically use OpenLCA ecoinvent database for scientifically validated environmental impact calculations including water footprint, carbon emissions, and land use.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-4">
+                {ingredientForms.map((ingredient, index) => (
+                  <IngredientFormCard
+                    key={ingredient.tempId}
+                    ingredient={ingredient}
+                    index={index}
+                    organizationId={currentOrganization?.id || ''}
+                    onUpdate={updateIngredient}
+                    onRemove={removeIngredient}
+                    canRemove={ingredientForms.length > 1}
+                  />
+                ))}
+              </div>
+
+              <Button
+                onClick={addIngredient}
+                variant="outline"
+                className="w-full border-dashed"
+                size="lg"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Ingredient ({ingredientCount}/{ingredientForms.length})
+              </Button>
+
+              <div className="flex gap-2 pt-4 border-t">
+                <Button onClick={saveIngredients} disabled={saving} className="flex-1">
+                  {saving ? 'Saving...' : 'Save Ingredients'}
+                </Button>
+                <Button variant="outline" onClick={fetchProductData} disabled={saving}>
+                  Cancel
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="packaging" className="space-y-4">
-          <Card>
+          <Card className="border-l-4 border-l-green-500">
             <CardHeader>
-              <CardTitle>Packaging</CardTitle>
-              <CardDescription>
-                Search from suppliers, OpenLCA database, or add custom packaging materials
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {currentOrganization?.id && (
-                <AssistedPackagingSearch
-                  lcaId=""
-                  organizationId={currentOrganization.id}
-                  subStages={subStages}
-                  onPackagingConfirmed={handlePackagingConfirmed}
-                />
-              )}
-
-              {packaging.length > 0 && (
-                <div className="space-y-2 pt-4 border-t">
-                  <h4 className="font-medium text-sm text-muted-foreground mb-3">Added Packaging ({packaging.length})</h4>
-                  {packaging.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors">
-                      <div className="flex-1 flex items-center gap-3">
-                        {getDataSourceIcon(item.data_source)}
-                        <div className="flex-1">
-                          <p className="font-medium">{item.material_name}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {getDataSourceBadge(item.data_source)}
-                            {item.packaging_category && (
-                              <Badge variant="secondary" className="text-xs capitalize">
-                                {item.packaging_category}
-                              </Badge>
-                            )}
-                            {item.supplier_name && (
-                              <span className="text-xs text-muted-foreground">
-                                {item.supplier_name}
-                              </span>
-                            )}
-                            {item.carbon_intensity && (
-                              <span className="text-xs text-muted-foreground">
-                                • {item.carbon_intensity.toFixed(2)} kg CO₂e/{item.unit}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="font-medium">{item.quantity} {item.unit || 'kg'}</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteMaterial(item.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 rounded-lg bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Box className="h-5 w-5 text-white" />
                 </div>
-              )}
+                <div className="flex-1">
+                  <CardTitle>Packaging Materials</CardTitle>
+                  <CardDescription>
+                    Select packaging from our OpenLCA database for automated environmental impact calculations
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                <Sparkles className="h-4 w-4 text-green-600" />
+                <AlertDescription className="text-sm text-green-800 dark:text-green-200">
+                  <strong>Automated Environmental Data</strong>
+                  <br />
+                  Packaging materials selected below will automatically use OpenLCA ecoinvent database for scientifically validated environmental impact calculations including carbon footprint and recyclability metrics.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-4">
+                {packagingForms.map((packaging, index) => (
+                  <PackagingFormCard
+                    key={packaging.tempId}
+                    packaging={packaging}
+                    index={index}
+                    organizationId={currentOrganization?.id || ''}
+                    onUpdate={updatePackaging}
+                    onRemove={removePackaging}
+                    canRemove={packagingForms.length > 1}
+                  />
+                ))}
+              </div>
+
+              <Button
+                onClick={addPackaging}
+                variant="outline"
+                className="w-full border-dashed"
+                size="lg"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Packaging ({packagingCount}/{packagingForms.length})
+              </Button>
+
+              <div className="flex gap-2 pt-4 border-t">
+                <Button onClick={savePackaging} disabled={saving} className="flex-1">
+                  {saving ? 'Saving...' : 'Save Packaging'}
+                </Button>
+                <Button variant="outline" onClick={fetchProductData} disabled={saving}>
+                  Cancel
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
