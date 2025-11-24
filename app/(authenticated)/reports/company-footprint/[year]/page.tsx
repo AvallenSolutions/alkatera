@@ -14,6 +14,9 @@ import { ProductsSupplyChainCard } from "@/components/reports/ProductsSupplyChai
 import { BusinessTravelCard } from "@/components/reports/BusinessTravelCard";
 import { ServicesOverheadCard } from "@/components/reports/ServicesOverheadCard";
 import { TeamCommutingCard } from "@/components/reports/TeamCommutingCard";
+import { CapitalGoodsCard } from "@/components/reports/CapitalGoodsCard";
+import { LogisticsDistributionCard } from "@/components/reports/LogisticsDistributionCard";
+import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard";
 import { toast } from "sonner";
 
 interface CorporateReport {
@@ -35,6 +38,12 @@ interface OverheadEntry {
   entry_date: string;
   computed_co2e: number;
   fte_count?: number;
+  asset_type?: string;
+  transport_mode?: string;
+  distance_km?: number;
+  weight_kg?: number;
+  material_type?: string;
+  disposal_method?: string;
 }
 
 export default function FootprintBuilderPage() {
@@ -244,6 +253,9 @@ export default function FootprintBuilderPage() {
   const serviceEntries = overheads.filter((o) => o.category === "purchased_services");
   const commutingEntry = overheads.find((o) => o.category === "employee_commuting");
   const fteCount = commutingEntry?.fte_count || 0;
+  const capitalGoodsEntries = overheads.filter((o) => o.category === "capital_goods") as any[];
+  const logisticsEntries = overheads.filter((o) => o.category === "downstream_logistics") as any[];
+  const wasteEntries = overheads.filter((o) => o.category === "operational_waste") as any[];
 
   const canGenerate = true; // Always allow generation
 
@@ -290,7 +302,7 @@ export default function FootprintBuilderPage() {
       </div>
 
       {/* Activity Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {/* Card 1: Operations & Energy */}
         <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
 
@@ -310,6 +322,27 @@ export default function FootprintBuilderPage() {
         {/* Card 5: Team & Commuting */}
         {report && (
           <TeamCommutingCard reportId={report.id} initialFteCount={fteCount} onUpdate={fetchReportData} />
+        )}
+
+        {/* Card 6: Capital Goods & Assets */}
+        {report && (
+          <CapitalGoodsCard reportId={report.id} entries={capitalGoodsEntries} onUpdate={fetchReportData} />
+        )}
+
+        {/* Card 7: Logistics & Distribution */}
+        {report && currentOrganization && (
+          <LogisticsDistributionCard
+            reportId={report.id}
+            organizationId={currentOrganization.id}
+            year={year}
+            entries={logisticsEntries}
+            onUpdate={fetchReportData}
+          />
+        )}
+
+        {/* Card 8: Operational Waste */}
+        {report && (
+          <OperationalWasteCard reportId={report.id} entries={wasteEntries} onUpdate={fetchReportData} />
         )}
       </div>
 
