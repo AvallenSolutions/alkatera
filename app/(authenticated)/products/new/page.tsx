@@ -25,6 +25,7 @@ import Link from "next/link";
 
 interface ProductFormData {
   name: string;
+  sku: string;
   product_description: string;
   functional_unit_type: string;
   functional_unit_volume: string;
@@ -55,6 +56,7 @@ export default function NewProductLCAPage() {
 
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
+    sku: "",
     product_description: "",
     functional_unit_type: "",
     functional_unit_volume: "",
@@ -62,6 +64,7 @@ export default function NewProductLCAPage() {
     system_boundary: "cradle_to_gate",
     product_image_url: "",
   });
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
 
   const handleInputChange = (field: keyof ProductFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -121,13 +124,23 @@ export default function NewProductLCAPage() {
     }
   };
 
-  const validateForm = (): boolean => {
+  const validateForm = (isDraft: boolean = false): boolean => {
     if (!formData.name.trim()) {
       toast.error("Product name is required");
       return false;
     }
 
-    if (formData.functional_unit_type && formData.functional_unit_volume) {
+    if (!isDraft) {
+      if (!formData.functional_unit_type) {
+        toast.error("Unit type is required");
+        return false;
+      }
+
+      if (!formData.functional_unit_volume) {
+        toast.error("Volume is required");
+        return false;
+      }
+
       const volume = parseFloat(formData.functional_unit_volume);
       if (isNaN(volume) || volume <= 0) {
         toast.error("Functional unit volume must be a positive number");
@@ -135,7 +148,7 @@ export default function NewProductLCAPage() {
       }
 
       if (!formData.functional_unit_measure) {
-        toast.error("Please select a measurement unit");
+        toast.error("Measurement unit is required");
         return false;
       }
     }
@@ -143,17 +156,21 @@ export default function NewProductLCAPage() {
     return true;
   };
 
-  const handleSubmit = async () => {
+  const saveProduct = async (isDraft: boolean = false) => {
     if (!currentOrganization?.id) {
       toast.error("No organization selected");
       return;
     }
 
-    if (!validateForm()) {
+    if (!validateForm(isDraft)) {
       return;
     }
 
-    setIsSubmitting(true);
+    if (isDraft) {
+      setIsSavingDraft(true);
+    } else {
+      setIsSubmitting(true);
+    }
 
     try {
       let imageUrl = formData.product_image_url;
@@ -174,10 +191,12 @@ export default function NewProductLCAPage() {
       const productData: any = {
         organization_id: currentOrganization.id,
         name: formData.name,
+        sku: formData.sku || null,
         product_description: formData.product_description || null,
         system_boundary: formData.system_boundary,
         product_image_url: imageUrl || null,
         created_by: user.id,
+        is_draft: isDraft,
       };
 
       if (formData.functional_unit_type) {
@@ -200,14 +219,30 @@ export default function NewProductLCAPage() {
 
       if (error) throw error;
 
-      toast.success("Product LCA definition created successfully");
-      router.push(`/products/detail?id=${data.id}`);
+      if (isDraft) {
+        toast.success("Product draft saved successfully");
+      } else {
+        toast.success("Product created successfully");
+      }
+      router.push(`/products/${data.id}`);
     } catch (error: any) {
       console.error("Error creating product:", error);
       toast.error(error.message || "Failed to create product");
     } finally {
-      setIsSubmitting(false);
+      if (isDraft) {
+        setIsSavingDraft(false);
+      } else {
+        setIsSubmitting(false);
+      }
     }
+  };
+
+  const handleSubmit = async () => {
+    await saveProduct(false);
+  };
+
+  const handleSaveDraft = async () => {
+    await saveProduct(true);
   };
 
   if (!currentOrganization) {
@@ -231,9 +266,9 @@ export default function NewProductLCAPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Define New Product LCA</h1>
+          <h1 className="text-3xl font-bold">Create New Product</h1>
           <p className="text-muted-foreground mt-1">
-            Create the foundational definition for your product's life cycle assessment
+            Define your product details and functional unit
           </p>
         </div>
       </div>
@@ -253,7 +288,18 @@ export default function NewProductLCAPage() {
               placeholder="e.g., Organic Orange Juice 500ml"
               value={formData.name}
               onChange={(e) => handleInputChange("name", e.target.value)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSavingDraft}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sku">SKU</Label>
+            <Input
+              id="sku"
+              placeholder="e.g., OOJ-500ML-001"
+              value={formData.sku}
+              onChange={(e) => handleInputChange("sku", e.target.value)}
+              disabled={isSubmitting || isSavingDraft}
             />
           </div>
 
@@ -264,7 +310,7 @@ export default function NewProductLCAPage() {
               placeholder="Provide a detailed description of the product, including key ingredients, materials, or characteristics..."
               value={formData.product_description}
               onChange={(e) => handleInputChange("product_description", e.target.value)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSavingDraft}
               rows={4}
             />
           </div>
@@ -287,7 +333,7 @@ export default function NewProductLCAPage() {
                       setUploadedImageUrl(null);
                       setImageFile(null);
                     }}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || isSavingDraft}
                   >
                     Remove Image
                   </Button>
@@ -310,7 +356,7 @@ export default function NewProductLCAPage() {
                       accept="image/*"
                       className="hidden"
                       onChange={handleImageSelect}
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isSavingDraft}
                     />
                     <p className="text-xs text-muted-foreground mt-2">
                       PNG, JPG up to 5MB
@@ -332,11 +378,11 @@ export default function NewProductLCAPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="unit-type">Unit Type</Label>
+            <Label htmlFor="unit-type">Unit Type *</Label>
             <Select
               value={formData.functional_unit_type}
               onValueChange={(value) => handleInputChange("functional_unit_type", value)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isSavingDraft}
             >
               <SelectTrigger id="unit-type">
                 <SelectValue placeholder="Select packaging type" />
@@ -353,7 +399,7 @@ export default function NewProductLCAPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="volume">Volume</Label>
+              <Label htmlFor="volume">Volume *</Label>
               <Input
                 id="volume"
                 type="number"
@@ -362,16 +408,16 @@ export default function NewProductLCAPage() {
                 placeholder="500"
                 value={formData.functional_unit_volume}
                 onChange={(e) => handleInputChange("functional_unit_volume", e.target.value)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSavingDraft}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="measure">Measurement Unit</Label>
+              <Label htmlFor="measure">Measurement Unit *</Label>
               <Select
                 value={formData.functional_unit_measure}
                 onValueChange={(value) => handleInputChange("functional_unit_measure", value)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSavingDraft}
               >
                 <SelectTrigger id="measure">
                   <SelectValue placeholder="Select unit" />
@@ -406,7 +452,7 @@ export default function NewProductLCAPage() {
             onValueChange={(value) =>
               handleInputChange("system_boundary", value as "cradle_to_gate" | "cradle_to_grave")
             }
-            disabled={isSubmitting}
+            disabled={isSubmitting || isSavingDraft}
           >
             <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4">
               <RadioGroupItem value="cradle_to_gate" id="cradle-to-gate" />
@@ -511,25 +557,44 @@ export default function NewProductLCAPage() {
         </>
       )}
 
-      <div className="flex items-center justify-end gap-4 pt-6 border-t">
+      <div className="flex items-center justify-between pt-6 border-t">
         <Link href="/products">
-          <Button variant="outline" disabled={isSubmitting}>
+          <Button variant="outline" disabled={isSubmitting || isSavingDraft}>
             Cancel
           </Button>
         </Link>
-        <Button onClick={handleSubmit} size="lg" disabled={isSubmitting || isUploading}>
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Creating...
-            </>
-          ) : (
-            <>
-              <Save className="mr-2 h-5 w-5" />
-              Create Product LCA
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={isSubmitting || isSavingDraft || isUploading}
+          >
+            {isSavingDraft ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving Draft...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save Draft
+              </>
+            )}
+          </Button>
+          <Button onClick={handleSubmit} size="lg" disabled={isSubmitting || isSavingDraft || isUploading}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-5 w-5" />
+                Create Product
+              </>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
