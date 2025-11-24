@@ -151,7 +151,7 @@ export default function ProductsPage() {
         <Link href="/products/new">
           <Button size="lg" className="gap-2">
             <Plus className="h-5 w-5" />
-            New Product LCA
+            Add New Product
           </Button>
         </Link>
       </div>
@@ -162,7 +162,7 @@ export default function ProductsPage() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No products found. Create your first product LCA to get started.
+                No products found. Create your first product to get started.
               </AlertDescription>
             </Alert>
           </CardContent>
