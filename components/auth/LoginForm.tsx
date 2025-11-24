@@ -52,6 +52,8 @@ export function LoginForm() {
 
     try {
       console.log('📧 LoginForm: Attempting sign-in for:', email)
+      console.log('🔗 Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+      console.log('🔑 Has anon key:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -64,6 +66,13 @@ export function LoginForm() {
           status: signInError.status,
           name: signInError.name,
         })
+
+        if (signInError.message === 'Failed to fetch') {
+          setError('Network error: Unable to connect to authentication server. Please check your internet connection and try again.')
+          setLoading(false)
+          return
+        }
+
         throw signInError
       }
 
