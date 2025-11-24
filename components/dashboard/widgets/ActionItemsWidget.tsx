@@ -8,27 +8,30 @@ export function ActionItemsWidget() {
   const placeholderItems = [
     {
       id: 1,
-      title: 'Complete organisation profile',
-      description: 'Add key details about your organisation to get started',
+      title: 'Set up your operations',
+      description: 'Add your facilities and utility meters to track operational data',
       priority: 'high' as const,
       status: 'pending' as const,
       dueDate: 'This week',
+      href: '/operations',
     },
     {
       id: 2,
-      title: 'Set emission reduction targets',
-      description: 'Define your sustainability goals and carbon reduction targets',
+      title: 'Create your first product',
+      description: 'Build product recipes using supplier data',
       priority: 'medium' as const,
       status: 'pending' as const,
       dueDate: 'Next week',
+      href: '/products',
     },
     {
       id: 3,
-      title: 'Review data collection procedures',
-      description: 'Establish processes for collecting and verifying emissions data',
+      title: 'Configure team access',
+      description: 'Invite team members and set up roles and permissions',
       priority: 'medium' as const,
       status: 'pending' as const,
       dueDate: 'Next month',
+      href: '/settings',
     },
   ]
 

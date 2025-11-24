@@ -1,8 +1,7 @@
 "use client"
 
 import {
-  KPISnapshotWidget,
-  GHGEmissionsSummaryWidget,
+  GettingStartedWidget,
   RecentActivityWidget,
   ActionItemsWidget,
   SupplierEngagementWidget,
@@ -16,14 +15,12 @@ export default function DashboardPage() {
           Dashboard
         </h1>
         <p className="text-sm text-muted-foreground">
-          Overview of your carbon management metrics
+          Welcome to your carbon management platform
         </p>
       </div>
 
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-4">
-        <KPISnapshotWidget />
-
-        <GHGEmissionsSummaryWidget />
+        <GettingStartedWidget />
 
         <SupplierEngagementWidget />
 

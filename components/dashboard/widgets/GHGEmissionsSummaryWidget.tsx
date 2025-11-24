@@ -11,15 +11,15 @@ const scopeColors: Record<number, string> = {
 }
 
 const scopeLabels: Record<number, string> = {
-  1: 'Scope 1: Direct Emissions',
-  2: 'Scope 2: Indirect Emissions',
-  3: 'Scope 3: Value Chain Emissions',
+  1: 'Operations: Direct Emissions',
+  2: 'Operations: Purchased Energy',
+  3: 'Supply Chain: Value Chain',
 }
 
 const scopeDescriptions: Record<number, string> = {
   1: 'Fuel combustion, company vehicles, fugitive emissions',
   2: 'Purchased electricity, heat, and cooling',
-  3: 'Supply chain, business travel, waste disposal',
+  3: 'Supplier activities, business travel, waste disposal',
 }
 
 function ScopeSkeleton() {
