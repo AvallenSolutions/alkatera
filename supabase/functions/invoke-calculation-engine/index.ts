@@ -29,7 +29,7 @@ interface InvokePayload {
 }
 
 /**
- * Emission Factor from Database
+ * Emission Factor from Internal Database (DEFRA/Proxy Fallback)
  */
 interface EmissionFactor {
   factor_id: string;
@@ -44,6 +44,26 @@ interface EmissionFactor {
 }
 
 /**
+ * OpenLCA/Ecoinvent Response Structure
+ */
+interface OpenLCAResponse {
+  success: boolean;
+  material_name: string;
+  calculated_co2e: number;
+  ecoinvent_process_uuid: string;
+  ecoinvent_process_name: string;
+  unit: string;
+  system_model: string;
+  database_version: string;
+  calculation_details?: {
+    quantity: number;
+    emission_factor: number;
+    formula: string;
+  };
+  error?: string;
+}
+
+/**
  * Calculated Material with Full Audit Trail
  */
 interface CalculatedMaterial {
@@ -54,19 +74,21 @@ interface CalculatedMaterial {
   emission_factor_used: number;
   emission_factor_unit: string;
   calculated_co2e: number;
-  data_source: "supplier" | "openlca" | "internal_library";
+  data_source: "supplier" | "openlca" | "internal_fallback";
   source_reference: string;
   calculation_method: string;
   confidence_score: "high" | "medium" | "low";
   geographic_scope: string;
-  year_of_publication: number;
+  year_of_publication: number | string;
   lca_stage: string;
+  ecoinvent_process_uuid?: string;
+  ecoinvent_process_name?: string;
+  database_version?: string;
   notes?: string;
 }
 
 /**
- * STEP 1: Check for Primary Supplier Data
- * Future enhancement: Query supplier_products table for specific emission values
+ * STEP 1: Check for Primary Supplier Data (Highest Priority)
  */
 async function checkSupplierData(
   supabase: any,
@@ -78,36 +100,144 @@ async function checkSupplierData(
 
   console.log(`[STEP 1] Checking supplier data for material: ${material.name}`);
 
-  // PLACEHOLDER: This is where supplier-specific emission factors would be retrieved
-  // For now, we return null to proceed to internal library lookup
-  // Future implementation should query:
+  // PLACEHOLDER: Query supplier_products table for supplier-specific emission values
   // const { data: supplierProduct } = await supabase
   //   .from('supplier_products')
-  //   .select('emission_factor, emission_factor_unit, source_documentation')
+  //   .select('emission_factor, emission_factor_unit, source_documentation, supplier_name')
   //   .eq('id', material.supplier_product_id)
   //   .maybeSingle();
+  //
+  // if (supplierProduct?.emission_factor) {
+  //   const calculatedCO2e = material.quantity * supplierProduct.emission_factor;
+  //   return {
+  //     material_id: material.id,
+  //     material_name: material.name || "Unknown",
+  //     quantity: material.quantity,
+  //     unit: material.unit || "kg",
+  //     emission_factor_used: supplierProduct.emission_factor,
+  //     emission_factor_unit: supplierProduct.emission_factor_unit,
+  //     calculated_co2e: calculatedCO2e,
+  //     data_source: "supplier",
+  //     source_reference: `Supplier: ${supplierProduct.supplier_name}`,
+  //     calculation_method: "Primary Supplier Data (Highest Quality)",
+  //     confidence_score: "high",
+  //     geographic_scope: material.origin_country || "Supplier-Specific",
+  //     year_of_publication: new Date().getFullYear(),
+  //     lca_stage: material.lca_sub_stage_id || "Unclassified",
+  //     notes: "Primary supplier data - highest confidence"
+  //   };
+  // }
 
   console.log(
-    `[STEP 1] No supplier-specific emission factor available yet. Falling back to internal library.`
+    `[STEP 1] No supplier-specific emission factor available yet. Proceeding to OpenLCA.`
   );
   return null;
 }
 
 /**
- * STEP 2: Query Internal Emissions Factors Library
- * This is the PRIMARY calculation path - queries public.emissions_factors table
+ * STEP 2: Query OpenLCA / Ecoinvent 3.12 (PRIMARY/STANDARD PATH)
+ * This is the main calculation route for ingredients and packaging
  */
-async function lookupInternalEmissionFactor(
+async function queryOpenLCA(
+  material: Material,
+  openLcaApiUrl: string | undefined,
+  openLcaApiKey: string | undefined
+): Promise<CalculatedMaterial | null> {
+  if (!openLcaApiUrl || !openLcaApiKey) {
+    console.warn(
+      `[STEP 2] OpenLCA API not configured. Skipping OpenLCA lookup for: ${material.name}`
+    );
+    return null;
+  }
+
+  console.log(`[STEP 2] Querying OpenLCA/Ecoinvent 3.12 for material: ${material.name}`);
+
+  try {
+    const requestPayload = {
+      material_name: material.name,
+      quantity: material.quantity,
+      unit: material.unit || "kg",
+      origin_country: material.origin_country,
+      is_organic: material.is_organic_certified || false,
+      database: "ecoinvent-3.12",
+    };
+
+    console.log(`[STEP 2] OpenLCA Request:`, requestPayload);
+
+    const response = await fetch(openLcaApiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openLcaApiKey}`,
+      },
+      body: JSON.stringify(requestPayload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(
+        `[STEP 2] OpenLCA API error (${response.status}): ${errorText}`
+      );
+      return null;
+    }
+
+    const openLcaData: OpenLCAResponse = await response.json();
+
+    if (!openLcaData.success || !openLcaData.ecoinvent_process_uuid) {
+      console.warn(
+        `[STEP 2] OpenLCA returned unsuccessful response or missing process UUID:`,
+        openLcaData
+      );
+      return null;
+    }
+
+    console.log(
+      `[STEP 2] ✓ OpenLCA Success: ${openLcaData.ecoinvent_process_name} (${openLcaData.ecoinvent_process_uuid})`
+    );
+
+    return {
+      material_id: material.id,
+      material_name: material.name || "Unknown",
+      quantity: material.quantity,
+      unit: material.unit || "kg",
+      emission_factor_used: openLcaData.calculation_details?.emission_factor || 0,
+      emission_factor_unit: openLcaData.unit,
+      calculated_co2e: openLcaData.calculated_co2e,
+      data_source: "openlca",
+      source_reference: `Ecoinvent ${openLcaData.database_version || "3.12"}`,
+      calculation_method: `OpenLCA: ${openLcaData.calculation_details?.formula || "Quantity × Emission Factor"}`,
+      confidence_score: "high",
+      geographic_scope: material.origin_country || openLcaData.system_model || "Global",
+      year_of_publication: 2024,
+      lca_stage: material.lca_sub_stage_id || "Unclassified",
+      ecoinvent_process_uuid: openLcaData.ecoinvent_process_uuid,
+      ecoinvent_process_name: openLcaData.ecoinvent_process_name,
+      database_version: openLcaData.database_version || "Ecoinvent 3.12",
+      notes: `System Model: ${openLcaData.system_model || "Cut-off"}`,
+    };
+  } catch (error: any) {
+    console.error(`[STEP 2] OpenLCA query failed:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * STEP 3: Internal Fallback (DEFRA/Proxy Data)
+ * Conservative fallback when OpenLCA fails or times out
+ */
+async function lookupInternalFallback(
   supabase: any,
   material: Material
 ): Promise<CalculatedMaterial | null> {
   if (!material.name) {
     throw new Error(
-      `Material ${material.id} has no name. Cannot perform emission factor lookup.`
+      `Material ${material.id} has no name. Cannot perform fallback lookup.`
     );
   }
 
-  console.log(`[STEP 2] Querying emissions_factors for material: ${material.name}`);
+  console.log(
+    `[STEP 3] Querying internal fallback (DEFRA/Proxy) for material: ${material.name}`
+  );
 
   const geographicScope = material.origin_country || "Global";
 
@@ -128,20 +258,20 @@ async function lookupInternalEmissionFactor(
   const { data: factors, error } = await query.limit(5);
 
   if (error) {
-    console.error(`[STEP 2] Database query error:`, error);
+    console.error(`[STEP 3] Database query error:`, error);
     throw new Error(`Failed to query emissions factors: ${error.message}`);
   }
 
   if (!factors || factors.length === 0) {
     console.warn(
-      `[STEP 2] No emission factor found for material: ${material.name} (origin: ${geographicScope})`
+      `[STEP 3] No fallback emission factor found for: ${material.name} (origin: ${geographicScope})`
     );
     return null;
   }
 
   const selectedFactor: EmissionFactor = factors[0];
   console.log(
-    `[STEP 2] Found emission factor: ${selectedFactor.name} = ${selectedFactor.value} ${selectedFactor.unit} (${selectedFactor.source} ${selectedFactor.year_of_publication})`
+    `[STEP 3] Found fallback factor: ${selectedFactor.name} = ${selectedFactor.value} ${selectedFactor.unit} (${selectedFactor.source} ${selectedFactor.year_of_publication})`
   );
 
   const calculatedCO2e = material.quantity * selectedFactor.value;
@@ -154,47 +284,28 @@ async function lookupInternalEmissionFactor(
     emission_factor_used: selectedFactor.value,
     emission_factor_unit: selectedFactor.unit,
     calculated_co2e: calculatedCO2e,
-    data_source: "internal_library",
+    data_source: "internal_fallback",
     source_reference: `${selectedFactor.source} ${selectedFactor.year_of_publication}`,
-    calculation_method: "Direct Multiplication (Quantity × Emission Factor)",
-    confidence_score: selectedFactor.geographic_scope === geographicScope ? "high" : "medium",
+    calculation_method: "Internal Fallback (Conservative Proxy)",
+    confidence_score: selectedFactor.geographic_scope === geographicScope ? "medium" : "low",
     geographic_scope: selectedFactor.geographic_scope,
     year_of_publication: selectedFactor.year_of_publication,
     lca_stage: material.lca_sub_stage_id || "Unclassified",
-    notes: factors.length > 1
-      ? `${factors.length - 1} other factors available. Selected most recent.`
-      : undefined,
+    notes:
+      `FALLBACK DATA - OpenLCA unavailable. ` +
+      (factors.length > 1
+        ? `${factors.length - 1} other factors available.`
+        : ""),
   };
 }
 
 /**
- * STEP 3: Fallback to OpenLCA External Service (Optional)
- * Only used if Steps 1 and 2 both fail
- */
-async function fallbackToOpenLCA(
-  material: Material,
-  openLcaApiUrl: string | undefined,
-  openLcaApiKey: string | undefined
-): Promise<CalculatedMaterial | null> {
-  if (!openLcaApiUrl || !openLcaApiKey) {
-    console.warn(
-      `[STEP 3] OpenLCA API not configured. Cannot use fallback for: ${material.name}`
-    );
-    return null;
-  }
-
-  console.log(`[STEP 3] Attempting OpenLCA fallback for material: ${material.name}`);
-
-  // This would call the external OpenLCA API
-  // For now, we don't implement this to ensure Glass Box compliance
-  console.warn(
-    `[STEP 3] OpenLCA fallback not implemented. Use internal library instead.`
-  );
-  return null;
-}
-
-/**
- * MAIN CALCULATION ENGINE: Process All Materials with Data Hierarchy
+ * MAIN CALCULATION ENGINE: Process All Materials with Corrected Data Hierarchy
+ *
+ * Data Priority:
+ * 1. Supplier-Specific Data (Highest Confidence)
+ * 2. OpenLCA/Ecoinvent 3.12 (Standard Path)
+ * 3. Internal DEFRA/Proxy (Conservative Fallback)
  */
 async function calculateMaterialsWithHierarchy(
   supabase: any,
@@ -205,33 +316,55 @@ async function calculateMaterialsWithHierarchy(
   calculated_materials: CalculatedMaterial[];
   total_co2e: number;
   missing_factors: string[];
+  data_sources_breakdown: {
+    supplier: number;
+    openlca: number;
+    internal_fallback: number;
+    failed: number;
+  };
 }> {
   const calculatedMaterials: CalculatedMaterial[] = [];
   const missingFactors: string[] = [];
+  const dataSourcesBreakdown = {
+    supplier: 0,
+    openlca: 0,
+    internal_fallback: 0,
+    failed: 0,
+  };
 
   for (const material of materials) {
     console.log(`\n=== Processing Material: ${material.name} ===`);
 
     let result: CalculatedMaterial | null = null;
 
+    // STEP 1: Highest Priority - Supplier Data
     result = await checkSupplierData(supabase, material);
-
-    if (!result) {
-      result = await lookupInternalEmissionFactor(supabase, material);
+    if (result) {
+      dataSourcesBreakdown.supplier++;
     }
 
+    // STEP 2: Standard Path - OpenLCA/Ecoinvent 3.12
     if (!result) {
-      result = await fallbackToOpenLCA(
-        material,
-        openLcaApiUrl,
-        openLcaApiKey
-      );
+      result = await queryOpenLCA(material, openLcaApiUrl, openLcaApiKey);
+      if (result) {
+        dataSourcesBreakdown.openlca++;
+      }
     }
 
+    // STEP 3: Conservative Fallback - Internal DEFRA/Proxy
+    if (!result) {
+      result = await lookupInternalFallback(supabase, material);
+      if (result) {
+        dataSourcesBreakdown.internal_fallback++;
+      }
+    }
+
+    // No data source succeeded
     if (!result) {
       const errorMsg = `Missing emission factor for: ${material.name} (origin: ${material.origin_country || "unspecified"})`;
       console.error(`[ERROR] ${errorMsg}`);
       missingFactors.push(errorMsg);
+      dataSourcesBreakdown.failed++;
 
       calculatedMaterials.push({
         material_id: material.id,
@@ -241,9 +374,9 @@ async function calculateMaterialsWithHierarchy(
         emission_factor_used: 0,
         emission_factor_unit: "kgCO2e/kg",
         calculated_co2e: 0,
-        data_source: "internal_library",
+        data_source: "internal_fallback",
         source_reference: "ERROR: No emission factor found",
-        calculation_method: "Failed",
+        calculation_method: "Failed - No Data Available",
         confidence_score: "low",
         geographic_scope: "Unknown",
         year_of_publication: 0,
@@ -262,14 +395,17 @@ async function calculateMaterialsWithHierarchy(
 
   console.log(`\n=== CALCULATION SUMMARY ===`);
   console.log(`Total Materials: ${materials.length}`);
-  console.log(`Successfully Calculated: ${calculatedMaterials.length - missingFactors.length}`);
-  console.log(`Missing Factors: ${missingFactors.length}`);
+  console.log(`  → Supplier Data: ${dataSourcesBreakdown.supplier}`);
+  console.log(`  → OpenLCA/Ecoinvent: ${dataSourcesBreakdown.openlca}`);
+  console.log(`  → Internal Fallback: ${dataSourcesBreakdown.internal_fallback}`);
+  console.log(`  → Failed: ${dataSourcesBreakdown.failed}`);
   console.log(`Total CO2e: ${totalCO2e.toFixed(2)} kg`);
 
   return {
     calculated_materials: calculatedMaterials,
     total_co2e: totalCO2e,
     missing_factors: missingFactors,
+    data_sources_breakdown: dataSourcesBreakdown,
   };
 }
 
@@ -351,7 +487,7 @@ Deno.serve(async (req: Request) => {
         status: "pending",
         request_payload: {
           materials_count: payload.materials.length,
-          calculation_method: "Glass Box Internal Library",
+          calculation_method: "Glass Box - OpenLCA/Ecoinvent 3.12 Primary",
           timestamp: new Date().toISOString(),
         },
       })
@@ -369,10 +505,9 @@ Deno.serve(async (req: Request) => {
       .update({ status: "pending" })
       .eq("id", payload.lcaId);
 
-    console.log(
-      `\n========================================`
-    );
+    console.log(`\n========================================`);
     console.log(`GLASS BOX CALCULATION ENGINE`);
+    console.log(`PRIMARY PATH: OpenLCA/Ecoinvent 3.12`);
     console.log(`Product: ${lca.product_name}`);
     console.log(`Materials: ${payload.materials.length}`);
     console.log(`========================================\n`);
@@ -401,6 +536,7 @@ Deno.serve(async (req: Request) => {
             response_data: {
               calculated_materials: calculationResult.calculated_materials,
               missing_factors: calculationResult.missing_factors,
+              data_sources_breakdown: calculationResult.data_sources_breakdown,
             },
             calculation_duration_ms: Date.now() - startTime,
           })
@@ -416,7 +552,7 @@ Deno.serve(async (req: Request) => {
         impact_category: "Climate Change",
         value: calculationResult.total_co2e,
         unit: "kg CO₂ eq",
-        method: "Internal Emissions Factors Library (Glass Box)",
+        method: "OpenLCA/Ecoinvent 3.12 (Glass Box Compliant)",
       },
     ];
 
@@ -443,10 +579,8 @@ Deno.serve(async (req: Request) => {
           response_data: {
             calculated_materials: calculationResult.calculated_materials,
             total_co2e: calculationResult.total_co2e,
-            calculation_method: "Glass Box Internal Library",
-            data_sources_used: calculationResult.calculated_materials.map(
-              (m) => m.data_source
-            ),
+            calculation_method: "OpenLCA/Ecoinvent 3.12 Primary Path",
+            data_sources_breakdown: calculationResult.data_sources_breakdown,
           },
           calculation_duration_ms: calculationDuration,
         })
@@ -456,16 +590,21 @@ Deno.serve(async (req: Request) => {
     console.log(`\n========================================`);
     console.log(`CALCULATION COMPLETE`);
     console.log(`Total CO2e: ${calculationResult.total_co2e.toFixed(2)} kg`);
+    console.log(
+      `Data Sources: OpenLCA=${calculationResult.data_sources_breakdown.openlca}, Supplier=${calculationResult.data_sources_breakdown.supplier}, Fallback=${calculationResult.data_sources_breakdown.internal_fallback}`
+    );
     console.log(`Duration: ${calculationDuration}ms`);
     console.log(`========================================\n`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: "LCA calculation completed successfully using Glass Box method",
+        message:
+          "LCA calculation completed successfully using OpenLCA/Ecoinvent 3.12",
         total_co2e: calculationResult.total_co2e,
         materials_calculated: calculationResult.calculated_materials.length,
-        calculation_method: "Internal Emissions Factors Library",
+        calculation_method: "OpenLCA/Ecoinvent 3.12 Primary Path",
+        data_sources_breakdown: calculationResult.data_sources_breakdown,
         results_count: resultsToInsert.length,
         calculation_duration_ms: calculationDuration,
         audit_trail: calculationResult.calculated_materials,
@@ -522,7 +661,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: false,
         error: error.message || "An unexpected error occurred",
-        calculation_method: "Glass Box Internal Library",
+        calculation_method: "OpenLCA/Ecoinvent 3.12 Primary Path",
       }),
       {
         status: statusCode,
