@@ -41,27 +41,64 @@ export default function PerformancePage() {
 
   const totalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
 
-  // Mock data for evidence drawers
+  // Mock data for evidence drawers - derived from metrics to ensure consistency
+  const waterConsumption = metrics?.total_impacts.water_consumption || 290.4;
+  const waterScarcityImpact = metrics?.total_impacts.water_scarcity_aware || 10845.5;
+
+  // Water breakdown (proportional to actual metrics)
   const waterSourceItems = [
-    { id: '1', source: 'London Production Site', location: 'London, UK', consumption: 1200, riskFactor: 8.2, riskLevel: 'low' as const, netImpact: 9840 },
-    { id: '2', source: 'Barcelona Bottling Plant', location: 'Andalusia, Spain', consumption: 850, riskFactor: 54.8, riskLevel: 'high' as const, netImpact: 46580 },
-    { id: '3', source: 'Dublin Distribution Centre', location: 'Dublin, Ireland', consumption: 340, riskFactor: 5.3, riskLevel: 'low' as const, netImpact: 1802 },
+    {
+      id: '1',
+      source: 'London Production Site',
+      location: 'London, UK',
+      consumption: waterConsumption * 0.41,
+      riskFactor: 8.2,
+      riskLevel: 'low' as const,
+      netImpact: waterScarcityImpact * 0.09
+    },
+    {
+      id: '2',
+      source: 'Barcelona Bottling Plant',
+      location: 'Andalusia, Spain',
+      consumption: waterConsumption * 0.35,
+      riskFactor: 54.8,
+      riskLevel: 'high' as const,
+      netImpact: waterScarcityImpact * 0.81
+    },
+    {
+      id: '3',
+      source: 'Dublin Distribution Centre',
+      location: 'Dublin, Ireland',
+      consumption: waterConsumption * 0.24,
+      riskFactor: 5.3,
+      riskLevel: 'low' as const,
+      netImpact: waterScarcityImpact * 0.10
+    },
   ];
+
+  // Circularity - derive waste streams to match card's circularity percentage
+  const circularityPercentage = metrics?.circularity_percentage || 57;
+  const estimatedTotalWaste = 5650;
+  const linearWasteMass = estimatedTotalWaste * (100 - circularityPercentage) / 100;
+  const circularWasteMass = estimatedTotalWaste * circularityPercentage / 100;
 
   const wasteStreams = [
-    { id: '1', stream: 'Broken Glass', disposition: 'recycling' as const, mass: 2500, circularityScore: 100 },
-    { id: '2', stream: 'Cardboard Packaging', disposition: 'recycling' as const, mass: 1800, circularityScore: 100 },
-    { id: '3', stream: 'Mixed Office Waste', disposition: 'landfill' as const, mass: 450, circularityScore: 0 },
-    { id: '4', stream: 'Organic Waste', disposition: 'composting' as const, mass: 620, circularityScore: 100 },
-    { id: '5', stream: 'Plastic Film', disposition: 'incineration' as const, mass: 280, circularityScore: 50 },
+    { id: '1', stream: 'Glass Bottles', disposition: 'recycling' as const, mass: Math.round(circularWasteMass * 0.45), circularityScore: 100 },
+    { id: '2', stream: 'Cardboard Packaging', disposition: 'recycling' as const, mass: Math.round(circularWasteMass * 0.33), circularityScore: 100 },
+    { id: '3', stream: 'Mixed Office Waste', disposition: 'landfill' as const, mass: Math.round(linearWasteMass * 0.6), circularityScore: 0 },
+    { id: '4', stream: 'Organic Waste', disposition: 'composting' as const, mass: Math.round(circularWasteMass * 0.22), circularityScore: 100 },
+    { id: '5', stream: 'Plastic Film', disposition: 'landfill' as const, mass: Math.round(linearWasteMass * 0.4), circularityScore: 0 },
   ];
 
+  // Land use - derive from actual metrics
+  const totalLandUseFromMetrics = metrics?.total_impacts.land_use || 6250;
+
   const landUseItems = [
-    { id: '1', ingredient: 'Winter Wheat', origin: 'France', mass: 5000, landIntensity: 2.3, totalFootprint: 11500 },
-    { id: '2', ingredient: 'Sugarcane', origin: 'Brazil', mass: 3200, landIntensity: 18.5, totalFootprint: 59200 },
-    { id: '3', ingredient: 'Apples', origin: 'UK', mass: 1500, landIntensity: 4.2, totalFootprint: 6300 },
-    { id: '4', ingredient: 'Lemons', origin: 'Spain', mass: 800, landIntensity: 3.8, totalFootprint: 3040 },
-    { id: '5', ingredient: 'Elderflower', origin: 'Austria', mass: 120, landIntensity: 1.5, totalFootprint: 180 },
+    { id: '1', ingredient: 'Winter Wheat', origin: 'France', mass: 5000, landIntensity: 2.3, totalFootprint: Math.round(totalLandUseFromMetrics * 0.14) },
+    { id: '2', ingredient: 'Sugarcane', origin: 'Brazil', mass: 3200, landIntensity: 18.5, totalFootprint: Math.round(totalLandUseFromMetrics * 0.74) },
+    { id: '3', ingredient: 'Apples', origin: 'UK', mass: 1500, landIntensity: 4.2, totalFootprint: Math.round(totalLandUseFromMetrics * 0.08) },
+    { id: '4', ingredient: 'Lemons', origin: 'Spain', mass: 800, landIntensity: 3.8, totalFootprint: Math.round(totalLandUseFromMetrics * 0.03) },
+    { id: '5', ingredient: 'Elderflower', origin: 'Austria', mass: 120, landIntensity: 1.5, totalFootprint: Math.round(totalLandUseFromMetrics * 0.01) },
   ];
 
   const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);
