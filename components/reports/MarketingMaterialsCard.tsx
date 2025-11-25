@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plane, Plus, Trash2 } from "lucide-react";
+import { Tag, Plus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -21,25 +21,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
 
-interface TravelEntry {
+interface MaterialEntry {
   id: string;
   description: string;
-  transport_mode?: string;
-  distance_km?: number;
-  passenger_count?: number;
-  is_return_trip?: boolean;
+  material_type?: string;
+  weight_kg?: number;
   entry_date: string;
   computed_co2e: number;
 }
 
-interface BusinessTravelCardProps {
+interface MarketingMaterialsCardProps {
   reportId: string;
-  entries: TravelEntry[];
+  entries: MaterialEntry[];
   onUpdate: () => void;
 }
 
@@ -48,16 +45,14 @@ interface EmissionFactor {
   name: string;
   value: number;
   unit: string;
-  travel_class: string;
+  material_type: string;
 }
 
-export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTravelCardProps) {
+export function MarketingMaterialsCard({ reportId, entries, onUpdate }: MarketingMaterialsCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState("");
-  const [transportMode, setTransportMode] = useState("");
-  const [distance, setDistance] = useState("");
-  const [passengers, setPassengers] = useState("1");
-  const [isReturnTrip, setIsReturnTrip] = useState(false);
+  const [materialType, setMaterialType] = useState("");
+  const [weight, setWeight] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [isSaving, setIsSaving] = useState(false);
   const [emissionFactors, setEmissionFactors] = useState<EmissionFactor[]>([]);
@@ -73,11 +68,11 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
     return `${value.toFixed(2)} kgCO₂e`;
   };
 
-  const transportModeOptions = [
-    { value: "Domestic", label: "Domestic Flight", icon: "✈️" },
-    { value: "Short-haul", label: "Short-haul International Flight", icon: "✈️" },
-    { value: "Long-haul", label: "Long-haul International Flight", icon: "✈️" },
-    { value: "National", label: "National Rail", icon: "🚆" },
+  const materialOptions = [
+    { value: "Glass", label: "Glass", icon: "🪟" },
+    { value: "Paper", label: "Paper & Board", icon: "📄" },
+    { value: "Textiles", label: "Textiles (Branded Merchandise)", icon: "👕" },
+    { value: "Plastic", label: "Plastic", icon: "🧴" },
   ];
 
   useEffect(() => {
@@ -88,7 +83,7 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
 
   useEffect(() => {
     calculateEstimate();
-  }, [transportMode, distance, passengers, isReturnTrip, emissionFactors]);
+  }, [materialType, weight, emissionFactors]);
 
   const fetchEmissionFactors = async () => {
     setIsLoadingFactors(true);
@@ -96,11 +91,11 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
       const supabase = getSupabaseBrowserClient();
       const { data, error } = await supabase
         .from("emissions_factors")
-        .select("factor_id, name, value, unit, travel_class")
+        .select("factor_id, name, value, unit, material_type")
         .eq("source", "DEFRA 2025")
         .eq("category", "Scope 3")
-        .in("type", ["Business Travel - Air", "Business Travel - Rail"])
-        .order("travel_class");
+        .eq("type", "Materials")
+        .order("material_type");
 
       if (error) throw error;
       setEmissionFactors(data || []);
@@ -113,59 +108,52 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
   };
 
   const calculateEstimate = () => {
-    if (!transportMode || !distance || !passengers) {
+    if (!materialType || !weight) {
       setEstimatedCO2e(null);
       return;
     }
 
-    const factor = emissionFactors.find((f) => f.travel_class === transportMode);
+    const factor = emissionFactors.find((f) => f.material_type === materialType);
     if (!factor) {
       setEstimatedCO2e(null);
       return;
     }
 
-    const distanceValue = parseFloat(distance);
-    const passengerValue = parseInt(passengers);
-    const effectiveDistance = isReturnTrip ? distanceValue * 2 : distanceValue;
-
-    const co2e = factor.value * effectiveDistance * passengerValue;
+    const weightValue = parseFloat(weight);
+    const co2e = factor.value * weightValue;
     setEstimatedCO2e(co2e);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!description || !transportMode || !distance || !passengers) {
+    if (!description || !materialType || !weight) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    if (parseFloat(distance) <= 0 || parseInt(passengers) <= 0) {
-      toast.error("Distance and passengers must be greater than zero");
+    if (parseFloat(weight) <= 0) {
+      toast.error("Weight must be greater than zero");
       return;
     }
 
     setIsSaving(true);
     try {
-      const factor = emissionFactors.find((f) => f.travel_class === transportMode);
+      const factor = emissionFactors.find((f) => f.material_type === materialType);
       if (!factor) {
         throw new Error("Emission factor not found");
       }
 
-      const distanceValue = parseFloat(distance);
-      const passengerValue = parseInt(passengers);
-      const effectiveDistance = isReturnTrip ? distanceValue * 2 : distanceValue;
-      const computedCO2e = factor.value * effectiveDistance * passengerValue;
+      const weightValue = parseFloat(weight);
+      const computedCO2e = factor.value * weightValue;
 
       const supabase = getSupabaseBrowserClient();
       const { error } = await supabase.from("corporate_overheads").insert({
         report_id: reportId,
-        category: "business_travel",
+        category: "purchased_services",
         description,
-        transport_mode: transportMode,
-        distance_km: distanceValue,
-        passenger_count: passengerValue,
-        is_return_trip: isReturnTrip,
+        material_type: materialType,
+        weight_kg: weightValue,
         entry_date: date,
         emission_factor: factor.value,
         computed_co2e: computedCO2e,
@@ -175,18 +163,16 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
 
       if (error) throw error;
 
-      toast.success("Business travel logged successfully");
+      toast.success("Marketing material logged successfully");
       setDescription("");
-      setTransportMode("");
-      setDistance("");
-      setPassengers("1");
-      setIsReturnTrip(false);
+      setMaterialType("");
+      setWeight("");
       setDate(new Date().toISOString().split("T")[0]);
       setEstimatedCO2e(null);
       setShowModal(false);
       onUpdate();
     } catch (error: any) {
-      console.error("Error saving travel entry:", error);
+      console.error("Error saving material entry:", error);
       toast.error(error.message || "Failed to save entry");
     } finally {
       setIsSaving(false);
@@ -196,22 +182,22 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
   return (
     <>
       <Card className="relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 dark:bg-blue-950 rounded-full -mr-16 -mt-16 opacity-50" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 dark:bg-orange-950 rounded-full -mr-16 -mt-16 opacity-50" />
 
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Plane className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="h-10 w-10 rounded-lg bg-orange-100 dark:bg-orange-900 flex items-center justify-center">
+                <Tag className="h-5 w-5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
-                <CardTitle className="text-lg">Business Travel</CardTitle>
-                <CardDescription>Activity-based tracking</CardDescription>
+                <CardTitle className="text-lg">Marketing Materials</CardTitle>
+                <CardDescription>Merchandise & POS materials</CardDescription>
               </div>
             </div>
             {entries.length > 0 && (
-              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                {entries.length} {entries.length === 1 ? "trip" : "trips"}
+              <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
+                {entries.length} {entries.length === 1 ? "item" : "items"}
               </Badge>
             )}
           </div>
@@ -225,7 +211,7 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
                   {formatEmissions(totalCO2e)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
-                  From {entries.length} business {entries.length === 1 ? "trip" : "trips"}
+                  From {entries.length} marketing {entries.length === 1 ? "item" : "items"}
                 </div>
               </div>
 
@@ -238,11 +224,7 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{entry.description}</div>
                       <div className="text-xs text-muted-foreground">
-                        {entry.distance_km && `${entry.distance_km}km`}
-                        {entry.passenger_count && ` • ${entry.passenger_count} pax`}
-                        {entry.is_return_trip && " • Return"}
-                        {" • "}
-                        {formatEmissions(entry.computed_co2e)}
+                        {entry.material_type} • {entry.weight_kg}kg • {formatEmissions(entry.computed_co2e)}
                       </div>
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -257,13 +239,13 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
             </>
           ) : (
             <div className="py-8 text-center">
-              <div className="text-sm text-muted-foreground mb-4">No business travel logged</div>
+              <div className="text-sm text-muted-foreground mb-4">No materials logged</div>
             </div>
           )}
 
           <Button onClick={() => setShowModal(true)} className="w-full" size="sm">
             <Plus className="h-4 w-4 mr-2" />
-            Log Business Travel
+            Log Marketing Material
           </Button>
         </CardContent>
       </Card>
@@ -271,7 +253,7 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Log Business Travel</DialogTitle>
+            <DialogTitle>Log Marketing Materials & Merchandise</DialogTitle>
             <DialogDescription>
               Activity-based tracking with DEFRA 2025 emission factors
             </DialogDescription>
@@ -279,10 +261,10 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="description">Trip Description</Label>
+              <Label htmlFor="description">Item Description</Label>
               <Input
                 id="description"
-                placeholder="e.g., London to Edinburgh"
+                placeholder="e.g., Conference T-Shirts"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 required
@@ -290,13 +272,13 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="transport-mode">Transport Mode</Label>
-              <Select value={transportMode} onValueChange={setTransportMode} required>
-                <SelectTrigger id="transport-mode">
-                  <SelectValue placeholder="Select transport mode" />
+              <Label htmlFor="material-type">Material Type</Label>
+              <Select value={materialType} onValueChange={setMaterialType} required>
+                <SelectTrigger id="material-type">
+                  <SelectValue placeholder="Select material type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {transportModeOptions.map((option) => (
+                  {materialOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.icon} {option.label}
                     </SelectItem>
@@ -306,47 +288,21 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
               <DataProvenanceBadge variant="block" />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="distance">Distance (km)</Label>
-                <Input
-                  id="distance"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  placeholder="e.g., 650"
-                  value={distance}
-                  onChange={(e) => setDistance(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="passengers">Passengers</Label>
-                <Input
-                  id="passengers"
-                  type="number"
-                  min="1"
-                  placeholder="1"
-                  value={passengers}
-                  onChange={(e) => setPassengers(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="return-trip"
-                checked={isReturnTrip}
-                onCheckedChange={(checked) => setIsReturnTrip(checked as boolean)}
+            <div className="space-y-2">
+              <Label htmlFor="weight">Total Weight (kg)</Label>
+              <Input
+                id="weight"
+                type="number"
+                step="0.001"
+                min="0"
+                placeholder="e.g., 5.5"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                required
               />
-              <Label
-                htmlFor="return-trip"
-                className="text-sm font-normal cursor-pointer"
-              >
-                Return trip (doubles the distance)
-              </Label>
+              <p className="text-xs text-muted-foreground">
+                Please weigh a single item and multiply by quantity, or use the shipping weight
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -361,16 +317,15 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
             </div>
 
             {estimatedCO2e !== null && (
-              <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                <div className="text-sm text-blue-900 dark:text-blue-100 mb-1">
+              <div className="p-4 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
+                <div className="text-sm text-orange-900 dark:text-orange-100 mb-1">
                   Estimated Emissions
                 </div>
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                   {formatEmissions(estimatedCO2e)}
                 </div>
-                <div className="text-xs text-blue-700 dark:text-blue-300 mt-2">
-                  {isReturnTrip && `${parseFloat(distance) * 2}km total • `}
-                  {passengers} {parseInt(passengers) === 1 ? "passenger" : "passengers"}
+                <div className="text-xs text-orange-700 dark:text-orange-300 mt-2">
+                  {weight}kg of {materialType}
                 </div>
               </div>
             )}
@@ -380,7 +335,7 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
                 Cancel
               </Button>
               <Button type="submit" disabled={isSaving || isLoadingFactors}>
-                {isSaving ? "Saving..." : "Save Trip"}
+                {isSaving ? "Saving..." : "Save Material"}
               </Button>
             </div>
           </form>

@@ -18,6 +18,7 @@ import { CapitalGoodsCard } from "@/components/reports/CapitalGoodsCard";
 import { LogisticsDistributionCard } from "@/components/reports/LogisticsDistributionCard";
 import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard";
 import { CompanyFleetCard } from "@/components/reports/CompanyFleetCard";
+import { MarketingMaterialsCard } from "@/components/reports/MarketingMaterialsCard";
 import { toast } from "sonner";
 
 interface CorporateReport {
@@ -279,7 +280,8 @@ export default function FootprintBuilderPage() {
   }
 
   const travelEntries = overheads.filter((o) => o.category === "business_travel");
-  const serviceEntries = overheads.filter((o) => o.category === "purchased_services");
+  const serviceEntries = overheads.filter((o) => o.category === "purchased_services" && !o.material_type);
+  const marketingEntries = overheads.filter((o) => o.category === "purchased_services" && o.material_type);
   const commutingEntry = overheads.find((o) => o.category === "employee_commuting");
   const fteCount = commutingEntry?.fte_count || 0;
   const capitalGoodsEntries = overheads.filter((o) => o.category === "capital_goods") as any[];
@@ -346,22 +348,27 @@ export default function FootprintBuilderPage() {
           <BusinessTravelCard reportId={report.id} entries={travelEntries} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 5: Services & Overhead */}
+        {/* Card 5: Marketing Materials & Merchandise */}
+        {report && (
+          <MarketingMaterialsCard reportId={report.id} entries={marketingEntries} onUpdate={fetchReportData} />
+        )}
+
+        {/* Card 6: Services & Overhead */}
         {report && (
           <ServicesOverheadCard reportId={report.id} entries={serviceEntries} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 6: Team & Commuting */}
+        {/* Card 7: Team & Commuting */}
         {report && (
           <TeamCommutingCard reportId={report.id} initialFteCount={fteCount} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 7: Capital Goods & Assets */}
+        {/* Card 8: Capital Goods & Assets */}
         {report && (
           <CapitalGoodsCard reportId={report.id} entries={capitalGoodsEntries} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 8: Logistics & Distribution */}
+        {/* Card 9: Logistics & Distribution */}
         {report && currentOrganization && (
           <LogisticsDistributionCard
             reportId={report.id}
@@ -372,7 +379,7 @@ export default function FootprintBuilderPage() {
           />
         )}
 
-        {/* Card 9: Operational Waste */}
+        {/* Card 10: Operational Waste */}
         {report && (
           <OperationalWasteCard reportId={report.id} entries={wasteEntries} onUpdate={fetchReportData} />
         )}
