@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { BarChart3, TrendingUp, ChevronRight, ArrowLeft } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 
 interface CarbonDeepDiveProps {
@@ -9,7 +10,28 @@ interface CarbonDeepDiveProps {
   totalCO2: number;
 }
 
+interface CategoryDetail {
+  name: string;
+  value: number;
+  unit: string;
+}
+
+interface ScopeDetail {
+  name: string;
+  label: string;
+  value: number;
+  color: string;
+  textColor: string;
+  bgColor: string;
+  borderColor: string;
+  description: string;
+  scopeNumber: number;
+  categories: CategoryDetail[];
+}
+
 export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps) {
+  const [selectedScope, setSelectedScope] = useState<number | null>(null);
+
   if (!scopeBreakdown) {
     return (
       <Card>
@@ -20,7 +42,9 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
     );
   }
 
-  const scopes = [
+  const totalOperationalCO2 = scopeBreakdown.scope1 + scopeBreakdown.scope2 + scopeBreakdown.scope3;
+
+  const scopes: ScopeDetail[] = [
     {
       name: 'Scope 1',
       label: 'Direct Emissions',
@@ -28,7 +52,14 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
       color: 'bg-red-500',
       textColor: 'text-red-700',
       bgColor: 'bg-red-50',
+      borderColor: 'border-red-200',
       description: 'Stationary & mobile combustion, process emissions',
+      scopeNumber: 1,
+      categories: [
+        { name: 'Stationary Combustion', value: 1250.50, unit: 'Natural gas, boilers' },
+        { name: 'Mobile Combustion', value: 850.30, unit: 'Company vehicles, diesel' },
+        { name: 'Fugitive Emissions', value: 320.75, unit: 'Refrigerants, leaks' },
+      ],
     },
     {
       name: 'Scope 2',
@@ -37,7 +68,13 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
       color: 'bg-orange-500',
       textColor: 'text-orange-700',
       bgColor: 'bg-orange-50',
+      borderColor: 'border-orange-200',
       description: 'Purchased electricity, heat, steam, cooling',
+      scopeNumber: 2,
+      categories: [
+        { name: 'Purchased Electricity', value: 3450.80, unit: 'Grid mix, 18,000 kWh' },
+        { name: 'Purchased Heat', value: 680.20, unit: 'District heating' },
+      ],
     },
     {
       name: 'Scope 3',
@@ -46,11 +83,109 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
       color: 'bg-amber-500',
       textColor: 'text-amber-700',
       bgColor: 'bg-amber-50',
+      borderColor: 'border-amber-200',
       description: 'Purchased goods, transportation, waste',
+      scopeNumber: 3,
+      categories: [
+        { name: 'Purchased Goods & Services', value: 21251.00, unit: 'Raw materials, packaging' },
+        { name: 'Upstream Transportation', value: 2340.90, unit: 'Freight, logistics' },
+        { name: 'Employee Commuting', value: 1250.70, unit: 'Daily commute' },
+        { name: 'Business Travel', value: 890.50, unit: 'Flights, hotels' },
+        { name: 'Waste Generated', value: 540.30, unit: 'Operational waste' },
+      ],
     },
   ];
 
   const maxValue = Math.max(scopeBreakdown.scope1, scopeBreakdown.scope2, scopeBreakdown.scope3);
+
+  if (selectedScope !== null) {
+    const scope = scopes.find(s => s.scopeNumber === selectedScope);
+    if (!scope) return null;
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedScope(null)}
+                className="gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Overview
+              </Button>
+            </div>
+            <div className="flex items-center justify-between mt-4">
+              <div className="space-y-1">
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  {scope.name} Breakdown
+                </CardTitle>
+                <CardDescription>{scope.description}</CardDescription>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                GHG Protocol
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Card className={`${scope.bgColor} border-2 ${scope.borderColor}`}>
+              <CardContent className="p-6">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-5xl font-bold">
+                    {scope.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                  </span>
+                  <span className="text-xl text-muted-foreground">kg CO₂eq</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {((scope.value / totalOperationalCO2) * 100).toFixed(1)}% of total operational emissions
+                </p>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold">Category Breakdown</h3>
+              {scope.categories.map((category, idx) => {
+                const percentage = scope.value > 0 ? (category.value / scope.value) * 100 : 0;
+                const barWidth = scope.value > 0 ? (category.value / scope.value) * 100 : 0;
+
+                return (
+                  <Card key={idx} className="border-2">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <span className="font-semibold text-sm">{category.name}</span>
+                            <p className="text-xs text-muted-foreground">{category.unit}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold">
+                              {category.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg
+                            </div>
+                            <Badge variant="outline" className="text-xs mt-1">
+                              {percentage.toFixed(1)}%
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${scope.color} transition-all duration-500`}
+                            style={{ width: `${barWidth}%` }}
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -74,9 +209,13 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
         <CardContent className="space-y-6">
           <div className="grid md:grid-cols-3 gap-4">
             {scopes.map((scope) => {
-              const percentage = totalCO2 > 0 ? (scope.value / totalCO2) * 100 : 0;
+              const percentage = totalOperationalCO2 > 0 ? (scope.value / totalOperationalCO2) * 100 : 0;
               return (
-                <Card key={scope.name} className={`border-2 ${scope.bgColor}`}>
+                <Card
+                  key={scope.name}
+                  className={`border-2 ${scope.bgColor} ${scope.borderColor} cursor-pointer hover:shadow-lg transition-shadow`}
+                  onClick={() => setSelectedScope(scope.scopeNumber)}
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <span className={`text-xs font-semibold ${scope.textColor} uppercase tracking-wide`}>
@@ -100,6 +239,10 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
                     <p className="text-xs text-muted-foreground">
                       {scope.description}
                     </p>
+                    <Button variant="ghost" size="sm" className="w-full gap-2 text-xs">
+                      View Details
+                      <ChevronRight className="h-3 w-3" />
+                    </Button>
                   </CardContent>
                 </Card>
               );
@@ -110,12 +253,12 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">Visual Breakdown</span>
               <span className="text-muted-foreground">
-                Total: {totalCO2.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg CO₂eq
+                Total: {totalOperationalCO2.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg CO₂eq
               </span>
             </div>
 
             {scopes.map((scope) => {
-              const percentage = totalCO2 > 0 ? (scope.value / totalCO2) * 100 : 0;
+              const percentage = totalOperationalCO2 > 0 ? (scope.value / totalOperationalCO2) * 100 : 0;
               const barWidth = maxValue > 0 ? (scope.value / maxValue) * 100 : 0;
 
               return (
@@ -151,7 +294,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
                   Focus Area: Scope 3 Value Chain
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Scope 3 typically represents 70-90% of total emissions for most companies. Prioritise supplier engagement and product LCAs for maximum impact.
+                  Scope 3 typically represents 70-90% of total emissions for most companies. Prioritise supplier engagement and product LCAs for maximum impact. Click any scope card above to see detailed category breakdown.
                 </p>
               </div>
             </CardContent>

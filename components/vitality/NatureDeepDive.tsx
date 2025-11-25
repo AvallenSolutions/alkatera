@@ -19,6 +19,8 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
       bgColor: 'bg-green-100',
       description: 'Land occupation and transformation impact',
       maxValue: 10000,
+      interpretation: 'Lower is better - less land transformed',
+      targetGuidance: 'Good: <500 | Fair: 500-2000 | High: >2000',
     },
     {
       name: 'Terrestrial Ecotoxicity',
@@ -29,6 +31,8 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
       bgColor: 'bg-emerald-100',
       description: 'Toxic impact on terrestrial ecosystems',
       maxValue: 100,
+      interpretation: 'Lower is better - less toxic impact',
+      targetGuidance: 'Good: <5 | Fair: 5-15 | High: >15',
     },
     {
       name: 'Freshwater Eutrophication',
@@ -39,6 +43,8 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
       bgColor: 'bg-blue-100',
       description: 'Nutrient loading in freshwater bodies',
       maxValue: 10,
+      interpretation: 'Lower is better - less water pollution',
+      targetGuidance: 'Good: <0.3 | Fair: 0.3-0.7 | High: >0.7',
     },
     {
       name: 'Terrestrial Acidification',
@@ -49,6 +55,8 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
       bgColor: 'bg-purple-100',
       description: 'Acidifying emissions affecting soil and plants',
       maxValue: 50,
+      interpretation: 'Lower is better - less soil acidification',
+      targetGuidance: 'Good: <1.5 | Fair: 1.5-3.0 | High: >3.0',
     },
   ];
 
@@ -100,6 +108,10 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                     </div>
 
                     <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-muted-foreground font-medium">{metric.interpretation}</span>
+                        <Badge variant="outline" className="text-xs">Impact Level</Badge>
+                      </div>
                       <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className={`h-full ${metric.color.replace('text-', 'bg-')} transition-all duration-500`}
@@ -109,6 +121,10 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                       <p className="text-xs text-muted-foreground">
                         {metric.description}
                       </p>
+                      <div className="pt-2 border-t">
+                        <p className="text-xs font-medium text-muted-foreground">Benchmark:</p>
+                        <p className="text-xs text-muted-foreground mt-1">{metric.targetGuidance}</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
