@@ -11,6 +11,9 @@ import {
   FileText,
   TrendingUp,
   Settings,
+  Code,
+  BookOpen,
+  FlaskConical,
 } from 'lucide-react'
 
 interface NavItem {
@@ -49,6 +52,24 @@ const navigationStructure: NavItem[] = [
     name: 'Settings',
     href: '/settings',
     icon: Settings,
+  },
+]
+
+const developmentStructure: NavItem[] = [
+  {
+    name: 'Fleet Implementation',
+    href: '/dev/docs/fleet-implementation',
+    icon: Code,
+  },
+  {
+    name: 'Verification Tests',
+    href: '/dev/docs/verification-tests',
+    icon: FlaskConical,
+  },
+  {
+    name: 'UI Documentation',
+    href: '/dev/docs/ui-documentation',
+    icon: BookOpen,
   },
 ]
 
@@ -101,6 +122,35 @@ export function Sidebar({ className }: SidebarProps) {
             </Link>
           )
         })}
+
+        {/* Development Section */}
+        <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
+          <div className="px-3 mb-2">
+            <h3 className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Development
+            </h3>
+          </div>
+          {developmentStructure.map((item) => {
+            const IconComponent = item.icon
+            const active = isActive(item.href)
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
+                  active
+                    ? 'bg-slate-900 text-slate-50 shadow-sm dark:bg-slate-50 dark:text-slate-900'
+                    : 'text-slate-700 hover:bg-slate-200/50 dark:text-slate-300 dark:hover:bg-slate-800/50'
+                )}
+              >
+                <IconComponent className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{item.name}</span>
+              </Link>
+            )
+          })}
+        </div>
       </nav>
     </aside>
   )
