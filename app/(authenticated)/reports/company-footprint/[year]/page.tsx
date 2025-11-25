@@ -17,6 +17,7 @@ import { TeamCommutingCard } from "@/components/reports/TeamCommutingCard";
 import { CapitalGoodsCard } from "@/components/reports/CapitalGoodsCard";
 import { LogisticsDistributionCard } from "@/components/reports/LogisticsDistributionCard";
 import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard";
+import { CompanyFleetCard } from "@/components/reports/CompanyFleetCard";
 import { toast } from "sonner";
 
 interface CorporateReport {
@@ -57,6 +58,7 @@ export default function FootprintBuilderPage() {
   const [overheads, setOverheads] = useState<OverheadEntry[]>([]);
   const [operationsCO2e, setOperationsCO2e] = useState(0);
   const [productsCO2e, setProductsCO2e] = useState(0);
+  const [fleetCO2e, setFleetCO2e] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -118,6 +120,9 @@ export default function FootprintBuilderPage() {
 
       // Fetch products emissions (Scope 3)
       await fetchProductsEmissions();
+
+      // Fetch fleet emissions (Scope 1 & 2)
+      await fetchFleetEmissions();
     } catch (error: any) {
       console.error("Error fetching report data:", error);
       toast.error("Failed to load footprint data");
@@ -202,6 +207,30 @@ export default function FootprintBuilderPage() {
       setProductsCO2e(total);
     } catch (error: any) {
       console.error("Error fetching products emissions:", error);
+    }
+  };
+
+  const fetchFleetEmissions = async () => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const yearStart = `${year}-01-01`;
+      const yearEnd = `${year}-12-31`;
+
+      const { data, error } = await supabase
+        .from("fleet_activities")
+        .select("emissions_tco2e")
+        .eq("organization_id", currentOrganization.id)
+        .gte("journey_date", yearStart)
+        .lte("journey_date", yearEnd);
+
+      if (error) throw error;
+
+      const total = data?.reduce((sum, item) => sum + (item.emissions_tco2e || 0), 0) || 0;
+      setFleetCO2e(total);
+    } catch (error: any) {
+      console.error("Error fetching fleet emissions:", error);
     }
   };
 
@@ -309,27 +338,30 @@ export default function FootprintBuilderPage() {
         {/* Card 2: Products & Supply Chain */}
         <ProductsSupplyChainCard totalCO2e={productsCO2e} year={year} />
 
-        {/* Card 3: Business Travel */}
+        {/* Card 3: Company Fleet & Vehicles */}
+        <CompanyFleetCard totalCO2e={fleetCO2e} year={year} />
+
+        {/* Card 4: Business Travel */}
         {report && (
           <BusinessTravelCard reportId={report.id} entries={travelEntries} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 4: Services & Overhead */}
+        {/* Card 5: Services & Overhead */}
         {report && (
           <ServicesOverheadCard reportId={report.id} entries={serviceEntries} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 5: Team & Commuting */}
+        {/* Card 6: Team & Commuting */}
         {report && (
           <TeamCommutingCard reportId={report.id} initialFteCount={fteCount} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 6: Capital Goods & Assets */}
+        {/* Card 7: Capital Goods & Assets */}
         {report && (
           <CapitalGoodsCard reportId={report.id} entries={capitalGoodsEntries} onUpdate={fetchReportData} />
         )}
 
-        {/* Card 7: Logistics & Distribution */}
+        {/* Card 8: Logistics & Distribution */}
         {report && currentOrganization && (
           <LogisticsDistributionCard
             reportId={report.id}
@@ -340,7 +372,7 @@ export default function FootprintBuilderPage() {
           />
         )}
 
-        {/* Card 8: Operational Waste */}
+        {/* Card 9: Operational Waste */}
         {report && (
           <OperationalWasteCard reportId={report.id} entries={wasteEntries} onUpdate={fetchReportData} />
         )}

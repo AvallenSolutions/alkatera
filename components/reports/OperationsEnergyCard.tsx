@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Factory, Bolt, ExternalLink } from "lucide-react";
+import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
 import Link from "next/link";
 
 interface OperationsEnergyCardProps {
@@ -69,6 +70,9 @@ export function OperationsEnergyCard({ totalCO2e, year, isLoading }: OperationsE
                   <span className="text-muted-foreground">Facility emissions</span>
                   <span className="font-medium">Calculated</span>
                 </div>
+              </div>
+              <div className="mt-3">
+                <DataProvenanceBadge variant="block" />
               </div>
             </div>
           </>

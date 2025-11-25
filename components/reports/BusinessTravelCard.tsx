@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
 import { toast } from "sonner";
 
 interface TravelEntry {
@@ -199,6 +200,7 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
                   onChange={(e) => setAmount(e.target.value)}
                   required
                 />
+                <DataProvenanceBadge variant="block" />
               </div>
 
               <div className="space-y-2">

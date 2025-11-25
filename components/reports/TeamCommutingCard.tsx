@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Save, CheckCircle2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
 import { toast } from "sonner";
 
 interface TeamCommutingCardProps {
@@ -126,6 +127,7 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate }: TeamC
             <p className="text-xs text-muted-foreground">
               We'll estimate commuting emissions using UK average data
             </p>
+            <DataProvenanceBadge variant="block" />
           </div>
 
           {fteCount && parseFloat(fteCount) > 0 && (
