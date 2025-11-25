@@ -14,6 +14,7 @@ import {
   Code,
   BookOpen,
   FlaskConical,
+  Sparkles,
 } from 'lucide-react'
 
 interface NavItem {
@@ -27,6 +28,11 @@ const navigationStructure: NavItem[] = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
+  },
+  {
+    name: 'Company Vitality',
+    href: '/performance',
+    icon: Sparkles,
   },
   {
     name: 'Operations',
