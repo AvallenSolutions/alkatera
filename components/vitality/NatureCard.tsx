@@ -8,9 +8,10 @@ import { CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 interface NatureCardProps {
   metrics: CompanyMetrics | null;
   loading: boolean;
+  onClick?: () => void;
 }
 
-export function NatureCard({ metrics, loading }: NatureCardProps) {
+export function NatureCard({ metrics, loading, onClick }: NatureCardProps) {
   if (loading) {
     return (
       <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white">
@@ -31,7 +32,10 @@ export function NatureCard({ metrics, loading }: NatureCardProps) {
   const landFootprintTotal = metrics?.land_footprint_total || 0;
 
   return (
-    <Card className="border-green-200 bg-gradient-to-br from-green-50 to-white hover:shadow-lg transition-shadow">
+    <Card
+      className="border-green-200 bg-gradient-to-br from-green-50 to-white hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

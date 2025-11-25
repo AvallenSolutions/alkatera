@@ -8,9 +8,10 @@ import { CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 interface WaterCardProps {
   metrics: CompanyMetrics | null;
   loading: boolean;
+  onClick?: () => void;
 }
 
-export function WaterCard({ metrics, loading }: WaterCardProps) {
+export function WaterCard({ metrics, loading, onClick }: WaterCardProps) {
   if (loading) {
     return (
       <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
@@ -61,7 +62,10 @@ export function WaterCard({ metrics, loading }: WaterCardProps) {
   const RiskIcon = config.icon;
 
   return (
-    <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:shadow-lg transition-shadow">
+    <Card
+      className="border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

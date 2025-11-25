@@ -8,9 +8,10 @@ import { CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 interface WasteCardProps {
   metrics: CompanyMetrics | null;
   loading: boolean;
+  onClick?: () => void;
 }
 
-export function WasteCard({ metrics, loading }: WasteCardProps) {
+export function WasteCard({ metrics, loading, onClick }: WasteCardProps) {
   if (loading) {
     return (
       <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white">
@@ -34,7 +35,10 @@ export function WasteCard({ metrics, loading }: WasteCardProps) {
   const circularityBg = circularityLevel === 'high' ? 'bg-green-100' : circularityLevel === 'medium' ? 'bg-amber-100' : 'bg-red-100';
 
   return (
-    <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-white hover:shadow-lg transition-shadow">
+    <Card
+      className="border-amber-200 bg-gradient-to-br from-amber-50 to-white hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={onClick}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

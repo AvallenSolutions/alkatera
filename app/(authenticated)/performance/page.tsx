@@ -18,6 +18,9 @@ import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
 import { WasteDeepDive } from '@/components/vitality/WasteDeepDive';
 import { NatureDeepDive } from '@/components/vitality/NatureDeepDive';
 import { AICopilotModal } from '@/components/vitality/AICopilotModal';
+import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
+import { CircularitySheet } from '@/components/vitality/CircularitySheet';
+import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
 
 export default function PerformancePage() {
   const {
@@ -32,8 +35,41 @@ export default function PerformancePage() {
 
   const [activeTab, setActiveTab] = useState('carbon');
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [waterSheetOpen, setWaterSheetOpen] = useState(false);
+  const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
+  const [natureSheetOpen, setNatureSheetOpen] = useState(false);
 
   const totalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
+
+  // Mock data for evidence drawers
+  const waterSourceItems = [
+    { id: '1', source: 'London Production Site', location: 'London, UK', consumption: 1200, riskFactor: 8.2, riskLevel: 'low' as const, netImpact: 9840 },
+    { id: '2', source: 'Barcelona Bottling Plant', location: 'Andalusia, Spain', consumption: 850, riskFactor: 54.8, riskLevel: 'high' as const, netImpact: 46580 },
+    { id: '3', source: 'Dublin Distribution Centre', location: 'Dublin, Ireland', consumption: 340, riskFactor: 5.3, riskLevel: 'low' as const, netImpact: 1802 },
+  ];
+
+  const wasteStreams = [
+    { id: '1', stream: 'Broken Glass', disposition: 'recycling' as const, mass: 2500, circularityScore: 100 },
+    { id: '2', stream: 'Cardboard Packaging', disposition: 'recycling' as const, mass: 1800, circularityScore: 100 },
+    { id: '3', stream: 'Mixed Office Waste', disposition: 'landfill' as const, mass: 450, circularityScore: 0 },
+    { id: '4', stream: 'Organic Waste', disposition: 'composting' as const, mass: 620, circularityScore: 100 },
+    { id: '5', stream: 'Plastic Film', disposition: 'incineration' as const, mass: 280, circularityScore: 50 },
+  ];
+
+  const landUseItems = [
+    { id: '1', ingredient: 'Winter Wheat', origin: 'France', mass: 5000, landIntensity: 2.3, totalFootprint: 11500 },
+    { id: '2', ingredient: 'Sugarcane', origin: 'Brazil', mass: 3200, landIntensity: 18.5, totalFootprint: 59200 },
+    { id: '3', ingredient: 'Apples', origin: 'UK', mass: 1500, landIntensity: 4.2, totalFootprint: 6300 },
+    { id: '4', ingredient: 'Lemons', origin: 'Spain', mass: 800, landIntensity: 3.8, totalFootprint: 3040 },
+    { id: '5', ingredient: 'Elderflower', origin: 'Austria', mass: 120, landIntensity: 1.5, totalFootprint: 180 },
+  ];
+
+  const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);
+  const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0);
+  const totalWaste = wasteStreams.reduce((sum, item) => sum + item.mass, 0);
+  const circularWaste = wasteStreams.reduce((sum, item) => sum + (item.mass * item.circularityScore / 100), 0);
+  const circularityRate = (circularWaste / totalWaste) * 100;
+  const totalLandUse = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0);
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -99,9 +135,9 @@ export default function PerformancePage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <ClimateCard metrics={metrics} loading={loading} />
-        <WaterCard metrics={metrics} loading={loading} />
-        <WasteCard metrics={metrics} loading={loading} />
-        <NatureCard metrics={metrics} loading={loading} />
+        <WaterCard metrics={metrics} loading={loading} onClick={() => setWaterSheetOpen(true)} />
+        <WasteCard metrics={metrics} loading={loading} onClick={() => setCircularitySheetOpen(true)} />
+        <NatureCard metrics={metrics} loading={loading} onClick={() => setNatureSheetOpen(true)} />
       </div>
 
       {metrics && metrics.csrd_compliant_percentage > 0 && (
@@ -183,6 +219,30 @@ export default function PerformancePage() {
       </div>
 
       <AICopilotModal open={aiModalOpen} onOpenChange={setAiModalOpen} />
+
+      <WaterImpactSheet
+        open={waterSheetOpen}
+        onOpenChange={setWaterSheetOpen}
+        totalConsumption={totalWaterConsumption}
+        totalImpact={totalWaterImpact}
+        sourceItems={waterSourceItems}
+      />
+
+      <CircularitySheet
+        open={circularitySheetOpen}
+        onOpenChange={setCircularitySheetOpen}
+        totalWaste={totalWaste}
+        circularityRate={circularityRate}
+        wasteStreams={wasteStreams}
+      />
+
+      <NatureImpactSheet
+        open={natureSheetOpen}
+        onOpenChange={setNatureSheetOpen}
+        totalLandUse={totalLandUse}
+        ingredientCount={landUseItems.length}
+        landUseItems={landUseItems}
+      />
     </div>
   );
 }
