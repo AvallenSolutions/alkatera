@@ -7,12 +7,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+/**
+ * Enhanced Material Interface with Dual-Path Data Support
+ */
 interface Material {
   id: string;
   name: string | null;
   quantity: number;
   unit: string | null;
   lca_sub_stage_id: string | null;
+  data_source?: "openlca" | "supplier" | null;
+  data_source_id?: string | null;
+  supplier_product_id?: string | null;
+  origin_country?: string | null;
+  is_organic_certified?: boolean;
 }
 
 interface InvokePayload {
@@ -20,87 +28,254 @@ interface InvokePayload {
   materials: Material[];
 }
 
-interface OpenLCAExchange {
-  "@type": string;
-  amount: number;
-  unit: {
-    "@type": string;
-    name: string;
-  };
-  flow: {
-    "@type": string;
-    name: string;
-    category: string;
-  };
-}
-
-interface OpenLCAProcess {
-  "@context": string;
-  "@type": string;
+/**
+ * Emission Factor from Database
+ */
+interface EmissionFactor {
+  factor_id: string;
   name: string;
-  processType: string;
-  exchanges: OpenLCAExchange[];
+  value: number;
+  unit: string;
+  source: string;
+  source_documentation_link: string;
+  year_of_publication: number;
+  geographic_scope: string;
+  system_model: string | null;
 }
 
-const IMPACT_CATEGORIES = [
-  { name: "Climate Change", unit: "kg CO₂ eq" },
-  { name: "Ozone Depletion", unit: "kg CFC-11 eq" },
-  { name: "Human Toxicity", unit: "kg 1,4-DB eq" },
-  { name: "Freshwater Ecotoxicity", unit: "kg 1,4-DB eq" },
-  { name: "Terrestrial Ecotoxicity", unit: "kg 1,4-DB eq" },
-  { name: "Eutrophication", unit: "kg PO₄³⁻ eq" },
-];
+/**
+ * Calculated Material with Full Audit Trail
+ */
+interface CalculatedMaterial {
+  material_id: string;
+  material_name: string;
+  quantity: number;
+  unit: string;
+  emission_factor_used: number;
+  emission_factor_unit: string;
+  calculated_co2e: number;
+  data_source: "supplier" | "openlca" | "internal_library";
+  source_reference: string;
+  calculation_method: string;
+  confidence_score: "high" | "medium" | "low";
+  geographic_scope: string;
+  year_of_publication: number;
+  lca_stage: string;
+  notes?: string;
+}
 
-async function transformToOpenLcaProcess(
+/**
+ * STEP 1: Check for Primary Supplier Data
+ * Future enhancement: Query supplier_products table for specific emission values
+ */
+async function checkSupplierData(
   supabase: any,
-  productName: string,
-  functionalUnit: string,
-  materials: Material[]
-): Promise<OpenLCAProcess> {
-  const stageIds = materials.map(m => m.lca_sub_stage_id).filter(Boolean);
-
-  const { data: subStages } = await supabase
-    .from('lca_sub_stages')
-    .select('id, name, stage_id, lca_life_cycle_stages(name)')
-    .in('id', stageIds);
-
-  const stageMap = new Map();
-  if (subStages) {
-    subStages.forEach((sub: any) => {
-      stageMap.set(sub.id, {
-        subStageName: sub.name,
-        stageName: sub.lca_life_cycle_stages?.name || 'Unknown Stage',
-      });
-    });
+  material: Material
+): Promise<CalculatedMaterial | null> {
+  if (material.data_source !== "supplier" || !material.supplier_product_id) {
+    return null;
   }
 
-  const exchanges: OpenLCAExchange[] = materials.map((material) => {
-    const stageInfo = material.lca_sub_stage_id ? stageMap.get(material.lca_sub_stage_id) : null;
+  console.log(`[STEP 1] Checking supplier data for material: ${material.name}`);
 
-    return {
-      "@type": "Exchange",
-      amount: material.quantity,
-      unit: {
-        "@type": "Unit",
-        name: material.unit || "kg",
-      },
-      flow: {
-        "@type": "Flow",
-        name: material.name || "Unnamed Material",
-        category: stageInfo ? `${stageInfo.stageName} > ${stageInfo.subStageName}` : "Unclassified",
-      },
-    };
-  });
+  // PLACEHOLDER: This is where supplier-specific emission factors would be retrieved
+  // For now, we return null to proceed to internal library lookup
+  // Future implementation should query:
+  // const { data: supplierProduct } = await supabase
+  //   .from('supplier_products')
+  //   .select('emission_factor, emission_factor_unit, source_documentation')
+  //   .eq('id', material.supplier_product_id)
+  //   .maybeSingle();
+
+  console.log(
+    `[STEP 1] No supplier-specific emission factor available yet. Falling back to internal library.`
+  );
+  return null;
+}
+
+/**
+ * STEP 2: Query Internal Emissions Factors Library
+ * This is the PRIMARY calculation path - queries public.emissions_factors table
+ */
+async function lookupInternalEmissionFactor(
+  supabase: any,
+  material: Material
+): Promise<CalculatedMaterial | null> {
+  if (!material.name) {
+    throw new Error(
+      `Material ${material.id} has no name. Cannot perform emission factor lookup.`
+    );
+  }
+
+  console.log(`[STEP 2] Querying emissions_factors for material: ${material.name}`);
+
+  const geographicScope = material.origin_country || "Global";
+
+  let query = supabase
+    .from("emissions_factors")
+    .select("*")
+    .ilike("name", `%${material.name}%`)
+    .order("year_of_publication", { ascending: false });
+
+  if (material.origin_country) {
+    query = query.or(
+      `geographic_scope.ilike.%${geographicScope}%,geographic_scope.eq.Global`
+    );
+  } else {
+    query = query.eq("geographic_scope", "Global");
+  }
+
+  const { data: factors, error } = await query.limit(5);
+
+  if (error) {
+    console.error(`[STEP 2] Database query error:`, error);
+    throw new Error(`Failed to query emissions factors: ${error.message}`);
+  }
+
+  if (!factors || factors.length === 0) {
+    console.warn(
+      `[STEP 2] No emission factor found for material: ${material.name} (origin: ${geographicScope})`
+    );
+    return null;
+  }
+
+  const selectedFactor: EmissionFactor = factors[0];
+  console.log(
+    `[STEP 2] Found emission factor: ${selectedFactor.name} = ${selectedFactor.value} ${selectedFactor.unit} (${selectedFactor.source} ${selectedFactor.year_of_publication})`
+  );
+
+  const calculatedCO2e = material.quantity * selectedFactor.value;
 
   return {
-    "@context": "http://greendelta.github.io/olca-schema",
-    "@type": "Process",
-    name: productName,
-    processType: "UNIT_PROCESS",
-    exchanges,
+    material_id: material.id,
+    material_name: material.name,
+    quantity: material.quantity,
+    unit: material.unit || "kg",
+    emission_factor_used: selectedFactor.value,
+    emission_factor_unit: selectedFactor.unit,
+    calculated_co2e: calculatedCO2e,
+    data_source: "internal_library",
+    source_reference: `${selectedFactor.source} ${selectedFactor.year_of_publication}`,
+    calculation_method: "Direct Multiplication (Quantity × Emission Factor)",
+    confidence_score: selectedFactor.geographic_scope === geographicScope ? "high" : "medium",
+    geographic_scope: selectedFactor.geographic_scope,
+    year_of_publication: selectedFactor.year_of_publication,
+    lca_stage: material.lca_sub_stage_id || "Unclassified",
+    notes: factors.length > 1
+      ? `${factors.length - 1} other factors available. Selected most recent.`
+      : undefined,
   };
 }
 
+/**
+ * STEP 3: Fallback to OpenLCA External Service (Optional)
+ * Only used if Steps 1 and 2 both fail
+ */
+async function fallbackToOpenLCA(
+  material: Material,
+  openLcaApiUrl: string | undefined,
+  openLcaApiKey: string | undefined
+): Promise<CalculatedMaterial | null> {
+  if (!openLcaApiUrl || !openLcaApiKey) {
+    console.warn(
+      `[STEP 3] OpenLCA API not configured. Cannot use fallback for: ${material.name}`
+    );
+    return null;
+  }
+
+  console.log(`[STEP 3] Attempting OpenLCA fallback for material: ${material.name}`);
+
+  // This would call the external OpenLCA API
+  // For now, we don't implement this to ensure Glass Box compliance
+  console.warn(
+    `[STEP 3] OpenLCA fallback not implemented. Use internal library instead.`
+  );
+  return null;
+}
+
+/**
+ * MAIN CALCULATION ENGINE: Process All Materials with Data Hierarchy
+ */
+async function calculateMaterialsWithHierarchy(
+  supabase: any,
+  materials: Material[],
+  openLcaApiUrl: string | undefined,
+  openLcaApiKey: string | undefined
+): Promise<{
+  calculated_materials: CalculatedMaterial[];
+  total_co2e: number;
+  missing_factors: string[];
+}> {
+  const calculatedMaterials: CalculatedMaterial[] = [];
+  const missingFactors: string[] = [];
+
+  for (const material of materials) {
+    console.log(`\n=== Processing Material: ${material.name} ===`);
+
+    let result: CalculatedMaterial | null = null;
+
+    result = await checkSupplierData(supabase, material);
+
+    if (!result) {
+      result = await lookupInternalEmissionFactor(supabase, material);
+    }
+
+    if (!result) {
+      result = await fallbackToOpenLCA(
+        material,
+        openLcaApiUrl,
+        openLcaApiKey
+      );
+    }
+
+    if (!result) {
+      const errorMsg = `Missing emission factor for: ${material.name} (origin: ${material.origin_country || "unspecified"})`;
+      console.error(`[ERROR] ${errorMsg}`);
+      missingFactors.push(errorMsg);
+
+      calculatedMaterials.push({
+        material_id: material.id,
+        material_name: material.name || "Unknown",
+        quantity: material.quantity,
+        unit: material.unit || "kg",
+        emission_factor_used: 0,
+        emission_factor_unit: "kgCO2e/kg",
+        calculated_co2e: 0,
+        data_source: "internal_library",
+        source_reference: "ERROR: No emission factor found",
+        calculation_method: "Failed",
+        confidence_score: "low",
+        geographic_scope: "Unknown",
+        year_of_publication: 0,
+        lca_stage: material.lca_sub_stage_id || "Unclassified",
+        notes: errorMsg,
+      });
+    } else {
+      calculatedMaterials.push(result);
+    }
+  }
+
+  const totalCO2e = calculatedMaterials.reduce(
+    (sum, mat) => sum + mat.calculated_co2e,
+    0
+  );
+
+  console.log(`\n=== CALCULATION SUMMARY ===`);
+  console.log(`Total Materials: ${materials.length}`);
+  console.log(`Successfully Calculated: ${calculatedMaterials.length - missingFactors.length}`);
+  console.log(`Missing Factors: ${missingFactors.length}`);
+  console.log(`Total CO2e: ${totalCO2e.toFixed(2)} kg`);
+
+  return {
+    calculated_materials: calculatedMaterials,
+    total_co2e: totalCO2e,
+    missing_factors: missingFactors,
+  };
+}
+
+/**
+ * MAIN EDGE FUNCTION HANDLER
+ */
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -126,7 +301,10 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       console.error("Authentication failed:", userError);
@@ -166,19 +344,16 @@ Deno.serve(async (req: Request) => {
       throw new Error("No materials provided for calculation");
     }
 
-    const openLcaPayload = await transformToOpenLcaProcess(
-      supabase,
-      lca.product_name,
-      lca.functional_unit,
-      payload.materials
-    );
-
     const { data: calcLog, error: logError } = await supabase
       .from("product_lca_calculation_logs")
       .insert({
         product_lca_id: payload.lcaId,
         status: "pending",
-        request_payload: openLcaPayload,
+        request_payload: {
+          materials_count: payload.materials.length,
+          calculation_method: "Glass Box Internal Library",
+          timestamp: new Date().toISOString(),
+        },
       })
       .select("id")
       .single();
@@ -194,56 +369,56 @@ Deno.serve(async (req: Request) => {
       .update({ status: "pending" })
       .eq("id", payload.lcaId);
 
-    let apiResponse: any;
-    let apiSuccess = false;
+    console.log(
+      `\n========================================`
+    );
+    console.log(`GLASS BOX CALCULATION ENGINE`);
+    console.log(`Product: ${lca.product_name}`);
+    console.log(`Materials: ${payload.materials.length}`);
+    console.log(`========================================\n`);
 
-    if (!openLcaApiUrl || !openLcaApiKey) {
-      console.warn("OpenLCA API credentials not configured. Using mock data for development.");
+    const calculationResult = await calculateMaterialsWithHierarchy(
+      supabase,
+      payload.materials,
+      openLcaApiUrl,
+      openLcaApiKey
+    );
 
-      apiResponse = {
-        results: IMPACT_CATEGORIES.map((category) => ({
-          impactCategory: category.name,
-          value: Math.random() * 1000,
-          unit: category.unit,
-          method: "ReCiPe 2016 Midpoint (H)",
-        })),
-      };
-      apiSuccess = true;
-    } else {
-      const requestHeaders: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
+    if (calculationResult.missing_factors.length > 0) {
+      const errorMessage = `Missing emission factors for ${calculationResult.missing_factors.length} materials:\n${calculationResult.missing_factors.join("\n")}`;
 
-      if (openLcaApiKey && openLcaApiKey.trim() !== "") {
-        requestHeaders["Authorization"] = `Bearer ${openLcaApiKey}`;
+      await supabase
+        .from("product_lcas")
+        .update({ status: "failed" })
+        .eq("id", payload.lcaId);
+
+      if (logId) {
+        await supabase
+          .from("product_lca_calculation_logs")
+          .update({
+            status: "failed",
+            error_message: errorMessage,
+            response_data: {
+              calculated_materials: calculationResult.calculated_materials,
+              missing_factors: calculationResult.missing_factors,
+            },
+            calculation_duration_ms: Date.now() - startTime,
+          })
+          .eq("id", logId);
       }
 
-      const apiResponseRaw = await fetch(openLcaApiUrl, {
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify(openLcaPayload),
-      });
-
-      if (!apiResponseRaw.ok) {
-        const errorText = await apiResponseRaw.text();
-        throw new Error(`OpenLCA API error (${apiResponseRaw.status}): ${errorText}`);
-      }
-
-      apiResponse = await apiResponseRaw.json();
-      apiSuccess = true;
+      throw new Error(errorMessage);
     }
 
-    if (!apiResponse.results || !Array.isArray(apiResponse.results)) {
-      throw new Error("Invalid response format from OpenLCA API");
-    }
-
-    const resultsToInsert = apiResponse.results.map((result: any) => ({
-      product_lca_id: payload.lcaId,
-      impact_category: result.impactCategory,
-      value: result.value,
-      unit: result.unit,
-      method: result.method || "ReCiPe 2016 Midpoint (H)",
-    }));
+    const resultsToInsert = [
+      {
+        product_lca_id: payload.lcaId,
+        impact_category: "Climate Change",
+        value: calculationResult.total_co2e,
+        unit: "kg CO₂ eq",
+        method: "Internal Emissions Factors Library (Glass Box)",
+      },
+    ];
 
     const { error: resultsError } = await supabase
       .from("product_lca_results")
@@ -265,18 +440,35 @@ Deno.serve(async (req: Request) => {
         .from("product_lca_calculation_logs")
         .update({
           status: "success",
-          response_data: apiResponse,
+          response_data: {
+            calculated_materials: calculationResult.calculated_materials,
+            total_co2e: calculationResult.total_co2e,
+            calculation_method: "Glass Box Internal Library",
+            data_sources_used: calculationResult.calculated_materials.map(
+              (m) => m.data_source
+            ),
+          },
           calculation_duration_ms: calculationDuration,
         })
         .eq("id", logId);
     }
 
+    console.log(`\n========================================`);
+    console.log(`CALCULATION COMPLETE`);
+    console.log(`Total CO2e: ${calculationResult.total_co2e.toFixed(2)} kg`);
+    console.log(`Duration: ${calculationDuration}ms`);
+    console.log(`========================================\n`);
+
     return new Response(
       JSON.stringify({
         success: true,
-        message: "LCA calculation completed successfully",
+        message: "LCA calculation completed successfully using Glass Box method",
+        total_co2e: calculationResult.total_co2e,
+        materials_calculated: calculationResult.calculated_materials.length,
+        calculation_method: "Internal Emissions Factors Library",
         results_count: resultsToInsert.length,
         calculation_duration_ms: calculationDuration,
+        audit_trail: calculationResult.calculated_materials,
       }),
       {
         status: 200,
@@ -319,13 +511,18 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const statusCode = error.message === "Unauthorized" ? 401 :
-                       error.message.includes("OpenLCA API") ? 502 : 400;
+    const statusCode =
+      error.message === "Unauthorized"
+        ? 401
+        : error.message.includes("Missing emission factor")
+        ? 422
+        : 400;
 
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || "An unexpected error occurred",
+        calculation_method: "Glass Box Internal Library",
       }),
       {
         status: statusCode,
