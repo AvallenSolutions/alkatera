@@ -57,6 +57,11 @@ const navigationStructure: NavItem[] = [
 
 const developmentStructure: NavItem[] = [
   {
+    name: 'Reporting Standards',
+    href: '/dev/docs/reporting-standards',
+    icon: BookOpen,
+  },
+  {
     name: 'Fleet Implementation',
     href: '/dev/docs/fleet-implementation',
     icon: Code,
