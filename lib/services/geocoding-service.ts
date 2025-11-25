@@ -143,6 +143,51 @@ export const popularDestinations: Location[] = [
     country: 'Japan',
     importance: 0.95,
   },
+  {
+    place_id: 'pop_sydney',
+    displayName: 'Sydney, New South Wales, Australia',
+    lat: -33.8688,
+    lon: 151.2093,
+    type: 'city',
+    country: 'Australia',
+    importance: 0.95,
+  },
+  {
+    place_id: 'pop_sydney_airport',
+    displayName: 'Sydney Kingsford Smith Airport (SYD), Sydney, Australia',
+    lat: -33.9461,
+    lon: 151.1772,
+    type: 'airport',
+    country: 'Australia',
+    importance: 0.93,
+  },
+  {
+    place_id: 'pop_melbourne',
+    displayName: 'Melbourne, Victoria, Australia',
+    lat: -37.8136,
+    lon: 144.9631,
+    type: 'city',
+    country: 'Australia',
+    importance: 0.9,
+  },
+  {
+    place_id: 'pop_hongkong',
+    displayName: 'Hong Kong',
+    lat: 22.3193,
+    lon: 114.1694,
+    type: 'city',
+    country: 'Hong Kong',
+    importance: 0.92,
+  },
+  {
+    place_id: 'pop_frankfurt',
+    displayName: 'Frankfurt, Germany',
+    lat: 50.1109,
+    lon: 8.6821,
+    type: 'city',
+    country: 'Germany',
+    importance: 0.88,
+  },
 ];
 
 /**
@@ -278,11 +323,11 @@ export async function searchLocations(query: string): Promise<Location[]> {
   }
 
   try {
-    // Search Nominatim
+    // Search Nominatim with larger limit to filter later
     const url = new URL('https://nominatim.openstreetmap.org/search');
     url.searchParams.set('q', trimmedQuery);
     url.searchParams.set('format', 'json');
-    url.searchParams.set('limit', '10');
+    url.searchParams.set('limit', '50'); // Increased to filter intelligently
     url.searchParams.set('addressdetails', '1');
 
     const response = await rateLimitedFetch(url.toString());
@@ -294,7 +339,7 @@ export async function searchLocations(query: string): Promise<Location[]> {
     const data = (await response.json()) as NominatimResult[];
 
     // Transform results
-    const locations: Location[] = data.map(result => ({
+    let locations: Location[] = data.map(result => ({
       place_id: result.place_id.toString(),
       displayName: result.display_name,
       lat: parseFloat(result.lat),
@@ -304,8 +349,11 @@ export async function searchLocations(query: string): Promise<Location[]> {
       importance: result.importance,
     }));
 
-    // Sort by importance
-    locations.sort((a, b) => b.importance - a.importance);
+    // Filter and prioritize major cities and airports
+    locations = filterAndRankLocations(locations, trimmedQuery);
+
+    // Limit to top 10 results
+    locations = locations.slice(0, 10);
 
     // Cache results
     setCachedResults(trimmedQuery, locations);
@@ -315,6 +363,87 @@ export async function searchLocations(query: string): Promise<Location[]> {
     console.error('Error searching locations:', error);
     throw error;
   }
+}
+
+/**
+ * Filter out irrelevant results and rank by relevance for business travel
+ */
+function filterAndRankLocations(locations: Location[], query: string): Location[] {
+  const queryLower = query.toLowerCase();
+
+  // Calculate relevance score for each location
+  const scoredLocations = locations.map(loc => {
+    let score = loc.importance * 100; // Base score from importance
+
+    // Boost airports significantly
+    if (loc.type === 'airport') {
+      score += 200;
+
+      // Extra boost for major international airports
+      if (
+        loc.displayName.toLowerCase().includes('international') ||
+        /\b[A-Z]{3}\b/.test(loc.displayName) // Has airport code
+      ) {
+        score += 100;
+      }
+    }
+
+    // Boost major cities
+    if (loc.type === 'city') {
+      score += 100;
+
+      // Extra boost if it's a capital or major metropolitan area
+      const majorCityKeywords = ['capital', 'metropolitan', 'city', 'municipality'];
+      if (majorCityKeywords.some(keyword => loc.displayName.toLowerCase().includes(keyword))) {
+        score += 50;
+      }
+    }
+
+    // Penalize non-city/airport results heavily
+    if (loc.type !== 'city' && loc.type !== 'airport') {
+      score -= 500;
+    }
+
+    // Boost exact matches at word boundaries
+    const displayLower = loc.displayName.toLowerCase();
+    const firstWord = displayLower.split(',')[0].trim();
+    if (firstWord === queryLower || firstWord.startsWith(queryLower + ' ')) {
+      score += 300;
+    }
+
+    // Boost if query matches the start of the display name
+    if (displayLower.startsWith(queryLower)) {
+      score += 150;
+    }
+
+    // Penalize results with too many commas (overly specific addresses)
+    const commaCount = (loc.displayName.match(/,/g) || []).length;
+    if (commaCount > 5) {
+      score -= 100;
+    }
+
+    // Penalize results that are suburbs or districts unless query is specific
+    const suburbanKeywords = ['suburb', 'district', 'neighbourhood', 'quarter', 'ward'];
+    if (suburbanKeywords.some(keyword => displayLower.includes(keyword))) {
+      score -= 200;
+    }
+
+    // Boost if this looks like a major hub (has high importance and is city/airport)
+    if ((loc.type === 'city' || loc.type === 'airport') && loc.importance > 0.5) {
+      score += 100;
+    }
+
+    return { ...loc, score };
+  });
+
+  // Filter out very low scores (likely irrelevant)
+  const filtered = scoredLocations.filter(loc => loc.score > -100);
+
+  // Sort by score descending
+  filtered.sort((a, b) => b.score - a.score);
+
+  // Remove the score property before returning
+  return filtered.map(({ score, ...loc }) => loc);
 }
 
 /**
