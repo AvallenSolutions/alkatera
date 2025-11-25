@@ -241,8 +241,8 @@ export function useCompanyMetrics() {
       if (!currentOrganization?.id) return;
 
       const { data: emissions, error } = await supabase
-        .from('calculated_emissions')
-        .select('scope, co2e_kg')
+        .from('ghg_emissions')
+        .select('category_id, total_emissions, ghg_categories(scope)')
         .eq('organization_id', currentOrganization.id);
 
       if (error) throw error;
@@ -253,13 +253,13 @@ export function useCompanyMetrics() {
         scope3: 0,
       };
 
-      emissions?.forEach((emission) => {
-        const scope = emission.scope?.toLowerCase();
-        const value = emission.co2e_kg || 0;
+      emissions?.forEach((emission: any) => {
+        const scope = emission.ghg_categories?.scope;
+        const value = emission.total_emissions || 0;
 
-        if (scope === 'scope 1') breakdown.scope1 += value;
-        else if (scope === 'scope 2') breakdown.scope2 += value;
-        else if (scope === 'scope 3') breakdown.scope3 += value;
+        if (scope === 1) breakdown.scope1 += value;
+        else if (scope === 2) breakdown.scope2 += value;
+        else if (scope === 3) breakdown.scope3 += value;
       });
 
       setScopeBreakdown(breakdown);
@@ -274,7 +274,7 @@ export function useCompanyMetrics() {
 
       const { data: facilities, error } = await supabase
         .from('facilities')
-        .select('id, name, location_country_code, latitude, longitude')
+        .select('id, name, location_country_code, address_lat, address_lng')
         .eq('organization_id', currentOrganization.id);
 
       if (error) throw error;
@@ -301,8 +301,8 @@ export function useCompanyMetrics() {
           location_country_code: countryCode || 'GLOBAL',
           water_scarcity_aware: awareFactor,
           risk_level: riskLevel,
-          latitude: facility.latitude,
-          longitude: facility.longitude,
+          latitude: facility.address_lat ? parseFloat(facility.address_lat) : undefined,
+          longitude: facility.address_lng ? parseFloat(facility.address_lng) : undefined,
         };
       }) || [];
 
