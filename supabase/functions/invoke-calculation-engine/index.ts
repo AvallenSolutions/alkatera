@@ -65,35 +65,42 @@ interface OpenLCAResponse {
 
 /**
  * Calculated Material with Full Audit Trail
+ * COMPLIANCE: Glass Box Protocol - All fields mandatory for audit trail
  */
 interface CalculatedMaterial {
   material_id: string;
   material_name: string;
   quantity: number;
   unit: string;
-  emission_factor_used: number;
-  emission_factor_unit: string;
-  calculated_co2e: number;
+
+  // MANDATORY GLASS BOX AUDIT METADATA
+  factor_value: number;                        // The actual emission factor used
+  emission_factor_unit: string;                // Unit of the factor (e.g., kgCO2e/kg)
+  calculated_co2e: number;                     // Final calculated result
   data_source: "supplier" | "openlca" | "internal_fallback";
-  source_reference: string;
-  calculation_method: string;
+  source_used: string;                         // REQUIRED: e.g., "Ecoinvent 3.12" or "DEFRA 2025"
+  external_reference_id: string;               // REQUIRED: Ecoinvent UUID, Supplier ID, or Factor ID
+  methodology: string;                         // REQUIRED: e.g., "Cradle-to-Gate", "Cradle-to-Grave"
   confidence_score: "high" | "medium" | "low";
+
+  // ADDITIONAL CONTEXT
   geographic_scope: string;
   year_of_publication: number | string;
   lca_stage: string;
-  ecoinvent_process_uuid?: string;
-  ecoinvent_process_name?: string;
+  ecoinvent_process_name?: string;            // Human-readable process name
   database_version?: string;
   notes?: string;
 }
 
 /**
  * STEP 1: Check for Primary Supplier Data (Highest Priority)
+ * COMPLIANCE: Checks data_source === "supplier" BEFORE any external API calls
  */
 async function checkSupplierData(
   supabase: any,
   material: Material
 ): Promise<CalculatedMaterial | null> {
+  // COMPLIANCE CHECK: Explicit supplier data check before proceeding
   if (material.data_source !== "supplier" || !material.supplier_product_id) {
     return null;
   }
@@ -103,7 +110,7 @@ async function checkSupplierData(
   // PLACEHOLDER: Query supplier_products table for supplier-specific emission values
   // const { data: supplierProduct } = await supabase
   //   .from('supplier_products')
-  //   .select('emission_factor, emission_factor_unit, source_documentation, supplier_name')
+  //   .select('emission_factor, emission_factor_unit, source_documentation, supplier_name, id')
   //   .eq('id', material.supplier_product_id)
   //   .maybeSingle();
   //
@@ -114,12 +121,13 @@ async function checkSupplierData(
   //     material_name: material.name || "Unknown",
   //     quantity: material.quantity,
   //     unit: material.unit || "kg",
-  //     emission_factor_used: supplierProduct.emission_factor,
+  //     factor_value: supplierProduct.emission_factor,
   //     emission_factor_unit: supplierProduct.emission_factor_unit,
   //     calculated_co2e: calculatedCO2e,
   //     data_source: "supplier",
-  //     source_reference: `Supplier: ${supplierProduct.supplier_name}`,
-  //     calculation_method: "Primary Supplier Data (Highest Quality)",
+  //     source_used: `Supplier: ${supplierProduct.supplier_name}`,
+  //     external_reference_id: supplierProduct.id,
+  //     methodology: "Primary Supplier EPD (Environmental Product Declaration)",
   //     confidence_score: "high",
   //     geographic_scope: material.origin_country || "Supplier-Specific",
   //     year_of_publication: new Date().getFullYear(),
@@ -136,7 +144,7 @@ async function checkSupplierData(
 
 /**
  * STEP 2: Query OpenLCA / Ecoinvent 3.12 (PRIMARY/STANDARD PATH)
- * This is the main calculation route for ingredients and packaging
+ * COMPLIANCE: Captures external_reference_id (Ecoinvent UUID) for full audit trail
  */
 async function queryOpenLCA(
   material: Material,
@@ -183,9 +191,10 @@ async function queryOpenLCA(
 
     const openLcaData: OpenLCAResponse = await response.json();
 
+    // COMPLIANCE CHECK: Validate external_reference_id exists
     if (!openLcaData.success || !openLcaData.ecoinvent_process_uuid) {
       console.warn(
-        `[STEP 2] OpenLCA returned unsuccessful response or missing process UUID:`,
+        `[STEP 2] OpenLCA returned unsuccessful response or missing process UUID (external_reference_id):`,
         openLcaData
       );
       return null;
@@ -195,22 +204,23 @@ async function queryOpenLCA(
       `[STEP 2] ✓ OpenLCA Success: ${openLcaData.ecoinvent_process_name} (${openLcaData.ecoinvent_process_uuid})`
     );
 
+    // COMPLIANCE: All mandatory fields populated
     return {
       material_id: material.id,
       material_name: material.name || "Unknown",
       quantity: material.quantity,
       unit: material.unit || "kg",
-      emission_factor_used: openLcaData.calculation_details?.emission_factor || 0,
+      factor_value: openLcaData.calculation_details?.emission_factor || 0,
       emission_factor_unit: openLcaData.unit,
       calculated_co2e: openLcaData.calculated_co2e,
       data_source: "openlca",
-      source_reference: `Ecoinvent ${openLcaData.database_version || "3.12"}`,
-      calculation_method: `OpenLCA: ${openLcaData.calculation_details?.formula || "Quantity × Emission Factor"}`,
+      source_used: `Ecoinvent ${openLcaData.database_version || "3.12"}`,
+      external_reference_id: openLcaData.ecoinvent_process_uuid,
+      methodology: `Cradle-to-Gate (${openLcaData.system_model || "Cut-off"} System Model)`,
       confidence_score: "high",
       geographic_scope: material.origin_country || openLcaData.system_model || "Global",
       year_of_publication: 2024,
       lca_stage: material.lca_sub_stage_id || "Unclassified",
-      ecoinvent_process_uuid: openLcaData.ecoinvent_process_uuid,
       ecoinvent_process_name: openLcaData.ecoinvent_process_name,
       database_version: openLcaData.database_version || "Ecoinvent 3.12",
       notes: `System Model: ${openLcaData.system_model || "Cut-off"}`,
@@ -223,7 +233,7 @@ async function queryOpenLCA(
 
 /**
  * STEP 3: Internal Fallback (DEFRA/Proxy Data)
- * Conservative fallback when OpenLCA fails or times out
+ * COMPLIANCE: Only triggered if OpenLCA fails - uses database factor_id as external_reference_id
  */
 async function lookupInternalFallback(
   supabase: any,
@@ -276,17 +286,19 @@ async function lookupInternalFallback(
 
   const calculatedCO2e = material.quantity * selectedFactor.value;
 
+  // COMPLIANCE: All mandatory fields populated, using factor_id as external_reference_id
   return {
     material_id: material.id,
     material_name: material.name,
     quantity: material.quantity,
     unit: material.unit || "kg",
-    emission_factor_used: selectedFactor.value,
+    factor_value: selectedFactor.value,
     emission_factor_unit: selectedFactor.unit,
     calculated_co2e: calculatedCO2e,
     data_source: "internal_fallback",
-    source_reference: `${selectedFactor.source} ${selectedFactor.year_of_publication}`,
-    calculation_method: "Internal Fallback (Conservative Proxy)",
+    source_used: `${selectedFactor.source} ${selectedFactor.year_of_publication}`,
+    external_reference_id: selectedFactor.factor_id,
+    methodology: "Conservative Proxy (Average Industry Factors)",
     confidence_score: selectedFactor.geographic_scope === geographicScope ? "medium" : "low",
     geographic_scope: selectedFactor.geographic_scope,
     year_of_publication: selectedFactor.year_of_publication,
@@ -302,7 +314,7 @@ async function lookupInternalFallback(
 /**
  * MAIN CALCULATION ENGINE: Process All Materials with Corrected Data Hierarchy
  *
- * Data Priority:
+ * COMPLIANCE: Strict data priority enforced
  * 1. Supplier-Specific Data (Highest Confidence)
  * 2. OpenLCA/Ecoinvent 3.12 (Standard Path)
  * 3. Internal DEFRA/Proxy (Conservative Fallback)
@@ -359,7 +371,7 @@ async function calculateMaterialsWithHierarchy(
       }
     }
 
-    // No data source succeeded
+    // No data source succeeded - COMPLIANCE: Return error with all required fields
     if (!result) {
       const errorMsg = `Missing emission factor for: ${material.name} (origin: ${material.origin_country || "unspecified"})`;
       console.error(`[ERROR] ${errorMsg}`);
@@ -371,12 +383,13 @@ async function calculateMaterialsWithHierarchy(
         material_name: material.name || "Unknown",
         quantity: material.quantity,
         unit: material.unit || "kg",
-        emission_factor_used: 0,
+        factor_value: 0,
         emission_factor_unit: "kgCO2e/kg",
         calculated_co2e: 0,
         data_source: "internal_fallback",
-        source_reference: "ERROR: No emission factor found",
-        calculation_method: "Failed - No Data Available",
+        source_used: "ERROR: No emission factor found",
+        external_reference_id: "N/A",
+        methodology: "Failed - No Data Available",
         confidence_score: "low",
         geographic_scope: "Unknown",
         year_of_publication: 0,
