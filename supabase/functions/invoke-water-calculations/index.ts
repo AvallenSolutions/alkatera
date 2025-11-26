@@ -163,15 +163,21 @@ Deno.serve(async (req: Request) => {
     const totalWaterConsumption = waterActivities.reduce(
       (sum: number, activity: ActivityDataRecord) => {
         let normalizedQuantity = activity.quantity;
+        const unitLower = activity.unit.toLowerCase();
 
-        if (activity.unit.toLowerCase() === 'm3' || activity.unit.toLowerCase() === 'cubic meters') {
+        if (unitLower === 'm3' || unitLower === 'm³' || unitLower === 'cubic meters' || unitLower === 'cubic_meters') {
           normalizedQuantity = activity.quantity * 1000;
-        } else if (activity.unit.toLowerCase() === 'ml') {
+        } else if (unitLower === 'liters' || unitLower === 'litres' || unitLower === 'l') {
           normalizedQuantity = activity.quantity;
-        } else if (activity.unit.toLowerCase() === 'kl') {
+        } else if (unitLower === 'ml' || unitLower === 'milliliters' || unitLower === 'millilitres') {
+          normalizedQuantity = activity.quantity / 1000;
+        } else if (unitLower === 'kl' || unitLower === 'kiloliters' || unitLower === 'kilolitres') {
           normalizedQuantity = activity.quantity * 1000;
-        } else if (activity.unit.toLowerCase() === 'gallons') {
+        } else if (unitLower === 'gallons') {
           normalizedQuantity = activity.quantity * 3.78541;
+        } else {
+          console.warn(`Unknown water unit: ${activity.unit}, treating as liters`);
+          normalizedQuantity = activity.quantity;
         }
 
         return sum + normalizedQuantity;
@@ -231,15 +237,21 @@ Calculation Date: ${new Date().toISOString()}`
 
     waterActivities.forEach((activity: ActivityDataRecord) => {
       let normalizedQuantity = activity.quantity;
+      const unitLower = activity.unit.toLowerCase();
 
-      if (activity.unit.toLowerCase() === 'm3' || activity.unit.toLowerCase() === 'cubic meters') {
+      if (unitLower === 'm3' || unitLower === 'm³' || unitLower === 'cubic meters' || unitLower === 'cubic_meters') {
         normalizedQuantity = activity.quantity * 1000;
-      } else if (activity.unit.toLowerCase() === 'ml') {
+      } else if (unitLower === 'liters' || unitLower === 'litres' || unitLower === 'l') {
         normalizedQuantity = activity.quantity;
-      } else if (activity.unit.toLowerCase() === 'kl') {
+      } else if (unitLower === 'ml' || unitLower === 'milliliters' || unitLower === 'millilitres') {
+        normalizedQuantity = activity.quantity / 1000;
+      } else if (unitLower === 'kl' || unitLower === 'kiloliters' || unitLower === 'kilolitres') {
         normalizedQuantity = activity.quantity * 1000;
-      } else if (activity.unit.toLowerCase() === 'gallons') {
+      } else if (unitLower === 'gallons') {
         normalizedQuantity = activity.quantity * 3.78541;
+      } else {
+        console.warn(`Unknown water unit: ${activity.unit}, treating as liters`);
+        normalizedQuantity = activity.quantity;
       }
 
       metricsToInsert.push({

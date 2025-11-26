@@ -39,8 +39,8 @@ const MOCK_LCA_REPORT = {
 const MOCK_METRICS = {
   total_impacts: {
     climate_change_gwp100: 0.185,
-    water_consumption: 0.82,
-    water_scarcity_aware: 3.2,
+    water_consumption: 0.82, // IMPORTANT: Always stored in m³ (cubic meters). Convert Liters: value / 1000
+    water_scarcity_aware: 3.2, // m³ world eq (AWARE-weighted)
     land_use: 1.85,
     terrestrial_ecotoxicity: 0.42,
     freshwater_eutrophication: 0.008,
@@ -120,10 +120,10 @@ export default function ProductLcaReportPage() {
   const totalLandUse = MOCK_METRICS.total_impacts.land_use;
 
   const landUseItems = [
-    { id: '1', ingredient: 'Sugar Beet', origin: 'UK', mass: 0.028, landIntensity: 1.8, totalFootprint: Math.round(totalLandUse * 0.03 * 1000) / 1000 },
-    { id: '2', ingredient: 'Elderflower', origin: 'Austria', mass: 0.004, landIntensity: 0.9, totalFootprint: Math.round(totalLandUse * 0.02 * 1000) / 1000 },
-    { id: '3', ingredient: 'Glass (Silica Sand)', origin: 'Spain', mass: 0.250, landIntensity: 5.2, totalFootprint: Math.round(totalLandUse * 0.70 * 1000) / 1000 },
-    { id: '4', ingredient: 'Citric Acid', origin: 'China', mass: 0.002, landIntensity: 12.5, totalFootprint: Math.round(totalLandUse * 0.25 * 1000) / 1000 },
+    { id: '1', ingredient: 'Sugar Beet', origin: 'UK', mass: 0.028, landIntensity: 1.8, totalFootprint: Math.round(0.028 * 1.8 * 1000) / 1000 },
+    { id: '2', ingredient: 'Elderflower', origin: 'Austria', mass: 0.004, landIntensity: 0.9, totalFootprint: Math.round(0.004 * 0.9 * 1000) / 1000 },
+    { id: '3', ingredient: 'Glass (Silica Sand)', origin: 'Spain', mass: 0.250, landIntensity: 5.2, totalFootprint: Math.round(0.250 * 5.2 * 1000) / 1000 },
+    { id: '4', ingredient: 'Citric Acid', origin: 'China', mass: 0.002, landIntensity: 12.5, totalFootprint: Math.round(0.002 * 12.5 * 1000) / 1000 },
   ];
 
   const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);

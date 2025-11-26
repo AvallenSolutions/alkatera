@@ -248,7 +248,29 @@ export function PackagingFormCard({
                   placeholder="0"
                   value={packaging.net_weight_g}
                   onChange={(e) => onUpdate(packaging.tempId, { net_weight_g: e.target.value })}
+                  className={
+                    (packaging.packaging_category === 'label' && Number(packaging.net_weight_g) > 10) ||
+                    (packaging.packaging_category === 'closure' && Number(packaging.net_weight_g) > 10)
+                      ? 'border-amber-500 focus-visible:ring-amber-500'
+                      : ''
+                  }
                 />
+                {packaging.packaging_category === 'label' && Number(packaging.net_weight_g) > 10 && (
+                  <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                      <strong>Sanity Check:</strong> This label weighs over 10g, which is unusually high. Typical beverage labels weigh 1-5g. Please verify this value.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {packaging.packaging_category === 'closure' && Number(packaging.net_weight_g) > 10 && (
+                  <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                      <strong>Sanity Check:</strong> This closure/cap weighs over 10g, which is unusually high. Typical caps weigh 2-8g. Please verify this value.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
                   The weight of one unit
                 </p>
