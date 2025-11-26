@@ -150,6 +150,7 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const query = searchParams.get('q');
+    const organizationId = searchParams.get('organization_id');
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json(
@@ -204,6 +205,41 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // ========================================
+    // WATERFALL STAGE 1: STAGING_EMISSION_FACTORS
+    // ========================================
+    const { data: stagingFactors, error: stagingError } = await supabase
+      .from('staging_emission_factors')
+      .select('*')
+      .or(`name.ilike.%${normalizedQuery}%`)
+      .in('category', ['Ingredient', 'Packaging'])
+      .order('name');
+
+    if (!stagingError && stagingFactors && stagingFactors.length > 0) {
+      const formattedResults = stagingFactors.map((factor) => ({
+        id: factor.id,
+        name: factor.name,
+        category: factor.category,
+        unit: factor.reference_unit,
+        processType: 'STAGING_FACTOR',
+        location: 'Internal',
+        co2_factor: factor.co2_factor,
+        source: factor.source,
+        metadata: factor.metadata,
+      }));
+
+      return NextResponse.json({
+        results: formattedResults,
+        cached: false,
+        source: 'staging_emission_factors',
+        waterfall_stage: 1,
+        note: 'Using local staging library (highest priority)',
+      });
+    }
+
+    // ========================================
+    // WATERFALL STAGE 2: CACHE CHECK
+    // ========================================
     const { data: cacheResult } = await supabase
       .from('openlca_process_cache')
       .select('results, created_at')
@@ -216,9 +252,13 @@ export async function GET(request: NextRequest) {
         results: cacheResult.results,
         cached: true,
         source: 'cache',
+        waterfall_stage: 2,
       });
     }
 
+    // ========================================
+    // WATERFALL STAGE 3: OPENLCA SERVER
+    // ========================================
     const results = await searchOpenLCAProcesses(query);
 
     await supabase
@@ -235,6 +275,7 @@ export async function GET(request: NextRequest) {
       results: results,
       cached: false,
       source: OPENLCA_SERVER_ENABLED ? 'openlca_server' : 'mock_data',
+      waterfall_stage: 3,
       mock: !OPENLCA_SERVER_ENABLED,
       serverUrl: OPENLCA_SERVER_ENABLED ? OPENLCA_SERVER_URL : undefined,
     });

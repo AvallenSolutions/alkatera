@@ -80,7 +80,79 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Query supplier products - RLS will now work because we're using the user's token
+    // ========================================
+    // WATERFALL STAGE 1: STAGING_EMISSION_FACTORS
+    // ========================================
+    if (query && query.trim().length > 0) {
+      const normalizedQuery = query.trim().toLowerCase();
+
+      const { data: stagingFactors, error: stagingError } = await supabase
+        .from('staging_emission_factors')
+        .select('*')
+        .or(`name.ilike.%${normalizedQuery}%`)
+        .in('category', ['Ingredient', 'Packaging'])
+        .order('name');
+
+      if (!stagingError && stagingFactors && stagingFactors.length > 0) {
+        const stagingResults: SupplierProductSearchResult[] = stagingFactors.map((factor: any) => ({
+          id: factor.id,
+          name: factor.name,
+          supplier_name: 'Internal Proxy Library',
+          category: factor.category,
+          unit: factor.reference_unit,
+          carbon_intensity: factor.co2_factor,
+          product_code: `STAGING-${factor.id.substring(0, 8)}`,
+          _source: 'staging_emission_factors',
+        }));
+
+        // Continue to check supplier products too
+        let supplierQuery = supabase
+          .from('supplier_products')
+          .select(`
+            id,
+            name,
+            category,
+            unit,
+            carbon_intensity,
+            product_code,
+            suppliers!inner(
+              name
+            )
+          `)
+          .eq('organization_id', organizationId)
+          .eq('is_active', true)
+          .ilike('name', `%${query.trim()}%`)
+          .order('name')
+          .limit(30);
+
+        const { data: supplierProducts } = await supplierQuery;
+
+        const supplierResults: SupplierProductSearchResult[] = (supplierProducts || []).map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          supplier_name: product.suppliers?.name || 'Unknown Supplier',
+          category: product.category,
+          unit: product.unit,
+          carbon_intensity: product.carbon_intensity,
+          product_code: product.product_code,
+          _source: 'supplier_products',
+        }));
+
+        // Combine: staging factors first (priority), then supplier products
+        const combinedResults = [...stagingResults, ...supplierResults];
+
+        return NextResponse.json({
+          results: combinedResults,
+          count: combinedResults.length,
+          waterfall_stage: 1,
+          note: 'Staging factors shown first (highest priority), followed by supplier products',
+        });
+      }
+    }
+
+    // ========================================
+    // WATERFALL STAGE 2: SUPPLIER_PRODUCTS ONLY
+    // ========================================
     let supplierQuery = supabase
       .from('supplier_products')
       .select(`
@@ -120,11 +192,13 @@ export async function GET(request: NextRequest) {
       unit: product.unit,
       carbon_intensity: product.carbon_intensity,
       product_code: product.product_code,
+      _source: 'supplier_products',
     }));
 
     return NextResponse.json({
       results,
       count: results.length,
+      waterfall_stage: 2,
     });
 
   } catch (error) {
