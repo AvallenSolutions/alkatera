@@ -111,36 +111,35 @@ export default function ProductRecipePage() {
           data_source: item.data_source as any,
           data_source_id: item.data_source_id,
           supplier_product_id: item.supplier_product_id,
-          supplier_name: item.supplier_name,
           amount: item.quantity,
           unit: item.unit || 'kg',
           origin_country: item.origin_country || '',
           is_organic_certified: item.is_organic_certified || false,
           transport_mode: 'truck',
           distance_km: '',
-          carbon_intensity: item.carbon_intensity,
         })));
       }
 
       if (packagingItems.length > 0) {
-        setPackagingForms(packagingItems.map(item => ({
-          tempId: item.id,
-          name: item.material_name,
-          data_source: item.data_source as any,
-          data_source_id: item.data_source_id,
-          supplier_product_id: item.supplier_product_id,
-          supplier_name: item.supplier_name,
-          amount: item.quantity,
-          unit: item.unit || 'g',
-          packaging_category: (item.packaging_category as any) || 'container',
-          recycled_content_percentage: '',
-          printing_process: 'standard_ink',
-          net_weight_g: item.quantity || '',
-          origin_country: item.origin_country || '',
-          transport_mode: 'truck',
-          distance_km: '',
-          carbon_intensity: item.carbon_intensity,
-        })));
+        setPackagingForms(packagingItems.map(item => {
+          const categoryMatch = item.notes?.match(/Category: (\w+)/);
+          return {
+            tempId: item.id,
+            name: item.material_name,
+            data_source: item.data_source as any,
+            data_source_id: item.data_source_id,
+            supplier_product_id: item.supplier_product_id,
+            amount: item.quantity,
+            unit: item.unit || 'g',
+            packaging_category: categoryMatch ? categoryMatch[1] : 'container',
+            recycled_content_percentage: '',
+            printing_process: 'standard_ink',
+            net_weight_g: item.quantity || '',
+            origin_country: item.origin_country || '',
+            transport_mode: 'truck',
+            distance_km: '',
+          };
+        }));
       }
     } catch (error: any) {
       console.error("Error fetching product data:", error);
@@ -236,8 +235,6 @@ export default function ProductRecipePage() {
         data_source: form.data_source,
         data_source_id: form.data_source_id || null,
         supplier_product_id: form.supplier_product_id || null,
-        supplier_name: form.supplier_name || null,
-        carbon_intensity: form.carbon_intensity || null,
         origin_country: form.origin_country || null,
         is_organic_certified: form.is_organic_certified,
       }));
@@ -248,11 +245,11 @@ export default function ProductRecipePage() {
 
       if (error) throw error;
 
-      toast.success("Ingredients saved successfully");
+      toast.success(`${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`);
       await fetchProductData();
     } catch (error: any) {
       console.error("Error saving ingredients:", error);
-      toast.error("Failed to save ingredients");
+      toast.error(`Failed to save ingredients: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -285,10 +282,8 @@ export default function ProductRecipePage() {
         data_source: form.data_source,
         data_source_id: form.data_source_id || null,
         supplier_product_id: form.supplier_product_id || null,
-        supplier_name: form.supplier_name || null,
-        carbon_intensity: form.carbon_intensity || null,
-        packaging_category: form.packaging_category,
         origin_country: form.origin_country || null,
+        notes: form.packaging_category ? `Category: ${form.packaging_category}` : null,
       }));
 
       const { error } = await supabase
@@ -297,11 +292,11 @@ export default function ProductRecipePage() {
 
       if (error) throw error;
 
-      toast.success("Packaging saved successfully");
+      toast.success(`${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`);
       await fetchProductData();
     } catch (error: any) {
       console.error("Error saving packaging:", error);
-      toast.error("Failed to save packaging");
+      toast.error(`Failed to save packaging: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -431,21 +426,73 @@ export default function ProductRecipePage() {
               <CardTitle>Recipe Summary</CardTitle>
               <CardDescription>Bill of materials overview</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">Ingredients</p>
-                  <p className="text-sm text-muted-foreground">Raw materials and components</p>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">Ingredients</h3>
+                  <Badge variant="outline">{ingredientCount} items</Badge>
                 </div>
-                <Badge variant="outline">{ingredientCount} items</Badge>
+
+                {ingredientCount > 0 ? (
+                  <div className="space-y-2">
+                    {ingredientForms.filter(f => f.name && f.amount).map((ingredient, index) => (
+                      <div key={ingredient.tempId} className="flex items-center justify-between p-2 border rounded text-sm">
+                        <div className="flex-1">
+                          <p className="font-medium">{ingredient.name}</p>
+                          {ingredient.origin_country && (
+                            <p className="text-xs text-muted-foreground">Origin: {ingredient.origin_country}</p>
+                          )}
+                          {ingredient.is_organic_certified && (
+                            <p className="text-xs text-green-600">Organic Certified</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">{ingredient.amount} {ingredient.unit}</p>
+                          {ingredient.data_source && (
+                            <p className="text-xs text-muted-foreground capitalize">{ingredient.data_source}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">No ingredients added yet</p>
+                )}
               </div>
 
-              <div className="flex justify-between items-center p-3 border rounded-lg">
-                <div>
-                  <p className="font-medium">Packaging</p>
-                  <p className="text-sm text-muted-foreground">Containers and materials</p>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-semibold">Packaging</h3>
+                  <Badge variant="outline">{packagingCount} items</Badge>
                 </div>
-                <Badge variant="outline">{packagingCount} items</Badge>
+
+                {packagingCount > 0 ? (
+                  <div className="space-y-2">
+                    {packagingForms.filter(f => f.name && f.amount && f.packaging_category).map((packaging, index) => (
+                      <div key={packaging.tempId} className="flex items-center justify-between p-2 border rounded text-sm">
+                        <div className="flex-1">
+                          <p className="font-medium">{packaging.name}</p>
+                          {packaging.packaging_category && (
+                            <p className="text-xs text-muted-foreground capitalize">
+                              {packaging.packaging_category.replace('_', ' ')}
+                            </p>
+                          )}
+                          {packaging.origin_country && (
+                            <p className="text-xs text-muted-foreground">Origin: {packaging.origin_country}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">{packaging.amount} {packaging.unit}</p>
+                          {packaging.data_source && (
+                            <p className="text-xs text-muted-foreground capitalize">{packaging.data_source}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-2">No packaging added yet</p>
+                )}
               </div>
             </CardContent>
           </Card>
