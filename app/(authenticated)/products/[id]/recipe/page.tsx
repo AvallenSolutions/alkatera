@@ -213,20 +213,30 @@ export default function ProductRecipePage() {
   const saveIngredients = async () => {
     const validForms = ingredientForms.filter(f => f.name && f.amount && Number(f.amount) > 0);
 
-    console.log('saveIngredients called', { validForms, productId, currentOrganization });
+    // Check authentication
+    const { data: { user } } = await supabase.auth.getUser();
+
+    console.log('=== SAVE INGREDIENTS START ===');
+    console.log('Current user:', user?.id, user?.email);
+    console.log('validForms:', validForms);
+    console.log('productId:', productId, 'type:', typeof productId);
+    console.log('currentOrganization:', currentOrganization);
 
     if (validForms.length === 0) {
+      console.log('ERROR: No valid forms');
       toast.error("Please add at least one valid ingredient");
       return;
     }
 
     if (!currentOrganization?.id) {
+      console.log('ERROR: No organization');
       toast.error("No organization selected");
       return;
     }
 
     setSaving(true);
     try {
+      console.log('Step 1: Deleting existing ingredients...');
       // Delete existing ingredients
       const { error: deleteError } = await supabase
         .from("product_materials")
@@ -236,8 +246,10 @@ export default function ProductRecipePage() {
 
       if (deleteError) {
         console.error("Delete error:", deleteError);
+        toast.error(`Delete failed: ${deleteError.message}`);
         throw new Error(`Failed to clear existing ingredients: ${deleteError.message}`);
       }
+      console.log('Step 1: Delete successful');
 
       // Prepare materials to insert
       const materialsToInsert = validForms.map(form => {
@@ -265,7 +277,7 @@ export default function ProductRecipePage() {
         return materialData;
       });
 
-      console.log('Inserting materials:', materialsToInsert);
+      console.log('Step 2: Prepared materials to insert:', JSON.stringify(materialsToInsert, null, 2));
 
       // Insert new ingredients
       const { data: insertedData, error: insertError } = await supabase
@@ -274,16 +286,21 @@ export default function ProductRecipePage() {
         .select();
 
       if (insertError) {
-        console.error("Insert error:", insertError);
+        console.error("Insert error object:", insertError);
+        console.error("Insert error details:", JSON.stringify(insertError, null, 2));
+        toast.error(`Insert failed: ${insertError.message}`);
         throw new Error(`Failed to save ingredients: ${insertError.message}`);
       }
 
-      console.log('Insert successful:', insertedData);
+      console.log('Step 2: Insert successful, data:', insertedData);
+      console.log('=== SAVE INGREDIENTS SUCCESS ===');
 
       toast.success(`${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`);
       await fetchProductData();
     } catch (error: any) {
-      console.error("Error saving ingredients:", error);
+      console.error("=== SAVE INGREDIENTS ERROR ===");
+      console.error("Error object:", error);
+      console.error("Error stack:", error.stack);
       toast.error(error.message || "Failed to save ingredients");
     } finally {
       setSaving(false);
