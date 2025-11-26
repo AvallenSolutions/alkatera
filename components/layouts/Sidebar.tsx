@@ -20,6 +20,7 @@ import {
   ChevronRight,
   FileBarChart,
   Award,
+  ShieldCheck,
 } from 'lucide-react'
 
 interface NavItem {
@@ -80,6 +81,11 @@ const navigationStructure: NavItem[] = [
 ]
 
 const developmentStructure: NavItem[] = [
+  {
+    name: 'ISO 14044 Compliance',
+    href: '/dev/docs/iso-14044-compliance',
+    icon: ShieldCheck,
+  },
   {
     name: 'Reporting Standards',
     href: '/dev/docs/reporting-standards',
