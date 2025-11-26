@@ -113,14 +113,6 @@ export function InlineIngredientSearch({
         const supplierData = await supplierResponse.json();
         const databaseData = await databaseResponse.json();
 
-        console.log('[InlineIngredientSearch] Search results:', {
-          query,
-          supplierCount: supplierData.results?.length || 0,
-          databaseCount: databaseData.results?.length || 0,
-          supplierData,
-          databaseData,
-        });
-
         setSearchResults({
           supplier: supplierData.results || [],
           database: databaseData.results || [],
