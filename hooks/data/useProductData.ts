@@ -32,11 +32,12 @@ export interface Product {
   id: number;
   name: string;
   sku: string;
-  description: string;
-  image_url: string;
+  product_description: string;
+  product_image_url: string;
   product_category: string;
   functional_unit: string;
-  functional_unit_quantity: number;
+  unit_size_value: number;
+  unit_size_unit: string;
 }
 
 export interface ProductData {

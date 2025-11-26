@@ -27,10 +27,10 @@ export function OverviewTab({ product }: OverviewTabProps) {
           </div>
         </CardHeader>
         <CardContent>
-          {product.image_url ? (
+          {product.product_image_url ? (
             <div className="aspect-square rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-900 border">
               <Image
-                src={product.image_url}
+                src={product.product_image_url}
                 alt={product.name}
                 width={400}
                 height={400}
@@ -93,21 +93,22 @@ export function OverviewTab({ product }: OverviewTabProps) {
               <div>
                 <Label>Functional Unit</Label>
                 <p className="text-base text-slate-900 dark:text-slate-100">
-                  {product.functional_unit_quantity && (
-                    <span className="font-semibold">{product.functional_unit_quantity} </span>
+                  {product.unit_size_value && product.unit_size_unit ? (
+                    <span className="font-semibold">{product.unit_size_value} {product.unit_size_unit}</span>
+                  ) : (
+                    product.functional_unit
                   )}
-                  {product.functional_unit}
                 </p>
               </div>
             )}
           </div>
 
           {/* Description */}
-          {product.description && (
+          {product.product_description && (
             <div>
               <Label>Description</Label>
               <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-1">
-                {product.description}
+                {product.product_description}
               </p>
             </div>
           )}

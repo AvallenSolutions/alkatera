@@ -176,13 +176,16 @@ export default function NewProductLCAPage() {
     try {
       let imageUrl = formData.product_image_url;
 
-      // Skip image upload for now - storage bucket not configured
-      // if (imageFile) {
-      //   const uploadedUrl = await uploadImage();
-      //   if (uploadedUrl) {
-      //     imageUrl = uploadedUrl;
-      //   }
-      // }
+      // Upload image if one was selected
+      if (imageFile) {
+        const uploadedUrl = await uploadImage();
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          // If image upload fails, don't block product creation
+          toast.warning("Product will be created without image");
+        }
+      }
 
       const { data: { user } } = await supabase.auth.getUser();
 

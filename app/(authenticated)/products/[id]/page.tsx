@@ -124,7 +124,7 @@ export default function ProductDashboardPage() {
         product={{
           name: product.name,
           sku: product.sku || "",
-          image_url: product.image_url,
+          image_url: product.product_image_url,
           product_category: product.product_category,
         }}
         isHealthy={isHealthy}
