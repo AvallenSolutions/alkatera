@@ -17,6 +17,8 @@ import { NatureCard } from '@/components/vitality/NatureCard';
 import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
 import { CircularitySheet } from '@/components/vitality/CircularitySheet';
 import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
+import { generateLcaReportPdf } from '@/lib/pdf-generator';
+import { useToast } from '@/hooks/use-toast';
 
 // Mock LCA Report Data
 const MOCK_LCA_REPORT = {
@@ -61,11 +63,13 @@ const DATA_SOURCES = [
 export default function ProductLcaReportPage() {
   const params = useParams();
   const productId = params?.id as string;
+  const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('planet');
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Mock data for evidence drawers - using metrics to ensure consistency
   const waterConsumption = MOCK_METRICS.total_impacts.water_consumption;
@@ -129,6 +133,47 @@ export default function ProductLcaReportPage() {
   const circularityRate = (circularWaste / totalWaste) * 100;
   const totalLandUseSum = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0);
 
+  const handleDownloadPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+
+      toast({
+        title: 'Generating PDF',
+        description: 'Creating your LCA report...',
+      });
+
+      await generateLcaReportPdf({
+        title: MOCK_LCA_REPORT.title,
+        version: MOCK_LCA_REPORT.version,
+        productName: MOCK_LCA_REPORT.product_name,
+        assessmentPeriod: MOCK_LCA_REPORT.assessment_period,
+        publishedDate: MOCK_LCA_REPORT.published_at,
+        dqiScore: MOCK_LCA_REPORT.dqi_score,
+        systemBoundary: MOCK_LCA_REPORT.system_boundary,
+        functionalUnit: MOCK_LCA_REPORT.functional_unit,
+        metrics: MOCK_METRICS,
+        waterSources: waterSourceItems,
+        wasteStreams: wasteStreams,
+        landUseItems: landUseItems,
+        dataSources: DATA_SOURCES,
+      });
+
+      toast({
+        title: 'PDF Generated',
+        description: 'Your LCA report has been downloaded successfully.',
+      });
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to generate PDF. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       {/* Header */}
@@ -154,9 +199,14 @@ export default function ProductLcaReportPage() {
         </div>
 
         <div className="flex items-start gap-3">
-          <Button variant="outline" className="gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleDownloadPdf}
+            disabled={isGeneratingPdf}
+          >
             <Download className="h-4 w-4" />
-            Download PDF
+            {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
           </Button>
           <Button variant="outline" className="gap-2">
             <Share2 className="h-4 w-4" />
