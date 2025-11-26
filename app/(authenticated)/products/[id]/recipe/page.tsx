@@ -213,43 +213,78 @@ export default function ProductRecipePage() {
   const saveIngredients = async () => {
     const validForms = ingredientForms.filter(f => f.name && f.amount && Number(f.amount) > 0);
 
+    console.log('saveIngredients called', { validForms, productId, currentOrganization });
+
     if (validForms.length === 0) {
       toast.error("Please add at least one valid ingredient");
       return;
     }
 
+    if (!currentOrganization?.id) {
+      toast.error("No organization selected");
+      return;
+    }
+
     setSaving(true);
     try {
-      await supabase
+      // Delete existing ingredients
+      const { error: deleteError } = await supabase
         .from("product_materials")
         .delete()
         .eq("product_id", productId)
         .eq("material_type", "ingredient");
 
-      const materialsToInsert = validForms.map(form => ({
-        product_id: parseInt(productId),
-        material_name: form.name,
-        quantity: Number(form.amount),
-        unit: form.unit,
-        material_type: 'ingredient',
-        data_source: form.data_source,
-        data_source_id: form.data_source_id || null,
-        supplier_product_id: form.supplier_product_id || null,
-        origin_country: form.origin_country || null,
-        is_organic_certified: form.is_organic_certified,
-      }));
+      if (deleteError) {
+        console.error("Delete error:", deleteError);
+        throw new Error(`Failed to clear existing ingredients: ${deleteError.message}`);
+      }
 
-      const { error } = await supabase
+      // Prepare materials to insert
+      const materialsToInsert = validForms.map(form => {
+        // Handle data source fields according to constraint requirements
+        const materialData: any = {
+          product_id: parseInt(productId),
+          material_name: form.name,
+          quantity: Number(form.amount),
+          unit: form.unit,
+          material_type: 'ingredient',
+          origin_country: form.origin_country || null,
+          is_organic_certified: form.is_organic_certified || false,
+        };
+
+        // Only include data_source if it's a valid value with required fields
+        if (form.data_source === 'openlca' && form.data_source_id) {
+          materialData.data_source = 'openlca';
+          materialData.data_source_id = form.data_source_id;
+        } else if (form.data_source === 'supplier' && form.supplier_product_id) {
+          materialData.data_source = 'supplier';
+          materialData.supplier_product_id = form.supplier_product_id;
+        }
+        // Otherwise, leave data_source as null (don't include it)
+
+        return materialData;
+      });
+
+      console.log('Inserting materials:', materialsToInsert);
+
+      // Insert new ingredients
+      const { data: insertedData, error: insertError } = await supabase
         .from("product_materials")
-        .insert(materialsToInsert);
+        .insert(materialsToInsert)
+        .select();
 
-      if (error) throw error;
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw new Error(`Failed to save ingredients: ${insertError.message}`);
+      }
+
+      console.log('Insert successful:', insertedData);
 
       toast.success(`${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`);
       await fetchProductData();
     } catch (error: any) {
       console.error("Error saving ingredients:", error);
-      toast.error(`Failed to save ingredients: ${error.message}`);
+      toast.error(error.message || "Failed to save ingredients");
     } finally {
       setSaving(false);
     }
@@ -260,43 +295,78 @@ export default function ProductRecipePage() {
       f => f.name && f.amount && Number(f.amount) > 0 && f.packaging_category
     );
 
+    console.log('savePackaging called', { validForms, productId, currentOrganization });
+
     if (validForms.length === 0) {
       toast.error("Please add at least one valid packaging item");
       return;
     }
 
+    if (!currentOrganization?.id) {
+      toast.error("No organization selected");
+      return;
+    }
+
     setSaving(true);
     try {
-      await supabase
+      // Delete existing packaging
+      const { error: deleteError } = await supabase
         .from("product_materials")
         .delete()
         .eq("product_id", productId)
         .eq("material_type", "packaging");
 
-      const materialsToInsert = validForms.map(form => ({
-        product_id: parseInt(productId),
-        material_name: form.name,
-        quantity: Number(form.net_weight_g) || Number(form.amount),
-        unit: form.unit,
-        material_type: 'packaging',
-        data_source: form.data_source,
-        data_source_id: form.data_source_id || null,
-        supplier_product_id: form.supplier_product_id || null,
-        origin_country: form.origin_country || null,
-        notes: form.packaging_category ? `Category: ${form.packaging_category}` : null,
-      }));
+      if (deleteError) {
+        console.error("Delete error:", deleteError);
+        throw new Error(`Failed to clear existing packaging: ${deleteError.message}`);
+      }
 
-      const { error } = await supabase
+      // Prepare materials to insert
+      const materialsToInsert = validForms.map(form => {
+        // Handle data source fields according to constraint requirements
+        const materialData: any = {
+          product_id: parseInt(productId),
+          material_name: form.name,
+          quantity: Number(form.net_weight_g) || Number(form.amount),
+          unit: form.unit,
+          material_type: 'packaging',
+          origin_country: form.origin_country || null,
+          notes: form.packaging_category ? `Category: ${form.packaging_category}` : null,
+        };
+
+        // Only include data_source if it's a valid value with required fields
+        if (form.data_source === 'openlca' && form.data_source_id) {
+          materialData.data_source = 'openlca';
+          materialData.data_source_id = form.data_source_id;
+        } else if (form.data_source === 'supplier' && form.supplier_product_id) {
+          materialData.data_source = 'supplier';
+          materialData.supplier_product_id = form.supplier_product_id;
+        }
+        // Otherwise, leave data_source as null (don't include it)
+
+        return materialData;
+      });
+
+      console.log('Inserting materials:', materialsToInsert);
+
+      // Insert new packaging
+      const { data: insertedData, error: insertError } = await supabase
         .from("product_materials")
-        .insert(materialsToInsert);
+        .insert(materialsToInsert)
+        .select();
 
-      if (error) throw error;
+      if (insertError) {
+        console.error("Insert error:", insertError);
+        throw new Error(`Failed to save packaging: ${insertError.message}`);
+      }
+
+      console.log('Insert successful:', insertedData);
 
       toast.success(`${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`);
       await fetchProductData();
     } catch (error: any) {
       console.error("Error saving packaging:", error);
-      toast.error(`Failed to save packaging: ${error.message}`);
+      toast.error(error.message || "Failed to save packaging");
     } finally {
       setSaving(false);
     }
