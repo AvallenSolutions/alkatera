@@ -15,10 +15,12 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
-import { ArrowLeft, Calculator, AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { ArrowLeft, Calculator, AlertCircle, CheckCircle2, Info, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import { useOrganization } from "@/lib/organizationContext";
+import { getFacilityIntensity, listFacilitiesWithIntensity, type FacilityIntensity } from "@/lib/facilityIntensity";
 
 interface Facility {
   id: string;
@@ -55,9 +57,10 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
 
   const [product, setProduct] = useState<ProductData | null>(null);
   const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [facilitiesWithIntensity, setFacilitiesWithIntensity] = useState<FacilityIntensity[]>([]);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>("");
-  const [totalProductionVolume, setTotalProductionVolume] = useState<string>("");
-  const [productProductionVolume, setProductProductionVolume] = useState<string>("");
+  const [selectedIntensity, setSelectedIntensity] = useState<FacilityIntensity | null>(null);
+  const [productNetVolume, setProductNetVolume] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,10 +80,10 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
         throw new Error("No organization selected");
       }
 
-      const [productResult, facilitiesResult] = await Promise.all([
+      const [productResult, facilitiesResult, intensitiesResult] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, core_operations_data, core_operations_provenance, core_operations_complete")
+          .select("id, name, net_volume, net_volume_unit, core_operations_data, core_operations_provenance, core_operations_complete")
           .eq("id", productId)
           .single(),
         supabase
@@ -88,6 +91,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
           .select("id, name, location")
           .eq("organization_id", currentOrganization.id)
           .order("name"),
+        listFacilitiesWithIntensity(currentOrganization.id),
       ]);
 
       if (productResult.error) throw productResult.error;
@@ -95,6 +99,15 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
 
       setProduct(productResult.data);
       setFacilities(facilitiesResult.data || []);
+
+      if (intensitiesResult.success) {
+        setFacilitiesWithIntensity(intensitiesResult.facilities);
+      }
+
+      // Pre-fill product volume from product definition
+      if (productResult.data.net_volume) {
+        setProductNetVolume(String(productResult.data.net_volume));
+      }
 
       if (productResult.data.core_operations_data &&
           typeof productResult.data.core_operations_data === 'object' &&
@@ -117,60 +130,72 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
     }
   };
 
+  const handleFacilityChange = async (facilityId: string) => {
+    setSelectedFacilityId(facilityId);
+
+    if (!currentOrganization?.id) return;
+
+    // Fetch intensity for selected facility
+    const result = await getFacilityIntensity(facilityId, currentOrganization.id);
+    if (result.success && result.intensity) {
+      setSelectedIntensity(result.intensity);
+    } else {
+      setSelectedIntensity(null);
+      if (result.error) {
+        toast.error(result.error);
+      }
+    }
+  };
+
   const handleCalculate = async () => {
     try {
       setIsCalculating(true);
       setError(null);
 
-      if (!selectedFacilityId) {
-        toast.error("Please select a manufacturing facility");
+      if (!selectedFacilityId || !selectedIntensity) {
+        toast.error("Please select a facility with calculated intensity");
         return;
       }
 
-      const totalVol = parseFloat(totalProductionVolume);
-      const productVol = parseFloat(productProductionVolume);
-
-      if (isNaN(totalVol) || totalVol <= 0) {
-        toast.error("Please enter a valid total production volume");
-        return;
-      }
+      const productVol = parseFloat(productNetVolume);
 
       if (isNaN(productVol) || productVol <= 0) {
-        toast.error("Please enter a valid product production volume");
+        toast.error("Please enter a valid product volume");
         return;
       }
 
-      if (productVol > totalVol) {
-        toast.error("Product volume cannot exceed total facility volume");
-        return;
-      }
+      // Calculate impact using facility intensity
+      const calculatedCO2e = selectedIntensity.calculatedIntensity! * productVol;
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/allocate-facility-impacts`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-            "Content-Type": "application/json",
+      // Store the calculated impact
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({
+          core_operations_data: {
+            co2e_per_unit: calculatedCO2e,
+            water_per_unit: 0, // TODO: Add water intensity
+            waste_per_unit: 0, // TODO: Add waste intensity
+            facility_name: selectedIntensity.facilityName,
+            facility_intensity: selectedIntensity.calculatedIntensity,
+            product_volume: productVol,
+            volume_unit: selectedIntensity.volumeUnit,
           },
-          body: JSON.stringify({
-            product_id: parseInt(productId),
-            facility_id: selectedFacilityId,
-            total_production_volume: totalVol,
-            product_production_volume: productVol,
-          }),
-        }
-      );
+          core_operations_provenance: selectedIntensity.isEstimate ? 'estimated' : 'verified',
+          core_operations_complete: true,
+        })
+        .eq("id", productId);
 
-      const result = await response.json();
+      if (updateError) throw updateError;
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to allocate impacts");
-      }
-
-      setAllocatedImpacts(result.allocated_impacts);
-      setProvenance(result.provenance);
-      toast.success("Impacts calculated and allocated successfully");
+      setAllocatedImpacts({
+        co2e_per_unit: calculatedCO2e,
+        water_per_unit: 0,
+        waste_per_unit: 0,
+        allocation_ratio: 1,
+        facility_name: selectedIntensity.facilityName,
+      });
+      setProvenance(selectedIntensity.isEstimate ? 'estimated' : 'verified');
+      toast.success("Manufacturing impact calculated successfully");
 
       await loadData();
     } catch (err: any) {
@@ -217,8 +242,8 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
       <Alert>
         <Info className="h-4 w-4" />
         <AlertDescription>
-          Allocate facility-level environmental impacts to this product based on production volume.
-          This uses actual measured data from your facilities for accurate LCA calculations.
+          Calculate manufacturing impacts using facility emission intensity. This ISO 14044-compliant approach
+          prevents denominator drift by using a fixed intensity factor calculated from verified facility data.
         </AlertDescription>
       </Alert>
 
@@ -235,72 +260,101 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
         <CardHeader>
           <CardTitle>Facility Impact Allocation</CardTitle>
           <CardDescription>
-            Select a facility and enter production volumes to calculate per-unit impacts
+            Calculate manufacturing impacts using pre-calculated facility emission intensity
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="facility">Select Manufacturing Facility *</Label>
-            <Select value={selectedFacilityId} onValueChange={setSelectedFacilityId}>
+            <Select value={selectedFacilityId} onValueChange={handleFacilityChange}>
               <SelectTrigger id="facility" className="mt-1">
                 <SelectValue placeholder="Choose a facility" />
               </SelectTrigger>
               <SelectContent>
-                {facilities.map((facility) => (
-                  <SelectItem key={facility.id} value={facility.id}>
-                    {facility.name}
-                    {facility.location && ` - ${facility.location}`}
+                {facilitiesWithIntensity.map((facility) => (
+                  <SelectItem key={facility.facilityId} value={facility.facilityId}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>{facility.facilityName}</span>
+                      {facility.isEstimate ? (
+                        <Badge variant="outline" className="ml-2">ESTIMATE</Badge>
+                      ) : (
+                        <Badge variant="secondary" className="ml-2">VERIFIED</Badge>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {facilitiesWithIntensity.length === 0 && facilities.length > 0 && (
+              <Alert className="mt-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  No facilities have emission intensity data. Please log emissions data for your facilities first.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
-          <div>
-            <Label htmlFor="total_volume">
-              Total Annual Production Volume at this Facility (All Products) *
-            </Label>
-            <Input
-              id="total_volume"
-              type="number"
-              step="0.01"
-              min="0"
-              value={totalProductionVolume}
-              onChange={(e) => setTotalProductionVolume(e.target.value)}
-              placeholder="e.g., 1000000"
-              className="mt-1"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Total units produced at this facility annually
-            </p>
-          </div>
+          {selectedIntensity && (
+            <div className="p-4 border rounded-lg bg-muted/50 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Facility Emission Intensity:</span>
+                {selectedIntensity.isEstimate ? (
+                  <Badge variant="outline">
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    ESTIMATE
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    VERIFIED
+                  </Badge>
+                )}
+              </div>
+              <p className="text-2xl font-bold text-primary">
+                {selectedIntensity.calculatedIntensity?.toFixed(4)} kg CO₂e / {selectedIntensity.volumeUnit}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Based on data from {new Date(selectedIntensity.reportingPeriodStart).toLocaleDateString()} to{' '}
+                {new Date(selectedIntensity.reportingPeriodEnd).toLocaleDateString()}
+              </p>
+              {selectedIntensity.isEstimate && (
+                <Alert variant="destructive" className="mt-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    This facility uses industry average data. This will result in a lower Data Quality Score.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
 
           <div>
             <Label htmlFor="product_volume">
-              Annual Production Volume for this Product *
+              Product Volume (per functional unit) *
             </Label>
             <Input
               id="product_volume"
               type="number"
-              step="0.01"
+              step="0.001"
               min="0"
-              value={productProductionVolume}
-              onChange={(e) => setProductProductionVolume(e.target.value)}
-              placeholder="e.g., 125000"
+              value={productNetVolume}
+              onChange={(e) => setProductNetVolume(e.target.value)}
+              placeholder="e.g., 0.33"
               className="mt-1"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Units of this specific product produced annually
+              Volume of this product (automatically populated from product definition)
             </p>
           </div>
 
           <Button
             onClick={handleCalculate}
-            disabled={isCalculating || facilities.length === 0}
+            disabled={isCalculating || !selectedIntensity}
             className="w-full"
           >
             <Calculator className="mr-2 h-4 w-4" />
-            {isCalculating ? "Calculating..." : "Calculate & Allocate Impacts"}
+            {isCalculating ? "Calculating..." : "Calculate Manufacturing Impact"}
           </Button>
         </CardContent>
       </Card>

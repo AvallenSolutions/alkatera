@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import { useOrganization } from "@/lib/organizationContext";
+import { LogEmissionsWithProduction } from "@/components/facilities/LogEmissionsWithProduction";
 
 interface Facility {
   id: string;
@@ -256,6 +257,11 @@ export default function FacilityDetailPage() {
         </TabsList>
 
         <TabsContent value="data-entry" className="space-y-6 mt-6">
+          <LogEmissionsWithProduction
+            facilityId={facilityId}
+            onSuccess={loadFacilityData}
+          />
+
           <Card>
             <CardHeader>
               <CardTitle>Add Utility Data</CardTitle>
