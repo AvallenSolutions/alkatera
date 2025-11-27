@@ -308,14 +308,32 @@ export default function ProductRecipePage() {
   };
 
   const savePackaging = async () => {
+    console.log('=== SAVE PACKAGING DEBUG ===');
+    console.log('All packaging forms:', packagingForms);
+
+    packagingForms.forEach((form, idx) => {
+      console.log(`Form ${idx}:`, {
+        name: form.name,
+        hasName: !!form.name,
+        amount: form.amount,
+        hasAmount: !!form.amount,
+        amountNumber: Number(form.amount),
+        amountValid: Number(form.amount) > 0,
+        packaging_category: form.packaging_category,
+        hasCategory: !!form.packaging_category,
+      });
+    });
+
     const validForms = packagingForms.filter(
       f => f.name && f.amount && Number(f.amount) > 0 && f.packaging_category
     );
 
-    console.log('savePackaging called', { validForms, productId, currentOrganization });
+    console.log('Valid forms:', validForms);
+    console.log('Product ID:', productId);
+    console.log('Current Organization:', currentOrganization);
 
     if (validForms.length === 0) {
-      toast.error("Please add at least one valid packaging item");
+      toast.error("Please add at least one valid packaging item with category selected");
       return;
     }
 
@@ -379,11 +397,14 @@ export default function ProductRecipePage() {
 
       console.log('Insert successful:', insertedData);
 
-      toast.success(`${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`);
+      toast.success(`✓ ${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`);
       await fetchProductData();
     } catch (error: any) {
-      console.error("Error saving packaging:", error);
-      toast.error(error.message || "Failed to save packaging");
+      console.error("=== ERROR SAVING PACKAGING ===");
+      console.error("Error object:", error);
+      console.error("Error message:", error.message);
+      console.error("Error details:", error);
+      toast.error(`Failed to save packaging: ${error.message || 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
