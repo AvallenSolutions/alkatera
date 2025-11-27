@@ -106,11 +106,18 @@ export default function CompositionManagerPage({ params }: CompositionManagerPag
     try {
       setIsSaving(true);
 
+      console.log('[CompositionManager] Saving modal data:', {
+        activeTab,
+        modalDataLength: modalData.length,
+        modalData,
+      });
+
       const invalidItems = modalData.filter(
         (item) => !item.name.trim() || item.weight_kg <= 0
       );
 
       if (invalidItems.length > 0) {
+        console.error('[CompositionManager] Invalid items found:', invalidItems);
         toast.error(`Please complete all ${activeTab} names and weights`);
         return;
       }
