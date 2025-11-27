@@ -69,6 +69,49 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
       throw new Error(`Failed to create LCA: ${lcaError.message}`);
     }
 
+    // Copy product materials (ingredients and packaging) to the LCA
+    try {
+      const { data: materials, error: materialsError } = await supabase
+        .from('product_materials')
+        .select('*')
+        .eq('product_id', params.productId);
+
+      if (materialsError) {
+        console.warn('[initiateLcaWorkflow] Could not fetch product materials:', materialsError);
+      } else if (materials && materials.length > 0) {
+        // Prepare LCA materials
+        const lcaMaterials = materials.map(material => ({
+          product_lca_id: lca.id,
+          organization_id: params.organizationId,
+          material_name: material.material_name,
+          material_type: material.material_type,
+          quantity: material.quantity,
+          unit: material.unit,
+          data_source: material.data_source,
+          data_source_id: material.data_source_id,
+          supplier_product_id: material.supplier_product_id,
+          origin_country: material.origin_country,
+          is_organic_certified: material.is_organic_certified,
+          packaging_category: material.packaging_category,
+          lca_stage_id: 1, // Default to first stage (materials/ingredients)
+          lca_sub_stage_id: null,
+        }));
+
+        const { error: insertError } = await supabase
+          .from('product_lca_materials')
+          .insert(lcaMaterials);
+
+        if (insertError) {
+          console.warn('[initiateLcaWorkflow] Could not copy materials to LCA:', insertError);
+        } else {
+          console.log(`[initiateLcaWorkflow] Copied ${materials.length} materials to LCA`);
+        }
+      }
+    } catch (copyError) {
+      console.warn('[initiateLcaWorkflow] Error copying materials:', copyError);
+      // Don't fail the LCA creation if copying fails
+    }
+
     await logWorkflowAction({
       lcaId: lca.id,
       workflowStep: 'goal_and_scope',
