@@ -160,7 +160,18 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
 
       if (partialEntries.length > 0) {
         console.error('[LogEmissions] Incomplete utility entries found', partialEntries);
-        toast.error('Please complete all fields for each utility entry (type, quantity, and unit)');
+
+        // Provide specific feedback about what's missing
+        const missingTypes = partialEntries.filter(e => !e.utility_type);
+        const missingQuantities = partialEntries.filter(e => !e.quantity);
+
+        if (missingTypes.length > 0) {
+          toast.error('⚠️ Please SELECT a Utility Type from the dropdown (e.g., "Purchased Electricity")');
+        } else if (missingQuantities.length > 0) {
+          toast.error('⚠️ Please ENTER a Quantity value');
+        } else {
+          toast.error('⚠️ Please complete all fields for each utility entry');
+        }
         return;
       }
 
