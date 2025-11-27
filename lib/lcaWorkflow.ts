@@ -79,21 +79,23 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
       if (materialsError) {
         console.warn('[initiateLcaWorkflow] Could not fetch product materials:', materialsError);
       } else if (materials && materials.length > 0) {
-        // Prepare LCA materials
+        // Prepare LCA materials - match the actual schema of product_lca_materials
         const lcaMaterials = materials.map(material => ({
           product_lca_id: lca.id,
-          organization_id: params.organizationId,
+          name: material.material_name,
           material_name: material.material_name,
           material_type: material.material_type,
           quantity: material.quantity,
           unit: material.unit,
+          unit_name: material.unit,
           data_source: material.data_source,
           data_source_id: material.data_source_id,
           supplier_product_id: material.supplier_product_id,
           origin_country: material.origin_country,
+          country_of_origin: material.origin_country,
           is_organic_certified: material.is_organic_certified,
+          is_organic: material.is_organic_certified,
           packaging_category: material.packaging_category,
-          lca_stage_id: 1, // Default to first stage (materials/ingredients)
           lca_sub_stage_id: null,
         }));
 
