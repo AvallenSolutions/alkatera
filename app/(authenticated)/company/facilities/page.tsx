@@ -15,12 +15,11 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Trash2, Plus, AlertCircle, Zap, MapPin, Pencil } from 'lucide-react';
+import { Loader2, Building2, Plus, AlertCircle, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AddFacilityWizard } from '@/components/facilities/AddFacilityWizard';
-import { EditFacilityDialog } from '@/components/facilities/EditFacilityDialog';
 import Link from 'next/link';
 
 interface Facility {
@@ -41,8 +40,6 @@ export default function FacilitiesPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
 
   const fetchFacilities = useCallback(async () => {
     if (!currentOrganization?.id) {
@@ -75,31 +72,6 @@ export default function FacilitiesPage() {
     fetchFacilities();
   }, [fetchFacilities]);
 
-  const handleEditFacility = (facilityId: string) => {
-    setSelectedFacilityId(facilityId);
-    setEditDialogOpen(true);
-  };
-
-  const handleDeleteFacility = async (facilityId: string, facilityName: string) => {
-    if (!confirm(`Are you sure you want to delete "${facilityName}"? This action cannot be undone.`)) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('facilities')
-        .delete()
-        .eq('id', facilityId);
-
-      if (error) throw error;
-
-      toast.success('Facility deleted successfully');
-      await fetchFacilities();
-    } catch (error: any) {
-      console.error('Error deleting facility:', error);
-      toast.error(error.message || 'Failed to delete facility');
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -152,7 +124,7 @@ export default function FacilitiesPage() {
                 <TableHead>Location</TableHead>
                 <TableHead>Control</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -205,42 +177,8 @@ export default function FacilitiesPage() {
                   <TableCell className="text-muted-foreground text-sm">
                     {formatDate(facility.created_at)}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/company/facilities/${facility.id}`);
-                        }}
-                        title="View facility details"
-                      >
-                        <Zap className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEditFacility(facility.id);
-                        }}
-                        title="Edit facility"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteFacility(facility.id, facility.name);
-                        }}
-                        title="Delete facility"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-600" />
-                      </Button>
-                    </div>
+                  <TableCell className="text-muted-foreground text-sm">
+                    Click to view details
                   </TableCell>
                 </TableRow>
               ))}
@@ -250,27 +188,16 @@ export default function FacilitiesPage() {
       )}
 
       {currentOrganization && (
-        <>
-          <AddFacilityWizard
-            open={wizardOpen}
-            onOpenChange={(open) => {
-              setWizardOpen(open);
-              if (!open) {
-                fetchFacilities();
-              }
-            }}
-            organizationId={currentOrganization.id}
-          />
-          <EditFacilityDialog
-            open={editDialogOpen}
-            onOpenChange={setEditDialogOpen}
-            facilityId={selectedFacilityId}
-            onSuccess={() => {
+        <AddFacilityWizard
+          open={wizardOpen}
+          onOpenChange={(open) => {
+            setWizardOpen(open);
+            if (!open) {
               fetchFacilities();
-              setSelectedFacilityId(null);
-            }}
-          />
-        </>
+            }
+          }}
+          organizationId={currentOrganization.id}
+        />
       )}
     </div>
   );

@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Plus, ArrowLeft, Save, Trash2, Building2, Zap } from "lucide-react";
+import { Loader2, Plus, ArrowLeft, Save, Trash2, Building2, Zap, Pencil } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import { useOrganization } from "@/lib/organizationContext";
 import { LogEmissionsWithProduction } from "@/components/facilities/LogEmissionsWithProduction";
+import { EditFacilityDialog } from "@/components/facilities/EditFacilityDialog";
 
 interface Facility {
   id: string;
@@ -80,6 +81,7 @@ export default function FacilityDetailPage() {
   const [utilityData, setUtilityData] = useState<UtilityDataEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("data-entry");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   const [newEntry, setNewEntry] = useState({
     utility_type: '',
@@ -198,6 +200,29 @@ export default function FacilityDetailPage() {
 
   const getUtilityLabel = (value: string) => {
     return UTILITY_TYPES.find(u => u.value === value)?.label || value;
+  };
+
+  const handleDeleteFacility = async () => {
+    if (!facility) return;
+
+    if (!confirm(`Are you sure you want to delete "${facility.name}"? This action cannot be undone and will remove all associated data.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('facilities')
+        .delete()
+        .eq('id', facilityId);
+
+      if (error) throw error;
+
+      toast.success('Facility deleted successfully');
+      router.push('/company/facilities');
+    } catch (error: any) {
+      console.error('Error deleting facility:', error);
+      toast.error(error.message || 'Failed to delete facility');
+    }
   };
 
   if (loading) {
@@ -443,44 +468,82 @@ export default function FacilityDetailPage() {
         </TabsContent>
 
         <TabsContent value="overview" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Facility Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Address</p>
-                <p>
-                  {facility.address_line1}
-                  <br />
-                  {facility.address_city}, {facility.address_postcode}
-                  <br />
-                  {facility.address_country}
-                </p>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Data Contracts</p>
-                {dataContracts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No data contracts defined</p>
-                ) : (
-                  <div className="space-y-2">
-                    {dataContracts.map((contract) => (
-                      <div key={contract.id} className="flex items-center justify-between p-2 border rounded">
-                        <span className="text-sm">{getUtilityLabel(contract.utility_type)}</span>
-                        <div className="flex gap-2">
-                          <Badge variant="outline">{contract.frequency}</Badge>
-                          <Badge variant="outline">{contract.data_quality}</Badge>
-                        </div>
-                      </div>
-                    ))}
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Facility Information</CardTitle>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditDialogOpen(true)}
+                    >
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit Facility
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteFacility}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Facility
+                    </Button>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Operational Control</p>
+                  <div className="mt-1">
+                    <Badge className={facility.operational_control === 'owned' ? 'bg-green-600' : 'bg-blue-600'}>
+                      {facility.operational_control === 'owned' ? 'Owned' : 'Third-Party'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Address</p>
+                  <p className="mt-1">
+                    {facility.address_line1}
+                    <br />
+                    {facility.address_city}, {facility.address_postcode}
+                    <br />
+                    {facility.address_country}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Data Contracts</p>
+                  {dataContracts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No data contracts defined</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {dataContracts.map((contract) => (
+                        <div key={contract.id} className="flex items-center justify-between p-2 border rounded">
+                          <span className="text-sm">{getUtilityLabel(contract.utility_type)}</span>
+                          <div className="flex gap-2">
+                            <Badge variant="outline">{contract.frequency}</Badge>
+                            <Badge variant="outline">{contract.data_quality}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
+
+      <EditFacilityDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        facilityId={facilityId}
+        onSuccess={loadFacilityData}
+      />
     </div>
   );
 }
