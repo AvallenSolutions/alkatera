@@ -128,7 +128,7 @@ export default function FacilitiesPage() {
             <Card
               key={facility.id}
               className="hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => router.push(`/operations/${facility.id}`)}
+              onClick={() => router.push(`/company/facilities/${facility.id}`)}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -180,7 +180,7 @@ export default function FacilitiesPage() {
                     className="w-full"
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/operations/${facility.id}`);
+                      router.push(`/company/facilities/${facility.id}`);
                     }}
                   >
                     View Dashboard
