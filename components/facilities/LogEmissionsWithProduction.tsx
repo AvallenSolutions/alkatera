@@ -54,8 +54,6 @@ interface LogEmissionsWithProductionProps {
 }
 
 export function LogEmissionsWithProduction({ facilityId, organizationId, onSuccess }: LogEmissionsWithProductionProps) {
-  console.log('[LogEmissions] Component mounted/rendered', { facilityId, organizationId });
-
   const [dataSourceType, setDataSourceType] = useState<'Primary' | 'Secondary_Average'>('Primary');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,6 +67,9 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
     quantity: '',
     unit: '',
   }]);
+
+  // Debug: Log whenever utilityEntries changes
+  console.log('[LogEmissions] Render - Current utilityEntries:', utilityEntries);
 
   const [productionVolume, setProductionVolume] = useState('');
   const [productionUnit, setProductionUnit] = useState<string>('Litres');
@@ -90,9 +91,12 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
   };
 
   const updateUtilityEntry = (index: number, field: string, value: string) => {
+    console.log('[LogEmissions] updateUtilityEntry called', { index, field, value, currentEntries: utilityEntries });
     const updated = [...utilityEntries];
     updated[index] = { ...updated[index], [field]: value };
+    console.log('[LogEmissions] Updated entry:', updated[index]);
     setUtilityEntries(updated);
+    console.log('[LogEmissions] State updated, new entries:', updated);
   };
 
   const handleActivityTypeChange = (value: string) => {
