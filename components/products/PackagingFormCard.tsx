@@ -103,6 +103,20 @@ export function PackagingFormCard({
     carbon_intensity?: number;
     location?: string;
   }) => {
+    // Auto-detect packaging category from material name
+    const nameLower = selection.name.toLowerCase();
+    let detectedCategory: PackagingCategory = 'container';
+
+    if (nameLower.includes('label') || nameLower.includes('sticker')) {
+      detectedCategory = 'label';
+    } else if (nameLower.includes('cap') || nameLower.includes('lid') || nameLower.includes('closure') || nameLower.includes('cork')) {
+      detectedCategory = 'closure';
+    } else if (nameLower.includes('box') || nameLower.includes('carton') || nameLower.includes('cardboard') || nameLower.includes('case') || nameLower.includes('crate')) {
+      detectedCategory = 'secondary';
+    } else if (nameLower.includes('bottle') || nameLower.includes('jar') || nameLower.includes('can') || nameLower.includes('container') || nameLower.includes('pouch')) {
+      detectedCategory = 'container';
+    }
+
     onUpdate(packaging.tempId, {
       name: selection.name,
       data_source: selection.data_source,
@@ -112,6 +126,7 @@ export function PackagingFormCard({
       unit: selection.unit,
       carbon_intensity: selection.carbon_intensity,
       location: selection.location,
+      packaging_category: detectedCategory,
     });
   };
 
