@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -72,14 +72,7 @@ export default function FacilityDetailPage() {
   const [activeTab, setActiveTab] = useState("data-entry");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-
-  useEffect(() => {
-    if (facilityId) {
-      loadFacilityData();
-    }
-  }, [facilityId]);
-
-  const loadFacilityData = async () => {
+  const loadFacilityData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -113,7 +106,13 @@ export default function FacilityDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [facilityId]);
+
+  useEffect(() => {
+    if (facilityId) {
+      loadFacilityData();
+    }
+  }, [facilityId, loadFacilityData]);
 
 
   const handleDeleteEntry = async (entryId: string) => {
