@@ -49,10 +49,11 @@ const PRODUCTION_UNITS = [
 
 interface LogEmissionsWithProductionProps {
   facilityId: string;
+  organizationId: string;
   onSuccess: () => void;
 }
 
-export function LogEmissionsWithProduction({ facilityId, onSuccess }: LogEmissionsWithProductionProps) {
+export function LogEmissionsWithProduction({ facilityId, organizationId, onSuccess }: LogEmissionsWithProductionProps) {
   const [dataSourceType, setDataSourceType] = useState<'Primary' | 'Secondary_Average'>('Primary');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -100,8 +101,21 @@ export function LogEmissionsWithProduction({ facilityId, onSuccess }: LogEmissio
 
   const handleSubmit = async () => {
     // Validation
+    if (!organizationId) {
+      toast.error('Organization ID is required');
+      return;
+    }
+
     if (!periodStart || !periodEnd) {
       toast.error('Please select reporting period');
+      return;
+    }
+
+    const startDate = new Date(periodStart);
+    const endDate = new Date(periodEnd);
+
+    if (endDate <= startDate) {
+      toast.error('End date must be after start date');
       return;
     }
 
@@ -113,6 +127,11 @@ export function LogEmissionsWithProduction({ facilityId, onSuccess }: LogEmissio
       const hasInvalidEntry = utilityEntries.some(e => !e.utility_type || !e.quantity || !e.unit);
       if (hasInvalidEntry) {
         toast.error('Please complete all utility entries');
+        return;
+      }
+      const hasZeroQuantity = utilityEntries.some(e => parseFloat(e.quantity) <= 0);
+      if (hasZeroQuantity) {
+        toast.error('All quantities must be greater than zero');
         return;
       }
     } else {
@@ -130,39 +149,59 @@ export function LogEmissionsWithProduction({ facilityId, onSuccess }: LogEmissio
         // TODO: Call edge function to calculate emissions from utility data
         // For now, we'll create a placeholder emission log
 
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !userData.user) {
+          throw new Error('User not authenticated');
+        }
+
         const { error } = await supabase
           .from('facility_emissions_aggregated')
           .insert({
             facility_id: facilityId,
-            organization_id: (await supabase.auth.getUser()).data.user?.user_metadata?.organization_id,
+            organization_id: organizationId,
             reporting_period_start: periodStart,
             reporting_period_end: periodEnd,
             total_co2e: 0, // Will be calculated by edge function
             total_production_volume: parseFloat(productionVolume),
-            volume_unit: productionUnit,
+            volume_unit: productionUnit as any,
             data_source_type: 'Primary',
+            calculated_by: userData.user.id,
             results_payload: { utility_entries: utilityEntries },
           });
 
-        if (error) throw error;
-        toast.success('Primary emissions data logged successfully. Intensity will be calculated automatically.');
+        if (error) {
+          console.error('Error inserting primary data:', error);
+          throw new Error(error.message || 'Failed to save primary emissions data');
+        }
+        toast.success('Primary emissions data logged successfully. Intensity calculated automatically.');
       } else {
         // Path B: Secondary Average - Use industry proxy
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !userData.user) {
+          throw new Error('User not authenticated');
+        }
+
         const { error } = await supabase
           .from('facility_emissions_aggregated')
           .insert({
             facility_id: facilityId,
-            organization_id: (await supabase.auth.getUser()).data.user?.user_metadata?.organization_id,
+            organization_id: organizationId,
             reporting_period_start: periodStart,
             reporting_period_end: periodEnd,
             total_co2e: 0, // Not calculated for secondary
             data_source_type: 'Secondary_Average',
             facility_activity_type: facilityActivityType,
             fallback_intensity_factor: selectedIntensity,
+            calculated_by: userData.user.id,
             results_payload: { method: 'industry_average' },
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error inserting secondary data:', error);
+          throw new Error(error.message || 'Failed to save industry average data');
+        }
         toast.success('Industry average intensity configured successfully');
       }
 

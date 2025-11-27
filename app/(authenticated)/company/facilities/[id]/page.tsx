@@ -221,6 +221,7 @@ export default function FacilityDetailPage() {
         <TabsContent value="data-entry" className="space-y-6 mt-6">
           <LogEmissionsWithProduction
             facilityId={facilityId}
+            organizationId={facility?.organization_id || ''}
             onSuccess={loadFacilityData}
           />
 
