@@ -365,8 +365,8 @@ export default function ProductRecipePage() {
           quantity: Number(form.net_weight_g) || Number(form.amount),
           unit: form.unit,
           material_type: 'packaging',
+          packaging_category: form.packaging_category || null,
           origin_country: form.origin_country || null,
-          notes: form.packaging_category ? `Category: ${form.packaging_category}` : null,
         };
 
         // Only include data_source if it's a valid value with required fields
