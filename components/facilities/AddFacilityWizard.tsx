@@ -55,6 +55,7 @@ const UTILITY_TYPES = [
 
 const FACILITY_FUNCTIONS = [
   'Brewing',
+  'Distillery',
   'Bottling',
   'Canning',
   'Kegging',

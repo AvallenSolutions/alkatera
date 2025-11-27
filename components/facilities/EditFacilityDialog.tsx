@@ -45,6 +45,7 @@ interface FacilityData {
 
 const FACILITY_FUNCTIONS = [
   'Brewing',
+  'Distillery',
   'Bottling',
   'Canning',
   'Kegging',
