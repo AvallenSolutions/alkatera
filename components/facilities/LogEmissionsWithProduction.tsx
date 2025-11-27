@@ -144,16 +144,32 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
         return;
       }
 
-      const hasInvalidEntry = utilityEntries.some(e => !e.utility_type || !e.quantity || !e.unit);
-      if (hasInvalidEntry) {
-        console.error('[LogEmissions] Invalid utility entries found', utilityEntries);
-        toast.error('Please complete all utility entries');
+      // Check each utility entry individually for better error messages
+      const emptyEntries = utilityEntries.filter(e => !e.utility_type && !e.quantity && !e.unit);
+      const partialEntries = utilityEntries.filter(e =>
+        (e.utility_type && (!e.quantity || !e.unit)) ||
+        (e.quantity && (!e.utility_type || !e.unit)) ||
+        (e.unit && (!e.utility_type || !e.quantity))
+      );
+
+      if (emptyEntries.length === utilityEntries.length) {
+        console.error('[LogEmissions] No utility entries provided');
+        toast.error('Please add at least one utility entry (select utility type, enter quantity and unit)');
         return;
       }
 
-      const hasZeroQuantity = utilityEntries.some(e => parseFloat(e.quantity) <= 0);
+      if (partialEntries.length > 0) {
+        console.error('[LogEmissions] Incomplete utility entries found', partialEntries);
+        toast.error('Please complete all fields for each utility entry (type, quantity, and unit)');
+        return;
+      }
+
+      // Filter out completely empty entries (in case user added extras)
+      const validEntries = utilityEntries.filter(e => e.utility_type || e.quantity || e.unit);
+
+      const hasZeroQuantity = validEntries.some(e => parseFloat(e.quantity) <= 0);
       if (hasZeroQuantity) {
-        console.error('[LogEmissions] Zero or negative quantities found', utilityEntries);
+        console.error('[LogEmissions] Zero or negative quantities found', validEntries);
         toast.error('All quantities must be greater than zero');
         return;
       }
@@ -185,6 +201,9 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
           throw new Error('User not authenticated');
         }
 
+        // Filter out completely empty entries before saving
+        const validUtilityEntries = utilityEntries.filter(e => e.utility_type && e.quantity && e.unit);
+
         console.log('[LogEmissions] Inserting facility emissions data...', {
           facility_id: facilityId,
           organization_id: organizationId,
@@ -192,6 +211,7 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
           reporting_period_end: periodEnd,
           total_production_volume: parseFloat(productionVolume),
           volume_unit: productionUnit,
+          valid_utility_entries: validUtilityEntries,
         });
 
         const { data: insertedData, error } = await supabase
@@ -206,7 +226,7 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
             volume_unit: productionUnit as any,
             data_source_type: 'Primary',
             calculated_by: userData.user.id,
-            results_payload: { utility_entries: utilityEntries },
+            results_payload: { utility_entries: validUtilityEntries },
           })
           .select();
 
