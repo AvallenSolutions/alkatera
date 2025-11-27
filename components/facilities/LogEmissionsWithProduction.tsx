@@ -121,6 +121,7 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
     }
 
     if (!periodStart || !periodEnd) {
+      console.error('[LogEmissions] Missing reporting period');
       toast.error('Please select reporting period');
       return;
     }
@@ -129,25 +130,35 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
     const endDate = new Date(periodEnd);
 
     if (endDate <= startDate) {
+      console.error('[LogEmissions] Invalid date range', { startDate, endDate });
       toast.error('End date must be after start date');
       return;
     }
 
     if (dataSourceType === 'Primary') {
+      console.log('[LogEmissions] Validating Primary data', { productionVolume, utilityEntries });
+
       if (!productionVolume || parseFloat(productionVolume) <= 0) {
+        console.error('[LogEmissions] Invalid production volume', productionVolume);
         toast.error('Please enter total production volume');
         return;
       }
+
       const hasInvalidEntry = utilityEntries.some(e => !e.utility_type || !e.quantity || !e.unit);
       if (hasInvalidEntry) {
+        console.error('[LogEmissions] Invalid utility entries found', utilityEntries);
         toast.error('Please complete all utility entries');
         return;
       }
+
       const hasZeroQuantity = utilityEntries.some(e => parseFloat(e.quantity) <= 0);
       if (hasZeroQuantity) {
+        console.error('[LogEmissions] Zero or negative quantities found', utilityEntries);
         toast.error('All quantities must be greater than zero');
         return;
       }
+
+      console.log('[LogEmissions] Primary validation passed');
     } else {
       if (!facilityActivityType || selectedIntensity === null) {
         toast.error('Please select facility activity type');
@@ -170,10 +181,20 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
         const { data: userData, error: userError } = await supabase.auth.getUser();
 
         if (userError || !userData.user) {
+          console.error('[LogEmissions] User authentication failed', userError);
           throw new Error('User not authenticated');
         }
 
-        const { error } = await supabase
+        console.log('[LogEmissions] Inserting facility emissions data...', {
+          facility_id: facilityId,
+          organization_id: organizationId,
+          reporting_period_start: periodStart,
+          reporting_period_end: periodEnd,
+          total_production_volume: parseFloat(productionVolume),
+          volume_unit: productionUnit,
+        });
+
+        const { data: insertedData, error } = await supabase
           .from('facility_emissions_aggregated')
           .insert({
             facility_id: facilityId,
@@ -186,7 +207,10 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
             data_source_type: 'Primary',
             calculated_by: userData.user.id,
             results_payload: { utility_entries: utilityEntries },
-          });
+          })
+          .select();
+
+        console.log('[LogEmissions] Insert response:', { data: insertedData, error });
 
         if (error) {
           console.error('Error inserting primary data:', error);
@@ -200,10 +224,18 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
         const { data: userData, error: userError } = await supabase.auth.getUser();
 
         if (userError || !userData.user) {
+          console.error('[LogEmissions] User authentication failed', userError);
           throw new Error('User not authenticated');
         }
 
-        const { error } = await supabase
+        console.log('[LogEmissions] Inserting secondary/industry average data...', {
+          facility_id: facilityId,
+          organization_id: organizationId,
+          facility_activity_type: facilityActivityType,
+          fallback_intensity_factor: selectedIntensity,
+        });
+
+        const { data: insertedData, error } = await supabase
           .from('facility_emissions_aggregated')
           .insert({
             facility_id: facilityId,
@@ -216,7 +248,10 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
             fallback_intensity_factor: selectedIntensity,
             calculated_by: userData.user.id,
             results_payload: { method: 'industry_average' },
-          });
+          })
+          .select();
+
+        console.log('[LogEmissions] Insert response:', { data: insertedData, error });
 
         if (error) {
           console.error('Error inserting secondary data:', error);
