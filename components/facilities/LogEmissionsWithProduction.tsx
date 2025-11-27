@@ -54,6 +54,8 @@ interface LogEmissionsWithProductionProps {
 }
 
 export function LogEmissionsWithProduction({ facilityId, organizationId, onSuccess }: LogEmissionsWithProductionProps) {
+  console.log('[LogEmissions] Component mounted/rendered', { facilityId, organizationId });
+
   const [dataSourceType, setDataSourceType] = useState<'Primary' | 'Secondary_Average'>('Primary');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -100,8 +102,20 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
   };
 
   const handleSubmit = async () => {
+    console.log('[LogEmissions] handleSubmit called', {
+      facilityId,
+      organizationId,
+      dataSourceType,
+      periodStart,
+      periodEnd,
+      productionVolume,
+      utilityEntries,
+      facilityActivityType
+    });
+
     // Validation
     if (!organizationId) {
+      console.error('[LogEmissions] Missing organization ID');
       toast.error('Organization ID is required');
       return;
     }
@@ -141,10 +155,14 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
       }
     }
 
+    console.log('[LogEmissions] Validation passed, starting submission...');
+
     try {
       setIsSubmitting(true);
+      console.log('[LogEmissions] isSubmitting set to true');
 
       if (dataSourceType === 'Primary') {
+        console.log('[LogEmissions] Processing Primary data path');
         // Path A: Primary Data - Calculate emissions from utilities, then calculate intensity
         // TODO: Call edge function to calculate emissions from utility data
         // For now, we'll create a placeholder emission log
@@ -174,8 +192,10 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
           console.error('Error inserting primary data:', error);
           throw new Error(error.message || 'Failed to save primary emissions data');
         }
+        console.log('[LogEmissions] Primary data saved successfully');
         toast.success('Primary emissions data logged successfully. Intensity calculated automatically.');
       } else {
+        console.log('[LogEmissions] Processing Secondary data path');
         // Path B: Secondary Average - Use industry proxy
         const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -202,6 +222,7 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
           console.error('Error inserting secondary data:', error);
           throw new Error(error.message || 'Failed to save industry average data');
         }
+        console.log('[LogEmissions] Secondary data saved successfully');
         toast.success('Industry average intensity configured successfully');
       }
 
