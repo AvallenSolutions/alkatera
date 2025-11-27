@@ -303,6 +303,7 @@ export async function getIngredientsForLCA(lcaId: string, organizationId: string
       .from('product_lca_materials')
       .select('*')
       .eq('product_lca_id', lcaId)
+      .eq('material_type', 'ingredient')
       .order('created_at', { ascending: true });
 
     if (error) {

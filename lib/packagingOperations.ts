@@ -314,7 +314,7 @@ export async function getPackagingForLCA(lcaId: string, organizationId: string) 
       .from('product_lca_materials')
       .select('*')
       .eq('product_lca_id', lcaId)
-      .not('packaging_category', 'is', null)
+      .eq('material_type', 'packaging')
       .order('packaging_category', { ascending: true })
       .order('created_at', { ascending: true });
 
