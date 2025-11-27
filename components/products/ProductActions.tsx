@@ -15,7 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Edit, Boxes, Trash2, LayoutDashboard } from "lucide-react";
+import { Edit, Boxes, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteProduct } from "@/lib/products";
 
@@ -55,13 +55,6 @@ export function ProductActions({
           <CardDescription>Manage this product</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          <Link href={`/products/${productId}/hub`} className="block">
-            <Button className="w-full">
-              <LayoutDashboard className="mr-2 h-4 w-4" />
-              Product Hub
-            </Button>
-          </Link>
-
           <Link href={`/dashboard/products/${productId}/edit`} className="block">
             <Button variant="outline" className="w-full">
               <Edit className="mr-2 h-4 w-4" />

@@ -218,9 +218,9 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-        <Button onClick={() => router.push(`/products/${productId}/hub`)} className="mt-4">
+        <Button onClick={() => router.push(`/products/${productId}`)} className="mt-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Hub
+          Back to Product
         </Button>
       </div>
     );
@@ -233,11 +233,25 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
           <h1 className="text-3xl font-bold">Core Operations</h1>
           <p className="text-muted-foreground mt-1">{product?.name}</p>
         </div>
-        <Button variant="outline" onClick={() => router.push(`/products/${productId}/hub`)}>
+        <Button variant="outline" onClick={() => router.push(`/products/${productId}`)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Hub
+          Back to Product
         </Button>
       </div>
+
+      <Alert variant="default" className="border-amber-500 bg-amber-50 dark:bg-amber-950">
+        <AlertCircle className="h-4 w-4 text-amber-600" />
+        <AlertDescription className="text-amber-800 dark:text-amber-200">
+          <strong>Notice:</strong> This workflow has been superseded by our ISO14044-compliant LCA process.
+          For new assessments, please use the <Button
+            variant="link"
+            className="p-0 h-auto text-amber-900 dark:text-amber-100 underline font-semibold"
+            onClick={() => router.push(`/products/${productId}/lca/initiate`)}
+          >
+            ISO14044 LCA Flow
+          </Button>.
+        </AlertDescription>
+      </Alert>
 
       <Alert>
         <Info className="h-4 w-4" />
