@@ -99,6 +99,21 @@ export function useProductData(productId: string | undefined) {
 
       if (packagingError) throw packagingError;
 
+      console.log('=== FETCHED PACKAGING DATA ===');
+      console.log('Raw packaging data:', packagingData);
+      if (packagingData && packagingData.length > 0) {
+        packagingData.forEach((pkg, idx) => {
+          console.log(`Package ${idx}:`, {
+            id: pkg.id,
+            material_name: pkg.material_name,
+            quantity: pkg.quantity,
+            unit: pkg.unit,
+            packaging_category: pkg.packaging_category,
+            has_category: !!pkg.packaging_category
+          });
+        });
+      }
+
       // Fetch LCA reports
       const { data: lcaData, error: lcaError } = await supabase
         .from("product_lcas")

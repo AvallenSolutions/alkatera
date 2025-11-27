@@ -395,10 +395,16 @@ export default function ProductRecipePage() {
         throw new Error(`Failed to save packaging: ${insertError.message}`);
       }
 
-      console.log('Insert successful:', insertedData);
+      console.log('=== INSERT SUCCESSFUL ===');
+      console.log('Inserted data:', insertedData);
 
+      // Show success toast
       toast.success(`✓ ${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`);
+
+      // Refetch product data
+      console.log('Refetching product data...');
       await fetchProductData();
+      console.log('Product data refetched');
     } catch (error: any) {
       console.error("=== ERROR SAVING PACKAGING ===");
       console.error("Error object:", error);
