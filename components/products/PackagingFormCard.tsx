@@ -262,7 +262,10 @@ export function PackagingFormCard({
                   min="0"
                   placeholder="0"
                   value={packaging.net_weight_g}
-                  onChange={(e) => onUpdate(packaging.tempId, { net_weight_g: e.target.value })}
+                  onChange={(e) => onUpdate(packaging.tempId, {
+                    net_weight_g: e.target.value,
+                    amount: e.target.value
+                  })}
                   className={
                     (packaging.packaging_category === 'label' && Number(packaging.net_weight_g) > 10) ||
                     (packaging.packaging_category === 'closure' && Number(packaging.net_weight_g) > 10)
