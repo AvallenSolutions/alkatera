@@ -6,22 +6,12 @@ import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Loader2, Plus, ArrowLeft, Save, Trash2, Building2, Zap, Pencil } from "lucide-react";
+import { ArrowLeft, Trash2, Building2, Zap, Pencil } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
-import { useOrganization } from "@/lib/organizationContext";
 import { LogEmissionsWithProduction } from "@/components/facilities/LogEmissionsWithProduction";
 import { EditFacilityDialog } from "@/components/facilities/EditFacilityDialog";
 
@@ -74,7 +64,6 @@ export default function FacilityDetailPage() {
   const params = useParams();
   const router = useRouter();
   const facilityId = params.id as string;
-  const { currentOrganization } = useOrganization();
 
   const [facility, setFacility] = useState<Facility | null>(null);
   const [dataContracts, setDataContracts] = useState<DataContract[]>([]);
@@ -83,16 +72,6 @@ export default function FacilityDetailPage() {
   const [activeTab, setActiveTab] = useState("data-entry");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
-  const [newEntry, setNewEntry] = useState({
-    utility_type: '',
-    quantity: '',
-    unit: '',
-    reporting_period_start: '',
-    reporting_period_end: '',
-    data_quality: 'actual',
-    notes: '',
-  });
-  const [isAddingEntry, setIsAddingEntry] = useState(false);
 
   useEffect(() => {
     if (facilityId) {
@@ -136,48 +115,6 @@ export default function FacilityDetailPage() {
     }
   };
 
-  const handleAddEntry = async () => {
-    if (!newEntry.utility_type || !newEntry.quantity || !newEntry.unit || !newEntry.reporting_period_start || !newEntry.reporting_period_end) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
-
-    try {
-      setIsAddingEntry(true);
-
-      const { error } = await supabase
-        .from('utility_data_entries')
-        .insert({
-          facility_id: facilityId,
-          utility_type: newEntry.utility_type,
-          quantity: parseFloat(newEntry.quantity),
-          unit: newEntry.unit,
-          reporting_period_start: newEntry.reporting_period_start,
-          reporting_period_end: newEntry.reporting_period_end,
-          data_quality: newEntry.data_quality,
-          notes: newEntry.notes || null,
-        });
-
-      if (error) throw error;
-
-      toast.success('Utility data added successfully');
-      setNewEntry({
-        utility_type: '',
-        quantity: '',
-        unit: '',
-        reporting_period_start: '',
-        reporting_period_end: '',
-        data_quality: 'actual',
-        notes: '',
-      });
-      await loadFacilityData();
-    } catch (error: any) {
-      console.error('Error adding utility data:', error);
-      toast.error(error.message || 'Failed to add utility data');
-    } finally {
-      setIsAddingEntry(false);
-    }
-  };
 
   const handleDeleteEntry = async (entryId: string) => {
     if (!confirm('Are you sure you want to delete this entry?')) return;
@@ -286,117 +223,6 @@ export default function FacilityDetailPage() {
             facilityId={facilityId}
             onSuccess={loadFacilityData}
           />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Add Utility Data</CardTitle>
-              <CardDescription>
-                Enter consumption data for this facility
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="utility_type">Utility Type *</Label>
-                  <Select
-                    value={newEntry.utility_type}
-                    onValueChange={(value) => {
-                      const utility = UTILITY_TYPES.find(u => u.value === value);
-                      setNewEntry({
-                        ...newEntry,
-                        utility_type: value,
-                        unit: utility?.defaultUnit || '',
-                      });
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select utility type..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {UTILITY_TYPES.map((utility) => (
-                        <SelectItem key={utility.value} value={utility.value}>
-                          {utility.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="quantity">Quantity *</Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={newEntry.quantity}
-                    onChange={(e) => setNewEntry({ ...newEntry, quantity: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="unit">Unit *</Label>
-                  <Input
-                    id="unit"
-                    placeholder="kWh, Litres, m³, etc."
-                    value={newEntry.unit}
-                    onChange={(e) => setNewEntry({ ...newEntry, unit: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="data_quality">Data Quality</Label>
-                  <Select
-                    value={newEntry.data_quality}
-                    onValueChange={(value) => setNewEntry({ ...newEntry, data_quality: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="actual">Actual</SelectItem>
-                      <SelectItem value="estimated">Estimated</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="period_start">Period Start *</Label>
-                  <Input
-                    id="period_start"
-                    type="date"
-                    value={newEntry.reporting_period_start}
-                    onChange={(e) => setNewEntry({ ...newEntry, reporting_period_start: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="period_end">Period End *</Label>
-                  <Input
-                    id="period_end"
-                    type="date"
-                    value={newEntry.reporting_period_end}
-                    onChange={(e) => setNewEntry({ ...newEntry, reporting_period_end: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <Input
-                  id="notes"
-                  placeholder="Any additional information..."
-                  value={newEntry.notes}
-                  onChange={(e) => setNewEntry({ ...newEntry, notes: e.target.value })}
-                />
-              </div>
-
-              <Button onClick={handleAddEntry} disabled={isAddingEntry}>
-                <Plus className="mr-2 h-4 w-4" />
-                {isAddingEntry ? 'Adding...' : 'Add Entry'}
-              </Button>
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>
