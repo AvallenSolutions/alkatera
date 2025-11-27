@@ -15,11 +15,12 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Trash2, Plus, AlertCircle, Zap, MapPin } from 'lucide-react';
+import { Loader2, Building2, Trash2, Plus, AlertCircle, Zap, MapPin, Pencil } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AddFacilityWizard } from '@/components/facilities/AddFacilityWizard';
+import { EditFacilityDialog } from '@/components/facilities/EditFacilityDialog';
 import Link from 'next/link';
 
 interface Facility {
@@ -40,6 +41,8 @@ export default function FacilitiesPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<string | null>(null);
 
   const fetchFacilities = useCallback(async () => {
     if (!currentOrganization?.id) {
@@ -71,6 +74,11 @@ export default function FacilitiesPage() {
   useEffect(() => {
     fetchFacilities();
   }, [fetchFacilities]);
+
+  const handleEditFacility = (facilityId: string) => {
+    setSelectedFacilityId(facilityId);
+    setEditDialogOpen(true);
+  };
 
   const handleDeleteFacility = async (facilityId: string, facilityName: string) => {
     if (!confirm(`Are you sure you want to delete "${facilityName}"? This action cannot be undone.`)) {
@@ -206,6 +214,7 @@ export default function FacilitiesPage() {
                           e.stopPropagation();
                           router.push(`/company/facilities/${facility.id}`);
                         }}
+                        title="View facility details"
                       >
                         <Zap className="h-4 w-4" />
                       </Button>
@@ -214,8 +223,20 @@ export default function FacilitiesPage() {
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
+                          handleEditFacility(facility.id);
+                        }}
+                        title="Edit facility"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDeleteFacility(facility.id, facility.name);
                         }}
+                        title="Delete facility"
                       >
                         <Trash2 className="h-4 w-4 text-red-600" />
                       </Button>
@@ -229,16 +250,27 @@ export default function FacilitiesPage() {
       )}
 
       {currentOrganization && (
-        <AddFacilityWizard
-          open={wizardOpen}
-          onOpenChange={(open) => {
-            setWizardOpen(open);
-            if (!open) {
+        <>
+          <AddFacilityWizard
+            open={wizardOpen}
+            onOpenChange={(open) => {
+              setWizardOpen(open);
+              if (!open) {
+                fetchFacilities();
+              }
+            }}
+            organizationId={currentOrganization.id}
+          />
+          <EditFacilityDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            facilityId={selectedFacilityId}
+            onSuccess={() => {
               fetchFacilities();
-            }
-          }}
-          organizationId={currentOrganization.id}
-        />
+              setSelectedFacilityId(null);
+            }}
+          />
+        </>
       )}
     </div>
   );
