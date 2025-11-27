@@ -35,6 +35,9 @@ import { addIngredientToLCA, getIngredientsForLCA, updateIngredient, removeIngre
 import { addPackagingToLCA, getPackagingForLCA, updatePackaging, removePackaging, type PackagingMaterial } from "@/lib/packagingOperations";
 import { logIngredientSelection } from "@/lib/ingredientAudit";
 import type { LcaSubStage, PackagingCategory } from "@/lib/types/lca";
+import { ProductionFacilitiesTable, type ProductionSite } from "@/components/lca/ProductionFacilitiesTable";
+import { LinkFacilityModal } from "@/components/lca/LinkFacilityModal";
+import { getProductionSites, addProductionSite, removeProductionSite, markProductionComplete } from "@/lib/productionSiteOperations";
 
 interface LcaData {
   id: string;
@@ -70,6 +73,11 @@ export default function LcaDataCapturePage() {
   const [subStages, setSubStages] = useState<LcaSubStage[]>([]);
   const [isLoadingIngredients, setIsLoadingIngredients] = useState(false);
   const [isLoadingPackaging, setIsLoadingPackaging] = useState(false);
+  const [productionSites, setProductionSites] = useState<ProductionSite[]>([]);
+  const [isLoadingProduction, setIsLoadingProduction] = useState(false);
+  const [isLinkFacilityModalOpen, setIsLinkFacilityModalOpen] = useState(false);
+  const [productNetVolume, setProductNetVolume] = useState<number>(1);
+  const [volumeUnit, setVolumeUnit] = useState<string>('litre');
 
   useEffect(() => {
     loadLcaData();
@@ -80,6 +88,8 @@ export default function LcaDataCapturePage() {
     if (lca && currentOrganization?.id) {
       loadIngredients();
       loadPackaging();
+      loadProductionSites();
+      loadProductDetails();
     }
   }, [lca, currentOrganization]);
 
@@ -348,6 +358,101 @@ export default function LcaDataCapturePage() {
     }
   };
 
+  const loadProductDetails = async () => {
+    try {
+      const { data: productData, error: productError } = await supabase
+        .from("products")
+        .select("net_volume, net_volume_unit")
+        .eq("id", productId)
+        .single();
+
+      if (productError) throw productError;
+
+      if (productData) {
+        setProductNetVolume(Number(productData.net_volume) || 1);
+        setVolumeUnit(productData.net_volume_unit || 'litre');
+      }
+    } catch (error: any) {
+      console.error('Error loading product details:', error);
+    }
+  };
+
+  const loadProductionSites = async () => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      setIsLoadingProduction(true);
+
+      const result = await getProductionSites(lcaId, currentOrganization.id);
+
+      if (result.success) {
+        setProductionSites(result.sites);
+      } else {
+        console.error('Error loading production sites:', result.error);
+      }
+    } catch (error: any) {
+      console.error('Error loading production sites:', error);
+    } finally {
+      setIsLoadingProduction(false);
+    }
+  };
+
+  const handleAddFacility = () => {
+    setIsLinkFacilityModalOpen(true);
+  };
+
+  const handleLinkFacility = async (facilityId: string, productionVolume: number) => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      const result = await addProductionSite({
+        lcaId,
+        facilityId,
+        organizationId: currentOrganization.id,
+        productionVolume,
+      });
+
+      if (result.success) {
+        toast.success('Production facility linked');
+        await loadProductionSites();
+
+        if (productionSites.length === 0) {
+          await markProductionComplete(lcaId, currentOrganization.id, true);
+          await loadLcaData();
+        }
+      } else {
+        toast.error(result.error || 'Failed to link facility');
+      }
+    } catch (error: any) {
+      console.error('Error linking facility:', error);
+      toast.error(error.message || 'Failed to link facility');
+    }
+  };
+
+  const handleRemoveFacility = async (siteId: string) => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      const result = await removeProductionSite(siteId, currentOrganization.id);
+
+      if (result.success) {
+        toast.success('Production facility removed');
+        await loadProductionSites();
+
+        const updatedSites = productionSites.filter(s => s.id !== siteId);
+        if (updatedSites.length === 0) {
+          await markProductionComplete(lcaId, currentOrganization.id, false);
+          await loadLcaData();
+        }
+      } else {
+        toast.error(result.error || 'Failed to remove facility');
+      }
+    } catch (error: any) {
+      console.error('Error removing facility:', error);
+      toast.error(error.message || 'Failed to remove facility');
+    }
+  };
+
   const handleProceedToReview = async () => {
     const completion = await getAllTabsComplete(lcaId);
 
@@ -581,34 +686,31 @@ export default function LcaDataCapturePage() {
         </TabsContent>
 
         <TabsContent value="production" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Production & Manufacturing</CardTitle>
-              <CardDescription>
-                Allocate facility-level environmental impacts
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Link to your CoreOpsManager to allocate facility emissions, water usage,
-                  and waste generation based on production volumes.
-                </AlertDescription>
-              </Alert>
+          {isLoadingProduction ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+              <p className="text-sm">Loading production sites...</p>
+            </div>
+          ) : (
+            <ProductionFacilitiesTable
+              productionSites={productionSites}
+              onAddFacility={handleAddFacility}
+              onRemoveFacility={handleRemoveFacility}
+              productNetVolume={productNetVolume}
+              volumeUnit={volumeUnit}
+              loading={isLoadingProduction}
+            />
+          )}
 
-              <div className="mt-4">
-                <Button
-                  onClick={() => router.push(`/products/${productId}/core-operations`)}
-                  variant="outline"
-                  className="w-full"
-                >
-                  <Factory className="mr-2 h-4 w-4" />
-                  Go to Core Operations Allocation
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {currentOrganization && (
+            <LinkFacilityModal
+              open={isLinkFacilityModalOpen}
+              onClose={() => setIsLinkFacilityModalOpen(false)}
+              onSubmit={handleLinkFacility}
+              organizationId={currentOrganization.id}
+              excludeFacilityIds={productionSites.map(site => site.facility_id)}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
