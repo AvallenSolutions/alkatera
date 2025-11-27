@@ -26,6 +26,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Building2, Users, FileCheck, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
+import { COUNTRIES } from "@/lib/countries";
 
 interface AddFacilityWizardProps {
   open: boolean;
@@ -325,12 +326,18 @@ export function AddFacilityWizard({
 
               <div>
                 <Label htmlFor="addressCountry">Country *</Label>
-                <Input
-                  id="addressCountry"
-                  placeholder="United Kingdom"
-                  value={addressCountry}
-                  onChange={(e) => setAddressCountry(e.target.value)}
-                />
+                <Select value={addressCountry} onValueChange={setAddressCountry}>
+                  <SelectTrigger id="addressCountry">
+                    <SelectValue placeholder="Select country..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {COUNTRIES.map((country) => (
+                      <SelectItem key={country.value} value={country.label}>
+                        {country.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>
