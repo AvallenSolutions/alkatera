@@ -89,21 +89,97 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Copy materials to product_lca_materials
-    const lcaMaterials = masterMaterials.map((material) => ({
-      product_lca_id: lca_id,
-      material_name: material.material_name,
-      material_id: material.material_id,
-      material_type: material.material_type,
-      quantity: material.quantity,
-      unit: material.unit,
-      lca_stage_id: material.lca_stage_id,
-      lca_sub_stage_id: material.lca_sub_stage_id,
-      data_source: material.data_source,
-      data_source_id: material.data_source_id,
-      supplier_product_id: material.supplier_product_id,
-      origin_country: material.origin_country,
-      is_organic_certified: material.is_organic_certified,
+    // Lookup impact factors for each material from staging or ecoinvent
+    const lcaMaterials = await Promise.all(masterMaterials.map(async (material) => {
+      let impactFactors = {
+        impact_climate: null,
+        impact_water: null,
+        impact_land: null,
+        impact_waste: null,
+      };
+
+      // Try to find impact factors from staging_emission_factors first
+      const { data: stagingFactor } = await supabase
+        .from("staging_emission_factors")
+        .select("id, co2_factor, water_factor, land_factor, waste_factor")
+        .ilike("name", material.material_name)
+        .in("category", ["Ingredient", "Packaging"])
+        .limit(1)
+        .maybeSingle();
+
+      let sourceId = material.data_source_id;
+
+      if (stagingFactor) {
+        // Normalize quantity to kg for calculation
+        let quantityInKg = parseFloat(material.quantity);
+        const unit = material.unit?.toLowerCase() || "kg";
+
+        if (unit === "g" || unit === "grams") {
+          quantityInKg = quantityInKg / 1000;
+        } else if (unit === "ml" || unit === "millilitres") {
+          quantityInKg = quantityInKg / 1000;
+        }
+
+        impactFactors = {
+          impact_climate: quantityInKg * parseFloat(stagingFactor.co2_factor),
+          impact_water: quantityInKg * parseFloat(stagingFactor.water_factor),
+          impact_land: quantityInKg * parseFloat(stagingFactor.land_factor),
+          impact_waste: quantityInKg * parseFloat(stagingFactor.waste_factor),
+        };
+
+        // Use staging factor ID as data_source_id if not already set
+        if (!sourceId) {
+          sourceId = stagingFactor.id;
+        }
+      } else {
+        // Try ecoinvent proxies as fallback
+        const { data: ecoinventProxy } = await supabase
+          .from("ecoinvent_material_proxies")
+          .select("id, impact_climate, impact_water, impact_land, impact_waste")
+          .ilike("material_name", `%${material.material_name}%`)
+          .limit(1)
+          .maybeSingle();
+
+        if (ecoinventProxy) {
+          let quantityInKg = parseFloat(material.quantity);
+          const unit = material.unit?.toLowerCase() || "kg";
+
+          if (unit === "g" || unit === "grams") {
+            quantityInKg = quantityInKg / 1000;
+          } else if (unit === "ml" || unit === "millilitres") {
+            quantityInKg = quantityInKg / 1000;
+          }
+
+          impactFactors = {
+            impact_climate: quantityInKg * parseFloat(ecoinventProxy.impact_climate),
+            impact_water: quantityInKg * parseFloat(ecoinventProxy.impact_water),
+            impact_land: quantityInKg * parseFloat(ecoinventProxy.impact_land),
+            impact_waste: quantityInKg * parseFloat(ecoinventProxy.impact_waste),
+          };
+
+          // Use ecoinvent proxy ID as data_source_id if not already set
+          if (!sourceId) {
+            sourceId = ecoinventProxy.id;
+          }
+        }
+      }
+
+      return {
+        product_lca_id: lca_id,
+        name: material.material_name,
+        material_id: material.material_id,
+        quantity: material.quantity,
+        unit: material.unit,
+        lca_stage_id: material.lca_stage_id,
+        lca_sub_stage_id: material.lca_sub_stage_id,
+        data_source: material.data_source,
+        data_source_id: sourceId, // Use looked-up source ID
+        supplier_product_id: material.supplier_product_id,
+        origin_country: material.origin_country,
+        is_organic_certified: material.is_organic_certified,
+        packaging_category: material.packaging_category,
+        ...impactFactors,
+      };
     }));
 
     const { data: insertedMaterials, error: insertError } = await supabase

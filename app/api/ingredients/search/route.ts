@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
     const { data: stagingFactors, error: stagingError } = await supabase
       .from('staging_emission_factors')
       .select('*')
-      .or(`name.ilike.%${normalizedQuery}%`)
+      .ilike('name', `%${normalizedQuery}%`)
       .in('category', ['Ingredient', 'Packaging'])
       .order('name');
 
