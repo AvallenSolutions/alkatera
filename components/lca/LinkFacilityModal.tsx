@@ -79,10 +79,9 @@ export function LinkFacilityModal({
 
       const { data: intensitiesData, error: intensitiesError } = await supabase
         .from("facility_emissions_aggregated")
-        .select("facility_id, calculated_intensity, data_source_type, volume_unit")
+        .select("facility_id, calculated_intensity, data_source_type, volume_unit, reporting_period_start, reporting_period_end")
         .in("facility_id", facilitiesData?.map(f => f.id) || [])
-        .order("reporting_year", { ascending: false })
-        .order("reporting_period", { ascending: false });
+        .order("reporting_period_start", { ascending: false });
 
       if (intensitiesError) throw intensitiesError;
 

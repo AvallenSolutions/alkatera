@@ -64,8 +64,22 @@ export async function getProductionSites(
 
     if (sitesError) throw sitesError;
 
-    const facilityIds = (sitesData || []).map(site => site.facility_id);
+    if (!sitesData || sitesData.length === 0) {
+      return {
+        success: true,
+        sites: [],
+      };
+    }
 
+    // Calculate total production volume for share calculation
+    const totalProductionVolume = sitesData.reduce(
+      (sum, site) => sum + Number(site.production_volume || 0),
+      0
+    );
+
+    const facilityIds = sitesData.map(site => site.facility_id);
+
+    // Fetch facility names
     const { data: facilitiesData, error: facilitiesError } = await supabase
       .from("facilities")
       .select("id, name")
@@ -77,16 +91,54 @@ export async function getProductionSites(
       (facilitiesData || []).map(f => [f.id, f.name])
     );
 
-    const sites: ProductionSiteData[] = (sitesData || []).map(site => ({
-      id: site.id,
-      facility_id: site.facility_id,
-      facility_name: facilitiesMap.get(site.facility_id) || "Unknown Facility",
-      production_volume: Number(site.production_volume),
-      share_of_production: Number(site.share_of_production || 0),
-      facility_intensity: Number(site.facility_intensity || 0),
-      attributable_emissions_per_unit: Number(site.attributable_emissions_per_unit || 0),
-      data_source: site.data_source as 'Verified' | 'Industry_Average',
-    }));
+    // Fetch latest facility intensities
+    const { data: intensitiesData, error: intensitiesError } = await supabase
+      .from("facility_emissions_aggregated")
+      .select("facility_id, calculated_intensity, data_source_type")
+      .in("facility_id", facilityIds)
+      .order("reporting_period_start", { ascending: false });
+
+    if (intensitiesError) throw intensitiesError;
+
+    // Map facilities to their latest intensity
+    const intensitiesMap = new Map<string, { intensity: number; dataSource: string }>();
+    (intensitiesData || []).forEach(intensity => {
+      if (!intensitiesMap.has(intensity.facility_id)) {
+        intensitiesMap.set(intensity.facility_id, {
+          intensity: Number(intensity.calculated_intensity || 0),
+          dataSource: intensity.data_source_type === 'Primary' ? 'Verified' : 'Industry_Average'
+        });
+      }
+    });
+
+    const sites: ProductionSiteData[] = sitesData.map(site => {
+      const productionVolume = Number(site.production_volume);
+      const shareOfProduction = totalProductionVolume > 0
+        ? (productionVolume / totalProductionVolume) * 100
+        : 0;
+
+      const facilityData = intensitiesMap.get(site.facility_id);
+      const facilityIntensity = facilityData?.intensity || Number(site.facility_intensity || 0);
+
+      // Ensure correct type for data_source
+      let dataSource: 'Verified' | 'Industry_Average' = 'Industry_Average';
+      if (facilityData?.dataSource === 'Verified') {
+        dataSource = 'Verified';
+      } else if (site.data_source === 'Verified') {
+        dataSource = 'Verified';
+      }
+
+      return {
+        id: site.id,
+        facility_id: site.facility_id,
+        facility_name: facilitiesMap.get(site.facility_id) || "Unknown Facility",
+        production_volume: productionVolume,
+        share_of_production: shareOfProduction,
+        facility_intensity: facilityIntensity,
+        attributable_emissions_per_unit: Number(site.attributable_emissions_per_unit || 0),
+        data_source: dataSource,
+      };
+    });
 
     return {
       success: true,
@@ -109,6 +161,22 @@ export async function addProductionSite({
   productionVolume,
 }: AddProductionSiteParams): Promise<AddProductionSiteResult> {
   try {
+    // Fetch the latest facility intensity
+    const { data: intensityData, error: intensityError } = await supabase
+      .from("facility_emissions_aggregated")
+      .select("calculated_intensity, data_source_type")
+      .eq("facility_id", facilityId)
+      .order("reporting_period_start", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (intensityError) {
+      console.error("Error fetching facility intensity:", intensityError);
+    }
+
+    const facilityIntensity = intensityData?.calculated_intensity || null;
+    const dataSource = intensityData?.data_source_type === 'Primary' ? 'Verified' : 'Industry_Average';
+
     const { data, error } = await supabase
       .from("product_lca_production_sites")
       .insert({
@@ -116,6 +184,8 @@ export async function addProductionSite({
         facility_id: facilityId,
         organization_id: organizationId,
         production_volume: productionVolume,
+        facility_intensity: facilityIntensity,
+        data_source: dataSource,
       })
       .select("id")
       .single();

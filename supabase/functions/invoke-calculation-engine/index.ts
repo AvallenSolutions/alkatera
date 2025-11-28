@@ -617,6 +617,107 @@ async function calculateMaterialsWithHierarchy(
 }
 
 /**
+ * Calculate Manufacturing Impact from Production Facilities
+ * Uses weighted average facility intensity based on production volume allocation
+ */
+async function calculateManufacturingImpact(
+  supabase: any,
+  lcaId: string,
+  organizationId: string,
+  productNetVolume: number
+): Promise<{
+  manufacturing_co2e: number;
+  weighted_avg_intensity: number;
+  production_sites: Array<{
+    facility_name: string;
+    production_volume: number;
+    share_of_production: number;
+    facility_intensity: number;
+    data_source: string;
+  }>;
+}> {
+  console.log(`\n=== CALCULATING MANUFACTURING IMPACT ===`);
+  console.log(`Product Net Volume: ${productNetVolume}`);
+
+  // Fetch production sites for this LCA
+  const { data: sites, error: sitesError } = await supabase
+    .from("product_lca_production_sites")
+    .select("facility_id, production_volume, facility_intensity, data_source")
+    .eq("product_lca_id", lcaId)
+    .eq("organization_id", organizationId);
+
+  if (sitesError) {
+    console.error("Error fetching production sites:", sitesError);
+    throw new Error(`Failed to fetch production sites: ${sitesError.message}`);
+  }
+
+  if (!sites || sites.length === 0) {
+    console.warn("No production sites linked. Manufacturing impact = 0");
+    return {
+      manufacturing_co2e: 0,
+      weighted_avg_intensity: 0,
+      production_sites: [],
+    };
+  }
+
+  // Fetch facility names
+  const facilityIds = sites.map((s: any) => s.facility_id);
+  const { data: facilities, error: facilitiesError } = await supabase
+    .from("facilities")
+    .select("id, name")
+    .in("id", facilityIds);
+
+  if (facilitiesError) {
+    console.error("Error fetching facilities:", facilitiesError);
+    throw new Error(`Failed to fetch facilities: ${facilitiesError.message}`);
+  }
+
+  const facilitiesMap = new Map((facilities || []).map((f: any) => [f.id, f.name]));
+
+  // Calculate total production volume and weighted average intensity
+  const totalProductionVolume = sites.reduce(
+    (sum: number, site: any) => sum + Number(site.production_volume || 0),
+    0
+  );
+
+  const weightedAvgIntensity = sites.reduce((sum: number, site: any) => {
+    const volume = Number(site.production_volume || 0);
+    const intensity = Number(site.facility_intensity || 0);
+    const weight = totalProductionVolume > 0 ? volume / totalProductionVolume : 0;
+    return sum + (intensity * weight);
+  }, 0);
+
+  const manufacturingCO2e = weightedAvgIntensity * productNetVolume;
+
+  const productionSitesDetails = sites.map((site: any) => {
+    const volume = Number(site.production_volume || 0);
+    const shareOfProduction = totalProductionVolume > 0
+      ? (volume / totalProductionVolume) * 100
+      : 0;
+
+    return {
+      facility_name: facilitiesMap.get(site.facility_id) || "Unknown Facility",
+      production_volume: volume,
+      share_of_production: shareOfProduction,
+      facility_intensity: Number(site.facility_intensity || 0),
+      data_source: site.data_source,
+    };
+  });
+
+  console.log(`Production Sites: ${sites.length}`);
+  console.log(`Total Production Volume: ${totalProductionVolume}`);
+  console.log(`Weighted Average Intensity: ${weightedAvgIntensity.toFixed(4)} kg CO₂e/unit`);
+  console.log(`Manufacturing CO₂e: ${manufacturingCO2e.toFixed(4)} kg`);
+  console.log(`Formula: ${weightedAvgIntensity.toFixed(4)} × ${productNetVolume} = ${manufacturingCO2e.toFixed(4)}`);
+
+  return {
+    manufacturing_co2e: manufacturingCO2e,
+    weighted_avg_intensity: weightedAvgIntensity,
+    production_sites: productionSitesDetails,
+  };
+}
+
+/**
  * MAIN EDGE FUNCTION HANDLER
  */
 Deno.serve(async (req: Request) => {
@@ -664,13 +765,27 @@ Deno.serve(async (req: Request) => {
 
     const { data: lca, error: lcaError } = await supabase
       .from("product_lcas")
-      .select("id, organization_id, product_name, functional_unit, status")
+      .select("id, organization_id, product_name, functional_unit, status, product_id")
       .eq("id", payload.lcaId)
       .maybeSingle();
 
     if (lcaError || !lca) {
       throw new Error("Product LCA not found");
     }
+
+    // Fetch product details for net volume
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("net_volume, volume_unit")
+      .eq("id", lca.product_id)
+      .maybeSingle();
+
+    if (productError) {
+      console.warn("Could not fetch product details:", productError);
+    }
+
+    const productNetVolume = product?.net_volume || 1;
+    const volumeUnit = product?.volume_unit || "unit";
 
     const { data: membership } = await supabase
       .from("organization_members")
@@ -729,6 +844,17 @@ Deno.serve(async (req: Request) => {
       openLcaApiKey
     );
 
+    // Calculate manufacturing impact from production facilities
+    const manufacturingResult = await calculateManufacturingImpact(
+      supabase,
+      payload.lcaId,
+      lca.organization_id,
+      productNetVolume
+    );
+
+    // Combine upstream (materials) and manufacturing impacts
+    const totalCO2e = calculationResult.total_co2e + manufacturingResult.manufacturing_co2e;
+
     if (calculationResult.missing_factors.length > 0) {
       const errorMessage = `Missing emission factors for ${calculationResult.missing_factors.length} materials:\n${calculationResult.missing_factors.join("\n")}`;
 
@@ -757,14 +883,28 @@ Deno.serve(async (req: Request) => {
       throw new Error(errorMessage);
     }
 
-    // Store multi-capital results
+    // Store multi-capital results with breakdown
     const resultsToInsert = [
       {
         product_lca_id: payload.lcaId,
-        impact_category: "Multi-Capital (ReCiPe 2016 Midpoint H)",
-        value: calculationResult.total_co2e,
+        impact_category: "Total Product Footprint",
+        value: totalCO2e,
         unit: "kg CO₂ eq",
         method: "ReCiPe 2016 Midpoint (H) - CSRD/TNFD Compliant",
+      },
+      {
+        product_lca_id: payload.lcaId,
+        impact_category: "Upstream (Materials & Packaging)",
+        value: calculationResult.total_co2e,
+        unit: "kg CO₂ eq",
+        method: "ReCiPe 2016 Midpoint (H)",
+      },
+      {
+        product_lca_id: payload.lcaId,
+        impact_category: "Manufacturing (Core Operations)",
+        value: manufacturingResult.manufacturing_co2e,
+        unit: "kg CO₂ eq",
+        method: "Facility Intensity Allocation (ISO 14044)",
       },
     ];
 
@@ -790,11 +930,14 @@ Deno.serve(async (req: Request) => {
           status: "success",
           response_data: {
             calculated_materials: calculationResult.calculated_materials,
-            total_co2e: calculationResult.total_co2e,
+            upstream_co2e: calculationResult.total_co2e,
+            manufacturing_co2e: manufacturingResult.manufacturing_co2e,
+            total_co2e: totalCO2e,
             aggregated_impacts: calculationResult.aggregated_impacts,
             calculation_method: "ReCiPe 2016 Midpoint (H) - Multi-Capital LCIA",
             data_sources_breakdown: calculationResult.data_sources_breakdown,
             csrd_compliant: calculationResult.csrd_compliant,
+            manufacturing_allocation: manufacturingResult,
           },
           calculation_duration_ms: calculationDuration,
         })
@@ -803,28 +946,36 @@ Deno.serve(async (req: Request) => {
 
     console.log(`\n========================================`);
     console.log(`CALCULATION COMPLETE`);
-    console.log(`Total CO2e: ${calculationResult.total_co2e.toFixed(2)} kg`);
+    console.log(`Upstream CO2e (Materials): ${calculationResult.total_co2e.toFixed(2)} kg`);
+    console.log(`Manufacturing CO2e: ${manufacturingResult.manufacturing_co2e.toFixed(2)} kg`);
+    console.log(`Total Product Footprint: ${totalCO2e.toFixed(2)} kg`);
     console.log(`CSRD Compliant: ${calculationResult.csrd_compliant ? "YES" : "NO"}`);
     console.log(
       `Data Sources: OpenLCA=${calculationResult.data_sources_breakdown.openlca}, Supplier=${calculationResult.data_sources_breakdown.supplier}, Fallback=${calculationResult.data_sources_breakdown.internal_fallback}`
     );
+    console.log(`Production Sites: ${manufacturingResult.production_sites.length}`);
     console.log(`Duration: ${calculationDuration}ms`);
     console.log(`========================================\n`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Multi-capital LCA calculation completed using ReCiPe 2016 Midpoint (H)",
-        total_co2e: calculationResult.total_co2e,
+        message: "Multi-capital LCA calculation completed using ReCiPe 2016 Midpoint (H) with facility-based manufacturing allocation",
+        upstream_co2e: calculationResult.total_co2e,
+        manufacturing_co2e: manufacturingResult.manufacturing_co2e,
+        total_co2e: totalCO2e,
         aggregated_impacts: calculationResult.aggregated_impacts,
         materials_calculated: calculationResult.calculated_materials.length,
-        calculation_method: "ReCiPe 2016 Midpoint (H)",
+        production_sites: manufacturingResult.production_sites.length,
+        weighted_avg_facility_intensity: manufacturingResult.weighted_avg_intensity,
+        calculation_method: "ReCiPe 2016 Midpoint (H) + ISO 14044 Facility Allocation",
         impact_assessment_method: "ReCiPe 2016 Midpoint (H)",
         data_sources_breakdown: calculationResult.data_sources_breakdown,
         csrd_compliant: calculationResult.csrd_compliant,
         results_count: resultsToInsert.length,
         calculation_duration_ms: calculationDuration,
         audit_trail: calculationResult.calculated_materials,
+        manufacturing_allocation: manufacturingResult,
       }),
       {
         status: 200,
