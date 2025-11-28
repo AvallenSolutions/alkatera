@@ -225,9 +225,11 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
           valid_utility_entries: validUtilityEntries,
         });
 
-        // Insert each utility entry as a separate record
-        const insertPromises = validUtilityEntries.map(entry =>
-          supabase
+        // Insert each utility entry as both utility_data_entries AND activity_data
+        // activity_data is what the calculation engine expects
+        const insertPromises = validUtilityEntries.map(async (entry) => {
+          // First, insert to utility_data_entries for tracking
+          const utilityResult = await supabase
             .from('utility_data_entries')
             .insert({
               facility_id: facilityId,
@@ -241,7 +243,36 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
               created_by: userData.user.id,
             })
             .select()
-        );
+            .single();
+
+          if (utilityResult.error) {
+            return utilityResult;
+          }
+
+          // Determine scope for category
+          const utilityTypeValue = entry.utility_type;
+          const scope1Types = ['natural_gas', 'lpg', 'diesel_stationary', 'heavy_fuel_oil', 'biomass_solid', 'refrigerant_leakage', 'diesel_mobile', 'petrol_mobile'];
+          const category = scope1Types.includes(utilityTypeValue) ? 'Scope 1' : 'Scope 2';
+
+          // Get friendly name for utility type
+          const utilityTypeName = UTILITY_TYPES.find(u => u.value === utilityTypeValue)?.label || utilityTypeValue;
+
+          // Also insert to activity_data for the calculation engine
+          const activityResult = await supabase
+            .from('activity_data')
+            .insert({
+              organization_id: organizationId,
+              user_id: userData.user.id,
+              name: `${utilityTypeName} - ${periodStart} to ${periodEnd}`,
+              category: category,
+              quantity: parseFloat(entry.quantity),
+              unit: entry.unit,
+              activity_date: periodEnd, // Use end date as the activity date
+            })
+            .select();
+
+          return activityResult;
+        });
 
         const results = await Promise.all(insertPromises);
 
@@ -305,7 +336,47 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
         }
 
         console.log('[LogEmissions] Production volume saved to facility_emissions_aggregated');
-        toast.success(`${validUtilityEntries.length} utility ${validUtilityEntries.length === 1 ? 'entry' : 'entries'} and production volume logged successfully`);
+
+        // CRITICAL: Automatically trigger emissions calculation to compute facility intensity
+        console.log('[LogEmissions] Automatically triggering emissions calculation...');
+        toast.loading('Calculating facility emissions...', { id: 'calculating' });
+
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            throw new Error('No active session');
+          }
+
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const calculateUrl = `${supabaseUrl}/functions/v1/invoke-scope1-2-calculations`;
+
+          const calcResponse = await fetch(calculateUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              organization_id: organizationId,
+            }),
+          });
+
+          if (!calcResponse.ok) {
+            const errorData = await calcResponse.json();
+            console.error('[LogEmissions] Calculation request failed:', errorData);
+            throw new Error(errorData.error || 'Failed to calculate emissions');
+          }
+
+          const calcResult = await calcResponse.json();
+          console.log('[LogEmissions] Emissions calculated successfully:', calcResult);
+
+          toast.dismiss('calculating');
+          toast.success(`Facility data logged and emissions intensity calculated successfully!`);
+        } catch (calcError: any) {
+          console.error('[LogEmissions] Error during automatic calculation:', calcError);
+          toast.dismiss('calculating');
+          toast.warning(`Utility data saved, but automatic calculation failed: ${calcError.message}. Please run 'Calculate Emissions' manually.`);
+        }
       } else {
         console.log('[LogEmissions] Processing Secondary data path');
         // Path B: Secondary Average - Use industry proxy
