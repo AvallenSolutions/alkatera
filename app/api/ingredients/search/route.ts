@@ -241,7 +241,45 @@ export async function GET(request: NextRequest) {
     }
 
     // ========================================
-    // WATERFALL STAGE 2: CACHE CHECK
+    // WATERFALL STAGE 2: ECOINVENT PROXIES
+    // ========================================
+    const { data: ecoinventProxies, error: ecoinventError } = await supabase
+      .from('ecoinvent_material_proxies')
+      .select('*')
+      .or(`material_name.ilike.%${normalizedQuery}%,ecoinvent_process_name.ilike.%${normalizedQuery}%`)
+      .order('material_name');
+
+    if (!ecoinventError && ecoinventProxies && ecoinventProxies.length > 0) {
+      const formattedResults = ecoinventProxies.map((proxy) => ({
+        id: proxy.id,
+        name: proxy.material_name,
+        category: proxy.material_category,
+        unit: proxy.reference_unit,
+        processType: 'ECOINVENT_PROXY',
+        location: proxy.geography || 'Global',
+        co2_factor: proxy.impact_climate,
+        water_factor: proxy.impact_water,
+        land_factor: proxy.impact_land,
+        waste_factor: proxy.impact_waste,
+        source: `Ecoinvent ${proxy.ecoinvent_version}`,
+        metadata: {
+          lcia_method: proxy.lcia_method,
+          system_model: proxy.system_model,
+          data_quality_score: proxy.data_quality_score,
+        },
+      }));
+
+      return NextResponse.json({
+        results: formattedResults,
+        cached: false,
+        source: 'ecoinvent_material_proxies',
+        waterfall_stage: 2,
+        note: 'Using Ecoinvent material proxies',
+      });
+    }
+
+    // ========================================
+    // WATERFALL STAGE 3: CACHE CHECK
     // ========================================
     const { data: cacheResult } = await supabase
       .from('openlca_process_cache')
@@ -255,12 +293,12 @@ export async function GET(request: NextRequest) {
         results: cacheResult.results,
         cached: true,
         source: 'cache',
-        waterfall_stage: 2,
+        waterfall_stage: 3,
       });
     }
 
     // ========================================
-    // WATERFALL STAGE 3: OPENLCA SERVER
+    // WATERFALL STAGE 4: OPENLCA SERVER
     // ========================================
     const results = await searchOpenLCAProcesses(query);
 
@@ -278,7 +316,7 @@ export async function GET(request: NextRequest) {
       results: results,
       cached: false,
       source: OPENLCA_SERVER_ENABLED ? 'openlca_server' : 'mock_data',
-      waterfall_stage: 3,
+      waterfall_stage: 4,
       mock: !OPENLCA_SERVER_ENABLED,
       serverUrl: OPENLCA_SERVER_ENABLED ? OPENLCA_SERVER_URL : undefined,
     });

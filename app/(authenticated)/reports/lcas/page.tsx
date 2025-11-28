@@ -1,72 +1,117 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Award, Eye, Download, Search, Filter, Package, Calendar, Shield } from 'lucide-react';
+import { Award, Eye, Download, Search, Filter, Package, Calendar, Shield, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { useOrganization } from '@/lib/organizationContext';
 
-// Mock LCA reports data
-const MOCK_LCA_REPORTS = [
-  {
-    id: '550e8400-e29b-41d4-a716-446655440000',
-    product_id: 1,
-    product_name: 'Elderflower Pressé 250ml',
-    title: '2025 Product Impact Assessment',
-    version: '1.0',
-    status: 'published' as const,
-    dqi_score: 92,
-    system_boundary: 'Cradle-to-Gate',
-    functional_unit: '250ml bottle',
-    assessment_period: 'January 2025',
-    published_at: '2025-01-20',
-    total_co2e: 0.185,
-  },
-  {
-    id: '550e8400-e29b-41d4-a716-446655440001',
-    product_id: 2,
-    product_name: 'Traditional Lemonade 330ml',
-    title: '2025 LCA Study',
-    version: '1.0',
-    status: 'published' as const,
-    dqi_score: 88,
-    system_boundary: 'Cradle-to-Gate',
-    functional_unit: '330ml bottle',
-    assessment_period: 'January 2025',
-    published_at: '2025-01-18',
-    total_co2e: 0.235,
-  },
-  {
-    id: '550e8400-e29b-41d4-a716-446655440002',
-    product_id: 3,
-    product_name: 'Ginger Beer 275ml',
-    title: '2025 Environmental Profile',
-    version: '1.0',
-    status: 'draft' as const,
-    dqi_score: 76,
-    system_boundary: 'Cradle-to-Gate',
-    functional_unit: '275ml bottle',
-    assessment_period: 'January 2025',
-    published_at: null,
-    total_co2e: 0.198,
-  },
-];
+interface LCAReport {
+  id: string;
+  product_id: number | null;
+  product_name: string;
+  title: string;
+  version: string;
+  status: 'completed' | 'draft' | 'in_progress';
+  dqi_score: number;
+  system_boundary: string;
+  functional_unit: string;
+  assessment_period: string;
+  published_at: string | null;
+  total_co2e: number;
+}
 
 export default function LcasPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [reports, setReports] = useState<LCAReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { currentOrganization } = useOrganization();
 
-  const filteredReports = MOCK_LCA_REPORTS.filter(report =>
+  useEffect(() => {
+    if (currentOrganization?.id) {
+      fetchLCAReports();
+    }
+  }, [currentOrganization]);
+
+  const fetchLCAReports = async () => {
+    try {
+      setLoading(true);
+      const supabase = getSupabaseBrowserClient();
+
+      // Fetch product LCAs with results
+      const { data: lcas, error } = await supabase
+        .from('product_lcas')
+        .select(`
+          id,
+          product_id,
+          products!inner(name),
+          functional_unit,
+          status,
+          system_boundary,
+          created_at,
+          updated_at,
+          product_lca_results(impact_category, value, unit)
+        `)
+        .eq('organization_id', currentOrganization!.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching LCAs:', error);
+        return;
+      }
+
+      // Transform the data
+      const transformedReports: LCAReport[] = (lcas || []).map((lca: any) => {
+        const climateResult = lca.product_lca_results?.find(
+          (r: any) => r.impact_category === 'Climate Change'
+        );
+        const totalCO2e = climateResult ? parseFloat(climateResult.value) : 0;
+
+        // Calculate a simple DQI score based on status and data completeness
+        let dqiScore = 50;
+        if (lca.status === 'completed') dqiScore = 85;
+        if (lca.product_lca_results?.length >= 4) dqiScore += 10;
+
+        return {
+          id: lca.id,
+          product_id: lca.product_id,
+          product_name: lca.products?.name || 'Unknown Product',
+          title: `${new Date(lca.created_at).getFullYear()} LCA Study`,
+          version: '1.0',
+          status: lca.status === 'completed' ? 'completed' : 'draft',
+          dqi_score: dqiScore,
+          system_boundary: lca.system_boundary || 'Cradle-to-Gate',
+          functional_unit: lca.functional_unit || 'per unit',
+          assessment_period: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+          published_at: lca.status === 'completed' ? lca.updated_at : null,
+          total_co2e: totalCO2e,
+        };
+      });
+
+      setReports(transformedReports);
+    } catch (error) {
+      console.error('Failed to fetch LCA reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredReports = reports.filter(report =>
     report.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     report.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const getStatusBadge = (status: string) => {
     const config = {
+      completed: { className: 'bg-green-600', label: 'Completed' },
       published: { className: 'bg-green-600', label: 'Published' },
       verified: { className: 'bg-blue-600', label: 'Verified' },
       draft: { className: 'bg-gray-500', label: 'Draft' },
+      in_progress: { className: 'bg-amber-600', label: 'In Progress' },
     };
     return config[status as keyof typeof config] || config.draft;
   };
@@ -115,48 +160,59 @@ export default function LcasPage() {
         </CardContent>
       </Card>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Loading State */}
+      {loading ? (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{MOCK_LCA_REPORTS.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {MOCK_LCA_REPORTS.filter(r => r.status === 'published').length} published
-            </p>
+          <CardContent className="p-12 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </CardContent>
         </Card>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{reports.length}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {reports.filter(r => r.status === 'completed').length} completed
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Average DQI Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.round(MOCK_LCA_REPORTS.reduce((sum, r) => sum + r.dqi_score, 0) / MOCK_LCA_REPORTS.length)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              High confidence data
-            </p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Average DQI Score</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {reports.length > 0 ? Math.round(reports.reduce((sum, r) => sum + r.dqi_score, 0) / reports.length) : 0}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Data quality indicator
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">CSRD Compliant</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {MOCK_LCA_REPORTS.filter(r => r.dqi_score >= 80).length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Ready for disclosure
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">CSRD Compliant</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {reports.filter(r => r.dqi_score >= 80).length}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Ready for disclosure
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
 
       {/* Reports List */}
       <div className="space-y-4">
