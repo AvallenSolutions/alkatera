@@ -47,6 +47,10 @@ interface AssistedIngredientSearchProps {
     lca_sub_stage_id?: string | null;
     origin_country?: string;
     is_organic_certified?: boolean;
+    impact_climate?: number;
+    impact_water?: number;
+    impact_land?: number;
+    impact_waste?: number;
   }) => void;
   disabled?: boolean;
 }
@@ -152,6 +156,10 @@ export function AssistedIngredientSearch({
       unit: process.unit || 'kg',
       location: process.location,
       processType: process.processType,
+      impact_climate: process.co2_factor,
+      impact_water: process.water_factor,
+      impact_land: process.land_factor,
+      impact_waste: process.waste_factor,
     });
     setQuantityDialogOpen(true);
     setSearchOpen(false);
@@ -232,6 +240,10 @@ export function AssistedIngredientSearch({
       lca_sub_stage_id: data.lca_sub_stage_id,
       origin_country: '',
       is_organic_certified: false,
+      impact_climate: selectedIngredient.impact_climate,
+      impact_water: selectedIngredient.impact_water,
+      impact_land: selectedIngredient.impact_land,
+      impact_waste: selectedIngredient.impact_waste,
     });
 
     setSelectedIngredient(null);

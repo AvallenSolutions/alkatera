@@ -197,6 +197,10 @@ export default function LcaDataCapturePage() {
     lca_sub_stage_id?: string | null;
     origin_country?: string;
     is_organic_certified?: boolean;
+    impact_climate?: number;
+    impact_water?: number;
+    impact_land?: number;
+    impact_waste?: number;
   }) => {
     if (!currentOrganization?.id || !lca) {
       console.error('[handleIngredientConfirmed] Missing requirements:', {
@@ -231,6 +235,10 @@ export default function LcaDataCapturePage() {
         supplier_name: ingredient.supplier_name,
         origin_country: ingredient.origin_country || '',
         is_organic_certified: ingredient.is_organic_certified ?? false,
+        impact_climate: ingredient.impact_climate,
+        impact_water: ingredient.impact_water,
+        impact_land: ingredient.impact_land,
+        impact_waste: ingredient.impact_waste,
       };
 
       console.log('[handleIngredientConfirmed] Calling addIngredientToLCA with:', ingredientData);
@@ -294,6 +302,10 @@ export default function LcaDataCapturePage() {
     is_organic_certified?: boolean;
     packaging_category: PackagingCategory;
     label_printing_type?: string;
+    impact_climate?: number;
+    impact_water?: number;
+    impact_land?: number;
+    impact_waste?: number;
   }) => {
     if (!currentOrganization?.id || !lca) {
       console.error('[handlePackagingConfirmed] Missing requirements');
@@ -316,6 +328,10 @@ export default function LcaDataCapturePage() {
         is_organic_certified: packaging.is_organic_certified ?? false,
         packaging_category: packaging.packaging_category,
         label_printing_type: packaging.label_printing_type,
+        impact_climate: packaging.impact_climate,
+        impact_water: packaging.impact_water,
+        impact_land: packaging.impact_land,
+        impact_waste: packaging.impact_waste,
       };
 
       const result = await addPackagingToLCA({

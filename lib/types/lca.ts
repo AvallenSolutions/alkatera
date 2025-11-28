@@ -164,6 +164,12 @@ export interface OpenLCAProcess {
   unit?: string;
   processType?: string;
   location?: string;
+  co2_factor?: number;
+  water_factor?: number;
+  land_factor?: number;
+  waste_factor?: number;
+  source?: string;
+  metadata?: any;
 }
 
 export interface SupplierProduct {

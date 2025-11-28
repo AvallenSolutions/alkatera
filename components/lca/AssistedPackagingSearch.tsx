@@ -53,6 +53,10 @@ interface AssistedPackagingSearchProps {
     is_organic_certified?: boolean;
     packaging_category: PackagingCategory;
     label_printing_type?: string;
+    impact_climate?: number;
+    impact_water?: number;
+    impact_land?: number;
+    impact_waste?: number;
   }) => void;
   disabled?: boolean;
 }
@@ -173,6 +177,10 @@ export function AssistedPackagingSearch({
       location: process.location,
       processType: process.processType,
       packaging_category: selectedCategory,
+      impact_climate: process.co2_factor,
+      impact_water: process.water_factor,
+      impact_land: process.land_factor,
+      impact_waste: process.waste_factor,
     });
     setQuantityDialogOpen(true);
     setSearchOpen(false);
@@ -199,6 +207,10 @@ export function AssistedPackagingSearch({
       is_organic_certified: false,
       packaging_category: selectedCategory,
       label_printing_type: selectedCategory === 'label' ? labelPrintingType : undefined,
+      impact_climate: selectedPackaging.impact_climate,
+      impact_water: selectedPackaging.impact_water,
+      impact_land: selectedPackaging.impact_land,
+      impact_waste: selectedPackaging.impact_waste,
     });
 
     setSelectedPackaging(null);
