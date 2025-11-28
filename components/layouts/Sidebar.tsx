@@ -21,6 +21,8 @@ import {
   FileBarChart,
   Award,
   ShieldCheck,
+  TestTube,
+  ClipboardCheck,
 } from 'lucide-react'
 
 interface NavItem {
@@ -90,6 +92,16 @@ const developmentStructure: NavItem[] = [
     name: 'Reporting Standards',
     href: '/dev/docs/reporting-standards',
     icon: BookOpen,
+  },
+  {
+    name: 'LCA Calculation Testing',
+    href: '/dev/docs/lca-calculation-testing',
+    icon: TestTube,
+  },
+  {
+    name: 'LCA Testing Summary',
+    href: '/dev/docs/lca-testing-summary',
+    icon: ClipboardCheck,
   },
   {
     name: 'Fleet Implementation',
