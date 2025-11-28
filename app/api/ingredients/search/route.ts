@@ -224,6 +224,9 @@ export async function GET(request: NextRequest) {
         processType: 'STAGING_FACTOR',
         location: 'Internal',
         co2_factor: factor.co2_factor,
+        water_factor: factor.water_factor,
+        land_factor: factor.land_factor,
+        waste_factor: factor.waste_factor,
         source: factor.source,
         metadata: factor.metadata,
       }));

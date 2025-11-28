@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { saveDraftData, markTabComplete } from './lcaWorkflow';
-import type { DataSource } from './types/lca';
+import type { DataSource, ImpactSourceType } from './types/lca';
 
 export interface AddIngredientParams {
   lcaId: string;
@@ -16,6 +16,12 @@ export interface AddIngredientParams {
     supplier_name?: string;
     origin_country?: string;
     is_organic_certified: boolean;
+    impact_climate?: number;
+    impact_water?: number;
+    impact_land?: number;
+    impact_waste?: number;
+    impact_source?: ImpactSourceType;
+    impact_reference_id?: string;
   };
 }
 
@@ -101,6 +107,12 @@ export async function addIngredientToLCA(params: AddIngredientParams) {
       supplier_product_id: params.ingredient.supplier_product_id || null,
       origin_country: params.ingredient.origin_country || null,
       is_organic_certified: params.ingredient.is_organic_certified,
+      impact_climate: params.ingredient.impact_climate || null,
+      impact_water: params.ingredient.impact_water || null,
+      impact_land: params.ingredient.impact_land || null,
+      impact_waste: params.ingredient.impact_waste || null,
+      impact_source: params.ingredient.impact_source || 'secondary_modelled',
+      impact_reference_id: params.ingredient.impact_reference_id || params.ingredient.data_source_id || null,
     };
 
     console.log('[addIngredientToLCA] Inserting material:', materialData);

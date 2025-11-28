@@ -56,6 +56,45 @@ export type LabelPrintingType = 'digital' | 'offset' | 'flexographic' | 'gravure
 
 export type DataSource = 'openlca' | 'supplier' | 'primary';
 
+export type ImpactSourceType = 'primary_verified' | 'secondary_modelled' | 'hybrid_proxy';
+
+/**
+ * Single environmental impact metric with provenance tracking
+ */
+export interface ImpactMetric {
+  value: number;
+  unit: string;
+  source_type: ImpactSourceType;
+  reference_id?: string; // OpenLCA/Ecoinvent process ID
+  confidence_score?: number; // 0-100
+}
+
+/**
+ * Complete multi-capital impact vector for CSRD/TNFD compliance
+ */
+export interface ImpactVector {
+  climate_change: ImpactMetric;
+  water_depletion: ImpactMetric;
+  land_use: ImpactMetric;
+  waste_generation: ImpactMetric;
+  marine_eutrophication?: ImpactMetric;
+  particulate_matter?: ImpactMetric;
+  human_toxicity?: ImpactMetric;
+}
+
+/**
+ * Simplified impact factors stored at material level (per reference unit)
+ */
+export interface MaterialImpactFactors {
+  impact_climate?: number | null;
+  impact_water?: number | null;
+  impact_land?: number | null;
+  impact_waste?: number | null;
+  impact_source?: ImpactSourceType | null;
+  impact_reference_id?: string | null;
+  impact_metadata?: Record<string, any> | null;
+}
+
 export interface MaterialSelectionOutput {
   materialId: string;
   materialType: MaterialType;
@@ -94,6 +133,13 @@ export interface ProductLcaMaterial {
   is_organic_certified?: boolean;
   packaging_category?: PackagingCategory | null;
   label_printing_type?: string | null;
+  impact_climate?: number | null;
+  impact_water?: number | null;
+  impact_land?: number | null;
+  impact_waste?: number | null;
+  impact_source?: ImpactSourceType | null;
+  impact_reference_id?: string | null;
+  impact_metadata?: Record<string, any> | null;
   created_at: string;
   updated_at: string;
 }

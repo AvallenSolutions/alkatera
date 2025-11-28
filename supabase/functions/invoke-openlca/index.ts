@@ -272,17 +272,102 @@ Deno.serve(async (req: Request) => {
     let apiSuccess = false;
 
     if (!openLcaApiUrl || !openLcaApiKey) {
-      console.warn("OpenLCA API credentials not configured. Using mock data for development.");
-      
+      console.log("OpenLCA API not configured. Using stored impact factors from materials.");
+
+      // Calculate impacts using stored material impact factors
+      let totalClimate = 0;
+      let totalWater = 0;
+      let totalLand = 0;
+      let totalWaste = 0;
+      const materialBreakdown: any[] = [];
+      let hasMissingImpacts = false;
+
+      for (const material of materials) {
+        const quantity = parseFloat(material.quantity) || 0;
+
+        // Check if material has impact factors stored
+        if (material.impact_climate !== null && material.impact_climate !== undefined) {
+          const materialClimate = quantity * (material.impact_climate || 0);
+          const materialWater = quantity * (material.impact_water || 0);
+          const materialLand = quantity * (material.impact_land || 0);
+          const materialWaste = quantity * (material.impact_waste || 0);
+
+          totalClimate += materialClimate;
+          totalWater += materialWater;
+          totalLand += materialLand;
+          totalWaste += materialWaste;
+
+          materialBreakdown.push({
+            name: material.name,
+            quantity: quantity,
+            unit: material.unit,
+            climate: materialClimate,
+            water: materialWater,
+            land: materialLand,
+            waste: materialWaste,
+            source: material.impact_source || 'secondary_modelled'
+          });
+
+          console.log(`Material: ${material.name} - Climate: ${materialClimate.toFixed(4)} kg CO2e`);
+        } else {
+          console.warn(`Material ${material.name} missing impact factors - skipping`);
+          hasMissingImpacts = true;
+          materialBreakdown.push({
+            name: material.name,
+            quantity: quantity,
+            unit: material.unit,
+            climate: 0,
+            water: 0,
+            land: 0,
+            waste: 0,
+            source: 'missing',
+            warning: 'No impact data available'
+          });
+        }
+      }
+
+      if (hasMissingImpacts) {
+        console.warn("Some materials are missing impact factors. Results may be incomplete.");
+      }
+
+      // Build multi-capital impact response
       apiResponse = {
-        results: IMPACT_CATEGORIES.map((category) => ({
-          impactCategory: category.name,
-          value: Math.random() * 1000,
-          unit: category.unit,
-          method: "ReCiPe 2016 Midpoint (H)",
-        })),
+        results: [
+          {
+            impactCategory: "Climate Change",
+            value: totalClimate,
+            unit: "kg CO₂ eq",
+            method: "Hybrid (Stored Material Factors)",
+          },
+          {
+            impactCategory: "Water Depletion",
+            value: totalWater,
+            unit: "L",
+            method: "Hybrid (Stored Material Factors)",
+          },
+          {
+            impactCategory: "Land Use",
+            value: totalLand,
+            unit: "m²",
+            method: "Hybrid (Stored Material Factors)",
+          },
+          {
+            impactCategory: "Waste Generation",
+            value: totalWaste,
+            unit: "kg",
+            method: "Hybrid (Stored Material Factors)",
+          },
+        ],
+        materialBreakdown: materialBreakdown,
+        calculationMethod: "material_impact_factors",
+        dataQuality: hasMissingImpacts ? "incomplete" : "complete",
       };
       apiSuccess = true;
+
+      console.log(`Total Climate Impact: ${totalClimate.toFixed(4)} kg CO2e`);
+      console.log(`Total Water Impact: ${totalWater.toFixed(4)} L`);
+      console.log(`Total Land Impact: ${totalLand.toFixed(4)} m²`);
+      console.log(`Total Waste Impact: ${totalWaste.toFixed(4)} kg`);
     } else {
       const requestHeaders: Record<string, string> = {
         "Content-Type": "application/json",
@@ -327,21 +412,45 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to save results: ${resultsError.message}`);
     }
 
+    // Build aggregated impacts for product_lcas table
+    const aggregatedImpacts = {
+      climate_change_gwp100: apiResponse.results.find((r: any) => r.impactCategory === "Climate Change")?.value || 0,
+      water_consumption: apiResponse.results.find((r: any) => r.impactCategory === "Water Depletion")?.value || 0,
+      land_use: apiResponse.results.find((r: any) => r.impactCategory === "Land Use")?.value || 0,
+      waste_generation: apiResponse.results.find((r: any) => r.impactCategory === "Waste Generation")?.value || 0,
+    };
+
     await supabase
       .from("product_lcas")
-      .update({ status: "completed" })
+      .update({
+        status: "completed",
+        aggregated_impacts: aggregatedImpacts,
+        csrd_compliant: apiResponse.dataQuality === "complete",
+      })
       .eq("id", payload.product_lca_id);
 
     const calculationDuration = Date.now() - startTime;
 
     if (logId) {
+      // Build impact_metrics JSONB for multi-capital storage
+      const impactMetrics = {
+        climate_change_gwp100: apiResponse.results.find((r: any) => r.impactCategory === "Climate Change")?.value || 0,
+        water_consumption: apiResponse.results.find((r: any) => r.impactCategory === "Water Depletion")?.value || 0,
+        land_use: apiResponse.results.find((r: any) => r.impactCategory === "Land Use")?.value || 0,
+        waste_generation: apiResponse.results.find((r: any) => r.impactCategory === "Waste Generation")?.value || 0,
+        material_breakdown: apiResponse.materialBreakdown || [],
+      };
+
       await supabase
         .from("product_lca_calculation_logs")
         .update({
           status: "success",
           response_data: apiResponse,
+          impact_metrics: impactMetrics,
+          impact_assessment_method: apiResponse.results[0]?.method || "Hybrid (Stored Material Factors)",
           calculation_duration_ms: calculationDuration,
           environment: executionEnvironment,
+          csrd_compliant: apiResponse.dataQuality === "complete",
         })
         .eq("id", logId);
     }

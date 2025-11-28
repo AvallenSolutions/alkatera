@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { saveDraftData, markTabComplete } from './lcaWorkflow';
-import type { DataSource, PackagingCategory } from './types/lca';
+import type { DataSource, PackagingCategory, ImpactSourceType } from './types/lca';
 
 export interface AddPackagingParams {
   lcaId: string;
@@ -18,6 +18,12 @@ export interface AddPackagingParams {
     is_organic_certified: boolean;
     packaging_category: PackagingCategory;
     label_printing_type?: string;
+    impact_climate?: number;
+    impact_water?: number;
+    impact_land?: number;
+    impact_waste?: number;
+    impact_source?: ImpactSourceType;
+    impact_reference_id?: string;
   };
 }
 
@@ -108,6 +114,12 @@ export async function addPackagingToLCA(params: AddPackagingParams) {
       is_organic_certified: params.packaging.is_organic_certified,
       packaging_category: params.packaging.packaging_category,
       label_printing_type: params.packaging.label_printing_type || null,
+      impact_climate: params.packaging.impact_climate || null,
+      impact_water: params.packaging.impact_water || null,
+      impact_land: params.packaging.impact_land || null,
+      impact_waste: params.packaging.impact_waste || null,
+      impact_source: params.packaging.impact_source || 'secondary_modelled',
+      impact_reference_id: params.packaging.impact_reference_id || params.packaging.data_source_id || null,
     };
 
     console.log('[addPackagingToLCA] Inserting material:', materialData);
