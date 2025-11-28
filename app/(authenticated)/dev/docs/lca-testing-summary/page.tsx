@@ -1,4 +1,8 @@
-# LCA Testing Implementation Summary
+"use client";
+
+import { MarkdownDoc } from "@/components/dev/MarkdownDoc";
+
+const markdownContent = `# LCA Testing Implementation Summary
 
 ## Executive Summary
 
@@ -13,14 +17,14 @@ Successfully diagnosed and resolved the LCA calculation issue where all impact c
 - Circularity showing seemingly random data (20 kg waste, 13,021 kg recyclable)
 
 ### Root Cause
-**Materials added to LCAs did not have impact factors populated in `product_lca_materials` table.**
+**Materials added to LCAs did not have impact factors populated in \`product_lca_materials\` table.**
 
 The data flow works as follows:
 1. User searches for material → API returns staging data with per-unit factors (co2_factor, water_factor, etc.)
-2. User selects material and enters quantity → `AssistedIngredientSearch` component receives impact factors
-3. Component passes factors to `addIngredientToLCA` function → Factors should be saved to database
+2. User selects material and enters quantity → \`AssistedIngredientSearch\` component receives impact factors
+3. Component passes factors to \`addIngredientToLCA\` function → Factors should be saved to database
 4. **Issue**: Impact factors were being passed correctly but arriving as NULL in the database for existing LCAs
-5. Calculation engine reads `impact_climate`, `impact_water`, etc. from materials → If NULL, calculation returns 0
+5. Calculation engine reads \`impact_climate\`, \`impact_water\`, etc. from materials → If NULL, calculation returns 0
 
 ---
 
@@ -28,7 +32,7 @@ The data flow works as follows:
 
 ### 1. Created Comprehensive Test Materials (10 items)
 
-Added to `staging_emission_factors` table with full multi-capital impact factors:
+Added to \`staging_emission_factors\` table with full multi-capital impact factors:
 
 **Ingredients (6):**
 - Water (Municipal Treatment): Baseline minimal impacts
@@ -51,29 +55,29 @@ Each material has realistic impact factors based on:
 
 ### 2. Fixed Existing Mass Market Soda LCA
 
-Retroactively calculated and populated impact factors for the latest completed LCA (`bfe07e37-0309-4bb0-8196-dc9b8841f996`):
+Retroactively calculated and populated impact factors for the latest completed LCA (\`bfe07e37-0309-4bb0-8196-dc9b8841f996\`):
 
 **Before:**
-```
+\`\`\`
 Climate: 0 kg CO2e
 Water: 0 L
 Land: 0 m²
 Waste: 0 kg
-```
+\`\`\`
 
 **After:**
-```
+\`\`\`
 Climate: 220.03 kg CO2e
 Water: 1.31 L
 Land: 4.04 m²
 Waste: 10.00 kg
-```
+\`\`\`
 
 Note: These values reflect the unusual quantities in that LCA (200 kg glass bottle).
 
 ### 3. Created Realistic Test LCA
 
-**Test Sparkling Lemonade 330ml** (UUID: `00000000-0000-0000-0000-000000000001`)
+**Test Sparkling Lemonade 330ml** (UUID: \`00000000-0000-0000-0000-000000000001\`)
 
 **Realistic Bill of Materials:**
 - 300ml water (0.3 kg)
@@ -93,7 +97,7 @@ All calculations shown step-by-step in testing guide for manual verification.
 
 ### 4. Created Comprehensive Testing Documentation
 
-**LCA_CALCULATION_TESTING_GUIDE.md** includes:
+**LCA Calculation Testing Guide** includes:
 - Problem diagnosis summary
 - Complete test materials catalogue
 - Detailed test case with expected results
@@ -110,24 +114,24 @@ All calculations shown step-by-step in testing guide for manual verification.
 
 The calculation system is correctly designed:
 
-1. **Data Entry** (`AssistedIngredientSearch.tsx`)
-   - Searches `staging_emission_factors` → Returns materials with impact factors
-   - Component receives: `co2_factor`, `water_factor`, `land_factor`, `waste_factor`
-   - Passes these to `onIngredientConfirmed` callback ✓
+1. **Data Entry** (\`AssistedIngredientSearch.tsx\`)
+   - Searches \`staging_emission_factors\` → Returns materials with impact factors
+   - Component receives: \`co2_factor\`, \`water_factor\`, \`land_factor\`, \`waste_factor\`
+   - Passes these to \`onIngredientConfirmed\` callback ✓
 
-2. **Data Storage** (`ingredientOperations.ts`)
-   - `addIngredientToLCA` function accepts `impact_climate`, `impact_water`, etc.
-   - Stores values in `product_lca_materials` table ✓
+2. **Data Storage** (\`ingredientOperations.ts\`)
+   - \`addIngredientToLCA\` function accepts \`impact_climate\`, \`impact_water\`, etc.
+   - Stores values in \`product_lca_materials\` table ✓
    - Database schema has correct columns ✓
 
-3. **Calculation** (`invoke-openlca/index.ts`)
-   - Reads materials from `product_lca_materials`
-   - For each material: `total_impact = quantity × impact_factor`
+3. **Calculation** (\`invoke-openlca/index.ts\`)
+   - Reads materials from \`product_lca_materials\`
+   - For each material: \`total_impact = quantity × impact_factor\`
    - Sums across all materials
-   - Stores in `product_lca_results` ✓
+   - Stores in \`product_lca_results\` ✓
 
 4. **Display** (Results pages)
-   - Reads from `product_lca_results`
+   - Reads from \`product_lca_results\`
    - Shows Climate, Water, Land, Waste metrics
    - Charts and breakdowns ✓
 
@@ -140,10 +144,10 @@ The calculation system is correctly designed:
 ### Immediate Testing (Manual)
 
 1. **Query Test LCA**
-   ```sql
+   \`\`\`sql
    SELECT * FROM product_lca_results
    WHERE product_lca_id = '00000000-0000-0000-0000-000000000001';
-   ```
+   \`\`\`
    Expected: 4 rows with non-zero values
 
 2. **View in UI**
@@ -181,7 +185,7 @@ For CI/CD pipeline:
 **Issue**: New LCAs created through UI may still have NULL impact factors
 
 **Action Required**:
-- Debug why `impact_*` values aren't being saved when materials are added
+- Debug why \`impact_*\` values aren't being saved when materials are added
 - Possible causes:
   - Component not multiplying factor × quantity before saving
   - Database constraint preventing save
@@ -190,18 +194,18 @@ For CI/CD pipeline:
 - Verify factors are present at each step
 
 **Files to Check:**
-- `components/lca/AssistedIngredientSearch.tsx` (lines 243-246)
-- `lib/ingredientOperations.ts` (lines 110-113)
-- `app/api/ingredients/search/route.ts` (lines 219-232)
+- \`components/lca/AssistedIngredientSearch.tsx\` (lines 243-246)
+- \`lib/ingredientOperations.ts\` (lines 110-113)
+- \`app/api/ingredients/search/route.ts\` (lines 219-232)
 
 ### Priority 2: Fix Circularity Calculation
 
-**Current**: Results page estimates waste as `quantity * 0.1`
-**Required**: Read actual `impact_waste` from materials
+**Current**: Results page estimates waste as \`quantity * 0.1\`
+**Required**: Read actual \`impact_waste\` from materials
 
 **Files to Update:**
-- `components/vitality/WasteCard.tsx`
-- `components/vitality/WasteDeepDive.tsx`
+- \`components/vitality/WasteCard.tsx\`
+- \`components/vitality/WasteDeepDive.tsx\`
 - Any other components showing circularity metrics
 
 ### Priority 3: Unit Testing
@@ -225,15 +229,15 @@ Create user-facing docs:
 ## Files Created/Modified
 
 ### New Files
-1. **`LCA_CALCULATION_TESTING_GUIDE.md`** - Comprehensive testing documentation
-2. **`LCA_TESTING_IMPLEMENTATION_SUMMARY.md`** - This file
+1. **LCA Calculation Testing Guide** - Comprehensive testing documentation (in dev docs)
+2. **LCA Testing Implementation Summary** - This file (in dev docs)
 
 ### Database Migrations
-1. **`create_comprehensive_test_materials_for_lca_testing.sql`**
+1. **\`create_comprehensive_test_materials_for_lca_testing.sql\`**
    - 10 materials with full impact factors
    - Ready for immediate testing
 
-2. **`create_realistic_test_lca_for_validation.sql`**
+2. **\`create_realistic_test_lca_for_validation.sql\`**
    - Test Sparkling Lemonade 330ml
    - Pre-calculated expected results
    - Validation-ready test case
@@ -253,17 +257,17 @@ Create user-facing docs:
 
 ### Test LCA Query Results
 
-```
+\`\`\`
 Test Sparkling Lemonade 330ml:
 - Climate: 0.2452 kg CO2e  ✓ Matches expected
 - Water: 0.30843 m³        ✓ Matches expected
 - Land: 0.04288 m²         ✓ Matches expected
 - Waste: 0.01260 kg        ✓ Matches expected
-```
+\`\`\`
 
 ### Mass Market Soda Results
 
-```
+\`\`\`
 Before Fix:    Climate: 0 kg CO2e
 After Fix:     Climate: 220.03 kg CO2e  ✓ Non-zero, verifiable
 
@@ -275,16 +279,16 @@ After Fix:     Land: 4.04 m²            ✓ Non-zero, verifiable
 
 Before Fix:    Waste: 0 kg
 After Fix:     Waste: 10.00 kg          ✓ Non-zero, verifiable
-```
+\`\`\`
 
 ### Build Status
-```
+\`\`\`
 ✓ TypeScript compilation successful
 ✓ Next.js build successful
 ✓ 46 pages generated
 ✓ No errors
 ⚠ 2 warnings (Supabase client - safe to ignore)
-```
+\`\`\`
 
 ---
 
@@ -298,13 +302,13 @@ After Fix:     Waste: 10.00 kg          ✓ Non-zero, verifiable
    - Check results page shows correct values
 
 2. **If impacts are still NULL in new LCAs:**
-   - Add `console.log` statements in `AssistedIngredientSearch`
+   - Add \`console.log\` statements in \`AssistedIngredientSearch\`
    - Track impact factors from API → component → database
    - Identify where values are being lost
 
 3. **Fix circularity calculation**
-   - Update waste display to use `impact_waste` from materials
-   - Remove estimated calculation (`quantity * 0.1`)
+   - Update waste display to use \`impact_waste\` from materials
+   - Remove estimated calculation (\`quantity * 0.1\`)
 
 4. **Consider edge cases:**
    - Materials with missing impact factors
@@ -344,3 +348,14 @@ Key achievements:
 - ✅ Build verified
 
 **Next step**: Test a new LCA creation through the UI to verify the complete data flow works correctly with the new test materials.
+`;
+
+export default function LCATestingSummaryPage() {
+  return (
+    <MarkdownDoc
+      content={markdownContent}
+      title="LCA Testing Implementation Summary"
+      description="Executive summary of the LCA calculation testing implementation, including problem diagnosis, solutions, and validation results."
+    />
+  );
+}
