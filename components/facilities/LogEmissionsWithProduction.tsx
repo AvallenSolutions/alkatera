@@ -253,7 +253,59 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
         }
 
         console.log('[LogEmissions] Utility data saved successfully:', results);
-        toast.success(`${validUtilityEntries.length} utility ${validUtilityEntries.length === 1 ? 'entry' : 'entries'} logged successfully`);
+
+        // CRITICAL FIX: Save production volume to facility_emissions_aggregated
+        // This enables the intensity calculation trigger to work correctly
+        console.log('[LogEmissions] Saving production volume to facility_emissions_aggregated...');
+
+        const { data: aggregatedData, error: aggregatedError } = await supabase
+          .from('facility_emissions_aggregated')
+          .insert({
+            facility_id: facilityId,
+            organization_id: organizationId,
+            reporting_period_start: periodStart,
+            reporting_period_end: periodEnd,
+            total_co2e: 0, // Will be updated by scope 1&2 calculations
+            data_source_type: 'Primary',
+            total_production_volume: parseFloat(productionVolume),
+            volume_unit: productionUnit as any,
+            calculated_by: userData.user.id,
+            results_payload: {
+              method: 'primary_verified_bills',
+              utility_entries_count: validUtilityEntries.length,
+              status: 'awaiting_calculation'
+            },
+          })
+          .select();
+
+        if (aggregatedError) {
+          // Check if it's a duplicate key error
+          if (aggregatedError.code === '23505') {
+            console.log('[LogEmissions] Record already exists, updating production volume instead');
+
+            const { error: updateError } = await supabase
+              .from('facility_emissions_aggregated')
+              .update({
+                total_production_volume: parseFloat(productionVolume),
+                volume_unit: productionUnit as any,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('facility_id', facilityId)
+              .eq('reporting_period_start', periodStart)
+              .eq('reporting_period_end', periodEnd);
+
+            if (updateError) {
+              console.error('[LogEmissions] Error updating production volume:', updateError);
+              throw new Error(`Failed to update production volume: ${updateError.message}`);
+            }
+          } else {
+            console.error('[LogEmissions] Error creating facility emissions record:', aggregatedError);
+            throw new Error(`Failed to save production volume: ${aggregatedError.message}`);
+          }
+        }
+
+        console.log('[LogEmissions] Production volume saved to facility_emissions_aggregated');
+        toast.success(`${validUtilityEntries.length} utility ${validUtilityEntries.length === 1 ? 'entry' : 'entries'} and production volume logged successfully`);
       } else {
         console.log('[LogEmissions] Processing Secondary data path');
         // Path B: Secondary Average - Use industry proxy

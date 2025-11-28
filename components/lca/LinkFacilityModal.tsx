@@ -126,7 +126,7 @@ export function LinkFacilityModal({
     }
 
     if (!selectedFacility?.calculated_intensity) {
-      setError("Selected facility does not have a valid emission intensity. Please ensure facility emissions have been calculated.");
+      setError("Selected facility does not have emission intensity data. To fix this: 1) Go to the facility page and log emissions and production volume, 2) Click 'Calculate Emissions' to compute facility intensity, 3) Return here to link the facility.");
       return;
     }
 

@@ -350,11 +350,94 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // CRITICAL: Aggregate emissions by facility and update facility_emissions_aggregated
+    // This enables facility intensity calculation for Product LCA allocation
+    console.log("Aggregating emissions by facility...");
+
+    // Query utility data entries to get facility context and reporting periods
+    const activityIds = insertedRecords.map(r => r.id);
+    const { data: utilityData, error: utilityError } = await supabaseAdmin
+      .from('utility_data_entries')
+      .select('id, facility_id, reporting_period_start, reporting_period_end')
+      .in('id', activityIds);
+
+    if (utilityError) {
+      console.warn('Warning: Could not query utility data for aggregation:', utilityError);
+    } else if (utilityData && utilityData.length > 0) {
+      // Group calculated emissions by facility and reporting period
+      const facilitiesMap = new Map<string, {
+        facility_id: string;
+        reporting_period_start: string;
+        reporting_period_end: string;
+        total_co2e: number;
+        activity_count: number;
+      }>();
+
+      for (const utility of utilityData) {
+        const key = `${utility.facility_id}-${utility.reporting_period_start}-${utility.reporting_period_end}`;
+
+        // Find the corresponding calculation result
+        const calcResult = calculationResults.find(r => {
+          const activity = activityData.find(a => a.id === r.activity_data_id);
+          return activity?.name === utility.id; // Match by utility entry ID
+        });
+
+        if (!calcResult) continue;
+
+        if (!facilitiesMap.has(key)) {
+          facilitiesMap.set(key, {
+            facility_id: utility.facility_id,
+            reporting_period_start: utility.reporting_period_start,
+            reporting_period_end: utility.reporting_period_end,
+            total_co2e: 0,
+            activity_count: 0,
+          });
+        }
+
+        const facilityData = facilitiesMap.get(key)!;
+        facilityData.total_co2e += calcResult.calculated_value_co2e;
+        facilityData.activity_count += 1;
+      }
+
+      // Update facility_emissions_aggregated records with calculated emissions
+      for (const [key, facilityData] of facilitiesMap) {
+        console.log(`Updating facility_emissions_aggregated for facility ${facilityData.facility_id}, period ${facilityData.reporting_period_start} to ${facilityData.reporting_period_end}`);
+
+        const { error: updateError } = await supabaseAdmin
+          .from('facility_emissions_aggregated')
+          .update({
+            total_co2e: facilityData.total_co2e,
+            results_payload: {
+              method: 'primary_verified_bills',
+              activity_count: facilityData.activity_count,
+              status: 'calculated',
+              calculation_date: new Date().toISOString(),
+            },
+          })
+          .eq('facility_id', facilityData.facility_id)
+          .eq('reporting_period_start', facilityData.reporting_period_start)
+          .eq('reporting_period_end', facilityData.reporting_period_end);
+
+        if (updateError) {
+          console.error(`Warning: Failed to update facility_emissions_aggregated for facility ${facilityData.facility_id}:`, updateError);
+          // Don't fail the entire calculation, just log the warning
+        } else {
+          console.log(`✓ Updated facility_emissions_aggregated: ${facilityData.total_co2e.toFixed(2)} kg CO₂e for ${facilityData.activity_count} activities`);
+        }
+      }
+
+      console.log(`Aggregated emissions for ${facilitiesMap.size} facility period(s)`);
+    }
+
     // Prepare summary message
     let message = `Successfully calculated Scope 1 & 2 emissions for ${calculationResults.length} activity record(s) and created ${insertedRecords.length} cryptographic log(s).`;
 
     if (unmatchedActivities.length > 0) {
       message += ` ${unmatchedActivities.length} activity record(s) could not be matched to emissions factors.`;
+    }
+
+    if (facilitiesMap.size > 0) {
+      message += ` Aggregated emissions for ${facilitiesMap.size} facility reporting period(s).`;
     }
 
     return new Response(
@@ -363,6 +446,7 @@ Deno.serve(async (req: Request) => {
         message,
         calculations_performed: calculationResults.length,
         logs_created: insertedRecords.length,
+        facilities_aggregated: facilitiesMap.size,
         unmatched_activities: unmatchedActivities.length,
         details: {
           total_unprocessed: activityData.length,
