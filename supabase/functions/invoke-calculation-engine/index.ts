@@ -624,27 +624,28 @@ async function calculateManufacturingImpact(
   supabase: any,
   lcaId: string,
   organizationId: string,
-  productNetVolume: number
+  productNetVolume: number,
+  referenceYear: number
 ): Promise<{
   manufacturing_co2e: number;
   weighted_avg_intensity: number;
   production_sites: Array<{
     facility_name: string;
-    production_volume: number;
-    share_of_production: number;
+    production_share_percent: number;
     facility_intensity: number;
     data_source: string;
+    attributable_co2e: number;
   }>;
 }> {
-  console.log(`\n=== CALCULATING MANUFACTURING IMPACT ===`);
+  console.log(`\n=== CALCULATING MANUFACTURING IMPACT (ISO 14067/14044) ===`);
   console.log(`Product Net Volume: ${productNetVolume}`);
+  console.log(`Reference Year: ${referenceYear}`);
 
-  // Fetch production sites for this LCA
+  // Fetch production mix for this LCA (ISO 14044 Physical Allocation)
   const { data: sites, error: sitesError } = await supabase
-    .from("product_lca_production_sites")
-    .select("facility_id, production_volume, facility_intensity, data_source")
-    .eq("product_lca_id", lcaId)
-    .eq("organization_id", organizationId);
+    .from("lca_production_mix")
+    .select("facility_id, production_share, facility_intensity, data_source_type")
+    .eq("lca_id", lcaId);
 
   if (sitesError) {
     console.error("Error fetching production sites:", sitesError);
@@ -652,13 +653,20 @@ async function calculateManufacturingImpact(
   }
 
   if (!sites || sites.length === 0) {
-    console.warn("No production sites linked. Manufacturing impact = 0");
-    return {
-      manufacturing_co2e: 0,
-      weighted_avg_intensity: 0,
-      production_sites: [],
-    };
+    const errorMsg = `No production mix defined for LCA. Please allocate 100% of production across facilities for reference year ${referenceYear}.`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
   }
+
+  // Validate production mix is complete (100%)
+  const totalShare = sites.reduce((sum: number, s: any) => sum + Number(s.production_share || 0), 0);
+  if (totalShare < 0.9999 || totalShare > 1.0001) {
+    const errorMsg = `Production mix incomplete: ${(totalShare * 100).toFixed(2)}%. Must equal 100% per ISO 14044 requirements.`;
+    console.error(errorMsg);
+    throw new Error(errorMsg);
+  }
+
+  console.log(`✓ Production mix validated: ${(totalShare * 100).toFixed(2)}% allocated`);
 
   // Fetch facility names
   const facilityIds = sites.map((s: any) => s.facility_id);
@@ -674,41 +682,52 @@ async function calculateManufacturingImpact(
 
   const facilitiesMap = new Map((facilities || []).map((f: any) => [f.id, f.name]));
 
-  // Calculate total production volume and weighted average intensity
-  const totalProductionVolume = sites.reduce(
-    (sum: number, site: any) => sum + Number(site.production_volume || 0),
-    0
-  );
+  // Validate all facilities have intensity data for reference year
+  for (const site of sites) {
+    if (!site.facility_intensity || site.facility_intensity === 0) {
+      const facilityName = facilitiesMap.get(site.facility_id) || "Unknown Facility";
+      const errorMsg = `Facility "${facilityName}" is missing emission intensity data for year ${referenceYear}. Please log emissions and production data for this facility before calculating.`;
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+  }
 
+  // Calculate weighted average intensity using production shares (ISO 14044 Physical Allocation)
   const weightedAvgIntensity = sites.reduce((sum: number, site: any) => {
-    const volume = Number(site.production_volume || 0);
+    const share = Number(site.production_share || 0);
     const intensity = Number(site.facility_intensity || 0);
-    const weight = totalProductionVolume > 0 ? volume / totalProductionVolume : 0;
-    return sum + (intensity * weight);
+    return sum + (intensity * share);
   }, 0);
 
   const manufacturingCO2e = weightedAvgIntensity * productNetVolume;
 
+  // Build per-facility breakdown for Glass Box transparency
   const productionSitesDetails = sites.map((site: any) => {
-    const volume = Number(site.production_volume || 0);
-    const shareOfProduction = totalProductionVolume > 0
-      ? (volume / totalProductionVolume) * 100
-      : 0;
+    const share = Number(site.production_share || 0);
+    const sharePercent = share * 100;
+    const intensity = Number(site.facility_intensity || 0);
+    const attributableCO2e = intensity * share * productNetVolume;
 
     return {
       facility_name: facilitiesMap.get(site.facility_id) || "Unknown Facility",
-      production_volume: volume,
-      share_of_production: shareOfProduction,
-      facility_intensity: Number(site.facility_intensity || 0),
-      data_source: site.data_source,
+      production_share_percent: sharePercent,
+      facility_intensity: intensity,
+      data_source: site.data_source_type === "Primary" ? "Verified" : "Industry_Average",
+      attributable_co2e: attributableCO2e,
     };
   });
 
-  console.log(`Production Sites: ${sites.length}`);
-  console.log(`Total Production Volume: ${totalProductionVolume}`);
+  console.log(`\n=== MANUFACTURING ALLOCATION (ISO 14044) ===`);
+  console.log(`Number of Facilities: ${sites.length}`);
+  console.log(`Reference Year: ${referenceYear}`);
   console.log(`Weighted Average Intensity: ${weightedAvgIntensity.toFixed(4)} kg CO₂e/unit`);
   console.log(`Manufacturing CO₂e: ${manufacturingCO2e.toFixed(4)} kg`);
-  console.log(`Formula: ${weightedAvgIntensity.toFixed(4)} × ${productNetVolume} = ${manufacturingCO2e.toFixed(4)}`);
+  console.log(`Formula: Σ(Intensity × Share) × Product Volume`);
+  console.log(`  = ${weightedAvgIntensity.toFixed(4)} × ${productNetVolume} = ${manufacturingCO2e.toFixed(4)} kg CO₂e`);
+  console.log(`\nPer-Facility Breakdown (Glass Box):`);
+  productionSitesDetails.forEach((detail) => {
+    console.log(`  - ${detail.facility_name}: ${detail.production_share_percent.toFixed(2)}% × ${detail.facility_intensity.toFixed(4)} = ${detail.attributable_co2e.toFixed(4)} kg CO₂e (${detail.data_source})`);
+  });
 
   return {
     manufacturing_co2e: manufacturingCO2e,
@@ -765,7 +784,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: lca, error: lcaError } = await supabase
       .from("product_lcas")
-      .select("id, organization_id, product_name, functional_unit, status, product_id")
+      .select("id, organization_id, product_name, functional_unit, status, product_id, reference_year")
       .eq("id", payload.lcaId)
       .maybeSingle();
 
@@ -849,7 +868,8 @@ Deno.serve(async (req: Request) => {
       supabase,
       payload.lcaId,
       lca.organization_id,
-      productNetVolume
+      productNetVolume,
+      lca.reference_year
     );
 
     // Combine upstream (materials) and manufacturing impacts
