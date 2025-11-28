@@ -205,9 +205,6 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
 
       if (dataSourceType === 'Primary') {
         console.log('[LogEmissions] Processing Primary data path');
-        // Path A: Primary Data - Calculate emissions from utilities, then calculate intensity
-        // TODO: Call edge function to calculate emissions from utility data
-        // For now, we'll create a placeholder emission log
 
         const { data: userData, error: userError } = await supabase.auth.getUser();
 
@@ -219,9 +216,8 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
         // Filter out completely empty entries before saving
         const validUtilityEntries = utilityEntries.filter(e => e.utility_type && e.quantity && e.unit);
 
-        console.log('[LogEmissions] Inserting facility emissions data...', {
+        console.log('[LogEmissions] Inserting utility data entries...', {
           facility_id: facilityId,
-          organization_id: organizationId,
           reporting_period_start: periodStart,
           reporting_period_end: periodEnd,
           total_production_volume: parseFloat(productionVolume),
@@ -229,30 +225,35 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
           valid_utility_entries: validUtilityEntries,
         });
 
-        const { data: insertedData, error } = await supabase
-          .from('facility_emissions_aggregated')
-          .insert({
-            facility_id: facilityId,
-            organization_id: organizationId,
-            reporting_period_start: periodStart,
-            reporting_period_end: periodEnd,
-            total_co2e: 0, // Will be calculated by edge function
-            total_production_volume: parseFloat(productionVolume),
-            volume_unit: productionUnit as any,
-            data_source_type: 'Primary',
-            calculated_by: userData.user.id,
-            results_payload: { utility_entries: validUtilityEntries },
-          })
-          .select();
+        // Insert each utility entry as a separate record
+        const insertPromises = validUtilityEntries.map(entry =>
+          supabase
+            .from('utility_data_entries')
+            .insert({
+              facility_id: facilityId,
+              utility_type: entry.utility_type,
+              quantity: parseFloat(entry.quantity),
+              unit: entry.unit,
+              reporting_period_start: periodStart,
+              reporting_period_end: periodEnd,
+              data_quality: 'actual',
+              calculated_scope: '', // Will be auto-calculated by trigger
+              created_by: userData.user.id,
+            })
+            .select()
+        );
 
-        console.log('[LogEmissions] Insert response:', { data: insertedData, error });
+        const results = await Promise.all(insertPromises);
 
-        if (error) {
-          console.error('Error inserting primary data:', error);
-          throw new Error(error.message || 'Failed to save primary emissions data');
+        // Check for any errors
+        const errors = results.filter(r => r.error);
+        if (errors.length > 0) {
+          console.error('[LogEmissions] Errors inserting utility data:', errors);
+          throw new Error(errors[0].error?.message || 'Failed to save utility data');
         }
-        console.log('[LogEmissions] Primary data saved successfully');
-        toast.success('Primary emissions data logged successfully. Intensity calculated automatically.');
+
+        console.log('[LogEmissions] Utility data saved successfully:', results);
+        toast.success(`${validUtilityEntries.length} utility ${validUtilityEntries.length === 1 ? 'entry' : 'entries'} logged successfully`);
       } else {
         console.log('[LogEmissions] Processing Secondary data path');
         // Path B: Secondary Average - Use industry proxy
