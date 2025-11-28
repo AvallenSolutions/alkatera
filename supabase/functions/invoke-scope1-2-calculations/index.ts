@@ -360,13 +360,12 @@ Deno.serve(async (req: Request) => {
       console.log(`Total emissions calculated: ${totalEmissions.toFixed(2)} kg CO₂e from ${calculationResults.length} activities`);
 
       // Query existing facility_emissions_aggregated records that need updating
-      // These are records with production volume but awaiting calculated emissions
+      // These are records with production volume (update ALL records, not just those with zero emissions)
       const { data: facilityRecords, error: queryError } = await supabaseAdmin
         .from('facility_emissions_aggregated')
         .select('id, facility_id, reporting_period_start, reporting_period_end, total_production_volume')
         .eq('organization_id', organization_id)
         .eq('data_source_type', 'Primary')
-        .is('total_co2e', 0) // Records awaiting calculation
         .not('total_production_volume', 'is', null); // Must have production volume
 
       if (queryError) {
