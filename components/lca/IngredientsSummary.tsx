@@ -3,22 +3,28 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-// import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Database, Building2, Sprout, TrendingUp } from "lucide-react";
+import { Database, Building2, Sprout, TrendingUp, CheckCircle2 } from "lucide-react";
 import { getAuditSummary, calculateDataQualityLabel } from "@/lib/ingredientAudit";
+import { markIngredientsComplete } from "@/lib/ingredientOperations";
 import type { IngredientMaterial } from "@/lib/ingredientOperations";
+import { toast } from "sonner";
 
 interface IngredientsSummaryProps {
   ingredients: IngredientMaterial[];
   lcaId: string;
+  organizationId: string;
   organizationName: string;
+  onMarkComplete?: () => void;
 }
 
 export function IngredientsSummary({
   ingredients,
   lcaId,
+  organizationId,
   organizationName,
+  onMarkComplete,
 }: IngredientsSummaryProps) {
   const [summary, setSummary] = useState({
     total: 0,
@@ -27,6 +33,7 @@ export function IngredientsSummary({
     database: 0,
     qualityScore: 0,
   });
+  const [isMarking, setIsMarking] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -79,6 +86,30 @@ export function IngredientsSummary({
   const getDatabasePercentage = () => {
     if (summary.total === 0) return 0;
     return Math.round((summary.database / summary.total) * 100);
+  };
+
+  const handleMarkComplete = async () => {
+    if (ingredients.length === 0) {
+      toast.error('Add at least one ingredient before marking complete');
+      return;
+    }
+
+    try {
+      setIsMarking(true);
+      const result = await markIngredientsComplete(lcaId, organizationId);
+
+      if (result.success) {
+        toast.success('Ingredients section marked complete');
+        onMarkComplete?.();
+      } else {
+        toast.error(result.error || 'Failed to mark complete');
+      }
+    } catch (error: any) {
+      console.error('Error marking complete:', error);
+      toast.error(error.message || 'Failed to mark complete');
+    } finally {
+      setIsMarking(false);
+    }
   };
 
   if (loading) {
@@ -173,10 +204,20 @@ export function IngredientsSummary({
           </p>
         </div>
 
-        {summary.total === 0 && (
+        {summary.total === 0 ? (
           <div className="text-center py-4 text-sm text-muted-foreground">
             Add ingredients to see data quality metrics
           </div>
+        ) : (
+          <Button
+            onClick={handleMarkComplete}
+            disabled={isMarking}
+            className="w-full"
+            size="lg"
+          >
+            <CheckCircle2 className="mr-2 h-4 w-4" />
+            {isMarking ? 'Marking Complete...' : 'Mark Ingredients Complete'}
+          </Button>
         )}
       </CardContent>
     </Card>

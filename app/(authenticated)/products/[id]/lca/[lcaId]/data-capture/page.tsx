@@ -624,7 +624,9 @@ export default function LcaDataCapturePage() {
                 <IngredientsSummary
                   ingredients={ingredients}
                   lcaId={lcaId}
+                  organizationId={currentOrganization.id}
                   organizationName={currentOrganization.name}
+                  onMarkComplete={() => loadLcaData()}
                 />
               )}
             </div>
