@@ -190,8 +190,8 @@ Deno.serve(async (req: Request) => {
       throw new Error("Product LCA not found");
     }
 
-    if (lca.status !== "draft") {
-      throw new Error(`Cannot calculate LCA with status: ${lca.status}. Only draft LCAs can be calculated.`);
+    if (lca.status !== "draft" && lca.status !== "pending") {
+      throw new Error(`Cannot calculate LCA with status: ${lca.status}. Only draft or pending LCAs can be calculated.`);
     }
 
     const { data: membership, error: membershipError } = await supabase
@@ -205,7 +205,6 @@ Deno.serve(async (req: Request) => {
       throw new Error("User is not a member of the LCA's organization");
     }
 
-    // Fetch materials from the normalized product_lca_materials table
     const { data: materials, error: materialsError } = await supabase
       .from("product_lca_materials")
       .select("*")
@@ -219,7 +218,6 @@ Deno.serve(async (req: Request) => {
       throw new Error("No materials found for this LCA. Please add ingredients and packaging first.");
     }
 
-    // Transform product_lca_materials into LCAInput format
     const lcaInputs: LCAInput[] = materials.map((material: any) => ({
       label: material.material_name || material.name,
       value: parseFloat(material.quantity) || 0,
@@ -274,7 +272,6 @@ Deno.serve(async (req: Request) => {
     if (!openLcaApiUrl || !openLcaApiKey) {
       console.log("OpenLCA API not configured. Using stored impact factors from materials.");
 
-      // Calculate impacts using stored material impact factors
       let totalClimate = 0;
       let totalWater = 0;
       let totalLand = 0;
@@ -282,10 +279,18 @@ Deno.serve(async (req: Request) => {
       const materialBreakdown: any[] = [];
       let hasMissingImpacts = false;
 
+      let fossilCO2 = 0;
+      let biogenicCO2 = 0;
+      let dlucCO2 = 0;
+      let co2Fossil = 0;
+      let co2Biogenic = 0;
+      let methane = 0;
+      let nitrousOxide = 0;
+      let hfcPfc = 0;
+
       for (const material of materials) {
         const quantity = parseFloat(material.quantity) || 0;
 
-        // Check if material has impact factors stored
         if (material.impact_climate !== null && material.impact_climate !== undefined) {
           const materialClimate = quantity * (material.impact_climate || 0);
           const materialWater = quantity * (material.impact_water || 0);
@@ -309,6 +314,43 @@ Deno.serve(async (req: Request) => {
           });
 
           console.log(`Material: ${material.name} - Climate: ${materialClimate.toFixed(4)} kg CO2e`);
+
+          const materialName = (material.name || '').toLowerCase();
+          const isBiogenic = materialName.includes('sugar') ||
+                            materialName.includes('water') ||
+                            materialName.includes('fruit') ||
+                            materialName.includes('juice') ||
+                            materialName.includes('plant') ||
+                            material.is_organic_certified;
+
+          const isFossil = materialName.includes('glass') ||
+                          materialName.includes('plastic') ||
+                          materialName.includes('pet') ||
+                          materialName.includes('hdpe') ||
+                          materialName.includes('aluminium') ||
+                          materialName.includes('steel') ||
+                          materialName.includes('diesel') ||
+                          materialName.includes('electricity');
+
+          const landUseFactor = 0.05;
+
+          if (isBiogenic) {
+            const biogenicPortion = materialClimate * (1 - landUseFactor);
+            const dlucPortion = materialClimate * landUseFactor;
+
+            biogenicCO2 += biogenicPortion;
+            dlucCO2 += dlucPortion;
+            co2Biogenic += biogenicPortion / 1;
+
+            methane += materialClimate * 0.001 / 27.9;
+            nitrousOxide += materialClimate * 0.0005 / 273;
+          } else if (isFossil) {
+            fossilCO2 += materialClimate;
+            co2Fossil += materialClimate / 1;
+          } else {
+            fossilCO2 += materialClimate;
+            co2Fossil += materialClimate / 1;
+          }
         } else {
           console.warn(`Material ${material.name} missing impact factors - skipping`);
           hasMissingImpacts = true;
@@ -330,7 +372,21 @@ Deno.serve(async (req: Request) => {
         console.warn("Some materials are missing impact factors. Results may be incomplete.");
       }
 
-      // Build multi-capital impact response with ISO 14067 GHG breakdown
+      const carbonSum = fossilCO2 + biogenicCO2 + dlucCO2;
+      const variance = Math.abs(carbonSum - totalClimate);
+
+      if (variance > 0.001) {
+        fossilCO2 += (totalClimate - carbonSum);
+        co2Fossil += (totalClimate - carbonSum);
+        console.log(`⚠ Adjusted fossil CO2 by ${(totalClimate - carbonSum).toFixed(6)} to match total`);
+      }
+
+      console.log(`Total Climate Impact: ${totalClimate.toFixed(4)} kg CO2e`);
+      console.log(`Total Water Impact: ${totalWater.toFixed(4)} L`);
+      console.log(`Total Land Impact: ${totalLand.toFixed(4)} m²`);
+      console.log(`Total Waste Impact: ${totalWaste.toFixed(4)} kg`);
+      console.log(`GHG Breakdown - Fossil: ${fossilCO2.toFixed(4)}, Biogenic: ${biogenicCO2.toFixed(4)}, dLUC: ${dlucCO2.toFixed(4)} kg CO2e`);
+
       apiResponse = {
         results: [
           {
@@ -361,8 +417,6 @@ Deno.serve(async (req: Request) => {
         materialBreakdown: materialBreakdown,
         calculationMethod: "material_impact_factors",
         dataQuality: hasMissingImpacts ? "incomplete" : "complete",
-
-        // ISO 14067 Compliant GHG Breakdown
         ghg_breakdown: {
           carbon_origin: {
             fossil: fossilCO2,
@@ -384,92 +438,6 @@ Deno.serve(async (req: Request) => {
         },
       };
       apiSuccess = true;
-
-      console.log(`Total Climate Impact: ${totalClimate.toFixed(4)} kg CO2e`);
-      console.log(`Total Water Impact: ${totalWater.toFixed(4)} L`);
-      console.log(`Total Land Impact: ${totalLand.toFixed(4)} m²`);
-      console.log(`Total Waste Impact: ${totalWaste.toFixed(4)} kg`);
-
-      // =====================================================
-      // ISO 14067 GHG BREAKDOWN CALCULATION
-      // =====================================================
-
-      // Estimate carbon origin split based on material characteristics
-      let fossilCO2 = 0;
-      let biogenicCO2 = 0;
-      let dlucCO2 = 0;
-
-      // Estimate gas inventory
-      let co2Fossil = 0;
-      let co2Biogenic = 0;
-      let methane = 0;
-      let nitrousOxide = 0;
-      let hfcPfc = 0;
-
-      for (const material of materials) {
-        const quantity = parseFloat(material.quantity) || 0;
-        const climateImpact = quantity * (material.impact_climate || 0);
-        const materialName = (material.name || '').toLowerCase();
-
-        // Classify materials by carbon origin
-        // Biogenic materials: sugar, water, organic ingredients
-        const isBiogenic = materialName.includes('sugar') ||
-                          materialName.includes('water') ||
-                          materialName.includes('fruit') ||
-                          materialName.includes('juice') ||
-                          materialName.includes('plant') ||
-                          material.is_organic_certified;
-
-        // Fossil materials: glass, plastic, metal, transport fuels
-        const isFossil = materialName.includes('glass') ||
-                        materialName.includes('plastic') ||
-                        materialName.includes('pet') ||
-                        materialName.includes('hdpe') ||
-                        materialName.includes('aluminium') ||
-                        materialName.includes('steel') ||
-                        materialName.includes('diesel') ||
-                        materialName.includes('electricity');
-
-        // Land use change: typically 5-10% of biogenic materials
-        const landUseFactor = 0.05; // 5% of biogenic as dLUC
-
-        if (isBiogenic) {
-          const biogenicPortion = climateImpact * (1 - landUseFactor);
-          const dlucPortion = climateImpact * landUseFactor;
-
-          biogenicCO2 += biogenicPortion;
-          dlucCO2 += dlucPortion;
-          co2Biogenic += biogenicPortion / 1; // CO2 has GWP of 1
-        } else if (isFossil) {
-          fossilCO2 += climateImpact;
-          co2Fossil += climateImpact / 1; // CO2 has GWP of 1
-        } else {
-          // Unknown material - allocate to fossil (conservative approach)
-          fossilCO2 += climateImpact;
-          co2Fossil += climateImpact / 1;
-        }
-
-        // Estimate trace gases (simplified - typically <1% of total)
-        // Methane: ~0.1% of climate impact from fermentation/decomposition
-        // N2O: ~0.05% from agricultural inputs
-        if (isBiogenic) {
-          methane += climateImpact * 0.001 / 27.9; // Convert CO2e to CH4 mass
-          nitrousOxide += climateImpact * 0.0005 / 273; // Convert CO2e to N2O mass
-        }
-      }
-
-      // Validate: Ensure breakdown sums to total (adjust fossil if needed)
-      const carbonSum = fossilCO2 + biogenicCO2 + dlucCO2;
-      const variance = Math.abs(carbonSum - totalClimate);
-
-      if (variance > 0.001) {
-        // Adjust fossil CO2 to match total (conservative approach)
-        fossilCO2 += (totalClimate - carbonSum);
-        co2Fossil += (totalClimate - carbonSum);
-        console.log(`⚠ Adjusted fossil CO2 by ${(totalClimate - carbonSum).toFixed(6)} to match total`);
-      }
-
-      console.log(`GHG Breakdown - Fossil: ${fossilCO2.toFixed(4)}, Biogenic: ${biogenicCO2.toFixed(4)}, dLUC: ${dlucCO2.toFixed(4)} kg CO2e`);
     } else {
       const requestHeaders: Record<string, string> = {
         "Content-Type": "application/json",
@@ -514,7 +482,6 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Failed to save results: ${resultsError.message}`);
     }
 
-    // Build aggregated impacts for product_lcas table
     const aggregatedImpacts = {
       climate_change_gwp100: apiResponse.results.find((r: any) => r.impactCategory === "Climate Change")?.value || 0,
       water_consumption: apiResponse.results.find((r: any) => r.impactCategory === "Water Depletion")?.value || 0,
@@ -534,15 +501,12 @@ Deno.serve(async (req: Request) => {
     const calculationDuration = Date.now() - startTime;
 
     if (logId) {
-      // Build impact_metrics JSONB for multi-capital storage with ISO 14067 GHG breakdown
       const impactMetrics = {
         climate_change_gwp100: apiResponse.results.find((r: any) => r.impactCategory === "Climate Change")?.value || 0,
         water_consumption: apiResponse.results.find((r: any) => r.impactCategory === "Water Depletion")?.value || 0,
         land_use: apiResponse.results.find((r: any) => r.impactCategory === "Land Use")?.value || 0,
         waste_generation: apiResponse.results.find((r: any) => r.impactCategory === "Waste Generation")?.value || 0,
         material_breakdown: apiResponse.materialBreakdown || [],
-
-        // ISO 14067 Compliant GHG Breakdown
         ghg_breakdown: apiResponse.ghg_breakdown || null,
       };
 
