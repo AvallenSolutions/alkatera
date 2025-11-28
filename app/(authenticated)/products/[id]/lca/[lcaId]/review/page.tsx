@@ -16,6 +16,7 @@ import {
   Boxes,
   Factory,
   AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
@@ -44,6 +45,8 @@ export default function LcaReviewPage() {
   const [lca, setLca] = useState<LcaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationProgress, setCalculationProgress] = useState(0);
+  const [calculationStage, setCalculationStage] = useState("");
 
   useEffect(() => {
     loadLcaData();
@@ -73,17 +76,29 @@ export default function LcaReviewPage() {
   const handleCalculate = async () => {
     try {
       setIsCalculating(true);
+      setCalculationProgress(0);
+      setCalculationStage("Initialising calculation...");
       toast.info("Starting LCA calculation...");
 
-      // Get session for auth header
+      // Stage 1: Get session
+      setCalculationProgress(15);
+      setCalculationStage("Authenticating...");
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("No active session");
       }
 
+      // Stage 2: Prepare calculation request
+      setCalculationProgress(25);
+      setCalculationStage("Preparing calculation request...");
+
       // Call the invoke-openlca edge function to perform the calculation
       // Note: The edge function will update the status internally
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+      // Stage 3: Submit calculation
+      setCalculationProgress(40);
+      setCalculationStage("Submitting calculation...");
       const response = await fetch(`${supabaseUrl}/functions/v1/invoke-openlca`, {
         method: 'POST',
         headers: {
@@ -100,8 +115,15 @@ export default function LcaReviewPage() {
         throw new Error(errorData.error || `Calculation request failed: ${response.statusText}`);
       }
 
+      // Stage 4: Processing calculation
+      setCalculationProgress(60);
+      setCalculationStage("Processing environmental impacts...");
       const result = await response.json();
       console.log('[Review] Calculation result:', result);
+
+      // Stage 5: Saving results
+      setCalculationProgress(80);
+      setCalculationStage("Saving results...");
 
       // Mark LCA as calculated and not a draft
       await supabase
@@ -112,13 +134,20 @@ export default function LcaReviewPage() {
         })
         .eq("id", lcaId);
 
+      // Stage 6: Complete
+      setCalculationProgress(100);
+      setCalculationStage("Calculation complete!");
       toast.success("LCA calculation completed successfully");
       router.push(`/dashboard/lcas/${lcaId}/results`);
     } catch (error: any) {
       console.error("Error initiating calculation:", error);
       toast.error(error.message || "Failed to initiate calculation");
     } finally {
-      setIsCalculating(false);
+      setTimeout(() => {
+        setIsCalculating(false);
+        setCalculationProgress(0);
+        setCalculationStage("");
+      }, 500);
     }
   };
 
@@ -273,11 +302,37 @@ export default function LcaReviewPage() {
             size="lg"
             className="w-full"
           >
-            <Calculator className="mr-2 h-5 w-5" />
-            {isCalculating ? "Calculating..." : "Calculate LCA"}
+            {isCalculating ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Calculating...
+              </>
+            ) : (
+              <>
+                <Calculator className="mr-2 h-5 w-5" />
+                Calculate LCA
+              </>
+            )}
           </Button>
 
-          {allComplete && (
+          {isCalculating && (
+            <div className="mt-6 space-y-3">
+              <div className="relative h-2 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full bg-primary transition-all duration-300 ease-in-out"
+                  style={{ width: `${calculationProgress}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                {calculationStage}
+              </p>
+              <p className="text-xs text-muted-foreground text-center">
+                {calculationProgress}% complete
+              </p>
+            </div>
+          )}
+
+          {allComplete && !isCalculating && (
             <p className="text-xs text-muted-foreground mt-4 text-center">
               Calculation typically takes 30-60 seconds
             </p>
