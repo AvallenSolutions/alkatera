@@ -422,9 +422,16 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
                     <Select
                       value={entry.utility_type}
                       onValueChange={(value) => {
+                        console.log('[LogEmissions] Dropdown onValueChange called with:', value);
                         const utility = UTILITY_TYPES.find(u => u.value === value);
-                        updateUtilityEntry(index, 'utility_type', value);
-                        updateUtilityEntry(index, 'unit', utility?.defaultUnit || '');
+                        const updated = [...utilityEntries];
+                        updated[index] = {
+                          ...updated[index],
+                          utility_type: value,
+                          unit: utility?.defaultUnit || ''
+                        };
+                        console.log('[LogEmissions] Setting state with updated:', updated);
+                        setUtilityEntries(updated);
                       }}
                     >
                       <SelectTrigger>
