@@ -75,17 +75,44 @@ export default function LcaReviewPage() {
       setIsCalculating(true);
       toast.info("Starting LCA calculation...");
 
-      const { error: updateError } = await supabase
+      // Get session for auth header
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("No active session");
+      }
+
+      // Call the invoke-openlca edge function to perform the calculation
+      // Note: The edge function will update the status internally
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/invoke-openlca`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          product_lca_id: lcaId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Calculation request failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('[Review] Calculation result:', result);
+
+      // Mark LCA as calculated and not a draft
+      await supabase
         .from("product_lcas")
         .update({
-          status: 'pending',
+          status: 'completed',
           is_draft: false,
         })
         .eq("id", lcaId);
 
-      if (updateError) throw updateError;
-
-      toast.success("LCA calculation initiated");
+      toast.success("LCA calculation completed successfully");
       router.push(`/dashboard/lcas/${lcaId}/results`);
     } catch (error: any) {
       console.error("Error initiating calculation:", error);

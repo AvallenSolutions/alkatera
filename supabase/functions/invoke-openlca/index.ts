@@ -205,28 +205,39 @@ Deno.serve(async (req: Request) => {
       throw new Error("User is not a member of the LCA's organization");
     }
 
-    const { data: inputRecords, error: inputsError } = await supabase
-      .from("product_lca_inputs")
-      .select("input_data")
-      .eq("product_lca_id", payload.product_lca_id)
-      .order("created_at", { ascending: false })
-      .limit(1);
+    // Fetch materials from the normalized product_lca_materials table
+    const { data: materials, error: materialsError } = await supabase
+      .from("product_lca_materials")
+      .select("*")
+      .eq("product_lca_id", payload.product_lca_id);
 
-    if (inputsError || !inputRecords || inputRecords.length === 0) {
-      throw new Error("No input data found for this LCA");
+    if (materialsError) {
+      throw new Error(`Failed to fetch materials: ${materialsError.message}`);
     }
 
-    const lcaInputs = inputRecords[0].input_data;
-
-    if (!Array.isArray(lcaInputs) || lcaInputs.length === 0) {
-      throw new Error("Input data is empty or invalid");
+    if (!materials || materials.length === 0) {
+      throw new Error("No materials found for this LCA. Please add ingredients and packaging first.");
     }
 
-    const evidenceValidation = validateEvidenceRequirements(lcaInputs);
-    if (!evidenceValidation.valid) {
-      throw new Error(
-        `Missing evidence for high-quality data points: ${evidenceValidation.missingEvidence.join(", ")}`
-      );
+    // Transform product_lca_materials into LCAInput format
+    const lcaInputs: LCAInput[] = materials.map((material: any) => ({
+      label: material.material_name || material.name,
+      value: parseFloat(material.quantity) || 0,
+      unit: material.unit || material.unit_name || 'kg',
+      dqi: {
+        reliability: 3,
+        temporal: 3,
+        geographical: 3,
+        technological: 3,
+        completeness: 3,
+      },
+      evidenceUrl: material.evidence_url,
+      stage: material.material_type === 'ingredient' ? 'A1-A3 Product Stage' : 'A4-A5 Packaging',
+      category: material.packaging_category || 'raw_materials',
+    }));
+
+    if (lcaInputs.length === 0) {
+      throw new Error("No valid materials found for calculation");
     }
 
     const openLcaPayload = transformToOpenLcaProcess(
