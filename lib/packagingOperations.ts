@@ -2,6 +2,32 @@ import { supabase } from './supabaseClient';
 import { saveDraftData, markTabComplete } from './lcaWorkflow';
 import type { DataSource, PackagingCategory, ImpactSourceType } from './types/lca';
 
+/**
+ * Normalize quantity and unit to kg
+ * All impact factors in the database are per kg, so we need to convert
+ * user input (which might be in grams) to kg before storing.
+ */
+function normalizeToKg(quantity: number, unit: string): { quantity: number; unit: string } {
+  const lowerUnit = unit.toLowerCase();
+
+  if (lowerUnit === 'g' || lowerUnit === 'grams') {
+    return { quantity: quantity / 1000, unit: 'kg' };
+  }
+
+  if (lowerUnit === 'ml' || lowerUnit === 'millilitres' || lowerUnit === 'milliliters') {
+    // Assuming density of 1 (water-like) for liquids
+    return { quantity: quantity / 1000, unit: 'kg' };
+  }
+
+  if (lowerUnit === 'l' || lowerUnit === 'litres' || lowerUnit === 'liters') {
+    // Assuming density of 1 (water-like) for liquids
+    return { quantity: quantity, unit: 'kg' };
+  }
+
+  // Already in kg or unknown unit - return as is
+  return { quantity, unit: 'kg' };
+}
+
 export interface AddPackagingParams {
   lcaId: string;
   organizationId: string;
@@ -101,11 +127,33 @@ export async function addPackagingToLCA(params: AddPackagingParams) {
       throw new Error("User not authorized for this organization");
     }
 
+    // Normalize quantity to kg (impact factors are per kg)
+    const normalized = normalizeToKg(params.packaging.quantity, params.packaging.unit);
+    const conversionFactor = normalized.quantity / params.packaging.quantity;
+
+    console.log(`[addPackagingToLCA] Unit conversion: ${params.packaging.quantity} ${params.packaging.unit} → ${normalized.quantity} ${normalized.unit} (factor: ${conversionFactor})`);
+
+    // If impact factors are provided, they need to be adjusted for the normalized quantity
+    // Impact factors from staging are per-unit (e.g., per kg), so:
+    // final_impact = quantity_in_kg × factor_per_kg
+    const adjustedImpactClimate = params.packaging.impact_climate
+      ? params.packaging.impact_climate * conversionFactor
+      : null;
+    const adjustedImpactWater = params.packaging.impact_water
+      ? params.packaging.impact_water * conversionFactor
+      : null;
+    const adjustedImpactLand = params.packaging.impact_land
+      ? params.packaging.impact_land * conversionFactor
+      : null;
+    const adjustedImpactWaste = params.packaging.impact_waste
+      ? params.packaging.impact_waste * conversionFactor
+      : null;
+
     const materialData: any = {
       product_lca_id: params.lcaId,
       name: params.packaging.name,
-      quantity: params.packaging.quantity,
-      unit: params.packaging.unit,
+      quantity: normalized.quantity,
+      unit: normalized.unit,
       lca_sub_stage_id: params.packaging.lca_sub_stage_id,
       data_source: params.packaging.data_source,
       data_source_id: params.packaging.data_source_id || null,
@@ -114,10 +162,10 @@ export async function addPackagingToLCA(params: AddPackagingParams) {
       is_organic_certified: params.packaging.is_organic_certified,
       packaging_category: params.packaging.packaging_category,
       label_printing_type: params.packaging.label_printing_type || null,
-      impact_climate: params.packaging.impact_climate || null,
-      impact_water: params.packaging.impact_water || null,
-      impact_land: params.packaging.impact_land || null,
-      impact_waste: params.packaging.impact_waste || null,
+      impact_climate: adjustedImpactClimate,
+      impact_water: adjustedImpactWater,
+      impact_land: adjustedImpactLand,
+      impact_waste: adjustedImpactWaste,
       impact_source: params.packaging.impact_source || 'secondary_modelled',
       impact_reference_id: params.packaging.impact_reference_id || params.packaging.data_source_id || null,
     };

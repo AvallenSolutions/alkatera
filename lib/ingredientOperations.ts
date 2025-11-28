@@ -2,6 +2,32 @@ import { supabase } from './supabaseClient';
 import { saveDraftData, markTabComplete } from './lcaWorkflow';
 import type { DataSource, ImpactSourceType } from './types/lca';
 
+/**
+ * Normalize quantity and unit to kg
+ * All impact factors in the database are per kg, so we need to convert
+ * user input (which might be in grams) to kg before storing.
+ */
+function normalizeToKg(quantity: number, unit: string): { quantity: number; unit: string } {
+  const lowerUnit = unit.toLowerCase();
+
+  if (lowerUnit === 'g' || lowerUnit === 'grams') {
+    return { quantity: quantity / 1000, unit: 'kg' };
+  }
+
+  if (lowerUnit === 'ml' || lowerUnit === 'millilitres' || lowerUnit === 'milliliters') {
+    // Assuming density of 1 (water-like) for liquids
+    return { quantity: quantity / 1000, unit: 'kg' };
+  }
+
+  if (lowerUnit === 'l' || lowerUnit === 'litres' || lowerUnit === 'liters') {
+    // Assuming density of 1 (water-like) for liquids
+    return { quantity: quantity, unit: 'kg' };
+  }
+
+  // Already in kg or unknown unit - return as is
+  return { quantity, unit: 'kg' };
+}
+
 export interface AddIngredientParams {
   lcaId: string;
   organizationId: string;
@@ -96,21 +122,43 @@ export async function addIngredientToLCA(params: AddIngredientParams) {
       throw new Error("User not authorized for this organization");
     }
 
+    // Normalize quantity to kg (impact factors are per kg)
+    const normalized = normalizeToKg(params.ingredient.quantity, params.ingredient.unit);
+    const conversionFactor = normalized.quantity / params.ingredient.quantity;
+
+    console.log(`[addIngredientToLCA] Unit conversion: ${params.ingredient.quantity} ${params.ingredient.unit} → ${normalized.quantity} ${normalized.unit} (factor: ${conversionFactor})`);
+
+    // If impact factors are provided, they need to be adjusted for the normalized quantity
+    // Impact factors from staging are per-unit (e.g., per kg), so:
+    // final_impact = quantity_in_kg × factor_per_kg
+    const adjustedImpactClimate = params.ingredient.impact_climate
+      ? params.ingredient.impact_climate * conversionFactor
+      : null;
+    const adjustedImpactWater = params.ingredient.impact_water
+      ? params.ingredient.impact_water * conversionFactor
+      : null;
+    const adjustedImpactLand = params.ingredient.impact_land
+      ? params.ingredient.impact_land * conversionFactor
+      : null;
+    const adjustedImpactWaste = params.ingredient.impact_waste
+      ? params.ingredient.impact_waste * conversionFactor
+      : null;
+
     const materialData: any = {
       product_lca_id: params.lcaId,
       name: params.ingredient.name,
-      quantity: params.ingredient.quantity,
-      unit: params.ingredient.unit,
+      quantity: normalized.quantity,
+      unit: normalized.unit,
       lca_sub_stage_id: params.ingredient.lca_sub_stage_id,
       data_source: params.ingredient.data_source,
       data_source_id: params.ingredient.data_source_id || null,
       supplier_product_id: params.ingredient.supplier_product_id || null,
       origin_country: params.ingredient.origin_country || null,
       is_organic_certified: params.ingredient.is_organic_certified,
-      impact_climate: params.ingredient.impact_climate || null,
-      impact_water: params.ingredient.impact_water || null,
-      impact_land: params.ingredient.impact_land || null,
-      impact_waste: params.ingredient.impact_waste || null,
+      impact_climate: adjustedImpactClimate,
+      impact_water: adjustedImpactWater,
+      impact_land: adjustedImpactLand,
+      impact_waste: adjustedImpactWaste,
       impact_source: params.ingredient.impact_source || 'secondary_modelled',
       impact_reference_id: params.ingredient.impact_reference_id || params.ingredient.data_source_id || null,
     };
