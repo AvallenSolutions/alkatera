@@ -95,6 +95,56 @@ export interface MaterialImpactFactors {
   impact_metadata?: Record<string, any> | null;
 }
 
+/**
+ * GHG Breakdown per ISO 14067 - Carbon Origin Split
+ */
+export interface CarbonOriginBreakdown {
+  fossil: number;           // kg CO2e from fossil sources
+  biogenic: number;         // kg CO2e from biogenic sources
+  land_use_change: number;  // kg CO2e from dLUC (direct land use change)
+}
+
+/**
+ * GHG Breakdown per ISO 14067 - Gas Inventory (by species)
+ */
+export interface GasInventory {
+  co2_fossil: number;     // kg CO2 (fossil)
+  co2_biogenic: number;   // kg CO2 (biogenic)
+  methane: number;        // kg CH4
+  nitrous_oxide: number;  // kg N2O
+  hfc_pfc: number;        // kg CO2e (fluorinated gases)
+}
+
+/**
+ * GWP Characterization Factors
+ */
+export interface GWPFactors {
+  methane_gwp100: number;   // Default: 27.9 (IPCC AR6)
+  n2o_gwp100: number;       // Default: 273 (IPCC AR6)
+  method: string;           // e.g., "IPCC AR6", "IPCC AR5"
+}
+
+/**
+ * Complete GHG Breakdown for ISO 14067 Compliance
+ */
+export interface GHGBreakdown {
+  carbon_origin: CarbonOriginBreakdown;
+  gas_inventory: GasInventory;
+  gwp_factors: GWPFactors;
+}
+
+/**
+ * GHG Breakdown Validation Result
+ */
+export interface GHGBreakdownValidation {
+  has_breakdown: boolean;
+  total_climate: number;
+  carbon_sum?: number;
+  variance_pct?: number;
+  is_valid: boolean;
+  warning?: string | null;
+}
+
 export interface MaterialSelectionOutput {
   materialId: string;
   materialType: MaterialType;
