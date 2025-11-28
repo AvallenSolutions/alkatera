@@ -69,6 +69,8 @@ export function LinkFacilityModal({
       setLoadingFacilities(true);
       setError(null);
 
+      console.log('[LinkFacilityModal] Loading facilities for organization:', organizationId);
+
       const { data: facilitiesData, error: facilitiesError } = await supabase
         .from("facilities")
         .select("id, name, location")
@@ -77,16 +79,27 @@ export function LinkFacilityModal({
 
       if (facilitiesError) throw facilitiesError;
 
+      console.log('[LinkFacilityModal] Facilities loaded:', facilitiesData);
+
       const { data: intensitiesData, error: intensitiesError } = await supabase
         .from("facility_emissions_aggregated")
-        .select("facility_id, calculated_intensity, data_source_type, volume_unit, reporting_period_start, reporting_period_end")
+        .select("facility_id, calculated_intensity, data_source_type, volume_unit, total_co2e, total_production_volume, reporting_period_start, reporting_period_end")
         .in("facility_id", facilitiesData?.map(f => f.id) || [])
+        .not('calculated_intensity', 'is', null)
         .order("reporting_period_start", { ascending: false });
 
       if (intensitiesError) throw intensitiesError;
 
+      console.log('[LinkFacilityModal] Intensities loaded:', intensitiesData);
+
       const facilitiesWithIntensity = (facilitiesData || []).map(facility => {
         const intensity = (intensitiesData || []).find(i => i.facility_id === facility.id);
+        console.log(`[LinkFacilityModal] Facility ${facility.name}:`, {
+          location: facility.location,
+          intensity: intensity?.calculated_intensity,
+          total_co2e: intensity?.total_co2e,
+          production_volume: intensity?.total_production_volume,
+        });
         return {
           ...facility,
           calculated_intensity: intensity?.calculated_intensity || null,
@@ -99,6 +112,7 @@ export function LinkFacilityModal({
         f => !excludeFacilityIds.includes(f.id)
       );
 
+      console.log('[LinkFacilityModal] Available facilities with intensity:', availableFacilities);
       setFacilities(availableFacilities);
     } catch (err: any) {
       console.error("Error loading facilities:", err);
