@@ -11,6 +11,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ArrowLeft,
   ShieldCheck,
   Info,
@@ -31,6 +38,7 @@ export default function LcaInitiatePage() {
   const [systemBoundary, setSystemBoundary] = useState<"cradle-to-gate" | "cradle-to-grave">(
     "cradle-to-gate"
   );
+  const [referenceYear, setReferenceYear] = useState<number>(new Date().getFullYear());
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<{ functionalUnit?: string }>({});
 
@@ -75,6 +83,7 @@ export default function LcaInitiatePage() {
         organizationId: currentOrganization.id,
         functionalUnit: functionalUnit.trim(),
         systemBoundary,
+        referenceYear,
       });
 
       if (!result.success) {
@@ -176,6 +185,48 @@ export default function LcaInitiatePage() {
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
               <span className="text-sm font-bold text-blue-600">2</span>
+            </div>
+            <div>
+              <CardTitle>Reference Year</CardTitle>
+              <CardDescription>
+                ISO 14067 Temporal Anchoring: Select the financial year for facility operational data
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="reference-year">
+              Reference Year <span className="text-red-600">*</span>
+            </Label>
+            <Select
+              value={referenceYear.toString()}
+              onValueChange={(value) => setReferenceYear(parseInt(value))}
+            >
+              <SelectTrigger id="reference-year" className="mt-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground mt-2">
+              All facility emissions and production data will be sourced from this financial year.
+              This ensures temporal consistency per ISO 14067 requirements.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/20">
+              <span className="text-sm font-bold text-blue-600">3</span>
             </div>
             <div>
               <CardTitle>System Boundary</CardTitle>

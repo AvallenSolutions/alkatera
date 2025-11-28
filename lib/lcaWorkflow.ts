@@ -5,6 +5,7 @@ export interface InitiateLcaParams {
   organizationId: string;
   functionalUnit: string;
   systemBoundary: 'cradle-to-gate' | 'cradle-to-grave';
+  referenceYear: number;
 }
 
 export interface WorkflowAuditParams {
@@ -45,6 +46,7 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
       product_image_url: product.product_image_url || null,
       functional_unit: params.functionalUnit,
       system_boundary: params.systemBoundary,
+      reference_year: params.referenceYear,
       lca_version: "1.0",
       lca_scope_type: params.systemBoundary,
       goal_and_scope_confirmed: true,
@@ -121,6 +123,7 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
       metadata: {
         functional_unit: params.functionalUnit,
         system_boundary: params.systemBoundary,
+        reference_year: params.referenceYear,
       },
     });
 
