@@ -28,6 +28,8 @@ export default function PerformancePage() {
     metrics,
     scopeBreakdown,
     facilityWaterRisks,
+    materialBreakdown,
+    ghgBreakdown,
     natureMetrics,
     loading,
     error,
@@ -277,6 +279,8 @@ export default function PerformancePage() {
         onOpenChange={setCarbonSheetOpen}
         scopeBreakdown={scopeBreakdown}
         totalCO2={totalCO2}
+        materialBreakdown={materialBreakdown}
+        ghgBreakdown={ghgBreakdown}
       />
 
       <WaterImpactSheet

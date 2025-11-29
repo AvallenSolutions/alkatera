@@ -62,6 +62,34 @@ export interface NatureMetrics {
   terrestrial_acidification: number;
 }
 
+export interface MaterialBreakdownItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  climate: number;
+  source: string;
+}
+
+export interface GHGBreakdown {
+  carbon_origin: {
+    fossil: number;
+    biogenic: number;
+    land_use_change: number;
+  };
+  gas_inventory: {
+    co2_fossil: number;
+    co2_biogenic: number;
+    methane: number;
+    nitrous_oxide: number;
+    hfc_pfc: number;
+  };
+  gwp_factors: {
+    methane_gwp100: number;
+    n2o_gwp100: number;
+    method: string;
+  };
+}
+
 export function useCompanyMetrics() {
   const { currentOrganization } = useOrganization();
   const [metrics, setMetrics] = useState<CompanyMetrics | null>(null);
@@ -69,6 +97,8 @@ export function useCompanyMetrics() {
   const [facilityWaterRisks, setFacilityWaterRisks] = useState<FacilityWaterRisk[]>([]);
   const [materialFlows, setMaterialFlows] = useState<MaterialFlow[]>([]);
   const [natureMetrics, setNatureMetrics] = useState<NatureMetrics | null>(null);
+  const [materialBreakdown, setMaterialBreakdown] = useState<MaterialBreakdownItem[]>([]);
+  const [ghgBreakdown, setGhgBreakdown] = useState<GHGBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -220,6 +250,9 @@ export function useCompanyMetrics() {
       // Fetch facility water risks
       await fetchFacilityWaterRisks();
 
+      // Fetch material and GHG breakdown
+      await fetchMaterialAndGHGBreakdown();
+
       // Set nature metrics
       setNatureMetrics({
         land_use: totalImpacts.land_use,
@@ -312,11 +345,109 @@ export function useCompanyMetrics() {
     }
   }
 
+  async function fetchMaterialAndGHGBreakdown() {
+    try {
+      if (!currentOrganization?.id) return;
+
+      // Fetch latest calculation logs for all completed LCAs
+      const { data: logs, error } = await supabase
+        .from('product_lca_calculation_logs')
+        .select('impact_metrics, product_lcas!inner(status, organization_id)')
+        .eq('product_lcas.organization_id', currentOrganization.id)
+        .eq('product_lcas.status', 'completed')
+        .not('impact_metrics', 'is', null)
+        .order('calculated_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!logs || logs.length === 0) {
+        return;
+      }
+
+      // Aggregate material breakdowns across all products
+      const materialMap = new Map<string, MaterialBreakdownItem>();
+      let totalGHG = {
+        co2_fossil: 0,
+        co2_biogenic: 0,
+        methane: 0,
+        nitrous_oxide: 0,
+        hfc_pfc: 0,
+      };
+      let productCount = 0;
+
+      logs.forEach((log: any) => {
+        const metrics = log.impact_metrics;
+        if (!metrics) return;
+
+        // Aggregate materials
+        if (metrics.material_breakdown && Array.isArray(metrics.material_breakdown)) {
+          metrics.material_breakdown.forEach((material: any) => {
+            const existing = materialMap.get(material.name);
+            if (existing) {
+              existing.quantity += material.quantity || 0;
+              existing.climate += material.climate || 0;
+            } else {
+              materialMap.set(material.name, {
+                name: material.name,
+                quantity: material.quantity || 0,
+                unit: material.unit || 'kg',
+                climate: material.climate || 0,
+                source: material.source || 'unknown',
+              });
+            }
+          });
+        }
+
+        // Aggregate GHG breakdown
+        if (metrics.ghg_breakdown?.gas_inventory) {
+          const inv = metrics.ghg_breakdown.gas_inventory;
+          totalGHG.co2_fossil += inv.co2_fossil || 0;
+          totalGHG.co2_biogenic += inv.co2_biogenic || 0;
+          totalGHG.methane += inv.methane || 0;
+          totalGHG.nitrous_oxide += inv.nitrous_oxide || 0;
+          totalGHG.hfc_pfc += inv.hfc_pfc || 0;
+          productCount++;
+        }
+      });
+
+      // Convert map to array and sort by climate impact
+      const materials = Array.from(materialMap.values())
+        .sort((a, b) => b.climate - a.climate);
+
+      setMaterialBreakdown(materials);
+
+      // Set aggregated GHG breakdown
+      if (productCount > 0) {
+        const totalFossil = totalGHG.co2_fossil;
+        const totalBiogenic = totalGHG.co2_biogenic;
+        const totalLUC = totalGHG.methane * 0.01; // Rough proxy for land use change
+
+        setGhgBreakdown({
+          carbon_origin: {
+            fossil: totalFossil,
+            biogenic: totalBiogenic,
+            land_use_change: totalLUC,
+          },
+          gas_inventory: totalGHG,
+          gwp_factors: {
+            methane_gwp100: 27.9,
+            n2o_gwp100: 273,
+            method: 'IPCC AR6',
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching material and GHG breakdown:', err);
+    }
+  }
+
   return {
     metrics,
     scopeBreakdown,
     facilityWaterRisks,
     materialFlows,
+    materialBreakdown,
+    ghgBreakdown,
     natureMetrics,
     loading,
     error,
