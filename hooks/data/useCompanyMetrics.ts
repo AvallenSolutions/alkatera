@@ -90,6 +90,15 @@ export interface GHGBreakdown {
   };
 }
 
+export interface LifecycleStageBreakdown {
+  stage_name: string;
+  sub_stage_name: string | null;
+  total_impact: number;
+  percentage: number;
+  material_count: number;
+  top_contributors: { name: string; impact: number }[];
+}
+
 export function useCompanyMetrics() {
   const { currentOrganization } = useOrganization();
   const [metrics, setMetrics] = useState<CompanyMetrics | null>(null);
@@ -99,6 +108,7 @@ export function useCompanyMetrics() {
   const [natureMetrics, setNatureMetrics] = useState<NatureMetrics | null>(null);
   const [materialBreakdown, setMaterialBreakdown] = useState<MaterialBreakdownItem[]>([]);
   const [ghgBreakdown, setGhgBreakdown] = useState<GHGBreakdown | null>(null);
+  const [lifecycleStageBreakdown, setLifecycleStageBreakdown] = useState<LifecycleStageBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -347,19 +357,50 @@ export function useCompanyMetrics() {
 
   async function fetchMaterialAndGHGBreakdown() {
     try {
-      if (!currentOrganization?.id) return;
+      console.log('[Carbon Debug] Starting fetchMaterialAndGHGBreakdown for org:', currentOrganization?.id);
 
-      // Fetch materials from all completed LCAs
+      if (!currentOrganization?.id) {
+        console.log('[Carbon Debug] No organization ID, skipping fetch');
+        return;
+      }
+
+      // Fetch materials from all completed LCAs with lifecycle stage information
       const { data: materials, error } = await supabase
         .from('product_lca_materials')
-        .select('name, quantity, unit, impact_climate, impact_water, impact_land, impact_waste, impact_source, packaging_category, product_lcas!inner(status, organization_id)')
+        .select(`
+          name,
+          quantity,
+          unit,
+          impact_climate,
+          impact_water,
+          impact_land,
+          impact_waste,
+          impact_source,
+          packaging_category,
+          lca_sub_stage_id,
+          lca_sub_stages (
+            id,
+            name,
+            lca_life_cycle_stages (
+              id,
+              name
+            )
+          ),
+          product_lcas!inner(status, organization_id)
+        `)
         .eq('product_lcas.organization_id', currentOrganization.id)
         .eq('product_lcas.status', 'completed')
         .not('impact_climate', 'is', null);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Carbon Debug] Query error:', error);
+        throw error;
+      }
+
+      console.log('[Carbon Debug] Query returned:', materials?.length || 0, 'materials');
 
       if (!materials || materials.length === 0) {
+        console.log('[Carbon Debug] No materials found - breakdown will be empty');
         return;
       }
 
@@ -388,29 +429,128 @@ export function useCompanyMetrics() {
       const aggregatedMaterials = Array.from(materialMap.values())
         .sort((a, b) => b.climate - a.climate);
 
-      setMaterialBreakdown(aggregatedMaterials);
-
-      // Calculate GHG breakdown (simplified - assumes mostly fossil CO2)
       const totalClimate = aggregatedMaterials.reduce((sum, m) => sum + m.climate, 0);
 
-      if (totalClimate > 0) {
-        // Simple estimation: 90% fossil CO2, 8% biogenic, 2% other gases
-        const co2Fossil = totalClimate * 0.90;
-        const co2Biogenic = totalClimate * 0.08;
-        const methaneEquiv = totalClimate * 0.015 / 27.9; // Convert back to CH4 mass
-        const n2oEquiv = totalClimate * 0.005 / 273; // Convert back to N2O mass
+      console.log('[Carbon Debug] Aggregated into', aggregatedMaterials.length, 'unique materials');
+      console.log('[Carbon Debug] Total climate impact:', totalClimate.toFixed(3), 'kg CO2eq');
+      console.log('[Carbon Debug] Top 3 contributors:', aggregatedMaterials.slice(0, 3).map(m => `${m.name}: ${m.climate.toFixed(3)}`));
 
-        setGhgBreakdown({
+      setMaterialBreakdown(aggregatedMaterials);
+
+      // Calculate lifecycle stage breakdown
+      const stageMap = new Map<string, {
+        total_impact: number;
+        material_count: number;
+        materials: { name: string; impact: number }[];
+      }>();
+
+      materials.forEach((material: any) => {
+        const impact = Number(material.impact_climate) || 0;
+        const stageName = material.lca_sub_stages?.lca_life_cycle_stages?.name || 'Unclassified';
+
+        if (!stageMap.has(stageName)) {
+          stageMap.set(stageName, {
+            total_impact: 0,
+            material_count: 0,
+            materials: []
+          });
+        }
+
+        const stage = stageMap.get(stageName)!;
+        stage.total_impact += impact;
+        stage.material_count += 1;
+        stage.materials.push({ name: material.name || 'Unknown', impact });
+      });
+
+      const stageBreakdown: LifecycleStageBreakdown[] = Array.from(stageMap.entries()).map(([stage_name, data]) => {
+        // Sort materials by impact and get top 3
+        const topContributors = data.materials
+          .sort((a, b) => b.impact - a.impact)
+          .slice(0, 3);
+
+        return {
+          stage_name,
+          sub_stage_name: null,
+          total_impact: data.total_impact,
+          percentage: totalClimate > 0 ? (data.total_impact / totalClimate) * 100 : 0,
+          material_count: data.material_count,
+          top_contributors: topContributors
+        };
+      }).sort((a, b) => b.total_impact - a.total_impact);
+
+      console.log('[Carbon Debug] Lifecycle stage breakdown:', stageBreakdown.map(s => `${s.stage_name}: ${s.total_impact.toFixed(3)} (${s.percentage.toFixed(1)}%)`));
+
+      setLifecycleStageBreakdown(stageBreakdown);
+
+      // Calculate accurate GHG breakdown based on material types
+      if (totalClimate > 0) {
+        let fossilCO2 = 0;
+        let biogenicCO2 = 0;
+        let landUseChange = 0;
+        let methaneTotal = 0;
+        let nitrousOxideTotal = 0;
+
+        materials.forEach((material: any) => {
+          const impact = Number(material.impact_climate) || 0;
+          const name = (material.name || '').toLowerCase();
+          const category = (material.packaging_category || '').toLowerCase();
+
+          // Categorise by material type for accurate GHG split
+          if (category === 'glass' || name.includes('glass')) {
+            // Glass: 100% fossil CO2 from fuel combustion
+            fossilCO2 += impact;
+          } else if (category === 'plastic' || category === 'pet' || category === 'hdpe' || name.includes('plastic') || name.includes('pet')) {
+            // Plastics: 100% fossil CO2 from petrochemicals
+            fossilCO2 += impact;
+          } else if (category === 'metal' || category === 'aluminium' || name.includes('aluminium') || name.includes('cap')) {
+            // Metals: 100% fossil CO2 from smelting
+            fossilCO2 += impact;
+          } else if (name.includes('sugar') || name.includes('glucose') || name.includes('fructose')) {
+            // Sugar: mostly biogenic from photosynthesis
+            biogenicCO2 += impact * 0.85;
+            fossilCO2 += impact * 0.10; // processing energy
+            nitrousOxideTotal += (impact * 0.05) / 273; // N2O from fertiliser
+          } else if (name.includes('fruit') || name.includes('apple') || name.includes('lemon') || name.includes('elderflower') || name.includes('juice')) {
+            // Fruit ingredients: mostly biogenic
+            biogenicCO2 += impact * 0.80;
+            fossilCO2 += impact * 0.10; // processing
+            landUseChange += impact * 0.08; // land conversion
+            nitrousOxideTotal += (impact * 0.02) / 273; // fertiliser
+          } else if (category === 'paper' || category === 'cardboard' || name.includes('label') || name.includes('cardboard')) {
+            // Paper/cardboard: mostly biogenic from wood
+            biogenicCO2 += impact * 0.70;
+            fossilCO2 += impact * 0.25; // processing energy
+            landUseChange += impact * 0.05;
+          } else if (name.includes('water')) {
+            // Water: minimal, mostly fossil from transport/treatment
+            fossilCO2 += impact * 0.90;
+            methaneTotal += (impact * 0.10) / 27.9;
+          } else if (name.includes('transport') || name.includes('freight') || name.includes('logistics')) {
+            // Transport: diesel/petrol combustion
+            fossilCO2 += impact * 0.95;
+            methaneTotal += (impact * 0.03) / 27.9;
+            nitrousOxideTotal += (impact * 0.02) / 273;
+          } else {
+            // Unknown/generic: use conservative estimate
+            fossilCO2 += impact * 0.70;
+            biogenicCO2 += impact * 0.20;
+            landUseChange += impact * 0.05;
+            methaneTotal += (impact * 0.03) / 27.9;
+            nitrousOxideTotal += (impact * 0.02) / 273;
+          }
+        });
+
+        const ghgData = {
           carbon_origin: {
-            fossil: co2Fossil,
-            biogenic: co2Biogenic,
-            land_use_change: totalClimate * 0.02,
+            fossil: fossilCO2,
+            biogenic: biogenicCO2,
+            land_use_change: landUseChange,
           },
           gas_inventory: {
-            co2_fossil: co2Fossil,
-            co2_biogenic: co2Biogenic,
-            methane: methaneEquiv,
-            nitrous_oxide: n2oEquiv,
+            co2_fossil: fossilCO2,
+            co2_biogenic: biogenicCO2,
+            methane: methaneTotal,
+            nitrous_oxide: nitrousOxideTotal,
             hfc_pfc: 0,
           },
           gwp_factors: {
@@ -418,10 +558,24 @@ export function useCompanyMetrics() {
             n2o_gwp100: 273,
             method: 'IPCC AR6',
           },
+        };
+
+        console.log('[Carbon Debug] Accurate GHG breakdown calculated:', {
+          fossil: fossilCO2.toFixed(3),
+          biogenic: biogenicCO2.toFixed(3),
+          luc: landUseChange.toFixed(3),
+          ch4_kg: methaneTotal.toFixed(6),
+          n2o_kg: nitrousOxideTotal.toFixed(6),
+          total_check: (fossilCO2 + biogenicCO2 + landUseChange + (methaneTotal * 27.9) + (nitrousOxideTotal * 273)).toFixed(3)
         });
+
+        setGhgBreakdown(ghgData);
       }
+
+      console.log('[Carbon Debug] fetchMaterialAndGHGBreakdown completed successfully');
     } catch (err) {
-      console.error('Error fetching material and GHG breakdown:', err);
+      console.error('[Carbon Debug] Error fetching material and GHG breakdown:', err);
+      console.error('[Carbon Debug] Error details:', { orgId: currentOrganization?.id, error: err });
     }
   }
 
@@ -432,6 +586,7 @@ export function useCompanyMetrics() {
     materialFlows,
     materialBreakdown,
     ghgBreakdown,
+    lifecycleStageBreakdown,
     natureMetrics,
     loading,
     error,

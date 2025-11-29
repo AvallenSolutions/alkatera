@@ -30,6 +30,7 @@ export default function PerformancePage() {
     facilityWaterRisks,
     materialBreakdown,
     ghgBreakdown,
+    lifecycleStageBreakdown,
     natureMetrics,
     loading,
     error,
@@ -233,7 +234,13 @@ export default function PerformancePage() {
                 <Skeleton className="h-32 w-full" />
               </div>
             ) : (
-              <CarbonDeepDive scopeBreakdown={scopeBreakdown} totalCO2={totalCO2} />
+              <CarbonDeepDive
+                scopeBreakdown={scopeBreakdown}
+                totalCO2={totalCO2}
+                materialBreakdown={materialBreakdown}
+                ghgBreakdown={ghgBreakdown}
+                lifecycleStageBreakdown={lifecycleStageBreakdown}
+              />
             )}
           </TabsContent>
 

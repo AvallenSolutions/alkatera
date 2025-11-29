@@ -6,19 +6,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { MaterialBreakdownItem, GHGBreakdown } from './CarbonBreakdownSheet';
+import { LifecycleStageBreakdown } from '@/hooks/data/useCompanyMetrics';
 
 interface CarbonDeepDiveProps {
   scopeBreakdown: ScopeBreakdown | null;
   totalCO2: number;
   materialBreakdown?: MaterialBreakdownItem[];
   ghgBreakdown?: GHGBreakdown | null;
+  lifecycleStageBreakdown?: LifecycleStageBreakdown[];
 }
 
-export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown }: CarbonDeepDiveProps) {
+export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown, lifecycleStageBreakdown }: CarbonDeepDiveProps) {
   const [sortBy, setSortBy] = useState<'impact' | 'name' | 'quantity'>('impact');
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log('[Carbon DeepDive] Component mounted with props:', {
+      hasScopeBreakdown: !!scopeBreakdown,
+      totalCO2,
+      materialBreakdownCount: materialBreakdown?.length || 0,
+      hasGhgBreakdown: !!ghgBreakdown,
+    });
+    if (materialBreakdown) {
+      console.log('[Carbon DeepDive] Materials received:', materialBreakdown.map(m => `${m.name}: ${m.climate.toFixed(3)}`));
+    }
+    if (ghgBreakdown) {
+      console.log('[Carbon DeepDive] GHG breakdown received:', ghgBreakdown.carbon_origin);
+    }
+  }, [scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown]);
 
   // Check if we have any data to display
   const hasData = scopeBreakdown || (materialBreakdown && materialBreakdown.length > 0) || ghgBreakdown;
+
+  console.log('[Carbon DeepDive] hasData check:', hasData, '- Breakdown:', {
+    scopeBreakdown: !!scopeBreakdown,
+    materialCount: materialBreakdown?.length || 0,
+    ghg: !!ghgBreakdown
+  });
 
   if (!hasData) {
     return (
@@ -81,12 +105,193 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="ghg" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="ghg">GHG Inventory</TabsTrigger>
-          <TabsTrigger value="materials">Material Breakdown</TabsTrigger>
-          <TabsTrigger value="origin">Carbon Origin</TabsTrigger>
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="stages">Lifecycle Stages</TabsTrigger>
+          <TabsTrigger value="materials">Materials</TabsTrigger>
+          <TabsTrigger value="ghg">GHG Detail</TabsTrigger>
         </TabsList>
+
+        {/* Overview Tab with Scope Breakdown */}
+        <TabsContent value="overview" className="space-y-4 mt-6">
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Scope Breakdown Card */}
+            {scopeBreakdown && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    GHG Protocol Scopes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Scope 1 (Direct)</span>
+                        <Badge variant="outline" className="bg-red-50">
+                          {scopeBreakdown.scope1.toFixed(3)} kg CO₂eq
+                        </Badge>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-red-600 h-2 rounded-full"
+                          style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope1 / totalCO2) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {totalCO2 > 0 ? ((scopeBreakdown.scope1 / totalCO2) * 100).toFixed(1) : 0}% - Facility operations
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Scope 2 (Energy)</span>
+                        <Badge variant="outline" className="bg-orange-50">
+                          {scopeBreakdown.scope2.toFixed(3)} kg CO₂eq
+                        </Badge>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-orange-600 h-2 rounded-full"
+                          style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope2 / totalCO2) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {totalCO2 > 0 ? ((scopeBreakdown.scope2 / totalCO2) * 100).toFixed(1) : 0}% - Purchased electricity
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Scope 3 (Value Chain)</span>
+                        <Badge variant="outline" className="bg-yellow-50">
+                          {scopeBreakdown.scope3.toFixed(3)} kg CO₂eq
+                        </Badge>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-yellow-600 h-2 rounded-full"
+                          style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope3 / totalCO2) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {totalCO2 > 0 ? ((scopeBreakdown.scope3 / totalCO2) * 100).toFixed(1) : 0}% - Materials, transport, end-of-life
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Summary Stats */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Carbon Footprint Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                    <span className="text-sm font-medium">Total Emissions</span>
+                    <span className="text-lg font-bold text-orange-900">
+                      {totalCO2.toFixed(3)} kg CO₂eq
+                    </span>
+                  </div>
+
+                  {materialBreakdown && materialBreakdown.length > 0 && (
+                    <>
+                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <span className="text-sm font-medium">Materials Tracked</span>
+                        <span className="text-lg font-bold text-blue-900">
+                          {materialBreakdown.length}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                        <span className="text-sm font-medium">Top Contributor</span>
+                        <span className="text-sm font-bold text-green-900">
+                          {materialBreakdown[0]?.name}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                        <span className="text-sm font-medium">Contribution</span>
+                        <span className="text-sm font-bold text-purple-900">
+                          {materialBreakdown[0] && totalCO2 > 0
+                            ? ((materialBreakdown[0].climate / totalCO2) * 100).toFixed(1)
+                            : 0}%
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Lifecycle Stages Tab */}
+        <TabsContent value="stages" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Package className="h-5 w-5 text-green-600" />
+                  <CardTitle className="text-lg">Emissions by Lifecycle Stage</CardTitle>
+                </div>
+                <Badge variant="outline" className="text-xs">ISO 14040/14044</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {lifecycleStageBreakdown && lifecycleStageBreakdown.length > 0 ? (
+                <div className="space-y-4">
+                  {lifecycleStageBreakdown.map((stage, index) => (
+                    <Card key={index} className="border-2">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-semibold text-sm">{stage.stage_name}</h3>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{stage.percentage.toFixed(1)}%</Badge>
+                            <span className="text-sm font-bold">{stage.total_impact.toFixed(3)} kg CO₂eq</span>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div
+                            className="bg-gradient-to-r from-green-600 to-green-400 h-3 rounded-full"
+                            style={{ width: `${stage.percentage}%` }}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">
+                            {stage.material_count} materials contributing
+                          </p>
+                          {stage.top_contributors.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {stage.top_contributors.map((contrib, idx) => (
+                                <Badge key={idx} variant="secondary" className="text-xs">
+                                  {contrib.name}: {contrib.impact.toFixed(3)}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Info className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm">Lifecycle stage data unavailable</p>
+                  <p className="text-xs mt-2">Ensure materials are classified with lifecycle stages in the LCA data</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         {/* GHG Gas Inventory Tab */}
         <TabsContent value="ghg" className="space-y-4 mt-6">
@@ -518,166 +723,6 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
               </CardContent>
             </Card>
           )}
-        </TabsContent>
-
-        {/* Carbon Origin Tab */}
-        <TabsContent value="origin" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Leaf className="h-5 w-5 text-green-600" />
-                  Carbon Origin Analysis
-                </CardTitle>
-                <Badge variant="outline" className="text-xs">ISO 14067 Compliant</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {ghgBreakdown ? (
-                <>
-                  <div className="grid grid-cols-3 gap-4">
-                    <Card className="bg-red-50 border-red-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-red-900">
-                            {ghgBreakdown.carbon_origin.fossil.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                          </span>
-                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">Fossil Carbon</p>
-                        <p className="text-xs font-semibold mt-1">
-                          {((ghgBreakdown.carbon_origin.fossil / totalCO2) * 100).toFixed(1)}% of total
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-green-50 border-green-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-green-900">
-                            {ghgBreakdown.carbon_origin.biogenic.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                          </span>
-                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">Biogenic Carbon</p>
-                        <p className="text-xs font-semibold mt-1">
-                          {((ghgBreakdown.carbon_origin.biogenic / totalCO2) * 100).toFixed(1)}% of total
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-amber-50 border-amber-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl font-bold text-amber-900">
-                            {ghgBreakdown.carbon_origin.land_use_change.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                          </span>
-                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">Land Use Change</p>
-                        <p className="text-xs font-semibold mt-1">
-                          {((ghgBreakdown.carbon_origin.land_use_change / totalCO2) * 100).toFixed(1)}% of total
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Visual Bar */}
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold">Carbon Origin Distribution</h3>
-                    <div className="h-8 w-full flex rounded-lg overflow-hidden border-2">
-                      <div
-                        className="bg-red-500 flex items-center justify-center text-xs font-semibold text-white"
-                        style={{ width: `${(ghgBreakdown.carbon_origin.fossil / totalCO2) * 100}%` }}
-                      >
-                        {((ghgBreakdown.carbon_origin.fossil / totalCO2) * 100) > 10 && 'Fossil'}
-                      </div>
-                      <div
-                        className="bg-green-500 flex items-center justify-center text-xs font-semibold text-white"
-                        style={{ width: `${(ghgBreakdown.carbon_origin.biogenic / totalCO2) * 100}%` }}
-                      >
-                        {((ghgBreakdown.carbon_origin.biogenic / totalCO2) * 100) > 10 && 'Biogenic'}
-                      </div>
-                      <div
-                        className="bg-amber-500 flex items-center justify-center text-xs font-semibold text-white"
-                        style={{ width: `${(ghgBreakdown.carbon_origin.land_use_change / totalCO2) * 100}%` }}
-                      >
-                        {((ghgBreakdown.carbon_origin.land_use_change / totalCO2) * 100) > 10 && 'dLUC'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Explanation Cards */}
-                  <div className="grid gap-4">
-                    <Card className="bg-red-50 border-red-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-2">
-                          <div className="w-3 h-3 rounded-full bg-red-500 mt-1" />
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold text-red-900">Fossil Carbon</p>
-                            <p className="text-xs text-muted-foreground">
-                              CO₂ emissions from fossil fuels and mineral sources (e.g., glass, plastics, metals, transport).
-                              These are geologically stored carbon released into the atmosphere.
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-green-50 border-green-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-2">
-                          <div className="w-3 h-3 rounded-full bg-green-500 mt-1" />
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold text-green-900">Biogenic Carbon</p>
-                            <p className="text-xs text-muted-foreground">
-                              CO₂ from recently living biomass (e.g., sugar, fruit, plant-based materials).
-                              Part of the short-term carbon cycle. Per ISO 14067, reported separately from fossil CO₂.
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-amber-50 border-amber-200">
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-2">
-                          <div className="w-3 h-3 rounded-full bg-amber-500 mt-1" />
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold text-amber-900">Direct Land Use Change (dLUC)</p>
-                            <p className="text-xs text-muted-foreground">
-                              Emissions from conversion of land for agricultural production (e.g., deforestation).
-                              Includes carbon stock changes in soil and biomass.
-                            </p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* Compliance Note */}
-                  <Card className="bg-blue-50 border-blue-200">
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5" />
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-blue-900">ISO 14067 Compliance</p>
-                          <p className="text-xs text-muted-foreground">
-                            Per ISO 14067:4.5.3, biogenic carbon removals and emissions are documented separately from fossil carbon.
-                            This separation enables transparent reporting and proper interpretation of product carbon footprints.
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p className="text-sm">Carbon origin breakdown not available for this calculation</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </TabsContent>
       </Tabs>
     </div>
