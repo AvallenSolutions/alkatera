@@ -90,7 +90,12 @@ export function ClimateCard({ metrics, loading, onViewBreakdown }: ClimateCardPr
         )}
 
         <button
-          onClick={onViewBreakdown}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onViewBreakdown) {
+              onViewBreakdown();
+            }
+          }}
           className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-orange-100/50 transition-colors text-sm font-medium text-orange-900"
         >
           <span>View carbon breakdown</span>

@@ -69,7 +69,7 @@ export function NatureImpactSheet({
               <CardContent className="p-4">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold text-green-900">
-                    {totalLandUse.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                    {totalLandUse.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                   </span>
                   <span className="text-sm text-muted-foreground">m²a</span>
                 </div>
@@ -141,18 +141,18 @@ export function NatureImpactSheet({
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-right">
-                          {item.mass.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg
+                          {item.mass.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
                         </TableCell>
                         <TableCell className="text-sm text-right">
                           <div className="flex flex-col items-end gap-1">
-                            <span>{item.landIntensity.toFixed(2)} m²a/kg</span>
+                            <span>{item.landIntensity.toFixed(3)} m²a/kg</span>
                             <Badge variant="default" className={`${intensityBadge.className} text-xs`}>
                               {intensityBadge.label}
                             </Badge>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm font-semibold text-right">
-                          {item.totalFootprint.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m²a
+                          {item.totalFootprint.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} m²a
                         </TableCell>
                       </TableRow>
                     );

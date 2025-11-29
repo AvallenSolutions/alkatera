@@ -53,7 +53,7 @@ export function WaterImpactSheet({
     const { className, label } = config[level];
     return (
       <Badge variant="default" className={className}>
-        {label} ({factor.toFixed(1)})
+        {label} ({factor.toFixed(3)})
       </Badge>
     );
   };
@@ -79,7 +79,7 @@ export function WaterImpactSheet({
               <CardContent className="p-4">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold text-blue-900">
-                    {totalConsumption.toLocaleString('en-GB', { maximumFractionDigits: 1 })}
+                    {totalConsumption.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                   </span>
                   <span className="text-sm text-muted-foreground">m³</span>
                 </div>
@@ -93,7 +93,7 @@ export function WaterImpactSheet({
               <CardContent className="p-4">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold text-blue-900">
-                    {totalImpact.toLocaleString('en-GB', { maximumFractionDigits: 1 })}
+                    {totalImpact.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                   </span>
                   <span className="text-sm text-muted-foreground">m³ world eq</span>
                 </div>
@@ -146,13 +146,13 @@ export function WaterImpactSheet({
                         {item.location}
                       </TableCell>
                       <TableCell className="text-sm text-right">
-                        {item.consumption.toLocaleString('en-GB', { maximumFractionDigits: 1 })} m³
+                        {item.consumption.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} m³
                       </TableCell>
                       <TableCell className="text-sm">
                         {getRiskBadge(item.riskLevel, item.riskFactor)}
                       </TableCell>
                       <TableCell className="text-sm font-semibold text-right">
-                        {item.netImpact.toLocaleString('en-GB', { maximumFractionDigits: 1 })} m³ world eq
+                        {item.netImpact.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} m³ world eq
                       </TableCell>
                     </TableRow>
                   ))}

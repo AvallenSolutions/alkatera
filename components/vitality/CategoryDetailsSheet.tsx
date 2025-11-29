@@ -102,7 +102,7 @@ export function CategoryDetailsSheet({
             <CardContent className="p-4">
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold text-blue-900">
-                  {totalImpact.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                  {totalImpact.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                 </span>
                 <span className="text-sm text-muted-foreground">kg CO₂eq</span>
               </div>
@@ -149,13 +149,13 @@ export function CategoryDetailsSheet({
                         {item.detail}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {item.quantity.toLocaleString('en-GB', { maximumFractionDigits: 2 })} {item.unit}
+                        {item.quantity.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {item.unit}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {item.emissionFactor.toLocaleString('en-GB', { maximumFractionDigits: 4 })} kg/unit
+                        {item.emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg/unit
                       </TableCell>
                       <TableCell className="text-sm font-semibold">
-                        {item.totalImpact.toLocaleString('en-GB', { maximumFractionDigits: 2 })} kg
+                        {item.totalImpact.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
                       </TableCell>
                     </TableRow>
                   ))}

@@ -180,12 +180,12 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
               <CardContent className="p-6">
                 <div className="flex items-baseline gap-3">
                   <span className="text-5xl font-bold">
-                    {scopeData.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                    {scopeData.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                   </span>
                   <span className="text-xl text-muted-foreground">kg CO₂eq</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  {((scopeData.value / totalOperationalCO2) * 100).toFixed(1)}% of total operational emissions
+                  {((scopeData.value / totalOperationalCO2) * 100).toFixed(3)}% of total operational emissions
                 </p>
               </CardContent>
             </Card>
@@ -225,10 +225,10 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
                           <div className="flex items-center gap-3">
                             <div className="text-right">
                               <div className="font-bold">
-                                {category.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg
+                                {category.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
                               </div>
                               <Badge variant="outline" className="text-xs mt-1">
-                                {percentage.toFixed(1)}%
+                                {percentage.toFixed(3)}%
                               </Badge>
                             </div>
                             {category.hasEvidence && (
@@ -299,7 +299,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
                         {scope.name}
                       </span>
                       <Badge variant="outline" className="text-xs">
-                        {percentage.toFixed(1)}%
+                        {percentage.toFixed(3)}%
                       </Badge>
                     </div>
                     <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -309,7 +309,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
                   <CardContent className="space-y-3">
                     <div className="flex items-baseline gap-2">
                       <span className="text-3xl font-bold">
-                        {scope.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                        {scope.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                       </span>
                       <span className="text-sm text-muted-foreground">kg CO₂eq</span>
                     </div>
@@ -330,7 +330,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
             <div className="flex items-center justify-between text-sm">
               <span className="font-medium">Visual Breakdown</span>
               <span className="text-muted-foreground">
-                Total: {totalOperationalCO2.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg CO₂eq
+                Total: {totalOperationalCO2.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq
               </span>
             </div>
 
@@ -343,7 +343,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
                   <div className="flex items-center justify-between text-sm">
                     <span className={`font-medium ${scope.textColor}`}>{scope.name}</span>
                     <span className="text-muted-foreground">
-                      {scope.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg ({percentage.toFixed(1)}%)
+                      {scope.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg ({percentage.toFixed(3)}%)
                     </span>
                   </div>
                   <div className="h-8 w-full bg-gray-100 rounded-lg overflow-hidden">
@@ -353,7 +353,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps
                     >
                       {barWidth > 15 && (
                         <span className="text-white text-xs font-semibold">
-                          {percentage.toFixed(0)}%
+                          {percentage.toFixed(3)}%
                         </span>
                       )}
                     </div>

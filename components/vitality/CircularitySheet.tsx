@@ -86,7 +86,7 @@ export function CircularitySheet({
               <CardContent className="p-4">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold text-amber-900">
-                    {totalWaste.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                    {totalWaste.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                   </span>
                   <span className="text-sm text-muted-foreground">kg</span>
                 </div>
@@ -100,7 +100,7 @@ export function CircularitySheet({
               <CardContent className="p-4">
                 <div className="flex items-baseline gap-3">
                   <span className="text-3xl font-bold text-amber-900">
-                    {circularityRate.toFixed(1)}%
+                    {circularityRate.toFixed(3)}%
                   </span>
                   <span className="text-sm text-muted-foreground">circular</span>
                 </div>
@@ -151,7 +151,7 @@ export function CircularitySheet({
                           {getDispositionBadge(item.disposition)}
                         </TableCell>
                         <TableCell className="text-sm text-right">
-                          {item.mass.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg
+                          {item.mass.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
                         </TableCell>
                         <TableCell className="text-sm">
                           <Badge variant="default" className={circularityBadge.className}>
