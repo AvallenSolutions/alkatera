@@ -41,6 +41,11 @@ export default function PerformancePage() {
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log('carbonSheetOpen state changed:', carbonSheetOpen);
+  }, [carbonSheetOpen]);
+
   const totalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
 
   // Mock data for evidence drawers - derived from metrics to ensure consistency
@@ -173,7 +178,15 @@ export default function PerformancePage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <ClimateCard metrics={metrics} loading={loading} onViewBreakdown={() => setCarbonSheetOpen(true)} />
+        <ClimateCard
+          metrics={metrics}
+          loading={loading}
+          onViewBreakdown={() => {
+            console.log('onViewBreakdown called in performance page');
+            setCarbonSheetOpen(true);
+            console.log('carbonSheetOpen set to true');
+          }}
+        />
         <WaterCard metrics={metrics} loading={loading} onClick={() => setWaterSheetOpen(true)} />
         <WasteCard metrics={metrics} loading={loading} onClick={() => setCircularitySheetOpen(true)} />
         <NatureCard metrics={metrics} loading={loading} onClick={() => setNatureSheetOpen(true)} />

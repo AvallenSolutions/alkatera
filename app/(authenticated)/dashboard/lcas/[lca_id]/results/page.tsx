@@ -15,6 +15,7 @@ import { ClimateCard } from '@/components/vitality/ClimateCard';
 import { WaterCard } from '@/components/vitality/WaterCard';
 import { WasteCard } from '@/components/vitality/WasteCard';
 import { NatureCard } from '@/components/vitality/NatureCard';
+import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
 import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
 import { CircularitySheet } from '@/components/vitality/CircularitySheet';
 import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
@@ -62,6 +63,7 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState('planet');
+  const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
@@ -446,7 +448,7 @@ export default function ResultsPage() {
         {/* Tab A: Planet (Active) */}
         <TabsContent value="planet" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <ClimateCard metrics={metrics as any} loading={false} />
+            <ClimateCard metrics={metrics as any} loading={false} onViewBreakdown={() => setCarbonSheetOpen(true)} />
             <WaterCard metrics={metrics as any} loading={false} onClick={() => setWaterSheetOpen(true)} />
             <WasteCard metrics={metrics as any} loading={false} onClick={() => setCircularitySheetOpen(true)} />
             <NatureCard metrics={metrics as any} loading={false} onClick={() => setNatureSheetOpen(true)} />
@@ -575,6 +577,13 @@ export default function ResultsPage() {
       </Tabs>
 
       {/* Evidence Drawers */}
+      <CarbonBreakdownSheet
+        open={carbonSheetOpen}
+        onOpenChange={setCarbonSheetOpen}
+        scopeBreakdown={null}
+        totalCO2={metrics?.total_impacts?.climate_change_gwp100 || 0}
+      />
+
       <WaterImpactSheet
         open={waterSheetOpen}
         onOpenChange={setWaterSheetOpen}

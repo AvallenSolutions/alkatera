@@ -14,6 +14,7 @@ import { ClimateCard } from '@/components/vitality/ClimateCard';
 import { WaterCard } from '@/components/vitality/WaterCard';
 import { WasteCard } from '@/components/vitality/WasteCard';
 import { NatureCard } from '@/components/vitality/NatureCard';
+import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
 import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
 import { CircularitySheet } from '@/components/vitality/CircularitySheet';
 import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
@@ -66,6 +67,7 @@ export default function ProductLcaReportPage() {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('planet');
+  const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
@@ -266,7 +268,7 @@ export default function ProductLcaReportPage() {
         {/* Tab A: Planet (Active) */}
         <TabsContent value="planet" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <ClimateCard metrics={MOCK_METRICS as any} loading={false} />
+            <ClimateCard metrics={MOCK_METRICS as any} loading={false} onViewBreakdown={() => setCarbonSheetOpen(true)} />
             <WaterCard metrics={MOCK_METRICS as any} loading={false} onClick={() => setWaterSheetOpen(true)} />
             <WasteCard metrics={MOCK_METRICS as any} loading={false} onClick={() => setCircularitySheetOpen(true)} />
             <NatureCard metrics={MOCK_METRICS as any} loading={false} onClick={() => setNatureSheetOpen(true)} />
@@ -376,6 +378,13 @@ export default function ProductLcaReportPage() {
       </Tabs>
 
       {/* Evidence Drawers */}
+      <CarbonBreakdownSheet
+        open={carbonSheetOpen}
+        onOpenChange={setCarbonSheetOpen}
+        scopeBreakdown={null}
+        totalCO2={MOCK_METRICS.total_impacts.climate_change_gwp100}
+      />
+
       <WaterImpactSheet
         open={waterSheetOpen}
         onOpenChange={setWaterSheetOpen}

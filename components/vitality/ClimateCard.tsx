@@ -90,10 +90,16 @@ export function ClimateCard({ metrics, loading, onViewBreakdown }: ClimateCardPr
         )}
 
         <button
+          type="button"
           onClick={(e) => {
+            e.preventDefault();
             e.stopPropagation();
+            console.log('Carbon breakdown button clicked', { onViewBreakdown: !!onViewBreakdown });
             if (onViewBreakdown) {
+              console.log('Calling onViewBreakdown');
               onViewBreakdown();
+            } else {
+              console.log('onViewBreakdown is not defined');
             }
           }}
           className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-orange-100/50 transition-colors text-sm font-medium text-orange-900"
