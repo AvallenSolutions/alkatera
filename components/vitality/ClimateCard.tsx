@@ -8,9 +8,10 @@ import { CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 interface ClimateCardProps {
   metrics: CompanyMetrics | null;
   loading: boolean;
+  onViewBreakdown?: () => void;
 }
 
-export function ClimateCard({ metrics, loading }: ClimateCardProps) {
+export function ClimateCard({ metrics, loading, onViewBreakdown }: ClimateCardProps) {
   if (loading) {
     return (
       <Card className="border-orange-200 bg-gradient-to-br from-orange-50 to-white">
@@ -52,7 +53,7 @@ export function ClimateCard({ metrics, loading }: ClimateCardProps) {
         <div className="space-y-1">
           <div className="flex items-baseline gap-2">
             <span className="text-4xl font-bold text-orange-900">
-              {totalCO2.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+              {totalCO2.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
             </span>
             <span className="text-lg text-muted-foreground">kg CO₂eq</span>
           </div>
@@ -79,7 +80,7 @@ export function ClimateCard({ metrics, loading }: ClimateCardProps) {
                 </span>
               </div>
               <span className="text-sm font-medium text-orange-700">
-                {topContributor.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })} kg
+                {topContributor.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -88,7 +89,10 @@ export function ClimateCard({ metrics, loading }: ClimateCardProps) {
           </div>
         )}
 
-        <button className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-orange-100/50 transition-colors text-sm font-medium text-orange-900">
+        <button
+          onClick={onViewBreakdown}
+          className="w-full flex items-center justify-between p-2 rounded-lg hover:bg-orange-100/50 transition-colors text-sm font-medium text-orange-900"
+        >
           <span>View carbon breakdown</span>
           <ArrowRight className="h-4 w-4" />
         </button>

@@ -18,6 +18,7 @@ import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
 import { WasteDeepDive } from '@/components/vitality/WasteDeepDive';
 import { NatureDeepDive } from '@/components/vitality/NatureDeepDive';
 import { AICopilotModal } from '@/components/vitality/AICopilotModal';
+import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
 import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
 import { CircularitySheet } from '@/components/vitality/CircularitySheet';
 import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
@@ -35,6 +36,7 @@ export default function PerformancePage() {
 
   const [activeTab, setActiveTab] = useState('carbon');
   const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
@@ -171,7 +173,7 @@ export default function PerformancePage() {
       )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <ClimateCard metrics={metrics} loading={loading} />
+        <ClimateCard metrics={metrics} loading={loading} onViewBreakdown={() => setCarbonSheetOpen(true)} />
         <WaterCard metrics={metrics} loading={loading} onClick={() => setWaterSheetOpen(true)} />
         <WasteCard metrics={metrics} loading={loading} onClick={() => setCircularitySheetOpen(true)} />
         <NatureCard metrics={metrics} loading={loading} onClick={() => setNatureSheetOpen(true)} />
@@ -256,6 +258,13 @@ export default function PerformancePage() {
       </div>
 
       <AICopilotModal open={aiModalOpen} onOpenChange={setAiModalOpen} />
+
+      <CarbonBreakdownSheet
+        open={carbonSheetOpen}
+        onOpenChange={setCarbonSheetOpen}
+        scopeBreakdown={scopeBreakdown}
+        totalCO2={totalCO2}
+      />
 
       <WaterImpactSheet
         open={waterSheetOpen}

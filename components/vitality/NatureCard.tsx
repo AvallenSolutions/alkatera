@@ -62,7 +62,7 @@ export function NatureCard({ metrics, loading, onClick }: NatureCardProps) {
           </p>
           <div className="flex items-baseline gap-2">
             <span className="text-4xl font-bold text-green-900">
-              {landFootprintTotal.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+              {landFootprintTotal.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
             </span>
             <span className="text-lg text-muted-foreground">m²a</span>
           </div>
@@ -81,7 +81,7 @@ export function NatureCard({ metrics, loading, onClick }: NatureCardProps) {
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-lg font-bold text-green-900">
-                {landUse.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                {landUse.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
               </span>
               <span className="text-xs text-muted-foreground">m²a</span>
             </div>
@@ -96,7 +96,7 @@ export function NatureCard({ metrics, loading, onClick }: NatureCardProps) {
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-lg font-bold text-green-900">
-                {ecotoxicity.toLocaleString('en-GB', { maximumFractionDigits: 2 })}
+                {ecotoxicity.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
               </span>
               <span className="text-xs text-muted-foreground">kg DCB</span>
             </div>

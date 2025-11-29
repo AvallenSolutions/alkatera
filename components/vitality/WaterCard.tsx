@@ -88,7 +88,7 @@ export function WaterCard({ metrics, loading, onClick }: WaterCardProps) {
             </p>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold text-blue-900">
-                {waterConsumption.toLocaleString('en-GB', { maximumFractionDigits: 1 })}
+                {waterConsumption.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
               </span>
               <span className="text-sm text-muted-foreground">m³</span>
             </div>
@@ -100,7 +100,7 @@ export function WaterCard({ metrics, loading, onClick }: WaterCardProps) {
             </p>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold text-blue-900">
-                {waterScarcity.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                {waterScarcity.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
               </span>
               <span className="text-xs text-muted-foreground">m³ world eq</span>
             </div>
