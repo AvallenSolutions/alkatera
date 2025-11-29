@@ -349,86 +349,70 @@ export function useCompanyMetrics() {
     try {
       if (!currentOrganization?.id) return;
 
-      // Fetch latest calculation logs for all completed LCAs
-      const { data: logs, error } = await supabase
-        .from('product_lca_calculation_logs')
-        .select('impact_metrics, product_lcas!inner(status, organization_id)')
+      // Fetch materials from all completed LCAs
+      const { data: materials, error } = await supabase
+        .from('product_lca_materials')
+        .select('name, quantity, unit, impact_climate, impact_water, impact_land, impact_waste, impact_source, packaging_category, product_lcas!inner(status, organization_id)')
         .eq('product_lcas.organization_id', currentOrganization.id)
         .eq('product_lcas.status', 'completed')
-        .not('impact_metrics', 'is', null)
-        .order('calculated_at', { ascending: false });
+        .not('impact_climate', 'is', null);
 
       if (error) throw error;
 
-      if (!logs || logs.length === 0) {
+      if (!materials || materials.length === 0) {
         return;
       }
 
-      // Aggregate material breakdowns across all products
+      // Aggregate materials by name
       const materialMap = new Map<string, MaterialBreakdownItem>();
-      let totalGHG = {
-        co2_fossil: 0,
-        co2_biogenic: 0,
-        methane: 0,
-        nitrous_oxide: 0,
-        hfc_pfc: 0,
-      };
-      let productCount = 0;
 
-      logs.forEach((log: any) => {
-        const metrics = log.impact_metrics;
-        if (!metrics) return;
+      materials.forEach((material: any) => {
+        const name = material.name || 'Unknown Material';
+        const existing = materialMap.get(name);
 
-        // Aggregate materials
-        if (metrics.material_breakdown && Array.isArray(metrics.material_breakdown)) {
-          metrics.material_breakdown.forEach((material: any) => {
-            const existing = materialMap.get(material.name);
-            if (existing) {
-              existing.quantity += material.quantity || 0;
-              existing.climate += material.climate || 0;
-            } else {
-              materialMap.set(material.name, {
-                name: material.name,
-                quantity: material.quantity || 0,
-                unit: material.unit || 'kg',
-                climate: material.climate || 0,
-                source: material.source || 'unknown',
-              });
-            }
+        if (existing) {
+          existing.quantity += Number(material.quantity) || 0;
+          existing.climate += Number(material.impact_climate) || 0;
+        } else {
+          materialMap.set(name, {
+            name: name,
+            quantity: Number(material.quantity) || 0,
+            unit: material.unit || 'kg',
+            climate: Number(material.impact_climate) || 0,
+            source: material.impact_source || 'secondary_modelled',
           });
-        }
-
-        // Aggregate GHG breakdown
-        if (metrics.ghg_breakdown?.gas_inventory) {
-          const inv = metrics.ghg_breakdown.gas_inventory;
-          totalGHG.co2_fossil += inv.co2_fossil || 0;
-          totalGHG.co2_biogenic += inv.co2_biogenic || 0;
-          totalGHG.methane += inv.methane || 0;
-          totalGHG.nitrous_oxide += inv.nitrous_oxide || 0;
-          totalGHG.hfc_pfc += inv.hfc_pfc || 0;
-          productCount++;
         }
       });
 
       // Convert map to array and sort by climate impact
-      const materials = Array.from(materialMap.values())
+      const aggregatedMaterials = Array.from(materialMap.values())
         .sort((a, b) => b.climate - a.climate);
 
-      setMaterialBreakdown(materials);
+      setMaterialBreakdown(aggregatedMaterials);
 
-      // Set aggregated GHG breakdown
-      if (productCount > 0) {
-        const totalFossil = totalGHG.co2_fossil;
-        const totalBiogenic = totalGHG.co2_biogenic;
-        const totalLUC = totalGHG.methane * 0.01; // Rough proxy for land use change
+      // Calculate GHG breakdown (simplified - assumes mostly fossil CO2)
+      const totalClimate = aggregatedMaterials.reduce((sum, m) => sum + m.climate, 0);
+
+      if (totalClimate > 0) {
+        // Simple estimation: 90% fossil CO2, 8% biogenic, 2% other gases
+        const co2Fossil = totalClimate * 0.90;
+        const co2Biogenic = totalClimate * 0.08;
+        const methaneEquiv = totalClimate * 0.015 / 27.9; // Convert back to CH4 mass
+        const n2oEquiv = totalClimate * 0.005 / 273; // Convert back to N2O mass
 
         setGhgBreakdown({
           carbon_origin: {
-            fossil: totalFossil,
-            biogenic: totalBiogenic,
-            land_use_change: totalLUC,
+            fossil: co2Fossil,
+            biogenic: co2Biogenic,
+            land_use_change: totalClimate * 0.02,
           },
-          gas_inventory: totalGHG,
+          gas_inventory: {
+            co2_fossil: co2Fossil,
+            co2_biogenic: co2Biogenic,
+            methane: methaneEquiv,
+            nitrous_oxide: n2oEquiv,
+            hfc_pfc: 0,
+          },
           gwp_factors: {
             methane_gwp100: 27.9,
             n2o_gwp100: 273,
