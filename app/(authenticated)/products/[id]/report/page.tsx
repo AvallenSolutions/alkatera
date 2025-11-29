@@ -61,41 +61,6 @@ const DATA_SOURCES = [
   { name: 'OpenLCA v2.0', description: 'Impact assessment calculations', count: 1 },
 ];
 
-// Mock GHG Breakdown following ISO 14067
-const MOCK_GHG_BREAKDOWN = {
-  carbon_origin: {
-    fossil: 0.11,      // Glass bottle, transport
-    biogenic: 0.065,   // Elderflower, sugar
-    land_use_change: 0.01,  // Agricultural inputs
-  },
-  gas_inventory: {
-    co2_fossil: 0.11,
-    co2_biogenic: 0.065,
-    methane: 0.00015,   // Agricultural processes
-    nitrous_oxide: 0.000008,  // Fertilizer application
-    hfc_pfc: 0,
-  },
-  gwp_factors: {
-    methane_gwp100: 27.9,
-    n2o_gwp100: 273,
-    method: 'IPCC AR6',
-  },
-};
-
-// Mock Material Breakdown
-const MOCK_MATERIAL_BREAKDOWN = [
-  { name: 'Glass Bottle (250ml)', quantity: 0.195, unit: 'kg', climate: 0.078, source: 'secondary_modelled' },
-  { name: 'Elderflower Extract', quantity: 0.015, unit: 'kg', climate: 0.012, source: 'primary' },
-  { name: 'Cane Sugar', quantity: 0.025, unit: 'kg', climate: 0.018, source: 'secondary' },
-  { name: 'Carbonated Water', quantity: 0.21, unit: 'kg', climate: 0.008, source: 'secondary_modelled' },
-  { name: 'Citric Acid', quantity: 0.003, unit: 'kg', climate: 0.004, source: 'secondary' },
-  { name: 'Metal Cap', quantity: 0.008, unit: 'kg', climate: 0.022, source: 'secondary_modelled' },
-  { name: 'Paper Label', quantity: 0.004, unit: 'kg', climate: 0.003, source: 'secondary' },
-  { name: 'Natural Flavouring', quantity: 0.002, unit: 'kg', climate: 0.005, source: 'modelled' },
-  { name: 'Transport (Ingredients)', quantity: 0.46, unit: 'kg', climate: 0.018, source: 'secondary_modelled' },
-  { name: 'Bottling Energy', quantity: 0.25, unit: 'kWh', climate: 0.017, source: 'secondary' },
-];
-
 export default function ProductLcaReportPage() {
   const params = useParams();
   const productId = params?.id as string;
@@ -418,8 +383,6 @@ export default function ProductLcaReportPage() {
         onOpenChange={setCarbonSheetOpen}
         scopeBreakdown={null}
         totalCO2={MOCK_METRICS.total_impacts.climate_change_gwp100}
-        materialBreakdown={MOCK_MATERIAL_BREAKDOWN}
-        ghgBreakdown={MOCK_GHG_BREAKDOWN}
       />
 
       <WaterImpactSheet
