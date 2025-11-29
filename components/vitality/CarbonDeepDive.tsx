@@ -1,383 +1,685 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { BarChart3, TrendingUp, ChevronRight, ArrowLeft, FileText } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
-import { CategoryDetailsSheet } from './CategoryDetailsSheet';
+import { MaterialBreakdownItem, GHGBreakdown } from './CarbonBreakdownSheet';
 
 interface CarbonDeepDiveProps {
   scopeBreakdown: ScopeBreakdown | null;
   totalCO2: number;
+  materialBreakdown?: MaterialBreakdownItem[];
+  ghgBreakdown?: GHGBreakdown | null;
 }
 
-interface CategoryDetail {
-  name: string;
-  value: number;
-  unit: string;
-  categoryId: string;
-  hasEvidence: boolean;
-}
+export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown }: CarbonDeepDiveProps) {
+  const [sortBy, setSortBy] = useState<'impact' | 'name' | 'quantity'>('impact');
 
-interface ScopeDetail {
-  name: string;
-  label: string;
-  color: string;
-  textColor: string;
-  bgColor: string;
-  borderColor: string;
-  description: string;
-  scopeNumber: number;
-  categories: CategoryDetail[];
-}
+  // Check if we have any data to display
+  const hasData = scopeBreakdown || (materialBreakdown && materialBreakdown.length > 0) || ghgBreakdown;
 
-interface EvidenceItem {
-  id: string;
-  name: string;
-  detail: string;
-  quantity: number;
-  unit: string;
-  emissionFactor: number;
-  totalImpact: number;
-}
-
-export function CarbonDeepDive({ scopeBreakdown, totalCO2 }: CarbonDeepDiveProps) {
-  const [selectedScope, setSelectedScope] = useState<number | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryDetail | null>(null);
-  const [evidenceItems, setEvidenceItems] = useState<EvidenceItem[]>([]);
-
-  if (!scopeBreakdown) {
+  if (!hasData) {
     return (
       <Card>
         <CardContent className="p-8 text-center text-muted-foreground">
-          No carbon breakdown data available
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p className="text-sm font-medium">No carbon breakdown data available</p>
+          <p className="text-xs mt-2">
+            Complete an LCA calculation to see detailed GHG emissions analysis
+          </p>
         </CardContent>
       </Card>
     );
   }
 
-  const scopes: ScopeDetail[] = [
-    {
-      name: 'Scope 1',
-      label: 'Direct Emissions',
-      color: 'bg-red-500',
-      textColor: 'text-red-700',
-      bgColor: 'bg-red-50',
-      borderColor: 'border-red-200',
-      description: 'Stationary & mobile combustion, process emissions',
-      scopeNumber: 1,
-      categories: [
-        { name: 'Stationary Combustion', value: 1250.50, unit: 'Natural gas, boilers', categoryId: 'stationary', hasEvidence: false },
-        { name: 'Mobile Combustion', value: 850.30, unit: 'Company vehicles, diesel', categoryId: 'mobile', hasEvidence: false },
-        { name: 'Fugitive Emissions', value: 320.75, unit: 'Refrigerants, leaks', categoryId: 'fugitive', hasEvidence: false },
-      ],
-    },
-    {
-      name: 'Scope 2',
-      label: 'Indirect Energy',
-      color: 'bg-orange-500',
-      textColor: 'text-orange-700',
-      bgColor: 'bg-orange-50',
-      borderColor: 'border-orange-200',
-      description: 'Purchased electricity, heat, steam, cooling',
-      scopeNumber: 2,
-      categories: [
-        { name: 'Purchased Electricity', value: 3450.80, unit: 'Grid mix, 18,000 kWh', categoryId: 'electricity', hasEvidence: false },
-        { name: 'Purchased Heat', value: 680.20, unit: 'District heating', categoryId: 'heat', hasEvidence: false },
-      ],
-    },
-    {
-      name: 'Scope 3',
-      label: 'Value Chain',
-      color: 'bg-amber-500',
-      textColor: 'text-amber-700',
-      bgColor: 'bg-amber-50',
-      borderColor: 'border-amber-200',
-      description: 'Purchased goods, transportation, waste',
-      scopeNumber: 3,
-      categories: [
-        { name: 'Purchased Goods & Services', value: 21251.00, unit: 'Raw materials, packaging', categoryId: 'purchased_goods', hasEvidence: true },
-        { name: 'Upstream Transportation', value: 2340.90, unit: 'Freight, logistics', categoryId: 'upstream_transport', hasEvidence: true },
-        { name: 'Employee Commuting', value: 1250.70, unit: 'Daily commute', categoryId: 'commuting', hasEvidence: false },
-        { name: 'Business Travel', value: 890.50, unit: 'Flights, hotels', categoryId: 'business_travel', hasEvidence: true },
-        { name: 'Waste Generated', value: 540.30, unit: 'Operational waste', categoryId: 'waste', hasEvidence: false },
-      ],
-    },
-  ];
+  // Sort materials
+  const sortedMaterials = materialBreakdown ? [...materialBreakdown].sort((a, b) => {
+    if (sortBy === 'impact') return b.climate - a.climate;
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    if (sortBy === 'quantity') return b.quantity - a.quantity;
+    return 0;
+  }) : [];
 
-  // Calculate scope values from categories (data integrity: whole = sum of parts)
-  const scopeValues = scopes.map(scope => ({
-    ...scope,
-    value: scope.categories.reduce((sum, cat) => sum + cat.value, 0)
+  // Calculate percentages
+  const materialsWithPercentage = sortedMaterials.map(m => ({
+    ...m,
+    percentage: totalCO2 > 0 ? (m.climate / totalCO2) * 100 : 0,
   }));
 
-  const totalOperationalCO2 = scopeValues.reduce((sum, scope) => sum + scope.value, 0);
-  const maxValue = Math.max(...scopeValues.map(s => s.value));
+  // Separate ingredients from packaging
+  const ingredients = materialsWithPercentage.filter(m =>
+    !m.name.toLowerCase().includes('bottle') &&
+    !m.name.toLowerCase().includes('cap') &&
+    !m.name.toLowerCase().includes('label') &&
+    !m.name.toLowerCase().includes('packaging')
+  );
 
-  const handleCategoryClick = async (category: CategoryDetail) => {
-    setSelectedCategory(category);
+  const packaging = materialsWithPercentage.filter(m =>
+    m.name.toLowerCase().includes('bottle') ||
+    m.name.toLowerCase().includes('cap') ||
+    m.name.toLowerCase().includes('label') ||
+    m.name.toLowerCase().includes('packaging')
+  );
 
-    // Mock evidence data - in production, this would fetch from database
-    const mockEvidence: EvidenceItem[] = [];
+  const ingredientsTotal = ingredients.reduce((sum, m) => sum + m.climate, 0);
+  const packagingTotal = packaging.reduce((sum, m) => sum + m.climate, 0);
 
-    if (category.categoryId === 'purchased_goods') {
-      mockEvidence.push(
-        { id: '1', name: 'Glass Bottles', detail: 'Supplier A (UK)', quantity: 50000, unit: 'units', emissionFactor: 0.285, totalImpact: 14250 },
-        { id: '2', name: 'Aluminium Cans', detail: 'Supplier B (ES)', quantity: 30000, unit: 'units', emissionFactor: 0.195, totalImpact: 5850 },
-        { id: '3', name: 'Cardboard Packaging', detail: 'Supplier C (DE)', quantity: 5000, unit: 'kg', emissionFactor: 0.95, totalImpact: 4750 }
-      );
-    } else if (category.categoryId === 'business_travel') {
-      mockEvidence.push(
-        { id: '1', name: 'London → Barcelona', detail: 'Flight, Economy', quantity: 1150, unit: 'km', emissionFactor: 0.255, totalImpact: 293.25 },
-        { id: '2', name: 'Barcelona → Dublin', detail: 'Flight, Economy', quantity: 1460, unit: 'km', emissionFactor: 0.255, totalImpact: 372.30 },
-        { id: '3', name: 'Dublin → London', detail: 'Flight, Economy', quantity: 465, unit: 'km', emissionFactor: 0.255, totalImpact: 118.58 }
-      );
-    } else if (category.categoryId === 'upstream_transport') {
-      mockEvidence.push(
-        { id: '1', name: 'Supplier A → London', detail: 'HGV, Diesel', quantity: 2500, unit: 'tkm', emissionFactor: 0.62, totalImpact: 1550 },
-        { id: '2', name: 'Supplier B → Barcelona', detail: 'HGV, Diesel', quantity: 1800, unit: 'tkm', emissionFactor: 0.62, totalImpact: 1116 }
-      );
-    }
+  const getDataSourceBadge = (source?: string) => {
+    const config: Record<string, { label: string; className: string }> = {
+      primary: { label: 'Primary Data', className: 'bg-green-600' },
+      secondary_modelled: { label: 'Secondary', className: 'bg-blue-600' },
+      secondary: { label: 'Secondary', className: 'bg-blue-600' },
+      missing: { label: 'Missing Data', className: 'bg-red-600' },
+      modelled: { label: 'Modelled', className: 'bg-amber-600' },
+    };
 
-    setEvidenceItems(mockEvidence);
+    const badgeConfig = config[source || 'secondary_modelled'] || config.secondary_modelled;
+    return <Badge variant="default" className={`${badgeConfig.className} text-xs`}>{badgeConfig.label}</Badge>;
   };
 
-  if (selectedScope !== null) {
-    const scopeData = scopeValues.find(s => s.scopeNumber === selectedScope);
-    if (!scopeData) return null;
+  return (
+    <div className="space-y-6">
+      <Tabs defaultValue="ghg" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="ghg">GHG Inventory</TabsTrigger>
+          <TabsTrigger value="materials">Material Breakdown</TabsTrigger>
+          <TabsTrigger value="origin">Carbon Origin</TabsTrigger>
+        </TabsList>
 
-    return (
-      <>
-        <div className="space-y-6">
+        {/* GHG Gas Inventory Tab */}
+        <TabsContent value="ghg" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center gap-3 mb-4">
-                <Button
-                  variant="default"
-                  size="lg"
-                  onClick={() => setSelectedScope(null)}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                  Back to Overview
-                </Button>
-              </div>
-            <div className="flex items-center justify-between mt-4">
-              <div className="space-y-1">
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  {scopeData.name} Breakdown
-                </CardTitle>
-                <CardDescription>{scopeData.description}</CardDescription>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                GHG Protocol
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Card className={`${scopeData.bgColor} border-2 ${scopeData.borderColor}`}>
-              <CardContent className="p-6">
-                <div className="flex items-baseline gap-3">
-                  <span className="text-5xl font-bold">
-                    {scopeData.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                  </span>
-                  <span className="text-xl text-muted-foreground">kg CO₂eq</span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {((scopeData.value / totalOperationalCO2) * 100).toFixed(3)}% of total operational emissions
-                </p>
-              </CardContent>
-            </Card>
-
-            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Category Breakdown</h3>
-                <Badge variant="outline" className="text-xs">
-                  Click rows with evidence to view audit trail
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-5 w-5 text-orange-600" />
+                  <CardTitle className="text-lg">Greenhouse Gas Inventory</CardTitle>
+                </div>
+                <div className="flex gap-2">
+                  <Badge variant="outline" className="text-xs">ISO 14067</Badge>
+                  <Badge variant="outline" className="text-xs">GHG Protocol</Badge>
+                </div>
               </div>
-              {scopeData.categories.map((category, idx) => {
-                const percentage = scopeData.value > 0 ? (category.value / scopeData.value) * 100 : 0;
-                const barWidth = scopeData.value > 0 ? (category.value / scopeData.value) * 100 : 0;
-
-                return (
-                  <Card
-                    key={idx}
-                    className={`border-2 ${category.hasEvidence ? 'cursor-pointer hover:bg-gray-50 hover:shadow-md' : ''} transition-all`}
-                    onClick={() => category.hasEvidence && handleCategoryClick(category)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-1 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-sm">{category.name}</span>
-                              {category.hasEvidence && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <FileText className="h-3 w-3 mr-1" />
-                                  Evidence
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">{category.unit}</p>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <div className="font-bold">
-                                {category.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
-                              </div>
-                              <Badge variant="outline" className="text-xs mt-1">
-                                {percentage.toFixed(3)}%
-                              </Badge>
-                            </div>
-                            {category.hasEvidence && (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {ghgBreakdown ? (
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <Card className="bg-orange-50 border-orange-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-orange-900">
+                            {totalCO2.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                          </span>
+                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
                         </div>
-                        <div className="h-3 w-full bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${scopeData.color} transition-all duration-500`}
-                            style={{ width: `${barWidth}%` }}
-                          />
+                        <p className="text-xs text-muted-foreground mt-1">Total GHG Emissions</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-blue-50 border-blue-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-blue-900">
+                            {ghgBreakdown.gwp_factors.methane_gwp100}
+                          </span>
+                          <span className="text-xs text-muted-foreground">GWP</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">CH₄ Factor (100-year)</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-blue-50 border-blue-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-blue-900">
+                            {ghgBreakdown.gwp_factors.n2o_gwp100}
+                          </span>
+                          <span className="text-xs text-muted-foreground">GWP</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">N₂O Factor (100-year)</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Gas Inventory Table */}
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Gas-by-Gas Breakdown
+                    </h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-orange-50">
+                            <TableHead className="font-semibold">Gas Species</TableHead>
+                            <TableHead className="font-semibold text-right">Mass (kg)</TableHead>
+                            <TableHead className="font-semibold text-center">GWP100 Factor</TableHead>
+                            <TableHead className="font-semibold text-right">CO₂eq (kg)</TableHead>
+                            <TableHead className="font-semibold text-right">% of Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-red-500" />
+                                CO₂ (Fossil)
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {ghgBreakdown.gas_inventory.co2_fossil.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-center">1</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {ghgBreakdown.gas_inventory.co2_fossil.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {((ghgBreakdown.gas_inventory.co2_fossil / totalCO2) * 100).toFixed(1)}%
+                            </TableCell>
+                          </TableRow>
+
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-green-500" />
+                                CO₂ (Biogenic)
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {ghgBreakdown.gas_inventory.co2_biogenic.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-center">1</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {ghgBreakdown.gas_inventory.co2_biogenic.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {((ghgBreakdown.gas_inventory.co2_biogenic / totalCO2) * 100).toFixed(1)}%
+                            </TableCell>
+                          </TableRow>
+
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-blue-500" />
+                                Methane (CH₄)
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {ghgBreakdown.gas_inventory.methane.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-center">{ghgBreakdown.gwp_factors.methane_gwp100}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {(ghgBreakdown.gas_inventory.methane * ghgBreakdown.gwp_factors.methane_gwp100).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {(((ghgBreakdown.gas_inventory.methane * ghgBreakdown.gwp_factors.methane_gwp100) / totalCO2) * 100).toFixed(1)}%
+                            </TableCell>
+                          </TableRow>
+
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-purple-500" />
+                                Nitrous Oxide (N₂O)
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {ghgBreakdown.gas_inventory.nitrous_oxide.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-center">{ghgBreakdown.gwp_factors.n2o_gwp100}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {(ghgBreakdown.gas_inventory.nitrous_oxide * ghgBreakdown.gwp_factors.n2o_gwp100).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {(((ghgBreakdown.gas_inventory.nitrous_oxide * ghgBreakdown.gwp_factors.n2o_gwp100) / totalCO2) * 100).toFixed(1)}%
+                            </TableCell>
+                          </TableRow>
+
+                          {ghgBreakdown.gas_inventory.hfc_pfc > 0 && (
+                            <TableRow>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                                  F-gases (HFC/PFC)
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                              <TableCell className="text-center">Various</TableCell>
+                              <TableCell className="text-right font-semibold">
+                                {ghgBreakdown.gas_inventory.hfc_pfc.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {((ghgBreakdown.gas_inventory.hfc_pfc / totalCO2) * 100).toFixed(1)}%
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+
+                  {/* Methodology Note */}
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-blue-900">Assessment Method: {ghgBreakdown.gwp_factors.method}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Global Warming Potentials calculated using {ghgBreakdown.gwp_factors.method} characterisation factors.
+                            All emissions converted to 100-year CO₂ equivalents per IPCC methodology.
+                          </p>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <CategoryDetailsSheet
-        open={selectedCategory !== null}
-        onOpenChange={(open) => !open && setSelectedCategory(null)}
-        categoryName={selectedCategory?.name || ''}
-        categoryId={selectedCategory?.categoryId || ''}
-        evidenceItems={evidenceItems}
-        totalImpact={selectedCategory?.value || 0}
-      />
-    </>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Carbon Footprint Breakdown
-              </CardTitle>
-              <CardDescription>
-                GHG Protocol Scope 1, 2, 3 emissions waterfall
-              </CardDescription>
-            </div>
-            <Badge variant="outline" className="text-xs">
-              GHG Protocol
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-4">
-            {scopeValues.map((scope) => {
-              const percentage = totalOperationalCO2 > 0 ? (scope.value / totalOperationalCO2) * 100 : 0;
-              return (
-                <Card
-                  key={scope.name}
-                  className={`border-2 ${scope.bgColor} ${scope.borderColor} cursor-pointer hover:shadow-lg transition-shadow`}
-                  onClick={() => setSelectedScope(scope.scopeNumber)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-semibold ${scope.textColor} uppercase tracking-wide`}>
-                        {scope.name}
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {percentage.toFixed(3)}%
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      {scope.label}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold">
-                        {scope.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                      </span>
-                      <span className="text-sm text-muted-foreground">kg CO₂eq</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {scope.description}
-                    </p>
-                    <Button variant="ghost" size="sm" className="w-full gap-2 text-xs">
-                      View Details
-                      <ChevronRight className="h-3 w-3" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">Visual Breakdown</span>
-              <span className="text-muted-foreground">
-                Total: {totalOperationalCO2.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq
-              </span>
-            </div>
-
-            {scopeValues.map((scope) => {
-              const percentage = totalOperationalCO2 > 0 ? (scope.value / totalOperationalCO2) * 100 : 0;
-              const barWidth = maxValue > 0 ? (scope.value / maxValue) * 100 : 0;
-
-              return (
-                <div key={scope.name} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className={`font-medium ${scope.textColor}`}>{scope.name}</span>
-                    <span className="text-muted-foreground">
-                      {scope.value.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg ({percentage.toFixed(3)}%)
-                    </span>
-                  </div>
-                  <div className="h-8 w-full bg-gray-100 rounded-lg overflow-hidden">
-                    <div
-                      className={`h-full ${scope.color} transition-all duration-500 flex items-center justify-end pr-3`}
-                      style={{ width: `${barWidth}%` }}
-                    >
-                      {barWidth > 15 && (
-                        <span className="text-white text-xs font-semibold">
-                          {percentage.toFixed(3)}%
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="text-sm">GHG breakdown not available for this calculation</p>
                 </div>
-              );
-            })}
-          </div>
-
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4 flex items-start gap-3">
-              <TrendingUp className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-blue-900">
-                  Focus Area: Scope 3 Value Chain
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Scope 3 typically represents 70-90% of total emissions for most companies. Prioritise supplier engagement and product LCAs for maximum impact. Click any scope card above to see detailed category breakdown.
-                </p>
-              </div>
+              )}
             </CardContent>
           </Card>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        {/* Material Breakdown Tab */}
+        <TabsContent value="materials" className="space-y-4 mt-6">
+          {materialBreakdown && materialBreakdown.length > 0 ? (
+            <>
+              {/* Summary Statistics */}
+              <div className="grid grid-cols-3 gap-4">
+                <Card className="bg-green-50 border-green-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold text-green-900">
+                        {ingredients.length}
+                      </span>
+                      <span className="text-xs text-muted-foreground">ingredients</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {ingredientsTotal.toFixed(3)} kg CO₂eq total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-blue-50 border-blue-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold text-blue-900">
+                        {packaging.length}
+                      </span>
+                      <span className="text-xs text-muted-foreground">packaging parts</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {packagingTotal.toFixed(3)} kg CO₂eq total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-orange-50 border-orange-200">
+                  <CardContent className="p-4">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold text-orange-900">
+                        {materialBreakdown.length}
+                      </span>
+                      <span className="text-xs text-muted-foreground">total materials</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {totalCO2.toFixed(3)} kg CO₂eq combined
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Sort Options */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  Material-by-Material Impact Analysis
+                </h3>
+                <div className="flex gap-2">
+                  <Badge
+                    variant={sortBy === 'impact' ? 'default' : 'outline'}
+                    className="cursor-pointer"
+                    onClick={() => setSortBy('impact')}
+                  >
+                    By Impact
+                  </Badge>
+                  <Badge
+                    variant={sortBy === 'name' ? 'default' : 'outline'}
+                    className="cursor-pointer"
+                    onClick={() => setSortBy('name')}
+                  >
+                    By Name
+                  </Badge>
+                  <Badge
+                    variant={sortBy === 'quantity' ? 'default' : 'outline'}
+                    className="cursor-pointer"
+                    onClick={() => setSortBy('quantity')}
+                  >
+                    By Quantity
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Ingredients Section */}
+              {ingredients.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Leaf className="h-4 w-4 text-green-600" />
+                      Ingredients ({ingredients.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-green-50">
+                            <TableHead className="font-semibold">Material Name</TableHead>
+                            <TableHead className="font-semibold text-right">Quantity</TableHead>
+                            <TableHead className="font-semibold text-right">Emission Factor</TableHead>
+                            <TableHead className="font-semibold text-right">Total Impact</TableHead>
+                            <TableHead className="font-semibold text-right">% of Total</TableHead>
+                            <TableHead className="font-semibold text-center">Data Source</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ingredients.map((material, idx) => {
+                            const emissionFactor = material.quantity > 0 ? material.climate / material.quantity : 0;
+                            return (
+                              <TableRow key={idx} className={material.percentage > 5 ? 'bg-orange-50/50' : ''}>
+                                <TableCell className="font-medium">
+                                  {material.name}
+                                  {material.warning && (
+                                    <Badge variant="destructive" className="ml-2 text-xs">
+                                      {material.warning}
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {material.quantity.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit}
+                                </TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground">
+                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  {material.climate.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-green-500"
+                                        style={{ width: `${Math.min(material.percentage, 100)}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-medium w-12 text-right">
+                                      {material.percentage.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {getDataSourceBadge(material.source)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Packaging Section */}
+              {packaging.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Package className="h-4 w-4 text-blue-600" />
+                      Packaging ({packaging.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-blue-50">
+                            <TableHead className="font-semibold">Material Name</TableHead>
+                            <TableHead className="font-semibold text-right">Quantity</TableHead>
+                            <TableHead className="font-semibold text-right">Emission Factor</TableHead>
+                            <TableHead className="font-semibold text-right">Total Impact</TableHead>
+                            <TableHead className="font-semibold text-right">% of Total</TableHead>
+                            <TableHead className="font-semibold text-center">Data Source</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {packaging.map((material, idx) => {
+                            const emissionFactor = material.quantity > 0 ? material.climate / material.quantity : 0;
+                            return (
+                              <TableRow key={idx} className={material.percentage > 5 ? 'bg-orange-50/50' : ''}>
+                                <TableCell className="font-medium">
+                                  {material.name}
+                                  {material.warning && (
+                                    <Badge variant="destructive" className="ml-2 text-xs">
+                                      {material.warning}
+                                    </Badge>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {material.quantity.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit}
+                                </TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground">
+                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit}
+                                </TableCell>
+                                <TableCell className="text-right font-semibold">
+                                  {material.climate.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full bg-blue-500"
+                                        style={{ width: `${Math.min(material.percentage, 100)}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs font-medium w-12 text-right">
+                                      {material.percentage.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {getDataSourceBadge(material.source)}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="text-sm font-medium">No material breakdown data available</p>
+                <p className="text-xs mt-2">
+                  Material-level emissions will appear here after LCA calculation
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Carbon Origin Tab */}
+        <TabsContent value="origin" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Leaf className="h-5 w-5 text-green-600" />
+                  Carbon Origin Analysis
+                </CardTitle>
+                <Badge variant="outline" className="text-xs">ISO 14067 Compliant</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {ghgBreakdown ? (
+                <>
+                  <div className="grid grid-cols-3 gap-4">
+                    <Card className="bg-red-50 border-red-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-red-900">
+                            {ghgBreakdown.carbon_origin.fossil.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                          </span>
+                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Fossil Carbon</p>
+                        <p className="text-xs font-semibold mt-1">
+                          {((ghgBreakdown.carbon_origin.fossil / totalCO2) * 100).toFixed(1)}% of total
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-green-50 border-green-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-green-900">
+                            {ghgBreakdown.carbon_origin.biogenic.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                          </span>
+                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Biogenic Carbon</p>
+                        <p className="text-xs font-semibold mt-1">
+                          {((ghgBreakdown.carbon_origin.biogenic / totalCO2) * 100).toFixed(1)}% of total
+                        </p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-amber-50 border-amber-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-amber-900">
+                            {ghgBreakdown.carbon_origin.land_use_change.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                          </span>
+                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Land Use Change</p>
+                        <p className="text-xs font-semibold mt-1">
+                          {((ghgBreakdown.carbon_origin.land_use_change / totalCO2) * 100).toFixed(1)}% of total
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Visual Bar */}
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Carbon Origin Distribution</h3>
+                    <div className="h-8 w-full flex rounded-lg overflow-hidden border-2">
+                      <div
+                        className="bg-red-500 flex items-center justify-center text-xs font-semibold text-white"
+                        style={{ width: `${(ghgBreakdown.carbon_origin.fossil / totalCO2) * 100}%` }}
+                      >
+                        {((ghgBreakdown.carbon_origin.fossil / totalCO2) * 100) > 10 && 'Fossil'}
+                      </div>
+                      <div
+                        className="bg-green-500 flex items-center justify-center text-xs font-semibold text-white"
+                        style={{ width: `${(ghgBreakdown.carbon_origin.biogenic / totalCO2) * 100}%` }}
+                      >
+                        {((ghgBreakdown.carbon_origin.biogenic / totalCO2) * 100) > 10 && 'Biogenic'}
+                      </div>
+                      <div
+                        className="bg-amber-500 flex items-center justify-center text-xs font-semibold text-white"
+                        style={{ width: `${(ghgBreakdown.carbon_origin.land_use_change / totalCO2) * 100}%` }}
+                      >
+                        {((ghgBreakdown.carbon_origin.land_use_change / totalCO2) * 100) > 10 && 'dLUC'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Explanation Cards */}
+                  <div className="grid gap-4">
+                    <Card className="bg-red-50 border-red-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-2">
+                          <div className="w-3 h-3 rounded-full bg-red-500 mt-1" />
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-red-900">Fossil Carbon</p>
+                            <p className="text-xs text-muted-foreground">
+                              CO₂ emissions from fossil fuels and mineral sources (e.g., glass, plastics, metals, transport).
+                              These are geologically stored carbon released into the atmosphere.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-green-50 border-green-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-2">
+                          <div className="w-3 h-3 rounded-full bg-green-500 mt-1" />
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-green-900">Biogenic Carbon</p>
+                            <p className="text-xs text-muted-foreground">
+                              CO₂ from recently living biomass (e.g., sugar, fruit, plant-based materials).
+                              Part of the short-term carbon cycle. Per ISO 14067, reported separately from fossil CO₂.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-amber-50 border-amber-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-2">
+                          <div className="w-3 h-3 rounded-full bg-amber-500 mt-1" />
+                          <div className="space-y-1">
+                            <p className="text-sm font-semibold text-amber-900">Direct Land Use Change (dLUC)</p>
+                            <p className="text-xs text-muted-foreground">
+                              Emissions from conversion of land for agricultural production (e.g., deforestation).
+                              Includes carbon stock changes in soil and biomass.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Compliance Note */}
+                  <Card className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-blue-600 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-blue-900">ISO 14067 Compliance</p>
+                          <p className="text-xs text-muted-foreground">
+                            Per ISO 14067:4.5.3, biogenic carbon removals and emissions are documented separately from fossil carbon.
+                            This separation enables transparent reporting and proper interpretation of product carbon footprints.
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p className="text-sm">Carbon origin breakdown not available for this calculation</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

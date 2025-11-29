@@ -582,6 +582,8 @@ export default function ResultsPage() {
         onOpenChange={setCarbonSheetOpen}
         scopeBreakdown={null}
         totalCO2={metrics?.total_impacts?.climate_change_gwp100 || 0}
+        materialBreakdown={calculationLog?.impact_metrics?.material_breakdown}
+        ghgBreakdown={calculationLog?.impact_metrics?.ghg_breakdown}
       />
 
       <WaterImpactSheet

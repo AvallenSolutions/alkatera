@@ -10,11 +10,45 @@ import { Leaf } from 'lucide-react';
 import { CarbonDeepDive } from './CarbonDeepDive';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 
+export interface MaterialBreakdownItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  climate: number;
+  water?: number;
+  land?: number;
+  waste?: number;
+  source?: string;
+  warning?: string;
+}
+
+export interface GHGBreakdown {
+  carbon_origin: {
+    fossil: number;
+    biogenic: number;
+    land_use_change: number;
+  };
+  gas_inventory: {
+    co2_fossil: number;
+    co2_biogenic: number;
+    methane: number;
+    nitrous_oxide: number;
+    hfc_pfc: number;
+  };
+  gwp_factors: {
+    methane_gwp100: number;
+    n2o_gwp100: number;
+    method: string;
+  };
+}
+
 interface CarbonBreakdownSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   scopeBreakdown: ScopeBreakdown | null;
   totalCO2: number;
+  materialBreakdown?: MaterialBreakdownItem[];
+  ghgBreakdown?: GHGBreakdown | null;
 }
 
 export function CarbonBreakdownSheet({
@@ -22,6 +56,8 @@ export function CarbonBreakdownSheet({
   onOpenChange,
   scopeBreakdown,
   totalCO2,
+  materialBreakdown,
+  ghgBreakdown,
 }: CarbonBreakdownSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -40,7 +76,12 @@ export function CarbonBreakdownSheet({
           </div>
         </SheetHeader>
 
-        <CarbonDeepDive scopeBreakdown={scopeBreakdown} totalCO2={totalCO2} />
+        <CarbonDeepDive
+          scopeBreakdown={scopeBreakdown}
+          totalCO2={totalCO2}
+          materialBreakdown={materialBreakdown}
+          ghgBreakdown={ghgBreakdown}
+        />
       </SheetContent>
     </Sheet>
   );
