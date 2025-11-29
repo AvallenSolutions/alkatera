@@ -83,7 +83,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
       const [productResult, facilitiesResult, intensitiesResult] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, net_volume, net_volume_unit, core_operations_data, core_operations_provenance, core_operations_complete")
+          .select("id, name, unit_size_value, unit_size_unit, core_operations_data, core_operations_provenance, core_operations_complete")
           .eq("id", productId)
           .single(),
         supabase
@@ -105,8 +105,8 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
       }
 
       // Pre-fill product volume from product definition
-      if (productResult.data.net_volume) {
-        setProductNetVolume(String(productResult.data.net_volume));
+      if (productResult.data.unit_size_value) {
+        setProductNetVolume(String(productResult.data.unit_size_value));
       }
 
       if (productResult.data.core_operations_data &&

@@ -378,15 +378,15 @@ export default function LcaDataCapturePage() {
     try {
       const { data: productData, error: productError } = await supabase
         .from("products")
-        .select("net_volume, net_volume_unit")
+        .select("unit_size_value, unit_size_unit")
         .eq("id", productId)
         .single();
 
       if (productError) throw productError;
 
       if (productData) {
-        setProductNetVolume(Number(productData.net_volume) || 1);
-        setVolumeUnit(productData.net_volume_unit || 'litre');
+        setProductNetVolume(Number(productData.unit_size_value) || 1);
+        setVolumeUnit(productData.unit_size_unit || 'litre');
       }
     } catch (error: any) {
       console.error('Error loading product details:', error);
