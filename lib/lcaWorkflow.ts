@@ -83,6 +83,16 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
       } else if (materials && materials.length > 0) {
         // Lookup impact factors for each material
         const lcaMaterials = await Promise.all(materials.map(async (material) => {
+          // Normalize quantity to kg FIRST (before any other operations)
+          let quantityInKg = parseFloat(material.quantity);
+          const unit = material.unit?.toLowerCase() || 'kg';
+
+          if (unit === 'g' || unit === 'grams') {
+            quantityInKg = quantityInKg / 1000;
+          } else if (unit === 'ml' || unit === 'millilitres' || unit === 'milliliters') {
+            quantityInKg = quantityInKg / 1000;
+          }
+
           let impactFactors = {
             impact_climate: null,
             impact_water: null,
@@ -101,16 +111,6 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
             .maybeSingle();
 
           if (stagingFactor && stagingFactor.co2_factor) {
-            // Normalize quantity to kg
-            let quantityInKg = parseFloat(material.quantity);
-            const unit = material.unit?.toLowerCase() || 'kg';
-
-            if (unit === 'g' || unit === 'grams') {
-              quantityInKg = quantityInKg / 1000;
-            } else if (unit === 'ml' || unit === 'millilitres' || unit === 'milliliters') {
-              quantityInKg = quantityInKg / 1000;
-            }
-
             // Supabase numeric types come as strings, need to convert
             impactFactors = {
               // @ts-expect-error
@@ -136,15 +136,6 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
               .maybeSingle();
 
             if (ecoinventProxy && ecoinventProxy.impact_climate) {
-              let quantityInKg = parseFloat(material.quantity);
-              const unit = material.unit?.toLowerCase() || 'kg';
-
-              if (unit === 'g' || unit === 'grams') {
-                quantityInKg = quantityInKg / 1000;
-              } else if (unit === 'ml' || unit === 'millilitres' || unit === 'milliliters') {
-                quantityInKg = quantityInKg / 1000;
-              }
-
               // Supabase numeric types come as strings, need to convert
               impactFactors = {
                 // @ts-expect-error
@@ -168,8 +159,8 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
             name: material.material_name,
             material_name: material.material_name,
             material_type: material.material_type,
-            quantity: material.quantity,
-            unit: material.unit,
+            quantity: quantityInKg,
+            unit: 'kg',
             unit_name: material.unit,
             data_source: material.data_source,
             data_source_id: sourceId,
