@@ -71,7 +71,7 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
       throw new Error(`Failed to create LCA: ${lcaError.message}`);
     }
 
-    // Copy product materials (ingredients and packaging) to the LCA
+    // Copy product materials (ingredients and packaging) to the LCA with impact factors
     try {
       const { data: materials, error: materialsError } = await supabase
         .from('product_materials')
@@ -81,24 +81,107 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
       if (materialsError) {
         console.warn('[initiateLcaWorkflow] Could not fetch product materials:', materialsError);
       } else if (materials && materials.length > 0) {
-        // Prepare LCA materials - match the actual schema of product_lca_materials
-        const lcaMaterials = materials.map(material => ({
-          product_lca_id: lca.id,
-          name: material.material_name,
-          material_name: material.material_name,
-          material_type: material.material_type,
-          quantity: material.quantity,
-          unit: material.unit,
-          unit_name: material.unit,
-          data_source: material.data_source,
-          data_source_id: material.data_source_id,
-          supplier_product_id: material.supplier_product_id,
-          origin_country: material.origin_country,
-          country_of_origin: material.origin_country,
-          is_organic_certified: material.is_organic_certified,
-          is_organic: material.is_organic_certified,
-          packaging_category: material.packaging_category,
-          lca_sub_stage_id: null,
+        // Lookup impact factors for each material
+        const lcaMaterials = await Promise.all(materials.map(async (material) => {
+          let impactFactors = {
+            impact_climate: null,
+            impact_water: null,
+            impact_land: null,
+            impact_waste: null,
+          };
+          let sourceId = material.data_source_id;
+
+          // Try staging_emission_factors first
+          const { data: stagingFactor } = await supabase
+            .from('staging_emission_factors')
+            .select('id, co2_factor, water_factor, land_factor, waste_factor')
+            .ilike('name', material.material_name)
+            .in('category', ['Ingredient', 'Packaging'])
+            .limit(1)
+            .maybeSingle();
+
+          if (stagingFactor && stagingFactor.co2_factor) {
+            // Normalize quantity to kg
+            let quantityInKg = parseFloat(material.quantity);
+            const unit = material.unit?.toLowerCase() || 'kg';
+
+            if (unit === 'g' || unit === 'grams') {
+              quantityInKg = quantityInKg / 1000;
+            } else if (unit === 'ml' || unit === 'millilitres' || unit === 'milliliters') {
+              quantityInKg = quantityInKg / 1000;
+            }
+
+            // Supabase numeric types come as strings, need to convert
+            impactFactors = {
+              // @ts-expect-error
+              impact_climate: quantityInKg * Number(stagingFactor.co2_factor),
+              // @ts-expect-error
+              impact_water: quantityInKg * Number(stagingFactor.water_factor),
+              // @ts-expect-error
+              impact_land: quantityInKg * Number(stagingFactor.land_factor),
+              // @ts-expect-error
+              impact_waste: quantityInKg * Number(stagingFactor.waste_factor),
+            };
+
+            if (!sourceId) {
+              sourceId = stagingFactor.id;
+            }
+          } else {
+            // Fallback to ecoinvent proxies
+            const { data: ecoinventProxy } = await supabase
+              .from('ecoinvent_material_proxies')
+              .select('id, impact_climate, impact_water, impact_land, impact_waste')
+              .ilike('material_name', `%${material.material_name}%`)
+              .limit(1)
+              .maybeSingle();
+
+            if (ecoinventProxy && ecoinventProxy.impact_climate) {
+              let quantityInKg = parseFloat(material.quantity);
+              const unit = material.unit?.toLowerCase() || 'kg';
+
+              if (unit === 'g' || unit === 'grams') {
+                quantityInKg = quantityInKg / 1000;
+              } else if (unit === 'ml' || unit === 'millilitres' || unit === 'milliliters') {
+                quantityInKg = quantityInKg / 1000;
+              }
+
+              // Supabase numeric types come as strings, need to convert
+              impactFactors = {
+                // @ts-expect-error
+                impact_climate: quantityInKg * Number(ecoinventProxy.impact_climate),
+                // @ts-expect-error
+                impact_water: quantityInKg * Number(ecoinventProxy.impact_water),
+                // @ts-expect-error
+                impact_land: quantityInKg * Number(ecoinventProxy.impact_land),
+                // @ts-expect-error
+                impact_waste: quantityInKg * Number(ecoinventProxy.impact_waste),
+              };
+
+              if (!sourceId) {
+                sourceId = ecoinventProxy.id;
+              }
+            }
+          }
+
+          return {
+            product_lca_id: lca.id,
+            name: material.material_name,
+            material_name: material.material_name,
+            material_type: material.material_type,
+            quantity: material.quantity,
+            unit: material.unit,
+            unit_name: material.unit,
+            data_source: material.data_source,
+            data_source_id: sourceId,
+            supplier_product_id: material.supplier_product_id,
+            origin_country: material.origin_country,
+            country_of_origin: material.origin_country,
+            is_organic_certified: material.is_organic_certified,
+            is_organic: material.is_organic_certified,
+            packaging_category: material.packaging_category,
+            lca_sub_stage_id: null,
+            ...impactFactors,
+          };
         }));
 
         const { error: insertError } = await supabase
@@ -108,7 +191,7 @@ export async function initiateLcaWorkflow(params: InitiateLcaParams) {
         if (insertError) {
           console.warn('[initiateLcaWorkflow] Could not copy materials to LCA:', insertError);
         } else {
-          console.log(`[initiateLcaWorkflow] Copied ${materials.length} materials to LCA`);
+          console.log(`[initiateLcaWorkflow] Copied ${materials.length} materials to LCA with impact factors`);
         }
       }
     } catch (copyError) {
