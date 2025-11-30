@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   TestTube,
   ClipboardCheck,
+  Calculator,
 } from 'lucide-react'
 
 interface NavItem {
@@ -83,6 +84,11 @@ const navigationStructure: NavItem[] = [
 ]
 
 const developmentStructure: NavItem[] = [
+  {
+    name: 'Calculation Verifier',
+    href: '/dev/calculation-verifier',
+    icon: Calculator,
+  },
   {
     name: 'ISO 14044 Compliance',
     href: '/dev/docs/iso-14044-compliance',
