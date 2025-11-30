@@ -426,10 +426,7 @@ export function useCompanyMetrics() {
           lca_sub_stages (
             id,
             name,
-            lca_life_cycle_stages (
-              id,
-              name
-            )
+            lca_stage_id
           ),
           product_lcas!inner(status, organization_id)
         `)
@@ -484,6 +481,16 @@ export function useCompanyMetrics() {
       setMaterialBreakdown(aggregatedMaterials);
       console.log('[Carbon Debug] setMaterialBreakdown called');
 
+      // Fetch lifecycle stages mapping
+      const { data: lifecycleStages } = await supabase
+        .from('lca_life_cycle_stages')
+        .select('id, name');
+
+      const stageIdToName = new Map<number, string>();
+      lifecycleStages?.forEach((stage: any) => {
+        stageIdToName.set(stage.id, stage.name);
+      });
+
       // Calculate lifecycle stage breakdown
       const stageMap = new Map<string, {
         total_impact: number;
@@ -493,7 +500,8 @@ export function useCompanyMetrics() {
 
       materials.forEach((material: any) => {
         const impact = Number(material.impact_climate) || 0;
-        const stageName = material.lca_sub_stages?.lca_life_cycle_stages?.name || 'Unclassified';
+        const lca_stage_id = material.lca_sub_stages?.lca_stage_id;
+        const stageName = lca_stage_id ? (stageIdToName.get(lca_stage_id) || 'Unclassified') : 'Unclassified';
 
         if (!stageMap.has(stageName)) {
           stageMap.set(stageName, {
