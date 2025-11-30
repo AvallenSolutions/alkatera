@@ -50,6 +50,15 @@ export default function PerformancePage() {
     console.log('carbonSheetOpen state changed:', carbonSheetOpen);
   }, [carbonSheetOpen]);
 
+  React.useEffect(() => {
+    console.log('[Performance Page] Hook values updated:', {
+      materialBreakdownLength: materialBreakdown?.length,
+      hasGhgBreakdown: !!ghgBreakdown,
+      lifecycleStagesLength: lifecycleStageBreakdown?.length,
+      facilityEmissionsLength: facilityEmissionsBreakdown?.length,
+    });
+  }, [materialBreakdown, ghgBreakdown, lifecycleStageBreakdown, facilityEmissionsBreakdown]);
+
   const totalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
 
   // Mock data for evidence drawers - derived from metrics to ensure consistency
