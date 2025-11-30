@@ -269,23 +269,31 @@ export function useCompanyMetrics() {
         last_updated: latestUpdate,
       });
 
+      console.log('[useCompanyMetrics] About to fetch breakdown data...');
+
       // Fetch scope breakdown (from calculated emissions)
       try {
+        console.log('[useCompanyMetrics] Calling fetchScopeBreakdown...');
         await fetchScopeBreakdown();
+        console.log('[useCompanyMetrics] fetchScopeBreakdown completed');
       } catch (err) {
         console.error('[useCompanyMetrics] fetchScopeBreakdown failed:', err);
       }
 
       // Fetch facility water risks
       try {
+        console.log('[useCompanyMetrics] Calling fetchFacilityWaterRisks...');
         await fetchFacilityWaterRisks();
+        console.log('[useCompanyMetrics] fetchFacilityWaterRisks completed');
       } catch (err) {
         console.error('[useCompanyMetrics] fetchFacilityWaterRisks failed:', err);
       }
 
       // Fetch material and GHG breakdown
       try {
+        console.log('[useCompanyMetrics] Calling fetchMaterialAndGHGBreakdown...');
         await fetchMaterialAndGHGBreakdown();
+        console.log('[useCompanyMetrics] fetchMaterialAndGHGBreakdown completed');
       } catch (err) {
         console.error('[useCompanyMetrics] fetchMaterialAndGHGBreakdown failed:', err);
       }
