@@ -131,7 +131,7 @@ export function ProductionFacilitiesTable({
                     {site.share_of_production.toFixed(1)}%
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm">
-                    {site.facility_intensity.toFixed(4)} kg CO₂e/{volumeUnit}
+                    {site.facility_intensity.toFixed(4)} kg CO₂e/L
                   </TableCell>
                   <TableCell>
                     <Button
@@ -156,7 +156,7 @@ export function ProductionFacilitiesTable({
             <div>
               <p className="text-sm text-blue-700 dark:text-blue-300">Weighted Average Intensity</p>
               <p className="text-lg font-mono font-semibold text-blue-900 dark:text-blue-100">
-                {weightedAverageIntensity.toFixed(4)} kg CO₂e/{volumeUnit}
+                {weightedAverageIntensity.toFixed(4)} kg CO₂e/L
               </p>
             </div>
 
@@ -174,7 +174,7 @@ export function ProductionFacilitiesTable({
               {manufacturingImpact.toFixed(4)} kg CO₂e/unit
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-              = {weightedAverageIntensity.toFixed(4)} × {productNetVolume} {volumeUnit}
+              = {weightedAverageIntensity.toFixed(4)} kg/L × {productNetVolume} {volumeUnit}
             </p>
           </div>
         </div>
