@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/sheet';
 import { Leaf } from 'lucide-react';
 import { CarbonDeepDive } from './CarbonDeepDive';
-import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
+import { ScopeBreakdown, LifecycleStageBreakdown, FacilityEmissionsBreakdown } from '@/hooks/data/useCompanyMetrics';
 
 export interface MaterialBreakdownItem {
   name: string;
@@ -49,6 +49,8 @@ interface CarbonBreakdownSheetProps {
   totalCO2: number;
   materialBreakdown?: MaterialBreakdownItem[];
   ghgBreakdown?: GHGBreakdown | null;
+  lifecycleStageBreakdown?: LifecycleStageBreakdown[];
+  facilityEmissionsBreakdown?: FacilityEmissionsBreakdown[];
 }
 
 export function CarbonBreakdownSheet({
@@ -58,6 +60,8 @@ export function CarbonBreakdownSheet({
   totalCO2,
   materialBreakdown,
   ghgBreakdown,
+  lifecycleStageBreakdown,
+  facilityEmissionsBreakdown,
 }: CarbonBreakdownSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -81,6 +85,8 @@ export function CarbonBreakdownSheet({
           totalCO2={totalCO2}
           materialBreakdown={materialBreakdown}
           ghgBreakdown={ghgBreakdown}
+          lifecycleStageBreakdown={lifecycleStageBreakdown}
+          facilityEmissionsBreakdown={facilityEmissionsBreakdown}
         />
       </SheetContent>
     </Sheet>

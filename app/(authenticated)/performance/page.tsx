@@ -290,6 +290,8 @@ export default function PerformancePage() {
         totalCO2={totalCO2}
         materialBreakdown={materialBreakdown}
         ghgBreakdown={ghgBreakdown}
+        lifecycleStageBreakdown={lifecycleStageBreakdown}
+        facilityEmissionsBreakdown={facilityEmissionsBreakdown}
       />
 
       <WaterImpactSheet
