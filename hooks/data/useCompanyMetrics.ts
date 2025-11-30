@@ -128,11 +128,14 @@ export function useCompanyMetrics() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('[useCompanyMetrics] useEffect triggered, org:', currentOrganization?.id);
     if (!currentOrganization?.id) {
+      console.log('[useCompanyMetrics] No org, returning early');
       setLoading(false);
       return;
     }
 
+    console.log('[useCompanyMetrics] Calling fetchCompanyMetrics');
     fetchCompanyMetrics();
   }, [currentOrganization?.id]);
 
@@ -477,7 +480,9 @@ export function useCompanyMetrics() {
       console.log('[Carbon Debug] Total climate impact:', totalClimate.toFixed(3), 'kg CO2eq');
       console.log('[Carbon Debug] Top 3 contributors:', aggregatedMaterials.slice(0, 3).map(m => `${m.name}: ${m.climate.toFixed(3)}`));
 
+      console.log('[Carbon Debug] About to call setMaterialBreakdown with', aggregatedMaterials.length, 'items');
       setMaterialBreakdown(aggregatedMaterials);
+      console.log('[Carbon Debug] setMaterialBreakdown called');
 
       // Calculate lifecycle stage breakdown
       const stageMap = new Map<string, {
@@ -611,7 +616,9 @@ export function useCompanyMetrics() {
           total_check: (fossilCO2 + biogenicCO2 + landUseChange + (methaneTotal * 27.9) + (nitrousOxideTotal * 273)).toFixed(3)
         });
 
+        console.log('[Carbon Debug] About to call setGhgBreakdown with data');
         setGhgBreakdown(ghgData);
+        console.log('[Carbon Debug] setGhgBreakdown called');
       }
 
       console.log('[Carbon Debug] fetchMaterialAndGHGBreakdown completed successfully');
