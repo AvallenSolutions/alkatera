@@ -24,6 +24,17 @@ import { CircularitySheet } from '@/components/vitality/CircularitySheet';
 import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
 
 export default function PerformancePage() {
+  const hookResult = useCompanyMetrics();
+
+  console.log('[CRITICAL] RAW HOOK RESULT:', JSON.stringify({
+    hasMaterialBreakdown: !!hookResult.materialBreakdown,
+    materialBreakdownType: typeof hookResult.materialBreakdown,
+    materialBreakdownLength: hookResult.materialBreakdown?.length,
+    isArray: Array.isArray(hookResult.materialBreakdown),
+    hasGhgBreakdown: !!hookResult.ghgBreakdown,
+    loading: hookResult.loading,
+  }, null, 2));
+
   const {
     metrics,
     scopeBreakdown,
@@ -36,7 +47,7 @@ export default function PerformancePage() {
     loading,
     error,
     refetch,
-  } = useCompanyMetrics();
+  } = hookResult;
 
   const [activeTab, setActiveTab] = useState('carbon');
   const [aiModalOpen, setAiModalOpen] = useState(false);
