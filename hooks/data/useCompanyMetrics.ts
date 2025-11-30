@@ -270,16 +270,32 @@ export function useCompanyMetrics() {
       });
 
       // Fetch scope breakdown (from calculated emissions)
-      await fetchScopeBreakdown();
+      try {
+        await fetchScopeBreakdown();
+      } catch (err) {
+        console.error('[useCompanyMetrics] fetchScopeBreakdown failed:', err);
+      }
 
       // Fetch facility water risks
-      await fetchFacilityWaterRisks();
+      try {
+        await fetchFacilityWaterRisks();
+      } catch (err) {
+        console.error('[useCompanyMetrics] fetchFacilityWaterRisks failed:', err);
+      }
 
       // Fetch material and GHG breakdown
-      await fetchMaterialAndGHGBreakdown();
+      try {
+        await fetchMaterialAndGHGBreakdown();
+      } catch (err) {
+        console.error('[useCompanyMetrics] fetchMaterialAndGHGBreakdown failed:', err);
+      }
 
       // Fetch facility emissions breakdown
-      await fetchFacilityEmissions();
+      try {
+        await fetchFacilityEmissions();
+      } catch (err) {
+        console.error('[useCompanyMetrics] fetchFacilityEmissions failed:', err);
+      }
 
       // Set nature metrics
       setNatureMetrics({

@@ -51,7 +51,15 @@ export function ProductionFacilitiesTable({
       }, 0)
     : 0;
 
-  const manufacturingImpact = weightedAverageIntensity * productNetVolume;
+  // Convert product volume to Litres for calculation
+  // Facility intensity is always in kg CO₂e/L
+  const productVolumeInLitres = volumeUnit === 'ml' || volumeUnit === 'mL' || volumeUnit === 'millilitre'
+    ? productNetVolume / 1000
+    : volumeUnit === 'L' || volumeUnit === 'litre' || volumeUnit === 'Litre'
+    ? productNetVolume
+    : productNetVolume; // default: assume litres
+
+  const manufacturingImpact = weightedAverageIntensity * productVolumeInLitres;
 
   if (productionSites.length === 0) {
     return (
@@ -174,7 +182,10 @@ export function ProductionFacilitiesTable({
               {manufacturingImpact.toFixed(4)} kg CO₂e/unit
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-              = {weightedAverageIntensity.toFixed(4)} kg/L × {productNetVolume} {volumeUnit}
+              = {weightedAverageIntensity.toFixed(4)} kg/L × {productVolumeInLitres.toFixed(3)} L
+              {volumeUnit !== 'L' && volumeUnit !== 'litre' && volumeUnit !== 'Litre' && (
+                <span className="text-blue-500"> ({productNetVolume} {volumeUnit})</span>
+              )}
             </p>
           </div>
         </div>
