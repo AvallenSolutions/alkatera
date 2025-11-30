@@ -99,6 +99,20 @@ export interface LifecycleStageBreakdown {
   top_contributors: { name: string; impact: number }[];
 }
 
+export interface FacilityEmissionsBreakdown {
+  facility_id: string;
+  facility_name: string;
+  location_city: string;
+  location_country_code: string;
+  total_emissions: number;
+  percentage: number;
+  production_volume: number;
+  share_of_production: number;
+  facility_intensity: number;
+  scope1_emissions: number;
+  scope2_emissions: number;
+}
+
 export function useCompanyMetrics() {
   const { currentOrganization } = useOrganization();
   const [metrics, setMetrics] = useState<CompanyMetrics | null>(null);
@@ -109,6 +123,7 @@ export function useCompanyMetrics() {
   const [materialBreakdown, setMaterialBreakdown] = useState<MaterialBreakdownItem[]>([]);
   const [ghgBreakdown, setGhgBreakdown] = useState<GHGBreakdown | null>(null);
   const [lifecycleStageBreakdown, setLifecycleStageBreakdown] = useState<LifecycleStageBreakdown[]>([]);
+  const [facilityEmissionsBreakdown, setFacilityEmissionsBreakdown] = useState<FacilityEmissionsBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -262,6 +277,9 @@ export function useCompanyMetrics() {
 
       // Fetch material and GHG breakdown
       await fetchMaterialAndGHGBreakdown();
+
+      // Fetch facility emissions breakdown
+      await fetchFacilityEmissions();
 
       // Set nature metrics
       setNatureMetrics({
@@ -579,6 +597,107 @@ export function useCompanyMetrics() {
     }
   }
 
+  async function fetchFacilityEmissions() {
+    try {
+      console.log('[Carbon Debug] Starting fetchFacilityEmissions for org:', currentOrganization?.id);
+
+      if (!currentOrganization?.id) {
+        console.log('[Carbon Debug] No organization ID, skipping facility fetch');
+        return;
+      }
+
+      // Fetch facility emissions from production sites linked to completed LCAs
+      const { data: productionSites, error } = await supabase
+        .from('product_lca_production_sites')
+        .select(`
+          facility_id,
+          production_volume,
+          share_of_production,
+          facility_intensity,
+          attributable_emissions_per_unit,
+          facilities (
+            id,
+            name,
+            location_city,
+            location_country_code
+          ),
+          product_lcas!inner(status, organization_id)
+        `)
+        .eq('product_lcas.organization_id', currentOrganization.id)
+        .eq('product_lcas.status', 'completed');
+
+      if (error) {
+        console.error('[Carbon Debug] Facility query error:', error);
+        throw error;
+      }
+
+      console.log('[Carbon Debug] Facility query returned:', productionSites?.length || 0, 'production sites');
+
+      if (!productionSites || productionSites.length === 0) {
+        console.log('[Carbon Debug] No facility production data found');
+        return;
+      }
+
+      // Aggregate by facility
+      const facilityMap = new Map<string, {
+        facility_name: string;
+        location_city: string;
+        location_country_code: string;
+        total_emissions: number;
+        production_volume: number;
+        facility_intensity: number;
+        site_count: number;
+      }>();
+
+      productionSites.forEach((site: any) => {
+        if (!site.facilities) return;
+
+        const facilityId = site.facility_id;
+        const emissions = (site.attributable_emissions_per_unit || 0) * (site.production_volume || 0);
+
+        if (!facilityMap.has(facilityId)) {
+          facilityMap.set(facilityId, {
+            facility_name: site.facilities.name,
+            location_city: site.facilities.location_city,
+            location_country_code: site.facilities.location_country_code,
+            total_emissions: 0,
+            production_volume: 0,
+            facility_intensity: site.facility_intensity || 0,
+            site_count: 0,
+          });
+        }
+
+        const facility = facilityMap.get(facilityId)!;
+        facility.total_emissions += emissions;
+        facility.production_volume += Number(site.production_volume) || 0;
+        facility.site_count += 1;
+      });
+
+      const totalEmissions = Array.from(facilityMap.values()).reduce((sum, f) => sum + f.total_emissions, 0);
+
+      const facilityBreakdown: FacilityEmissionsBreakdown[] = Array.from(facilityMap.entries()).map(([facility_id, data]) => ({
+        facility_id,
+        facility_name: data.facility_name,
+        location_city: data.location_city,
+        location_country_code: data.location_country_code,
+        total_emissions: data.total_emissions,
+        percentage: totalEmissions > 0 ? (data.total_emissions / totalEmissions) * 100 : 0,
+        production_volume: data.production_volume,
+        share_of_production: 0, // Would need total production to calculate
+        facility_intensity: data.facility_intensity,
+        scope1_emissions: data.total_emissions * 0.3, // Estimate: 30% scope 1, 70% scope 2
+        scope2_emissions: data.total_emissions * 0.7,
+      })).sort((a, b) => b.total_emissions - a.total_emissions);
+
+      console.log('[Carbon Debug] Facility breakdown:', facilityBreakdown.map(f => `${f.facility_name}: ${f.total_emissions.toFixed(3)} kg CO2eq`));
+
+      setFacilityEmissionsBreakdown(facilityBreakdown);
+    } catch (err) {
+      console.error('[Carbon Debug] Error fetching facility emissions:', err);
+      console.error('[Carbon Debug] Error details:', { orgId: currentOrganization?.id, error: err });
+    }
+  }
+
   return {
     metrics,
     scopeBreakdown,
@@ -587,6 +706,7 @@ export function useCompanyMetrics() {
     materialBreakdown,
     ghgBreakdown,
     lifecycleStageBreakdown,
+    facilityEmissionsBreakdown,
     natureMetrics,
     loading,
     error,

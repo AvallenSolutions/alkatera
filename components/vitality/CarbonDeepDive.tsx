@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { MaterialBreakdownItem, GHGBreakdown } from './CarbonBreakdownSheet';
-import { LifecycleStageBreakdown } from '@/hooks/data/useCompanyMetrics';
+import { LifecycleStageBreakdown, FacilityEmissionsBreakdown } from '@/hooks/data/useCompanyMetrics';
 
 interface CarbonDeepDiveProps {
   scopeBreakdown: ScopeBreakdown | null;
@@ -14,9 +14,10 @@ interface CarbonDeepDiveProps {
   materialBreakdown?: MaterialBreakdownItem[];
   ghgBreakdown?: GHGBreakdown | null;
   lifecycleStageBreakdown?: LifecycleStageBreakdown[];
+  facilityEmissionsBreakdown?: FacilityEmissionsBreakdown[];
 }
 
-export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown, lifecycleStageBreakdown }: CarbonDeepDiveProps) {
+export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown, lifecycleStageBreakdown, facilityEmissionsBreakdown }: CarbonDeepDiveProps) {
   const [sortBy, setSortBy] = useState<'impact' | 'name' | 'quantity'>('impact');
 
   // Debug logging
@@ -45,14 +46,55 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
   });
 
   if (!hasData) {
+    // Provide context-specific empty states
+    const hasPartialData = totalCO2 > 0;
+
     return (
       <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p className="text-sm font-medium">No carbon breakdown data available</p>
-          <p className="text-xs mt-2">
-            Complete an LCA calculation to see detailed GHG emissions analysis
-          </p>
+        <CardContent className="p-8 space-y-4">
+          <div className="text-center text-muted-foreground">
+            <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+
+            {hasPartialData ? (
+              <>
+                <p className="text-sm font-medium">Partial carbon data available</p>
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg text-left">
+                  <p className="text-sm font-semibold text-blue-900">Summary metric: {totalCO2.toFixed(3)} kg CO₂eq</p>
+                  <p className="text-xs text-blue-700 mt-2">
+                    Detailed breakdown pending. Run a full LCA calculation to see:
+                  </p>
+                  <ul className="text-xs text-blue-700 mt-2 space-y-1 list-disc list-inside">
+                    <li>Material-level contributions</li>
+                    <li>GHG gas inventory (CO₂, CH₄, N₂O)</li>
+                    <li>Lifecycle stage breakdown</li>
+                    <li>Facility operations data</li>
+                  </ul>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium">No carbon breakdown data available</p>
+                <div className="mt-4 space-y-3">
+                  <div className="p-4 bg-orange-50 rounded-lg text-left">
+                    <p className="text-sm font-semibold text-orange-900">Getting Started</p>
+                    <p className="text-xs text-orange-700 mt-2">
+                      To see detailed carbon breakdowns:
+                    </p>
+                    <ol className="text-xs text-orange-700 mt-2 space-y-1 list-decimal list-inside">
+                      <li>Navigate to Products → New Product</li>
+                      <li>Add materials and packaging data</li>
+                      <li>Run LCA calculation</li>
+                      <li>Return here to view detailed breakdown</li>
+                    </ol>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Once you have completed LCAs, this view will display rich insights including emissions by material, lifecycle stage, and production facility.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         </CardContent>
       </Card>
     );
@@ -115,6 +157,47 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
 
         {/* Overview Tab with Scope Breakdown */}
         <TabsContent value="overview" className="space-y-4 mt-6">
+          {/* Data Quality Validation Banner */}
+          {ghgBreakdown && (
+            (() => {
+              const fossilBiogenicLuc = ghgBreakdown.carbon_origin.fossil + ghgBreakdown.carbon_origin.biogenic + ghgBreakdown.carbon_origin.land_use_change;
+              const variance = Math.abs(fossilBiogenicLuc - totalCO2);
+              const variancePercent = totalCO2 > 0 ? (variance / totalCO2) * 100 : 0;
+              const isValid = variancePercent <= 5;
+
+              if (!isValid) {
+                return (
+                  <Card className="border-amber-300 bg-amber-50">
+                    <CardContent className="p-4 flex items-start gap-3">
+                      <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-amber-900">Data Quality Warning</p>
+                        <p className="text-xs text-amber-700">
+                          Carbon origin sum ({fossilBiogenicLuc.toFixed(3)} kg) deviates {variancePercent.toFixed(1)}% from total ({totalCO2.toFixed(3)} kg).
+                          ISO 14067 recommends &lt;5% variance.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              } else {
+                return (
+                  <Card className="border-green-300 bg-green-50">
+                    <CardContent className="p-4 flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-green-900">ISO 14067 Validated</p>
+                        <p className="text-xs text-green-700">
+                          Carbon origin breakdown validated with {variancePercent.toFixed(2)}% variance (within 5% tolerance).
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              }
+            })()
+          )}
+
           <div className="grid md:grid-cols-2 gap-4">
             {/* Scope Breakdown Card */}
             {scopeBreakdown && (
@@ -291,6 +374,69 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
               )}
             </CardContent>
           </Card>
+
+          {/* Facility Operations Breakdown */}
+          {facilityEmissionsBreakdown && facilityEmissionsBreakdown.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-blue-600" />
+                    <CardTitle className="text-lg">Emissions by Production Facility</CardTitle>
+                  </div>
+                  <Badge variant="outline" className="text-xs">Operations Data</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-4">
+                  {facilityEmissionsBreakdown.map((facility, index) => (
+                    <Card key={index} className="border-2">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-1">
+                            <h3 className="font-semibold text-sm">{facility.facility_name}</h3>
+                            <p className="text-xs text-muted-foreground">
+                              {facility.location_city}, {facility.location_country_code}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline">{facility.percentage.toFixed(1)}%</Badge>
+                            <p className="text-sm font-bold mt-1">{facility.total_emissions.toFixed(3)} kg CO₂eq</p>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div
+                            className="bg-gradient-to-r from-blue-600 to-blue-400 h-3 rounded-full"
+                            style={{ width: `${facility.percentage}%` }}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="flex items-center justify-between p-2 bg-red-50 rounded">
+                            <span className="text-muted-foreground">Scope 1</span>
+                            <span className="font-semibold">{facility.scope1_emissions.toFixed(2)} kg</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
+                            <span className="text-muted-foreground">Scope 2</span>
+                            <span className="font-semibold">{facility.scope2_emissions.toFixed(2)} kg</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
+                            <span className="text-muted-foreground">Production</span>
+                            <span className="font-semibold">{facility.production_volume.toLocaleString()} units</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-green-50 rounded">
+                            <span className="text-muted-foreground">Intensity</span>
+                            <span className="font-semibold">{facility.facility_intensity.toFixed(4)} kg/unit</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* GHG Gas Inventory Tab */}

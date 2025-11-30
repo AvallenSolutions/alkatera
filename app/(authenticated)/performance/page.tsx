@@ -31,6 +31,7 @@ export default function PerformancePage() {
     materialBreakdown,
     ghgBreakdown,
     lifecycleStageBreakdown,
+    facilityEmissionsBreakdown,
     natureMetrics,
     loading,
     error,
@@ -240,6 +241,7 @@ export default function PerformancePage() {
                 materialBreakdown={materialBreakdown}
                 ghgBreakdown={ghgBreakdown}
                 lifecycleStageBreakdown={lifecycleStageBreakdown}
+                facilityEmissionsBreakdown={facilityEmissionsBreakdown}
               />
             )}
           </TabsContent>
