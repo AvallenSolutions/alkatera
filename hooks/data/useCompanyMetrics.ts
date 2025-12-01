@@ -272,9 +272,16 @@ export function useCompanyMetrics() {
         last_updated: latestUpdate,
       });
 
-      console.log('[useCompanyMetrics] About to fetch breakdown data...');
+      console.log('[useCompanyMetrics] Extracting breakdown data from aggregated_impacts...');
 
-      // Fetch scope breakdown (from calculated emissions)
+      // Extract breakdown data directly from aggregated_impacts (NEW APPROACH)
+      try {
+        extractBreakdownFromAggregatedImpacts(lcas);
+      } catch (err) {
+        console.error('[useCompanyMetrics] extractBreakdownFromAggregatedImpacts failed:', err);
+      }
+
+      // Fetch scope breakdown (from calculated emissions) - FALLBACK
       try {
         console.log('[useCompanyMetrics] Calling fetchScopeBreakdown...');
         await fetchScopeBreakdown();
@@ -292,20 +299,26 @@ export function useCompanyMetrics() {
         console.error('[useCompanyMetrics] fetchFacilityWaterRisks failed:', err);
       }
 
-      // Fetch material and GHG breakdown
-      try {
-        console.log('[useCompanyMetrics] Calling fetchMaterialAndGHGBreakdown...');
-        await fetchMaterialAndGHGBreakdown();
-        console.log('[useCompanyMetrics] fetchMaterialAndGHGBreakdown completed');
-      } catch (err) {
-        console.error('[useCompanyMetrics] fetchMaterialAndGHGBreakdown failed:', err);
+      // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
+      const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
+      if (!hasMaterialBreakdown) {
+        try {
+          console.log('[useCompanyMetrics] Calling fetchMaterialAndGHGBreakdown (fallback)...');
+          await fetchMaterialAndGHGBreakdown();
+          console.log('[useCompanyMetrics] fetchMaterialAndGHGBreakdown completed');
+        } catch (err) {
+          console.error('[useCompanyMetrics] fetchMaterialAndGHGBreakdown failed:', err);
+        }
       }
 
-      // Fetch facility emissions breakdown
-      try {
-        await fetchFacilityEmissions();
-      } catch (err) {
-        console.error('[useCompanyMetrics] fetchFacilityEmissions failed:', err);
+      // Fetch facility emissions breakdown - FALLBACK
+      const hasFacilityBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_facility);
+      if (!hasFacilityBreakdown) {
+        try {
+          await fetchFacilityEmissions();
+        } catch (err) {
+          console.error('[useCompanyMetrics] fetchFacilityEmissions failed:', err);
+        }
       }
 
       // Set nature metrics
@@ -321,6 +334,113 @@ export function useCompanyMetrics() {
       console.error('Error fetching company metrics:', err);
       setError(err.message || 'Failed to fetch company metrics');
       setLoading(false);
+    }
+  }
+
+  function extractBreakdownFromAggregatedImpacts(lcas: any[]) {
+    console.log('[useCompanyMetrics] Extracting breakdown from', lcas.length, 'LCAs');
+
+    // Aggregate scope breakdown
+    const scopeTotal: ScopeBreakdown = { scope1: 0, scope2: 0, scope3: 0 };
+    const allMaterials: MaterialBreakdownItem[] = [];
+    const allFacilities: any[] = [];
+    const allLifecycleStages: any[] = [];
+    let hasGhgData = false;
+    let ghgTotal: GHGBreakdown = {
+      carbon_origin: { fossil: 0, biogenic: 0, land_use_change: 0 },
+      gas_inventory: { co2_fossil: 0, co2_biogenic: 0, methane: 0, nitrous_oxide: 0, hfc_pfc: 0 },
+      gwp_factors: { methane_gwp100: 27.9, n2o_gwp100: 273, method: 'IPCC AR6' }
+    };
+
+    lcas.forEach((lca) => {
+      const breakdown = lca.aggregated_impacts?.breakdown;
+      const ghg = lca.aggregated_impacts?.ghg_breakdown;
+
+      if (breakdown) {
+        // Aggregate scope data
+        if (breakdown.by_scope) {
+          scopeTotal.scope1 += breakdown.by_scope.scope1 || 0;
+          scopeTotal.scope2 += breakdown.by_scope.scope2 || 0;
+          scopeTotal.scope3 += breakdown.by_scope.scope3 || 0;
+          console.log(`[useCompanyMetrics] LCA ${lca.product_name} scope breakdown:`, breakdown.by_scope);
+        }
+
+        // Aggregate material data
+        if (breakdown.by_material && Array.isArray(breakdown.by_material)) {
+          allMaterials.push(...breakdown.by_material);
+          console.log(`[useCompanyMetrics] LCA ${lca.product_name} has ${breakdown.by_material.length} materials`);
+        }
+
+        // Aggregate facility data
+        if (breakdown.by_facility && Array.isArray(breakdown.by_facility)) {
+          allFacilities.push(...breakdown.by_facility);
+        }
+
+        // Aggregate lifecycle stage data
+        if (breakdown.by_lifecycle_stage && Array.isArray(breakdown.by_lifecycle_stage)) {
+          breakdown.by_lifecycle_stage.forEach((stage: any) => {
+            const existing = allLifecycleStages.find(s => s.stage === stage.stage);
+            if (existing) {
+              existing.emissions += stage.emissions || 0;
+            } else {
+              allLifecycleStages.push({ ...stage });
+            }
+          });
+        }
+      }
+
+      // Aggregate GHG data
+      if (ghg) {
+        hasGhgData = true;
+        if (ghg.carbon_origin) {
+          ghgTotal.carbon_origin.fossil += ghg.carbon_origin.fossil || 0;
+          ghgTotal.carbon_origin.biogenic += ghg.carbon_origin.biogenic || 0;
+          ghgTotal.carbon_origin.land_use_change += ghg.carbon_origin.land_use_change || 0;
+        }
+        if (ghg.gas_inventory) {
+          ghgTotal.gas_inventory.co2_fossil += ghg.gas_inventory.co2_fossil || 0;
+          ghgTotal.gas_inventory.co2_biogenic += ghg.gas_inventory.co2_biogenic || 0;
+          ghgTotal.gas_inventory.methane += ghg.gas_inventory.methane || 0;
+          ghgTotal.gas_inventory.nitrous_oxide += ghg.gas_inventory.nitrous_oxide || 0;
+          ghgTotal.gas_inventory.hfc_pfc += ghg.gas_inventory.hfc_pfc || 0;
+        }
+        console.log(`[useCompanyMetrics] LCA ${lca.product_name} GHG breakdown:`, ghg.carbon_origin);
+      }
+    });
+
+    // Set scope breakdown
+    if (scopeTotal.scope1 > 0 || scopeTotal.scope2 > 0 || scopeTotal.scope3 > 0) {
+      console.log('[useCompanyMetrics] Setting scope breakdown:', scopeTotal);
+      setScopeBreakdown(scopeTotal);
+    }
+
+    // Set material breakdown
+    if (allMaterials.length > 0) {
+      console.log('[useCompanyMetrics] Setting material breakdown:', allMaterials.length, 'materials');
+      setMaterialBreakdown(allMaterials);
+    }
+
+    // Set lifecycle stage breakdown
+    if (allLifecycleStages.length > 0) {
+      // Recalculate percentages
+      const total = allLifecycleStages.reduce((sum, stage) => sum + stage.emissions, 0);
+      allLifecycleStages.forEach(stage => {
+        stage.percentage = total > 0 ? (stage.emissions / total) * 100 : 0;
+      });
+      console.log('[useCompanyMetrics] Setting lifecycle stage breakdown:', allLifecycleStages);
+      setLifecycleStageBreakdown(allLifecycleStages);
+    }
+
+    // Set facility breakdown
+    if (allFacilities.length > 0) {
+      console.log('[useCompanyMetrics] Setting facility breakdown:', allFacilities.length, 'facilities');
+      setFacilityEmissionsBreakdown(allFacilities);
+    }
+
+    // Set GHG breakdown
+    if (hasGhgData) {
+      console.log('[useCompanyMetrics] Setting GHG breakdown:', ghgTotal);
+      setGhgBreakdown(ghgTotal);
     }
   }
 
