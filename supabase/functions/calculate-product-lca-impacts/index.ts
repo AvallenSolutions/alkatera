@@ -241,16 +241,29 @@ Deno.serve(async (req: Request) => {
 
     // 6. Calculate materials impacts - ALL materials are Scope 3 upstream
     materials?.forEach((material: any) => {
-      // Impact values are ALREADY CALCULATED (quantity × factor)
-      // Just like Calculation Verifier: activity.quantity × emission_source.emission_factor_co2e
-      const climate = Number(material.impact_climate) || 0;
-      const water = Number(material.impact_water) || 0;
-      const waterScarcity = Number(material.impact_water_scarcity) || water * 20;
-      const land = Number(material.impact_land) || 0;
-      const terrestrialEcotox = Number(material.impact_terrestrial_ecotoxicity) || 0;
-      const freshwaterEutro = Number(material.impact_freshwater_eutrophication) || 0;
-      const terrestrialAcid = Number(material.impact_terrestrial_acidification) || 0;
-      const fossilResource = Number(material.impact_fossil_resource_scarcity) || 0;
+      // CRITICAL: impact_climate stores the FACTOR, not the total
+      // We must multiply by quantity: emissions = quantity × factor
+      // This matches Calculation Verifier: activity.quantity × emission_source.emission_factor_co2e
+      const quantity = Number(material.quantity) || 0;
+      const climateFactor = Number(material.impact_climate) || 0;
+      const waterFactor = Number(material.impact_water) || 0;
+      const landFactor = Number(material.impact_land) || 0;
+      const wasteFactor = Number(material.impact_waste) || 0;
+      const waterScarcityFactor = Number(material.impact_water_scarcity) || (waterFactor * 20);
+      const terrestrialEcotoxFactor = Number(material.impact_terrestrial_ecotoxicity) || 0;
+      const freshwaterEutroFactor = Number(material.impact_freshwater_eutrophication) || 0;
+      const terrestrialAcidFactor = Number(material.impact_terrestrial_acidification) || 0;
+      const fossilResourceFactor = Number(material.impact_fossil_resource_scarcity) || 0;
+
+      // Calculate actual emissions by multiplying quantity × factor
+      const climate = quantity * climateFactor;
+      const water = quantity * waterFactor;
+      const waterScarcity = quantity * waterScarcityFactor;
+      const land = quantity * landFactor;
+      const terrestrialEcotox = quantity * terrestrialEcotoxFactor;
+      const freshwaterEutro = quantity * freshwaterEutroFactor;
+      const terrestrialAcid = quantity * terrestrialAcidFactor;
+      const fossilResource = quantity * fossilResourceFactor;
 
       totalClimate += climate;
       totalWater += water;
