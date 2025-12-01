@@ -49,27 +49,22 @@ interface AggregatedImpacts {
       transport: number;
       end_of_life: number;
     };
-    by_material: MaterialBreakdownItem[];
-    by_facility: FacilityBreakdownItem[];
-    by_lifecycle_stage: Array<{
-      stage: string;
-      emissions: number;
-      percentage: number;
-    }>;
-  };
-  ghg_breakdown: {
-    carbon_origin: {
-      fossil: number;
-      biogenic: number;
-      land_use_change: number;
-    };
-    gas_inventory: {
+    by_ghg: {
       co2_fossil: number;
       co2_biogenic: number;
-      methane: number;
-      nitrous_oxide: number;
-      hfc_pfc: number;
+      ch4: number;
+      n2o: number;
     };
+    by_lifecycle_stage: {
+      raw_materials: number;
+      processing: number;
+      packaging_stage: number;
+      distribution: number;
+      use_phase: number;
+      end_of_life: number;
+    };
+    by_material: MaterialBreakdownItem[];
+    by_facility: FacilityBreakdownItem[];
   };
 }
 
@@ -89,127 +84,65 @@ Deno.serve(async (req: Request) => {
     const { product_lca_id } = await req.json();
 
     if (!product_lca_id) {
-      throw new Error("product_lca_id is required");
+      return new Response(
+        JSON.stringify({ success: false, error: "product_lca_id is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    console.log(`[LCA Calculation] Starting calculation for LCA: ${product_lca_id}`);
+    console.log("[calculate-product-lca-impacts] Starting calculation for LCA:", product_lca_id);
 
-    // 1. Fetch LCA basic info
+    // 1. Fetch LCA
     const { data: lca, error: lcaError } = await supabase
       .from("product_lcas")
-      .select("id, product_id, product_name, functional_unit, functional_unit_quantity, organization_id")
+      .select("*")
       .eq("id", product_lca_id)
-      .single();
+      .maybeSingle();
 
-    if (lcaError) throw lcaError;
-    if (!lca) throw new Error("LCA not found");
+    if (lcaError || !lca) {
+      console.error("[calculate-product-lca-impacts] LCA not found:", lcaError);
+      return new Response(
+        JSON.stringify({ success: false, error: "LCA not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    console.log(`[LCA Calculation] Found LCA: ${lca.product_name}`);
-
-    // 2. Fetch all materials with their PRE-CALCULATED impacts
-    // This matches Calculation Verifier pattern: quantity × emission_factor already stored
+    // 2. Fetch materials
     const { data: materials, error: materialsError } = await supabase
       .from("product_lca_materials")
-      .select(`
-        id,
-        name,
-        quantity,
-        unit,
-        impact_climate,
-        impact_water,
-        impact_land,
-        impact_waste,
-        impact_water_scarcity,
-        impact_terrestrial_ecotoxicity,
-        impact_freshwater_eutrophication,
-        impact_terrestrial_acidification,
-        impact_fossil_resource_scarcity,
-        packaging_category,
-        impact_source,
-        lca_sub_stage_id,
-        lca_sub_stages (
-          lca_stage_id,
-          lca_life_cycle_stages (
-            name
-          )
-        )
-      `)
+      .select("*")
       .eq("product_lca_id", product_lca_id);
 
-    if (materialsError) throw materialsError;
+    if (materialsError) {
+      console.error("[calculate-product-lca-impacts] Materials fetch error:", materialsError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to fetch materials" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    console.log(`[LCA Calculation] Found ${materials?.length || 0} materials`);
+    console.log(`[calculate-product-lca-impacts] Found ${materials?.length || 0} materials`);
 
-    // 3. Fetch production sites and their emissions FROM FACILITY ACTIVITY DATA
-    // This replicates the Calculation Verifier approach
+    // 3. Fetch production sites (facilities)
     const { data: productionSites, error: sitesError } = await supabase
       .from("product_lca_production_sites")
       .select(`
-        facility_id,
-        production_volume,
-        share_of_production,
-        facility_intensity,
-        attributable_emissions_per_unit,
-        facilities (
+        *,
+        facility:facilities(
           id,
           name,
-          location_country_code
+          calculated_metrics
         )
       `)
       .eq("product_lca_id", product_lca_id);
 
-    if (sitesError) console.warn("Error fetching production sites:", sitesError);
-
-    console.log(`[LCA Calculation] Found ${productionSites?.length || 0} production sites`);
-
-    // 4. For each facility, fetch actual Scope 1 & 2 activity data
-    // This is the KEY difference - we use REAL facility data like Calculation Verifier
-    const facilityEmissions: Record<string, { scope1: number; scope2: number; total: number; name: string }> = {};
-
-    if (productionSites && productionSites.length > 0) {
-      for (const site of productionSites) {
-        const { data: activityData } = await supabase
-          .from('facility_activity_data')
-          .select(`
-            quantity,
-            unit,
-            emission_source:scope_1_2_emission_sources(
-              scope,
-              source_name,
-              emission_factor_co2e
-            )
-          `)
-          .eq('facility_id', site.facility_id);
-
-        if (activityData && activityData.length > 0) {
-          let scope1Total = 0;
-          let scope2Total = 0;
-
-          activityData.forEach((activity: any) => {
-            const quantity = parseFloat(activity.quantity || '0');
-            const emissionFactor = parseFloat(activity.emission_source?.emission_factor_co2e || '0');
-            const emissions = quantity * emissionFactor;
-
-            if (activity.emission_source?.scope === 'scope_1') {
-              scope1Total += emissions;
-            } else {
-              scope2Total += emissions;
-            }
-          });
-
-          facilityEmissions[site.facility_id] = {
-            scope1: scope1Total,
-            scope2: scope2Total,
-            total: scope1Total + scope2Total,
-            name: site.facilities?.name || 'Unknown Facility'
-          };
-
-          console.log(`[LCA Calculation] Facility ${site.facilities?.name}: Scope 1 = ${scope1Total.toFixed(3)}, Scope 2 = ${scope2Total.toFixed(3)}`);
-        }
-      }
+    if (sitesError) {
+      console.warn("[calculate-product-lca-impacts] Production sites fetch warning:", sitesError);
     }
 
-    // 5. Initialize totals
+    console.log(`[calculate-product-lca-impacts] Found ${productionSites?.length || 0} production sites`);
+
+    // 4. Initialize totals
     let totalClimate = 0;
     let totalWater = 0;
     let totalWaterScarcity = 0;
@@ -219,22 +152,31 @@ Deno.serve(async (req: Request) => {
     let totalTerrestrialAcid = 0;
     let totalFossilResource = 0;
 
-    // Breakdown by category
-    let materialsClimate = 0;
-    let packagingClimate = 0;
-    let productionClimate = 0;
-
     // Scope breakdown
     let scope1Total = 0;
     let scope2Total = 0;
     let scope3Total = 0;
 
+    // Category breakdown
+    let materialsTotal = 0;
+    let packagingTotal = 0;
+    let productionTotal = 0;
+    let transportTotal = 0;
+    let eolTotal = 0;
+
     // GHG breakdown
-    let fossilCO2 = 0;
-    let biogenicCO2 = 0;
-    let landUseChange = 0;
-    let methaneTotal = 0;
-    let nitrousOxideTotal = 0;
+    let co2Fossil = 0;
+    let co2Biogenic = 0;
+    let ch4 = 0;
+    let n2o = 0;
+
+    // Lifecycle stage breakdown
+    let rawMaterialsTotal = 0;
+    let processingTotal = 0;
+    let packagingStageTotal = 0;
+    let distributionTotal = 0;
+    let usePhaseTotal = 0;
+    let endOfLifeTotal = 0;
 
     // Material breakdown array
     const materialBreakdown: MaterialBreakdownItem[] = [];
@@ -281,144 +223,90 @@ Deno.serve(async (req: Request) => {
       const isPackaging = material.packaging_category ||
                          material.name?.toLowerCase().includes('bottle') ||
                          material.name?.toLowerCase().includes('cap') ||
-                         material.name?.toLowerCase().includes('label') ||
-                         material.name?.toLowerCase().includes('packaging') ||
-                         material.name?.toLowerCase().includes('cardboard');
+                         material.name?.toLowerCase().includes('label');
 
       if (isPackaging) {
-        packagingClimate += climate;
+        packagingTotal += climate;
+        packagingStageTotal += climate;
       } else {
-        materialsClimate += climate;
+        materialsTotal += climate;
+        rawMaterialsTotal += climate;
       }
+
+      // GHG breakdown - assume 85% fossil CO2, 15% biogenic CO2 (conservative)
+      co2Fossil += climate * 0.85;
+      co2Biogenic += climate * 0.15;
 
       // Add to material breakdown
-      materialBreakdown.push({
-        name: material.name,
-        quantity: material.quantity,
-        unit: material.unit,
-        emissions: climate,
-        percentage: 0, // Will calculate after we know total
-        category: isPackaging ? 'Packaging' : 'Ingredient',
-        dataSource: material.impact_source || 'secondary_modelled'
-      });
-
-      // GHG breakdown by material type
-      const name = (material.name || '').toLowerCase();
-      const category = (material.packaging_category || '').toLowerCase();
-
-      // Glass/Plastic/Metal = Fossil
-      if (category === 'glass' || name.includes('glass') ||
-          category === 'plastic' || category === 'pet' || category === 'hdpe' || name.includes('plastic') ||
-          category === 'metal' || category === 'aluminium' || name.includes('aluminium') || name.includes('cap')) {
-        fossilCO2 += climate;
-      }
-      // Sugar = Mostly biogenic
-      else if (name.includes('sugar') || name.includes('glucose') || name.includes('fructose')) {
-        biogenicCO2 += climate * 0.75;
-        fossilCO2 += climate * 0.20;
-        nitrousOxideTotal += (climate * 0.05) / 273;
-      }
-      // Fruits/Juice = Biogenic + LUC
-      else if (name.includes('fruit') || name.includes('apple') || name.includes('lemon') || name.includes('juice')) {
-        biogenicCO2 += climate * 0.70;
-        fossilCO2 += climate * 0.15;
-        landUseChange += climate * 0.12;
-        nitrousOxideTotal += (climate * 0.03) / 273;
-      }
-      // Paper/Cardboard = Biogenic + Fossil
-      else if (category === 'paper' || category === 'cardboard' || name.includes('label') || name.includes('cardboard')) {
-        biogenicCO2 += climate * 0.60;
-        fossilCO2 += climate * 0.35;
-        landUseChange += climate * 0.05;
-      }
-      // Water = Fossil (energy for treatment/pumping)
-      else if (name.includes('water')) {
-        fossilCO2 += climate * 0.95;
-        methaneTotal += (climate * 0.05) / 27.9;
-      }
-      // Citric acid, flavours, etc = Fossil
-      else if (name.includes('acid') || name.includes('flavour') || name.includes('citric')) {
-        fossilCO2 += climate * 0.90;
-        methaneTotal += (climate * 0.05) / 27.9;
-        nitrousOxideTotal += (climate * 0.05) / 273;
-      }
-      // Default split
-      else {
-        fossilCO2 += climate * 0.70;
-        biogenicCO2 += climate * 0.20;
-        landUseChange += climate * 0.05;
-        methaneTotal += (climate * 0.03) / 27.9;
-        nitrousOxideTotal += (climate * 0.02) / 273;
+      if (climate > 0) {
+        materialBreakdown.push({
+          name: material.name || 'Unknown Material',
+          quantity: quantity,
+          unit: material.unit || 'kg',
+          emissions: climate,
+          percentage: 0, // Will calculate after total is known
+          category: isPackaging ? 'packaging' : 'ingredient',
+          dataSource: material.impact_source || material.data_source || 'unknown',
+        });
       }
     });
 
-    console.log(`[LCA Calculation] Materials total: ${totalClimate.toFixed(6)} kg CO2eq`);
-    console.log(`[LCA Calculation] Breakdown: Materials ${materialsClimate.toFixed(6)}, Packaging ${packagingClimate.toFixed(6)}`);
-
-    // 7. Calculate production emissions from facility data
+    // 7. Calculate facility impacts
     const facilityBreakdown: FacilityBreakdownItem[] = [];
+    
+    productionSites?.forEach((site: any) => {
+      const sharePercent = Number(site.production_volume_share_percent) || 0;
+      const facility = site.facility;
 
-    Object.values(facilityEmissions).forEach((facility) => {
-      const facilityTotal = facility.scope1 + facility.scope2;
-      productionClimate += facilityTotal;
-      totalClimate += facilityTotal;
-      scope1Total += facility.scope1;
-      scope2Total += facility.scope2;
+      if (!facility || sharePercent === 0) return;
 
-      // Production is 100% fossil CO2 from energy
-      fossilCO2 += facilityTotal;
+      const calculatedMetrics = facility.calculated_metrics || {};
+      const facilityIntensity = Number(calculatedMetrics.emissions_intensity_kg_co2e_per_kg) || 0;
 
-      facilityBreakdown.push({
-        facility_name: facility.name,
-        emissions: facilityTotal,
-        percentage: 0, // Will calculate after
-        scope1: facility.scope1,
-        scope2: facility.scope2
-      });
+      // Calculate allocated emissions: functional_unit × share × intensity
+      const allocatedEmissions = (lca.functional_unit || 1) * (sharePercent / 100) * facilityIntensity;
 
-      console.log(`[LCA Calculation] Facility ${facility.name}: ${facilityTotal.toFixed(6)} kg CO2eq`);
+      if (allocatedEmissions > 0) {
+        const scope1 = Number(calculatedMetrics.total_scope_1_emissions) || 0;
+        const scope2 = Number(calculatedMetrics.total_scope_2_emissions) || 0;
+        const totalFacilityEmissions = scope1 + scope2;
+
+        // Allocate scope 1 and 2 proportionally
+        const allocatedScope1 = totalFacilityEmissions > 0 ? (scope1 / totalFacilityEmissions) * allocatedEmissions : 0;
+        const allocatedScope2 = totalFacilityEmissions > 0 ? (scope2 / totalFacilityEmissions) * allocatedEmissions : 0;
+
+        totalClimate += allocatedEmissions;
+        scope1Total += allocatedScope1;
+        scope2Total += allocatedScope2;
+        productionTotal += allocatedEmissions;
+        processingTotal += allocatedEmissions;
+
+        facilityBreakdown.push({
+          facility_name: facility.name,
+          emissions: allocatedEmissions,
+          percentage: 0, // Will calculate later
+          scope1: allocatedScope1,
+          scope2: allocatedScope2,
+        });
+      }
     });
-
-    console.log(`[LCA Calculation] Production total: ${productionClimate.toFixed(6)} kg CO2eq`);
-    console.log(`[LCA Calculation] GRAND TOTAL: ${totalClimate.toFixed(6)} kg CO2eq`);
-    console.log(`[LCA Calculation] Scope breakdown: S1=${scope1Total.toFixed(6)}, S2=${scope2Total.toFixed(6)}, S3=${scope3Total.toFixed(6)}`);
 
     // 8. Calculate percentages
     if (totalClimate > 0) {
       materialBreakdown.forEach(item => {
         item.percentage = (item.emissions / totalClimate) * 100;
       });
+
       facilityBreakdown.forEach(item => {
         item.percentage = (item.emissions / totalClimate) * 100;
       });
     }
 
-    // 9. Calculate water risk level
-    const avgWaterScarcity = totalWater > 0 ? totalWaterScarcity / totalWater : 0;
-    let waterRiskLevel = 'low';
-    if (avgWaterScarcity > 40) waterRiskLevel = 'high';
-    else if (avgWaterScarcity > 20) waterRiskLevel = 'medium';
+    // Sort by emissions (highest first)
+    materialBreakdown.sort((a, b) => b.emissions - a.emissions);
+    facilityBreakdown.sort((a, b) => b.emissions - a.emissions);
 
-    // 10. Calculate circularity
-    const circularityPercentage = totalFossilResource > 0
-      ? Math.max(0, Math.min(100, 100 - (totalFossilResource * 10)))
-      : 65;
-
-    // 11. Build lifecycle stage breakdown
-    const lifecycleStageBreakdown: Array<{ stage: string; emissions: number; percentage: number }> = [
-      {
-        stage: 'Raw Material Extraction',
-        emissions: scope3Total,
-        percentage: totalClimate > 0 ? (scope3Total / totalClimate) * 100 : 0
-      },
-      {
-        stage: 'Production',
-        emissions: scope1Total + scope2Total,
-        percentage: totalClimate > 0 ? ((scope1Total + scope2Total) / totalClimate) * 100 : 0
-      }
-    ];
-
-    // 12. Build aggregated impacts with FULL breakdown structure
+    // 9. Build aggregated impacts
     const aggregatedImpacts: AggregatedImpacts = {
       climate_change_gwp100: totalClimate,
       water_consumption: totalWater,
@@ -428,103 +316,89 @@ Deno.serve(async (req: Request) => {
       freshwater_eutrophication: totalFreshwaterEutro,
       terrestrial_acidification: totalTerrestrialAcid,
       fossil_resource_scarcity: totalFossilResource,
-      circularity_percentage: Math.round(circularityPercentage),
-      water_risk_level: waterRiskLevel,
+      circularity_percentage: 0,
+      water_risk_level: 'low',
       breakdown: {
         by_scope: {
           scope1: scope1Total,
           scope2: scope2Total,
-          scope3: scope3Total
+          scope3: scope3Total,
         },
         by_category: {
-          materials: materialsClimate,
-          packaging: packagingClimate,
-          production: productionClimate,
-          transport: 0,
-          end_of_life: 0
+          materials: materialsTotal,
+          packaging: packagingTotal,
+          production: productionTotal,
+          transport: transportTotal,
+          end_of_life: eolTotal,
         },
-        by_material: materialBreakdown.sort((a, b) => b.emissions - a.emissions),
+        by_ghg: {
+          co2_fossil: co2Fossil,
+          co2_biogenic: co2Biogenic,
+          ch4: ch4,
+          n2o: n2o,
+        },
+        by_lifecycle_stage: {
+          raw_materials: rawMaterialsTotal,
+          processing: processingTotal,
+          packaging_stage: packagingStageTotal,
+          distribution: distributionTotal,
+          use_phase: usePhaseTotal,
+          end_of_life: endOfLifeTotal,
+        },
+        by_material: materialBreakdown,
         by_facility: facilityBreakdown,
-        by_lifecycle_stage: lifecycleStageBreakdown
       },
-      ghg_breakdown: {
-        carbon_origin: {
-          fossil: fossilCO2,
-          biogenic: biogenicCO2,
-          land_use_change: landUseChange
-        },
-        gas_inventory: {
-          co2_fossil: fossilCO2,
-          co2_biogenic: biogenicCO2,
-          methane: methaneTotal,
-          nitrous_oxide: nitrousOxideTotal,
-          hfc_pfc: 0
-        }
-      }
     };
 
-    console.log(`[LCA Calculation] Final aggregated impacts:`, {
-      total_climate: totalClimate.toFixed(6),
-      scope_breakdown: {
-        scope1: scope1Total.toFixed(6),
-        scope2: scope2Total.toFixed(6),
-        scope3: scope3Total.toFixed(6)
-      },
-      category_breakdown: {
-        materials: materialsClimate.toFixed(6),
-        packaging: packagingClimate.toFixed(6),
-        production: productionClimate.toFixed(6)
-      },
-      ghg_breakdown: {
-        fossil: fossilCO2.toFixed(6),
-        biogenic: biogenicCO2.toFixed(6),
-        luc: landUseChange.toFixed(6)
-      },
-      material_count: materialBreakdown.length,
-      facility_count: facilityBreakdown.length
+    console.log("[calculate-product-lca-impacts] Calculated totals:", {
+      totalClimate,
+      scope1Total,
+      scope2Total,
+      scope3Total,
+      materialsCount: materialBreakdown.length,
+      facilitiesCount: facilityBreakdown.length,
     });
 
-    // 13. Update product_lcas with aggregated impacts
+    // 10. Update product_lcas table
     const { error: updateError } = await supabase
       .from("product_lcas")
       .update({
         aggregated_impacts: aggregatedImpacts,
-        status: "completed",
-        updated_at: new Date().toISOString()
+        status: 'completed',
+        updated_at: new Date().toISOString(),
       })
       .eq("id", product_lca_id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("[calculate-product-lca-impacts] Update error:", updateError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Failed to update LCA" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    console.log(`[LCA Calculation] ✅ Successfully updated LCA ${product_lca_id}`);
+    console.log("[calculate-product-lca-impacts] Successfully updated LCA with impacts");
 
     return new Response(
       JSON.stringify({
         success: true,
-        product_lca_id,
-        aggregated_impacts: aggregatedImpacts
+        aggregated_impacts: aggregatedImpacts,
       }),
       {
         status: 200,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (error: any) {
-    console.error("[LCA Calculation] ❌ Error:", error);
+  } catch (error) {
+    console.error("[calculate-product-lca-impacts] Error:", error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || "Failed to calculate LCA impacts"
+        error: error instanceof Error ? error.message : "Unknown error",
       }),
       {
         status: 500,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json"
-        }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
