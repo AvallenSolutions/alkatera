@@ -54,7 +54,7 @@ export type PackagingCategory = 'container' | 'label' | 'closure' | 'secondary';
 
 export type LabelPrintingType = 'digital' | 'offset' | 'flexographic' | 'gravure' | 'screen' | 'letterpress' | 'other';
 
-export type DataSource = 'openlca' | 'supplier' | 'primary';
+export type DataSource = 'openlca' | 'supplier' | 'primary' | 'staging' | 'ecoinvent';
 
 export type ImpactSourceType = 'primary_verified' | 'secondary_modelled' | 'hybrid_proxy';
 

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box } from "lucide-react";
-// import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { COUNTRIES } from "@/lib/countries";
 import type { DataSource, PackagingCategory } from "@/lib/types/lca";
 
@@ -197,11 +197,12 @@ export function PackagingFormCard({
                 <Label htmlFor={`search-${packaging.tempId}`} className="flex items-center gap-2">
                   Search Material <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  id={`search-${packaging.tempId}`}
+                <InlineIngredientSearch
+                  organizationId={organizationId}
                   value={packaging.name}
-                  onChange={(e) => onUpdate(packaging.tempId, { name: e.target.value })}
-                  placeholder="Enter packaging material name"
+                  placeholder="Search for packaging material..."
+                  onSelect={handleSearchSelect}
+                  onChange={(value) => onUpdate(packaging.tempId, { name: value })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Search by material name to find matches from your supplier network or global database

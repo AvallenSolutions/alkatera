@@ -16,12 +16,14 @@ import {
   Info,
   Plus,
   Sparkles,
+  Settings,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
 import { IngredientFormCard, IngredientFormData } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard, PackagingFormData } from "@/components/products/PackagingFormCard";
+import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 
 interface Product {
   id: string;
@@ -44,6 +46,7 @@ export default function ProductRecipePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [showOpenLCAConfig, setShowOpenLCAConfig] = useState(false);
 
   const [ingredientForms, setIngredientForms] = useState<IngredientFormData[]>([
     {
@@ -460,6 +463,14 @@ export default function ProductRecipePage() {
             Functional Unit: {formatFunctionalUnit()}
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowOpenLCAConfig(true)}
+        >
+          <Settings className="h-4 w-4 mr-2" />
+          Configure OpenLCA
+        </Button>
       </div>
 
       <Card>
@@ -742,6 +753,11 @@ export default function ProductRecipePage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <OpenLCAConfigDialog
+        open={showOpenLCAConfig}
+        onOpenChange={setShowOpenLCAConfig}
+      />
     </div>
   );
 }

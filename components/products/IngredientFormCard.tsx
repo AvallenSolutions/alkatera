@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2, Building2, Database, Sprout, Info } from "lucide-react";
-// import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { COUNTRIES } from "@/lib/countries";
 import type { DataSource } from "@/lib/types/lca";
 
@@ -140,11 +140,12 @@ export function IngredientFormCard({
             <Label htmlFor={`search-${ingredient.tempId}`} className="flex items-center gap-2">
               Search Ingredient <span className="text-destructive">*</span>
             </Label>
-            <Input
-              id={`search-${ingredient.tempId}`}
+            <InlineIngredientSearch
+              organizationId={organizationId}
               value={ingredient.name}
-              onChange={(e) => onUpdate(ingredient.tempId, { name: e.target.value })}
-              placeholder="Enter ingredient name"
+              placeholder="Search for ingredient..."
+              onSelect={handleSearchSelect}
+              onChange={(value) => onUpdate(ingredient.tempId, { name: value })}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Search by ingredient name to find matches from your supplier network or global database
