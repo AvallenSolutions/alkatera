@@ -120,12 +120,23 @@ export default function ProductLCATest() {
 
       setTestState({ status: 'running', message: 'Fetching calculation logs...' })
 
-      const { data: logs, error: logsError } = await supabase
-        .from('product_lca_calculation_logs')
-        .select('*')
-        .eq('product_lca_id', productLcas.id)
-        .order('created_at', { ascending: false })
-        .limit(10)
+      let logs: any[] = []
+      try {
+        const { data: logsData, error: logsError } = await supabase
+          .from('product_lca_calculation_logs')
+          .select('*')
+          .eq('product_lca_id', productLcas.id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (!logsError && logsData) {
+          logs = logsData
+        } else {
+          console.warn('Could not fetch product LCA calculation logs:', logsError?.message)
+        }
+      } catch (logError) {
+        console.warn('Error fetching logs, continuing without them:', logError)
+      }
 
       setTestState({
         status: 'success',
@@ -135,7 +146,7 @@ export default function ProductLCATest() {
           materials,
           calculations,
           results,
-          logs: logs || [],
+          logs,
         },
       })
     } catch (error: any) {

@@ -67,9 +67,13 @@ export default function LogExplorer({ logs, type }: LogExplorerProps) {
         <CardContent>
           <div className="text-center py-8 text-muted-foreground">
             <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p className="text-sm">No calculation logs found</p>
-            <p className="text-xs mt-1">
-              Logs will appear here after calculations are executed
+            <p className="text-sm font-medium">No calculation logs found</p>
+            <p className="text-xs mt-2 max-w-md mx-auto">
+              Calculation logs are created when you run calculations through edge functions.
+              This test uses direct database queries to show existing data, so logs may not be available.
+            </p>
+            <p className="text-xs mt-3 text-blue-600">
+              To generate logs: Use the LCA calculation workflows or run corporate calculations through the edge functions.
             </p>
           </div>
         </CardContent>
