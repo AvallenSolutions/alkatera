@@ -123,6 +123,20 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[calculate-product-lca-impacts] Found ${materials?.length || 0} materials`);
 
+    // Log material details for debugging
+    materials?.forEach((mat: any, idx: number) => {
+      console.log(`[calculate-product-lca-impacts] Material ${idx + 1}:`, {
+        name: mat.name,
+        quantity: mat.quantity,
+        unit: mat.unit,
+        data_source: mat.data_source,
+        supplier_product_id: mat.supplier_product_id,
+        impact_climate: mat.impact_climate,
+        impact_water: mat.impact_water,
+        impact_land: mat.impact_land,
+      });
+    });
+
     // 3. Fetch production sites (facilities)
     const { data: productionSites, error: sitesError } = await supabase
       .from("product_lca_production_sites")
@@ -187,6 +201,11 @@ Deno.serve(async (req: Request) => {
       // Materials are stored with pre-calculated values, DO NOT multiply by quantity again!
       const quantity = Number(material.quantity) || 0;
       const climate = Number(material.impact_climate) || 0;
+
+      // Warn about materials with zero impact
+      if (climate === 0 && quantity > 0) {
+        console.warn(`[calculate-product-lca-impacts] WARNING: Material "${material.name}" has zero climate impact but non-zero quantity (${quantity} ${material.unit}). Data source: ${material.data_source}, Supplier ID: ${material.supplier_product_id || 'none'}`);
+      }
       const water = Number(material.impact_water) || 0;
       const waterScarcity = Number(material.impact_water_scarcity) || water * 20;
       const land = Number(material.impact_land) || 0;
@@ -345,6 +364,7 @@ Deno.serve(async (req: Request) => {
       scope3Total,
       materialsCount: materialBreakdown.length,
       facilitiesCount: facilityBreakdown.length,
+      materialBreakdownTop3: materialBreakdown.slice(0, 3),
     });
 
     // 10. Update product_lcas table

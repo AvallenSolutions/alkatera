@@ -124,8 +124,8 @@ export function ImpactReportsTab({
                         </span>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {report.total_ghg_emissions
-                          ? `${report.total_ghg_emissions.toFixed(2)} kg CO₂e`
+                        {report.aggregated_impacts?.climate_change_gwp100
+                          ? `${report.aggregated_impacts.climate_change_gwp100.toFixed(3)} kg CO₂e`
                           : '—'
                         }
                       </TableCell>

@@ -99,6 +99,8 @@ export default function ProductLcaReportPage() {
           return;
         }
 
+        console.log('[ProductReport] Fetched LCA:', lca);
+
         if (lca) {
           // Fetch materials for this LCA
           const { data: materials, error: materialsError } = await supabase
@@ -108,9 +110,13 @@ export default function ProductLcaReportPage() {
 
           if (!materialsError && materials) {
             lca.materials = materials;
+            console.log('[ProductReport] Fetched materials:', materials.length);
           }
 
+          console.log('[ProductReport] LCA aggregated_impacts:', lca.aggregated_impacts);
           setLcaData(lca);
+        } else {
+          console.log('[ProductReport] No completed LCA found for product:', productId);
         }
       } catch (error) {
         console.error('Error fetching LCA data:', error);

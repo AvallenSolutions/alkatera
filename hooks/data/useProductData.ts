@@ -24,7 +24,13 @@ export interface ProductLCA {
   id: string;
   created_at: string;
   system_boundary: string;
-  total_ghg_emissions: number;
+  aggregated_impacts: {
+    climate_change_gwp100: number;
+    water_consumption: number;
+    water_scarcity_aware: number;
+    land_use: number;
+    breakdown?: any;
+  } | null;
   status: string;
 }
 
@@ -117,12 +123,16 @@ export function useProductData(productId: string | undefined) {
       // Fetch LCA reports
       const { data: lcaData, error: lcaError } = await supabase
         .from("product_lcas")
-        .select("id, created_at, system_boundary, total_ghg_emissions, status")
+        .select("id, created_at, system_boundary, aggregated_impacts, status")
         .eq("product_id", productId)
         .order("created_at", { ascending: false });
 
       // LCA error is non-critical, just log it
-      if (lcaError) console.warn("Error fetching LCA data:", lcaError);
+      if (lcaError) {
+        console.warn("Error fetching LCA data:", lcaError);
+      } else {
+        console.log('[useProductData] Fetched LCA reports:', lcaData?.length, lcaData);
+      }
 
       // Calculate data health
       const hasIngredients = (ingredientsData || []).length > 0;
