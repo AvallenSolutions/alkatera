@@ -24,6 +24,14 @@ import {
   TestTube,
   ClipboardCheck,
   Calculator,
+  Building2,
+  Warehouse,
+  Truck,
+  Database,
+  Flame,
+  Droplet,
+  Trash2,
+  Upload,
 } from 'lucide-react'
 
 interface NavItem {
@@ -45,9 +53,53 @@ const navigationStructure: NavItem[] = [
     icon: Sparkles,
   },
   {
-    name: 'Operations',
-    href: '/operations',
-    icon: Factory,
+    name: 'Company',
+    href: '/company',
+    icon: Building2,
+    children: [
+      {
+        name: 'Overview',
+        href: '/company/overview',
+        icon: Building2,
+      },
+      {
+        name: 'Facilities',
+        href: '/company/facilities',
+        icon: Warehouse,
+      },
+      {
+        name: 'Fleet',
+        href: '/company/fleet',
+        icon: Truck,
+      },
+    ],
+  },
+  {
+    name: 'Data Entry',
+    href: '/data',
+    icon: Database,
+    children: [
+      {
+        name: 'Scope 1 & 2',
+        href: '/data/scope-1-2',
+        icon: Flame,
+      },
+      {
+        name: 'Waste & Circularity',
+        href: '/data/waste-and-circularity',
+        icon: Trash2,
+      },
+      {
+        name: 'Water Footprint',
+        href: '/data/water-footprint',
+        icon: Droplet,
+      },
+      {
+        name: 'Data Ingest',
+        href: '/data/ingest',
+        icon: Upload,
+      },
+    ],
   },
   {
     name: 'Products',
