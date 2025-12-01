@@ -29,7 +29,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
       hasGhgBreakdown: !!ghgBreakdown,
     });
     if (materialBreakdown) {
-      console.log('[Carbon DeepDive] Materials received:', materialBreakdown.map(m => `${m.name}: ${m.climate.toFixed(3)}`));
+      console.log('[Carbon DeepDive] Materials received:', materialBreakdown.map(m => `${m.name}: ${(m.climate ?? 0).toFixed(3)}`));
     }
     if (ghgBreakdown) {
       console.log('[Carbon DeepDive] GHG breakdown received:', ghgBreakdown.carbon_origin);
@@ -344,27 +344,27 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                         <div className="flex items-center justify-between">
                           <h3 className="font-semibold text-sm">{stage.stage_name}</h3>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline">{stage.percentage.toFixed(1)}%</Badge>
-                            <span className="text-sm font-bold">{stage.total_impact.toFixed(3)} kg CO₂eq</span>
+                            <Badge variant="outline">{(stage.percentage ?? 0).toFixed(1)}%</Badge>
+                            <span className="text-sm font-bold">{(stage.total_impact ?? 0).toFixed(3)} kg CO₂eq</span>
                           </div>
                         </div>
 
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div
                             className="bg-gradient-to-r from-green-600 to-green-400 h-3 rounded-full"
-                            style={{ width: `${stage.percentage}%` }}
+                            style={{ width: `${stage.percentage ?? 0}%` }}
                           />
                         </div>
 
                         <div className="space-y-1">
                           <p className="text-xs text-muted-foreground">
-                            {stage.material_count} materials contributing
+                            {stage.material_count ?? 0} materials contributing
                           </p>
-                          {stage.top_contributors.length > 0 && (
+                          {stage.top_contributors && stage.top_contributors.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
                               {stage.top_contributors.map((contrib, idx) => (
                                 <Badge key={idx} variant="secondary" className="text-xs">
-                                  {contrib.name}: {contrib.impact.toFixed(3)}
+                                  {contrib.name}: {(contrib.impact ?? 0).toFixed(3)}
                                 </Badge>
                               ))}
                             </div>
@@ -409,34 +409,34 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                             </p>
                           </div>
                           <div className="text-right">
-                            <Badge variant="outline">{facility.percentage.toFixed(1)}%</Badge>
-                            <p className="text-sm font-bold mt-1">{facility.total_emissions.toFixed(3)} kg CO₂eq</p>
+                            <Badge variant="outline">{(facility.percentage ?? 0).toFixed(1)}%</Badge>
+                            <p className="text-sm font-bold mt-1">{(facility.total_emissions ?? 0).toFixed(3)} kg CO₂eq</p>
                           </div>
                         </div>
 
                         <div className="w-full bg-gray-200 rounded-full h-3">
                           <div
                             className="bg-gradient-to-r from-blue-600 to-blue-400 h-3 rounded-full"
-                            style={{ width: `${facility.percentage}%` }}
+                            style={{ width: `${facility.percentage ?? 0}%` }}
                           />
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div className="flex items-center justify-between p-2 bg-red-50 rounded">
                             <span className="text-muted-foreground">Scope 1</span>
-                            <span className="font-semibold">{facility.scope1_emissions.toFixed(2)} kg</span>
+                            <span className="font-semibold">{(facility.scope1_emissions ?? 0).toFixed(2)} kg</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
                             <span className="text-muted-foreground">Scope 2</span>
-                            <span className="font-semibold">{facility.scope2_emissions.toFixed(2)} kg</span>
+                            <span className="font-semibold">{(facility.scope2_emissions ?? 0).toFixed(2)} kg</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
                             <span className="text-muted-foreground">Production</span>
-                            <span className="font-semibold">{facility.production_volume.toLocaleString()} units</span>
+                            <span className="font-semibold">{(facility.production_volume ?? 0).toLocaleString()} units</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-green-50 rounded">
                             <span className="text-muted-foreground">Intensity</span>
-                            <span className="font-semibold">{facility.facility_intensity.toFixed(4)} kg/unit</span>
+                            <span className="font-semibold">{(facility.facility_intensity ?? 0).toFixed(4)} kg/unit</span>
                           </div>
                         </div>
                       </CardContent>
