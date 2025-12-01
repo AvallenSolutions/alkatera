@@ -11,7 +11,6 @@ import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info } from "
 import { ProductHeader } from "@/components/products/ProductHeader";
 import { OverviewTab } from "@/components/products/OverviewTab";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
-import { ImpactReportsTab } from "@/components/products/ImpactReportsTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
 import { useProductData } from "@/hooks/data/useProductData";
@@ -35,11 +34,11 @@ export default function ProductDashboardPage() {
     }
 
     try {
-      toast.info("Initiating LCA calculation...");
-      router.push(`/products/${productId}/lca/initiate`);
+      toast.info("Redirecting to impact calculator...");
+      router.push(`/products/${productId}/calculate-lca`);
     } catch (error) {
       console.error("Calculate error:", error);
-      toast.error("Failed to initiate calculation");
+      toast.error("Failed to navigate to calculator");
     }
   };
 
@@ -141,7 +140,7 @@ export default function ProductDashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-3xl">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
             <TabsTrigger value="overview">
               <Info className="mr-2 h-4 w-4" />
               Overview
@@ -149,10 +148,6 @@ export default function ProductDashboardPage() {
             <TabsTrigger value="specification">
               <FileBarChart className="mr-2 h-4 w-4" />
               Specification
-            </TabsTrigger>
-            <TabsTrigger value="impact">
-              <FileText className="mr-2 h-4 w-4" />
-              Impact & Reports
             </TabsTrigger>
             <TabsTrigger value="settings">
               <Settings className="mr-2 h-4 w-4" />
@@ -169,15 +164,6 @@ export default function ProductDashboardPage() {
               productId={productId}
               ingredients={ingredients}
               packaging={packaging}
-            />
-          </TabsContent>
-
-          <TabsContent value="impact" className="space-y-6">
-            <ImpactReportsTab
-              productId={productId}
-              isHealthy={isHealthy}
-              lcaReports={lcaReports}
-              onCalculate={handleCalculate}
             />
           </TabsContent>
 

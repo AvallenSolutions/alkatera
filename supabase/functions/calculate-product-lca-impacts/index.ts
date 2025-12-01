@@ -313,7 +313,47 @@ Deno.serve(async (req: Request) => {
     materialBreakdown.sort((a, b) => b.emissions - a.emissions);
     facilityBreakdown.sort((a, b) => b.emissions - a.emissions);
 
-    // 9. Build aggregated impacts
+    // 9. Calculate data quality summary (ISO Compliance)
+    const totalMaterialCount = materials.length;
+    const priority1Count = materials.filter((m: any) => Number(m.data_priority) === 1).length;
+    const priority2Count = materials.filter((m: any) => Number(m.data_priority) === 2).length;
+    const priority3Count = materials.filter((m: any) => Number(m.data_priority) === 3).length;
+
+    const dataQualityScore = totalMaterialCount > 0
+      ? Math.round((priority1Count * 95 + priority2Count * 85 + priority3Count * 70) / totalMaterialCount)
+      : 0;
+
+    let dataQualityRating = 'Low';
+    if (dataQualityScore >= 85) dataQualityRating = 'High';
+    else if (dataQualityScore >= 70) dataQualityRating = 'Medium';
+
+    const dataQualitySummary = {
+      score: dataQualityScore,
+      rating: dataQualityRating,
+      total_materials: totalMaterialCount,
+      breakdown: {
+        primary_verified_count: priority1Count,
+        primary_verified_share: `${Math.round((priority1Count / totalMaterialCount) * 100)}%`,
+        regional_standard_count: priority2Count,
+        regional_standard_share: `${Math.round((priority2Count / totalMaterialCount) * 100)}%`,
+        secondary_modelled_count: priority3Count,
+        secondary_modelled_share: `${Math.round((priority3Count / totalMaterialCount) * 100)}%`,
+      },
+    };
+
+    // Enrich material breakdown with provenance
+    const enrichedMaterialBreakdown = materialBreakdown.map((item: any) => {
+      const material = materials.find((m: any) => m.name === item.name);
+      return {
+        ...item,
+        data_quality_tag: material?.data_quality_tag || 'Unknown',
+        confidence_score: material?.confidence_score || 0,
+        source_reference: material?.source_reference || 'Unknown',
+        methodology: material?.methodology || 'Unknown',
+      };
+    });
+
+    // 10. Build aggregated impacts
     const aggregatedImpacts: AggregatedImpacts = {
       climate_change_gwp100: totalClimate,
       water_consumption: totalWater,
@@ -325,6 +365,7 @@ Deno.serve(async (req: Request) => {
       fossil_resource_scarcity: totalFossilResource,
       circularity_percentage: 0,
       water_risk_level: 'low',
+      data_quality: dataQualitySummary,
       breakdown: {
         by_scope: {
           scope1: scope1Total,
@@ -344,6 +385,13 @@ Deno.serve(async (req: Request) => {
           ch4: ch4,
           n2o: n2o,
         },
+        by_ghg_detailed: {
+          co2_fossil: materials.reduce((sum: number, m: any) => sum + (Number(m.impact_climate_fossil) || 0), 0),
+          co2_biogenic: materials.reduce((sum: number, m: any) => sum + (Number(m.impact_climate_biogenic) || 0), 0),
+          co2_dluc: materials.reduce((sum: number, m: any) => sum + (Number(m.impact_climate_dluc) || 0), 0),
+          ch4: ch4,
+          n2o: n2o,
+        },
         by_lifecycle_stage: {
           raw_materials: rawMaterialsTotal,
           processing: processingTotal,
@@ -352,7 +400,7 @@ Deno.serve(async (req: Request) => {
           use_phase: usePhaseTotal,
           end_of_life: endOfLifeTotal,
         },
-        by_material: materialBreakdown,
+        by_material: enrichedMaterialBreakdown,
         by_facility: facilityBreakdown,
       },
     };

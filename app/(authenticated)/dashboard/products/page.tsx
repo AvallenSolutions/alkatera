@@ -35,7 +35,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useOrganization } from "@/lib/organizationContext";
 import { fetchProducts, deleteProduct } from "@/lib/products";
-import { createDraftLca } from "@/lib/lca";
 import type { Product } from "@/lib/types/products";
 
 export default function ProductsPage() {
@@ -103,33 +102,8 @@ export default function ProductsPage() {
       return;
     }
 
-    console.log('[Products] Creating LCA for product:', product.name, product.id);
-
-    try {
-      setIsCreatingLca(true);
-
-      console.log('[Products] Calling createDraftLca...');
-      const result = await createDraftLca(product.id, organizationId);
-
-      console.log('[Products] createDraftLca result:', result);
-
-      if (!result.success) {
-        console.error('[Products] LCA creation failed:', result.error);
-        throw new Error(result.error);
-      }
-
-      console.log('[Products] LCA created successfully:', result.lcaId);
-      toast.success(`LCA created for "${product.name}"`);
-
-      console.log('[Products] Navigating to sourcing page...');
-      router.push(`/dashboard/lcas/${result.lcaId}/create/sourcing`);
-    } catch (err) {
-      console.error('[Products] Error in handleCreateLca:', err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to create LCA";
-      toast.error(errorMessage);
-    } finally {
-      setIsCreatingLca(false);
-    }
+    // Redirect to new calculate LCA flow
+    router.push(`/products/${product.id}/calculate-lca`);
   };
 
   if (!organizationId) {
