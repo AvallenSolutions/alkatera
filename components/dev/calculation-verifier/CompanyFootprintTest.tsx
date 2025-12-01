@@ -60,16 +60,37 @@ export default function CompanyFootprintTest() {
         throw new Error('No facilities found. Please create a test facility first.')
       }
 
-      setTestState({ status: 'running', message: 'Fetching activity data...' })
+      setTestState({ status: 'running', message: 'Fetching activity data with emission factors...' })
 
       const { data: activityData, error: activityError } = await supabase
         .from('facility_activity_data')
-        .select('*')
+        .select(`
+          *,
+          emission_source:scope_1_2_emission_sources(
+            scope,
+            category,
+            source_name,
+            emission_factor_co2e,
+            unit
+          )
+        `)
         .eq('facility_id', facilities.id)
-        .limit(20)
+        .limit(50)
 
       if (activityError) {
-        console.warn('No facility activity data found, using mock data:', activityError.message)
+        console.warn('No facility activity data found, will check corporate overheads:', activityError.message)
+      }
+
+      setTestState({ status: 'running', message: 'Fetching corporate overhead data (Scope 3)...' })
+
+      const { data: corporateData, error: corporateError } = await supabase
+        .from('corporate_overheads')
+        .select('*')
+        .eq('organization_id', facilities.organization_id)
+        .limit(50)
+
+      if (corporateError) {
+        console.warn('No corporate overhead data found:', corporateError.message)
       }
 
       setTestState({ status: 'running', message: 'Calculating Scope 1, 2, and 3 emissions...' })
@@ -82,89 +103,74 @@ export default function CompanyFootprintTest() {
       if (activityData && activityData.length > 0) {
         activityData.forEach((activity: any) => {
           const quantity = parseFloat(activity.quantity || '0')
-          const emissionFactor = 0.185
+          const emissionFactor = parseFloat(activity.emission_source?.emission_factor_co2e || '0')
           const emissions = quantity * emissionFactor
 
-          let scope = 'Scope 3'
-          if (activity.activity_type?.includes('combustion') || activity.activity_type?.includes('fuel')) {
-            scope = 'Scope 1'
+          const scope = activity.emission_source?.scope === 'scope_1' ? 'Scope 1' : 'Scope 2'
+          const category = activity.emission_source?.source_name || 'Unknown'
+
+          if (scope === 'Scope 1') {
             scope1Total += emissions
-          } else if (activity.activity_type?.includes('electricity') || activity.activity_type?.includes('energy')) {
-            scope = 'Scope 2'
-            scope2Total += emissions
           } else {
-            scope3Total += emissions
+            scope2Total += emissions
           }
 
           calculations.push({
             scope,
-            category: activity.activity_type || 'Unknown',
-            activityType: activity.activity_type || 'N/A',
+            category,
+            activityType: activity.emission_source?.source_name || 'N/A',
             quantity,
             unit: activity.unit || 'unit',
             emissionFactor,
             emissions,
-            formula: `${quantity} ${activity.unit} × ${emissionFactor} kg CO₂e/${activity.unit}`,
+            formula: `${quantity.toLocaleString()} ${activity.unit} × ${emissionFactor.toFixed(5)} kg CO₂e/${activity.unit} = ${emissions.toFixed(2)} kg CO₂e`,
           })
         })
-      } else {
-        const mockCalculations: ScopeResult[] = [
-          {
-            scope: 'Scope 1',
-            category: 'Stationary Combustion',
-            activityType: 'Natural Gas',
-            quantity: 10000,
-            unit: 'kWh',
-            emissionFactor: 0.185,
-            emissions: 1850,
-            formula: '10,000 kWh × 0.185 kg CO₂e/kWh = 1,850 kg CO₂e',
-          },
-          {
-            scope: 'Scope 1',
-            category: 'Mobile Combustion',
-            activityType: 'Diesel Vehicles',
-            quantity: 5000,
-            unit: 'km',
-            emissionFactor: 0.17,
-            emissions: 850,
-            formula: '5,000 km × 0.17 kg CO₂e/km = 850 kg CO₂e',
-          },
-          {
-            scope: 'Scope 2',
-            category: 'Purchased Electricity',
-            activityType: 'Grid Electricity (Location-Based)',
-            quantity: 50000,
-            unit: 'kWh',
-            emissionFactor: 0.233,
-            emissions: 11650,
-            formula: '50,000 kWh × 0.233 kg CO₂e/kWh = 11,650 kg CO₂e',
-          },
-          {
-            scope: 'Scope 3',
-            category: 'Category 5: Waste',
-            activityType: 'Waste to Landfill',
-            quantity: 500,
-            unit: 'kg',
-            emissionFactor: 0.54,
-            emissions: 270,
-            formula: '500 kg × 0.54 kg CO₂e/kg = 270 kg CO₂e',
-          },
-          {
-            scope: 'Scope 3',
-            category: 'Category 6: Business Travel',
-            activityType: 'Flights (Economy)',
-            quantity: 2000,
-            unit: 'km',
-            emissionFactor: 0.255,
-            emissions: 510,
-            formula: '2,000 km × 0.255 kg CO₂e/km = 510 kg CO₂e',
-          },
-        ]
+      }
 
-        calculations.push(...mockCalculations)
-        scope1Total = 2700
-        scope2Total = 11650
-        scope3Total = 780
+      if (corporateData && corporateData.length > 0) {
+        const scope3FactorMap: Record<string, number> = {
+          'landfill': 0.54,
+          'recycling': 0.021,
+          'flights_short_haul_economy': 0.24587,
+          'flights_long_haul_economy': 0.19085,
+          'rail_national': 0.03549,
+          'car_average': 0.17078,
+          'car_diesel': 0.17078,
+          'car_petrol': 0.18254,
+        }
+
+        corporateData.forEach((overhead: any) => {
+          const quantity = parseFloat(overhead.quantity || '0')
+          const emissionFactor = scope3FactorMap[overhead.sub_category] || 0.1
+          const emissions = quantity * emissionFactor
+
+          scope3Total += emissions
+
+          const categoryName = overhead.category
+            .replace('scope_3_cat_', 'Category ')
+            .replace('_', ' ')
+            .split(' ')
+            .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ')
+
+          calculations.push({
+            scope: 'Scope 3',
+            category: categoryName,
+            activityType: overhead.description || overhead.sub_category,
+            quantity,
+            unit: overhead.unit || 'unit',
+            emissionFactor,
+            emissions,
+            formula: `${quantity.toLocaleString()} ${overhead.unit} × ${emissionFactor.toFixed(5)} kg CO₂e/${overhead.unit} = ${emissions.toFixed(2)} kg CO₂e`,
+          })
+        })
+      }
+
+      if (calculations.length === 0) {
+        throw new Error(
+          'No activity data or corporate overhead data found. Please run the seed-calculation-verifier-test-data.sql script first.'
+        )
       }
 
       const totals = {
