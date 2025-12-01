@@ -292,10 +292,12 @@ Deno.serve(async (req: Request) => {
         const quantity = parseFloat(material.quantity) || 0;
 
         if (material.impact_climate !== null && material.impact_climate !== undefined) {
-          const materialClimate = quantity * (material.impact_climate || 0);
-          const materialWater = quantity * (material.impact_water || 0);
-          const materialLand = quantity * (material.impact_land || 0);
-          const materialWaste = quantity * (material.impact_waste || 0);
+          // CRITICAL FIX: impact_climate is ALREADY PRE-CALCULATED (quantity × factor)
+          // DO NOT multiply by quantity again!
+          const materialClimate = (material.impact_climate || 0);
+          const materialWater = (material.impact_water || 0);
+          const materialLand = (material.impact_land || 0);
+          const materialWaste = (material.impact_waste || 0);
 
           totalClimate += materialClimate;
           totalWater += materialWater;
