@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -20,6 +20,7 @@ import { CircularitySheet } from '@/components/vitality/CircularitySheet';
 import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
 import { generateLcaReportPdf } from '@/lib/pdf-generator';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/lib/supabaseClient';
 
 // Mock LCA Report Data
 const MOCK_LCA_REPORT = {
@@ -72,40 +73,115 @@ export default function ProductLcaReportPage() {
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [lcaData, setLcaData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data for evidence drawers - using metrics to ensure consistency
-  const waterConsumption = MOCK_METRICS.total_impacts.water_consumption;
-  const waterScarcityImpact = MOCK_METRICS.total_impacts.water_scarcity_aware;
+  // Fetch real LCA data for this product
+  useEffect(() => {
+    async function fetchLcaData() {
+      if (!productId) return;
 
-  const waterSourceItems = [
-    {
-      id: '1',
-      source: 'Primary Production (UK)',
-      location: 'Herefordshire, UK',
-      consumption: waterConsumption * 0.45,
-      riskFactor: 6.2,
-      riskLevel: 'low' as const,
-      netImpact: waterScarcityImpact * 0.10
-    },
-    {
-      id: '2',
-      source: 'Glass Manufacturing',
-      location: 'Castilla-La Mancha, Spain',
-      consumption: waterConsumption * 0.40,
-      riskFactor: 48.5,
-      riskLevel: 'high' as const,
-      netImpact: waterScarcityImpact * 0.82
-    },
-    {
-      id: '3',
-      source: 'Sugar Refining',
-      location: 'Thames Valley, UK',
-      consumption: waterConsumption * 0.15,
-      riskFactor: 7.8,
-      riskLevel: 'low' as const,
-      netImpact: waterScarcityImpact * 0.08
-    },
-  ];
+      try {
+        setLoading(true);
+
+        // Fetch the latest completed LCA for this product
+        const { data: lca, error: lcaError } = await supabase
+          .from('product_lcas')
+          .select('*')
+          .eq('product_id', productId)
+          .eq('status', 'completed')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lcaError) {
+          console.error('Error fetching LCA:', lcaError);
+          return;
+        }
+
+        if (lca) {
+          // Fetch materials for this LCA
+          const { data: materials, error: materialsError } = await supabase
+            .from('product_lca_materials')
+            .select('*')
+            .eq('product_lca_id', lca.id);
+
+          if (!materialsError && materials) {
+            lca.materials = materials;
+          }
+
+          setLcaData(lca);
+        }
+      } catch (error) {
+        console.error('Error fetching LCA data:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLcaData();
+  }, [productId]);
+
+  // Use real LCA data if available, otherwise use mock data
+  const impacts = lcaData?.aggregated_impacts || MOCK_METRICS.total_impacts;
+  const breakdown = lcaData?.aggregated_impacts?.breakdown;
+
+  const waterConsumption = impacts.water_consumption || MOCK_METRICS.total_impacts.water_consumption;
+  const waterScarcityImpact = impacts.water_scarcity_aware || MOCK_METRICS.total_impacts.water_scarcity_aware;
+
+  // Transform materials data into water source items
+  const waterSourceItems = lcaData?.materials?.length > 0
+    ? lcaData.materials.map((material: any, idx: number) => {
+        const waterImpact = Number(material.impact_water) || 0;
+        const waterScarcity = Number(material.impact_water_scarcity) || 0;
+        const totalWater = waterConsumption > 0 ? waterConsumption : 1;
+
+        let riskLevel: 'low' | 'medium' | 'high' = 'low';
+        if (waterScarcity > waterImpact * 20) {
+          riskLevel = 'high';
+        } else if (waterScarcity > waterImpact * 10) {
+          riskLevel = 'medium';
+        }
+
+        return {
+          id: String(idx + 1),
+          source: material.name,
+          location: material.origin_country || 'Unknown',
+          consumption: waterImpact,
+          riskFactor: waterScarcity > 0 && waterImpact > 0 ? (waterScarcity / waterImpact) : 10,
+          riskLevel: riskLevel,
+          netImpact: waterScarcity,
+        };
+      })
+    : [
+        {
+          id: '1',
+          source: 'Primary Production (UK)',
+          location: 'Herefordshire, UK',
+          consumption: waterConsumption * 0.45,
+          riskFactor: 6.2,
+          riskLevel: 'low' as const,
+          netImpact: waterScarcityImpact * 0.10
+        },
+        {
+          id: '2',
+          source: 'Glass Manufacturing',
+          location: 'Castilla-La Mancha, Spain',
+          consumption: waterConsumption * 0.40,
+          riskFactor: 48.5,
+          riskLevel: 'high' as const,
+          netImpact: waterScarcityImpact * 0.82
+        },
+        {
+          id: '3',
+          source: 'Sugar Refining',
+          location: 'Thames Valley, UK',
+          consumption: waterConsumption * 0.15,
+          riskFactor: 7.8,
+          riskLevel: 'low' as const,
+          netImpact: waterScarcityImpact * 0.08
+        },
+      ];
 
   const circularityPercentage = MOCK_METRICS.circularity_percentage;
   const estimatedTotalWaste = 0.45; // kg per unit
@@ -119,21 +195,39 @@ export default function ProductLcaReportPage() {
     { id: '4', stream: 'Process Waste', disposition: 'landfill' as const, mass: Math.round(linearWasteMass * 1000), circularityScore: 0 },
   ];
 
-  const totalLandUse = MOCK_METRICS.total_impacts.land_use;
+  const totalLandUse = impacts.land_use || MOCK_METRICS.total_impacts.land_use;
 
-  const landUseItems = [
-    { id: '1', ingredient: 'Sugar Beet', origin: 'UK', mass: 0.028, landIntensity: 1.8, totalFootprint: Math.round(0.028 * 1.8 * 1000) / 1000 },
-    { id: '2', ingredient: 'Elderflower', origin: 'Austria', mass: 0.004, landIntensity: 0.9, totalFootprint: Math.round(0.004 * 0.9 * 1000) / 1000 },
-    { id: '3', ingredient: 'Glass (Silica Sand)', origin: 'Spain', mass: 0.250, landIntensity: 5.2, totalFootprint: Math.round(0.250 * 5.2 * 1000) / 1000 },
-    { id: '4', ingredient: 'Citric Acid', origin: 'China', mass: 0.002, landIntensity: 12.5, totalFootprint: Math.round(0.002 * 12.5 * 1000) / 1000 },
-  ];
+  // Transform materials data into land use items
+  const landUseItems = lcaData?.materials?.length > 0
+    ? lcaData.materials
+        .filter((m: any) => Number(m.impact_land) > 0)
+        .map((material: any, idx: number) => {
+          const landImpact = Number(material.impact_land) || 0;
+          const quantity = Number(material.quantity) || 0;
+          const landIntensity = quantity > 0 ? landImpact / quantity : 0;
 
-  const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);
-  const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0);
-  const totalWaste = wasteStreams.reduce((sum, item) => sum + item.mass, 0) / 1000; // Convert to kg
-  const circularWaste = wasteStreams.reduce((sum, item) => sum + (item.mass * item.circularityScore / 100), 0) / 1000;
+          return {
+            id: String(idx + 1),
+            ingredient: material.name,
+            origin: material.origin_country || 'Unknown',
+            mass: quantity,
+            landIntensity: landIntensity,
+            totalFootprint: landImpact,
+          };
+        })
+    : [
+        { id: '1', ingredient: 'Sugar Beet', origin: 'UK', mass: 0.028, landIntensity: 1.8, totalFootprint: Math.round(0.028 * 1.8 * 1000) / 1000 },
+        { id: '2', ingredient: 'Elderflower', origin: 'Austria', mass: 0.004, landIntensity: 0.9, totalFootprint: Math.round(0.004 * 0.9 * 1000) / 1000 },
+        { id: '3', ingredient: 'Glass (Silica Sand)', origin: 'Spain', mass: 0.250, landIntensity: 5.2, totalFootprint: Math.round(0.250 * 5.2 * 1000) / 1000 },
+        { id: '4', ingredient: 'Citric Acid', origin: 'China', mass: 0.002, landIntensity: 12.5, totalFootprint: Math.round(0.002 * 12.5 * 1000) / 1000 },
+      ];
+
+  const totalWaterConsumption = waterSourceItems.reduce((sum: number, item: any) => sum + item.consumption, 0);
+  const totalWaterImpact = waterSourceItems.reduce((sum: number, item: any) => sum + item.netImpact, 0);
+  const totalWaste = wasteStreams.reduce((sum: number, item: any) => sum + item.mass, 0) / 1000; // Convert to kg
+  const circularWaste = wasteStreams.reduce((sum: number, item: any) => sum + (item.mass * item.circularityScore / 100), 0) / 1000;
   const circularityRate = (circularWaste / totalWaste) * 100;
-  const totalLandUseSum = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0);
+  const totalLandUseSum = landUseItems.reduce((sum: number, item: any) => sum + item.totalFootprint, 0);
 
   const handleDownloadPdf = async () => {
     try {
@@ -268,10 +362,38 @@ export default function ProductLcaReportPage() {
         {/* Tab A: Planet (Active) */}
         <TabsContent value="planet" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <ClimateCard metrics={MOCK_METRICS as any} loading={false} onViewBreakdown={() => setCarbonSheetOpen(true)} />
-            <WaterCard metrics={MOCK_METRICS as any} loading={false} onClick={() => setWaterSheetOpen(true)} />
-            <WasteCard metrics={MOCK_METRICS as any} loading={false} onClick={() => setCircularitySheetOpen(true)} />
-            <NatureCard metrics={MOCK_METRICS as any} loading={false} onClick={() => setNatureSheetOpen(true)} />
+            <ClimateCard
+              metrics={{
+                total_impacts: impacts,
+                total_products_assessed: 1,
+                csrd_compliant_percentage: 100,
+              } as any}
+              loading={loading}
+              onViewBreakdown={() => setCarbonSheetOpen(true)}
+            />
+            <WaterCard
+              metrics={{
+                total_impacts: impacts,
+                total_products_assessed: 1,
+              } as any}
+              loading={loading}
+              onClick={() => setWaterSheetOpen(true)}
+            />
+            <WasteCard
+              metrics={{
+                total_impacts: impacts,
+                circularity_percentage: MOCK_METRICS.circularity_percentage,
+              } as any}
+              loading={loading}
+              onClick={() => setCircularitySheetOpen(true)}
+            />
+            <NatureCard
+              metrics={{
+                total_impacts: impacts,
+              } as any}
+              loading={loading}
+              onClick={() => setNatureSheetOpen(true)}
+            />
           </div>
         </TabsContent>
 
@@ -381,8 +503,53 @@ export default function ProductLcaReportPage() {
       <CarbonBreakdownSheet
         open={carbonSheetOpen}
         onOpenChange={setCarbonSheetOpen}
-        scopeBreakdown={null}
-        totalCO2={MOCK_METRICS.total_impacts.climate_change_gwp100}
+        scopeBreakdown={breakdown?.by_scope ? {
+          scope1: breakdown.by_scope.scope1 || 0,
+          scope2: breakdown.by_scope.scope2 || 0,
+          scope3: breakdown.by_scope.scope3 || 0,
+        } : null}
+        totalCO2={impacts.climate_change_gwp100 || 0}
+        materialBreakdown={breakdown?.by_material?.map((m: any) => ({
+          name: m.name,
+          quantity: m.quantity,
+          unit: m.unit,
+          climate: m.emissions,
+          source: m.dataSource,
+        }))}
+        ghgBreakdown={breakdown?.by_ghg ? {
+          carbon_origin: {
+            fossil: breakdown.by_ghg.co2_fossil || 0,
+            biogenic: breakdown.by_ghg.co2_biogenic || 0,
+            land_use_change: 0,
+          },
+          gas_inventory: {
+            co2_fossil: breakdown.by_ghg.co2_fossil || 0,
+            co2_biogenic: breakdown.by_ghg.co2_biogenic || 0,
+            methane: breakdown.by_ghg.ch4 || 0,
+            nitrous_oxide: breakdown.by_ghg.n2o || 0,
+            hfc_pfc: 0,
+          },
+          gwp_factors: {
+            methane_gwp100: 28,
+            n2o_gwp100: 265,
+            method: 'IPCC AR6',
+          },
+        } : null}
+        lifecycleStageBreakdown={breakdown?.by_lifecycle_stage ? [
+          { stage_name: 'Raw Materials', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.raw_materials, percentage: 0, material_count: 0, top_contributors: [] },
+          { stage_name: 'Processing', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.processing, percentage: 0, material_count: 0, top_contributors: [] },
+          { stage_name: 'Packaging', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.packaging_stage, percentage: 0, material_count: 0, top_contributors: [] },
+          { stage_name: 'Distribution', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.distribution, percentage: 0, material_count: 0, top_contributors: [] },
+          { stage_name: 'Use Phase', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.use_phase, percentage: 0, material_count: 0, top_contributors: [] },
+          { stage_name: 'End of Life', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.end_of_life, percentage: 0, material_count: 0, top_contributors: [] },
+        ] : undefined}
+        facilityEmissionsBreakdown={breakdown?.by_facility?.map((f: any) => ({
+          facility_name: f.facility_name,
+          emissions: f.emissions,
+          percentage: f.percentage,
+          scope_1: f.scope1,
+          scope_2: f.scope2,
+        }))}
       />
 
       <WaterImpactSheet
