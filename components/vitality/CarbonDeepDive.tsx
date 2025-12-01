@@ -751,9 +751,12 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                         </TableHeader>
                         <TableBody>
                           {ingredients.map((material, idx) => {
-                            const emissionFactor = material.quantity > 0 ? material.climate / material.quantity : 0;
+                            const climateValue = material.climate ?? 0;
+                            const quantityValue = material.quantity ?? 0;
+                            const percentageValue = material.percentage ?? 0;
+                            const emissionFactor = quantityValue > 0 ? climateValue / quantityValue : 0;
                             return (
-                              <TableRow key={idx} className={material.percentage > 5 ? 'bg-orange-50/50' : ''}>
+                              <TableRow key={idx} className={percentageValue > 5 ? 'bg-orange-50/50' : ''}>
                                 <TableCell className="font-medium">
                                   {material.name}
                                   {material.warning && (
@@ -763,24 +766,24 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {material.quantity.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit}
+                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right text-xs text-muted-foreground">
-                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit}
+                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
-                                  {material.climate.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
+                                  {climateValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
                                     <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                                       <div
                                         className="h-full bg-green-500"
-                                        style={{ width: `${Math.min(material.percentage, 100)}%` }}
+                                        style={{ width: `${Math.min(percentageValue, 100)}%` }}
                                       />
                                     </div>
                                     <span className="text-xs font-medium w-12 text-right">
-                                      {material.percentage.toFixed(1)}%
+                                      {percentageValue.toFixed(1)}%
                                     </span>
                                   </div>
                                 </TableCell>
@@ -821,9 +824,12 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                         </TableHeader>
                         <TableBody>
                           {packaging.map((material, idx) => {
-                            const emissionFactor = material.quantity > 0 ? material.climate / material.quantity : 0;
+                            const climateValue = material.climate ?? 0;
+                            const quantityValue = material.quantity ?? 0;
+                            const percentageValue = material.percentage ?? 0;
+                            const emissionFactor = quantityValue > 0 ? climateValue / quantityValue : 0;
                             return (
-                              <TableRow key={idx} className={material.percentage > 5 ? 'bg-orange-50/50' : ''}>
+                              <TableRow key={idx} className={percentageValue > 5 ? 'bg-orange-50/50' : ''}>
                                 <TableCell className="font-medium">
                                   {material.name}
                                   {material.warning && (
@@ -833,24 +839,24 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {material.quantity.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit}
+                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right text-xs text-muted-foreground">
-                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit}
+                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
-                                  {material.climate.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
+                                  {climateValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
                                     <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
                                       <div
                                         className="h-full bg-blue-500"
-                                        style={{ width: `${Math.min(material.percentage, 100)}%` }}
+                                        style={{ width: `${Math.min(percentageValue, 100)}%` }}
                                       />
                                     </div>
                                     <span className="text-xs font-medium w-12 text-right">
-                                      {material.percentage.toFixed(1)}%
+                                      {percentageValue.toFixed(1)}%
                                     </span>
                                   </div>
                                 </TableCell>
