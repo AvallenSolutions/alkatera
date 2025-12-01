@@ -16,11 +16,17 @@ import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Database, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
+import { useOrganization } from "@/lib/organizationContext";
+import { toast } from "sonner";
 
 interface OpenLCAConfig {
   serverUrl: string;
   databaseName: string;
   enabled: boolean;
+  preferUnitProcesses?: boolean;
+  withRegionalization?: boolean;
+  defaultAllocationMethod?: string;
 }
 
 interface OpenLCAConfigDialogProps {
@@ -34,28 +40,48 @@ export function OpenLCAConfigDialog({
   onOpenChange,
   onSave,
 }: OpenLCAConfigDialogProps) {
+  const { currentOrganization } = useOrganization();
   const [config, setConfig] = useState<OpenLCAConfig>({
     serverUrl: "http://localhost:8080",
-    databaseName: "ecoinvent_3.9",
+    databaseName: "ecoinvent_312_cutoff",
     enabled: false,
+    preferUnitProcesses: true,
+    withRegionalization: true,
+    defaultAllocationMethod: "economic",
   });
   const [isTesting, setIsTesting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
   } | null>(null);
 
   useEffect(() => {
-    const savedConfig = localStorage.getItem("openlca_config");
-    if (savedConfig) {
-      try {
-        const parsed = JSON.parse(savedConfig);
-        setConfig(parsed);
-      } catch (error) {
-        console.error("Failed to parse saved OpenLCA config:", error);
-      }
+    if (open && currentOrganization?.id) {
+      loadConfiguration();
     }
-  }, [open]);
+  }, [open, currentOrganization?.id]);
+
+  const loadConfiguration = async () => {
+    if (!currentOrganization?.id) return;
+
+    const { data, error } = await supabase
+      .from('openlca_configurations')
+      .select('*')
+      .eq('organization_id', currentOrganization.id)
+      .single();
+
+    if (data && !error) {
+      setConfig({
+        serverUrl: data.server_url,
+        databaseName: data.database_name,
+        enabled: data.enabled,
+        preferUnitProcesses: data.prefer_unit_processes,
+        withRegionalization: data.with_regionalization,
+        defaultAllocationMethod: data.default_allocation_method,
+      });
+    }
+  };
 
   const testConnection = async () => {
     setIsTesting(true);
@@ -106,10 +132,58 @@ export function OpenLCAConfigDialog({
     }
   };
 
-  const handleSave = () => {
-    localStorage.setItem("openlca_config", JSON.stringify(config));
-    onSave?.(config);
-    onOpenChange(false);
+  const handleSave = async () => {
+    if (!currentOrganization?.id) {
+      toast.error('No organization selected');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      const { data: existing } = await supabase
+        .from('openlca_configurations')
+        .select('id')
+        .eq('organization_id', currentOrganization.id)
+        .single();
+
+      const configData = {
+        organization_id: currentOrganization.id,
+        server_url: config.serverUrl,
+        database_name: config.databaseName,
+        enabled: config.enabled,
+        prefer_unit_processes: config.preferUnitProcesses ?? true,
+        with_regionalization: config.withRegionalization ?? true,
+        default_allocation_method: config.defaultAllocationMethod || 'economic',
+        last_health_check: testResult?.success ? new Date().toISOString() : null,
+      };
+
+      let error;
+
+      if (existing) {
+        ({ error } = await supabase
+          .from('openlca_configurations')
+          .update(configData)
+          .eq('id', existing.id));
+      } else {
+        ({ error } = await supabase
+          .from('openlca_configurations')
+          .insert(configData));
+      }
+
+      if (error) {
+        throw error;
+      }
+
+      toast.success('OpenLCA configuration saved successfully');
+      onSave?.(config);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to save OpenLCA configuration:', error);
+      toast.error('Failed to save configuration');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -276,10 +350,19 @@ export function OpenLCAConfigDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save Configuration</Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Configuration'
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
