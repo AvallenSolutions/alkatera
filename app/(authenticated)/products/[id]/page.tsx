@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info } from "lucide-react";
+import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info, Calculator } from "lucide-react";
 import { ProductHeader } from "@/components/products/ProductHeader";
 import { OverviewTab } from "@/components/products/OverviewTab";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
@@ -132,12 +132,31 @@ export default function ProductDashboardPage() {
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-6">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between">
           <Button variant="ghost" onClick={() => router.push("/products")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Products
           </Button>
+
+          <Button
+            onClick={handleCalculate}
+            disabled={!isHealthy}
+            size="lg"
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Calculator className="mr-2 h-4 w-4" />
+            Calculate LCA
+          </Button>
         </div>
+
+        {!isHealthy && (
+          <Alert className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Please add ingredients and packaging to your product before calculating its environmental impact.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-3 max-w-2xl">
