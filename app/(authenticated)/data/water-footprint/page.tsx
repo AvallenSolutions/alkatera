@@ -361,7 +361,6 @@ export default function WaterFootprintPage() {
                     <SelectValue placeholder="Select facility (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No facility</SelectItem>
                     {facilities.map((facility) => (
                       <SelectItem key={facility.id} value={facility.id}>
                         {facility.name}

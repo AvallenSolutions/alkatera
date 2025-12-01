@@ -27,11 +27,10 @@ import {
   Building2,
   Warehouse,
   Truck,
-  Database,
   Flame,
   Droplet,
   Trash2,
-  Upload,
+  BarChart3,
 } from 'lucide-react'
 
 interface NavItem {
@@ -72,32 +71,25 @@ const navigationStructure: NavItem[] = [
         href: '/company/fleet',
         icon: Truck,
       },
-    ],
-  },
-  {
-    name: 'Data Entry',
-    href: '/data',
-    icon: Database,
-    children: [
       {
-        name: 'Scope 1 & 2',
+        name: 'Annual Footprint Builder',
+        href: '/reports/company-footprint/2024',
+        icon: BarChart3,
+      },
+      {
+        name: 'Scope 1 & 2 Data',
         href: '/data/scope-1-2',
         icon: Flame,
       },
       {
-        name: 'Waste & Circularity',
+        name: 'Waste Data',
         href: '/data/waste-and-circularity',
         icon: Trash2,
       },
       {
-        name: 'Water Footprint',
+        name: 'Water Data',
         href: '/data/water-footprint',
         icon: Droplet,
-      },
-      {
-        name: 'Data Ingest',
-        href: '/data/ingest',
-        icon: Upload,
       },
     ],
   },
