@@ -27,6 +27,7 @@ import {
   PopoverAnchor,
 } from "@/components/ui/popover";
 import { Database, Building2, Sprout, Search, Info, Loader2, Package, Tag, Grip, Box } from "lucide-react";
+import { toast } from "sonner";
 import { IngredientQuantityDialog } from "./IngredientQuantityDialog";
 import type { OpenLCAProcess, SupplierProduct, LcaSubStage, PackagingCategory } from "@/lib/types/lca";
 
@@ -79,14 +80,26 @@ const PACKAGING_CATEGORIES = [
 /**
  * Normalize quantity to kilograms for calculation
  * All emission factors in the database are per kg
+ * EXCEPT for count-based units (unit, units, piece, pieces, bottle, bottles)
+ * which should remain as-is (no conversion)
  */
 function normalizeQuantityToKg(quantity: number, unit: string): number {
-  const lowerUnit = unit.toLowerCase();
+  const lowerUnit = unit.toLowerCase().trim();
 
+  // Count-based units - NO conversion needed
+  if (lowerUnit === 'unit' || lowerUnit === 'units' ||
+      lowerUnit === 'piece' || lowerUnit === 'pieces' ||
+      lowerUnit === 'bottle' || lowerUnit === 'bottles' ||
+      lowerUnit === 'item' || lowerUnit === 'items') {
+    return quantity;
+  }
+
+  // Mass conversions to kg
   if (lowerUnit === 'g' || lowerUnit === 'grams') {
     return quantity / 1000;
   }
 
+  // Volume conversions to litres (assuming density = 1)
   if (lowerUnit === 'ml' || lowerUnit === 'millilitres' || lowerUnit === 'milliliters') {
     return quantity / 1000;
   }
@@ -95,6 +108,7 @@ function normalizeQuantityToKg(quantity: number, unit: string): number {
     return quantity;
   }
 
+  // Default: assume kg or unknown unit, return as-is
   return quantity;
 }
 
@@ -177,6 +191,23 @@ export function AssistedPackagingSearch({
   }, [searchQuery, debouncedSearch, selectedCategory]);
 
   const handleSupplierClick = (supplier: SupplierProduct) => {
+    // Defensive check: ensure carbon_intensity is available
+    if (!supplier.carbon_intensity || supplier.carbon_intensity === 0) {
+      console.warn('[AssistedPackagingSearch] Supplier product missing carbon_intensity:', {
+        name: supplier.name,
+        id: supplier.id,
+        carbon_intensity: supplier.carbon_intensity,
+      });
+      toast.error(`Supplier product "${supplier.name}" is missing carbon intensity data. Please contact the supplier for complete data.`);
+      return;
+    }
+
+    console.log('[AssistedPackagingSearch] Supplier selected:', {
+      name: supplier.name,
+      carbon_intensity: supplier.carbon_intensity,
+      unit: supplier.unit,
+    });
+
     setSelectedPackaging({
       name: supplier.name,
       data_source: 'supplier',
@@ -221,41 +252,59 @@ export function AssistedPackagingSearch({
     let calculatedImpactLand: number | undefined;
     let calculatedImpactWaste: number | undefined;
 
-    // Normalize quantity to kg for calculations
-    const quantityInKg = normalizeQuantityToKg(data.quantity, data.unit);
+    // Normalize quantity to kg for calculations (or keep as units for count-based)
+    const normalizedQuantity = normalizeQuantityToKg(data.quantity, data.unit);
 
-    if (selectedPackaging.data_source === 'supplier' && selectedPackaging.carbon_intensity) {
-      // Supplier data: carbon_intensity is per-kg, multiply by quantity
-      calculatedImpactClimate = selectedPackaging.carbon_intensity * quantityInKg;
+    console.log('[AssistedPackagingSearch] Quantity normalization:', {
+      inputQuantity: data.quantity,
+      inputUnit: data.unit,
+      normalizedQuantity: normalizedQuantity,
+      dataSource: selectedPackaging.data_source,
+    });
+
+    if (selectedPackaging.data_source === 'supplier') {
+      // Defensive check: carbon_intensity must exist and be non-zero
+      if (!selectedPackaging.carbon_intensity || selectedPackaging.carbon_intensity === 0) {
+        console.error('[AssistedPackagingSearch] CRITICAL: Supplier missing carbon_intensity!', {
+          name: selectedPackaging.name,
+          carbon_intensity: selectedPackaging.carbon_intensity,
+        });
+        toast.error('Cannot calculate impact: supplier carbon intensity is missing');
+        return;
+      }
+
+      // Supplier data: carbon_intensity is per-unit (kg or item), multiply by quantity
+      calculatedImpactClimate = selectedPackaging.carbon_intensity * normalizedQuantity;
 
       console.log('[AssistedPackagingSearch] Supplier data calculation:', {
         name: selectedPackaging.name,
         inputQuantity: data.quantity,
         inputUnit: data.unit,
-        normalizedQuantityKg: quantityInKg,
-        carbonIntensityPerKg: selectedPackaging.carbon_intensity,
+        normalizedQuantity: normalizedQuantity,
+        carbonIntensityPerUnit: selectedPackaging.carbon_intensity,
         calculatedTotalImpact: calculatedImpactClimate,
+        formula: `${selectedPackaging.carbon_intensity} × ${normalizedQuantity} = ${calculatedImpactClimate}`,
       });
     } else if (selectedPackaging.data_source === 'openlca') {
       // OpenLCA data: impacts are already calculated per unit, multiply by quantity
       calculatedImpactClimate = selectedPackaging.impact_climate
-        ? selectedPackaging.impact_climate * quantityInKg
+        ? selectedPackaging.impact_climate * normalizedQuantity
         : undefined;
       calculatedImpactWater = selectedPackaging.impact_water
-        ? selectedPackaging.impact_water * quantityInKg
+        ? selectedPackaging.impact_water * normalizedQuantity
         : undefined;
       calculatedImpactLand = selectedPackaging.impact_land
-        ? selectedPackaging.impact_land * quantityInKg
+        ? selectedPackaging.impact_land * normalizedQuantity
         : undefined;
       calculatedImpactWaste = selectedPackaging.impact_waste
-        ? selectedPackaging.impact_waste * quantityInKg
+        ? selectedPackaging.impact_waste * normalizedQuantity
         : undefined;
 
       console.log('[AssistedPackagingSearch] OpenLCA data calculation:', {
         name: selectedPackaging.name,
         inputQuantity: data.quantity,
         inputUnit: data.unit,
-        normalizedQuantityKg: quantityInKg,
+        normalizedQuantity: normalizedQuantity,
         impactFactors: {
           climate: selectedPackaging.impact_climate,
           water: selectedPackaging.impact_water,

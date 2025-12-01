@@ -6,25 +6,35 @@ import type { DataSource, ImpactSourceType } from './types/lca';
  * Normalize quantity and unit to kg
  * All impact factors in the database are per kg, so we need to convert
  * user input (which might be in grams) to kg before storing.
+ * EXCEPT for count-based units (unit, units, piece, pieces, bottle, bottles)
+ * which should be preserved as-is
  */
 function normalizeToKg(quantity: number, unit: string): { quantity: number; unit: string } {
-  const lowerUnit = unit.toLowerCase();
+  const lowerUnit = unit.toLowerCase().trim();
 
+  // Count-based units - preserve as-is, DO NOT convert to kg
+  if (lowerUnit === 'unit' || lowerUnit === 'units' ||
+      lowerUnit === 'piece' || lowerUnit === 'pieces' ||
+      lowerUnit === 'bottle' || lowerUnit === 'bottles' ||
+      lowerUnit === 'item' || lowerUnit === 'items') {
+    return { quantity, unit: lowerUnit };
+  }
+
+  // Mass conversions to kg
   if (lowerUnit === 'g' || lowerUnit === 'grams') {
     return { quantity: quantity / 1000, unit: 'kg' };
   }
 
+  // Volume conversions to kg (assuming density = 1)
   if (lowerUnit === 'ml' || lowerUnit === 'millilitres' || lowerUnit === 'milliliters') {
-    // Assuming density of 1 (water-like) for liquids
     return { quantity: quantity / 1000, unit: 'kg' };
   }
 
   if (lowerUnit === 'l' || lowerUnit === 'litres' || lowerUnit === 'liters') {
-    // Assuming density of 1 (water-like) for liquids
     return { quantity: quantity, unit: 'kg' };
   }
 
-  // Already in kg or unknown unit - return as is
+  // Already in kg or unknown unit - return as kg
   return { quantity, unit: 'kg' };
 }
 

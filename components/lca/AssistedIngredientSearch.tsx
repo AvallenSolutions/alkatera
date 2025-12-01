@@ -21,6 +21,7 @@ import {
   PopoverAnchor,
 } from "@/components/ui/popover";
 import { Database, Building2, Sprout, Search, Info, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { IngredientConfirmationPopover } from "./IngredientConfirmationPopover";
 import { PrimaryIngredientForm } from "./PrimaryIngredientForm";
 import { IngredientQuantityDialog } from "./IngredientQuantityDialog";
@@ -58,14 +59,26 @@ interface AssistedIngredientSearchProps {
 /**
  * Normalize quantity to kilograms for calculation
  * All emission factors in the database are per kg
+ * EXCEPT for count-based units (unit, units, piece, pieces, bottle, bottles)
+ * which should remain as-is (no conversion)
  */
 function normalizeQuantityToKg(quantity: number, unit: string): number {
-  const lowerUnit = unit.toLowerCase();
+  const lowerUnit = unit.toLowerCase().trim();
 
+  // Count-based units - NO conversion needed
+  if (lowerUnit === 'unit' || lowerUnit === 'units' ||
+      lowerUnit === 'piece' || lowerUnit === 'pieces' ||
+      lowerUnit === 'bottle' || lowerUnit === 'bottles' ||
+      lowerUnit === 'item' || lowerUnit === 'items') {
+    return quantity;
+  }
+
+  // Mass conversions to kg
   if (lowerUnit === 'g' || lowerUnit === 'grams') {
     return quantity / 1000;
   }
 
+  // Volume conversions to litres (assuming density = 1)
   if (lowerUnit === 'ml' || lowerUnit === 'millilitres' || lowerUnit === 'milliliters') {
     return quantity / 1000;
   }
@@ -74,6 +87,7 @@ function normalizeQuantityToKg(quantity: number, unit: string): number {
     return quantity;
   }
 
+  // Default: assume kg or unknown unit, return as-is
   return quantity;
 }
 
@@ -158,6 +172,23 @@ export function AssistedIngredientSearch({
   }, [searchQuery, debouncedSearch]);
 
   const handleSupplierClick = (supplier: SupplierProduct) => {
+    // Defensive check: ensure carbon_intensity is available
+    if (!supplier.carbon_intensity || supplier.carbon_intensity === 0) {
+      console.warn('[AssistedIngredientSearch] Supplier product missing carbon_intensity:', {
+        name: supplier.name,
+        id: supplier.id,
+        carbon_intensity: supplier.carbon_intensity,
+      });
+      toast.error(`Supplier product "${supplier.name}" is missing carbon intensity data. Please contact the supplier for complete data.`);
+      return;
+    }
+
+    console.log('[AssistedIngredientSearch] Supplier selected:', {
+      name: supplier.name,
+      carbon_intensity: supplier.carbon_intensity,
+      unit: supplier.unit,
+    });
+
     setSelectedIngredient({
       name: supplier.name,
       data_source: 'supplier',
@@ -256,41 +287,59 @@ export function AssistedIngredientSearch({
     let calculatedImpactLand: number | undefined;
     let calculatedImpactWaste: number | undefined;
 
-    // Normalize quantity to kg for calculations
-    const quantityInKg = normalizeQuantityToKg(data.quantity, data.unit);
+    // Normalize quantity to kg for calculations (or keep as units for count-based)
+    const normalizedQuantity = normalizeQuantityToKg(data.quantity, data.unit);
 
-    if (selectedIngredient.data_source === 'supplier' && selectedIngredient.carbon_intensity) {
-      // Supplier data: carbon_intensity is per-kg, multiply by quantity
-      calculatedImpactClimate = selectedIngredient.carbon_intensity * quantityInKg;
+    console.log('[AssistedIngredientSearch] Quantity normalization:', {
+      inputQuantity: data.quantity,
+      inputUnit: data.unit,
+      normalizedQuantity: normalizedQuantity,
+      dataSource: selectedIngredient.data_source,
+    });
+
+    if (selectedIngredient.data_source === 'supplier') {
+      // Defensive check: carbon_intensity must exist and be non-zero
+      if (!selectedIngredient.carbon_intensity || selectedIngredient.carbon_intensity === 0) {
+        console.error('[AssistedIngredientSearch] CRITICAL: Supplier missing carbon_intensity!', {
+          name: selectedIngredient.name,
+          carbon_intensity: selectedIngredient.carbon_intensity,
+        });
+        toast.error('Cannot calculate impact: supplier carbon intensity is missing');
+        return;
+      }
+
+      // Supplier data: carbon_intensity is per-unit (kg or item), multiply by quantity
+      calculatedImpactClimate = selectedIngredient.carbon_intensity * normalizedQuantity;
 
       console.log('[AssistedIngredientSearch] Supplier data calculation:', {
         name: selectedIngredient.name,
         inputQuantity: data.quantity,
         inputUnit: data.unit,
-        normalizedQuantityKg: quantityInKg,
-        carbonIntensityPerKg: selectedIngredient.carbon_intensity,
+        normalizedQuantity: normalizedQuantity,
+        carbonIntensityPerUnit: selectedIngredient.carbon_intensity,
         calculatedTotalImpact: calculatedImpactClimate,
+        formula: `${selectedIngredient.carbon_intensity} × ${normalizedQuantity} = ${calculatedImpactClimate}`,
       });
     } else if (selectedIngredient.data_source === 'openlca') {
       // OpenLCA data: impacts are already calculated per unit, multiply by quantity
       calculatedImpactClimate = selectedIngredient.impact_climate
-        ? selectedIngredient.impact_climate * quantityInKg
+        ? selectedIngredient.impact_climate * normalizedQuantity
         : undefined;
       calculatedImpactWater = selectedIngredient.impact_water
-        ? selectedIngredient.impact_water * quantityInKg
+        ? selectedIngredient.impact_water * normalizedQuantity
         : undefined;
       calculatedImpactLand = selectedIngredient.impact_land
-        ? selectedIngredient.impact_land * quantityInKg
+        ? selectedIngredient.impact_land * normalizedQuantity
         : undefined;
       calculatedImpactWaste = selectedIngredient.impact_waste
-        ? selectedIngredient.impact_waste * quantityInKg
+        ? selectedIngredient.impact_waste * normalizedQuantity
         : undefined;
 
       console.log('[AssistedIngredientSearch] OpenLCA data calculation:', {
         name: selectedIngredient.name,
         inputQuantity: data.quantity,
         inputUnit: data.unit,
-        normalizedQuantityKg: quantityInKg,
+        normalizedQuantity: normalizedQuantity,
         impactFactors: {
           climate: selectedIngredient.impact_climate,
           water: selectedIngredient.impact_water,
