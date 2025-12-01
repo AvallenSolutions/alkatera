@@ -124,25 +124,30 @@ export async function addIngredientToLCA(params: AddIngredientParams) {
 
     // Normalize quantity to kg (impact factors are per kg)
     const normalized = normalizeToKg(params.ingredient.quantity, params.ingredient.unit);
-    const conversionFactor = normalized.quantity / params.ingredient.quantity;
 
-    console.log(`[addIngredientToLCA] Unit conversion: ${params.ingredient.quantity} ${params.ingredient.unit} → ${normalized.quantity} ${normalized.unit} (factor: ${conversionFactor})`);
+    console.log(`[addIngredientToLCA] Unit conversion: ${params.ingredient.quantity} ${params.ingredient.unit} → ${normalized.quantity} ${normalized.unit}`);
 
-    // If impact factors are provided, they need to be adjusted for the normalized quantity
-    // Impact factors from staging are per-unit (e.g., per kg), so:
-    // final_impact = quantity_in_kg × factor_per_kg
-    const adjustedImpactClimate = params.ingredient.impact_climate
-      ? params.ingredient.impact_climate * conversionFactor
-      : null;
-    const adjustedImpactWater = params.ingredient.impact_water
-      ? params.ingredient.impact_water * conversionFactor
-      : null;
-    const adjustedImpactLand = params.ingredient.impact_land
-      ? params.ingredient.impact_land * conversionFactor
-      : null;
-    const adjustedImpactWaste = params.ingredient.impact_waste
-      ? params.ingredient.impact_waste * conversionFactor
-      : null;
+    // CRITICAL FIX: Impact values are ALREADY calculated as totals in the UI
+    // For supplier data: impact_climate = carbon_intensity × quantity_in_kg (calculated in AssistedIngredientSearch)
+    // For OpenLCA data: impact_climate = factor × quantity_in_kg (calculated in AssistedIngredientSearch)
+    // NO further multiplication needed - just pass through the values
+    const adjustedImpactClimate = params.ingredient.impact_climate || null;
+    const adjustedImpactWater = params.ingredient.impact_water || null;
+    const adjustedImpactLand = params.ingredient.impact_land || null;
+    const adjustedImpactWaste = params.ingredient.impact_waste || null;
+
+    console.log('[addIngredientToLCA] Impact values (pre-calculated totals):', {
+      name: params.ingredient.name,
+      dataSource: params.ingredient.data_source,
+      inputQuantity: params.ingredient.quantity,
+      inputUnit: params.ingredient.unit,
+      normalizedQuantity: normalized.quantity,
+      normalizedUnit: normalized.unit,
+      impactClimate: adjustedImpactClimate,
+      impactWater: adjustedImpactWater,
+      impactLand: adjustedImpactLand,
+      impactWaste: adjustedImpactWaste,
+    });
 
     const materialData: any = {
       product_lca_id: params.lcaId,

@@ -76,6 +76,28 @@ const PACKAGING_CATEGORIES = [
   { value: 'secondary', label: 'Secondary', icon: Box, description: 'Gift packs, delivery boxes' },
 ] as const;
 
+/**
+ * Normalize quantity to kilograms for calculation
+ * All emission factors in the database are per kg
+ */
+function normalizeQuantityToKg(quantity: number, unit: string): number {
+  const lowerUnit = unit.toLowerCase();
+
+  if (lowerUnit === 'g' || lowerUnit === 'grams') {
+    return quantity / 1000;
+  }
+
+  if (lowerUnit === 'ml' || lowerUnit === 'millilitres' || lowerUnit === 'milliliters') {
+    return quantity / 1000;
+  }
+
+  if (lowerUnit === 'l' || lowerUnit === 'litres' || lowerUnit === 'liters') {
+    return quantity;
+  }
+
+  return quantity;
+}
+
 export function AssistedPackagingSearch({
   lcaId,
   organizationId,
@@ -193,6 +215,62 @@ export function AssistedPackagingSearch({
   }) => {
     if (!selectedPackaging || !selectedCategory) return;
 
+    // CRITICAL FIX: Calculate total impact based on data source
+    let calculatedImpactClimate: number | undefined;
+    let calculatedImpactWater: number | undefined;
+    let calculatedImpactLand: number | undefined;
+    let calculatedImpactWaste: number | undefined;
+
+    // Normalize quantity to kg for calculations
+    const quantityInKg = normalizeQuantityToKg(data.quantity, data.unit);
+
+    if (selectedPackaging.data_source === 'supplier' && selectedPackaging.carbon_intensity) {
+      // Supplier data: carbon_intensity is per-kg, multiply by quantity
+      calculatedImpactClimate = selectedPackaging.carbon_intensity * quantityInKg;
+
+      console.log('[AssistedPackagingSearch] Supplier data calculation:', {
+        name: selectedPackaging.name,
+        inputQuantity: data.quantity,
+        inputUnit: data.unit,
+        normalizedQuantityKg: quantityInKg,
+        carbonIntensityPerKg: selectedPackaging.carbon_intensity,
+        calculatedTotalImpact: calculatedImpactClimate,
+      });
+    } else if (selectedPackaging.data_source === 'openlca') {
+      // OpenLCA data: impacts are already calculated per unit, multiply by quantity
+      calculatedImpactClimate = selectedPackaging.impact_climate
+        ? selectedPackaging.impact_climate * quantityInKg
+        : undefined;
+      calculatedImpactWater = selectedPackaging.impact_water
+        ? selectedPackaging.impact_water * quantityInKg
+        : undefined;
+      calculatedImpactLand = selectedPackaging.impact_land
+        ? selectedPackaging.impact_land * quantityInKg
+        : undefined;
+      calculatedImpactWaste = selectedPackaging.impact_waste
+        ? selectedPackaging.impact_waste * quantityInKg
+        : undefined;
+
+      console.log('[AssistedPackagingSearch] OpenLCA data calculation:', {
+        name: selectedPackaging.name,
+        inputQuantity: data.quantity,
+        inputUnit: data.unit,
+        normalizedQuantityKg: quantityInKg,
+        impactFactors: {
+          climate: selectedPackaging.impact_climate,
+          water: selectedPackaging.impact_water,
+          land: selectedPackaging.impact_land,
+          waste: selectedPackaging.impact_waste,
+        },
+        calculatedImpacts: {
+          climate: calculatedImpactClimate,
+          water: calculatedImpactWater,
+          land: calculatedImpactLand,
+          waste: calculatedImpactWaste,
+        },
+      });
+    }
+
     onPackagingConfirmed({
       name: selectedPackaging.name,
       data_source: selectedPackaging.data_source,
@@ -200,17 +278,16 @@ export function AssistedPackagingSearch({
       supplier_product_id: selectedPackaging.supplier_product_id,
       supplier_name: selectedPackaging.supplier_name,
       unit: data.unit,
-      carbon_intensity: selectedPackaging.carbon_intensity,
       quantity: data.quantity,
       lca_sub_stage_id: data.lca_sub_stage_id,
       origin_country: '',
       is_organic_certified: false,
       packaging_category: selectedCategory,
       label_printing_type: selectedCategory === 'label' ? labelPrintingType : undefined,
-      impact_climate: selectedPackaging.impact_climate,
-      impact_water: selectedPackaging.impact_water,
-      impact_land: selectedPackaging.impact_land,
-      impact_waste: selectedPackaging.impact_waste,
+      impact_climate: calculatedImpactClimate,
+      impact_water: calculatedImpactWater,
+      impact_land: calculatedImpactLand,
+      impact_waste: calculatedImpactWaste,
     });
 
     setSelectedPackaging(null);

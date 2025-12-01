@@ -55,6 +55,28 @@ interface AssistedIngredientSearchProps {
   disabled?: boolean;
 }
 
+/**
+ * Normalize quantity to kilograms for calculation
+ * All emission factors in the database are per kg
+ */
+function normalizeQuantityToKg(quantity: number, unit: string): number {
+  const lowerUnit = unit.toLowerCase();
+
+  if (lowerUnit === 'g' || lowerUnit === 'grams') {
+    return quantity / 1000;
+  }
+
+  if (lowerUnit === 'ml' || lowerUnit === 'millilitres' || lowerUnit === 'milliliters') {
+    return quantity / 1000;
+  }
+
+  if (lowerUnit === 'l' || lowerUnit === 'litres' || lowerUnit === 'liters') {
+    return quantity;
+  }
+
+  return quantity;
+}
+
 export function AssistedIngredientSearch({
   lcaId,
   organizationId,
@@ -228,6 +250,62 @@ export function AssistedIngredientSearch({
   }) => {
     if (!selectedIngredient) return;
 
+    // CRITICAL FIX: Calculate total impact based on data source
+    let calculatedImpactClimate: number | undefined;
+    let calculatedImpactWater: number | undefined;
+    let calculatedImpactLand: number | undefined;
+    let calculatedImpactWaste: number | undefined;
+
+    // Normalize quantity to kg for calculations
+    const quantityInKg = normalizeQuantityToKg(data.quantity, data.unit);
+
+    if (selectedIngredient.data_source === 'supplier' && selectedIngredient.carbon_intensity) {
+      // Supplier data: carbon_intensity is per-kg, multiply by quantity
+      calculatedImpactClimate = selectedIngredient.carbon_intensity * quantityInKg;
+
+      console.log('[AssistedIngredientSearch] Supplier data calculation:', {
+        name: selectedIngredient.name,
+        inputQuantity: data.quantity,
+        inputUnit: data.unit,
+        normalizedQuantityKg: quantityInKg,
+        carbonIntensityPerKg: selectedIngredient.carbon_intensity,
+        calculatedTotalImpact: calculatedImpactClimate,
+      });
+    } else if (selectedIngredient.data_source === 'openlca') {
+      // OpenLCA data: impacts are already calculated per unit, multiply by quantity
+      calculatedImpactClimate = selectedIngredient.impact_climate
+        ? selectedIngredient.impact_climate * quantityInKg
+        : undefined;
+      calculatedImpactWater = selectedIngredient.impact_water
+        ? selectedIngredient.impact_water * quantityInKg
+        : undefined;
+      calculatedImpactLand = selectedIngredient.impact_land
+        ? selectedIngredient.impact_land * quantityInKg
+        : undefined;
+      calculatedImpactWaste = selectedIngredient.impact_waste
+        ? selectedIngredient.impact_waste * quantityInKg
+        : undefined;
+
+      console.log('[AssistedIngredientSearch] OpenLCA data calculation:', {
+        name: selectedIngredient.name,
+        inputQuantity: data.quantity,
+        inputUnit: data.unit,
+        normalizedQuantityKg: quantityInKg,
+        impactFactors: {
+          climate: selectedIngredient.impact_climate,
+          water: selectedIngredient.impact_water,
+          land: selectedIngredient.impact_land,
+          waste: selectedIngredient.impact_waste,
+        },
+        calculatedImpacts: {
+          climate: calculatedImpactClimate,
+          water: calculatedImpactWater,
+          land: calculatedImpactLand,
+          waste: calculatedImpactWaste,
+        },
+      });
+    }
+
     onIngredientConfirmed({
       name: selectedIngredient.name,
       data_source: selectedIngredient.data_source,
@@ -235,15 +313,14 @@ export function AssistedIngredientSearch({
       supplier_product_id: selectedIngredient.supplier_product_id,
       supplier_name: selectedIngredient.supplier_name,
       unit: data.unit,
-      carbon_intensity: selectedIngredient.carbon_intensity,
       quantity: data.quantity,
       lca_sub_stage_id: data.lca_sub_stage_id,
       origin_country: '',
       is_organic_certified: false,
-      impact_climate: selectedIngredient.impact_climate,
-      impact_water: selectedIngredient.impact_water,
-      impact_land: selectedIngredient.impact_land,
-      impact_waste: selectedIngredient.impact_waste,
+      impact_climate: calculatedImpactClimate,
+      impact_water: calculatedImpactWater,
+      impact_land: calculatedImpactLand,
+      impact_waste: calculatedImpactWaste,
     });
 
     setSelectedIngredient(null);
