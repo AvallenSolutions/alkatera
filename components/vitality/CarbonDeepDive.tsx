@@ -37,12 +37,21 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
   }, [scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown]);
 
   // Check if we have any data to display
-  const hasData = scopeBreakdown || (materialBreakdown && materialBreakdown.length > 0) || ghgBreakdown;
+  const hasMaterialData = materialBreakdown && materialBreakdown.length > 0;
+  const hasGhgData = ghgBreakdown && ghgBreakdown.carbon_origin;
+  const hasScopeData = scopeBreakdown && (scopeBreakdown.scope1 > 0 || scopeBreakdown.scope2 > 0 || scopeBreakdown.scope3 > 0);
+  const hasLifecycleData = lifecycleStageBreakdown && lifecycleStageBreakdown.length > 0;
+  const hasFacilityData = facilityEmissionsBreakdown && facilityEmissionsBreakdown.length > 0;
+
+  // We have data if we have ANY of these
+  const hasData = hasMaterialData || hasGhgData || hasScopeData || hasLifecycleData || hasFacilityData;
 
   console.log('[Carbon DeepDive] hasData check:', hasData, '- Breakdown:', {
-    scopeBreakdown: !!scopeBreakdown,
+    scopeBreakdown: hasScopeData,
     materialCount: materialBreakdown?.length || 0,
-    ghg: !!ghgBreakdown
+    ghg: hasGhgData,
+    lifecycle: hasLifecycleData,
+    facilities: hasFacilityData,
   });
 
   if (!hasData) {

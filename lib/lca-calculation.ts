@@ -53,6 +53,7 @@ export async function runLcaCalculation(lcaId: string): Promise<{ success: boole
       firstMaterial: materials[0],
     });
 
+    // Call the calculation engine (for detailed calculation logs)
     const { data, error: functionError } = await supabase.functions.invoke('invoke-calculation-engine', {
       body: {
         lcaId,
@@ -63,23 +64,36 @@ export async function runLcaCalculation(lcaId: string): Promise<{ success: boole
     console.log('[runLcaCalculation] Edge function response:', { data, functionError });
 
     if (functionError) {
-      console.error('[runLcaCalculation] Edge function error:', functionError);
-      throw new Error(`Calculation failed: ${functionError.message}`);
+      console.warn('[runLcaCalculation] Edge function warning:', functionError);
+      // Don't throw error, continue to aggregation
     }
 
-    if (!data || !data.success) {
-      console.error('[runLcaCalculation] Edge function returned failure:', data);
-      throw new Error(data?.error || "Calculation failed");
+    if (data && !data.success) {
+      console.warn('[runLcaCalculation] Edge function returned warning:', data);
+      // Don't throw error, continue to aggregation
     }
 
-    const { error: updateError } = await supabase
-      .from('product_lcas')
-      .update({ status: 'completed' })
-      .eq('id', lcaId);
+    // Call the new aggregation function to calculate accurate impacts
+    console.log('[runLcaCalculation] Calling calculate-product-lca-impacts...');
+    const { data: impactsData, error: impactsError } = await supabase.functions.invoke('calculate-product-lca-impacts', {
+      body: {
+        product_lca_id: lcaId,
+      },
+    });
 
-    if (updateError) {
-      console.error('Failed to update LCA status:', updateError);
+    console.log('[runLcaCalculation] Impacts calculation response:', { impactsData, impactsError });
+
+    if (impactsError) {
+      console.error('[runLcaCalculation] Impacts calculation error:', impactsError);
+      throw new Error(`Failed to calculate impacts: ${impactsError.message}`);
     }
+
+    if (!impactsData || !impactsData.success) {
+      console.error('[runLcaCalculation] Impacts calculation returned failure:', impactsData);
+      throw new Error(impactsData?.error || "Failed to calculate impacts");
+    }
+
+    console.log('[runLcaCalculation] Successfully calculated impacts:', impactsData.aggregated_impacts);
 
     return { success: true };
   } catch (error) {

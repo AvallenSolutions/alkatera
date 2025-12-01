@@ -32,6 +32,7 @@ interface LcaData {
   system_boundary?: string;
   functional_unit?: string;
   created_at: string;
+  aggregated_impacts?: any;
 }
 
 interface CalculationLog {
@@ -75,10 +76,10 @@ export default function ResultsPage() {
         setIsLoading(true);
         setError(null);
 
-        // Fetch LCA data
+        // Fetch LCA data with aggregated impacts
         const { data: lca, error: lcaError } = await supabase
           .from('product_lcas')
-          .select('id, product_name, product_id, status, system_boundary, functional_unit, created_at')
+          .select('id, product_name, product_id, status, system_boundary, functional_unit, created_at, aggregated_impacts')
           .eq('id', lcaId)
           .maybeSingle();
 
@@ -126,49 +127,74 @@ export default function ResultsPage() {
 
   // Transform data for display
   const getMetrics = () => {
-    if (!calculationLog?.impact_metrics) {
-      // Calculate from materials if no calculation log
-      const totalClimate = materials.reduce((sum, m) => sum + (m.impact_climate || 0) * m.quantity, 0);
-      const totalWater = materials.reduce((sum, m) => sum + (m.impact_water || 0) * m.quantity, 0);
-      const totalLand = materials.reduce((sum, m) => sum + (m.impact_land || 0) * m.quantity, 0);
-      const totalWaste = materials.reduce((sum, m) => sum + (m.impact_waste || 0) * m.quantity, 0);
-
+    // Priority 1: Use aggregated_impacts from product_lcas (most accurate)
+    if (lcaData?.aggregated_impacts) {
+      const impacts = lcaData.aggregated_impacts;
       return {
         total_impacts: {
-          climate_change_gwp100: totalClimate,
-          water_consumption: totalWater,
-          water_scarcity_aware: totalWater * 4, // Rough estimate
-          land_use: totalLand,
-          terrestrial_ecotoxicity: 0,
-          freshwater_eutrophication: 0,
-          terrestrial_acidification: 0,
-          fossil_resource_scarcity: totalWaste * 0.5, // Rough estimate
+          climate_change_gwp100: impacts.climate_change_gwp100 || 0,
+          water_consumption: impacts.water_consumption || 0,
+          water_scarcity_aware: impacts.water_scarcity_aware || 0,
+          land_use: impacts.land_use || 0,
+          terrestrial_ecotoxicity: impacts.terrestrial_ecotoxicity || 0,
+          freshwater_eutrophication: impacts.freshwater_eutrophication || 0,
+          terrestrial_acidification: impacts.terrestrial_acidification || 0,
+          fossil_resource_scarcity: impacts.fossil_resource_scarcity || 0,
         },
-        circularity_percentage: 65, // Default estimate
+        circularity_percentage: impacts.circularity_percentage || 65,
         total_products_assessed: 1,
-        csrd_compliant_percentage: 80,
-        water_risk_level: 'low' as const,
-        land_footprint_total: totalLand,
+        csrd_compliant_percentage: 85,
+        water_risk_level: impacts.water_risk_level || 'low' as const,
+        land_footprint_total: impacts.land_use || 0,
+        breakdown: impacts.breakdown,
+        ghg_breakdown: impacts.ghg_breakdown,
       };
     }
 
-    const metrics = calculationLog.impact_metrics;
+    // Priority 2: Use calculation log if available
+    if (calculationLog?.impact_metrics) {
+      const metrics = calculationLog.impact_metrics;
+      return {
+        total_impacts: {
+          climate_change_gwp100: metrics.climate_change_gwp100 || 0,
+          water_consumption: metrics.water_consumption || 0,
+          water_scarcity_aware: metrics.water_scarcity_aware || metrics.water_consumption * 4,
+          land_use: metrics.land_use || 0,
+          terrestrial_ecotoxicity: metrics.terrestrial_ecotoxicity || 0,
+          freshwater_eutrophication: metrics.freshwater_eutrophication || 0,
+          terrestrial_acidification: metrics.terrestrial_acidification || 0,
+          fossil_resource_scarcity: metrics.fossil_resource_scarcity || 0,
+        },
+        circularity_percentage: metrics.circularity_percentage || 65,
+        total_products_assessed: 1,
+        csrd_compliant_percentage: 85,
+        water_risk_level: metrics.water_risk_level || 'low' as const,
+        land_footprint_total: metrics.land_use || 0,
+      };
+    }
+
+    // Priority 3: Fallback - Calculate from materials
+    const totalClimate = materials.reduce((sum, m) => sum + (m.impact_climate || 0), 0);
+    const totalWater = materials.reduce((sum, m) => sum + (m.impact_water || 0), 0);
+    const totalLand = materials.reduce((sum, m) => sum + (m.impact_land || 0), 0);
+    const totalWaste = materials.reduce((sum, m) => sum + (m.impact_waste || 0), 0);
+
     return {
       total_impacts: {
-        climate_change_gwp100: metrics.climate_change_gwp100 || 0,
-        water_consumption: metrics.water_consumption || 0,
-        water_scarcity_aware: metrics.water_scarcity_aware || metrics.water_consumption * 4,
-        land_use: metrics.land_use || 0,
-        terrestrial_ecotoxicity: metrics.terrestrial_ecotoxicity || 0,
-        freshwater_eutrophication: metrics.freshwater_eutrophication || 0,
-        terrestrial_acidification: metrics.terrestrial_acidification || 0,
-        fossil_resource_scarcity: metrics.fossil_resource_scarcity || 0,
+        climate_change_gwp100: totalClimate,
+        water_consumption: totalWater,
+        water_scarcity_aware: totalWater * 20,
+        land_use: totalLand,
+        terrestrial_ecotoxicity: 0,
+        freshwater_eutrophication: 0,
+        terrestrial_acidification: 0,
+        fossil_resource_scarcity: totalWaste * 0.5,
       },
-      circularity_percentage: metrics.circularity_percentage || 65,
+      circularity_percentage: 65,
       total_products_assessed: 1,
-      csrd_compliant_percentage: 85,
-      water_risk_level: metrics.water_risk_level || 'low' as const,
-      land_footprint_total: metrics.land_use || 0,
+      csrd_compliant_percentage: 80,
+      water_risk_level: 'low' as const,
+      land_footprint_total: totalLand,
     };
   };
 
