@@ -109,7 +109,7 @@ export function GoogleAddressInput({
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
     script.async = true;
     script.defer = true;
     script.onerror = () => {
@@ -119,7 +119,21 @@ export function GoogleAddressInput({
     };
 
     script.onload = () => {
-      initAutocomplete();
+      const checkPlacesLoaded = setInterval(() => {
+        if ((window as any).google?.maps?.places?.Autocomplete) {
+          clearInterval(checkPlacesLoaded);
+          initAutocomplete();
+        }
+      }, 50);
+
+      setTimeout(() => {
+        clearInterval(checkPlacesLoaded);
+        if (!(window as any).google?.maps?.places?.Autocomplete) {
+          console.error('Google Places library failed to load');
+          setScriptError(true);
+          setIsLoading(false);
+        }
+      }, 5000);
     };
 
     document.head.appendChild(script);
