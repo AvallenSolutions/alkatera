@@ -27,6 +27,7 @@ import { Building2, Users, FileCheck, ArrowRight, ArrowLeft, Check } from "lucid
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { COUNTRIES } from "@/lib/countries";
+import { GoogleAddressInput } from "@/components/ui/google-address-input";
 
 interface AddFacilityWizardProps {
   open: boolean;
@@ -82,6 +83,9 @@ export function AddFacilityWizard({
   const [addressCity, setAddressCity] = useState('');
   const [addressCountry, setAddressCountry] = useState('');
   const [addressPostcode, setAddressPostcode] = useState('');
+  const [addressLat, setAddressLat] = useState<number | null>(null);
+  const [addressLng, setAddressLng] = useState<number | null>(null);
+  const [locationSearchValue, setLocationSearchValue] = useState('');
   const [dataContracts, setDataContracts] = useState<DataContract[]>([]);
   const [selectedUtilityTypes, setSelectedUtilityTypes] = useState<Set<string>>(new Set());
 
@@ -100,8 +104,8 @@ export function AddFacilityWizard({
         toast.error('Please select at least one function');
         return;
       }
-      if (!addressLine1.trim() || !addressCity.trim() || !addressCountry.trim()) {
-        toast.error('Please complete the address fields');
+      if (!addressLat || !addressLng || !addressCity || !addressCountry) {
+        toast.error('Please select a location using the search');
         return;
       }
     }
@@ -155,6 +159,21 @@ export function AddFacilityWizard({
     }
   };
 
+  const handleAddressSelect = (address: {
+    formatted_address: string;
+    lat: number;
+    lng: number;
+    country_code: string;
+    city?: string;
+  }) => {
+    setLocationSearchValue(address.formatted_address);
+    setAddressLine1(address.formatted_address);
+    setAddressCity(address.city || '');
+    setAddressCountry(address.country_code);
+    setAddressLat(address.lat);
+    setAddressLng(address.lng);
+  };
+
   const handleSubmit = async () => {
     if (!operationalControl) return;
 
@@ -172,6 +191,8 @@ export function AddFacilityWizard({
           address_city: addressCity,
           address_country: addressCountry,
           address_postcode: addressPostcode,
+          address_lat: addressLat,
+          address_lng: addressLng,
         })
         .select()
         .single();
@@ -295,50 +316,21 @@ export function AddFacilityWizard({
               </div>
 
               <div>
-                <Label htmlFor="addressLine1">Street Address *</Label>
-                <Input
-                  id="addressLine1"
-                  placeholder="123 Brewery Lane"
-                  value={addressLine1}
-                  onChange={(e) => setAddressLine1(e.target.value)}
+                <Label htmlFor="location">Facility Location *</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Search for the city or factory address
+                </p>
+                <GoogleAddressInput
+                  value={locationSearchValue}
+                  onAddressSelect={handleAddressSelect}
+                  placeholder="Search for city or factory location..."
+                  required
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="addressCity">City *</Label>
-                  <Input
-                    id="addressCity"
-                    placeholder="London"
-                    value={addressCity}
-                    onChange={(e) => setAddressCity(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="addressPostcode">Postcode</Label>
-                  <Input
-                    id="addressPostcode"
-                    placeholder="SW1A 1AA"
-                    value={addressPostcode}
-                    onChange={(e) => setAddressPostcode(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="addressCountry">Country *</Label>
-                <Select value={addressCountry} onValueChange={setAddressCountry}>
-                  <SelectTrigger id="addressCountry">
-                    <SelectValue placeholder="Select country..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {COUNTRIES.map((country) => (
-                      <SelectItem key={country.value} value={country.label}>
-                        {country.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {addressLine1 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Selected: {addressLine1}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -450,11 +442,13 @@ export function AddFacilityWizard({
               </div>
 
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Address</p>
-                <p className="text-sm">
-                  {addressLine1}, {addressCity}, {addressCountry}
-                  {addressPostcode && `, ${addressPostcode}`}
-                </p>
+                <p className="text-sm font-medium text-muted-foreground">Location</p>
+                <p className="text-sm">{addressLine1}</p>
+                {addressCity && addressCountry && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {addressCity}, {addressCountry}
+                  </p>
+                )}
               </div>
 
               <div>
