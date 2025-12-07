@@ -21,12 +21,6 @@ interface GoogleAddressInputProps {
   required?: boolean;
 }
 
-declare global {
-  interface Window {
-    initGoogleMaps?: () => void;
-  }
-}
-
 export function GoogleAddressInput({
   value = '',
   onAddressSelect,
@@ -40,14 +34,14 @@ export function GoogleAddressInput({
   const [isLoading, setIsLoading] = useState(true);
   const [scriptError, setScriptError] = useState(false);
   const [inputValue, setInputValue] = useState(value);
-  const loadingRef = useRef(false);
+  const initializingRef = useRef(false);
 
   useEffect(() => {
     setInputValue(value);
   }, [value]);
 
   useEffect(() => {
-    if (disabled || loadingRef.current) {
+    if (disabled || initializingRef.current) {
       return;
     }
 
@@ -60,18 +54,57 @@ export function GoogleAddressInput({
       return;
     }
 
-    loadingRef.current = true;
+    initializingRef.current = true;
 
-    const initAutocomplete = async () => {
+    const loadScript = (): Promise<void> => {
+      return new Promise((resolve, reject) => {
+        if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+          resolve();
+          return;
+        }
+
+        const existingScript = document.getElementById('google-maps-script');
+
+        if (existingScript) {
+          existingScript.addEventListener('load', () => resolve());
+          existingScript.addEventListener('error', () => reject(new Error('Script failed to load')));
+          return;
+        }
+
+        const script = document.createElement('script');
+        script.id = 'google-maps-script';
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
+        script.async = true;
+        script.defer = true;
+
+        script.addEventListener('load', () => {
+          console.log('Google Maps script loaded successfully');
+          resolve();
+        });
+
+        script.addEventListener('error', () => {
+          console.error('Failed to load Google Maps script');
+          reject(new Error('Failed to load Google Maps script'));
+        });
+
+        document.head.appendChild(script);
+      });
+    };
+
+    const initializeAutocomplete = async () => {
       if (!inputRef.current) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const { Autocomplete } = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
+        await loadScript();
 
-        const autocomplete = new Autocomplete(inputRef.current, {
+        if (!google.maps || !google.maps.places) {
+          throw new Error('Google Maps Places library not available');
+        }
+
+        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
           types: ['geocode', 'establishment'],
           fields: ['address_components', 'geometry', 'formatted_address', 'name', 'types'],
         });
@@ -83,6 +116,7 @@ export function GoogleAddressInput({
 
         autocompleteRef.current = autocomplete;
         setIsLoading(false);
+        console.log('Autocomplete initialized successfully');
       } catch (error) {
         console.error('Error initializing autocomplete:', error);
         setScriptError(true);
@@ -90,44 +124,7 @@ export function GoogleAddressInput({
       }
     };
 
-    const loadGoogleMaps = () => {
-      if (typeof google !== 'undefined' && google.maps) {
-        initAutocomplete();
-        return;
-      }
-
-      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-      if (existingScript) {
-        const waitForGoogle = setInterval(() => {
-          if (typeof google !== 'undefined' && google.maps) {
-            clearInterval(waitForGoogle);
-            initAutocomplete();
-          }
-        }, 100);
-
-        setTimeout(() => {
-          clearInterval(waitForGoogle);
-          if (typeof google === 'undefined' || !google.maps) {
-            setScriptError(true);
-            setIsLoading(false);
-          }
-        }, 10000);
-        return;
-      }
-
-      (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
-        key: apiKey,
-        v: "weekly"
-      });
-
-      initAutocomplete().catch(err => {
-        console.error('Failed to initialize Google Maps:', err);
-        setScriptError(true);
-        setIsLoading(false);
-      });
-    };
-
-    loadGoogleMaps();
+    initializeAutocomplete();
 
     return () => {
       if (autocompleteRef.current) {
@@ -272,6 +269,7 @@ export function GoogleAddressInput({
         className={`pl-10 ${className}`}
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
+        autoComplete="off"
       />
     </div>
   );
