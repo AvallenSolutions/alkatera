@@ -5,6 +5,10 @@ const nextConfig = {
   },
   images: { unoptimized: true },
   trailingSlash: true,
+  swcMinify: false,
+  compiler: {
+    removeConsole: false,
+  },
 };
 
 module.exports = nextConfig;
