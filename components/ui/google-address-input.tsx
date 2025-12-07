@@ -44,16 +44,18 @@ export function GoogleAddressInput({
   useEffect(() => {
     if (disabled) return;
 
-    const initAutocomplete = () => {
+    const initAutocomplete = async () => {
       if (!inputRef.current) return;
 
       try {
         const google = (window as any).google;
-        if (!google || !google.maps || !google.maps.places) {
-          throw new Error('Google Maps Places library not loaded');
+        if (!google?.maps?.importLibrary) {
+          throw new Error('Google Maps not loaded');
         }
 
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
+        const { Autocomplete } = await google.maps.importLibrary("places");
+
+        const autocomplete = new Autocomplete(inputRef.current, {
           types: ['geocode', 'establishment'],
           fields: ['address_components', 'geometry', 'formatted_address', 'name', 'types'],
         });
@@ -72,11 +74,6 @@ export function GoogleAddressInput({
       }
     };
 
-    if ((window as any).google?.maps?.places?.Autocomplete) {
-      initAutocomplete();
-      return;
-    }
-
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
     if (!apiKey) {
@@ -89,54 +86,60 @@ export function GoogleAddressInput({
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
 
     if (existingScript) {
-      const checkGoogleLoaded = setInterval(() => {
-        if ((window as any).google?.maps?.places?.Autocomplete) {
+      if ((window as any).google?.maps?.importLibrary) {
+        initAutocomplete();
+      } else {
+        const checkGoogleLoaded = setInterval(() => {
+          if ((window as any).google?.maps?.importLibrary) {
+            clearInterval(checkGoogleLoaded);
+            initAutocomplete();
+          }
+        }, 100);
+
+        setTimeout(() => {
           clearInterval(checkGoogleLoaded);
-          initAutocomplete();
-        }
-      }, 100);
+          if (!(window as any).google?.maps?.importLibrary) {
+            console.error('Google Maps API failed to load in time');
+            setScriptError(true);
+            setIsLoading(false);
+          }
+        }, 10000);
 
-      setTimeout(() => {
-        clearInterval(checkGoogleLoaded);
-        if (!(window as any).google?.maps?.places?.Autocomplete) {
-          console.error('Google Maps API failed to load in time');
-          setScriptError(true);
-          setIsLoading(false);
-        }
-      }, 10000);
-
-      return () => clearInterval(checkGoogleLoaded);
+        return () => clearInterval(checkGoogleLoaded);
+      }
+      return;
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async`;
     script.async = true;
     script.defer = true;
+
     script.onerror = () => {
       console.error('Failed to load Google Maps script');
       setScriptError(true);
       setIsLoading(false);
     };
 
-    script.onload = () => {
-      const checkPlacesLoaded = setInterval(() => {
-        if ((window as any).google?.maps?.places?.Autocomplete) {
-          clearInterval(checkPlacesLoaded);
-          initAutocomplete();
-        }
-      }, 50);
-
-      setTimeout(() => {
-        clearInterval(checkPlacesLoaded);
-        if (!(window as any).google?.maps?.places?.Autocomplete) {
-          console.error('Google Places library failed to load');
-          setScriptError(true);
-          setIsLoading(false);
-        }
-      }, 5000);
-    };
-
     document.head.appendChild(script);
+
+    const checkGoogleLoaded = setInterval(() => {
+      if ((window as any).google?.maps?.importLibrary) {
+        clearInterval(checkGoogleLoaded);
+        initAutocomplete();
+      }
+    }, 100);
+
+    setTimeout(() => {
+      clearInterval(checkGoogleLoaded);
+      if (!(window as any).google?.maps?.importLibrary) {
+        console.error('Google Maps API failed to load in time');
+        setScriptError(true);
+        setIsLoading(false);
+      }
+    }, 10000);
+
+    return () => clearInterval(checkGoogleLoaded);
   }, [disabled]);
 
   const getLocalityLevel = (place: any): 'city' | 'region' | 'country' => {
