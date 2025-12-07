@@ -56,10 +56,10 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   if (authLoading || isOrganizationLoading) {
     console.log('⏳ AppLayout: Loading...', { authLoading, isOrganizationLoading })
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+      <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-slate-600 dark:text-slate-400" />
-          <p className="text-sm text-muted-foreground">Loading...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-neon-lime" />
+          <p className="text-sm text-muted-foreground font-data">Loading...</p>
         </div>
       </main>
     )
@@ -74,7 +74,7 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0',
@@ -84,7 +84,7 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
 
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -95,7 +95,7 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
           isMobileMenuOpen={isMobileMenuOpen}
         />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-white dark:bg-slate-950">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
             {children}
           </div>

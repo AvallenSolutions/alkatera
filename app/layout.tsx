@@ -1,11 +1,28 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Lora, JetBrains_Mono } from 'next/font/google';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { OrganizationProvider } from '@/lib/organizationContext';
 import { Toaster } from '@/components/ui/toaster';
+import { ThemeProvider } from 'next-themes';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-body',
+  display: 'swap',
+});
+
+const lora = Lora({
+  subsets: ['latin'],
+  variable: '--font-heading',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-data',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'AlkaTera',
@@ -18,14 +35,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <AuthProvider>
-          <OrganizationProvider>
-            {children}
-            <Toaster />
-          </OrganizationProvider>
-        </AuthProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} font-body`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange={false}
+        >
+          <AuthProvider>
+            <OrganizationProvider>
+              {children}
+              <Toaster />
+            </OrganizationProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
