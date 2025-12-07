@@ -1,9 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { MapPin, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface GoogleAddressInputProps {
   value?: string;
@@ -21,6 +33,15 @@ interface GoogleAddressInputProps {
   required?: boolean;
 }
 
+interface PlacePrediction {
+  place_id: string;
+  description: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
+}
+
 export function GoogleAddressInput({
   value = '',
   onAddressSelect,
@@ -29,113 +50,75 @@ export function GoogleAddressInput({
   className = '',
   required = false,
 }: GoogleAddressInputProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [scriptError, setScriptError] = useState(false);
   const [inputValue, setInputValue] = useState(value);
-  const initializingRef = useRef(false);
+  const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setInputValue(value);
   }, [value]);
 
-  useEffect(() => {
-    if (disabled || initializingRef.current) {
+  const fetchPredictions = useCallback(async (input: string) => {
+    if (!input || input.length < 3) {
+      setPredictions([]);
       return;
     }
 
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
-    if (!apiKey) {
-      console.error('Google Maps API key not found');
-      setScriptError(true);
+    abortControllerRef.current = new AbortController();
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `/api/places/autocomplete?input=${encodeURIComponent(input)}`,
+        { signal: abortControllerRef.current.signal }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch suggestions');
+      }
+
+      const data = await response.json();
+
+      if (data.status === 'ZERO_RESULTS') {
+        setPredictions([]);
+      } else if (data.predictions) {
+        setPredictions(data.predictions);
+        setIsOpen(true);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Error fetching predictions:', err);
+        setError(err.message);
+      }
+    } finally {
       setIsLoading(false);
-      return;
+    }
+  }, []);
+
+  const handleInputChange = (newValue: string) => {
+    setInputValue(newValue);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
 
-    initializingRef.current = true;
+    debounceTimerRef.current = setTimeout(() => {
+      fetchPredictions(newValue);
+    }, 300);
+  };
 
-    const loadScript = (): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        if (typeof google !== 'undefined' && google.maps && google.maps.places) {
-          resolve();
-          return;
-        }
-
-        const existingScript = document.getElementById('google-maps-script');
-
-        if (existingScript) {
-          existingScript.addEventListener('load', () => resolve());
-          existingScript.addEventListener('error', () => reject(new Error('Script failed to load')));
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.id = 'google-maps-script';
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=Function.prototype`;
-        script.async = true;
-        script.defer = true;
-
-        script.addEventListener('load', () => {
-          console.log('Google Maps script loaded successfully');
-          resolve();
-        });
-
-        script.addEventListener('error', () => {
-          console.error('Failed to load Google Maps script');
-          reject(new Error('Failed to load Google Maps script'));
-        });
-
-        document.head.appendChild(script);
-      });
-    };
-
-    const initializeAutocomplete = async () => {
-      if (!inputRef.current) {
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        await loadScript();
-
-        if (!google.maps || !google.maps.places) {
-          throw new Error('Google Maps Places library not available');
-        }
-
-        const autocomplete = new google.maps.places.Autocomplete(inputRef.current, {
-          types: ['geocode', 'establishment'],
-          fields: ['address_components', 'geometry', 'formatted_address', 'name', 'types'],
-        });
-
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          handlePlaceSelect(place);
-        });
-
-        autocompleteRef.current = autocomplete;
-        setIsLoading(false);
-        console.log('Autocomplete initialized successfully');
-      } catch (error) {
-        console.error('Error initializing autocomplete:', error);
-        setScriptError(true);
-        setIsLoading(false);
-      }
-    };
-
-    initializeAutocomplete();
-
-    return () => {
-      if (autocompleteRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      }
-    };
-  }, [disabled]);
-
-  const getLocalityLevel = (place: google.maps.places.PlaceResult): 'city' | 'region' | 'country' => {
-    const types = place.types || [];
-
+  const getLocalityLevel = (types: string[]): 'city' | 'region' | 'country' => {
     if (
       types.includes('locality') ||
       types.includes('sublocality') ||
@@ -160,21 +143,16 @@ export function GoogleAddressInput({
     return 'city';
   };
 
-  const extractCountryCode = (place: google.maps.places.PlaceResult): string => {
-    const addressComponents = place.address_components || [];
-
+  const extractCountryCode = (addressComponents: any[]): string => {
     for (const component of addressComponents) {
       if (component.types.includes('country')) {
         return component.short_name || '';
       }
     }
-
     return '';
   };
 
-  const extractCity = (place: google.maps.places.PlaceResult): string | undefined => {
-    const addressComponents = place.address_components || [];
-
+  const extractCity = (addressComponents: any[]): string | undefined => {
     for (const component of addressComponents) {
       if (
         component.types.includes('locality') ||
@@ -184,58 +162,82 @@ export function GoogleAddressInput({
         return component.long_name || '';
       }
     }
-
     return undefined;
   };
 
-  const handlePlaceSelect = (place: google.maps.places.PlaceResult) => {
-    if (!place || !place.geometry || !place.geometry.location) {
-      toast.error('Please select a location from the dropdown suggestions');
-      return;
-    }
+  const handleSelectPlace = async (prediction: PlacePrediction) => {
+    try {
+      setIsLoading(true);
+      setIsOpen(false);
 
-    const localityLevel = getLocalityLevel(place);
+      const response = await fetch(
+        `/api/places/details?place_id=${encodeURIComponent(prediction.place_id)}`
+      );
 
-    if (localityLevel === 'country' || localityLevel === 'region') {
-      toast.error('Please select a more specific location (city or factory name)', {
-        description: 'We need at least city-level precision for accurate transport calculations.',
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch place details');
+      }
+
+      const data = await response.json();
+      const place = data.result;
+
+      if (!place || !place.geometry || !place.geometry.location) {
+        throw new Error('Invalid place data received');
+      }
+
+      const localityLevel = getLocalityLevel(place.types || []);
+
+      if (localityLevel === 'country' || localityLevel === 'region') {
+        toast.error('Please select a more specific location (city or factory name)', {
+          description: 'We need at least city-level precision for accurate transport calculations.',
+        });
+        setInputValue('');
+        return;
+      }
+
+      const lat = place.geometry.location.lat;
+      const lng = place.geometry.location.lng;
+      const country_code = extractCountryCode(place.address_components || []);
+      const city = extractCity(place.address_components || []);
+      const formatted_address = place.formatted_address || place.name || '';
+
+      setInputValue(formatted_address);
+
+      onAddressSelect({
+        formatted_address,
+        lat,
+        lng,
+        country_code,
+        city,
+        locality_level: localityLevel,
       });
 
-      if (inputRef.current) {
-        inputRef.current.value = '';
-        setInputValue('');
-      }
-      return;
+      toast.success('Location selected successfully', {
+        description: formatted_address,
+      });
+    } catch (err: any) {
+      console.error('Error selecting place:', err);
+      toast.error('Failed to select location', {
+        description: err.message,
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    const lat = place.geometry.location.lat();
-    const lng = place.geometry.location.lng();
-    const country_code = extractCountryCode(place);
-    const city = extractCity(place);
-    const formatted_address = place.formatted_address || place.name || '';
-
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      toast.error('Invalid coordinates received. Please try again.');
-      return;
-    }
-
-    setInputValue(formatted_address);
-
-    onAddressSelect({
-      formatted_address,
-      lat,
-      lng,
-      country_code,
-      city,
-      locality_level: localityLevel,
-    });
-
-    toast.success('Location selected successfully', {
-      description: formatted_address,
-    });
   };
 
-  if (scriptError) {
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  if (error && error.includes('API key')) {
     return (
       <div className="relative">
         <div className="flex items-center gap-2 px-3 py-2 border border-destructive rounded-md bg-destructive/10">
@@ -248,29 +250,70 @@ export function GoogleAddressInput({
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 px-3 py-2 border rounded-md">
-        <Loader2 className="h-4 w-4 text-muted-foreground animate-spin" />
-        <span className="text-sm text-muted-foreground">Loading location search...</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative">
-      <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-      <Input
-        ref={inputRef}
-        type="text"
-        placeholder={placeholder}
-        disabled={disabled}
-        required={required}
-        className={`pl-10 ${className}`}
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        autoComplete="off"
-      />
-    </div>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <div className="relative">
+          <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+          {isLoading && (
+            <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground animate-spin" />
+          )}
+          <Input
+            type="text"
+            placeholder={placeholder}
+            disabled={disabled}
+            required={required}
+            className={`pl-10 ${isLoading ? 'pr-10' : ''} ${className}`}
+            value={inputValue}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={() => {
+              if (predictions.length > 0) {
+                setIsOpen(true);
+              }
+            }}
+            autoComplete="off"
+          />
+        </div>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+        <Command>
+          <CommandList>
+            {predictions.length === 0 && !isLoading && inputValue.length >= 3 && (
+              <CommandEmpty>No locations found. Try a different search.</CommandEmpty>
+            )}
+            {predictions.length === 0 && !isLoading && inputValue.length < 3 && (
+              <CommandEmpty>Type at least 3 characters to search...</CommandEmpty>
+            )}
+            {isLoading && (
+              <div className="py-6 text-center text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+                Searching...
+              </div>
+            )}
+            {predictions.length > 0 && (
+              <CommandGroup>
+                {predictions.map((prediction) => (
+                  <CommandItem
+                    key={prediction.place_id}
+                    onSelect={() => handleSelectPlace(prediction)}
+                    className="cursor-pointer"
+                  >
+                    <MapPin className="mr-2 h-4 w-4 flex-shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="font-medium">
+                        {prediction.structured_formatting.main_text}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {prediction.structured_formatting.secondary_text}
+                      </span>
+                    </div>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
