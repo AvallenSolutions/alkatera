@@ -15,8 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Building2, Database, Sprout, Info } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { GoogleAddressInput } from "@/components/ui/google-address-input";
 import { COUNTRIES } from "@/lib/countries";
 import type { DataSource } from "@/lib/types/lca";
 
@@ -30,6 +31,10 @@ export interface IngredientFormData {
   amount: number | string;
   unit: string;
   origin_country: string;
+  origin_address?: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  origin_country_code?: string;
   is_organic_certified: boolean;
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
@@ -195,28 +200,6 @@ export function IngredientFormCard({
             </div>
           </div>
 
-          <div>
-            <Label htmlFor={`origin-${ingredient.tempId}`}>Origin Country</Label>
-            <Select
-              value={ingredient.origin_country}
-              onValueChange={(value) => onUpdate(ingredient.tempId, { origin_country: value })}
-            >
-              <SelectTrigger id={`origin-${ingredient.tempId}`}>
-                <SelectValue placeholder="Select country..." />
-              </SelectTrigger>
-              <SelectContent>
-                {COUNTRIES.map((country) => (
-                  <SelectItem key={country.value} value={country.label}>
-                    {country.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">
-              Country or region of origin
-            </p>
-          </div>
-
           <div className="flex items-center space-x-2">
             <Checkbox
               id={`organic-${ingredient.tempId}`}
@@ -233,36 +216,68 @@ export function IngredientFormCard({
             </Label>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t">
-            <div>
-              <Label htmlFor={`transport-${ingredient.tempId}`}>Transport Mode</Label>
-              <Select
-                value={ingredient.transport_mode}
-                onValueChange={(value: any) => onUpdate(ingredient.tempId, { transport_mode: value })}
-              >
-                <SelectTrigger id={`transport-${ingredient.tempId}`}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="truck">Truck</SelectItem>
-                  <SelectItem value="train">Train</SelectItem>
-                  <SelectItem value="ship">Ship</SelectItem>
-                  <SelectItem value="air">Air</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="pt-2 border-t">
+            <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+              <MapPin className="h-4 w-4" />
+              Origin & Logistics
+            </h4>
 
-            <div>
-              <Label htmlFor={`distance-${ingredient.tempId}`}>Distance (km)</Label>
-              <Input
-                id={`distance-${ingredient.tempId}`}
-                type="number"
-                step="1"
-                min="0"
-                placeholder="0"
-                value={ingredient.distance_km}
-                onChange={(e) => onUpdate(ingredient.tempId, { distance_km: e.target.value })}
-              />
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor={`origin-address-${ingredient.tempId}`}>
+                  Where is this manufactured? (City or Factory Name)
+                </Label>
+                <GoogleAddressInput
+                  value={ingredient.origin_address || ''}
+                  placeholder="e.g., Munich, Germany or Yorkshire Maltings, UK"
+                  onAddressSelect={(address) => {
+                    onUpdate(ingredient.tempId, {
+                      origin_address: address.formatted_address,
+                      origin_lat: address.lat,
+                      origin_lng: address.lng,
+                      origin_country_code: address.country_code,
+                      origin_country: address.formatted_address,
+                    });
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Search for the city or factory where this ingredient is produced.
+                  We need at least city-level accuracy for transport calculations.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor={`transport-${ingredient.tempId}`}>Transport Mode</Label>
+                  <Select
+                    value={ingredient.transport_mode}
+                    onValueChange={(value: any) => onUpdate(ingredient.tempId, { transport_mode: value })}
+                  >
+                    <SelectTrigger id={`transport-${ingredient.tempId}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="truck">Truck</SelectItem>
+                      <SelectItem value="train">Train</SelectItem>
+                      <SelectItem value="ship">Ship</SelectItem>
+                      <SelectItem value="air">Air</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor={`distance-${ingredient.tempId}`}>Distance (km)</Label>
+                  <Input
+                    id={`distance-${ingredient.tempId}`}
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="0"
+                    value={ingredient.distance_km}
+                    onChange={(e) => onUpdate(ingredient.tempId, { distance_km: e.target.value })}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

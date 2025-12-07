@@ -180,6 +180,10 @@ export interface ProductLcaMaterial {
   data_source_id?: string | null;
   supplier_product_id?: string | null;
   origin_country?: string | null;
+  origin_address?: string | null;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
+  origin_country_code?: string | null;
   is_organic_certified?: boolean;
   packaging_category?: PackagingCategory | null;
   label_printing_type?: string | null;
@@ -233,6 +237,10 @@ export interface SupplierProduct {
   carbon_intensity?: number | null;
   product_code?: string | null;
   supplier_name?: string;
+  origin_address?: string | null;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
+  origin_country_code?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

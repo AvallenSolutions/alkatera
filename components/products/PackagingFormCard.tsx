@@ -14,8 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { GoogleAddressInput } from "@/components/ui/google-address-input";
 import { COUNTRIES } from "@/lib/countries";
 import type { DataSource, PackagingCategory } from "@/lib/types/lca";
 
@@ -33,6 +34,10 @@ export interface PackagingFormData {
   printing_process: string;
   net_weight_g: number | string;
   origin_country: string;
+  origin_address?: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  origin_country_code?: string;
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   carbon_intensity?: number;
@@ -296,28 +301,31 @@ export function PackagingFormCard({
               </div>
 
               <div className="pt-2 border-t">
-                <h4 className="text-sm font-medium mb-3">Logistics</h4>
+                <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Origin & Logistics
+                </h4>
 
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor={`origin-${packaging.tempId}`}>Origin Country</Label>
-                    <Select
-                      value={packaging.origin_country}
-                      onValueChange={(value) => onUpdate(packaging.tempId, { origin_country: value })}
-                    >
-                      <SelectTrigger id={`origin-${packaging.tempId}`}>
-                        <SelectValue placeholder="Select country..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COUNTRIES.map((country) => (
-                          <SelectItem key={country.value} value={country.label}>
-                            {country.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor={`origin-address-${packaging.tempId}`}>
+                      Where is this manufactured? (City or Factory Name)
+                    </Label>
+                    <GoogleAddressInput
+                      value={packaging.origin_address || ''}
+                      placeholder="e.g., Shanghai, China or Birmingham Glass Factory, UK"
+                      onAddressSelect={(address) => {
+                        onUpdate(packaging.tempId, {
+                          origin_address: address.formatted_address,
+                          origin_lat: address.lat,
+                          origin_lng: address.lng,
+                          origin_country_code: address.country_code,
+                          origin_country: address.formatted_address,
+                        });
+                      }}
+                    />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Country or region of origin
+                      Search for the production location. City-level precision required.
                     </p>
                   </div>
 
