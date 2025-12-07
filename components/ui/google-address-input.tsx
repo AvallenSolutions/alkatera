@@ -51,15 +51,15 @@ export function GoogleAddressInput({
 
       try {
         const googleMaps = (window as any).google;
-        if (!googleMaps || !googleMaps.maps || !googleMaps.maps.places) {
+        if (!googleMaps || !googleMaps.maps) {
           throw new Error('Google Maps not loaded');
         }
 
-        // Wait for PlaceAutocompleteElement to be available
-        await googleMaps.maps.importLibrary('places');
+        // Dynamically import the places library
+        const { PlaceAutocompleteElement } = await googleMaps.maps.importLibrary('places');
 
         // Create PlaceAutocompleteElement
-        const autocompleteElement = document.createElement('gmp-place-autocomplete') as any;
+        const autocompleteElement = new PlaceAutocompleteElement();
         autocompleteElement.placeholder = placeholder;
 
         // Add listener for place selection
@@ -89,7 +89,7 @@ export function GoogleAddressInput({
     };
 
     // Check if Google Maps is already loaded
-    if ((window as any).google?.maps?.places) {
+    if ((window as any).google?.maps) {
       initAutocomplete();
       return;
     }
@@ -112,10 +112,12 @@ export function GoogleAddressInput({
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=Function.prototype`;
     script.async = true;
     script.defer = true;
-    script.onload = () => initAutocomplete();
+    script.onload = () => {
+      setTimeout(() => initAutocomplete(), 100);
+    };
     script.onerror = () => {
       console.error('Failed to load Google Maps script');
       setScriptError(true);
