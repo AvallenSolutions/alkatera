@@ -108,30 +108,21 @@ export function GoogleAddressInput({
       return () => clearInterval(checkGoogleLoaded);
     }
 
-    const callbackName = `initGoogleMaps_${Date.now()}`;
-    (window as any)[callbackName] = () => {
-      delete (window as any)[callbackName];
-      initAutocomplete();
-    };
-
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=${callbackName}`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
     script.async = true;
     script.defer = true;
     script.onerror = () => {
       console.error('Failed to load Google Maps script');
-      delete (window as any)[callbackName];
       setScriptError(true);
       setIsLoading(false);
     };
 
-    document.head.appendChild(script);
-
-    return () => {
-      if ((window as any)[callbackName]) {
-        delete (window as any)[callbackName];
-      }
+    script.onload = () => {
+      initAutocomplete();
     };
+
+    document.head.appendChild(script);
   }, [disabled]);
 
   const getLocalityLevel = (place: any): 'city' | 'region' | 'country' => {
