@@ -1,7 +1,5 @@
 "use client";
 
-/// <reference path="../../types/google-maps.d.ts" />
-
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { MapPin, Loader2, AlertCircle } from "lucide-react";
@@ -23,6 +21,12 @@ interface GoogleAddressInputProps {
   required?: boolean;
 }
 
+declare global {
+  interface Window {
+    initGoogleMaps?: () => void;
+  }
+}
+
 export function GoogleAddressInput({
   value = '',
   onAddressSelect,
@@ -32,28 +36,40 @@ export function GoogleAddressInput({
   required = false,
 }: GoogleAddressInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<any>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [scriptError, setScriptError] = useState(false);
   const [inputValue, setInputValue] = useState(value);
+  const loadingRef = useRef(false);
 
   useEffect(() => {
     setInputValue(value);
   }, [value]);
 
   useEffect(() => {
-    if (disabled) return;
+    if (disabled || loadingRef.current) {
+      return;
+    }
+
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+    if (!apiKey) {
+      console.error('Google Maps API key not found');
+      setScriptError(true);
+      setIsLoading(false);
+      return;
+    }
+
+    loadingRef.current = true;
 
     const initAutocomplete = async () => {
-      if (!inputRef.current) return;
+      if (!inputRef.current) {
+        setIsLoading(false);
+        return;
+      }
 
       try {
-        const google = (window as any).google;
-        if (!google?.maps?.importLibrary) {
-          throw new Error('Google Maps not loaded');
-        }
-
-        const { Autocomplete } = await google.maps.importLibrary("places");
+        const { Autocomplete } = await google.maps.importLibrary("places") as google.maps.PlacesLibrary;
 
         const autocomplete = new Autocomplete(inputRef.current, {
           types: ['geocode', 'establishment'],
@@ -68,81 +84,59 @@ export function GoogleAddressInput({
         autocompleteRef.current = autocomplete;
         setIsLoading(false);
       } catch (error) {
-        console.error('Error initializing Google Places Autocomplete:', error);
+        console.error('Error initializing autocomplete:', error);
         setScriptError(true);
         setIsLoading(false);
       }
     };
 
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    if (!apiKey) {
-      console.error('Google Maps API key not found. Please add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to your environment variables.');
-      setScriptError(true);
-      setIsLoading(false);
-      return;
-    }
-
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-
-    if (existingScript) {
-      if ((window as any).google?.maps?.importLibrary) {
+    const loadGoogleMaps = () => {
+      if (typeof google !== 'undefined' && google.maps) {
         initAutocomplete();
-      } else {
-        const checkGoogleLoaded = setInterval(() => {
-          if ((window as any).google?.maps?.importLibrary) {
-            clearInterval(checkGoogleLoaded);
+        return;
+      }
+
+      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+      if (existingScript) {
+        const waitForGoogle = setInterval(() => {
+          if (typeof google !== 'undefined' && google.maps) {
+            clearInterval(waitForGoogle);
             initAutocomplete();
           }
         }, 100);
 
         setTimeout(() => {
-          clearInterval(checkGoogleLoaded);
-          if (!(window as any).google?.maps?.importLibrary) {
-            console.error('Google Maps API failed to load in time');
+          clearInterval(waitForGoogle);
+          if (typeof google === 'undefined' || !google.maps) {
             setScriptError(true);
             setIsLoading(false);
           }
         }, 10000);
-
-        return () => clearInterval(checkGoogleLoaded);
+        return;
       }
-      return;
-    }
 
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async`;
-    script.async = true;
-    script.defer = true;
+      (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.googleapis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+        key: apiKey,
+        v: "weekly"
+      });
 
-    script.onerror = () => {
-      console.error('Failed to load Google Maps script');
-      setScriptError(true);
-      setIsLoading(false);
-    };
-
-    document.head.appendChild(script);
-
-    const checkGoogleLoaded = setInterval(() => {
-      if ((window as any).google?.maps?.importLibrary) {
-        clearInterval(checkGoogleLoaded);
-        initAutocomplete();
-      }
-    }, 100);
-
-    setTimeout(() => {
-      clearInterval(checkGoogleLoaded);
-      if (!(window as any).google?.maps?.importLibrary) {
-        console.error('Google Maps API failed to load in time');
+      initAutocomplete().catch(err => {
+        console.error('Failed to initialize Google Maps:', err);
         setScriptError(true);
         setIsLoading(false);
-      }
-    }, 10000);
+      });
+    };
 
-    return () => clearInterval(checkGoogleLoaded);
+    loadGoogleMaps();
+
+    return () => {
+      if (autocompleteRef.current) {
+        google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
   }, [disabled]);
 
-  const getLocalityLevel = (place: any): 'city' | 'region' | 'country' => {
+  const getLocalityLevel = (place: google.maps.places.PlaceResult): 'city' | 'region' | 'country' => {
     const types = place.types || [];
 
     if (
@@ -169,7 +163,7 @@ export function GoogleAddressInput({
     return 'city';
   };
 
-  const extractCountryCode = (place: any): string => {
+  const extractCountryCode = (place: google.maps.places.PlaceResult): string => {
     const addressComponents = place.address_components || [];
 
     for (const component of addressComponents) {
@@ -181,7 +175,7 @@ export function GoogleAddressInput({
     return '';
   };
 
-  const extractCity = (place: any): string | undefined => {
+  const extractCity = (place: google.maps.places.PlaceResult): string | undefined => {
     const addressComponents = place.address_components || [];
 
     for (const component of addressComponents) {
@@ -197,7 +191,7 @@ export function GoogleAddressInput({
     return undefined;
   };
 
-  const handlePlaceSelect = (place: any) => {
+  const handlePlaceSelect = (place: google.maps.places.PlaceResult) => {
     if (!place || !place.geometry || !place.geometry.location) {
       toast.error('Please select a location from the dropdown suggestions');
       return;
