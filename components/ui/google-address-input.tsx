@@ -112,7 +112,7 @@ export function GoogleAddressInput({
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=Function.prototype`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&loading=async&callback=Function.prototype&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => {
