@@ -114,6 +114,15 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
         }
 
         // Build LCA material record with all impact data
+        // Note: data_source must be 'openlca', 'supplier', or NULL per constraint
+        // For staging factors, we use NULL
+        let dataSource = null;
+        if (material.data_source === 'openlca' && material.data_source_id) {
+          dataSource = 'openlca';
+        } else if (material.data_source === 'supplier' && material.supplier_product_id) {
+          dataSource = 'supplier';
+        }
+
         const lcaMaterial = {
           product_lca_id: lca.id,
           name: material.material_name,
@@ -128,7 +137,8 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
           is_organic: material.is_organic_certified,
           is_organic_certified: material.is_organic_certified,
           supplier_product_id: material.supplier_product_id,
-          data_source: material.data_source || 'database',
+          data_source: dataSource,
+          data_source_id: material.data_source_id || null,
 
           // Transport data
           transport_mode: material.transport_mode || null,
@@ -163,7 +173,7 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
           methodology: resolved.methodology,
           source_reference: resolved.source_reference,
           impact_source: resolveImpactSource(resolved.data_quality_tag, resolved.data_priority),
-          impact_reference_id: resolved.supplier_lca_id || material.data_source_id || null,
+          impact_reference_id: resolved.supplier_lca_id || null,
         };
 
         lcaMaterialsWithImpacts.push(lcaMaterial);
