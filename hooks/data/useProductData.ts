@@ -9,6 +9,10 @@ export interface ProductIngredient {
   quantity: number;
   unit: string;
   data_source: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  origin_address?: string;
+  origin_country_code?: string;
 }
 
 export interface ProductPackaging {
@@ -18,6 +22,10 @@ export interface ProductPackaging {
   unit: string;
   packaging_category: string;
   data_source: string;
+  origin_lat?: number;
+  origin_lng?: number;
+  origin_address?: string;
+  origin_country_code?: string;
 }
 
 export interface ProductLCA {
@@ -48,6 +56,7 @@ export interface Product {
   functional_unit: string;
   unit_size_value: number;
   unit_size_unit: string;
+  organization_id: string;
 }
 
 export interface ProductData {

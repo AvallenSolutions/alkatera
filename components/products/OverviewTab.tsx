@@ -3,8 +3,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Droplets, Zap, Wind, MapPin, Bot, AlertTriangle, FileText, TrendingUp, CheckCircle2, ArrowRight } from "lucide-react";
+import { Package, Droplets, Zap, Wind, MapPin, Bot, AlertTriangle, FileText, TrendingUp, CheckCircle2, ArrowRight, Map } from "lucide-react";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
+import { useFacilityLocation } from "@/hooks/data/useFacilityLocation";
+import { SupplyChainMap } from "./SupplyChainMap";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
@@ -19,6 +21,7 @@ interface OverviewTabProps {
 export function OverviewTab({ product, ingredients, packaging, lcaReports, isHealthy }: OverviewTabProps) {
   const latestLCA = lcaReports[0];
   const hasLCAData = latestLCA && latestLCA.aggregated_impacts;
+  const { facility } = useFacilityLocation(product.organization_id);
 
   const ingredientWeight = ingredients.reduce((sum, ing) => {
     const weight = ing.unit === 'kg' ? ing.quantity : ing.quantity / 1000;
@@ -488,6 +491,37 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </CardContent>
         </Card>
       </div>
+
+      {/* Supply Chain Network Map */}
+      <Card className="lg:col-span-12 backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-cyan-500/20 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <Map className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div>
+                <CardTitle className="text-white">Supply Chain Network</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Geographic distribution of materials and production facility
+                </CardDescription>
+              </div>
+            </div>
+            {facility && (ingredients.filter(i => i.origin_lat && i.origin_lng).length > 0 || packaging.filter(p => p.origin_lat && p.origin_lng).length > 0) && (
+              <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30">
+                {1 + ingredients.filter(i => i.origin_lat && i.origin_lng).length + packaging.filter(p => p.origin_lat && p.origin_lng).length} locations
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <SupplyChainMap
+            facility={facility}
+            ingredients={ingredients}
+            packaging={packaging}
+          />
+        </CardContent>
+      </Card>
 
       {/* Product Health Status */}
       <Card className="lg:col-span-6 backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all">

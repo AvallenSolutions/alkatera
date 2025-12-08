@@ -152,3 +152,51 @@
     background-size: 1000px 100%;
   }
 }
+
+/* Leaflet Map Styles */
+@import 'leaflet/dist/leaflet.css';
+
+.leaflet-container {
+  font-family: inherit;
+}
+
+.leaflet-popup-content-wrapper {
+  background-color: rgba(15, 23, 42, 0.95);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.leaflet-popup-tip {
+  background-color: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.leaflet-popup-close-button {
+  color: #94a3b8 !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #e2e8f0 !important;
+}
+
+.map-tiles {
+  filter: brightness(0.7) contrast(1.2) saturate(0.8);
+}
+
+.leaflet-control-zoom a {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+}
+
+.leaflet-control-attribution {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #64748b !important;
+  font-size: 10px !important;
+}
