@@ -15,11 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Building2, Database, Sprout, Info, MapPin } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { GoogleAddressInput } from "@/components/ui/google-address-input";
 import { COUNTRIES } from "@/lib/countries";
 import type { DataSource } from "@/lib/types/lca";
+import { calculateDistance } from "@/lib/utils/distance-calculator";
 
 export interface IngredientFormData {
   tempId: string;
@@ -42,10 +43,19 @@ export interface IngredientFormData {
   location?: string;
 }
 
+interface ProductionFacility {
+  id: string;
+  name: string;
+  address_lat: number | null;
+  address_lng: number | null;
+  production_share?: number;
+}
+
 interface IngredientFormCardProps {
   ingredient: IngredientFormData;
   index: number;
   organizationId: string;
+  productionFacilities: ProductionFacility[];
   onUpdate: (tempId: string, updates: Partial<IngredientFormData>) => void;
   onRemove: (tempId: string) => void;
   canRemove: boolean;
@@ -55,6 +65,7 @@ export function IngredientFormCard({
   ingredient,
   index,
   organizationId,
+  productionFacilities,
   onUpdate,
   onRemove,
   canRemove,
@@ -87,6 +98,28 @@ export function IngredientFormCard({
       default:
         return null;
     }
+  };
+
+  const calculateAndSetDistance = (originLat: number, originLng: number) => {
+    if (productionFacilities.length === 0) {
+      return 0;
+    }
+
+    if (productionFacilities.length === 1) {
+      const facility = productionFacilities[0];
+      if (facility.address_lat && facility.address_lng) {
+        return calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
+      }
+    }
+
+    const totalDistance = productionFacilities.reduce((sum, facility) => {
+      if (facility.address_lat && facility.address_lng) {
+        return sum + calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
+      }
+      return sum;
+    }, 0);
+
+    return Math.round(totalDistance / productionFacilities.length);
   };
 
   const handleSearchSelect = (selection: {
@@ -231,12 +264,14 @@ export function IngredientFormCard({
                   value={ingredient.origin_address || ''}
                   placeholder="e.g., Munich, Germany or Yorkshire Maltings, UK"
                   onAddressSelect={(address) => {
+                    const calculatedDistance = calculateAndSetDistance(address.lat, address.lng);
                     onUpdate(ingredient.tempId, {
                       origin_address: address.formatted_address,
                       origin_lat: address.lat,
                       origin_lng: address.lng,
                       origin_country_code: address.country_code,
                       origin_country: address.formatted_address,
+                      distance_km: calculatedDistance,
                     });
                   }}
                 />
@@ -266,16 +301,36 @@ export function IngredientFormCard({
                 </div>
 
                 <div>
-                  <Label htmlFor={`distance-${ingredient.tempId}`}>Distance (km)</Label>
+                  <Label htmlFor={`distance-${ingredient.tempId}`} className="flex items-center gap-1">
+                    Distance (km)
+                    {ingredient.distance_km && productionFacilities.length > 0 && (
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                        <Calculator className="h-2.5 w-2.5 mr-0.5" />
+                        Auto
+                      </Badge>
+                    )}
+                  </Label>
                   <Input
                     id={`distance-${ingredient.tempId}`}
                     type="number"
                     step="1"
                     min="0"
-                    placeholder="0"
+                    placeholder={productionFacilities.length === 0 ? "No facilities configured" : "Select origin to calculate"}
                     value={ingredient.distance_km}
                     onChange={(e) => onUpdate(ingredient.tempId, { distance_km: e.target.value })}
+                    readOnly={!!ingredient.origin_lat && productionFacilities.length > 0}
+                    className={ingredient.origin_lat && productionFacilities.length > 0 ? 'bg-muted cursor-not-allowed' : ''}
                   />
+                  {ingredient.origin_lat && productionFacilities.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Automatically calculated from origin to your production facility
+                    </p>
+                  )}
+                  {productionFacilities.length === 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      Add a facility with location to enable automatic distance calculation
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

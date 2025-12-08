@@ -36,6 +36,14 @@ interface Product {
   unit_size_unit: string | null;
 }
 
+interface ProductionFacility {
+  id: string;
+  name: string;
+  address_lat: number | null;
+  address_lng: number | null;
+  production_share?: number;
+}
+
 export default function ProductRecipePage() {
   const router = useRouter();
   const params = useParams();
@@ -43,6 +51,7 @@ export default function ProductRecipePage() {
   const { currentOrganization } = useOrganization();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [productionFacilities, setProductionFacilities] = useState<ProductionFacility[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
@@ -95,6 +104,15 @@ export default function ProductRecipePage() {
 
       if (productError) throw productError;
       setProduct(productData);
+
+      const { data: facilitiesData, error: facilitiesError } = await supabase
+        .from("facilities")
+        .select("id, name, address_lat, address_lng")
+        .eq("organization_id", currentOrganization?.id);
+
+      if (!facilitiesError && facilitiesData) {
+        setProductionFacilities(facilitiesData.filter(f => f.address_lat && f.address_lng) as ProductionFacility[]);
+      }
 
       const { data: materialsData, error: materialsError } = await supabase
         .from("product_materials")
@@ -659,6 +677,7 @@ export default function ProductRecipePage() {
                     ingredient={ingredient}
                     index={index}
                     organizationId={currentOrganization?.id || ''}
+                    productionFacilities={productionFacilities}
                     onUpdate={updateIngredient}
                     onRemove={removeIngredient}
                     canRemove={ingredientForms.length > 1}
@@ -724,6 +743,7 @@ export default function ProductRecipePage() {
                     packaging={packaging}
                     index={index}
                     organizationId={currentOrganization?.id || ''}
+                    productionFacilities={productionFacilities}
                     onUpdate={updatePackaging}
                     onRemove={removePackaging}
                     canRemove={packagingForms.length > 1}
