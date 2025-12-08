@@ -74,15 +74,31 @@ export default function ProductLcaReportPage() {
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [lcaData, setLcaData] = useState<any>(null);
+  const [productData, setProductData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch real LCA data for this product
+  // Fetch real product and LCA data
   useEffect(() => {
-    async function fetchLcaData() {
+    async function fetchData() {
       if (!productId) return;
 
       try {
         setLoading(true);
+
+        // Fetch product details
+        const { data: product, error: productError } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', productId)
+          .maybeSingle();
+
+        if (productError) {
+          console.error('Error fetching product:', productError);
+          return;
+        }
+
+        console.log('[ProductReport] Fetched product:', product);
+        setProductData(product);
 
         // Fetch the latest completed LCA for this product
         const { data: lca, error: lcaError } = await supabase
@@ -119,13 +135,13 @@ export default function ProductLcaReportPage() {
           console.log('[ProductReport] No completed LCA found for product:', productId);
         }
       } catch (error) {
-        console.error('Error fetching LCA data:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchLcaData();
+    fetchData();
   }, [productId]);
 
   // Use real LCA data if available, otherwise use mock data
@@ -245,15 +261,15 @@ export default function ProductLcaReportPage() {
       });
 
       await generateLcaReportPdf({
-        title: MOCK_LCA_REPORT.title,
-        version: MOCK_LCA_REPORT.version,
-        productName: MOCK_LCA_REPORT.product_name,
-        assessmentPeriod: MOCK_LCA_REPORT.assessment_period,
-        publishedDate: MOCK_LCA_REPORT.published_at,
-        dqiScore: MOCK_LCA_REPORT.dqi_score,
-        systemBoundary: MOCK_LCA_REPORT.system_boundary,
-        functionalUnit: MOCK_LCA_REPORT.functional_unit,
-        metrics: MOCK_METRICS,
+        title: displayTitle,
+        version: displayVersion,
+        productName: displayProductName,
+        assessmentPeriod: displayPeriod,
+        publishedDate: displayPublished,
+        dqiScore: displayDqi,
+        systemBoundary: displayBoundary,
+        functionalUnit: displayFunctionalUnit,
+        metrics: lcaData?.aggregated_impacts ? { ...MOCK_METRICS, total_impacts: lcaData.aggregated_impacts } : MOCK_METRICS,
         waterSources: waterSourceItems,
         wasteStreams: wasteStreams,
         landUseItems: landUseItems,
@@ -276,6 +292,17 @@ export default function ProductLcaReportPage() {
     }
   };
 
+  // Determine display values - use real data if available, fallback to mock
+  const displayTitle = lcaData ? '2025 Product Impact Assessment' : MOCK_LCA_REPORT.title;
+  const displayProductName = productData?.name || lcaData?.product_name || MOCK_LCA_REPORT.product_name;
+  const displayStatus = lcaData?.status || MOCK_LCA_REPORT.status;
+  const displayVersion = lcaData?.lca_version || MOCK_LCA_REPORT.version;
+  const displayPeriod = lcaData ? `${new Date(lcaData.reference_year, 0).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}` : MOCK_LCA_REPORT.assessment_period;
+  const displayPublished = lcaData?.updated_at ? new Date(lcaData.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date(MOCK_LCA_REPORT.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const displayDqi = lcaData?.dqi_score || MOCK_LCA_REPORT.dqi_score;
+  const displayBoundary = lcaData?.system_boundary || MOCK_LCA_REPORT.system_boundary;
+  const displayFunctionalUnit = lcaData?.functional_unit || MOCK_LCA_REPORT.functional_unit;
+
   return (
     <div className="container mx-auto py-8 space-y-8">
       {/* Header */}
@@ -287,16 +314,16 @@ export default function ProductLcaReportPage() {
               Back to Product
             </Button>
           </Link>
-          <h1 className="text-4xl font-bold tracking-tight">{MOCK_LCA_REPORT.title}</h1>
+          <h1 className="text-4xl font-bold tracking-tight">{displayTitle}</h1>
           <div className="flex items-center gap-4">
-            <p className="text-lg text-muted-foreground">{MOCK_LCA_REPORT.product_name}</p>
+            <p className="text-lg text-muted-foreground">{displayProductName}</p>
             <Badge variant="default" className="bg-green-600">
-              {MOCK_LCA_REPORT.status.charAt(0).toUpperCase() + MOCK_LCA_REPORT.status.slice(1)}
+              {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
             </Badge>
-            <Badge variant="outline">v{MOCK_LCA_REPORT.version}</Badge>
+            <Badge variant="outline">v{displayVersion}</Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Assessment Period: {MOCK_LCA_REPORT.assessment_period} • Published: {new Date(MOCK_LCA_REPORT.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+            Assessment Period: {displayPeriod} • Published: {displayPublished}
           </p>
         </div>
 
@@ -320,7 +347,7 @@ export default function ProductLcaReportPage() {
       {/* Trust Signal: DQI Gauge */}
       <div className="grid md:grid-cols-4 gap-6">
         <div className="md:col-span-1">
-          <DQIGauge score={MOCK_LCA_REPORT.dqi_score} size="md" />
+          <DQIGauge score={displayDqi} size="md" />
         </div>
         <div className="md:col-span-3">
           <Card>
@@ -331,11 +358,11 @@ export default function ProductLcaReportPage() {
             <CardContent className="grid md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm font-semibold mb-2">System Boundary</h4>
-                <p className="text-sm text-muted-foreground">{MOCK_LCA_REPORT.system_boundary}</p>
+                <p className="text-sm text-muted-foreground">{displayBoundary}</p>
               </div>
               <div>
                 <h4 className="text-sm font-semibold mb-2">Functional Unit</h4>
-                <p className="text-sm text-muted-foreground">{MOCK_LCA_REPORT.functional_unit}</p>
+                <p className="text-sm text-muted-foreground">{displayFunctionalUnit}</p>
               </div>
               <div>
                 <h4 className="text-sm font-semibold mb-2">Standards</h4>
@@ -469,7 +496,7 @@ export default function ProductLcaReportPage() {
               <div>
                 <h4 className="font-semibold text-sm mb-2">Boundary Definition</h4>
                 <p className="text-sm text-muted-foreground">
-                  {MOCK_LCA_REPORT.system_boundary}
+                  {displayBoundary}
                 </p>
               </div>
               <div className="grid md:grid-cols-3 gap-4 mt-4">
