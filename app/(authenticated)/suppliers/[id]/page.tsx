@@ -35,105 +35,23 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-interface Supplier {
-  id: string;
-  name: string;
-  contact_email: string | null;
-  contact_name: string | null;
-  industry_sector: string | null;
-  country: string | null;
-  annual_spend: number | null;
-  spend_currency: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-interface SupplierEngagement {
-  status: string;
-  invited_date: string | null;
-  accepted_date: string | null;
-  data_submitted_date: string | null;
-  last_contact_date: string | null;
-  data_quality_score: number | null;
-}
-
-interface SupplierProduct {
-  id: string;
-  name: string;
-  description: string | null;
-  category: string | null;
-  unit: string;
-  carbon_intensity: number | null;
-  product_code: string | null;
-  is_active: boolean;
-  created_at: string;
-}
+import { useSupplier } from "@/hooks/data/useSuppliers";
+import { useSupplierProducts } from "@/hooks/data/useSupplierProducts";
+import { AddSupplierProductModal } from "@/components/suppliers/AddSupplierProductModal";
+import { SupplierLocationTab } from "@/components/suppliers/SupplierLocationTab";
+import { SupplierEvidenceTab } from "@/components/suppliers/SupplierEvidenceTab";
 
 export default function SupplierDetailPage() {
   const params = useParams();
   const router = useRouter();
   const supplierId = params.id as string;
 
-  const [supplier, setSupplier] = useState<Supplier | null>(null);
-  const [engagement, setEngagement] = useState<SupplierEngagement | null>(null);
-  const [products, setProducts] = useState<SupplierProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { supplier, engagement, loading, refetch: refetchSupplier } = useSupplier(supplierId);
+  const { products, refetch: refetchProducts } = useSupplierProducts(supplierId);
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleting, setIsDeleting] = useState(false);
-
-  useEffect(() => {
-    if (supplierId) {
-      fetchSupplierData();
-    }
-  }, [supplierId]);
-
-  const fetchSupplierData = async () => {
-    try {
-      setLoading(true);
-
-      // Fetch supplier details
-      const { data: supplierData, error: supplierError } = await supabase
-        .from("suppliers")
-        .select("*")
-        .eq("id", supplierId)
-        .maybeSingle();
-
-      if (supplierError) throw supplierError;
-      if (!supplierData) {
-        toast.error("Supplier not found");
-        router.push("/suppliers");
-        return;
-      }
-
-      setSupplier(supplierData);
-
-      // Fetch engagement data
-      const { data: engagementData } = await supabase
-        .from("supplier_engagements")
-        .select("*")
-        .eq("supplier_id", supplierId)
-        .maybeSingle();
-
-      setEngagement(engagementData);
-
-      // Fetch products
-      const { data: productsData } = await supabase
-        .from("supplier_products")
-        .select("*")
-        .eq("supplier_id", supplierId)
-        .order("created_at", { ascending: false });
-
-      setProducts(productsData || []);
-
-    } catch (error: any) {
-      console.error("Error fetching supplier:", error);
-      toast.error(error.message || "Failed to load supplier data");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(undefined);
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -153,6 +71,11 @@ export default function SupplierDetailPage() {
       toast.error(error.message || "Failed to delete supplier");
       setIsDeleting(false);
     }
+  };
+
+  const handleAddProduct = () => {
+    setEditingProduct(undefined);
+    setProductModalOpen(true);
   };
 
   const formatDate = (dateString: string | null) => {
@@ -420,7 +343,7 @@ export default function SupplierDetailPage() {
                   Products and materials provided by this supplier
                 </CardDescription>
               </div>
-              <Button>
+              <Button onClick={handleAddProduct}>
                 <Package className="h-4 w-4 mr-2" />
                 Add Product
               </Button>
@@ -429,9 +352,13 @@ export default function SupplierDetailPage() {
               {products.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-muted-foreground mb-4">
                     No products added yet. Start building this supplier's product portfolio.
                   </p>
+                  <Button onClick={handleAddProduct}>
+                    <Package className="h-4 w-4 mr-2" />
+                    Add First Product
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -446,6 +373,9 @@ export default function SupplierDetailPage() {
                           {!product.is_active && (
                             <Badge variant="secondary" className="text-xs">Inactive</Badge>
                           )}
+                          {product.product_code && (
+                            <Badge variant="outline" className="text-xs">{product.product_code}</Badge>
+                          )}
                         </div>
                         {product.description && (
                           <p className="text-sm text-muted-foreground mb-2">
@@ -456,7 +386,9 @@ export default function SupplierDetailPage() {
                           {product.category && <span>Category: {product.category}</span>}
                           <span>Unit: {product.unit}</span>
                           {product.carbon_intensity && (
-                            <span>Carbon: {product.carbon_intensity} kg CO₂e/{product.unit}</span>
+                            <span className="font-semibold text-foreground">
+                              Carbon: {product.carbon_intensity} kg CO₂e/{product.unit}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -470,53 +402,21 @@ export default function SupplierDetailPage() {
 
         {/* Evidence Tab */}
         <TabsContent value="evidence" className="space-y-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>LCA Evidence & Documentation</CardTitle>
-                <CardDescription>
-                  EPDs, LCA reports, and certificates from this supplier
-                </CardDescription>
-              </div>
-              <Button>
-                <FileText className="h-4 w-4 mr-2" />
-                Upload Document
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground">
-                  No documents uploaded yet. Upload EPDs, LCA reports, or certificates.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <SupplierEvidenceTab supplierId={supplierId} />
         </TabsContent>
 
         {/* Location Tab */}
         <TabsContent value="location" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Supplier Location</CardTitle>
-              <CardDescription>
-                Geographic location and facilities
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-sm text-muted-foreground mb-2">
-                  Location mapping coming soon
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Country: {supplier.country || "Not specified"}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <SupplierLocationTab supplier={supplier} onUpdate={refetchSupplier} />
         </TabsContent>
       </Tabs>
+
+      <AddSupplierProductModal
+        supplierId={supplierId}
+        open={productModalOpen}
+        onOpenChange={setProductModalOpen}
+        product={editingProduct}
+      />
     </div>
   );
 }
