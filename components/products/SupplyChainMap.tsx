@@ -228,11 +228,8 @@ export function SupplyChainMap({ facility, ingredients, packaging, productId, pr
             [facility.address_lat, facility.address_lng],
           ];
 
-          const isVerified = ingredient.data_source === 'supplier' && ingredient.supplier_product_id;
-          const ingredientIconForMarker = useMemo(
-            () => createCustomIcon("#22d3ee", "droplets", isVerified),
-            [isVerified]
-          );
+          const isVerified = !!(ingredient.data_source === 'supplier' && ingredient.supplier_product_id);
+          const ingredientIconForMarker = createCustomIcon("#22d3ee", "droplets", isVerified);
 
           return (
             <div key={`ingredient-${ingredient.id}`}>
@@ -304,11 +301,8 @@ export function SupplyChainMap({ facility, ingredients, packaging, productId, pr
             [facility.address_lat, facility.address_lng],
           ];
 
-          const isVerified = pkg.data_source === 'supplier' && pkg.supplier_product_id;
-          const packagingIconForMarker = useMemo(
-            () => createCustomIcon("#fb923c", "package", isVerified),
-            [isVerified]
-          );
+          const isVerified = !!(pkg.data_source === 'supplier' && pkg.supplier_product_id);
+          const packagingIconForMarker = createCustomIcon("#fb923c", "package", isVerified);
 
           return (
             <div key={`packaging-${pkg.id}`}>

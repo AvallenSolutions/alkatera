@@ -1,0 +1,41 @@
+
+> nextjs@0.1.0 build
+> next build
+
+   Creating an optimized production build...
+ ⚠ Compiled with warnings
+
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+./node_modules/@supabase/realtime-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./lib/supabase/browser-client.ts
+./app/(authenticated)/production/page.tsx
+
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+./node_modules/@supabase/realtime-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/api/supplier-products/search/route.ts
+
+   Skipping linting
+   Checking validity of types...
+Failed to compile.
+
+./components/products/SupplyChainMap.tsx:232:83
+Type error: Argument of type 'string | false | null | undefined' is not assignable to parameter of type 'boolean | undefined'.
+  Type 'null' is not assignable to type 'boolean | undefined'.
+
+[0m [90m 230 | [39m[0m
+[0m [90m 231 | [39m          [36mconst[39m isVerified [33m=[39m ingredient[33m.[39mdata_source [33m===[39m [32m'supplier'[39m [33m&&[39m ingredient[33m.[39msupplier_product_id[33m;[39m[0m
+[0m[31m[1m>[22m[39m[90m 232 | [39m          [36mconst[39m ingredientIconForMarker [33m=[39m createCustomIcon([32m"#22d3ee"[39m[33m,[39m [32m"droplets"[39m[33m,[39m isVerified)[33m;[39m[0m
+[0m [90m     | [39m                                                                                  [31m[1m^[22m[39m[0m
+[0m [90m 233 | [39m[0m
+[0m [90m 234 | [39m          [36mreturn[39m ([0m
+[0m [90m 235 | [39m            [33m<[39m[33mdiv[39m key[33m=[39m{[32m`ingredient-${ingredient.id}`[39m}[33m>[39m[0m
