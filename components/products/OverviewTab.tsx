@@ -78,7 +78,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-2xl text-white">Digital Twin</CardTitle>
+              <CardTitle className="text-2xl text-white truncate max-w-md">{product.name}</CardTitle>
               <CardDescription className="text-slate-400">Carbon Impact Visualisation</CardDescription>
             </div>
             {hasLCAData && (
@@ -91,10 +91,10 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         <CardContent>
           {!hasLCAData ? (
             <div className="flex flex-col items-center justify-center py-12 space-y-6">
-              <div className="relative w-40 h-72 opacity-30">
+              <div className="relative w-48 h-96 opacity-30">
                 <svg viewBox="0 0 200 400" className="w-full h-full">
                   <path
-                    d="M 85 20 Q 85 10, 95 10 L 105 10 Q 115 10, 115 20 L 115 45 Q 115 50, 120 50 L 130 50 L 130 360 Q 130 380, 120 380 L 80 380 Q 70 380, 70 360 L 70 50 L 80 50 Q 85 50, 85 45 Z"
+                    d="M 90 10 L 110 10 L 110 35 Q 110 40, 113 43 Q 120 50, 125 60 Q 130 70, 130 80 L 130 340 Q 130 360, 120 370 Q 110 380, 100 380 Q 90 380, 80 370 Q 70 360, 70 340 L 70 80 Q 70 70, 75 60 Q 80 50, 87 43 Q 90 40, 90 35 Z"
                     fill="rgba(255, 255, 255, 0.1)"
                     stroke="rgba(255, 255, 255, 0.2)"
                     strokeWidth="2"
@@ -118,7 +118,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center py-8 relative">
+            <div className="flex flex-col items-center justify-center py-8 space-y-8">
               <style jsx>{`
                 @keyframes fillUp {
                   from {
@@ -129,20 +129,20 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                   }
                 }
                 .liquid-layer {
-                  animation: fillUp 2s ease-out forwards;
+                  animation: fillUp 1.5s ease-out forwards;
                 }
               `}</style>
 
               {/* Bottle Visualization */}
               <div className="relative">
-                <div className="relative w-48 h-96 mx-auto">
+                <div className="relative w-56 h-[28rem] mx-auto">
                   <svg
                     viewBox="0 0 200 400"
                     className="w-full h-full drop-shadow-2xl relative z-10"
                   >
                     <defs>
                       <clipPath id="bottleClip">
-                        <path d="M 85 20 Q 85 10, 95 10 L 105 10 Q 115 10, 115 20 L 115 45 Q 115 50, 120 50 L 130 50 L 130 360 Q 130 380, 120 380 L 80 380 Q 70 380, 70 360 L 70 50 L 80 50 Q 85 50, 85 45 Z" />
+                        <path d="M 90 10 L 110 10 L 110 35 Q 110 40, 113 43 Q 120 50, 125 60 Q 130 70, 130 80 L 130 340 Q 130 360, 120 370 Q 110 380, 100 380 Q 90 380, 80 370 Q 70 360, 70 340 L 70 80 Q 70 70, 75 60 Q 80 50, 87 43 Q 90 40, 90 35 Z" />
                       </clipPath>
                       <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stopColor="rgba(255, 255, 255, 0.1)" />
@@ -157,9 +157,9 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       {breakdown.logistics > 0 && (
                         <rect
                           x="70"
-                          y={380 - (310 * breakdown.logistics / 100)}
+                          y={370 - (290 * breakdown.logistics / 100)}
                           width="60"
-                          height={(310 * breakdown.logistics / 100)}
+                          height={(290 * breakdown.logistics / 100)}
                           fill="rgba(34, 211, 238, 0.8)"
                           className="liquid-layer"
                           style={{ animationDelay: '0s' }}
@@ -170,12 +170,12 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       {breakdown.packaging > 0 && (
                         <rect
                           x="70"
-                          y={380 - (310 * (breakdown.logistics + breakdown.packaging) / 100)}
+                          y={370 - (290 * (breakdown.logistics + breakdown.packaging) / 100)}
                           width="60"
-                          height={(310 * breakdown.packaging / 100)}
+                          height={(290 * breakdown.packaging / 100)}
                           fill="rgba(251, 146, 60, 0.8)"
                           className="liquid-layer"
-                          style={{ animationDelay: '0.3s' }}
+                          style={{ animationDelay: '0.4s' }}
                         />
                       )}
 
@@ -183,33 +183,33 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       {breakdown.ingredients > 0 && (
                         <rect
                           x="70"
-                          y="70"
+                          y={80}
                           width="60"
-                          height={(310 * breakdown.ingredients / 100)}
+                          height={(290 * breakdown.ingredients / 100)}
                           fill="rgba(132, 204, 22, 0.8)"
                           className="liquid-layer"
-                          style={{ animationDelay: '0.6s' }}
+                          style={{ animationDelay: '0.8s' }}
                         />
                       )}
 
                       {/* Bubbles */}
-                      <circle cx="90" cy="300" r="2" fill="rgba(255, 255, 255, 0.5)">
-                        <animate attributeName="cy" values="320;280;320" dur="3s" repeatCount="indefinite" />
+                      <circle cx="85" cy="320" r="2" fill="rgba(255, 255, 255, 0.5)">
+                        <animate attributeName="cy" values="350;300;350" dur="3s" repeatCount="indefinite" />
                         <animate attributeName="opacity" values="0.5;0.8;0.5" dur="3s" repeatCount="indefinite" />
                       </circle>
-                      <circle cx="110" cy="280" r="1.5" fill="rgba(255, 255, 255, 0.4)">
-                        <animate attributeName="cy" values="300;260;300" dur="4s" repeatCount="indefinite" />
+                      <circle cx="115" cy="280" r="1.5" fill="rgba(255, 255, 255, 0.4)">
+                        <animate attributeName="cy" values="320;260;320" dur="4s" repeatCount="indefinite" />
                         <animate attributeName="opacity" values="0.4;0.7;0.4" dur="4s" repeatCount="indefinite" />
                       </circle>
-                      <circle cx="100" cy="250" r="2.5" fill="rgba(255, 255, 255, 0.6)">
-                        <animate attributeName="cy" values="270;230;270" dur="3.5s" repeatCount="indefinite" />
+                      <circle cx="100" cy="240" r="2.5" fill="rgba(255, 255, 255, 0.6)">
+                        <animate attributeName="cy" values="280;220;280" dur="3.5s" repeatCount="indefinite" />
                         <animate attributeName="opacity" values="0.6;0.9;0.6" dur="3.5s" repeatCount="indefinite" />
                       </circle>
                     </g>
 
                     {/* Bottle Glass Outline */}
                     <path
-                      d="M 85 20 Q 85 10, 95 10 L 105 10 Q 115 10, 115 20 L 115 45 Q 115 50, 120 50 L 130 50 L 130 360 Q 130 380, 120 380 L 80 380 Q 70 380, 70 360 L 70 50 L 80 50 Q 85 50, 85 45 Z"
+                      d="M 90 10 L 110 10 L 110 35 Q 110 40, 113 43 Q 120 50, 125 60 Q 130 70, 130 80 L 130 340 Q 130 360, 120 370 Q 110 380, 100 380 Q 90 380, 80 370 Q 70 360, 70 340 L 70 80 Q 70 70, 75 60 Q 80 50, 87 43 Q 90 40, 90 35 Z"
                       fill="url(#glassShine)"
                       stroke="rgba(255, 255, 255, 0.4)"
                       strokeWidth="2"
@@ -218,47 +218,54 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
 
                     {/* Glass Highlights */}
                     <path
-                      d="M 75 60 Q 75 55, 78 55 L 82 55 Q 85 55, 85 60 L 85 340"
+                      d="M 77 85 L 77 335 Q 77 345, 82 352"
                       stroke="rgba(255, 255, 255, 0.5)"
                       strokeWidth="1.5"
                       fill="none"
                       opacity="0.6"
                     />
+                    <path
+                      d="M 123 85 L 123 335 Q 123 345, 118 352"
+                      stroke="rgba(255, 255, 255, 0.3)"
+                      strokeWidth="1"
+                      fill="none"
+                      opacity="0.4"
+                    />
                   </svg>
 
                   {/* Glow Effect */}
-                  <div className="absolute inset-0 -z-10 blur-3xl opacity-50">
-                    <div className="w-full h-1/3 absolute bottom-0 bg-cyan-500/30" style={{ height: `${breakdown.logistics}%` }} />
-                    <div className="w-full h-1/3 absolute bg-orange-500/30" style={{ bottom: `${breakdown.logistics}%`, height: `${breakdown.packaging}%` }} />
-                    <div className="w-full h-1/3 absolute bg-lime-500/30" style={{ bottom: `${breakdown.logistics + breakdown.packaging}%`, height: `${breakdown.ingredients}%` }} />
+                  <div className="absolute inset-0 -z-10 blur-3xl opacity-40">
+                    <div className="w-full absolute bg-cyan-500/30" style={{ bottom: '0', height: `${breakdown.logistics}%` }} />
+                    <div className="w-full absolute bg-orange-500/30" style={{ bottom: `${breakdown.logistics}%`, height: `${breakdown.packaging}%` }} />
+                    <div className="w-full absolute bg-lime-500/30" style={{ bottom: `${breakdown.logistics + breakdown.packaging}%`, height: `${breakdown.ingredients}%` }} />
                   </div>
                 </div>
               </div>
 
               {/* Impact Metrics Below Bottle */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md">
-                <div className="grid grid-cols-3 gap-4 px-4">
+              <div className="w-full max-w-lg">
+                <div className="grid grid-cols-3 gap-4">
                   {/* Logistics */}
-                  <div className="backdrop-blur-xl bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 text-center">
-                    <MapPin className="h-5 w-5 text-cyan-400 mx-auto mb-1" />
-                    <div className="text-xs text-slate-400">Logistics</div>
-                    <div className="text-lg font-bold text-cyan-400">{breakdown.logistics}%</div>
+                  <div className="backdrop-blur-xl bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4 text-center hover:bg-cyan-500/15 transition-all">
+                    <MapPin className="h-6 w-6 text-cyan-400 mx-auto mb-2" />
+                    <div className="text-xs text-slate-400 mb-1">Logistics</div>
+                    <div className="text-2xl font-bold text-cyan-400">{breakdown.logistics}%</div>
                   </div>
 
                   {/* Packaging */}
-                  <div className="backdrop-blur-xl bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 text-center">
-                    <Package className="h-5 w-5 text-orange-400 mx-auto mb-1" />
-                    <div className="text-xs text-slate-400">Packaging</div>
-                    <div className="text-lg font-bold text-orange-400">{breakdown.packaging}%</div>
+                  <div className="backdrop-blur-xl bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 text-center hover:bg-orange-500/15 transition-all">
+                    <Package className="h-6 w-6 text-orange-400 mx-auto mb-2" />
+                    <div className="text-xs text-slate-400 mb-1">Packaging</div>
+                    <div className="text-2xl font-bold text-orange-400">{breakdown.packaging}%</div>
                   </div>
 
                   {/* Ingredients - Highlighted */}
-                  <div className="backdrop-blur-xl bg-lime-500/20 border-2 border-lime-500/40 rounded-lg p-3 text-center shadow-lg shadow-lime-500/20">
-                    <Droplets className="h-5 w-5 text-lime-400 mx-auto mb-1" />
-                    <div className="text-xs text-lime-300">Ingredients</div>
-                    <div className="text-lg font-bold text-lime-400">{breakdown.ingredients}%</div>
+                  <div className="backdrop-blur-xl bg-lime-500/20 border-2 border-lime-500/40 rounded-lg p-4 text-center shadow-lg shadow-lime-500/20 hover:bg-lime-500/25 transition-all">
+                    <Droplets className="h-6 w-6 text-lime-400 mx-auto mb-2" />
+                    <div className="text-xs text-lime-300 mb-1">Ingredients</div>
+                    <div className="text-2xl font-bold text-lime-400">{breakdown.ingredients}%</div>
                     {breakdown.ingredients > 50 && (
-                      <Badge className="mt-1 text-[10px] bg-lime-500/30 text-lime-300 border-lime-500/50">High Impact</Badge>
+                      <Badge className="mt-2 text-[10px] bg-lime-500/30 text-lime-300 border-lime-500/50">High Impact</Badge>
                     )}
                   </div>
                 </div>
