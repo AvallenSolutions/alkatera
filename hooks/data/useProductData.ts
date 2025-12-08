@@ -29,6 +29,10 @@ export interface ProductLCA {
     water_consumption: number;
     water_scarcity_aware: number;
     land_use: number;
+    water_risk_level?: string;
+    circularity_percentage?: number;
+    fossil_resource_scarcity?: number;
+    terrestrial_ecotoxicity?: number;
     breakdown?: any;
   } | null;
   status: string;

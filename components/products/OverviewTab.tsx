@@ -258,77 +258,233 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         </CardContent>
       </Card>
 
-      {/* Pulse Strip - Key Metrics */}
+      {/* Planet Impact Cards */}
       <div className="lg:col-span-5 space-y-4">
-        {/* Scope 1 - Direct Emissions */}
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        {/* Climate Impact */}
+        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all shadow-lg group">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center shadow-lg shadow-red-500/20">
                   <Zap className="h-5 w-5 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Carbon Footprint</p>
-                  <p className="text-2xl font-bold text-white">
-                    {hasLCAData ? `${totalCarbon.toFixed(2)}` : '—'}
-                    <span className="text-sm font-normal text-slate-400 ml-1">kg CO₂e</span>
-                  </p>
+                  <p className="text-sm font-medium text-white">Climate Impact</p>
+                  <p className="text-xs text-slate-400">Total greenhouse gas emissions (CSRD E1)</p>
                 </div>
               </div>
               {hasLCAData && (
-                <div className="text-right">
-                  <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    Tracked
-                  </Badge>
-                </div>
+                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                  CSRD
+                </Badge>
               )}
             </div>
+            <div className="mb-4">
+              <p className="text-3xl font-bold text-white">
+                {hasLCAData ? `${totalCarbon.toFixed(3)}` : '—'}
+                <span className="text-base font-normal text-slate-400 ml-2">kg CO₂eq</span>
+              </p>
+              <p className="text-xs text-slate-500 mt-1">Across 1 products assessed</p>
+            </div>
+            {hasLCAData && (
+              <Button
+                variant="link"
+                className="text-red-400 hover:text-red-300 p-0 h-auto font-normal text-sm group-hover:underline"
+                asChild
+              >
+                <Link href={`/products/${product.id}/report`}>
+                  View carbon breakdown
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
 
-        {/* Water Consumption */}
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        {/* Water Impact */}
+        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all shadow-lg group">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-blue-500/20 flex items-center justify-center shadow-lg shadow-blue-500/20">
                   <Droplets className="h-5 w-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Water Footprint</p>
-                  <p className="text-2xl font-bold text-white">
-                    {hasLCAData && latestLCA.aggregated_impacts?.water_consumption
-                      ? `${latestLCA.aggregated_impacts.water_consumption.toFixed(2)}`
-                      : '—'}
-                    <span className="text-sm font-normal text-slate-400 ml-1">L</span>
-                  </p>
+                  <p className="text-sm font-medium text-white">Water Impact</p>
+                  <p className="text-xs text-slate-400">Water consumption & scarcity (CSRD E3)</p>
                 </div>
               </div>
+              {hasLCAData && latestLCA.aggregated_impacts?.water_scarcity_aware && (
+                <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs">
+                  E3
+                </Badge>
+              )}
             </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-slate-500 uppercase mb-1">Consumption</p>
+                <p className="text-2xl font-bold text-white">
+                  {hasLCAData && latestLCA.aggregated_impacts?.water_consumption
+                    ? `${latestLCA.aggregated_impacts.water_consumption.toFixed(3)}`
+                    : '—'}
+                  <span className="text-sm font-normal text-slate-400 ml-1">m³</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase mb-1">Scarcity Impact</p>
+                <p className="text-2xl font-bold text-white">
+                  {hasLCAData && latestLCA.aggregated_impacts?.water_scarcity_aware
+                    ? `${latestLCA.aggregated_impacts.water_scarcity_aware.toFixed(3)}`
+                    : '—'}
+                  <span className="text-sm font-normal text-slate-400 ml-1">m³ world eq</span>
+                </p>
+              </div>
+            </div>
+            {hasLCAData && latestLCA.aggregated_impacts?.water_risk_level && (
+              <>
+                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs mb-3">
+                  {latestLCA.aggregated_impacts.water_risk_level === 'low' ? 'Low Risk' :
+                   latestLCA.aggregated_impacts.water_risk_level === 'medium' ? 'Medium Risk' : 'High Risk'}
+                </Badge>
+                <p className="text-xs text-slate-500 mb-3">Based on spatially-explicit water scarcity factors across operations</p>
+                <Button
+                  variant="link"
+                  className="text-blue-400 hover:text-blue-300 p-0 h-auto font-normal text-sm group-hover:underline"
+                  asChild
+                >
+                  <Link href={`/products/${product.id}/report`}>
+                    View facility water risks
+                    <ArrowRight className="ml-2 h-3 w-3" />
+                  </Link>
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {/* Land Use */}
-        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
+        {/* Circularity Score */}
+        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all shadow-lg group">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                  <Package className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">Circularity</p>
+                  <p className="text-xs text-slate-400">Resource use & circular economy (CSRD E5)</p>
+                </div>
+              </div>
+              {hasLCAData && (
+                <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                  E5
+                </Badge>
+              )}
+            </div>
+            <div className="mb-4">
+              <p className="text-xs text-slate-500 mb-2">Circularity Score</p>
+              <p className="text-3xl font-bold text-white mb-2">
+                {hasLCAData && latestLCA.aggregated_impacts?.circularity_percentage !== undefined
+                  ? `${latestLCA.aggregated_impacts.circularity_percentage}`
+                  : '—'}
+                <span className="text-base font-normal text-slate-400 ml-2">%</span>
+              </p>
+              {hasLCAData && latestLCA.aggregated_impacts?.circularity_percentage !== undefined && (
+                <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                  {latestLCA.aggregated_impacts.circularity_percentage >= 75 ? 'EXCELLENT' :
+                   latestLCA.aggregated_impacts.circularity_percentage >= 50 ? 'GOOD' :
+                   latestLCA.aggregated_impacts.circularity_percentage >= 25 ? 'FAIR' : 'POOR'}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 mb-3">Material circularity based on virgin resource use and recycled content</p>
+            <div className="mb-3">
+              <p className="text-xs text-slate-500 uppercase mb-1">Fossil Resource Use</p>
+              <p className="text-xl font-bold text-white">
+                {hasLCAData && latestLCA.aggregated_impacts?.fossil_resource_scarcity !== undefined
+                  ? `${latestLCA.aggregated_impacts.fossil_resource_scarcity}`
+                  : '0'}
+                <span className="text-sm font-normal text-slate-400 ml-1">kg oil eq</span>
+              </p>
+              <p className="text-xs text-slate-500 mt-1">Virgin fossil resources consumed in product lifecycle</p>
+            </div>
+            {hasLCAData && (
+              <Button
+                variant="link"
+                className="text-amber-400 hover:text-amber-300 p-0 h-auto font-normal text-sm group-hover:underline"
+                asChild
+              >
+                <Link href={`/products/${product.id}/report`}>
+                  View material flows
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Land & Biodiversity Impact */}
+        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all shadow-lg group">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-green-500/20 flex items-center justify-center shadow-lg shadow-green-500/20">
                   <Wind className="h-5 w-5 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-400">Land Use</p>
-                  <p className="text-2xl font-bold text-white">
-                    {hasLCAData && latestLCA.aggregated_impacts?.land_use
-                      ? `${latestLCA.aggregated_impacts.land_use.toFixed(2)}`
-                      : '—'}
-                    <span className="text-sm font-normal text-slate-400 ml-1">m²</span>
-                  </p>
+                  <p className="text-sm font-medium text-white">Nature Impact</p>
+                  <p className="text-xs text-slate-400">Land use & biodiversity impact (CSRD E4 / TNFD)</p>
                 </div>
               </div>
+              {hasLCAData && (
+                <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                  E4
+                </Badge>
+              )}
             </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-slate-500 uppercase mb-1">Land Use</p>
+                <p className="text-2xl font-bold text-white">
+                  {hasLCAData && latestLCA.aggregated_impacts?.land_use
+                    ? `${latestLCA.aggregated_impacts.land_use.toFixed(3)}`
+                    : '—'}
+                  <span className="text-sm font-normal text-slate-400 ml-1">m²a</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase mb-1">Ecotoxicity</p>
+                <p className="text-2xl font-bold text-white">
+                  {hasLCAData && latestLCA.aggregated_impacts?.terrestrial_ecotoxicity !== undefined
+                    ? `${latestLCA.aggregated_impacts.terrestrial_ecotoxicity.toFixed(3)}`
+                    : '0.000'}
+                  <span className="text-sm font-normal text-slate-400 ml-1">kg DCB</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mb-3">
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                ReCiPe 2016
+              </Badge>
+              <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                Multi-capital Assessment
+              </Badge>
+            </div>
+            <p className="text-xs text-slate-500 mb-3">
+              Comprehensive biodiversity impact across land transformation, habitat quality, and ecosystem toxicity
+            </p>
+            {hasLCAData && (
+              <Button
+                variant="link"
+                className="text-green-400 hover:text-green-300 p-0 h-auto font-normal text-sm group-hover:underline"
+                asChild
+              >
+                <Link href={`/products/${product.id}/report`}>
+                  View nature metrics
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
