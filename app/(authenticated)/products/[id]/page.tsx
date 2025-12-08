@@ -117,23 +117,36 @@ export default function ProductDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      {/* Header */}
-      <ProductHeader
-        product={{
-          name: product.name,
-          sku: product.sku || "",
-          image_url: product.product_image_url,
-          product_category: product.product_category,
-        }}
-        isHealthy={isHealthy}
-        onEdit={() => setShowEditDialog(true)}
-      />
+    <div className="min-h-screen bg-[#09090b] relative overflow-hidden">
+      {/* Animated Background Gradient Orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-lime-500/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-2000" />
+      </div>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-6 py-6">
+      {/* Content */}
+      <div className="relative z-10">
+        {/* Header */}
+        <ProductHeader
+          product={{
+            name: product.name,
+            sku: product.sku || "",
+            image_url: product.product_image_url,
+            product_category: product.product_category,
+          }}
+          isHealthy={isHealthy}
+          onEdit={() => setShowEditDialog(true)}
+        />
+
+        {/* Main Content */}
+        <div className="container mx-auto px-6 py-6">
         <div className="mb-6 flex items-center justify-between">
-          <Button variant="ghost" onClick={() => router.push("/products")}>
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/products")}
+            className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white"
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Products
           </Button>
@@ -142,7 +155,7 @@ export default function ProductDashboardPage() {
             onClick={handleCalculate}
             disabled={!isHealthy}
             size="lg"
-            className="bg-blue-600 hover:bg-blue-700"
+            className="backdrop-blur-xl bg-lime-500/90 hover:bg-lime-500 text-black font-semibold shadow-lg shadow-lime-500/20 border border-lime-400/50"
           >
             <Calculator className="mr-2 h-4 w-4" />
             Calculate LCA
@@ -150,32 +163,47 @@ export default function ProductDashboardPage() {
         </div>
 
         {!isHealthy && (
-          <Alert className="mb-6">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+          <Alert className="mb-6 backdrop-blur-xl bg-amber-500/10 border border-amber-500/20">
+            <AlertCircle className="h-4 w-4 text-amber-400" />
+            <AlertDescription className="text-amber-200">
               Please add ingredients and packaging to your product before calculating its environmental impact.
             </AlertDescription>
           </Alert>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl">
-            <TabsTrigger value="overview">
+          <TabsList className="grid w-full grid-cols-3 max-w-2xl backdrop-blur-xl bg-white/5 border border-white/10 p-1">
+            <TabsTrigger
+              value="overview"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+            >
               <Info className="mr-2 h-4 w-4" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="specification">
+            <TabsTrigger
+              value="specification"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+            >
               <FileBarChart className="mr-2 h-4 w-4" />
               Specification
             </TabsTrigger>
-            <TabsTrigger value="settings">
+            <TabsTrigger
+              value="settings"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+            >
               <Settings className="mr-2 h-4 w-4" />
               Settings
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            <OverviewTab product={product} />
+            <OverviewTab
+              product={product}
+              ingredients={ingredients}
+              packaging={packaging}
+              lcaReports={lcaReports}
+              isHealthy={isHealthy}
+            />
           </TabsContent>
 
           <TabsContent value="specification" className="space-y-6">
@@ -194,6 +222,7 @@ export default function ProductDashboardPage() {
             />
           </TabsContent>
         </Tabs>
+        </div>
       </div>
 
       {/* Edit Product Dialog */}

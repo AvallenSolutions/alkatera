@@ -18,12 +18,12 @@ interface ProductHeaderProps {
 
 export function ProductHeader({ product, isHealthy, onEdit }: ProductHeaderProps) {
   return (
-    <div className="border-b bg-white dark:bg-slate-950">
+    <div className="border-b border-white/10 backdrop-blur-xl bg-white/5">
       <div className="container mx-auto px-6 py-6">
         <div className="flex items-start gap-6">
           {/* Product Image */}
           <div className="flex-shrink-0">
-            <div className="h-24 w-24 rounded-lg border bg-slate-50 dark:bg-slate-900 overflow-hidden">
+            <div className="h-24 w-24 rounded-lg border border-white/20 backdrop-blur-xl bg-white/5 overflow-hidden shadow-lg">
               {product.image_url ? (
                 <Image
                   src={product.image_url}
@@ -33,7 +33,7 @@ export function ProductHeader({ product, isHealthy, onEdit }: ProductHeaderProps
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="h-full w-full flex items-center justify-center text-slate-400">
+                <div className="h-full w-full flex items-center justify-center text-slate-300">
                   <span className="text-2xl font-bold">
                     {product.name.charAt(0).toUpperCase()}
                   </span>
@@ -47,28 +47,28 @@ export function ProductHeader({ product, isHealthy, onEdit }: ProductHeaderProps
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
-                  <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 truncate">
+                  <h1 className="text-2xl font-bold text-white truncate">
                     {product.name}
                   </h1>
                   {isHealthy ? (
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 border-green-200 dark:border-green-800">
+                    <Badge className="backdrop-blur-xl bg-green-500/20 text-green-400 border-green-500/30">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Ready for Calculation
                     </Badge>
                   ) : (
-                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100 border-amber-200 dark:border-amber-800">
+                    <Badge className="backdrop-blur-xl bg-amber-500/20 text-amber-400 border-amber-500/30">
                       <AlertCircle className="h-3 w-3 mr-1" />
                       Setup Incomplete
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
+                <div className="flex items-center gap-4 text-sm text-slate-400">
                   {product.sku && (
                     <span className="font-mono">SKU: {product.sku}</span>
                   )}
                   {product.product_category && (
                     <>
-                      <span className="text-slate-300 dark:text-slate-700">•</span>
+                      <span className="text-slate-600">•</span>
                       <span>{product.product_category}</span>
                     </>
                   )}
@@ -76,7 +76,11 @@ export function ProductHeader({ product, isHealthy, onEdit }: ProductHeaderProps
               </div>
 
               {/* Actions */}
-              <Button variant="outline" onClick={onEdit}>
+              <Button
+                variant="outline"
+                onClick={onEdit}
+                className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white"
+              >
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Product Details
               </Button>

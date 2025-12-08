@@ -54,23 +54,23 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-        <AlertTriangle className="h-4 w-4 text-amber-600" />
-        <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+      <Alert className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/30">
+        <AlertTriangle className="h-4 w-4 text-amber-400" />
+        <AlertDescription className="text-sm text-amber-200">
           <strong>Danger Zone:</strong> These actions cannot be easily undone. Please proceed with caution.
         </AlertDescription>
       </Alert>
 
       {/* Archive Product */}
-      <Card className="border-amber-200 dark:border-amber-800">
+      <Card className="backdrop-blur-xl bg-white/5 border border-amber-500/30 shadow-xl hover:bg-white/10 transition-all">
         <CardHeader>
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center flex-shrink-0">
-              <Archive className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <div className="h-10 w-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/20">
+              <Archive className="h-5 w-5 text-amber-400" />
             </div>
             <div className="flex-1">
-              <CardTitle className="text-amber-900 dark:text-amber-100">Archive Product</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-amber-100">Archive Product</CardTitle>
+              <CardDescription className="text-slate-400">
                 Remove this product from active listings whilst preserving all data
               </CardDescription>
             </div>
@@ -78,13 +78,13 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-slate-300">
               Archived products are hidden from lists and reports but can be restored at any time.
               All calculation history and material data will be preserved.
             </p>
             <Button
               variant="outline"
-              className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
+              className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
               onClick={() => setShowArchiveDialog(true)}
             >
               <Archive className="h-4 w-4 mr-2" />
@@ -95,15 +95,15 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
       </Card>
 
       {/* Delete Product */}
-      <Card className="border-red-200 dark:border-red-800">
+      <Card className="backdrop-blur-xl bg-white/5 border border-red-500/30 shadow-xl hover:bg-white/10 transition-all">
         <CardHeader>
           <div className="flex items-start gap-3">
-            <div className="h-10 w-10 rounded-lg bg-red-100 dark:bg-red-900 flex items-center justify-center flex-shrink-0">
-              <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+            <div className="h-10 w-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0 shadow-lg shadow-red-500/20">
+              <Trash2 className="h-5 w-5 text-red-400" />
             </div>
             <div className="flex-1">
-              <CardTitle className="text-red-900 dark:text-red-100">Delete Product</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-red-100">Delete Product</CardTitle>
+              <CardDescription className="text-slate-400">
                 Permanently delete this product and all associated data
               </CardDescription>
             </div>
@@ -111,12 +111,13 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm text-slate-300">
               This action permanently removes the product, all ingredients, packaging, and calculation history.
-              <strong className="text-red-600 dark:text-red-400"> This cannot be undone.</strong>
+              <strong className="text-red-400"> This cannot be undone.</strong>
             </p>
             <Button
               variant="destructive"
+              className="bg-red-500/80 hover:bg-red-500 text-white"
               onClick={() => setShowDeleteDialog(true)}
             >
               <Trash2 className="h-4 w-4 mr-2" />
