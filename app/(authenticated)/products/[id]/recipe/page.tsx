@@ -135,9 +135,13 @@ export default function ProductRecipePage() {
           amount: item.quantity,
           unit: item.unit || 'kg',
           origin_country: item.origin_country || '',
+          origin_address: item.origin_address || '',
+          origin_lat: item.origin_lat || undefined,
+          origin_lng: item.origin_lng || undefined,
+          origin_country_code: item.origin_country_code || '',
           is_organic_certified: item.is_organic_certified || false,
-          transport_mode: 'truck',
-          distance_km: '',
+          transport_mode: item.transport_mode || 'truck',
+          distance_km: item.distance_km || '',
         })));
       }
 
@@ -152,13 +156,17 @@ export default function ProductRecipePage() {
             supplier_product_id: item.supplier_product_id,
             amount: item.quantity,
             unit: item.unit || 'g',
-            packaging_category: categoryMatch ? categoryMatch[1] : 'container',
+            packaging_category: item.packaging_category || (categoryMatch ? categoryMatch[1] : 'container'),
             recycled_content_percentage: '',
             printing_process: 'standard_ink',
             net_weight_g: item.quantity || '',
             origin_country: item.origin_country || '',
-            transport_mode: 'truck',
-            distance_km: '',
+            origin_address: item.origin_address || '',
+            origin_lat: item.origin_lat || undefined,
+            origin_lng: item.origin_lng || undefined,
+            origin_country_code: item.origin_country_code || '',
+            transport_mode: item.transport_mode || 'truck',
+            distance_km: item.distance_km || '',
           };
         }));
       }
