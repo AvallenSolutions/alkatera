@@ -1,6 +1,7 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './impact-waterfall-resolver';
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
+import { resolveImpactSource } from './utils/data-quality-mapper';
 
 export interface CalculateLCAParams {
   productId: string;
@@ -161,7 +162,7 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
           confidence_score: resolved.confidence_score,
           methodology: resolved.methodology,
           source_reference: resolved.source_reference,
-          impact_source: resolved.data_quality_tag,
+          impact_source: resolveImpactSource(resolved.data_quality_tag, resolved.data_priority),
           impact_reference_id: resolved.supplier_lca_id || material.data_source_id || null,
         };
 
