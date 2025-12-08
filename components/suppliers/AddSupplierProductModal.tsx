@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Shield, Clock, Info } from "lucide-react";
 import { useSupplierProducts, SupplierProduct } from "@/hooks/data/useSupplierProducts";
 import { useOrganization } from "@/lib/organizationContext";
 
@@ -79,11 +82,50 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{product ? "Edit Product" : "Add Product"}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {product ? "Edit Product" : "Add Product"}
+            {product?.is_verified && (
+              <Badge className="bg-emerald-600 text-white">
+                <Shield className="h-3 w-3 mr-1" />
+                Verified
+              </Badge>
+            )}
+            {product && !product.is_verified && (
+              <Badge variant="outline" className="text-amber-600 border-amber-600">
+                <Clock className="h-3 w-3 mr-1" />
+                Pending Verification
+              </Badge>
+            )}
+          </DialogTitle>
           <DialogDescription>
             {product ? "Update product details" : "Add a new product to this supplier's portfolio"}
           </DialogDescription>
         </DialogHeader>
+
+        {product && product.is_verified && product.verified_at && (
+          <Alert className="bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
+            <Shield className="h-4 w-4 text-emerald-600" />
+            <AlertDescription className="text-emerald-800 dark:text-emerald-100">
+              This product has been verified by Alkatera on{' '}
+              {new Date(product.verified_at).toLocaleDateString('en-GB', {
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+              })}
+              . It will appear in material search results.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {(!product || (product && !product.is_verified)) && (
+          <Alert className="bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800">
+            <Info className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-800 dark:text-amber-100">
+              Products require verification by Alkatera before appearing in material search.
+              You will be notified when verification is complete.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">

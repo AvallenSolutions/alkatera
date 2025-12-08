@@ -206,6 +206,57 @@ export async function GET(request: NextRequest) {
     }
 
     // ========================================
+    // WATERFALL STAGE 0: VERIFIED SUPPLIER PRODUCTS (Primary Data)
+    // ========================================
+    if (organizationId) {
+      const { data: supplierProducts, error: supplierError } = await supabase
+        .from('supplier_products')
+        .select(`
+          id,
+          name,
+          category,
+          unit,
+          carbon_intensity,
+          product_code,
+          verified_at,
+          suppliers!inner(
+            name
+          )
+        `)
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .eq('is_verified', true)
+        .ilike('name', `%${normalizedQuery}%`)
+        .order('name')
+        .limit(20);
+
+      if (!supplierError && supplierProducts && supplierProducts.length > 0) {
+        const formattedResults = supplierProducts.map((product: any) => ({
+          id: product.id,
+          name: product.name,
+          category: product.category || 'Supplier Product',
+          unit: product.unit,
+          processType: 'SUPPLIER_PRODUCT',
+          location: 'Verified Supplier',
+          co2_factor: product.carbon_intensity,
+          supplier_name: product.suppliers?.name || 'Unknown Supplier',
+          product_code: product.product_code,
+          verified_at: product.verified_at,
+          source: 'Verified Supplier Data',
+        }));
+
+        return NextResponse.json({
+          results: formattedResults,
+          cached: false,
+          source: 'supplier_products_verified',
+          waterfall_stage: 0,
+          note: 'Using verified primary supplier data (highest quality)',
+          has_primary_data: true,
+        });
+      }
+    }
+
+    // ========================================
     // WATERFALL STAGE 1: STAGING_EMISSION_FACTORS
     // ========================================
     const { data: stagingFactors, error: stagingError } = await supabase

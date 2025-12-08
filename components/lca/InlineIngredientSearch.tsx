@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield } from "lucide-react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { DataSource } from "@/lib/types/lca";
 
@@ -174,6 +174,13 @@ export function InlineIngredientSearch({
 
   const getWaterfallBadge = (stage: number) => {
     switch (stage) {
+      case 0:
+        return (
+          <Badge className="bg-emerald-600 text-white text-xs">
+            <Shield className="h-3 w-3 mr-1" />
+            Verified Supplier Data
+          </Badge>
+        );
       case 1:
         return (
           <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 text-xs">
@@ -202,6 +209,9 @@ export function InlineIngredientSearch({
   };
 
   const getResultIcon = (result: SearchResult) => {
+    if (result.processType === 'SUPPLIER_PRODUCT') {
+      return <Shield className="h-4 w-4 text-emerald-600" />;
+    }
     if (result.supplier_name) {
       return <Building2 className="h-4 w-4 text-green-600" />;
     }

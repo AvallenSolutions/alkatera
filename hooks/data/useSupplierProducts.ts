@@ -13,6 +13,10 @@ export interface SupplierProduct {
   carbon_intensity: number | null;
   product_code: string | null;
   is_active: boolean;
+  is_verified: boolean;
+  verified_by: string | null;
+  verified_at: string | null;
+  verification_notes: string | null;
   metadata: any;
   created_at: string;
   updated_at: string;
