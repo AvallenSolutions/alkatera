@@ -201,6 +201,7 @@ Deno.serve(async (req: Request) => {
       // Materials are stored with pre-calculated values, DO NOT multiply by quantity again!
       const quantity = Number(material.quantity) || 0;
       const climate = Number(material.impact_climate) || 0;
+      const transport = Number(material.impact_transport) || 0;
 
       // Warn about materials with zero impact
       if (climate === 0 && quantity > 0) {
@@ -223,8 +224,13 @@ Deno.serve(async (req: Request) => {
       totalTerrestrialAcid += terrestrialAcid;
       totalFossilResource += fossilResource;
 
+      // Add transport emissions to totals
+      totalClimate += transport;
+      transportTotal += transport;
+
       // All materials are Scope 3 Category 1 (Purchased Goods)
-      scope3Total += climate;
+      // Transport is Scope 3 Category 4 (Upstream Transportation)
+      scope3Total += climate + transport;
 
       // Categorize as material vs packaging
       const isPackaging = material.packaging_category ||
@@ -240,9 +246,17 @@ Deno.serve(async (req: Request) => {
         rawMaterialsTotal += climate;
       }
 
+      // Transport emissions belong to distribution stage
+      if (transport > 0) {
+        distributionTotal += transport;
+      }
+
       // GHG breakdown - assume 85% fossil CO2, 15% biogenic CO2 (conservative)
       co2Fossil += climate * 0.85;
       co2Biogenic += climate * 0.15;
+
+      // Transport emissions are 100% fossil CO2
+      co2Fossil += transport;
 
       // Add to material breakdown
       if (climate > 0) {
@@ -410,6 +424,10 @@ Deno.serve(async (req: Request) => {
       scope1Total,
       scope2Total,
       scope3Total,
+      transportTotal,
+      materialsTotal,
+      packagingTotal,
+      productionTotal,
       materialsCount: materialBreakdown.length,
       facilitiesCount: facilityBreakdown.length,
       materialBreakdownTop3: materialBreakdown.slice(0, 3),

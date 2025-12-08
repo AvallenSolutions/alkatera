@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './impact-waterfall-resolver';
+import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 
 export interface CalculateLCAParams {
   productId: string;
@@ -95,6 +96,22 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
         // Apply waterfall logic to get impact factors
         const resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg);
 
+        // Calculate transport emissions if transport data is available
+        let transportEmissions = 0;
+        if (material.transport_mode && material.distance_km) {
+          try {
+            const transportResult = await calculateTransportEmissions({
+              weightKg: quantityKg,
+              distanceKm: Number(material.distance_km),
+              transportMode: material.transport_mode as TransportMode
+            });
+            transportEmissions = transportResult.emissions;
+            console.log(`[calculateProductLCA] ✓ Transport emissions for ${material.material_name}: ${transportEmissions.toFixed(4)} kg CO2e (${material.transport_mode}, ${material.distance_km} km)`);
+          } catch (error: any) {
+            console.warn(`[calculateProductLCA] ⚠ Failed to calculate transport emissions for ${material.material_name}:`, error.message);
+          }
+        }
+
         // Build LCA material record with all impact data
         const lcaMaterial = {
           product_lca_id: lca.id,
@@ -111,6 +128,17 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
           is_organic_certified: material.is_organic_certified,
           supplier_product_id: material.supplier_product_id,
           data_source: material.data_source || 'database',
+
+          // Transport data
+          transport_mode: material.transport_mode || null,
+          distance_km: material.distance_km || null,
+          impact_transport: transportEmissions,
+
+          // Origin geolocation
+          origin_address: material.origin_address || null,
+          origin_lat: material.origin_lat || null,
+          origin_lng: material.origin_lng || null,
+          origin_country_code: material.origin_country_code || null,
 
           // Impact values
           impact_climate: resolved.impact_climate,
@@ -139,7 +167,8 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
 
         lcaMaterialsWithImpacts.push(lcaMaterial);
 
-        console.log(`[calculateProductLCA] ✓ Resolved ${material.material_name}: ${resolved.impact_climate.toFixed(3)} kg CO2e (Priority ${resolved.data_priority})`);
+        const totalMaterialEmissions = resolved.impact_climate + transportEmissions;
+        console.log(`[calculateProductLCA] ✓ Resolved ${material.material_name}: ${resolved.impact_climate.toFixed(3)} kg CO2e + ${transportEmissions.toFixed(3)} kg transport = ${totalMaterialEmissions.toFixed(3)} kg CO2e total (Priority ${resolved.data_priority})`);
 
       } catch (error: any) {
         console.error(`[calculateProductLCA] ✗ Failed to resolve ${material.material_name}:`, error.message);

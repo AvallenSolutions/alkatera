@@ -295,6 +295,20 @@ export default function ProductRecipePage() {
         }
         // Otherwise, leave data_source as null (don't include it)
 
+        // Include transport data if available
+        if (form.transport_mode && form.distance_km) {
+          materialData.transport_mode = form.transport_mode;
+          materialData.distance_km = Number(form.distance_km);
+        }
+
+        // Include origin geolocation data if available
+        if (form.origin_lat && form.origin_lng) {
+          materialData.origin_lat = form.origin_lat;
+          materialData.origin_lng = form.origin_lng;
+          materialData.origin_address = form.origin_address || null;
+          materialData.origin_country_code = form.origin_country_code || null;
+        }
+
         return materialData;
       });
 
@@ -399,6 +413,20 @@ export default function ProductRecipePage() {
           materialData.supplier_product_id = form.supplier_product_id;
         }
         // Otherwise, leave data_source as null (don't include it)
+
+        // Include transport data if available
+        if (form.transport_mode && form.distance_km) {
+          materialData.transport_mode = form.transport_mode;
+          materialData.distance_km = Number(form.distance_km);
+        }
+
+        // Include origin geolocation data if available
+        if (form.origin_lat && form.origin_lng) {
+          materialData.origin_lat = form.origin_lat;
+          materialData.origin_lng = form.origin_lng;
+          materialData.origin_address = form.origin_address || null;
+          materialData.origin_country_code = form.origin_country_code || null;
+        }
 
         return materialData;
       });
