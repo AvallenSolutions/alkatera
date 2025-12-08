@@ -28,42 +28,52 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
   const packagingWeight = packaging.reduce((sum, pkg) => sum + pkg.quantity, 0);
 
   const calculateMaterialBreakdown = () => {
-    if (!hasLCAData || !latestLCA.aggregated_impacts?.breakdown?.by_material) {
-      return { ingredients: 45, packaging: 35, logistics: 20 };
+    if (!hasLCAData) {
+      return null;
     }
 
-    const materials = latestLCA.aggregated_impacts.breakdown.by_material;
-    let ingredientsTotal = 0;
+    let rawMaterialsTotal = 0;
     let packagingTotal = 0;
-    let logisticsTotal = 0;
+    let processingTotal = 0;
+    let transportationTotal = 0;
 
-    if (Array.isArray(materials)) {
+    // Extract from by_lifecycle_stage if available
+    if (latestLCA.aggregated_impacts?.breakdown?.by_lifecycle_stage && Array.isArray(latestLCA.aggregated_impacts.breakdown.by_lifecycle_stage)) {
+      const stages = latestLCA.aggregated_impacts.breakdown.by_lifecycle_stage;
+
+      stages.forEach((stage: any) => {
+        const emission = stage.climate_change_gwp100 || 0;
+        const stageName = stage.stage_name || '';
+
+        if (stageName.includes('Raw Material') || stageName.includes('Acquisition')) {
+          rawMaterialsTotal += emission;
+        } else if (stageName.includes('Production') || stageName.includes('Manufacturing')) {
+          processingTotal += emission;
+        } else if (stageName.includes('Distribution') || stageName.includes('Transport') || stageName.includes('A2:')) {
+          transportationTotal += emission;
+        }
+      });
+    }
+
+    // Extract packaging from by_material if available
+    if (latestLCA.aggregated_impacts?.breakdown?.by_material && Array.isArray(latestLCA.aggregated_impacts.breakdown.by_material)) {
+      const materials = latestLCA.aggregated_impacts.breakdown.by_material;
+
       materials.forEach((mat: any) => {
-        if (mat.material_type === 'ingredient') {
-          ingredientsTotal += mat.climate_change_gwp100 || 0;
-        } else if (mat.material_type === 'packaging') {
+        if (mat.material_type === 'packaging') {
           packagingTotal += mat.climate_change_gwp100 || 0;
         }
       });
     }
 
-    if (latestLCA.aggregated_impacts.breakdown?.by_lifecycle_stage) {
-      const stages = latestLCA.aggregated_impacts.breakdown.by_lifecycle_stage;
-      if (Array.isArray(stages)) {
-        const transport = stages.find((s: any) => s.stage_name === 'A2: Transport' || s.stage_name === 'Distribution');
-        if (transport) {
-          logisticsTotal = transport.climate_change_gwp100 || 0;
-        }
-      }
-    }
-
-    const total = ingredientsTotal + packagingTotal + logisticsTotal;
-    if (total === 0) return { ingredients: 45, packaging: 35, logistics: 20 };
+    const total = rawMaterialsTotal + packagingTotal + processingTotal + transportationTotal;
+    if (total === 0) return null;
 
     return {
-      ingredients: Math.round((ingredientsTotal / total) * 100),
+      rawMaterials: Math.round((rawMaterialsTotal / total) * 100),
       packaging: Math.round((packagingTotal / total) * 100),
-      logistics: Math.round((logisticsTotal / total) * 100),
+      processing: Math.round((processingTotal / total) * 100),
+      transportation: Math.round((transportationTotal / total) * 100),
     };
   };
 
@@ -89,7 +99,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </div>
         </CardHeader>
         <CardContent>
-          {!hasLCAData ? (
+          {!breakdown ? (
             <div className="flex flex-col items-center justify-center py-12 space-y-6">
               <div className="relative w-64 h-96 opacity-30">
                 <svg viewBox="0 0 200 400" className="w-full h-full">
@@ -139,98 +149,48 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
 
                     {/* Liquid Layers (stacked bottom to top) */}
                     <g clipPath="url(#bottleClip)">
-                      {/* Logistics Layer (bottom - 0% to 20% of bottle) */}
-                      {breakdown.logistics > 0 && (
+                      {/* Transportation Layer (bottom) */}
+                      {breakdown.transportation > 0 && (
                         <rect
                           x="40"
-                          y={370 - (295 * breakdown.logistics / 100)}
+                          y={370 - (295 * breakdown.transportation / 100)}
                           width="120"
-                          height="0"
+                          height={(295 * breakdown.transportation / 100)}
                           fill="rgba(34, 211, 238, 0.8)"
-                        >
-                          <animate
-                            attributeName="height"
-                            from="0"
-                            to={(295 * breakdown.logistics / 100)}
-                            dur="0.8s"
-                            fill="freeze"
-                            calcMode="spline"
-                            keySplines="0.4 0 0.2 1"
-                          />
-                          <animate
-                            attributeName="y"
-                            from="370"
-                            to={370 - (295 * breakdown.logistics / 100)}
-                            dur="0.8s"
-                            fill="freeze"
-                            calcMode="spline"
-                            keySplines="0.4 0 0.2 1"
-                          />
-                        </rect>
+                        />
                       )}
 
-                      {/* Packaging Layer (middle - 20% to 55% of bottle) */}
+                      {/* Packaging Layer */}
                       {breakdown.packaging > 0 && (
                         <rect
                           x="40"
-                          y={370 - (295 * (breakdown.logistics + breakdown.packaging) / 100)}
+                          y={370 - (295 * (breakdown.transportation + breakdown.packaging) / 100)}
                           width="120"
-                          height="0"
+                          height={(295 * breakdown.packaging / 100)}
                           fill="rgba(251, 146, 60, 0.8)"
-                        >
-                          <animate
-                            attributeName="height"
-                            from="0"
-                            to={(295 * breakdown.packaging / 100)}
-                            begin="0.8s"
-                            dur="0.8s"
-                            fill="freeze"
-                            calcMode="spline"
-                            keySplines="0.4 0 0.2 1"
-                          />
-                          <animate
-                            attributeName="y"
-                            from={370 - (295 * breakdown.logistics / 100)}
-                            to={370 - (295 * (breakdown.logistics + breakdown.packaging) / 100)}
-                            begin="0.8s"
-                            dur="0.8s"
-                            fill="freeze"
-                            calcMode="spline"
-                            keySplines="0.4 0 0.2 1"
-                          />
-                        </rect>
+                        />
                       )}
 
-                      {/* Ingredients Layer (top - 55% to 100% of bottle) */}
-                      {breakdown.ingredients > 0 && (
+                      {/* Processing Layer */}
+                      {breakdown.processing > 0 && (
                         <rect
                           x="40"
-                          y={370 - (295 * (breakdown.logistics + breakdown.packaging + breakdown.ingredients) / 100)}
+                          y={370 - (295 * (breakdown.transportation + breakdown.packaging + breakdown.processing) / 100)}
                           width="120"
-                          height="0"
+                          height={(295 * breakdown.processing / 100)}
+                          fill="rgba(168, 85, 247, 0.8)"
+                        />
+                      )}
+
+                      {/* Raw Materials Layer (top) */}
+                      {breakdown.rawMaterials > 0 && (
+                        <rect
+                          x="40"
+                          y={370 - (295 * (breakdown.transportation + breakdown.packaging + breakdown.processing + breakdown.rawMaterials) / 100)}
+                          width="120"
+                          height={(295 * breakdown.rawMaterials / 100)}
                           fill="rgba(132, 204, 22, 0.8)"
-                        >
-                          <animate
-                            attributeName="height"
-                            from="0"
-                            to={(295 * breakdown.ingredients / 100)}
-                            begin="1.6s"
-                            dur="0.8s"
-                            fill="freeze"
-                            calcMode="spline"
-                            keySplines="0.4 0 0.2 1"
-                          />
-                          <animate
-                            attributeName="y"
-                            from={370 - (295 * (breakdown.logistics + breakdown.packaging) / 100)}
-                            to={370 - (295 * (breakdown.logistics + breakdown.packaging + breakdown.ingredients) / 100)}
-                            begin="1.6s"
-                            dur="0.8s"
-                            fill="freeze"
-                            calcMode="spline"
-                            keySplines="0.4 0 0.2 1"
-                          />
-                        </rect>
+                        />
                       )}
 
                       {/* Bubbles */}
@@ -276,38 +236,43 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
 
                   {/* Glow Effect */}
                   <div className="absolute inset-0 -z-10 blur-3xl opacity-40">
-                    <div className="w-full absolute bg-cyan-500/30" style={{ bottom: '0', height: `${breakdown.logistics}%` }} />
-                    <div className="w-full absolute bg-orange-500/30" style={{ bottom: `${breakdown.logistics}%`, height: `${breakdown.packaging}%` }} />
-                    <div className="w-full absolute bg-lime-500/30" style={{ bottom: `${breakdown.logistics + breakdown.packaging}%`, height: `${breakdown.ingredients}%` }} />
+                    <div className="w-full absolute bg-cyan-500/30" style={{ bottom: '0', height: `${breakdown.transportation}%` }} />
+                    <div className="w-full absolute bg-orange-500/30" style={{ bottom: `${breakdown.transportation}%`, height: `${breakdown.packaging}%` }} />
+                    <div className="w-full absolute bg-purple-500/30" style={{ bottom: `${breakdown.transportation + breakdown.packaging}%`, height: `${breakdown.processing}%` }} />
+                    <div className="w-full absolute bg-lime-500/30" style={{ bottom: `${breakdown.transportation + breakdown.packaging + breakdown.processing}%`, height: `${breakdown.rawMaterials}%` }} />
                   </div>
                 </div>
               </div>
 
               {/* Impact Metrics Below Bottle */}
-              <div className="w-full max-w-lg">
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Logistics */}
-                  <div className="backdrop-blur-xl bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-4 text-center hover:bg-cyan-500/15 transition-all">
-                    <MapPin className="h-6 w-6 text-cyan-400 mx-auto mb-2" />
-                    <div className="text-xs text-slate-400 mb-1">Logistics</div>
-                    <div className="text-2xl font-bold text-cyan-400">{breakdown.logistics}%</div>
+              <div className="w-full max-w-2xl">
+                <div className="grid grid-cols-4 gap-3">
+                  {/* Transportation */}
+                  <div className="backdrop-blur-xl bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 text-center hover:bg-cyan-500/15 transition-all">
+                    <MapPin className="h-5 w-5 text-cyan-400 mx-auto mb-2" />
+                    <div className="text-xs text-slate-400 mb-1">Transportation</div>
+                    <div className="text-xl font-bold text-cyan-400">{breakdown.transportation}%</div>
                   </div>
 
                   {/* Packaging */}
-                  <div className="backdrop-blur-xl bg-orange-500/10 border border-orange-500/20 rounded-lg p-4 text-center hover:bg-orange-500/15 transition-all">
-                    <Package className="h-6 w-6 text-orange-400 mx-auto mb-2" />
+                  <div className="backdrop-blur-xl bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 text-center hover:bg-orange-500/15 transition-all">
+                    <Package className="h-5 w-5 text-orange-400 mx-auto mb-2" />
                     <div className="text-xs text-slate-400 mb-1">Packaging</div>
-                    <div className="text-2xl font-bold text-orange-400">{breakdown.packaging}%</div>
+                    <div className="text-xl font-bold text-orange-400">{breakdown.packaging}%</div>
                   </div>
 
-                  {/* Ingredients - Highlighted */}
-                  <div className="backdrop-blur-xl bg-lime-500/20 border-2 border-lime-500/40 rounded-lg p-4 text-center shadow-lg shadow-lime-500/20 hover:bg-lime-500/25 transition-all">
-                    <Droplets className="h-6 w-6 text-lime-400 mx-auto mb-2" />
-                    <div className="text-xs text-lime-300 mb-1">Ingredients</div>
-                    <div className="text-2xl font-bold text-lime-400">{breakdown.ingredients}%</div>
-                    {breakdown.ingredients > 50 && (
-                      <Badge className="mt-2 text-[10px] bg-lime-500/30 text-lime-300 border-lime-500/50">High Impact</Badge>
-                    )}
+                  {/* Processing */}
+                  <div className="backdrop-blur-xl bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 text-center hover:bg-purple-500/15 transition-all">
+                    <Zap className="h-5 w-5 text-purple-400 mx-auto mb-2" />
+                    <div className="text-xs text-slate-400 mb-1">Processing</div>
+                    <div className="text-xl font-bold text-purple-400">{breakdown.processing}%</div>
+                  </div>
+
+                  {/* Raw Materials */}
+                  <div className="backdrop-blur-xl bg-lime-500/10 border border-lime-500/20 rounded-lg p-3 text-center hover:bg-lime-500/15 transition-all">
+                    <Droplets className="h-5 w-5 text-lime-400 mx-auto mb-2" />
+                    <div className="text-xs text-slate-400 mb-1">Raw Materials</div>
+                    <div className="text-xl font-bold text-lime-400">{breakdown.rawMaterials}%</div>
                   </div>
                 </div>
               </div>
