@@ -119,20 +119,6 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8 space-y-8">
-              <style jsx>{`
-                @keyframes fillUp {
-                  from {
-                    height: 0%;
-                  }
-                  to {
-                    height: 100%;
-                  }
-                }
-                .liquid-layer {
-                  animation: fillUp 1.5s ease-out forwards;
-                }
-              `}</style>
-
               {/* Bottle Visualization */}
               <div className="relative">
                 <div className="relative w-64 h-[28rem] mx-auto">
@@ -151,45 +137,100 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       </linearGradient>
                     </defs>
 
-                    {/* Liquid Layers (rendered bottom to top) */}
+                    {/* Liquid Layers (stacked bottom to top) */}
                     <g clipPath="url(#bottleClip)">
-                      {/* Logistics Layer (bottom) */}
+                      {/* Logistics Layer (bottom - 0% to 20% of bottle) */}
                       {breakdown.logistics > 0 && (
                         <rect
                           x="40"
                           y={370 - (295 * breakdown.logistics / 100)}
                           width="120"
-                          height={(295 * breakdown.logistics / 100)}
+                          height="0"
                           fill="rgba(34, 211, 238, 0.8)"
-                          className="liquid-layer"
-                          style={{ animationDelay: '0s' }}
-                        />
+                        >
+                          <animate
+                            attributeName="height"
+                            from="0"
+                            to={(295 * breakdown.logistics / 100)}
+                            dur="0.8s"
+                            fill="freeze"
+                            calcMode="spline"
+                            keySplines="0.4 0 0.2 1"
+                          />
+                          <animate
+                            attributeName="y"
+                            from="370"
+                            to={370 - (295 * breakdown.logistics / 100)}
+                            dur="0.8s"
+                            fill="freeze"
+                            calcMode="spline"
+                            keySplines="0.4 0 0.2 1"
+                          />
+                        </rect>
                       )}
 
-                      {/* Packaging Layer (middle) */}
+                      {/* Packaging Layer (middle - 20% to 55% of bottle) */}
                       {breakdown.packaging > 0 && (
                         <rect
                           x="40"
                           y={370 - (295 * (breakdown.logistics + breakdown.packaging) / 100)}
                           width="120"
-                          height={(295 * breakdown.packaging / 100)}
+                          height="0"
                           fill="rgba(251, 146, 60, 0.8)"
-                          className="liquid-layer"
-                          style={{ animationDelay: '0.4s' }}
-                        />
+                        >
+                          <animate
+                            attributeName="height"
+                            from="0"
+                            to={(295 * breakdown.packaging / 100)}
+                            begin="0.8s"
+                            dur="0.8s"
+                            fill="freeze"
+                            calcMode="spline"
+                            keySplines="0.4 0 0.2 1"
+                          />
+                          <animate
+                            attributeName="y"
+                            from={370 - (295 * breakdown.logistics / 100)}
+                            to={370 - (295 * (breakdown.logistics + breakdown.packaging) / 100)}
+                            begin="0.8s"
+                            dur="0.8s"
+                            fill="freeze"
+                            calcMode="spline"
+                            keySplines="0.4 0 0.2 1"
+                          />
+                        </rect>
                       )}
 
-                      {/* Ingredients Layer (top) */}
+                      {/* Ingredients Layer (top - 55% to 100% of bottle) */}
                       {breakdown.ingredients > 0 && (
                         <rect
                           x="40"
                           y={370 - (295 * (breakdown.logistics + breakdown.packaging + breakdown.ingredients) / 100)}
                           width="120"
-                          height={(295 * breakdown.ingredients / 100)}
+                          height="0"
                           fill="rgba(132, 204, 22, 0.8)"
-                          className="liquid-layer"
-                          style={{ animationDelay: '0.8s' }}
-                        />
+                        >
+                          <animate
+                            attributeName="height"
+                            from="0"
+                            to={(295 * breakdown.ingredients / 100)}
+                            begin="1.6s"
+                            dur="0.8s"
+                            fill="freeze"
+                            calcMode="spline"
+                            keySplines="0.4 0 0.2 1"
+                          />
+                          <animate
+                            attributeName="y"
+                            from={370 - (295 * (breakdown.logistics + breakdown.packaging) / 100)}
+                            to={370 - (295 * (breakdown.logistics + breakdown.packaging + breakdown.ingredients) / 100)}
+                            begin="1.6s"
+                            dur="0.8s"
+                            fill="freeze"
+                            calcMode="spline"
+                            keySplines="0.4 0 0.2 1"
+                          />
+                        </rect>
                       )}
 
                       {/* Bubbles */}
