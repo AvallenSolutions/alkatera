@@ -12,6 +12,7 @@ export interface SupplierProduct {
   unit: string;
   carbon_intensity: number | null;
   product_code: string | null;
+  product_image_url: string | null;
   is_active: boolean;
   is_verified: boolean;
   verified_by: string | null;

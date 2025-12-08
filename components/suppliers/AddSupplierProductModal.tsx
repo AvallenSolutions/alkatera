@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,9 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Shield, Clock, Info } from "lucide-react";
+import { Shield, Clock, Info, Upload, X, Image as ImageIcon } from "lucide-react";
 import { useSupplierProducts, SupplierProduct } from "@/hooks/data/useSupplierProducts";
 import { useOrganization } from "@/lib/organizationContext";
+import { supabase } from "@/lib/supabaseClient";
+import { toast } from "sonner";
+import Image from "next/image";
 
 interface AddSupplierProductModalProps {
   supplierId: string;
@@ -25,6 +28,10 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
   const { currentOrganization } = useOrganization();
   const { createProduct, updateProduct } = useSupplierProducts(supplierId);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(product?.product_image_url || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: product?.name || "",
@@ -36,6 +43,68 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
     is_active: product?.is_active !== undefined ? product.is_active : true,
   });
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be less than 5MB");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("File must be an image");
+      return;
+    }
+
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const uploadImage = async (productId: string): Promise<string | null> => {
+    if (!imageFile || !currentOrganization) return null;
+
+    setUploading(true);
+    try {
+      const fileExt = imageFile.name.split(".").pop();
+      const fileName = `${productId}_${Date.now()}.${fileExt}`;
+      const filePath = `${currentOrganization.id}/${supplierId}/${productId}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("supplier-product-images")
+        .upload(filePath, imageFile, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("supplier-product-images")
+        .getPublicUrl(filePath);
+
+      return publicUrl;
+    } catch (error: any) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
+      return null;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOrganization) return;
@@ -43,7 +112,9 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
     setLoading(true);
 
     try {
-      const productData = {
+      let imageUrl = imagePreview;
+
+      const productData: any = {
         supplier_id: supplierId,
         organization_id: currentOrganization.id,
         name: formData.name,
@@ -55,10 +126,25 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
         is_active: formData.is_active,
       };
 
+      let savedProduct;
+
       if (product) {
-        await updateProduct(product.id, productData);
+        if (imageFile) {
+          const uploadedUrl = await uploadImage(product.id);
+          if (uploadedUrl) imageUrl = uploadedUrl;
+        }
+
+        productData.product_image_url = imageUrl;
+        savedProduct = await updateProduct(product.id, productData);
       } else {
-        await createProduct(productData);
+        savedProduct = await createProduct(productData);
+
+        if (savedProduct && imageFile) {
+          const uploadedUrl = await uploadImage(savedProduct.id);
+          if (uploadedUrl) {
+            await updateProduct(savedProduct.id, { product_image_url: uploadedUrl });
+          }
+        }
       }
 
       onOpenChange(false);
@@ -71,6 +157,8 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
         product_code: "",
         is_active: true,
       });
+      setImageFile(null);
+      setImagePreview(null);
     } catch (error) {
       console.error("Error saving product:", error);
     } finally {
@@ -147,6 +235,57 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
               onChange={(e) => setFormData({ ...formData, product_code: e.target.value })}
               placeholder="e.g., OSC-001"
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Product Image</Label>
+            <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-4">
+              {imagePreview ? (
+                <div className="relative">
+                  <div className="relative w-full h-48 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+                    <Image
+                      src={imagePreview}
+                      alt="Product preview"
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="absolute top-2 right-2"
+                    onClick={handleRemoveImage}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+                  <div className="mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload Image
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleImageSelect}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    PNG, JPG, GIF up to 5MB
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -233,11 +372,11 @@ export function AddSupplierProductModal({ supplierId, open, onOpenChange, produc
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading || uploading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : product ? "Update Product" : "Add Product"}
+            <Button type="submit" disabled={loading || uploading}>
+              {uploading ? "Uploading..." : loading ? "Saving..." : product ? "Update Product" : "Add Product"}
             </Button>
           </DialogFooter>
         </form>

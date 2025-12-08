@@ -7,6 +7,7 @@ export interface Supplier {
   name: string;
   contact_email: string | null;
   contact_name: string | null;
+  website: string | null;
   industry_sector: string | null;
   country: string | null;
   annual_spend: number | null;

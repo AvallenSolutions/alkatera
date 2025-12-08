@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
-import { Plus, Users, AlertCircle, Trash2, MoreVertical, Search, Building2, MapPin, Package } from "lucide-react";
+import { Plus, Users, AlertCircle, Trash2, MoreVertical, Search, Building2, MapPin, Package, Lock } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
+import { useSupplierPermissions } from "@/hooks/useSupplierPermissions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 interface Supplier {
@@ -49,6 +51,7 @@ interface SupplierWithEngagement extends Supplier {
 
 export default function SuppliersPage() {
   const { currentOrganization } = useOrganization();
+  const { canCreateSuppliers, canDeleteSuppliers } = useSupplierPermissions();
   const [suppliers, setSuppliers] = useState<SupplierWithEngagement[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -211,12 +214,28 @@ export default function SuppliersPage() {
             Manage your supply chain and supplier network
           </p>
         </div>
-        <Link href="/suppliers/new">
-          <Button size="lg" className="gap-2">
-            <Plus className="h-5 w-5" />
-            Add New Supplier
-          </Button>
-        </Link>
+        {canCreateSuppliers ? (
+          <Link href="/suppliers/new">
+            <Button size="lg" className="gap-2">
+              <Plus className="h-5 w-5" />
+              Add New Supplier
+            </Button>
+          </Link>
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="lg" className="gap-2" disabled>
+                  <Lock className="h-5 w-5" />
+                  Add New Supplier
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Only administrators can add suppliers</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
       {suppliers.length > 0 && (
@@ -258,28 +277,30 @@ export default function SuppliersPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSuppliers.map((supplier) => (
             <Card key={supplier.id} className="h-full hover:shadow-lg transition-shadow relative group">
-              <div className="absolute top-4 right-4 z-10">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 shadow-sm"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      className="text-red-600 focus:text-red-600"
-                      onClick={(e) => handleDeleteClick(supplier, e)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Supplier
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+              {canDeleteSuppliers && (
+                <div className="absolute top-4 right-4 z-10">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 shadow-sm"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-red-600 focus:text-red-600"
+                        onClick={(e) => handleDeleteClick(supplier, e)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Supplier
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
 
               <Link href={`/suppliers/${supplier.id}`}>
                 <CardHeader>

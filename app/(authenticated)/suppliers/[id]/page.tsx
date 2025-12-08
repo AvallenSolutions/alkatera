@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +21,8 @@ import {
   Phone,
   Globe,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  ExternalLink
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
@@ -37,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useSupplier } from "@/hooks/data/useSuppliers";
 import { useSupplierProducts } from "@/hooks/data/useSupplierProducts";
+import { useSupplierPermissions } from "@/hooks/useSupplierPermissions";
 import { AddSupplierProductModal } from "@/components/suppliers/AddSupplierProductModal";
 import { SupplierLocationTab } from "@/components/suppliers/SupplierLocationTab";
 import { SupplierEvidenceTab } from "@/components/suppliers/SupplierEvidenceTab";
@@ -48,6 +51,7 @@ export default function SupplierDetailPage() {
 
   const { supplier, engagement, loading, refetch: refetchSupplier } = useSupplier(supplierId);
   const { products, refetch: refetchProducts } = useSupplierProducts(supplierId);
+  const { canEditSuppliers, canDeleteSuppliers, canCreateSuppliers } = useSupplierPermissions();
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleting, setIsDeleting] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -140,38 +144,44 @@ export default function SupplierDetailPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+        {(canEditSuppliers || canDeleteSuppliers) && (
+          <div className="flex items-center gap-2">
+            {canEditSuppliers && (
+              <Button variant="outline" size="sm">
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{supplier.name}"? This action cannot be undone and will remove all associated products and data.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  {isDeleting ? "Deleting..." : "Delete Supplier"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
+            )}
+            {canDeleteSuppliers && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to delete "{supplier.name}"? This action cannot be undone and will remove all associated products and data.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      {isDeleting ? "Deleting..." : "Delete Supplier"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -247,6 +257,26 @@ export default function SupplierDetailPage() {
                     <p className="text-sm text-muted-foreground">
                       {supplier.contact_name || "Not provided"}
                     </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <Globe className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Website</p>
+                    {supplier.website ? (
+                      <a
+                        href={supplier.website.startsWith('http') ? supplier.website : `https://${supplier.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                      >
+                        {supplier.website}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Not provided</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -343,30 +373,50 @@ export default function SupplierDetailPage() {
                   Products and materials provided by this supplier
                 </CardDescription>
               </div>
-              <Button onClick={handleAddProduct}>
-                <Package className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
+              {canCreateSuppliers && (
+                <Button onClick={handleAddProduct}>
+                  <Package className="h-4 w-4 mr-2" />
+                  Add Product
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {products.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-sm text-muted-foreground mb-4">
-                    No products added yet. Start building this supplier's product portfolio.
+                    {canCreateSuppliers
+                      ? "No products added yet. Start building this supplier's product portfolio."
+                      : "No products added yet. Only administrators can add products."}
                   </p>
-                  <Button onClick={handleAddProduct}>
-                    <Package className="h-4 w-4 mr-2" />
-                    Add First Product
-                  </Button>
+                  {canCreateSuppliers && (
+                    <Button onClick={handleAddProduct}>
+                      <Package className="h-4 w-4 mr-2" />
+                      Add First Product
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
                   {products.map((product) => (
                     <div
                       key={product.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-start gap-4 p-4 border rounded-lg"
                     >
+                      <div className="relative h-20 w-20 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                        {product.product_image_url ? (
+                          <Image
+                            src={product.product_image_url}
+                            alt={product.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <Package className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h4 className="font-medium">{product.name}</h4>

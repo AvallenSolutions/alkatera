@@ -26,6 +26,7 @@ interface SupplierFormData {
   name: string;
   contact_name: string;
   contact_email: string;
+  website: string;
   industry_sector: string;
   country: string;
   annual_spend: string;
@@ -63,6 +64,7 @@ export default function NewSupplierPage() {
     name: "",
     contact_name: "",
     contact_email: "",
+    website: "",
     industry_sector: "",
     country: "",
     annual_spend: "",
@@ -120,6 +122,7 @@ export default function NewSupplierPage() {
         name: formData.name,
         contact_name: formData.contact_name || null,
         contact_email: formData.contact_email || null,
+        website: formData.website || null,
         industry_sector: formData.industry_sector || null,
         country: formData.country || null,
         annual_spend: formData.annual_spend ? parseFloat(formData.annual_spend) : null,
@@ -279,6 +282,21 @@ export default function NewSupplierPage() {
               onChange={(e) => handleInputChange("contact_email", e.target.value)}
               disabled={isSubmitting}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="website">Website</Label>
+            <Input
+              id="website"
+              type="url"
+              placeholder="e.g., https://www.supplier.com"
+              value={formData.website}
+              onChange={(e) => handleInputChange("website", e.target.value)}
+              disabled={isSubmitting}
+            />
+            <p className="text-xs text-muted-foreground">
+              The supplier's company website (include https:// or http://)
+            </p>
           </div>
         </CardContent>
       </Card>
