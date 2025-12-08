@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,13 +57,18 @@ const CURRENCIES = [
 
 export default function NewSupplierPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { currentOrganization } = useOrganization();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const invitationToken = searchParams?.get("token");
+  const invitedEmail = searchParams?.get("email");
+  const invitedName = searchParams?.get("name");
+
   const [formData, setFormData] = useState<SupplierFormData>({
-    name: "",
+    name: invitedName || "",
     contact_name: "",
-    contact_email: "",
+    contact_email: invitedEmail || "",
     website: "",
     industry_sector: "",
     country: "",
@@ -71,6 +76,16 @@ export default function NewSupplierPage() {
     spend_currency: "GBP",
     notes: "",
   });
+
+  useEffect(() => {
+    if (invitedEmail || invitedName) {
+      setFormData(prev => ({
+        ...prev,
+        contact_email: invitedEmail || prev.contact_email,
+        name: invitedName || prev.name,
+      }));
+    }
+  }, [invitedEmail, invitedName]);
 
   const handleInputChange = (field: keyof SupplierFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -151,6 +166,21 @@ export default function NewSupplierPage() {
         console.error("Error creating engagement:", engagementError);
       }
 
+      if (invitationToken) {
+        const { error: invitationUpdateError } = await supabase
+          .from("supplier_invitations")
+          .update({
+            status: "accepted",
+            accepted_at: new Date().toISOString(),
+            supplier_id: data.id,
+          })
+          .eq("invitation_token", invitationToken);
+
+        if (invitationUpdateError) {
+          console.error("Error updating invitation:", invitationUpdateError);
+        }
+      }
+
       toast.success("Supplier created successfully");
       router.push(`/suppliers/${data.id}`);
     } catch (error: any) {
@@ -183,9 +213,13 @@ export default function NewSupplierPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Add New Supplier</h1>
+          <h1 className="text-3xl font-bold">
+            {invitationToken ? "Complete Supplier Registration" : "Add New Supplier"}
+          </h1>
           <p className="text-muted-foreground mt-1">
-            Add a supplier to your supply chain network
+            {invitationToken
+              ? "Fill in your company details to complete your supplier profile"
+              : "Add a supplier to your supply chain network"}
           </p>
         </div>
       </div>

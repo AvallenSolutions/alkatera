@@ -519,6 +519,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             facility={facility}
             ingredients={ingredients}
             packaging={packaging}
+            productId={product.id}
+            productName={product.name}
           />
         </CardContent>
       </Card>

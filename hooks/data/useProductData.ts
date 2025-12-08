@@ -8,7 +8,9 @@ export interface ProductIngredient {
   material_name: string;
   quantity: number;
   unit: string;
-  data_source: string;
+  data_source: string | null;
+  supplier_product_id?: string | null;
+  supplier_name?: string | null;
   origin_lat?: number;
   origin_lng?: number;
   origin_address?: string;
@@ -23,7 +25,9 @@ export interface ProductPackaging {
   quantity: number;
   unit: string;
   packaging_category: string;
-  data_source: string;
+  data_source: string | null;
+  supplier_product_id?: string | null;
+  supplier_name?: string | null;
   origin_lat?: number;
   origin_lng?: number;
   origin_address?: string;
@@ -104,19 +108,35 @@ export function useProductData(productId: string | undefined) {
 
       if (productError) throw productError;
 
-      // Fetch ingredients
+      // Fetch ingredients with supplier information
       const { data: ingredientsData, error: ingredientsError } = await supabase
         .from("product_materials")
-        .select("*")
+        .select(`
+          *,
+          supplier_products (
+            supplier_id,
+            suppliers (
+              name
+            )
+          )
+        `)
         .eq("product_id", productId)
         .eq("material_type", "ingredient");
 
       if (ingredientsError) throw ingredientsError;
 
-      // Fetch packaging
+      // Fetch packaging with supplier information
       const { data: packagingData, error: packagingError } = await supabase
         .from("product_materials")
-        .select("*")
+        .select(`
+          *,
+          supplier_products (
+            supplier_id,
+            suppliers (
+              name
+            )
+          )
+        `)
         .eq("product_id", productId)
         .eq("material_type", "packaging");
 
@@ -151,15 +171,26 @@ export function useProductData(productId: string | undefined) {
         console.log('[useProductData] Fetched LCA reports:', lcaData?.length, lcaData);
       }
 
+      // Transform data to flatten supplier information
+      const transformedIngredients = (ingredientsData || []).map((item: any) => ({
+        ...item,
+        supplier_name: item.supplier_products?.suppliers?.name || null,
+      }));
+
+      const transformedPackaging = (packagingData || []).map((item: any) => ({
+        ...item,
+        supplier_name: item.supplier_products?.suppliers?.name || null,
+      }));
+
       // Calculate data health
-      const hasIngredients = (ingredientsData || []).length > 0;
-      const hasPackaging = (packagingData || []).length > 0;
+      const hasIngredients = transformedIngredients.length > 0;
+      const hasPackaging = transformedPackaging.length > 0;
       const isHealthy = hasIngredients && hasPackaging;
 
       setData({
         product: productData,
-        ingredients: ingredientsData || [],
-        packaging: packagingData || [],
+        ingredients: transformedIngredients,
+        packaging: transformedPackaging,
         lcaReports: lcaData || [],
         isHealthy,
         loading: false,
