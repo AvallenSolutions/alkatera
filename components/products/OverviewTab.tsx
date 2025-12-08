@@ -35,19 +35,23 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
     let packagingTotal = 0;
     let logisticsTotal = 0;
 
-    materials.forEach((mat: any) => {
-      if (mat.material_type === 'ingredient') {
-        ingredientsTotal += mat.climate_change_gwp100 || 0;
-      } else if (mat.material_type === 'packaging') {
-        packagingTotal += mat.climate_change_gwp100 || 0;
-      }
-    });
+    if (Array.isArray(materials)) {
+      materials.forEach((mat: any) => {
+        if (mat.material_type === 'ingredient') {
+          ingredientsTotal += mat.climate_change_gwp100 || 0;
+        } else if (mat.material_type === 'packaging') {
+          packagingTotal += mat.climate_change_gwp100 || 0;
+        }
+      });
+    }
 
     if (latestLCA.aggregated_impacts.breakdown?.by_lifecycle_stage) {
       const stages = latestLCA.aggregated_impacts.breakdown.by_lifecycle_stage;
-      const transport = stages.find((s: any) => s.stage_name === 'A2: Transport' || s.stage_name === 'Distribution');
-      if (transport) {
-        logisticsTotal = transport.climate_change_gwp100 || 0;
+      if (Array.isArray(stages)) {
+        const transport = stages.find((s: any) => s.stage_name === 'A2: Transport' || s.stage_name === 'Distribution');
+        if (transport) {
+          logisticsTotal = transport.climate_change_gwp100 || 0;
+        }
       }
     }
 
