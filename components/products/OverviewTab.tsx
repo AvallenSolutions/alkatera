@@ -32,39 +32,16 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
       return null;
     }
 
-    let rawMaterialsTotal = 0;
-    let packagingTotal = 0;
-    let processingTotal = 0;
-    let transportationTotal = 0;
+    const stages = latestLCA.aggregated_impacts?.breakdown?.by_lifecycle_stage;
 
-    // Extract from by_lifecycle_stage if available
-    if (latestLCA.aggregated_impacts?.breakdown?.by_lifecycle_stage && Array.isArray(latestLCA.aggregated_impacts.breakdown.by_lifecycle_stage)) {
-      const stages = latestLCA.aggregated_impacts.breakdown.by_lifecycle_stage;
-
-      stages.forEach((stage: any) => {
-        const emission = stage.climate_change_gwp100 || 0;
-        const stageName = stage.stage_name || '';
-
-        if (stageName.includes('Raw Material') || stageName.includes('Acquisition')) {
-          rawMaterialsTotal += emission;
-        } else if (stageName.includes('Production') || stageName.includes('Manufacturing')) {
-          processingTotal += emission;
-        } else if (stageName.includes('Distribution') || stageName.includes('Transport') || stageName.includes('A2:')) {
-          transportationTotal += emission;
-        }
-      });
+    if (!stages) {
+      return null;
     }
 
-    // Extract packaging from by_material if available
-    if (latestLCA.aggregated_impacts?.breakdown?.by_material && Array.isArray(latestLCA.aggregated_impacts.breakdown.by_material)) {
-      const materials = latestLCA.aggregated_impacts.breakdown.by_material;
-
-      materials.forEach((mat: any) => {
-        if (mat.material_type === 'packaging') {
-          packagingTotal += mat.climate_change_gwp100 || 0;
-        }
-      });
-    }
+    const rawMaterialsTotal = stages.raw_materials || 0;
+    const packagingTotal = stages.packaging_stage || 0;
+    const processingTotal = stages.processing || 0;
+    const transportationTotal = stages.distribution || 0;
 
     const total = rawMaterialsTotal + packagingTotal + processingTotal + transportationTotal;
     if (total === 0) return null;
