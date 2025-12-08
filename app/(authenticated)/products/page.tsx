@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
-import { Plus, Package, AlertCircle, Trash2, MoreVertical } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import {
@@ -47,6 +48,7 @@ export default function ProductsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -135,6 +137,17 @@ export default function ProductsPage() {
     }
   };
 
+  const filteredProducts = products.filter((product) => {
+    if (!searchQuery) return true;
+
+    const query = searchQuery.toLowerCase();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.product_description?.toLowerCase().includes(query) ||
+      product.functional_unit_type?.toLowerCase().includes(query)
+    );
+  });
+
   if (loading) {
     return <PageLoader message="Loading products..." />;
   }
@@ -143,9 +156,9 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Product LCAs</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Products</h1>
           <p className="text-muted-foreground mt-2">
-            Define and manage product life cycle assessments
+            Create and manage your products here
           </p>
         </div>
         <Link href="/products/new">
@@ -155,6 +168,19 @@ export default function ProductsPage() {
           </Button>
         </Link>
       </div>
+
+      {products.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search products by name, description, or functional unit..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      )}
 
       {products.length === 0 ? (
         <Card>
@@ -167,9 +193,20 @@ export default function ProductsPage() {
             </Alert>
           </CardContent>
         </Card>
+      ) : filteredProducts.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No products match your search. Try adjusting your search terms.
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product) => (
+          {filteredProducts.map((product) => (
             <Card key={product.id} className="h-full hover:shadow-lg transition-shadow relative group">
               <div className="absolute top-4 right-4 z-10">
                 <DropdownMenu>
