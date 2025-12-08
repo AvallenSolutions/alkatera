@@ -105,6 +105,25 @@ export function SupplyChainMap({ facility, ingredients, packaging }: SupplyChain
     return L.latLngBounds(positions);
   }, [facility, ingredientsWithLocation, packagingWithLocation]);
 
+  const totalIngredientDistance = useMemo(() => {
+    return ingredientsWithLocation.reduce((sum, ing) => {
+      return sum + (ing.distance_km ? Number(ing.distance_km) : 0);
+    }, 0);
+  }, [ingredientsWithLocation]);
+
+  const totalPackagingDistance = useMemo(() => {
+    return packagingWithLocation.reduce((sum, pkg) => {
+      return sum + (pkg.distance_km ? Number(pkg.distance_km) : 0);
+    }, 0);
+  }, [packagingWithLocation]);
+
+  const totalSupplyChainDistance = totalIngredientDistance + totalPackagingDistance;
+  const totalLocations = 1 + ingredientsWithLocation.length + packagingWithLocation.length;
+
+  const formatDistance = (km: number) => {
+    return km.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+  };
+
   const defaultCenter: [number, number] = facility?.address_lat && facility?.address_lng
     ? [facility.address_lat, facility.address_lng]
     : [51.5074, -0.1278];
@@ -123,26 +142,6 @@ export function SupplyChainMap({ facility, ingredients, packaging }: SupplyChain
       </div>
     );
   }
-
-  const totalLocations = 1 + ingredientsWithLocation.length + packagingWithLocation.length;
-
-  const totalIngredientDistance = useMemo(() => {
-    return ingredientsWithLocation.reduce((sum, ing) => {
-      return sum + (ing.distance_km ? Number(ing.distance_km) : 0);
-    }, 0);
-  }, [ingredientsWithLocation]);
-
-  const totalPackagingDistance = useMemo(() => {
-    return packagingWithLocation.reduce((sum, pkg) => {
-      return sum + (pkg.distance_km ? Number(pkg.distance_km) : 0);
-    }, 0);
-  }, [packagingWithLocation]);
-
-  const totalSupplyChainDistance = totalIngredientDistance + totalPackagingDistance;
-
-  const formatDistance = (km: number) => {
-    return km.toLocaleString('en-GB', { maximumFractionDigits: 0 });
-  };
 
   return (
     <div className="w-full h-[450px] relative rounded-lg overflow-hidden border border-white/10">
