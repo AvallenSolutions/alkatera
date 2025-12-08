@@ -91,10 +91,10 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         <CardContent>
           {!hasLCAData ? (
             <div className="flex flex-col items-center justify-center py-12 space-y-6">
-              <div className="relative w-48 h-96 opacity-30">
+              <div className="relative w-64 h-96 opacity-30">
                 <svg viewBox="0 0 200 400" className="w-full h-full">
                   <path
-                    d="M 90 10 L 110 10 L 110 35 Q 110 40, 113 43 Q 120 50, 125 60 Q 130 70, 130 80 L 130 340 Q 130 360, 120 370 Q 110 380, 100 380 Q 90 380, 80 370 Q 70 360, 70 340 L 70 80 Q 70 70, 75 60 Q 80 50, 87 43 Q 90 40, 90 35 Z"
+                    d="M 85 10 L 115 10 L 115 60 Q 120 63, 130 68 Q 145 72, 160 75 L 160 370 L 40 370 L 40 75 Q 55 72, 70 68 Q 80 63, 85 60 Z"
                     fill="rgba(255, 255, 255, 0.1)"
                     stroke="rgba(255, 255, 255, 0.2)"
                     strokeWidth="2"
@@ -135,14 +135,14 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
 
               {/* Bottle Visualization */}
               <div className="relative">
-                <div className="relative w-56 h-[28rem] mx-auto">
+                <div className="relative w-64 h-[28rem] mx-auto">
                   <svg
                     viewBox="0 0 200 400"
                     className="w-full h-full drop-shadow-2xl relative z-10"
                   >
                     <defs>
                       <clipPath id="bottleClip">
-                        <path d="M 90 10 L 110 10 L 110 35 Q 110 40, 113 43 Q 120 50, 125 60 Q 130 70, 130 80 L 130 340 Q 130 360, 120 370 Q 110 380, 100 380 Q 90 380, 80 370 Q 70 360, 70 340 L 70 80 Q 70 70, 75 60 Q 80 50, 87 43 Q 90 40, 90 35 Z" />
+                        <path d="M 85 10 L 115 10 L 115 60 Q 120 63, 130 68 Q 145 72, 160 75 L 160 370 L 40 370 L 40 75 Q 55 72, 70 68 Q 80 63, 85 60 Z" />
                       </clipPath>
                       <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="0%">
                         <stop offset="0%" stopColor="rgba(255, 255, 255, 0.1)" />
@@ -156,10 +156,10 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       {/* Logistics Layer (bottom) */}
                       {breakdown.logistics > 0 && (
                         <rect
-                          x="70"
-                          y={370 - (290 * breakdown.logistics / 100)}
-                          width="60"
-                          height={(290 * breakdown.logistics / 100)}
+                          x="40"
+                          y={370 - (295 * breakdown.logistics / 100)}
+                          width="120"
+                          height={(295 * breakdown.logistics / 100)}
                           fill="rgba(34, 211, 238, 0.8)"
                           className="liquid-layer"
                           style={{ animationDelay: '0s' }}
@@ -169,10 +169,10 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       {/* Packaging Layer (middle) */}
                       {breakdown.packaging > 0 && (
                         <rect
-                          x="70"
-                          y={370 - (290 * (breakdown.logistics + breakdown.packaging) / 100)}
-                          width="60"
-                          height={(290 * breakdown.packaging / 100)}
+                          x="40"
+                          y={370 - (295 * (breakdown.logistics + breakdown.packaging) / 100)}
+                          width="120"
+                          height={(295 * breakdown.packaging / 100)}
                           fill="rgba(251, 146, 60, 0.8)"
                           className="liquid-layer"
                           style={{ animationDelay: '0.4s' }}
@@ -182,10 +182,10 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       {/* Ingredients Layer (top) */}
                       {breakdown.ingredients > 0 && (
                         <rect
-                          x="70"
-                          y={80}
-                          width="60"
-                          height={(290 * breakdown.ingredients / 100)}
+                          x="40"
+                          y={370 - (295 * (breakdown.logistics + breakdown.packaging + breakdown.ingredients) / 100)}
+                          width="120"
+                          height={(295 * breakdown.ingredients / 100)}
                           fill="rgba(132, 204, 22, 0.8)"
                           className="liquid-layer"
                           style={{ animationDelay: '0.8s' }}
@@ -193,23 +193,23 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       )}
 
                       {/* Bubbles */}
-                      <circle cx="85" cy="320" r="2" fill="rgba(255, 255, 255, 0.5)">
+                      <circle cx="70" cy="320" r="2" fill="rgba(255, 255, 255, 0.5)">
                         <animate attributeName="cy" values="350;300;350" dur="3s" repeatCount="indefinite" />
                         <animate attributeName="opacity" values="0.5;0.8;0.5" dur="3s" repeatCount="indefinite" />
                       </circle>
-                      <circle cx="115" cy="280" r="1.5" fill="rgba(255, 255, 255, 0.4)">
+                      <circle cx="130" cy="280" r="1.5" fill="rgba(255, 255, 255, 0.4)">
                         <animate attributeName="cy" values="320;260;320" dur="4s" repeatCount="indefinite" />
                         <animate attributeName="opacity" values="0.4;0.7;0.4" dur="4s" repeatCount="indefinite" />
                       </circle>
-                      <circle cx="100" cy="240" r="2.5" fill="rgba(255, 255, 255, 0.6)">
-                        <animate attributeName="cy" values="280;220;280" dur="3.5s" repeatCount="indefinite" />
+                      <circle cx="100" cy="250" r="2.5" fill="rgba(255, 255, 255, 0.6)">
+                        <animate attributeName="cy" values="290;230;290" dur="3.5s" repeatCount="indefinite" />
                         <animate attributeName="opacity" values="0.6;0.9;0.6" dur="3.5s" repeatCount="indefinite" />
                       </circle>
                     </g>
 
                     {/* Bottle Glass Outline */}
                     <path
-                      d="M 90 10 L 110 10 L 110 35 Q 110 40, 113 43 Q 120 50, 125 60 Q 130 70, 130 80 L 130 340 Q 130 360, 120 370 Q 110 380, 100 380 Q 90 380, 80 370 Q 70 360, 70 340 L 70 80 Q 70 70, 75 60 Q 80 50, 87 43 Q 90 40, 90 35 Z"
+                      d="M 85 10 L 115 10 L 115 60 Q 120 63, 130 68 Q 145 72, 160 75 L 160 370 L 40 370 L 40 75 Q 55 72, 70 68 Q 80 63, 85 60 Z"
                       fill="url(#glassShine)"
                       stroke="rgba(255, 255, 255, 0.4)"
                       strokeWidth="2"
@@ -218,16 +218,16 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
 
                     {/* Glass Highlights */}
                     <path
-                      d="M 77 85 L 77 335 Q 77 345, 82 352"
+                      d="M 50 80 L 50 360"
                       stroke="rgba(255, 255, 255, 0.5)"
-                      strokeWidth="1.5"
+                      strokeWidth="2"
                       fill="none"
                       opacity="0.6"
                     />
                     <path
-                      d="M 123 85 L 123 335 Q 123 345, 118 352"
+                      d="M 150 80 L 150 360"
                       stroke="rgba(255, 255, 255, 0.3)"
-                      strokeWidth="1"
+                      strokeWidth="1.5"
                       fill="none"
                       opacity="0.4"
                     />
