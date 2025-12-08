@@ -126,6 +126,24 @@ export function SupplyChainMap({ facility, ingredients, packaging }: SupplyChain
 
   const totalLocations = 1 + ingredientsWithLocation.length + packagingWithLocation.length;
 
+  const totalIngredientDistance = useMemo(() => {
+    return ingredientsWithLocation.reduce((sum, ing) => {
+      return sum + (ing.distance_km ? Number(ing.distance_km) : 0);
+    }, 0);
+  }, [ingredientsWithLocation]);
+
+  const totalPackagingDistance = useMemo(() => {
+    return packagingWithLocation.reduce((sum, pkg) => {
+      return sum + (pkg.distance_km ? Number(pkg.distance_km) : 0);
+    }, 0);
+  }, [packagingWithLocation]);
+
+  const totalSupplyChainDistance = totalIngredientDistance + totalPackagingDistance;
+
+  const formatDistance = (km: number) => {
+    return km.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+  };
+
   return (
     <div className="w-full h-[450px] relative rounded-lg overflow-hidden border border-white/10">
       <MapContainer
@@ -196,6 +214,11 @@ export function SupplyChainMap({ facility, ingredients, packaging }: SupplyChain
                     <p className="text-xs text-slate-600 mt-1">
                       {ingredient.quantity} {ingredient.unit}
                     </p>
+                    {ingredient.distance_km && (
+                      <p className="text-xs text-slate-600 mt-1">
+                        Distance: {formatDistance(Number(ingredient.distance_km))} km
+                      </p>
+                    )}
                     {ingredient.origin_address && (
                       <p className="text-xs text-slate-600 mt-1">
                         {ingredient.origin_address}
@@ -239,6 +262,11 @@ export function SupplyChainMap({ facility, ingredients, packaging }: SupplyChain
                     <p className="text-xs text-slate-600 mt-1">
                       {pkg.quantity} {pkg.unit}
                     </p>
+                    {pkg.distance_km && (
+                      <p className="text-xs text-slate-600 mt-1">
+                        Distance: {formatDistance(Number(pkg.distance_km))} km
+                      </p>
+                    )}
                     {pkg.origin_address && (
                       <p className="text-xs text-slate-600 mt-1">
                         {pkg.origin_address}
@@ -252,10 +280,41 @@ export function SupplyChainMap({ facility, ingredients, packaging }: SupplyChain
         })}
       </MapContainer>
 
-      <div className="absolute top-4 right-4 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg px-3 py-2 z-[1000]">
-        <p className="text-xs text-white font-medium">
-          {totalLocations} location{totalLocations !== 1 ? "s" : ""} mapped
-        </p>
+      <div className="absolute top-4 right-4 backdrop-blur-xl bg-white/10 border border-white/20 rounded-lg px-4 py-3 z-[1000] space-y-2 min-w-[200px]">
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-xs text-white/70">Locations</p>
+          <p className="text-xs text-white font-semibold">
+            {totalLocations}
+          </p>
+        </div>
+        <div className="border-t border-white/20 pt-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-cyan-300/90 flex items-center gap-1.5">
+              <Droplets className="h-3 w-3" />
+              Ingredients
+            </p>
+            <p className="text-xs text-white font-medium">
+              {formatDistance(totalIngredientDistance)} km
+            </p>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-orange-300/90 flex items-center gap-1.5">
+              <Package className="h-3 w-3" />
+              Packaging
+            </p>
+            <p className="text-xs text-white font-medium">
+              {formatDistance(totalPackagingDistance)} km
+            </p>
+          </div>
+        </div>
+        <div className="border-t border-white/20 pt-2">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-xs text-white font-semibold">Total Distance</p>
+            <p className="text-sm text-white font-bold">
+              {formatDistance(totalSupplyChainDistance)} km
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

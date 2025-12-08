@@ -13,6 +13,8 @@ export interface ProductIngredient {
   origin_lng?: number;
   origin_address?: string;
   origin_country_code?: string;
+  distance_km?: number;
+  transport_mode?: string;
 }
 
 export interface ProductPackaging {
@@ -26,6 +28,8 @@ export interface ProductPackaging {
   origin_lng?: number;
   origin_address?: string;
   origin_country_code?: string;
+  distance_km?: number;
+  transport_mode?: string;
 }
 
 export interface ProductLCA {
