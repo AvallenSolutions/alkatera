@@ -2,9 +2,11 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Package, Droplets, Zap, Wind, MapPin, Bot, AlertTriangle, FileText, TrendingUp, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Package, Droplets, Zap, Wind, MapPin, Bot, AlertTriangle, FileText, TrendingUp, CheckCircle2, ArrowRight } from "lucide-react";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
 import { formatDistanceToNow } from "date-fns";
+import Link from "next/link";
 
 interface OverviewTabProps {
   product: Product;
@@ -77,7 +79,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-2xl text-white">Digital Twin</CardTitle>
-              <CardDescription className="text-slate-400">Carbon Impact Visualization</CardDescription>
+              <CardDescription className="text-slate-400">Carbon Impact Visualisation</CardDescription>
             </div>
             {hasLCAData && (
               <Badge className="bg-lime-500/20 text-lime-400 border-lime-500/30">
@@ -87,90 +89,180 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center py-8 relative">
-            {/* Bottle Visualization */}
-            <div className="relative">
-              {/* Bottle Container */}
-              <div className="relative w-48 h-96 mx-auto">
-                {/* Bottle Shape - SVG */}
-                <svg
-                  viewBox="0 0 200 400"
-                  className="w-full h-full drop-shadow-2xl"
-                  style={{ filter: 'drop-shadow(0 0 20px rgba(132, 204, 22, 0.3))' }}
-                >
-                  <defs>
-                    <linearGradient id="bottleGlass" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="rgba(255, 255, 255, 0.2)" />
-                      <stop offset="100%" stopColor="rgba(255, 255, 255, 0.05)" />
-                    </linearGradient>
-                    <linearGradient id="liquidFill" x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor="rgba(132, 204, 22, 0.8)" />
-                      <stop offset="100%" stopColor="rgba(132, 204, 22, 0.4)" />
-                    </linearGradient>
-                  </defs>
-
-                  {/* Bottle Neck */}
-                  <rect x="75" y="10" width="50" height="40" fill="url(#bottleGlass)" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="2" rx="5" />
-
-                  {/* Bottle Body - Main Container */}
+          {!hasLCAData ? (
+            <div className="flex flex-col items-center justify-center py-12 space-y-6">
+              <div className="relative w-40 h-72 opacity-30">
+                <svg viewBox="0 0 200 400" className="w-full h-full">
                   <path
-                    d="M 60 50 L 60 350 Q 60 370, 80 370 L 120 370 Q 140 370, 140 350 L 140 50 Z"
-                    fill="url(#bottleGlass)"
-                    stroke="rgba(255, 255, 255, 0.3)"
+                    d="M 85 20 Q 85 10, 95 10 L 105 10 Q 115 10, 115 20 L 115 45 Q 115 50, 120 50 L 130 50 L 130 360 Q 130 380, 120 380 L 80 380 Q 70 380, 70 360 L 70 50 L 80 50 Q 85 50, 85 45 Z"
+                    fill="rgba(255, 255, 255, 0.1)"
+                    stroke="rgba(255, 255, 255, 0.2)"
                     strokeWidth="2"
                   />
-
-                  {/* Liquid Fill - Animated based on total impact */}
-                  <path
-                    d="M 60 250 L 60 350 Q 60 370, 80 370 L 120 370 Q 140 370, 140 350 L 140 250 Z"
-                    fill="url(#liquidFill)"
-                    className="animate-pulse"
-                  />
-
-                  {/* Bubbles in liquid */}
-                  <circle cx="80" cy="300" r="3" fill="rgba(255, 255, 255, 0.4)" className="animate-bounce" />
-                  <circle cx="110" cy="320" r="2" fill="rgba(255, 255, 255, 0.3)" className="animate-bounce delay-300" />
-                  <circle cx="95" cy="280" r="2.5" fill="rgba(255, 255, 255, 0.3)" className="animate-bounce delay-500" />
                 </svg>
-
-                {/* Glow Effect Behind Bottle */}
-                <div className="absolute inset-0 -z-10 blur-3xl bg-lime-500/20 rounded-full scale-150" />
+              </div>
+              <div className="text-center space-y-4 max-w-md">
+                <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto" />
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">No LCA Data Available</h3>
+                  <p className="text-sm text-slate-400">
+                    Complete a Life Cycle Assessment to visualise the environmental impact of this product
+                  </p>
+                </div>
+                <Link href={`/products/${product.id}/calculate-lca`}>
+                  <Button className="bg-lime-500 hover:bg-lime-600 text-slate-900">
+                    Calculate LCA
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
             </div>
+          ) : (
+            <div className="flex items-center justify-center py-8 relative">
+              <style jsx>{`
+                @keyframes fillUp {
+                  from {
+                    height: 0%;
+                  }
+                  to {
+                    height: 100%;
+                  }
+                }
+                .liquid-layer {
+                  animation: fillUp 2s ease-out forwards;
+                }
+              `}</style>
 
-            {/* Impact Metrics Below Bottle */}
-            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md">
-              <div className="grid grid-cols-3 gap-4 px-4">
-                {/* Packaging */}
-                <div className="backdrop-blur-xl bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 text-center">
-                  <Package className="h-5 w-5 text-orange-400 mx-auto mb-1" />
-                  <div className="text-xs text-slate-400">Packaging</div>
-                  <div className="text-lg font-bold text-orange-400">{breakdown.packaging}%</div>
-                </div>
+              {/* Bottle Visualization */}
+              <div className="relative">
+                <div className="relative w-48 h-96 mx-auto">
+                  <svg
+                    viewBox="0 0 200 400"
+                    className="w-full h-full drop-shadow-2xl relative z-10"
+                  >
+                    <defs>
+                      <clipPath id="bottleClip">
+                        <path d="M 85 20 Q 85 10, 95 10 L 105 10 Q 115 10, 115 20 L 115 45 Q 115 50, 120 50 L 130 50 L 130 360 Q 130 380, 120 380 L 80 380 Q 70 380, 70 360 L 70 50 L 80 50 Q 85 50, 85 45 Z" />
+                      </clipPath>
+                      <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="rgba(255, 255, 255, 0.1)" />
+                        <stop offset="50%" stopColor="rgba(255, 255, 255, 0.3)" />
+                        <stop offset="100%" stopColor="rgba(255, 255, 255, 0.1)" />
+                      </linearGradient>
+                    </defs>
 
-                {/* Ingredients - Highlighted */}
-                <div className="backdrop-blur-xl bg-lime-500/20 border-2 border-lime-500/40 rounded-lg p-3 text-center shadow-lg shadow-lime-500/20">
-                  <Droplets className="h-5 w-5 text-lime-400 mx-auto mb-1" />
-                  <div className="text-xs text-lime-300">Ingredients</div>
-                  <div className="text-lg font-bold text-lime-400">{breakdown.ingredients}%</div>
-                  <Badge className="mt-1 text-[10px] bg-lime-500/30 text-lime-300 border-lime-500/50">High Impact</Badge>
-                </div>
+                    {/* Liquid Layers (rendered bottom to top) */}
+                    <g clipPath="url(#bottleClip)">
+                      {/* Logistics Layer (bottom) */}
+                      {breakdown.logistics > 0 && (
+                        <rect
+                          x="70"
+                          y={380 - (310 * breakdown.logistics / 100)}
+                          width="60"
+                          height={(310 * breakdown.logistics / 100)}
+                          fill="rgba(34, 211, 238, 0.8)"
+                          className="liquid-layer"
+                          style={{ animationDelay: '0s' }}
+                        />
+                      )}
 
-                {/* Logistics */}
-                <div className="backdrop-blur-xl bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 text-center">
-                  <MapPin className="h-5 w-5 text-cyan-400 mx-auto mb-1" />
-                  <div className="text-xs text-slate-400">Logistics</div>
-                  <div className="text-lg font-bold text-cyan-400">{breakdown.logistics}%</div>
+                      {/* Packaging Layer (middle) */}
+                      {breakdown.packaging > 0 && (
+                        <rect
+                          x="70"
+                          y={380 - (310 * (breakdown.logistics + breakdown.packaging) / 100)}
+                          width="60"
+                          height={(310 * breakdown.packaging / 100)}
+                          fill="rgba(251, 146, 60, 0.8)"
+                          className="liquid-layer"
+                          style={{ animationDelay: '0.3s' }}
+                        />
+                      )}
+
+                      {/* Ingredients Layer (top) */}
+                      {breakdown.ingredients > 0 && (
+                        <rect
+                          x="70"
+                          y="70"
+                          width="60"
+                          height={(310 * breakdown.ingredients / 100)}
+                          fill="rgba(132, 204, 22, 0.8)"
+                          className="liquid-layer"
+                          style={{ animationDelay: '0.6s' }}
+                        />
+                      )}
+
+                      {/* Bubbles */}
+                      <circle cx="90" cy="300" r="2" fill="rgba(255, 255, 255, 0.5)">
+                        <animate attributeName="cy" values="320;280;320" dur="3s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.5;0.8;0.5" dur="3s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx="110" cy="280" r="1.5" fill="rgba(255, 255, 255, 0.4)">
+                        <animate attributeName="cy" values="300;260;300" dur="4s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.4;0.7;0.4" dur="4s" repeatCount="indefinite" />
+                      </circle>
+                      <circle cx="100" cy="250" r="2.5" fill="rgba(255, 255, 255, 0.6)">
+                        <animate attributeName="cy" values="270;230;270" dur="3.5s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="0.6;0.9;0.6" dur="3.5s" repeatCount="indefinite" />
+                      </circle>
+                    </g>
+
+                    {/* Bottle Glass Outline */}
+                    <path
+                      d="M 85 20 Q 85 10, 95 10 L 105 10 Q 115 10, 115 20 L 115 45 Q 115 50, 120 50 L 130 50 L 130 360 Q 130 380, 120 380 L 80 380 Q 70 380, 70 360 L 70 50 L 80 50 Q 85 50, 85 45 Z"
+                      fill="url(#glassShine)"
+                      stroke="rgba(255, 255, 255, 0.4)"
+                      strokeWidth="2"
+                      fillOpacity="0.15"
+                    />
+
+                    {/* Glass Highlights */}
+                    <path
+                      d="M 75 60 Q 75 55, 78 55 L 82 55 Q 85 55, 85 60 L 85 340"
+                      stroke="rgba(255, 255, 255, 0.5)"
+                      strokeWidth="1.5"
+                      fill="none"
+                      opacity="0.6"
+                    />
+                  </svg>
+
+                  {/* Glow Effect */}
+                  <div className="absolute inset-0 -z-10 blur-3xl opacity-50">
+                    <div className="w-full h-1/3 absolute bottom-0 bg-cyan-500/30" style={{ height: `${breakdown.logistics}%` }} />
+                    <div className="w-full h-1/3 absolute bg-orange-500/30" style={{ bottom: `${breakdown.logistics}%`, height: `${breakdown.packaging}%` }} />
+                    <div className="w-full h-1/3 absolute bg-lime-500/30" style={{ bottom: `${breakdown.logistics + breakdown.packaging}%`, height: `${breakdown.ingredients}%` }} />
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {!hasLCAData && (
-            <div className="text-center mt-4 p-4 backdrop-blur-xl bg-amber-500/10 border border-amber-500/20 rounded-lg">
-              <p className="text-sm text-amber-300">
-                Calculate LCA to see real environmental impact data visualised in the bottle
-              </p>
+              {/* Impact Metrics Below Bottle */}
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md">
+                <div className="grid grid-cols-3 gap-4 px-4">
+                  {/* Logistics */}
+                  <div className="backdrop-blur-xl bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 text-center">
+                    <MapPin className="h-5 w-5 text-cyan-400 mx-auto mb-1" />
+                    <div className="text-xs text-slate-400">Logistics</div>
+                    <div className="text-lg font-bold text-cyan-400">{breakdown.logistics}%</div>
+                  </div>
+
+                  {/* Packaging */}
+                  <div className="backdrop-blur-xl bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 text-center">
+                    <Package className="h-5 w-5 text-orange-400 mx-auto mb-1" />
+                    <div className="text-xs text-slate-400">Packaging</div>
+                    <div className="text-lg font-bold text-orange-400">{breakdown.packaging}%</div>
+                  </div>
+
+                  {/* Ingredients - Highlighted */}
+                  <div className="backdrop-blur-xl bg-lime-500/20 border-2 border-lime-500/40 rounded-lg p-3 text-center shadow-lg shadow-lime-500/20">
+                    <Droplets className="h-5 w-5 text-lime-400 mx-auto mb-1" />
+                    <div className="text-xs text-lime-300">Ingredients</div>
+                    <div className="text-lg font-bold text-lime-400">{breakdown.ingredients}%</div>
+                    {breakdown.ingredients > 50 && (
+                      <Badge className="mt-1 text-[10px] bg-lime-500/30 text-lime-300 border-lime-500/50">High Impact</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
@@ -307,14 +399,24 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
       {/* LCA Reports Feed */}
       <Card className="lg:col-span-6 backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all">
         <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-cyan-500/20 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <FileText className="h-5 w-5 text-cyan-400" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-lg bg-cyan-500/20 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <FileText className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div>
+                <CardTitle className="text-white">LCA Reports</CardTitle>
+                <CardDescription className="text-slate-400">Calculation history</CardDescription>
+              </div>
             </div>
-            <div>
-              <CardTitle className="text-white">LCA Reports</CardTitle>
-              <CardDescription className="text-slate-400">Calculation history</CardDescription>
-            </div>
+            {lcaReports.length > 0 && (
+              <Link href="/reports/lcas">
+                <Button variant="ghost" size="sm" className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10">
+                  View All
+                  <ArrowRight className="ml-2 h-3 w-3" />
+                </Button>
+              </Link>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -325,34 +427,44 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <p className="text-xs text-slate-500 mt-1">Calculate your first LCA to see results here</p>
             </div>
           ) : (
-            lcaReports.slice(0, 3).map((lca, idx) => (
-              <div
-                key={lca.id}
-                className="p-3 backdrop-blur-xl bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <Badge className={`${lca.status === 'completed' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'}`}>
-                    {lca.status}
-                  </Badge>
-                  <span className="text-xs text-slate-400">
-                    {formatDistanceToNow(new Date(lca.created_at), { addSuffix: true })}
-                  </span>
+            <>
+              {lcaReports.slice(0, 3).map((lca, idx) => (
+                <Link key={lca.id} href={`/products/${product.id}/report`}>
+                  <div className="p-3 backdrop-blur-xl bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-all cursor-pointer">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge className={`${lca.status === 'completed' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'}`}>
+                        {lca.status}
+                      </Badge>
+                      <span className="text-xs text-slate-400">
+                        {formatDistanceToNow(new Date(lca.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                    {lca.aggregated_impacts && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-300">Total Impact</span>
+                        <span className="text-sm font-bold text-white">
+                          {lca.aggregated_impacts.climate_change_gwp100.toFixed(2)} kg CO₂e
+                        </span>
+                      </div>
+                    )}
+                    {lca.system_boundary && (
+                      <div className="text-xs text-slate-500 mt-1">
+                        Boundary: {lca.system_boundary}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+              {lcaReports.length > 3 && (
+                <div className="text-center pt-2">
+                  <Link href="/reports/lcas">
+                    <Button variant="outline" size="sm" className="text-slate-400 hover:text-white border-slate-700 hover:bg-white/5">
+                      View {lcaReports.length - 3} more report{lcaReports.length - 3 !== 1 ? 's' : ''}
+                    </Button>
+                  </Link>
                 </div>
-                {lca.aggregated_impacts && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-300">Total Impact</span>
-                    <span className="text-sm font-bold text-white">
-                      {lca.aggregated_impacts.climate_change_gwp100.toFixed(2)} kg CO₂e
-                    </span>
-                  </div>
-                )}
-                {lca.system_boundary && (
-                  <div className="text-xs text-slate-500 mt-1">
-                    Boundary: {lca.system_boundary}
-                  </div>
-                )}
-              </div>
-            ))
+              )}
+            </>
           )}
         </CardContent>
       </Card>
