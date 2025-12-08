@@ -31,6 +31,7 @@ import {
   Droplet,
   Trash2,
   BarChart3,
+  Users,
 } from 'lucide-react'
 
 interface NavItem {
@@ -97,6 +98,11 @@ const navigationStructure: NavItem[] = [
     name: 'Products',
     href: '/products',
     icon: Package,
+  },
+  {
+    name: 'Suppliers',
+    href: '/suppliers',
+    icon: Users,
   },
   {
     name: 'Production',
