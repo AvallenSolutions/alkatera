@@ -61,16 +61,18 @@ export default function ItemDetailPage() {
           user_id: user.id,
         })
 
-        await supabase.rpc('increment', {
+        const { error: rpcError } = await supabase.rpc('increment', {
           table_name: 'knowledge_bank_items',
           row_id: itemId,
           column_name: 'view_count',
-        }).catch(() => {
-          supabase
+        })
+
+        if (rpcError) {
+          await supabase
             .from('knowledge_bank_items')
             .update({ view_count: (item?.view_count || 0) + 1 })
             .eq('id', itemId)
-        })
+        }
 
         setViewRecorded(true)
       } catch (error) {
@@ -125,16 +127,18 @@ export default function ItemDetailPage() {
     if (!item?.file_url) return
 
     try {
-      await supabase.rpc('increment', {
+      const { error: rpcError } = await supabase.rpc('increment', {
         table_name: 'knowledge_bank_items',
         row_id: itemId,
         column_name: 'download_count',
-      }).catch(() => {
-        supabase
+      })
+
+      if (rpcError) {
+        await supabase
           .from('knowledge_bank_items')
           .update({ download_count: (item?.download_count || 0) + 1 })
           .eq('id', itemId)
-      })
+      }
 
       window.open(item.file_url, '_blank')
       toast.success('Download started')

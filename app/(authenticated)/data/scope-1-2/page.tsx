@@ -32,9 +32,10 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, CheckCircle2, Calculator, Flame, Zap } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, Calculator, Flame, Zap, BarChart3 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import { useRouter } from 'next/navigation';
 
 const scope1Schema = z.object({
   facility_id: z.string().min(1, 'Facility is required'),
@@ -82,6 +83,7 @@ interface ActivityDataRecord {
 
 export default function Scope12DataPage() {
   const { currentOrganization } = useOrganization();
+  const router = useRouter();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [recentData, setRecentData] = useState<ActivityDataRecord[]>([]);
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(true);
@@ -330,7 +332,7 @@ export default function Scope12DataPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Scope 1 & 2 Data Ingestion
+            Company Emissions
           </h1>
           <p className="text-muted-foreground mt-2">
             Track direct and indirect GHG emissions from your operations
@@ -366,7 +368,7 @@ export default function Scope12DataPage() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
           <TabsTrigger value="scope1" className="gap-2">
             <Flame className="h-4 w-4" />
             Scope 1: Direct Emissions
@@ -374,6 +376,10 @@ export default function Scope12DataPage() {
           <TabsTrigger value="scope2" className="gap-2">
             <Zap className="h-4 w-4" />
             Scope 2: Indirect Emissions
+          </TabsTrigger>
+          <TabsTrigger value="footprint" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Annual Footprint Builder
           </TabsTrigger>
         </TabsList>
 
@@ -624,6 +630,49 @@ export default function Scope12DataPage() {
                   )}
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="footprint">
+          <Card>
+            <CardHeader>
+              <CardTitle>Annual Footprint Builder</CardTitle>
+              <CardDescription>
+                Build your comprehensive annual greenhouse gas inventory
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Alert>
+                  <BarChart3 className="h-4 w-4" />
+                  <AlertDescription>
+                    The Annual Footprint Builder allows you to compile all emission sources across your organisation into a comprehensive report.
+                  </AlertDescription>
+                </Alert>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button
+                    onClick={() => router.push('/reports/company-footprint/2024')}
+                    className="h-20"
+                    variant="outline"
+                  >
+                    <div className="text-left">
+                      <div className="font-semibold">2024 Footprint</div>
+                      <div className="text-sm text-muted-foreground">Current year report</div>
+                    </div>
+                  </Button>
+                  <Button
+                    onClick={() => router.push('/reports/company-footprint/2023')}
+                    className="h-20"
+                    variant="outline"
+                  >
+                    <div className="text-left">
+                      <div className="font-semibold">2023 Footprint</div>
+                      <div className="text-sm text-muted-foreground">Previous year report</div>
+                    </div>
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

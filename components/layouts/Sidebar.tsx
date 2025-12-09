@@ -70,12 +70,7 @@ const navigationStructure: NavItem[] = [
         icon: Warehouse,
       },
       {
-        name: 'Annual Footprint Builder',
-        href: '/reports/company-footprint/2024',
-        icon: BarChart3,
-      },
-      {
-        name: 'Scope 1 & 2 Data',
+        name: 'Company Emissions',
         href: '/data/scope-1-2',
         icon: Flame,
       },
