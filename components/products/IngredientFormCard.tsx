@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { GoogleAddressInput } from "@/components/ui/google-address-input";
 import { COUNTRIES } from "@/lib/countries";
@@ -76,24 +76,44 @@ export function IngredientFormCard({
     switch (ingredient.data_source) {
       case 'supplier':
         return (
-          <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-            <Building2 className="h-3 w-3 mr-1" />
-            Primary Data Selected
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <Award className="h-3 w-3 mr-1.5" />
+              Supplier Verified (High Quality)
+            </Badge>
+            <span className="text-xs text-muted-foreground">95% confidence</span>
+          </div>
         );
+      case 'staging':
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+              <Layers className="h-3 w-3 mr-1.5" />
+              Hybrid Source (DEFRA + Ecoinvent)
+            </Badge>
+            <span className="text-xs text-muted-foreground">80% confidence</span>
+          </div>
+        );
+      case 'ecoinvent':
       case 'openlca':
         return (
-          <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
-            <Database className="h-3 w-3 mr-1" />
-            Secondary Data Selected
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
+              <Database className="h-3 w-3 mr-1.5" />
+              Ecoinvent Database (Medium Quality)
+            </Badge>
+            <span className="text-xs text-muted-foreground">70% confidence</span>
+          </div>
         );
       case 'primary':
         return (
-          <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-            <Sprout className="h-3 w-3 mr-1" />
-            Custom Primary Data
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              <Sprout className="h-3 w-3 mr-1.5" />
+              Custom Primary Data
+            </Badge>
+            <span className="text-xs text-muted-foreground">90% confidence</span>
+          </div>
         );
       default:
         return null;
@@ -344,11 +364,19 @@ export function IngredientFormCard({
             </div>
           )}
 
-          {ingredient.data_source === 'openlca' && (
+          {(ingredient.data_source === 'openlca' || ingredient.data_source === 'ecoinvent') && (
             <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <Info className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> This ingredient uses secondary data from the global database. For more accurate results, consider using supplier-specific data from your network.
+                <strong>Note:</strong> This ingredient uses secondary data from the Ecoinvent 3.12 database (70% confidence). For improved accuracy, consider requesting Environmental Product Declaration (EPD) data from your supplier.
+              </AlertDescription>
+            </Alert>
+          )}
+          {ingredient.data_source === 'staging' && (
+            <Alert className="bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800">
+              <Info className="h-4 w-4 text-purple-600" />
+              <AlertDescription className="text-xs text-purple-800 dark:text-purple-200">
+                <strong>Hybrid Source:</strong> GHG data from DEFRA 2025 (UK regulatory compliance), non-GHG environmental impacts from Ecoinvent 3.12. Confidence: 80%.
               </AlertDescription>
             </Alert>
           )}
