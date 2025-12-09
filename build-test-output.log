@@ -1,0 +1,168 @@
+
+> nextjs@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   Creating an optimized production build...
+ ⚠ Compiled with warnings
+
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+./node_modules/@supabase/realtime-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./lib/supabase/browser-client.ts
+./app/(authenticated)/production/page.tsx
+
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+Critical dependency: the request of a dependency is an expression
+
+Import trace for requested module:
+./node_modules/@supabase/realtime-js/dist/main/RealtimeClient.js
+./node_modules/@supabase/realtime-js/dist/main/index.js
+./node_modules/@supabase/supabase-js/dist/main/index.js
+./app/api/supplier-products/search/route.ts
+
+   Skipping linting
+   Checking validity of types...
+   Collecting page data...
+   Generating static pages (0/53)...
+✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
+✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+   Generating static pages (13/53)
+
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+   Generating static pages (26/53)
+
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+   Generating static pages (39/53)
+
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+⏳ AppLayout: Loading... { authLoading: true, isOrganizationLoading: true }
+ ⚠ Entire page /supplier-onboarding deopted into client-side rendering. https://nextjs.org/docs/messages/deopted-into-client-rendering /supplier-onboarding
+ ✓ Generating static pages (53/53)
+   Finalizing page optimization...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    191 B            87 kB
+├ ○ /_not-found                          891 B          80.9 kB
+├ ○ /admin/supplier-verification         11.4 kB         152 kB
+├ λ /api/ingredients/search              0 B                0 B
+├ λ /api/places/autocomplete             0 B                0 B
+├ λ /api/places/details                  0 B                0 B
+├ λ /api/supplier-products/search        0 B                0 B
+├ ○ /company/facilities                  2.14 kB         192 kB
+├ λ /company/facilities/[id]             13 kB           182 kB
+├ ○ /company/fleet                       5.22 kB        99.1 kB
+├ ○ /company/overview                    4.35 kB         133 kB
+├ ○ /create-organization                 7.09 kB         136 kB
+├ ○ /dashboard                           8.63 kB         103 kB
+├ ○ /dashboard/data-hub/scope-1          3.69 kB        97.6 kB
+├ ○ /dashboard/data-hub/scope-2          3.81 kB        97.7 kB
+├ ○ /dashboard/data-hub/scope-3          4.51 kB        98.4 kB
+├ ○ /dashboard/products                  10.6 kB         179 kB
+├ ● /dashboard/products/[id]/edit        695 B           167 kB
+├ ○ /dashboard/products/create           7.72 kB         169 kB
+├ ○ /dashboard/reports/product-lca       9.82 kB         164 kB
+├ ○ /dashboard/settings/profile          6.73 kB         135 kB
+├ ○ /dashboard/settings/team             12.2 kB         169 kB
+├ ○ /data/ingest                         3.88 kB         185 kB
+├ ○ /data/quality                        11 kB           153 kB
+├ ○ /data/scope-1-2                      8.7 kB          193 kB
+├ ○ /data/waste-and-circularity          7.35 kB         188 kB
+├ ○ /data/water-footprint                8.94 kB         197 kB
+├ ○ /dev/calculation-verifier            13.5 kB         149 kB
+├ ○ /dev/docs/fleet-implementation       4.57 kB        91.7 kB
+├ ○ /dev/docs/iso-14044-compliance       13.2 kB         100 kB
+├ ○ /dev/docs/lca-calculation-testing    5.95 kB        93.1 kB
+├ ○ /dev/docs/lca-testing-summary        6.6 kB         93.7 kB
+├ ○ /dev/docs/reporting-standards        10.2 kB         104 kB
+├ ○ /dev/docs/ui-documentation           5.17 kB        92.3 kB
+├ ○ /dev/docs/verification-tests         4.39 kB        91.5 kB
+├ ○ /dev/test-harness                    4.35 kB         133 kB
+├ ○ /login                               162 B           142 kB
+├ ○ /operations                          1.79 kB         192 kB
+├ ○ /password-reset                      4.57 kB         140 kB
+├ ○ /performance                         19.8 kB         178 kB
+├ ○ /production                          21.8 kB         201 kB
+├ ○ /products                            10.6 kB         179 kB
+├ λ /products/[id]                       64 kB           251 kB
+├ λ /products/[id]/calculate-lca         10.9 kB         144 kB
+├ λ /products/[id]/core-operations       8.9 kB          170 kB
+├ λ /products/[id]/distribution          3.89 kB          91 kB
+├ λ /products/[id]/end-of-life           3.88 kB          91 kB
+├ λ /products/[id]/materials             8.86 kB         170 kB
+├ λ /products/[id]/recipe                20.3 kB         214 kB
+├ λ /products/[id]/report                148 kB          313 kB
+├ ○ /products/detail                     5.8 kB          141 kB
+├ ○ /products/new                        11.5 kB         179 kB
+├ ○ /reporting/calculations              7.31 kB         140 kB
+├ ○ /reports                             2.47 kB         103 kB
+├ ○ /reports/company-footprint           6.99 kB         140 kB
+├ λ /reports/company-footprint/[year]    27.1 kB         214 kB
+├ ○ /reports/lcas                        8.57 kB         144 kB
+├ ○ /reports/sustainability              4.38 kB        98.3 kB
+├ ○ /settings                            2.83 kB         103 kB
+├ ○ /signup                              162 B           142 kB
+├ ○ /supplier-onboarding                 5.82 kB         141 kB
+├ ○ /suppliers                           14 kB           183 kB
+├ λ /suppliers/[id]                      11.9 kB         213 kB
+├ ○ /suppliers/new                       5.06 kB         177 kB
+└ ○ /update-password                     4.7 kB          133 kB
++ First Load JS shared by all            80 kB
+  ├ chunks/7864-e512a25ecff418a4.js      26.6 kB
+  ├ chunks/fd9d1056-ae38a91c84cde294.js  51.1 kB
+  ├ chunks/main-app-723e9312178506c1.js  235 B
+  └ chunks/webpack-7c2a8ec5299b05a1.js   2.03 kB
+
+
+ƒ Middleware                             26.8 kB
+
+λ  (Server)  server-side renders at runtime (uses getInitialProps or getServerSideProps)
+○  (Static)  automatically rendered as static HTML (uses no initial props)
+●  (SSG)     automatically generated as static HTML + JSON (uses getStaticProps)
+
