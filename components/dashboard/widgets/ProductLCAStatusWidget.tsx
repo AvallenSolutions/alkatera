@@ -38,7 +38,7 @@ export function ProductLCAStatusWidget() {
 
         const { data: products, error: productsError } = await supabase
           .from('products')
-          .select('id, name, status, image_url, updated_at')
+          .select('id, name, is_draft, has_active_lca, latest_lca_id, image_url, updated_at')
           .eq('organization_id', currentOrganization.id)
           .order('updated_at', { ascending: false })
           .limit(5);
@@ -63,7 +63,20 @@ export function ProductLCAStatusWidget() {
           inProgress,
         });
 
-        setRecentProducts(products || []);
+        const productsWithStatus = (products || []).map((p) => {
+          const productLca = lcas?.find((l) => l.id === p.latest_lca_id);
+          let status = 'draft';
+          if (productLca?.status === 'completed') {
+            status = 'completed';
+          } else if (productLca?.status === 'in_progress' || p.has_active_lca) {
+            status = 'in progress';
+          } else if (p.is_draft) {
+            status = 'draft';
+          }
+          return { ...p, status };
+        });
+
+        setRecentProducts(productsWithStatus);
       } catch (err: any) {
         console.error('Error fetching product stats:', err);
         setError(err.message);

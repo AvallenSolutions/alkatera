@@ -83,6 +83,39 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         setLoading(true);
         setError(null);
 
+        const { data: lcas, error: lcasError } = await supabase
+          .from('product_lcas')
+          .select('id, product_id')
+          .eq('organization_id', organizationId);
+
+        if (lcasError) throw lcasError;
+
+        if (!lcas || lcas.length === 0) {
+          setDistribution({
+            high_count: 0,
+            high_percentage: 0,
+            medium_count: 0,
+            medium_percentage: 0,
+            low_count: 0,
+            low_percentage: 0,
+            total_count: 0,
+          });
+          setLoading(false);
+          return;
+        }
+
+        const lcaIds = lcas.map(l => l.id);
+
+        const { data: products, error: productsError } = await supabase
+          .from('products')
+          .select('id, name')
+          .eq('organization_id', organizationId);
+
+        if (productsError) throw productsError;
+
+        const productMap = new Map((products || []).map(p => [p.id, p.name]));
+        const lcaProductMap = new Map(lcas.map(l => [l.id, l.product_id]));
+
         const { data: materials, error: materialsError } = await supabase
           .from('product_lca_materials')
           .select(`
@@ -98,17 +131,9 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
             gwp_data_source,
             is_hybrid_source,
             category_type,
-            supplier_product_id,
-            product_lcas!inner(
-              product_id,
-              products!inner(
-                id,
-                name,
-                organization_id
-              )
-            )
+            supplier_product_id
           `)
-          .eq('product_lcas.products.organization_id', organizationId);
+          .in('product_lca_id', lcaIds);
 
         if (materialsError) throw materialsError;
 
@@ -166,10 +191,10 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
             const currentConfidence = m.confidence_score || 50;
             const ghgImpact = m.impact_climate || 0;
 
-            let potentialConfidence = 95;
-            let confidenceGain = potentialConfidence - currentConfidence;
+            const potentialConfidence = 95;
+            const confidenceGain = potentialConfidence - currentConfidence;
 
-            let priorityScore = (ghgImpact * confidenceGain) / 100;
+            const priorityScore = (ghgImpact * confidenceGain) / 100;
 
             let recommendation = '';
             if (ghgImpact > 10) {
@@ -180,12 +205,12 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
               recommendation = 'Low impact - Consider when updating product';
             }
 
-            const productLca = m.product_lcas as any;
-            const product = productLca?.products as any;
+            const productId = lcaProductMap.get(m.product_lca_id) || '';
+            const productName = productMap.get(productId) || 'Unknown Product';
 
             return {
-              product_id: product?.id || '',
-              product_name: product?.name || 'Unknown Product',
+              product_id: productId,
+              product_name: productName,
               material_id: m.id,
               material_name: m.name || 'Unknown Material',
               current_quality: currentQuality,
