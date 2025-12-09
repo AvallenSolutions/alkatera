@@ -32,6 +32,7 @@ import {
   Trash2,
   BarChart3,
   Users,
+  Briefcase,
 } from 'lucide-react'
 
 interface NavItem {
@@ -66,11 +67,6 @@ const navigationStructure: NavItem[] = [
         name: 'Facilities',
         href: '/company/facilities',
         icon: Warehouse,
-      },
-      {
-        name: 'Fleet',
-        href: '/company/fleet',
-        icon: Truck,
       },
       {
         name: 'Annual Footprint Builder',
@@ -123,6 +119,18 @@ const navigationStructure: NavItem[] = [
         name: "LCA's & EPD's",
         href: '/reports/lcas',
         icon: Award,
+      },
+    ],
+  },
+  {
+    name: 'How We Work',
+    href: '/company',
+    icon: Briefcase,
+    children: [
+      {
+        name: 'Fleet',
+        href: '/company/fleet',
+        icon: Truck,
       },
     ],
   },
