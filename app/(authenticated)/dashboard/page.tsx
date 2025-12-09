@@ -1,142 +1,175 @@
-"use client"
+'use client';
 
-import dynamic from 'next/dynamic';
-import { Leaf, Droplet, Recycle, Sprout } from 'lucide-react';
-import { KPICard } from '@/components/dashboard/KPICard';
-import { SmartGoalsSection } from '@/components/dashboard/SmartGoalsSection';
-import { LiveFeedCard } from '@/components/dashboard/LiveFeedCard';
+import { useEffect, useState } from 'react';
+import { useOrganization } from '@/lib/organizationContext';
+import { useDashboardPreferences } from '@/hooks/data/useDashboardPreferences';
+import { DashboardCustomiseModal } from '@/components/dashboard/DashboardCustomiseModal';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Settings2, RefreshCw } from 'lucide-react';
 
-const ImpactTrajectoryChart = dynamic(
-  () => import('@/components/dashboard/ImpactTrajectoryChart').then(mod => ({ default: mod.ImpactTrajectoryChart })),
-  { ssr: false }
-);
+import {
+  HeadlineMetricsWidget,
+  QuickActionsWidget,
+  GHGEmissionsSummaryWidget,
+  SupplierEngagementWidget,
+  RecentActivityWidget,
+  DataQualityWidget,
+  ProductLCAStatusWidget,
+  GettingStartedWidget,
+  WaterRiskWidget,
+  ComplianceStatusWidget,
+  EmissionsTrendWidget,
+} from '@/components/dashboard/widgets';
 
-const mockChartData = [
-  { month: 'Jan', value: 4000 },
-  { month: 'Feb', value: 3200 },
-  { month: 'Mar', value: 3400 },
-  { month: 'Apr', value: 2800 },
-  { month: 'May', value: 3100 },
-  { month: 'Jun', value: 2600 },
-  { month: 'Jul', value: 2900 },
-];
+const widgetComponents: Record<string, React.ComponentType> = {
+  'headline-metrics': HeadlineMetricsWidget,
+  'quick-actions': QuickActionsWidget,
+  'ghg-summary': GHGEmissionsSummaryWidget,
+  'supplier-engagement': SupplierEngagementWidget,
+  'recent-activity': RecentActivityWidget,
+  'data-quality': DataQualityWidget,
+  'product-lca-status': ProductLCAStatusWidget,
+  'getting-started': GettingStartedWidget,
+  'water-risk': WaterRiskWidget,
+  'compliance-status': ComplianceStatusWidget,
+  'emissions-trend': EmissionsTrendWidget,
+};
 
-const mockGoals = [
-  {
-    title: 'Reduce Scope 1 Emissions',
-    current: 1204,
-    target: 1600,
-    unit: 'tCO2e',
-    targetYear: 'Q4 2024',
-    percentage: 75,
-    color: 'lime' as const,
-  },
-  {
-    title: 'Achieve Zero Waste to Landfill',
-    current: 850,
-    target: 1889,
-    unit: 'kg',
-    targetYear: 'Q2 2025',
-    percentage: 45,
-    color: 'cyan' as const,
-  },
-  {
-    title: 'Supply Chain Audit',
-    current: 82,
-    target: 100,
-    unit: 'Suppliers',
-    targetYear: 'Q3 2024',
-    percentage: 82,
-    color: 'emerald' as const,
-  },
-];
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-4 w-48" />
+        </div>
+        <Skeleton className="h-9 w-28" />
+      </div>
+      <Skeleton className="h-48 w-full rounded-xl" />
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-64 rounded-xl col-span-2" />
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-80 rounded-xl col-span-2" />
+        <Skeleton className="h-80 rounded-xl" />
+        <Skeleton className="h-80 rounded-xl" />
+      </div>
+    </div>
+  );
+}
 
-const mockFeedItems = [
-  {
-    id: '1',
-    type: 'error' as const,
-    message: 'High water usage detected in Sector 4',
-    timestamp: '2 mins ago',
-  },
-  {
-    id: '2',
-    type: 'success' as const,
-    message: 'Monthly audit completed successfully',
-    timestamp: '17 mins ago',
-  },
-  {
-    id: '3',
-    type: 'info' as const,
-    message: 'Syncing supply chain data...',
-    timestamp: '32 mins ago',
-  },
-  {
-    id: '4',
-    type: 'success' as const,
-    message: 'Scope 3 emissions updated',
-    timestamp: '47 mins ago',
-  },
-];
+function EmptyDashboard() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="h-16 w-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+        <Settings2 className="h-8 w-8 text-slate-400" />
+      </div>
+      <h3 className="text-lg font-semibold mb-2">No Widgets Enabled</h3>
+      <p className="text-sm text-muted-foreground mb-4 max-w-md">
+        You have hidden all dashboard widgets. Click customise to enable the widgets you want to see.
+      </p>
+      <DashboardCustomiseModal>
+        <Button>
+          <Settings2 className="h-4 w-4 mr-2" />
+          Customise Dashboard
+        </Button>
+      </DashboardCustomiseModal>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
-  return (
-    <div className="space-y-8 animate-fade-in-up">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-heading font-bold tracking-tight">
-          Sustainability Overview
-        </h1>
-        <p className="text-sm text-muted-foreground font-data">
-          Last updated: Today, 09:41 AM
-        </p>
-      </div>
+  const { currentOrganization } = useOrganization();
+  const { enabledWidgets, loading, error, refetch } = useDashboardPreferences();
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <KPICard
-          icon={Leaf}
-          label="Carbon Footprint"
-          value={1204}
-          unit="tCO2e"
-          trend={-12}
-          progress={65}
-          color="lime"
-        />
-        <KPICard
-          icon={Droplet}
-          label="Water Efficiency"
-          value={4.2}
-          unit="L/L"
-          trend={-5}
-          progress={72}
-          color="cyan"
-        />
-        <KPICard
-          icon={Recycle}
-          label="Spent Grain"
-          value={850}
-          unit="kg"
-          trend={2}
-          progress={58}
-          color="purple"
-        />
-        <KPICard
-          icon={Sprout}
-          label="Biodiversity Score"
-          value={88}
-          unit="/100"
-          trend={4}
-          progress={88}
-          color="emerald"
-        />
-      </div>
+  useEffect(() => {
+    setLastUpdated(new Date());
+  }, [enabledWidgets]);
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          {/* <ImpactTrajectoryChart data={mockChartData} /> */}
+  const getColSpanClass = (colSpan: number) => {
+    switch (colSpan) {
+      case 1:
+        return 'col-span-1';
+      case 2:
+        return 'col-span-1 md:col-span-2';
+      case 3:
+        return 'col-span-1 md:col-span-2 lg:col-span-3';
+      case 4:
+        return 'col-span-full';
+      default:
+        return 'col-span-1 md:col-span-2';
+    }
+  };
+
+  const handleRefresh = () => {
+    refetch();
+    setLastUpdated(new Date());
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <DashboardSkeleton />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
+          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+          <Button variant="outline" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Try Again
+          </Button>
         </div>
-        <LiveFeedCard items={mockFeedItems} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in-up">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight">
+            {currentOrganization?.name ? `${currentOrganization.name} Dashboard` : 'Dashboard'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Last updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh dashboard">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <DashboardCustomiseModal />
+        </div>
       </div>
 
-      <SmartGoalsSection goals={mockGoals} />
+      {enabledWidgets.length === 0 ? (
+        <EmptyDashboard />
+      ) : (
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+          {enabledWidgets.map((pref) => {
+            const WidgetComponent = widgetComponents[pref.widget_id];
+            if (!WidgetComponent) return null;
+
+            return (
+              <div
+                key={pref.widget_id}
+                className={getColSpanClass(pref.col_span)}
+              >
+                <WidgetComponent />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
-  )
+  );
 }

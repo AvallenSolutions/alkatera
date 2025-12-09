@@ -15,7 +15,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Plus } from 'lucide-react'
+import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Plus, Search } from 'lucide-react'
+import { CommandPalette } from '@/components/dashboard/CommandPalette'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import {
   Command,
@@ -163,6 +164,20 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true });
+              document.dispatchEvent(event);
+            }}
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Search className="h-4 w-4" />
+            <span>Search...</span>
+            <kbd className="inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium">
+              <span className="text-xs">Cmd</span>K
+            </kbd>
+          </button>
+          <CommandPalette />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
