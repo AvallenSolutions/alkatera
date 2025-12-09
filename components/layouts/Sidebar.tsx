@@ -145,6 +145,11 @@ const developmentStructure: NavItem[] = [
     icon: ShieldCheck,
   },
   {
+    name: 'ISO Compliance Tests',
+    href: '/dev/docs/iso-compliance-tests',
+    icon: FileBarChart,
+  },
+  {
     name: 'Reporting Standards',
     href: '/dev/docs/reporting-standards',
     icon: BookOpen,
