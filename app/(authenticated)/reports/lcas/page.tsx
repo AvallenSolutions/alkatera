@@ -48,7 +48,7 @@ export default function LcasPage() {
         .select(`
           id,
           product_id,
-          products!inner(name),
+          product_name,
           functional_unit,
           status,
           system_boundary,
@@ -79,7 +79,7 @@ export default function LcasPage() {
         return {
           id: lca.id,
           product_id: lca.product_id,
-          product_name: lca.products?.name || 'Unknown Product',
+          product_name: lca.product_name || 'Unknown Product',
           title: `${new Date(lca.created_at).getFullYear()} LCA Study`,
           version: '1.0',
           status: lca.status === 'completed' ? 'completed' : 'draft',
