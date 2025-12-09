@@ -33,6 +33,7 @@ import {
   BarChart3,
   Users,
   Briefcase,
+  GraduationCap,
 } from 'lucide-react'
 
 interface NavItem {
@@ -99,6 +100,11 @@ const navigationStructure: NavItem[] = [
     name: 'Suppliers',
     href: '/suppliers',
     icon: Users,
+  },
+  {
+    name: 'Knowledge Bank',
+    href: '/knowledge-bank',
+    icon: GraduationCap,
   },
   {
     name: 'Production',
