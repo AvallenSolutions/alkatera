@@ -26,16 +26,48 @@ interface FacilityBreakdownItem {
 }
 
 interface AggregatedImpacts {
+  // Core 4 impacts
   climate_change_gwp100: number;
   water_consumption: number;
   water_scarcity_aware: number;
   land_use: number;
+
+  // Complete ReCiPe 2016 Midpoint (18 categories)
+  ozone_depletion: number;
+  photochemical_ozone_formation: number;
+  ionising_radiation: number;
+  particulate_matter: number;
+  human_toxicity_carcinogenic: number;
+  human_toxicity_non_carcinogenic: number;
   terrestrial_ecotoxicity: number;
+  freshwater_ecotoxicity: number;
+  marine_ecotoxicity: number;
   freshwater_eutrophication: number;
+  marine_eutrophication: number;
   terrestrial_acidification: number;
+  mineral_resource_scarcity: number;
   fossil_resource_scarcity: number;
+  waste: number;
+
+  // Legacy fields
   circularity_percentage: number;
   water_risk_level: string;
+
+  // GHG breakdown (ISO 14067)
+  climate_fossil: number;
+  climate_biogenic: number;
+  climate_dluc: number;
+
+  // Data quality and provenance
+  data_quality: any;
+  data_provenance: {
+    hybrid_sources_count: number;
+    defra_gwp_count: number;
+    supplier_verified_count: number;
+    ecoinvent_only_count: number;
+    methodology_summary: string;
+  };
+
   breakdown: {
     by_scope: {
       scope1: number;
@@ -156,15 +188,39 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[calculate-product-lca-impacts] Found ${productionSites?.length || 0} production sites`);
 
-    // 4. Initialize totals
+    // 4. Initialize totals for all 18 ReCiPe 2016 categories
     let totalClimate = 0;
     let totalWater = 0;
     let totalWaterScarcity = 0;
     let totalLand = 0;
+    let totalWaste = 0;
+
+    // Extended ReCiPe 2016 impacts
+    let totalOzoneDepletion = 0;
+    let totalPhotochemicalOzone = 0;
+    let totalIonisingRadiation = 0;
+    let totalParticulateMatter = 0;
+    let totalHumanToxCarcinogenic = 0;
+    let totalHumanToxNonCarcinogenic = 0;
     let totalTerrestrialEcotox = 0;
+    let totalFreshwaterEcotox = 0;
+    let totalMarineEcotox = 0;
     let totalFreshwaterEutro = 0;
+    let totalMarineEutro = 0;
     let totalTerrestrialAcid = 0;
+    let totalMineralResource = 0;
     let totalFossilResource = 0;
+
+    // GHG breakdown tracking
+    let climateFossil = 0;
+    let climateBiogenic = 0;
+    let climateDluc = 0;
+
+    // Data provenance tracking
+    let hybridSourcesCount = 0;
+    let defraGwpCount = 0;
+    let supplierVerifiedCount = 0;
+    let ecoinventOnlyCount = 0;
 
     // Scope breakdown
     let scope1Total = 0;
@@ -197,7 +253,7 @@ Deno.serve(async (req: Request) => {
 
     // 6. Calculate materials impacts - ALL materials are Scope 3 upstream
     materials?.forEach((material: any) => {
-      // CRITICAL FIX: impact_climate is ALREADY PRE-CALCULATED (quantity × factor)
+      // CRITICAL: impact values are ALREADY PRE-CALCULATED (quantity × factor)
       // Materials are stored with pre-calculated values, DO NOT multiply by quantity again!
       const quantity = Number(material.quantity) || 0;
       const climate = Number(material.impact_climate) || 0;
@@ -207,22 +263,75 @@ Deno.serve(async (req: Request) => {
       if (climate === 0 && quantity > 0) {
         console.warn(`[calculate-product-lca-impacts] WARNING: Material "${material.name}" has zero climate impact but non-zero quantity (${quantity} ${material.unit}). Data source: ${material.data_source}, Supplier ID: ${material.supplier_product_id || 'none'}`);
       }
+
+      // Core 4 impacts
       const water = Number(material.impact_water) || 0;
       const waterScarcity = Number(material.impact_water_scarcity) || water * 20;
       const land = Number(material.impact_land) || 0;
+      const waste = Number(material.impact_waste) || 0;
+
+      // Extended ReCiPe 2016 impacts
+      const ozoneDepletion = Number(material.impact_ozone_depletion) || 0;
+      const photochemicalOzone = Number(material.impact_photochemical_ozone_formation) || 0;
+      const ionisingRadiation = Number(material.impact_ionising_radiation) || 0;
+      const particulateMatter = Number(material.impact_particulate_matter) || 0;
+      const humanToxCarcinogenic = Number(material.impact_human_toxicity_carcinogenic) || 0;
+      const humanToxNonCarcinogenic = Number(material.impact_human_toxicity_non_carcinogenic) || 0;
       const terrestrialEcotox = Number(material.impact_terrestrial_ecotoxicity) || 0;
+      const freshwaterEcotox = Number(material.impact_freshwater_ecotoxicity) || 0;
+      const marineEcotox = Number(material.impact_marine_ecotoxicity) || 0;
       const freshwaterEutro = Number(material.impact_freshwater_eutrophication) || 0;
+      const marineEutro = Number(material.impact_marine_eutrophication) || 0;
       const terrestrialAcid = Number(material.impact_terrestrial_acidification) || 0;
+      const mineralResource = Number(material.impact_mineral_resource_scarcity) || 0;
       const fossilResource = Number(material.impact_fossil_resource_scarcity) || 0;
 
+      // GHG breakdown
+      const climateF = Number(material.impact_climate_fossil) || 0;
+      const climateB = Number(material.impact_climate_biogenic) || 0;
+      const climateD = Number(material.impact_climate_dluc) || 0;
+
+      // Track provenance
+      const isHybrid = material.is_hybrid_source || false;
+      const gwpSource = material.gwp_data_source || '';
+      const dataQualityGrade = material.data_quality_grade || '';
+
+      if (isHybrid && gwpSource.includes('DEFRA')) {
+        hybridSourcesCount++;
+        defraGwpCount++;
+      } else if (dataQualityGrade === 'HIGH' || gwpSource.includes('Supplier')) {
+        supplierVerifiedCount++;
+      } else if (gwpSource.includes('Ecoinvent') && !isHybrid) {
+        ecoinventOnlyCount++;
+      }
+
+      // Aggregate core impacts
       totalClimate += climate;
       totalWater += water;
       totalWaterScarcity += waterScarcity;
       totalLand += land;
+      totalWaste += waste;
+
+      // Aggregate extended impacts
+      totalOzoneDepletion += ozoneDepletion;
+      totalPhotochemicalOzone += photochemicalOzone;
+      totalIonisingRadiation += ionisingRadiation;
+      totalParticulateMatter += particulateMatter;
+      totalHumanToxCarcinogenic += humanToxCarcinogenic;
+      totalHumanToxNonCarcinogenic += humanToxNonCarcinogenic;
       totalTerrestrialEcotox += terrestrialEcotox;
+      totalFreshwaterEcotox += freshwaterEcotox;
+      totalMarineEcotox += marineEcotox;
       totalFreshwaterEutro += freshwaterEutro;
+      totalMarineEutro += marineEutro;
       totalTerrestrialAcid += terrestrialAcid;
+      totalMineralResource += mineralResource;
       totalFossilResource += fossilResource;
+
+      // Aggregate GHG breakdown
+      climateFossil += climateF;
+      climateBiogenic += climateB;
+      climateDluc += climateD;
 
       // Add transport emissions to totals
       totalClimate += transport;
@@ -367,19 +476,67 @@ Deno.serve(async (req: Request) => {
       };
     });
 
-    // 10. Build aggregated impacts
+    // Generate methodology summary
+    const methodologySummary = [];
+    if (defraGwpCount > 0) {
+      methodologySummary.push(`DEFRA 2025 GHG factors (${defraGwpCount} materials)`);
+    }
+    if (supplierVerifiedCount > 0) {
+      methodologySummary.push(`Supplier verified EPDs (${supplierVerifiedCount} materials)`);
+    }
+    if (ecoinventOnlyCount > 0) {
+      methodologySummary.push(`Ecoinvent 3.12 full dataset (${ecoinventOnlyCount} materials)`);
+    }
+    if (hybridSourcesCount > 0) {
+      methodologySummary.push(`Hybrid sources (${hybridSourcesCount} materials)`);
+    }
+
+    // 10. Build aggregated impacts with complete 18 categories
     const aggregatedImpacts: AggregatedImpacts = {
+      // Core 4 impacts
       climate_change_gwp100: totalClimate,
       water_consumption: totalWater,
       water_scarcity_aware: totalWaterScarcity,
       land_use: totalLand,
+
+      // Complete ReCiPe 2016 Midpoint (18 categories)
+      ozone_depletion: totalOzoneDepletion,
+      photochemical_ozone_formation: totalPhotochemicalOzone,
+      ionising_radiation: totalIonisingRadiation,
+      particulate_matter: totalParticulateMatter,
+      human_toxicity_carcinogenic: totalHumanToxCarcinogenic,
+      human_toxicity_non_carcinogenic: totalHumanToxNonCarcinogenic,
       terrestrial_ecotoxicity: totalTerrestrialEcotox,
+      freshwater_ecotoxicity: totalFreshwaterEcotox,
+      marine_ecotoxicity: totalMarineEcotox,
       freshwater_eutrophication: totalFreshwaterEutro,
+      marine_eutrophication: totalMarineEutro,
       terrestrial_acidification: totalTerrestrialAcid,
+      mineral_resource_scarcity: totalMineralResource,
       fossil_resource_scarcity: totalFossilResource,
+      waste: totalWaste,
+
+      // GHG breakdown (ISO 14067)
+      climate_fossil: climateFossil,
+      climate_biogenic: climateBiogenic,
+      climate_dluc: climateDluc,
+
+      // Legacy fields
       circularity_percentage: 0,
       water_risk_level: 'low',
+
+      // Data quality
       data_quality: dataQualitySummary,
+
+      // Data provenance tracking
+      data_provenance: {
+        hybrid_sources_count: hybridSourcesCount,
+        defra_gwp_count: defraGwpCount,
+        supplier_verified_count: supplierVerifiedCount,
+        ecoinvent_only_count: ecoinventOnlyCount,
+        methodology_summary: methodologySummary.join('; '),
+      },
+
       breakdown: {
         by_scope: {
           scope1: scope1Total,
@@ -394,15 +551,15 @@ Deno.serve(async (req: Request) => {
           end_of_life: eolTotal,
         },
         by_ghg: {
-          co2_fossil: co2Fossil,
-          co2_biogenic: co2Biogenic,
+          co2_fossil: climateFossil,
+          co2_biogenic: climateBiogenic,
           ch4: ch4,
           n2o: n2o,
         },
         by_ghg_detailed: {
-          co2_fossil: materials.reduce((sum: number, m: any) => sum + (Number(m.impact_climate_fossil) || 0), 0),
-          co2_biogenic: materials.reduce((sum: number, m: any) => sum + (Number(m.impact_climate_biogenic) || 0), 0),
-          co2_dluc: materials.reduce((sum: number, m: any) => sum + (Number(m.impact_climate_dluc) || 0), 0),
+          co2_fossil: climateFossil,
+          co2_biogenic: climateBiogenic,
+          co2_dluc: climateDluc,
           ch4: ch4,
           n2o: n2o,
         },
