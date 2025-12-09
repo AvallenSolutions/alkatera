@@ -5,11 +5,19 @@ import { supabase } from './supabaseClient'
 import { useAuth } from '@/hooks/useAuth'
 import type { User } from '@supabase/supabase-js'
 
-interface Organization {
+export interface Organization {
   id: string
   name: string
   slug: string
   created_at: string
+  logo_url?: string | null
+  address?: string | null
+  city?: string | null
+  country?: string | null
+  industry_sector?: string | null
+  founding_year?: number | null
+  company_size?: string | null
+  description?: string | null
 }
 
 interface OrganizationMember {
