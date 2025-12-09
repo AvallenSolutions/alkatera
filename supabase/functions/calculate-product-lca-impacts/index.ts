@@ -453,6 +453,79 @@ Deno.serve(async (req: Request) => {
 
     console.log("[calculate-product-lca-impacts] Successfully updated LCA with impacts");
 
+    // 11. Delete existing results and insert new ones into product_lca_results
+    const { error: deleteError } = await supabase
+      .from("product_lca_results")
+      .delete()
+      .eq("product_lca_id", product_lca_id);
+
+    if (deleteError) {
+      console.warn("[calculate-product-lca-impacts] Warning: Failed to delete old results:", deleteError);
+    }
+
+    // Insert new results
+    const resultsToInsert = [
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Climate Change",
+        value: totalClimate,
+        unit: "kg CO2e"
+      },
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Water Consumption",
+        value: totalWater,
+        unit: "L"
+      },
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Water Scarcity",
+        value: totalWaterScarcity,
+        unit: "L H2O-eq"
+      },
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Land Use",
+        value: totalLand,
+        unit: "m²"
+      },
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Terrestrial Ecotoxicity",
+        value: totalTerrestrialEcotox,
+        unit: "kg 1,4-DCB"
+      },
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Freshwater Eutrophication",
+        value: totalFreshwaterEutro,
+        unit: "kg P eq"
+      },
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Terrestrial Acidification",
+        value: totalTerrestrialAcid,
+        unit: "kg SO2 eq"
+      },
+      {
+        product_lca_id: product_lca_id,
+        impact_category: "Fossil Resource Scarcity",
+        value: totalFossilResource,
+        unit: "kg oil eq"
+      }
+    ];
+
+    const { error: insertResultsError } = await supabase
+      .from("product_lca_results")
+      .insert(resultsToInsert);
+
+    if (insertResultsError) {
+      console.error("[calculate-product-lca-impacts] Failed to insert results:", insertResultsError);
+      // Don't fail the whole operation, just log the error
+    } else {
+      console.log("[calculate-product-lca-impacts] Successfully inserted impact results");
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
