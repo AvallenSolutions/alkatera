@@ -125,7 +125,7 @@ const navigationStructure: NavItem[] = [
   },
   {
     name: 'How We Work',
-    href: '/company',
+    href: '/how-we-work',
     icon: Briefcase,
     children: [
       {
