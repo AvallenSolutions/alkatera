@@ -6,7 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
-import { TrendingDown, TrendingUp, Minus, LineChart } from 'lucide-react';
+import { TrendingDown, TrendingUp, Minus, LineChart, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -161,57 +163,71 @@ export function EmissionsTrendWidget() {
           )}
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         {hasData ? (
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="emissionsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 12 }}
-                  tickLine={false}
-                  axisLine={false}
-                  className="text-slate-500"
-                />
-                <YAxis
-                  tick={{ fontSize: 12 }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${value.toFixed(0)}`}
-                  className="text-slate-500"
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                  formatter={(value: number) => [`${value.toFixed(2)} tCO₂e`, 'Emissions']}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="emissions"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  fill="url(#emissionsGradient)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="emissionsGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fontSize: 12 }}
+                    tickLine={false}
+                    axisLine={false}
+                    className="text-slate-500"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `${value.toFixed(0)}`}
+                    className="text-slate-500"
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                    formatter={(value: number) => [`${value.toFixed(2)} tCO₂e`, 'Emissions']}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="emissions"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="url(#emissionsGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <Link href="/reports/company-footprint">
+                View Full Report
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </>
         ) : (
           <div className="h-48 flex flex-col items-center justify-center text-center">
             <LineChart className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-3" />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4">
               Complete product LCAs to see your emissions trend
             </p>
+            <Button size="sm" asChild>
+              <Link href="/products">
+                View Products
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
           </div>
         )}
       </CardContent>

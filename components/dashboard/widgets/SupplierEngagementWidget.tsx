@@ -1,7 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Users, AlertCircle, ArrowRight } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSupplierEngagement } from "@/hooks/data/useSupplierEngagement"
+import Link from "next/link"
 
 const statusColors: Record<string, string> = {
   data_provided: '#10b981',
@@ -137,9 +139,15 @@ export function SupplierEngagementWidget() {
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <Users className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Suppliers</h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mb-4">
               Add suppliers to track engagement and Scope 3 emissions
             </p>
+            <Button size="sm" asChild>
+              <Link href="/suppliers/new">
+                Add Supplier
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
           </div>
         ) : (
           <div className="space-y-6">
@@ -167,11 +175,17 @@ export function SupplierEngagementWidget() {
               ))}
             </div>
 
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Total Suppliers</span>
                 <span className="font-semibold">{totalSuppliers}</span>
               </div>
+              <Button variant="outline" size="sm" className="w-full" asChild>
+                <Link href="/suppliers">
+                  View All Suppliers
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           </div>
         )}

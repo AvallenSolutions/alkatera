@@ -2,9 +2,11 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
-import { Droplet, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { Droplet, AlertTriangle, CheckCircle, Info, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
 
 const riskColors = {
   high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -109,18 +111,32 @@ export function WaterRiskWidget() {
         )}
 
         {facilityWaterRisks.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-2">
-            Add facilities to assess water risk by location
-          </p>
+          <div className="text-center py-2 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Add facilities to assess water risk by location
+            </p>
+            <Button size="sm" asChild>
+              <Link href="/company/facilities">
+                Add Facility
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         )}
 
-        <div className="pt-2 border-t">
+        <div className="pt-2 border-t space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Total Water Consumption</span>
             <span className="font-medium">
               {metrics?.total_impacts?.water_consumption?.toFixed(1) || 0} m³
             </span>
           </div>
+          <Button variant="outline" size="sm" className="w-full" asChild>
+            <Link href="/data/water-footprint">
+              View Water Data
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
         </div>
       </CardContent>
     </Card>
