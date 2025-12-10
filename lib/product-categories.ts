@@ -54,6 +54,36 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
     group: "Spirits",
     description: "Sweetened spirits and liqueurs",
   },
+  {
+    value: "Spirits",
+    label: "Bourbon",
+    group: "Spirits",
+    description: "American bourbon whiskey",
+  },
+  {
+    value: "Spirits",
+    label: "Rye Whiskey",
+    group: "Spirits",
+    description: "Rye-based whiskey",
+  },
+  {
+    value: "Spirits",
+    label: "Calvados",
+    group: "Spirits",
+    description: "Apple brandy from Normandy",
+  },
+  {
+    value: "Spirits",
+    label: "Baijiu",
+    group: "Spirits",
+    description: "Chinese distilled spirit",
+  },
+  {
+    value: "Spirits",
+    label: "Aquavit",
+    group: "Spirits",
+    description: "Scandinavian distilled spirit flavoured with botanicals",
+  },
 
   {
     value: "Beer",
@@ -65,7 +95,13 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
     value: "Beer",
     label: "Ale",
     group: "Beer & Cider",
-    description: "Top-fermented ales including IPA, pale ale, bitter",
+    description: "Top-fermented ales including pale ale and bitter",
+  },
+  {
+    value: "Beer",
+    label: "IPA",
+    group: "Beer & Cider",
+    description: "India Pale Ale including West Coast, New England, and session styles",
   },
   {
     value: "Beer",
@@ -127,6 +163,12 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
     label: "Fortified Wine",
     group: "Wine",
     description: "Port, Sherry, Vermouth, and other fortified wines",
+  },
+  {
+    value: "Wine",
+    label: "Natural Wine",
+    group: "Wine",
+    description: "Low-intervention, organic, and biodynamic wines",
   },
 
   {
@@ -261,6 +303,36 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
     label: "Kombucha (Non-Alcoholic)",
     group: "Non-Alcoholic",
     description: "Fermented tea without significant alcohol",
+  },
+  {
+    value: "Non-Alcoholic Alternative",
+    label: "Non-Alcoholic Spirit",
+    group: "Non-Alcoholic",
+    description: "Zero-alcohol spirit alternatives",
+  },
+  {
+    value: "Non-Alcoholic Alternative",
+    label: "Non-Alcoholic Liqueur",
+    group: "Non-Alcoholic",
+    description: "Zero-alcohol liqueur alternatives",
+  },
+  {
+    value: "Non-Alcoholic Alternative",
+    label: "Non-Alcoholic Beer",
+    group: "Non-Alcoholic",
+    description: "Zero-alcohol and low-alcohol beer",
+  },
+  {
+    value: "Non-Alcoholic Alternative",
+    label: "Non-Alcoholic Wine",
+    group: "Non-Alcoholic",
+    description: "Dealcoholised wine and zero-alcohol wine alternatives",
+  },
+  {
+    value: "Non-Alcoholic Alternative",
+    label: "Non-Alcoholic Cider",
+    group: "Non-Alcoholic",
+    description: "Zero-alcohol cider alternatives",
   },
 ];
 
