@@ -6,7 +6,6 @@ const nextConfig = {
     removeConsole: false,
   },
   serverExternalPackages: ['pdfjs-dist'],
-  turbopack: {},
 };
 
 module.exports = nextConfig;
