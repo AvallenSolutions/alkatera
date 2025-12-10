@@ -75,6 +75,7 @@ interface Allocation {
   emission_intensity_kg_co2e_per_unit: number;
   status: string;
   is_energy_intensive_process: boolean;
+  uses_proxy_data?: boolean;
   data_source_tag: string;
   co2e_entry_method: string;
   created_at: string;
@@ -161,8 +162,8 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
     loadData();
   };
 
-  const getStatusBadge = (status: string, isEnergyIntensive: boolean) => {
-    if (status === "provisional" || isEnergyIntensive) {
+  const getStatusBadge = (status: string, isEnergyIntensive: boolean, usesProxyData?: boolean) => {
+    if (status === "provisional" || isEnergyIntensive || usesProxyData) {
       return <Badge className="bg-amber-500/20 text-amber-300">Provisional</Badge>;
     }
     if (status === "verified") {
@@ -179,7 +180,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
     .reduce((sum, a) => sum + (a.allocated_emissions_kg_co2e || 0), 0);
 
   const hasProvisionalAllocations = allocations.some(
-    (a) => a.status === "provisional" || a.is_energy_intensive_process
+    (a) => a.status === "provisional" || a.is_energy_intensive_process || a.uses_proxy_data
   );
 
   if (loading) {
@@ -338,7 +339,14 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
                         </span>
                       </TableCell>
                       <TableCell>
-                        {getStatusBadge(allocation.status, allocation.is_energy_intensive_process)}
+                        <div className="flex items-center gap-2">
+                          {allocation.uses_proxy_data && (
+                            <Badge variant="outline" className="text-amber-300 border-amber-500">
+                              EST
+                            </Badge>
+                          )}
+                          {getStatusBadge(allocation.status, allocation.is_energy_intensive_process, allocation.uses_proxy_data)}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

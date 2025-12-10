@@ -96,6 +96,10 @@ export function ContractManufacturerAllocationForm({
   const [totalFacilityProductionVolume, setTotalFacilityProductionVolume] = useState("");
   const [productionVolumeUnit, setProductionVolumeUnit] = useState("units");
 
+  const [useProxyData, setUseProxyData] = useState(false);
+  const [productCategory, setProductCategory] = useState("");
+  const [proxyMapping, setProxyMapping] = useState<any>(null);
+
   const [co2eEntryMethod, setCo2eEntryMethod] = useState<"direct" | "calculated_from_energy">("direct");
   const [directCo2eValue, setDirectCo2eValue] = useState("");
   const [emissionFactorYear, setEmissionFactorYear] = useState(currentYear);
@@ -109,6 +113,18 @@ export function ContractManufacturerAllocationForm({
   useEffect(() => {
     loadEmissionFactors();
   }, [emissionFactorYear]);
+
+  useEffect(() => {
+    loadProductCategory();
+  }, [productId]);
+
+  useEffect(() => {
+    if (useProxyData && productCategory) {
+      loadProxyMapping();
+    } else {
+      setProxyMapping(null);
+    }
+  }, [useProxyData, productCategory]);
 
   const loadEmissionFactors = async () => {
     const { data, error } = await supabase
@@ -125,12 +141,46 @@ export function ContractManufacturerAllocationForm({
     }
   };
 
+  const loadProductCategory = async () => {
+    const { data } = await supabase
+      .from("products")
+      .select("product_category")
+      .eq("id", productId)
+      .single();
+
+    if (data) {
+      setProductCategory(data.product_category || "");
+    }
+  };
+
+  const loadProxyMapping = async () => {
+    const { data } = await supabase
+      .from("product_category_proxy_mappings")
+      .select("*")
+      .eq("product_category", productCategory)
+      .maybeSingle();
+
+    if (data) {
+      setProxyMapping(data);
+      toast.info(`Using ${data.ecoinvent_process_name} (+ ${data.recommended_buffer_percentage}% buffer)`);
+    } else {
+      toast.warning(`No proxy mapping found for ${productCategory}. Please enter specific data.`);
+      setUseProxyData(false);
+    }
+  };
+
   const totalFacilityCo2e = useMemo(() => {
+    if (useProxyData && proxyMapping) {
+      const totalVolume = parseFloat(totalFacilityProductionVolume) || 0;
+      const bufferMultiplier = 1 + (proxyMapping.recommended_buffer_percentage / 100);
+      return totalVolume * proxyMapping.co2e_per_kg * bufferMultiplier;
+    }
+
     if (co2eEntryMethod === "direct") {
       return parseFloat(directCo2eValue) || 0;
     }
     return energyInputs.reduce((sum, input) => sum + (input.calculatedCo2e || 0), 0);
-  }, [co2eEntryMethod, directCo2eValue, energyInputs]);
+  }, [useProxyData, proxyMapping, totalFacilityProductionVolume, co2eEntryMethod, directCo2eValue, energyInputs]);
 
   const attributionRatio = useMemo(() => {
     const totalVolume = parseFloat(totalFacilityProductionVolume) || 0;
@@ -211,11 +261,16 @@ export function ContractManufacturerAllocationForm({
     if (!totalFacilityProductionVolume || parseFloat(totalFacilityProductionVolume) <= 0) {
       return "Please enter the total facility production volume";
     }
-    if (co2eEntryMethod === "direct" && (!directCo2eValue || parseFloat(directCo2eValue) < 0)) {
-      return "Please enter the total facility CO2e";
+    if (useProxyData && !proxyMapping) {
+      return "No industry average available for this product category";
     }
-    if (co2eEntryMethod === "calculated_from_energy" && energyInputs.length === 0) {
-      return "Please add at least one energy input";
+    if (!useProxyData) {
+      if (co2eEntryMethod === "direct" && (!directCo2eValue || parseFloat(directCo2eValue) < 0)) {
+        return "Please enter the total facility CO2e";
+      }
+      if (co2eEntryMethod === "calculated_from_energy" && energyInputs.length === 0) {
+        return "Please add at least one energy input";
+      }
     }
     if (!clientProductionVolume || parseFloat(clientProductionVolume) <= 0) {
       return "Please enter the client production volume";
@@ -250,15 +305,22 @@ export function ContractManufacturerAllocationForm({
         total_facility_production_volume: parseFloat(totalFacilityProductionVolume),
         production_volume_unit: productionVolumeUnit,
         total_facility_co2e_kg: totalFacilityCo2e,
-        co2e_entry_method: co2eEntryMethod,
+        co2e_entry_method: useProxyData ? "proxy" : co2eEntryMethod,
         emission_factor_year: emissionFactorYear,
-        emission_factor_source: "DEFRA",
+        emission_factor_source: useProxyData ? "Ecoinvent" : "DEFRA",
         client_production_volume: parseFloat(clientProductionVolume),
         is_energy_intensive_process: isEnergyIntensiveProcess,
         energy_intensive_notes: isEnergyIntensiveProcess ? energyIntensiveNotes : null,
         created_by: user?.id,
-        data_quality_score: co2eEntryMethod === "calculated_from_energy" ? 4 : 3,
+        data_quality_score: useProxyData ? 1 : (co2eEntryMethod === "calculated_from_energy" ? 4 : 3),
         locked_at: new Date().toISOString(),
+        uses_proxy_data: useProxyData,
+        proxy_mapping_id: useProxyData && proxyMapping ? proxyMapping.id : null,
+        calculation_method: useProxyData ? "Secondary Data (Estimate)" : "Primary Data (Measured)",
+        data_quality_rating: useProxyData ? "Low" : "High",
+        confidence_score: useProxyData ? "Estimated" : "Verified",
+        data_source: useProxyData ? `${proxyMapping?.ecoinvent_process_name} (${proxyMapping?.ecoinvent_version})` : "Facility-specific data",
+        safety_buffer_applied: useProxyData ? proxyMapping?.recommended_buffer_percentage : 0,
       };
 
       const { data: allocation, error: allocationError } = await supabase
@@ -393,22 +455,77 @@ export function ContractManufacturerAllocationForm({
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className={useProxyData ? "bg-amber-900/20 border-amber-500/30" : "bg-blue-900/20 border-blue-500/30"}>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Zap className="h-5 w-5 text-lime-400" />
-            Input B: Facility Energy & Emissions
+          <CardTitle className={useProxyData ? "text-amber-200" : "text-blue-200"}>
+            Missing Facility Data?
           </CardTitle>
-          <CardDescription>
-            Total CO2e emissions from the facility during this period
+          <CardDescription className={useProxyData ? "text-amber-100/70" : "text-blue-100/70"}>
+            Use industry averages if manufacturer energy bills are unavailable
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Tabs value={co2eEntryMethod} onValueChange={(v) => setCo2eEntryMethod(v as "direct" | "calculated_from_energy")}>
-            <TabsList className="grid w-full grid-cols-2 bg-slate-800">
-              <TabsTrigger value="direct">Direct CO2e Entry</TabsTrigger>
-              <TabsTrigger value="calculated_from_energy">Raw Energy Data</TabsTrigger>
-            </TabsList>
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="useProxyData"
+              checked={useProxyData}
+              onCheckedChange={(checked) => setUseProxyData(checked as boolean)}
+            />
+            <div className="flex-1">
+              <Label htmlFor="useProxyData" className={useProxyData ? "text-amber-100" : "text-blue-100"}>
+                I do not have specific energy data for this facility
+              </Label>
+              <p className={`text-xs mt-1 ${useProxyData ? "text-amber-200/70" : "text-blue-200/70"}`}>
+                System will use conservative industry averages based on your product category
+              </p>
+            </div>
+          </div>
+
+          {useProxyData && proxyMapping && (
+            <Alert className="bg-amber-500/10 border-amber-500/20">
+              <AlertCircle className="h-4 w-4 text-amber-400" />
+              <AlertDescription className="text-amber-200">
+                <strong>Using industry average:</strong> {proxyMapping.ecoinvent_process_name}
+                <br />
+                <strong>Base emission factor:</strong> {proxyMapping.co2e_per_kg.toFixed(3)} kg CO2e per kg product
+                <br />
+                <strong>Safety buffer:</strong> +{proxyMapping.recommended_buffer_percentage}% (ensures conservative estimate)
+                <br />
+                <strong>Data quality:</strong> Low confidence - enter actual facility data to improve accuracy
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {useProxyData && !proxyMapping && productCategory && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                No industry average proxy available for category: <strong>{productCategory}</strong>
+                <br />
+                Please uncheck this option and enter specific facility data.
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      {!useProxyData && (
+        <Card className="bg-slate-900/50 border-slate-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <Zap className="h-5 w-5 text-lime-400" />
+              Input B: Facility Energy & Emissions
+            </CardTitle>
+            <CardDescription>
+              Total CO2e emissions from the facility during this period
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Tabs value={co2eEntryMethod} onValueChange={(v) => setCo2eEntryMethod(v as "direct" | "calculated_from_energy")}>
+              <TabsList className="grid w-full grid-cols-2 bg-slate-800">
+                <TabsTrigger value="direct">Direct CO2e Entry</TabsTrigger>
+                <TabsTrigger value="calculated_from_energy">Raw Energy Data</TabsTrigger>
+              </TabsList>
 
             <TabsContent value="direct" className="space-y-4 pt-4">
               <div>
@@ -545,6 +662,7 @@ export function ContractManufacturerAllocationForm({
           </Tabs>
         </CardContent>
       </Card>
+      )}
 
       <Card className="bg-slate-900/50 border-slate-800">
         <CardHeader>
@@ -671,20 +789,36 @@ export function ContractManufacturerAllocationForm({
           </div>
 
           <div className="mt-4 pt-4 border-t border-slate-700">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-slate-300">
-                  {co2eEntryMethod === "direct" ? "Direct Entry" : "Calculated from Energy"}
-                </Badge>
-                <Badge variant="outline" className="text-slate-300">
-                  DEFRA {emissionFactorYear}
-                </Badge>
-                <Badge className={isEnergyIntensiveProcess ? "bg-amber-500/20 text-amber-300" : "bg-lime-500/20 text-lime-300"}>
-                  {isEnergyIntensiveProcess ? "Provisional" : "Verified"}
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {useProxyData ? (
+                  <>
+                    <Badge variant="outline" className="text-amber-300 border-amber-500">
+                      EST (Industry Average)
+                    </Badge>
+                    <Badge variant="outline" className="text-amber-300">
+                      +{proxyMapping?.recommended_buffer_percentage}% Buffer
+                    </Badge>
+                    <Badge variant="outline" className="text-slate-300">
+                      Ecoinvent {proxyMapping?.ecoinvent_version}
+                    </Badge>
+                  </>
+                ) : (
+                  <>
+                    <Badge variant="outline" className="text-slate-300">
+                      {co2eEntryMethod === "direct" ? "Direct Entry" : "Calculated from Energy"}
+                    </Badge>
+                    <Badge variant="outline" className="text-slate-300">
+                      DEFRA {emissionFactorYear}
+                    </Badge>
+                  </>
+                )}
+                <Badge className={isEnergyIntensiveProcess || useProxyData ? "bg-amber-500/20 text-amber-300" : "bg-lime-500/20 text-lime-300"}>
+                  {isEnergyIntensiveProcess || useProxyData ? "Provisional" : "Verified"}
                 </Badge>
               </div>
-              <Badge className="bg-blue-500/20 text-blue-300">
-                Primary - Allocated
+              <Badge className={useProxyData ? "bg-amber-500/20 text-amber-300" : "bg-blue-500/20 text-blue-300"}>
+                {useProxyData ? "Secondary - Estimated" : "Primary - Allocated"}
               </Badge>
             </div>
           </div>
