@@ -46,98 +46,98 @@ interface NavItem {
 const navigationStructure: NavItem[] = [
   {
     name: 'Dashboard',
-    href: '/dashboard',
+    href: '/dashboard/',
     icon: LayoutDashboard,
   },
   {
     name: 'Company Vitality',
-    href: '/performance',
+    href: '/performance/',
     icon: Sparkles,
   },
   {
     name: 'Company',
-    href: '/company',
+    href: '/company/',
     icon: Building2,
     children: [
       {
         name: 'Overview',
-        href: '/company/overview',
+        href: '/company/overview/',
         icon: Building2,
       },
       {
         name: 'Facilities',
-        href: '/company/facilities',
+        href: '/company/facilities/',
         icon: Warehouse,
       },
       {
         name: 'Company Emissions',
-        href: '/data/scope-1-2',
+        href: '/data/scope-1-2/',
         icon: Flame,
       },
       {
         name: 'Waste Data',
-        href: '/data/waste-and-circularity',
+        href: '/data/waste-and-circularity/',
         icon: Trash2,
       },
       {
         name: 'Water Data',
-        href: '/data/water-footprint',
+        href: '/data/water-footprint/',
         icon: Droplet,
       },
     ],
   },
   {
     name: 'Products',
-    href: '/products',
+    href: '/products/',
     icon: Package,
   },
   {
     name: 'Suppliers',
-    href: '/suppliers',
+    href: '/suppliers/',
     icon: Users,
   },
   {
     name: 'Knowledge Bank',
-    href: '/knowledge-bank',
+    href: '/knowledge-bank/',
     icon: GraduationCap,
   },
   {
     name: 'Production',
-    href: '/production',
+    href: '/production/',
     icon: ClipboardList,
   },
   {
     name: 'Reports',
-    href: '/reports',
+    href: '/reports/',
     icon: FileText,
     children: [
       {
         name: 'Sustainability Reports',
-        href: '/reports/sustainability',
+        href: '/reports/sustainability/',
         icon: TrendingUp,
       },
       {
         name: "LCA's & EPD's",
-        href: '/reports/lcas',
+        href: '/reports/lcas/',
         icon: Award,
       },
     ],
   },
   {
     name: 'How We Work',
-    href: '/how-we-work',
+    href: '/how-we-work/',
     icon: Briefcase,
     children: [
       {
         name: 'Fleet',
-        href: '/company/fleet',
+        href: '/company/fleet/',
         icon: Truck,
       },
     ],
   },
   {
     name: 'Settings',
-    href: '/settings',
+    href: '/settings/',
     icon: Settings,
   },
 ]
@@ -145,47 +145,47 @@ const navigationStructure: NavItem[] = [
 const developmentStructure: NavItem[] = [
   {
     name: 'Calculation Verifier',
-    href: '/dev/calculation-verifier',
+    href: '/dev/calculation-verifier/',
     icon: Calculator,
   },
   {
     name: 'ISO 14044 Compliance',
-    href: '/dev/docs/iso-14044-compliance',
+    href: '/dev/docs/iso-14044-compliance/',
     icon: ShieldCheck,
   },
   {
     name: 'ISO Compliance Tests',
-    href: '/dev/docs/iso-compliance-tests',
+    href: '/dev/docs/iso-compliance-tests/',
     icon: FileBarChart,
   },
   {
     name: 'Reporting Standards',
-    href: '/dev/docs/reporting-standards',
+    href: '/dev/docs/reporting-standards/',
     icon: BookOpen,
   },
   {
     name: 'LCA Calculation Testing',
-    href: '/dev/docs/lca-calculation-testing',
+    href: '/dev/docs/lca-calculation-testing/',
     icon: TestTube,
   },
   {
     name: 'LCA Testing Summary',
-    href: '/dev/docs/lca-testing-summary',
+    href: '/dev/docs/lca-testing-summary/',
     icon: ClipboardCheck,
   },
   {
     name: 'Fleet Implementation',
-    href: '/dev/docs/fleet-implementation',
+    href: '/dev/docs/fleet-implementation/',
     icon: Code,
   },
   {
     name: 'Verification Tests',
-    href: '/dev/docs/verification-tests',
+    href: '/dev/docs/verification-tests/',
     icon: FlaskConical,
   },
   {
     name: 'UI Documentation',
-    href: '/dev/docs/ui-documentation',
+    href: '/dev/docs/ui-documentation/',
     icon: BookOpen,
   },
 ]
@@ -200,9 +200,9 @@ export function Sidebar({ className }: SidebarProps) {
 
   const isActive = (path: string) => {
     if (!pathname) return false
-    const normalizedPathname = pathname.replace(/\/$/, '')
-    const normalizedPath = path.replace(/\/$/, '')
-    if (normalizedPath === '/dashboard') {
+    const normalizedPathname = pathname.endsWith('/') ? pathname : `${pathname}/`
+    const normalizedPath = path.endsWith('/') ? path : `${path}/`
+    if (normalizedPath === '/dashboard/') {
       return normalizedPathname === normalizedPath
     }
     return normalizedPathname.startsWith(normalizedPath)
@@ -228,6 +228,9 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <aside
+      onClick={(e) => {
+        console.log('🖱️ Sidebar clicked', e.target)
+      }}
       className={cn(
         'flex flex-col gap-2 border-r border-border bg-sidebar px-3 py-4 transition-colors',
         className
@@ -286,6 +289,11 @@ export function Sidebar({ className }: SidebarProps) {
                         <Link
                           key={child.href}
                           href={child.href}
+                          onClick={(e) => {
+                            console.log('🖱️ Child link clicked:', child.name, child.href)
+                            console.log('🖱️ Event:', e)
+                            console.log('🖱️ Current pathname:', pathname)
+                          }}
                           className={cn(
                             'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
                             childActive
@@ -311,6 +319,11 @@ export function Sidebar({ className }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={(e) => {
+                console.log('🖱️ Main link clicked:', item.name, item.href)
+                console.log('🖱️ Event:', e)
+                console.log('🖱️ Current pathname:', pathname)
+              }}
               className={cn(
                 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
                 active
@@ -342,6 +355,11 @@ export function Sidebar({ className }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={(e) => {
+                  console.log('🖱️ Dev link clicked:', item.name, item.href)
+                  console.log('🖱️ Event:', e)
+                  console.log('🖱️ Current pathname:', pathname)
+                }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
                   active
