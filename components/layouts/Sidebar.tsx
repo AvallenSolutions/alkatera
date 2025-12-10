@@ -228,9 +228,6 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <aside
-      onClick={(e) => {
-        console.log('🖱️ Sidebar clicked', e.target)
-      }}
       className={cn(
         'flex flex-col gap-2 border-r border-border bg-sidebar px-3 py-4 transition-colors',
         className
@@ -289,11 +286,6 @@ export function Sidebar({ className }: SidebarProps) {
                         <Link
                           key={child.href}
                           href={child.href}
-                          onClick={(e) => {
-                            console.log('🖱️ Child link clicked:', child.name, child.href)
-                            console.log('🖱️ Event:', e)
-                            console.log('🖱️ Current pathname:', pathname)
-                          }}
                           className={cn(
                             'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
                             childActive
@@ -319,11 +311,6 @@ export function Sidebar({ className }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              onClick={(e) => {
-                console.log('🖱️ Main link clicked:', item.name, item.href)
-                console.log('🖱️ Event:', e)
-                console.log('🖱️ Current pathname:', pathname)
-              }}
               className={cn(
                 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
                 active
@@ -355,11 +342,6 @@ export function Sidebar({ className }: SidebarProps) {
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={(e) => {
-                  console.log('🖱️ Dev link clicked:', item.name, item.href)
-                  console.log('🖱️ Event:', e)
-                  console.log('🖱️ Current pathname:', pathname)
-                }}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
                   active

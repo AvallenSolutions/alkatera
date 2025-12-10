@@ -19,7 +19,6 @@ import {
   GettingStartedWidget,
   WaterRiskWidget,
   ComplianceStatusWidget,
-  EmissionsTrendWidget,
 } from '@/components/dashboard/widgets';
 
 const widgetComponents: Record<string, React.ComponentType> = {
@@ -33,7 +32,6 @@ const widgetComponents: Record<string, React.ComponentType> = {
   'getting-started': GettingStartedWidget,
   'water-risk': WaterRiskWidget,
   'compliance-status': ComplianceStatusWidget,
-  'emissions-trend': EmissionsTrendWidget,
 };
 
 function DashboardSkeleton() {
