@@ -284,11 +284,14 @@ export function Sidebar({ className }: SidebarProps) {
                           key={child.href}
                           href={child.href}
                           className={cn(
-                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
+                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all cursor-pointer',
                             childActive
                               ? 'bg-secondary text-foreground font-medium'
                               : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
                           )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                          }}
                         >
                           <ChildIcon className={cn(
                             'h-3.5 w-3.5 flex-shrink-0',
@@ -309,11 +312,14 @@ export function Sidebar({ className }: SidebarProps) {
               key={item.href}
               href={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer',
                 active
                   ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                   : 'text-sidebar-foreground hover:bg-secondary/50'
               )}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
             >
               <IconComponent className={cn(
                 'h-4 w-4 flex-shrink-0 transition-colors',
@@ -340,11 +346,14 @@ export function Sidebar({ className }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer',
                   active
                     ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                     : 'text-sidebar-foreground hover:bg-secondary/50'
                 )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
               >
                 <IconComponent className={cn(
                   'h-4 w-4 flex-shrink-0 transition-colors',
