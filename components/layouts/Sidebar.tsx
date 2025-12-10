@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -195,18 +196,16 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
 
   const isActive = (path: string) => {
-    if (path === '/dashboard') {
-      return pathname === path
+    if (!pathname) return false
+    const normalizedPathname = pathname.replace(/\/$/, '')
+    const normalizedPath = path.replace(/\/$/, '')
+    if (normalizedPath === '/dashboard') {
+      return normalizedPathname === normalizedPath
     }
-    return pathname.startsWith(path)
-  }
-
-  const handleNavigation = (href: string) => {
-    router.push(href)
+    return normalizedPathname.startsWith(normalizedPath)
   }
 
   const toggleMenu = (menuName: string) => {
@@ -284,11 +283,11 @@ export function Sidebar({ className }: SidebarProps) {
                       const childActive = isActive(child.href)
 
                       return (
-                        <button
+                        <Link
                           key={child.href}
-                          onClick={() => handleNavigation(child.href)}
+                          href={child.href}
                           className={cn(
-                            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all cursor-pointer text-left',
+                            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
                             childActive
                               ? 'bg-secondary text-foreground font-medium'
                               : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
@@ -299,7 +298,7 @@ export function Sidebar({ className }: SidebarProps) {
                             childActive ? 'text-neon-lime' : ''
                           )} />
                           <span className="truncate">{child.name}</span>
-                        </button>
+                        </Link>
                       )
                     })}
                   </div>
@@ -309,11 +308,11 @@ export function Sidebar({ className }: SidebarProps) {
           }
 
           return (
-            <button
+            <Link
               key={item.href}
-              onClick={() => handleNavigation(item.href)}
+              href={item.href}
               className={cn(
-                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer text-left',
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
                 active
                   ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                   : 'text-sidebar-foreground hover:bg-secondary/50'
@@ -324,7 +323,7 @@ export function Sidebar({ className }: SidebarProps) {
                 active ? 'text-neon-lime' : ''
               )} />
               <span className="truncate">{item.name}</span>
-            </button>
+            </Link>
           )
         })}
 
@@ -340,11 +339,11 @@ export function Sidebar({ className }: SidebarProps) {
             const active = isActive(item.href)
 
             return (
-              <button
+              <Link
                 key={item.href}
-                onClick={() => handleNavigation(item.href)}
+                href={item.href}
                 className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer text-left',
+                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
                   active
                     ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                     : 'text-sidebar-foreground hover:bg-secondary/50'
@@ -355,7 +354,7 @@ export function Sidebar({ className }: SidebarProps) {
                   active ? 'text-neon-lime' : ''
                 )} />
                 <span className="truncate">{item.name}</span>
-              </button>
+              </Link>
             )
           })}
         </div>
