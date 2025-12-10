@@ -1,8 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -196,6 +195,7 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
 
   const isActive = (path: string) => {
@@ -203,6 +203,10 @@ export function Sidebar({ className }: SidebarProps) {
       return pathname === path
     }
     return pathname.startsWith(path)
+  }
+
+  const handleNavigation = (href: string) => {
+    router.push(href)
   }
 
   const toggleMenu = (menuName: string) => {
@@ -280,25 +284,22 @@ export function Sidebar({ className }: SidebarProps) {
                       const childActive = isActive(child.href)
 
                       return (
-                        <Link
+                        <button
                           key={child.href}
-                          href={child.href}
+                          onClick={() => handleNavigation(child.href)}
                           className={cn(
-                            'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all cursor-pointer',
+                            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all cursor-pointer text-left',
                             childActive
                               ? 'bg-secondary text-foreground font-medium'
                               : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
                           )}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                          }}
                         >
                           <ChildIcon className={cn(
                             'h-3.5 w-3.5 flex-shrink-0',
                             childActive ? 'text-neon-lime' : ''
                           )} />
                           <span className="truncate">{child.name}</span>
-                        </Link>
+                        </button>
                       )
                     })}
                   </div>
@@ -308,25 +309,22 @@ export function Sidebar({ className }: SidebarProps) {
           }
 
           return (
-            <Link
+            <button
               key={item.href}
-              href={item.href}
+              onClick={() => handleNavigation(item.href)}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer',
+                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer text-left',
                 active
                   ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                   : 'text-sidebar-foreground hover:bg-secondary/50'
               )}
-              onClick={(e) => {
-                e.stopPropagation();
-              }}
             >
               <IconComponent className={cn(
                 'h-4 w-4 flex-shrink-0 transition-colors',
                 active ? 'text-neon-lime' : ''
               )} />
               <span className="truncate">{item.name}</span>
-            </Link>
+            </button>
           )
         })}
 
@@ -342,25 +340,22 @@ export function Sidebar({ className }: SidebarProps) {
             const active = isActive(item.href)
 
             return (
-              <Link
+              <button
                 key={item.href}
-                href={item.href}
+                onClick={() => handleNavigation(item.href)}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer',
+                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative cursor-pointer text-left',
                   active
                     ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                     : 'text-sidebar-foreground hover:bg-secondary/50'
                 )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
               >
                 <IconComponent className={cn(
                   'h-4 w-4 flex-shrink-0 transition-colors',
                   active ? 'text-neon-lime' : ''
                 )} />
                 <span className="truncate">{item.name}</span>
-              </Link>
+              </button>
             )
           })}
         </div>
