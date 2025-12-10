@@ -1,10 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Cloud, Info, AlertCircle, ArrowRight } from "lucide-react"
+import { Cloud, Info, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useGhgHotspots } from "@/hooks/data/useGhgHotspots"
-import Link from "next/link"
 
 const scopeColors: Record<number, string> = {
   1: 'bg-red-500',
@@ -159,39 +157,23 @@ export function GHGEmissionsSummaryWidget() {
               )
             })}
 
-            <div className="pt-4 border-t space-y-3">
+            <div className="pt-4 border-t">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Total Emissions</span>
                 <span className="text-2xl font-bold">{formatEmissions(totalEmissions)}</span>
               </div>
               {totalEmissions === 0 ? (
-                <>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Info className="h-4 w-4" />
-                    <span>Begin tracking emissions to see your organisation's carbon footprint</span>
-                  </div>
-                  <Button size="sm" asChild className="w-full">
-                    <Link href="/data/scope-1-2">
-                      Record Emissions
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </>
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4" />
+                  <span>Begin tracking emissions to see your organisation's carbon footprint</span>
+                </div>
               ) : (
-                <>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Info className="h-4 w-4" />
-                    <span>
-                      {hotspots?.length || 0} emission {hotspots?.length === 1 ? 'category' : 'categories'} tracked
-                    </span>
-                  </div>
-                  <Button variant="outline" size="sm" className="w-full" asChild>
-                    <Link href="/reports/company-footprint">
-                      View Full Report
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
-                </>
+                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4" />
+                  <span>
+                    {hotspots?.length || 0} emission {hotspots?.length === 1 ? 'category' : 'categories'} tracked
+                  </span>
+                </div>
               )}
             </div>
           </div>
