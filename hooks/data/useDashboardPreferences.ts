@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 
@@ -119,14 +119,16 @@ export function useDashboardPreferences(): UseDashboardPreferencesResult {
     fetchData();
   }, [fetchData]);
 
-  const enabledWidgets = preferences
-    .filter((p) => p.enabled)
-    .map((p) => ({
-      ...p,
-      widget: widgets.find((w) => w.id === p.widget_id)!,
-    }))
-    .filter((p) => p.widget)
-    .sort((a, b) => a.display_order - b.display_order);
+  const enabledWidgets = useMemo(() => {
+    return preferences
+      .filter((p) => p.enabled)
+      .map((p) => ({
+        ...p,
+        widget: widgets.find((w) => w.id === p.widget_id)!,
+      }))
+      .filter((p) => p.widget)
+      .sort((a, b) => a.display_order - b.display_order);
+  }, [preferences, widgets]);
 
   const updatePreference = async (
     widgetId: string,
