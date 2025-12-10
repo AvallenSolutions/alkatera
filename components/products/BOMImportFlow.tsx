@@ -41,13 +41,17 @@ export function BOMImportFlow({
     items: ExtractedBOMItem[],
     extractedMetadata: BOMParseResult['metadata']
   ) => {
+    console.log('[BOMImportFlow] Items extracted:', items.length);
     const reviewable = createReviewableItems(items);
+    console.log('[BOMImportFlow] Reviewable items created:', reviewable.length);
     setReviewItems(reviewable);
     setMetadata(extractedMetadata);
     setStep('review');
+    console.log('[BOMImportFlow] Step set to review');
   };
 
   const handleImport = async (selectedItems: ReviewableBOMItem[]) => {
+    console.log('[BOMImportFlow] Import started with', selectedItems.length, 'items');
     setIsImporting(true);
 
     try {
@@ -87,10 +91,11 @@ export function BOMImportFlow({
         }
       }
 
+      console.log('[BOMImportFlow] Calling onImportComplete with:', ingredients.length, 'ingredients,', packaging.length, 'packaging');
       onImportComplete(ingredients, packaging);
       handleClose();
     } catch (error) {
-      console.error('Import failed:', error);
+      console.error('[BOMImportFlow] Import failed:', error);
     } finally {
       setIsImporting(false);
     }
@@ -111,6 +116,8 @@ export function BOMImportFlow({
       handleClose();
     }
   };
+
+  console.log('[BOMImportFlow] Current step:', step, 'reviewItems:', reviewItems.length);
 
   if (step === 'upload') {
     return (

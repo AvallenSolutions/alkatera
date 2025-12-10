@@ -246,25 +246,32 @@ export default function ProductRecipePage() {
     importedIngredients: IngredientFormData[],
     importedPackaging: PackagingFormData[]
   ) => {
+    console.log('[Recipe Page] handleBOMImportComplete called');
+    console.log('[Recipe Page] Ingredients:', importedIngredients);
+    console.log('[Recipe Page] Packaging:', importedPackaging);
     setSaving(true);
 
     try {
       const totalImported = importedIngredients.length + importedPackaging.length;
 
       if (totalImported === 0) {
+        console.log('[Recipe Page] No items to import');
         toast.error('No items to import');
         return;
       }
 
       if (importedIngredients.length > 0) {
+        console.log('[Recipe Page] Saving', importedIngredients.length, 'ingredients');
         await saveBOMIngredients(importedIngredients);
       }
 
       if (importedPackaging.length > 0) {
+        console.log('[Recipe Page] Saving', importedPackaging.length, 'packaging items');
         await saveBOMPackaging(importedPackaging);
       }
 
       toast.success(`Imported and saved ${totalImported} item${totalImported !== 1 ? 's' : ''} from BOM`);
+      console.log('[Recipe Page] Import complete, refreshing data');
 
       await fetchProductData();
 
