@@ -34,6 +34,7 @@ import {
   Users,
   Briefcase,
   GraduationCap,
+  AlertCircle,
 } from 'lucide-react'
 
 interface NavItem {
@@ -143,6 +144,11 @@ const navigationStructure: NavItem[] = [
 ]
 
 const developmentStructure: NavItem[] = [
+  {
+    name: 'Technical Debt Audit',
+    href: '/dev/docs/technical-debt/',
+    icon: AlertCircle,
+  },
   {
     name: 'Calculation Verifier',
     href: '/dev/calculation-verifier/',
