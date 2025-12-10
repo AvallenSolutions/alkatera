@@ -3,9 +3,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Droplets, Zap, Wind, MapPin, Bot, AlertTriangle, FileText, TrendingUp, CheckCircle2, ArrowRight, Map } from "lucide-react";
+import { Package, Droplets, Zap, Wind, MapPin, Bot, AlertTriangle, FileText, TrendingUp, CheckCircle2, ArrowRight, Map, Factory, ShieldAlert, Clock } from "lucide-react";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
 import { useFacilityLocation } from "@/hooks/data/useFacilityLocation";
+import { useAllocationStatus } from "@/hooks/data/useAllocationStatus";
 import { SupplyChainMap } from "./SupplyChainMap";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -22,6 +23,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
   const latestLCA = lcaReports[0];
   const hasLCAData = latestLCA && latestLCA.aggregated_impacts;
   const { facility } = useFacilityLocation(product.organization_id);
+  const allocationStatus = useAllocationStatus(product.id);
 
   const ingredientWeight = ingredients.reduce((sum, ing) => {
     const weight = ing.unit === 'kg' ? ing.quantity : ing.quantity / 1000;
@@ -577,6 +579,92 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </div>
         </CardContent>
       </Card>
+
+      {/* Contract Manufacturer Allocations */}
+      {(allocationStatus.provisionalCount > 0 || allocationStatus.verifiedCount > 0 || allocationStatus.totalAllocatedEmissions > 0) && (
+        <Card className={`lg:col-span-6 backdrop-blur-xl border hover:bg-white/8 transition-all ${
+          allocationStatus.hasProvisionalAllocations
+            ? 'bg-amber-900/10 border-amber-500/30'
+            : 'bg-white/5 border-white/10'
+        }`}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-lg flex items-center justify-center shadow-lg ${
+                  allocationStatus.hasProvisionalAllocations
+                    ? 'bg-amber-500/20 shadow-amber-500/20'
+                    : 'bg-lime-500/20 shadow-lime-500/20'
+                }`}>
+                  <Factory className={`h-5 w-5 ${
+                    allocationStatus.hasProvisionalAllocations ? 'text-amber-400' : 'text-lime-400'
+                  }`} />
+                </div>
+                <div>
+                  <CardTitle className="text-white">Production Sites</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Contract manufacturer allocations
+                  </CardDescription>
+                </div>
+              </div>
+              {allocationStatus.hasProvisionalAllocations ? (
+                <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {allocationStatus.provisionalCount} Pending
+                </Badge>
+              ) : (
+                <Badge className="bg-lime-500/20 text-lime-300 border-lime-500/30">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Verified
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {allocationStatus.hasProvisionalAllocations && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 text-amber-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-200">Report Generation Blocked</p>
+                    <p className="text-xs text-amber-200/70 mt-1">
+                      Final reports cannot be generated until all provisional allocations are verified.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 backdrop-blur-xl bg-white/5 border border-white/10 rounded-lg">
+                <p className="text-xs text-slate-400 uppercase mb-1">Allocated Emissions</p>
+                <p className="text-xl font-bold text-lime-400">
+                  {allocationStatus.totalAllocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  <span className="text-sm font-normal text-slate-400 ml-1">kg CO₂e</span>
+                </p>
+              </div>
+              <div className="p-3 backdrop-blur-xl bg-white/5 border border-white/10 rounded-lg">
+                <p className="text-xs text-slate-400 uppercase mb-1">Allocations</p>
+                <p className="text-xl font-bold text-white">
+                  {allocationStatus.verifiedCount + allocationStatus.provisionalCount}
+                  <span className="text-sm font-normal text-slate-400 ml-1">
+                    ({allocationStatus.verifiedCount} verified)
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <Link href={`/products/${product.id}/core-operations`}>
+              <Button
+                variant="outline"
+                className="w-full text-slate-300 border-slate-700 hover:bg-white/5"
+              >
+                Manage Production Sites
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* LCA Reports Feed */}
       <Card className="lg:col-span-6 backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/8 transition-all">

@@ -1,0 +1,481 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertCircle,
+  Building2,
+  Calendar,
+  ChevronRight,
+  Factory,
+  Loader2,
+  MapPin,
+  Plus,
+  Users,
+} from "lucide-react";
+import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { ContractManufacturerAllocationForm } from "@/components/facilities/ContractManufacturerAllocationForm";
+import { format } from "date-fns";
+
+interface ProductionSitesTabProps {
+  productId: number;
+  organizationId: string;
+}
+
+interface Facility {
+  id: string;
+  name: string;
+  operational_control: "owned" | "third_party";
+  address_city: string | null;
+  address_country: string | null;
+  functions: string[] | null;
+}
+
+interface Allocation {
+  id: string;
+  facility_id: string;
+  facility_name: string;
+  facility_city: string | null;
+  facility_country: string | null;
+  supplier_name: string | null;
+  reporting_period_start: string;
+  reporting_period_end: string;
+  total_facility_production_volume: number;
+  production_volume_unit: string;
+  client_production_volume: number;
+  attribution_ratio: number;
+  allocated_emissions_kg_co2e: number;
+  emission_intensity_kg_co2e_per_unit: number;
+  status: string;
+  is_energy_intensive_process: boolean;
+  data_source_tag: string;
+  co2e_entry_method: string;
+  created_at: string;
+  days_pending: number | null;
+}
+
+export function ProductionSitesTab({ productId, organizationId }: ProductionSitesTabProps) {
+  const supabase = getSupabaseBrowserClient();
+
+  const [loading, setLoading] = useState(true);
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
+
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showAllocationForm, setShowAllocationForm] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  const [facilityType, setFacilityType] = useState<"owned" | "contract_manufacturer">("contract_manufacturer");
+
+  useEffect(() => {
+    loadData();
+  }, [productId, organizationId]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [facilitiesRes, allocationsRes] = await Promise.all([
+        supabase
+          .from("facilities")
+          .select("id, name, operational_control, address_city, address_country, functions")
+          .eq("organization_id", organizationId),
+        supabase
+          .from("contract_manufacturer_allocation_summary")
+          .select("*")
+          .eq("product_id", productId)
+          .eq("organization_id", organizationId)
+          .order("reporting_period_start", { ascending: false }),
+      ]);
+
+      if (facilitiesRes.data) setFacilities(facilitiesRes.data);
+      if (allocationsRes.data) setAllocations(allocationsRes.data);
+    } catch (error) {
+      console.error("Error loading production sites data:", error);
+      toast.error("Failed to load production sites");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddFacility = () => {
+    setShowAddDialog(true);
+    setSelectedFacility(null);
+    setFacilityType("contract_manufacturer");
+  };
+
+  const handleSelectFacility = (facilityId: string) => {
+    const facility = facilities.find((f) => f.id === facilityId);
+    if (facility) {
+      setSelectedFacility(facility);
+      if (facility.operational_control === "third_party") {
+        setFacilityType("contract_manufacturer");
+      } else {
+        setFacilityType("owned");
+      }
+    }
+  };
+
+  const handleProceedToAllocation = () => {
+    if (!selectedFacility) {
+      toast.error("Please select a facility");
+      return;
+    }
+
+    if (facilityType === "contract_manufacturer") {
+      setShowAddDialog(false);
+      setShowAllocationForm(true);
+    } else {
+      toast.info("Owned facility allocation coming soon");
+    }
+  };
+
+  const handleAllocationSuccess = () => {
+    setShowAllocationForm(false);
+    setSelectedFacility(null);
+    loadData();
+  };
+
+  const getStatusBadge = (status: string, isEnergyIntensive: boolean) => {
+    if (status === "provisional" || isEnergyIntensive) {
+      return <Badge className="bg-amber-500/20 text-amber-300">Provisional</Badge>;
+    }
+    if (status === "verified") {
+      return <Badge className="bg-lime-500/20 text-lime-300">Verified</Badge>;
+    }
+    if (status === "approved") {
+      return <Badge className="bg-blue-500/20 text-blue-300">Approved</Badge>;
+    }
+    return <Badge className="bg-slate-500/20 text-slate-300">Draft</Badge>;
+  };
+
+  const totalAllocatedEmissions = allocations
+    .filter((a) => a.status !== "draft")
+    .reduce((sum, a) => sum + (a.allocated_emissions_kg_co2e || 0), 0);
+
+  const hasProvisionalAllocations = allocations.some(
+    (a) => a.status === "provisional" || a.is_energy_intensive_process
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-lime-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {hasProvisionalAllocations && (
+        <Alert className="bg-amber-500/10 border-amber-500/20">
+          <AlertCircle className="h-4 w-4 text-amber-400" />
+          <AlertDescription className="text-amber-200">
+            This product has <strong>provisional allocations</strong> pending verification.
+            Final reports cannot be generated until all allocations are verified.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Production Sites</h3>
+          <p className="text-sm text-slate-400">
+            Facilities where this product is manufactured
+          </p>
+        </div>
+        <Button onClick={handleAddFacility} className="bg-lime-500 hover:bg-lime-600 text-black">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Production Site
+        </Button>
+      </div>
+
+      {allocations.length === 0 ? (
+        <Card className="bg-slate-900/50 border-slate-800">
+          <CardContent className="py-12 text-center">
+            <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
+            <h4 className="text-lg font-medium text-white mb-2">No Production Sites Assigned</h4>
+            <p className="text-sm text-slate-400 mb-4">
+              Add production facilities to track manufacturing emissions for this product
+            </p>
+            <Button onClick={handleAddFacility} variant="outline">
+              <Plus className="mr-2 h-4 w-4" />
+              Add First Production Site
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Total Allocations</p>
+                  <p className="text-3xl font-bold text-white mt-1">{allocations.length}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Allocated Emissions</p>
+                  <p className="text-3xl font-bold text-lime-400 mt-1">
+                    {totalAllocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-slate-500">kg CO2e</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Verification Status</p>
+                  <div className="mt-2">
+                    {hasProvisionalAllocations ? (
+                      <Badge className="bg-amber-500/20 text-amber-300 text-lg px-4 py-1">
+                        Pending Review
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-lime-500/20 text-lime-300 text-lg px-4 py-1">
+                        All Verified
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="bg-slate-900/50 border-slate-800">
+            <CardHeader>
+              <CardTitle className="text-white">Allocation History</CardTitle>
+              <CardDescription>
+                Time-bound snapshots of facility emissions allocated to this product
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-700">
+                    <TableHead className="text-slate-400">Facility</TableHead>
+                    <TableHead className="text-slate-400">Period</TableHead>
+                    <TableHead className="text-slate-400 text-right">Attribution</TableHead>
+                    <TableHead className="text-slate-400 text-right">Allocated CO2e</TableHead>
+                    <TableHead className="text-slate-400 text-right">Intensity</TableHead>
+                    <TableHead className="text-slate-400">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allocations.map((allocation) => (
+                    <TableRow key={allocation.id} className="border-slate-700">
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Factory className="h-4 w-4 text-slate-500" />
+                          <div>
+                            <p className="font-medium text-white">{allocation.facility_name}</p>
+                            {allocation.facility_city && (
+                              <p className="text-xs text-slate-400 flex items-center gap-1">
+                                <MapPin className="h-3 w-3" />
+                                {allocation.facility_city}, {allocation.facility_country}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1 text-slate-300">
+                          <Calendar className="h-3 w-3" />
+                          <span className="text-sm">
+                            {format(new Date(allocation.reporting_period_start), "MMM yyyy")} -{" "}
+                            {format(new Date(allocation.reporting_period_end), "MMM yyyy")}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-mono text-white">
+                          {(allocation.attribution_ratio * 100).toFixed(1)}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-mono text-lime-400">
+                          {allocation.allocated_emissions_kg_co2e?.toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}{" "}
+                          kg
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-mono text-slate-300">
+                          {allocation.emission_intensity_kg_co2e_per_unit?.toFixed(4)}
+                        </span>
+                        <span className="text-xs text-slate-500 ml-1">
+                          kg/{allocation.production_volume_unit}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(allocation.status, allocation.is_energy_intensive_process)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Production Site</DialogTitle>
+            <DialogDescription>
+              Select a facility and specify how it relates to this product
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <div>
+              <Label>Select Facility</Label>
+              <Select
+                value={selectedFacility?.id || ""}
+                onValueChange={handleSelectFacility}
+              >
+                <SelectTrigger className="mt-2">
+                  <SelectValue placeholder="Choose a facility" />
+                </SelectTrigger>
+                <SelectContent>
+                  {facilities.map((facility) => (
+                    <SelectItem key={facility.id} value={facility.id}>
+                      <div className="flex items-center gap-2">
+                        {facility.operational_control === "owned" ? (
+                          <Building2 className="h-4 w-4 text-blue-500" />
+                        ) : (
+                          <Users className="h-4 w-4 text-amber-500" />
+                        )}
+                        <span>{facility.name}</span>
+                        {facility.address_city && (
+                          <span className="text-slate-400 text-sm">
+                            ({facility.address_city})
+                          </span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {selectedFacility && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Facility Type</Label>
+                  <div className="grid grid-cols-2 gap-3 mt-2">
+                    <Card
+                      className={`cursor-pointer transition-all ${
+                        facilityType === "owned"
+                          ? "ring-2 ring-blue-500 bg-blue-500/10"
+                          : "hover:bg-slate-800"
+                      }`}
+                      onClick={() => setFacilityType("owned")}
+                    >
+                      <CardContent className="p-4 text-center">
+                        <Building2 className="h-8 w-8 mx-auto mb-2 text-blue-500" />
+                        <p className="font-medium">Owned Facility</p>
+                        <p className="text-xs text-slate-400">Scope 1 & 2</p>
+                      </CardContent>
+                    </Card>
+                    <Card
+                      className={`cursor-pointer transition-all ${
+                        facilityType === "contract_manufacturer"
+                          ? "ring-2 ring-amber-500 bg-amber-500/10"
+                          : "hover:bg-slate-800"
+                      }`}
+                      onClick={() => setFacilityType("contract_manufacturer")}
+                    >
+                      <CardContent className="p-4 text-center">
+                        <Users className="h-8 w-8 mx-auto mb-2 text-amber-500" />
+                        <p className="font-medium">Contract Manufacturer</p>
+                        <p className="text-xs text-slate-400">Scope 3</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                {facilityType === "contract_manufacturer" && (
+                  <Alert className="bg-blue-500/10 border-blue-500/20">
+                    <AlertCircle className="h-4 w-4 text-blue-400" />
+                    <AlertDescription className="text-blue-200">
+                      You will be asked to provide facility energy data and production volumes
+                      for ISO 14067 compliant physical allocation.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="ghost" onClick={() => setShowAddDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleProceedToAllocation}
+                disabled={!selectedFacility}
+                className="bg-lime-500 hover:bg-lime-600 text-black"
+              >
+                Continue
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showAllocationForm} onOpenChange={setShowAllocationForm}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Contract Manufacturer Allocation</DialogTitle>
+            <DialogDescription>
+              Enter facility data for {selectedFacility?.name} to calculate allocated emissions
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedFacility && (
+            <ContractManufacturerAllocationForm
+              productId={productId}
+              facilityId={selectedFacility.id}
+              facilityName={selectedFacility.name}
+              organizationId={organizationId}
+              onSuccess={handleAllocationSuccess}
+              onCancel={() => setShowAllocationForm(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
