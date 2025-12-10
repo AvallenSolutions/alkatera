@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Info } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { fetchProduct, updateProduct } from "@/lib/products";
 import type { UnitSizeUnit, Certification, Award } from "@/lib/types/products";
+import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from "@/lib/product-categories";
 
 interface EditProductFormProps {
   productId: string;
@@ -28,6 +30,7 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
   const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState("");
   const [sku, setSku] = useState("");
+  const [productCategory, setProductCategory] = useState("");
   const [unitSizeValue, setUnitSizeValue] = useState("");
   const [unitSizeUnit, setUnitSizeUnit] = useState<UnitSizeUnit | "">("");
   const [description, setDescription] = useState("");
@@ -54,6 +57,7 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
 
       setName(product.name);
       setSku(product.sku || "");
+      setProductCategory(product.product_category || "");
       setUnitSizeValue(product.unit_size_value?.toString() || "");
       setUnitSizeUnit((product.unit_size_unit as UnitSizeUnit) || "");
       setDescription(product.product_description || "");
@@ -116,6 +120,7 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
         id: productId,
         name: name.trim(),
         sku: sku.trim() || undefined,
+        product_category: productCategory || undefined,
         unit_size_value: unitSizeValue ? parseFloat(unitSizeValue) : undefined,
         unit_size_unit: unitSizeUnit || undefined,
         product_description: description.trim() || undefined,
@@ -202,6 +207,53 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
                 placeholder="e.g., PCB-250-001"
                 disabled={isSaving}
               />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="product_category">Product Category</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>Used to match with industry average emission factors when specific facility data is unavailable</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Select
+                value={productCategory}
+                onValueChange={setProductCategory}
+                disabled={isSaving}
+              >
+                <SelectTrigger id="product_category">
+                  <SelectValue placeholder="Select product category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUCT_CATEGORY_GROUPS.map((group) => (
+                    <div key={group}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                        {group}
+                      </div>
+                      {getCategoriesByGroup(group).map((category) => (
+                        <SelectItem key={category.label} value={category.value}>
+                          <div>
+                            <div className="font-medium">{category.label}</div>
+                            {category.description && (
+                              <div className="text-xs text-muted-foreground">{category.description}</div>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </div>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Select the category that best describes your product
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

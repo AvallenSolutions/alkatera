@@ -14,6 +14,7 @@ export interface Product {
   organization_id: string;
   name: string;
   sku?: string | null;
+  product_category?: string | null;
   unit_size_value?: number | null;
   unit_size_unit?: UnitSizeUnit | null;
   product_description?: string | null;
@@ -28,6 +29,7 @@ export interface Product {
 export interface CreateProductInput {
   name: string;
   sku?: string;
+  product_category?: string;
   unit_size_value?: number;
   unit_size_unit?: UnitSizeUnit;
   product_description?: string;

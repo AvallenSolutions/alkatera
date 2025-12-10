@@ -21,11 +21,13 @@ import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
 import Link from "next/link";
+import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from "@/lib/product-categories";
 
 interface ProductFormData {
   name: string;
   sku: string;
   product_description: string;
+  product_category: string;
   unit_size_value: string;
   unit_size_unit: string;
   system_boundary: string;
@@ -65,6 +67,7 @@ export default function NewProductLCAPage() {
     name: "",
     sku: "",
     product_description: "",
+    product_category: "",
     unit_size_value: "",
     unit_size_unit: "",
     system_boundary: "cradle_to_gate",
@@ -137,6 +140,11 @@ export default function NewProductLCAPage() {
     }
 
     if (!isDraft) {
+      if (!formData.product_category) {
+        toast.error("Product category is required");
+        return false;
+      }
+
       if (!formData.unit_size_value) {
         toast.error("Unit size is required");
         return false;
@@ -202,6 +210,7 @@ export default function NewProductLCAPage() {
         name: formData.name,
         sku: formData.sku || null,
         product_description: formData.product_description || null,
+        product_category: formData.product_category || null,
         product_image_url: imageUrl || null,
         created_by: user.id,
         is_draft: isDraft,
@@ -316,6 +325,53 @@ export default function NewProductLCAPage() {
               disabled={isSubmitting || isSavingDraft}
               rows={4}
             />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="product_category">Product Category *</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p>Used to match with industry average emission factors when specific facility data is unavailable</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <Select
+              value={formData.product_category}
+              onValueChange={(value) => handleInputChange("product_category", value)}
+              disabled={isSubmitting || isSavingDraft}
+            >
+              <SelectTrigger id="product_category">
+                <SelectValue placeholder="Select product category" />
+              </SelectTrigger>
+              <SelectContent>
+                {PRODUCT_CATEGORY_GROUPS.map((group) => (
+                  <div key={group}>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      {group}
+                    </div>
+                    {getCategoriesByGroup(group).map((category) => (
+                      <SelectItem key={category.label} value={category.value}>
+                        <div>
+                          <div className="font-medium">{category.label}</div>
+                          {category.description && (
+                            <div className="text-xs text-muted-foreground">{category.description}</div>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Select the category that best describes your product
+            </p>
           </div>
 
           <div className="space-y-2">

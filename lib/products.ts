@@ -67,6 +67,7 @@ export async function insertProduct(
       organization_id: organizationId,
       name: input.name,
       sku: input.sku || null,
+      product_category: input.product_category || null,
       unit_size_value: input.unit_size_value || null,
       unit_size_unit: input.unit_size_unit || null,
       product_description: input.product_description || null,
@@ -96,6 +97,9 @@ export async function updateProduct(input: UpdateProductInput): Promise<Product>
 
   if (updateData.name !== undefined) updatePayload.name = updateData.name;
   if (updateData.sku !== undefined) updatePayload.sku = updateData.sku || null;
+  if (updateData.product_category !== undefined) {
+    updatePayload.product_category = updateData.product_category || null;
+  }
   if (updateData.unit_size_value !== undefined) {
     updatePayload.unit_size_value = updateData.unit_size_value || null;
   }
