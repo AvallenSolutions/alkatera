@@ -154,7 +154,7 @@ export function BOMUploadDialog({
 
       setTimeout(() => {
         onItemsExtracted(result.items, result.metadata);
-        handleClose();
+        resetState();
       }, 1500);
 
     } catch (err: any) {

@@ -325,7 +325,7 @@ export default function ProductRecipePage() {
 
   const saveBOMPackaging = async (forms: PackagingFormData[]) => {
     const validForms = forms.filter(
-      f => f.name && f.amount && Number(f.amount) > 0 && f.packaging_category
+      f => f.name && f.amount && Number(f.amount) > 0
     );
 
     if (validForms.length === 0) {
