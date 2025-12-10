@@ -242,39 +242,128 @@ export default function ProductRecipePage() {
     ]);
   };
 
-  const handleBOMImportComplete = (
+  const handleBOMImportComplete = async (
     importedIngredients: IngredientFormData[],
     importedPackaging: PackagingFormData[]
   ) => {
-    if (importedIngredients.length > 0) {
-      const hasEmptyIngredients = ingredientForms.length === 1 &&
-        !ingredientForms[0].name && !ingredientForms[0].amount;
+    setSaving(true);
 
-      if (hasEmptyIngredients) {
-        setIngredientForms(importedIngredients);
-      } else {
-        setIngredientForms(prev => [...prev, ...importedIngredients]);
+    try {
+      const totalImported = importedIngredients.length + importedPackaging.length;
+
+      if (totalImported === 0) {
+        toast.error('No items to import');
+        return;
       }
+
+      if (importedIngredients.length > 0) {
+        await saveBOMIngredients(importedIngredients);
+      }
+
+      if (importedPackaging.length > 0) {
+        await saveBOMPackaging(importedPackaging);
+      }
+
+      toast.success(`Imported and saved ${totalImported} item${totalImported !== 1 ? 's' : ''} from BOM`);
+
+      await fetchProductData();
+
+      if (importedIngredients.length > 0 && importedPackaging.length === 0) {
+        setActiveTab('ingredients');
+      } else if (importedPackaging.length > 0 && importedIngredients.length === 0) {
+        setActiveTab('packaging');
+      }
+    } catch (error: any) {
+      console.error('BOM import error:', error);
+      toast.error(`Failed to import BOM: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBOMIngredients = async (forms: IngredientFormData[]) => {
+    const validForms = forms.filter(f => f.name && f.amount && Number(f.amount) > 0);
+
+    if (validForms.length === 0) {
+      throw new Error('No valid ingredients to save');
     }
 
-    if (importedPackaging.length > 0) {
-      const hasEmptyPackaging = packagingForms.length === 1 &&
-        !packagingForms[0].name && !packagingForms[0].amount;
-
-      if (hasEmptyPackaging) {
-        setPackagingForms(importedPackaging);
-      } else {
-        setPackagingForms(prev => [...prev, ...importedPackaging]);
-      }
+    if (!currentOrganization?.id) {
+      throw new Error('No organization selected');
     }
 
-    const totalImported = importedIngredients.length + importedPackaging.length;
-    toast.success(`Imported ${totalImported} item${totalImported !== 1 ? 's' : ''} from BOM`);
+    const { error: deleteError } = await supabase
+      .from('product_materials')
+      .delete()
+      .eq('product_id', productId)
+      .eq('material_type', 'ingredient');
 
-    if (importedIngredients.length > 0 && importedPackaging.length === 0) {
-      setActiveTab('ingredients');
-    } else if (importedPackaging.length > 0 && importedIngredients.length === 0) {
-      setActiveTab('packaging');
+    if (deleteError) {
+      throw new Error(`Failed to clear existing ingredients: ${deleteError.message}`);
+    }
+
+    const materialsToInsert = validForms.map(form => ({
+      product_id: parseInt(productId),
+      material_name: form.name,
+      quantity: Number(form.amount),
+      unit: form.unit,
+      material_type: 'ingredient',
+      origin_country: form.origin_country || null,
+      is_organic_certified: form.is_organic_certified || false,
+      transport_mode: form.transport_mode || 'truck',
+      distance_km: form.distance_km ? Number(form.distance_km) : null,
+    }));
+
+    const { error: insertError } = await supabase
+      .from('product_materials')
+      .insert(materialsToInsert);
+
+    if (insertError) {
+      throw new Error(`Failed to save ingredients: ${insertError.message}`);
+    }
+  };
+
+  const saveBOMPackaging = async (forms: PackagingFormData[]) => {
+    const validForms = forms.filter(
+      f => f.name && f.amount && Number(f.amount) > 0 && f.packaging_category
+    );
+
+    if (validForms.length === 0) {
+      throw new Error('No valid packaging to save');
+    }
+
+    if (!currentOrganization?.id) {
+      throw new Error('No organization selected');
+    }
+
+    const { error: deleteError } = await supabase
+      .from('product_materials')
+      .delete()
+      .eq('product_id', productId)
+      .eq('material_type', 'packaging');
+
+    if (deleteError) {
+      throw new Error(`Failed to clear existing packaging: ${deleteError.message}`);
+    }
+
+    const materialsToInsert = validForms.map(form => ({
+      product_id: parseInt(productId),
+      material_name: form.name,
+      quantity: Number(form.net_weight_g) || Number(form.amount),
+      unit: form.unit,
+      material_type: 'packaging',
+      packaging_category: form.packaging_category || null,
+      origin_country: form.origin_country || null,
+      transport_mode: form.transport_mode || 'truck',
+      distance_km: form.distance_km ? Number(form.distance_km) : null,
+    }));
+
+    const { error: insertError } = await supabase
+      .from('product_materials')
+      .insert(materialsToInsert);
+
+    if (insertError) {
+      throw new Error(`Failed to save packaging: ${insertError.message}`);
     }
   };
 
