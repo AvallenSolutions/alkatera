@@ -17,6 +17,7 @@ import {
   Plus,
   Sparkles,
   Settings,
+  Upload,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
@@ -24,6 +25,7 @@ import { toast } from "sonner";
 import { IngredientFormCard, IngredientFormData } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard, PackagingFormData } from "@/components/products/PackagingFormCard";
 import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
+import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 
 interface Product {
   id: string;
@@ -56,6 +58,7 @@ export default function ProductRecipePage() {
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [showOpenLCAConfig, setShowOpenLCAConfig] = useState(false);
+  const [showBOMImport, setShowBOMImport] = useState(false);
 
   const [ingredientForms, setIngredientForms] = useState<IngredientFormData[]>([
     {
@@ -237,6 +240,42 @@ export default function ProductRecipePage() {
         distance_km: '',
       }
     ]);
+  };
+
+  const handleBOMImportComplete = (
+    importedIngredients: IngredientFormData[],
+    importedPackaging: PackagingFormData[]
+  ) => {
+    if (importedIngredients.length > 0) {
+      const hasEmptyIngredients = ingredientForms.length === 1 &&
+        !ingredientForms[0].name && !ingredientForms[0].amount;
+
+      if (hasEmptyIngredients) {
+        setIngredientForms(importedIngredients);
+      } else {
+        setIngredientForms(prev => [...prev, ...importedIngredients]);
+      }
+    }
+
+    if (importedPackaging.length > 0) {
+      const hasEmptyPackaging = packagingForms.length === 1 &&
+        !packagingForms[0].name && !packagingForms[0].amount;
+
+      if (hasEmptyPackaging) {
+        setPackagingForms(importedPackaging);
+      } else {
+        setPackagingForms(prev => [...prev, ...importedPackaging]);
+      }
+    }
+
+    const totalImported = importedIngredients.length + importedPackaging.length;
+    toast.success(`Imported ${totalImported} item${totalImported !== 1 ? 's' : ''} from BOM`);
+
+    if (importedIngredients.length > 0 && importedPackaging.length === 0) {
+      setActiveTab('ingredients');
+    } else if (importedPackaging.length > 0 && importedIngredients.length === 0) {
+      setActiveTab('packaging');
+    }
   };
 
   const saveIngredients = async () => {
@@ -517,14 +556,25 @@ export default function ProductRecipePage() {
             Functional Unit: {formatFunctionalUnit()}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowOpenLCAConfig(true)}
-        >
-          <Settings className="h-4 w-4 mr-2" />
-          Configure OpenLCA
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => setShowBOMImport(true)}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import from BOM
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowOpenLCAConfig(true)}
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Configure OpenLCA
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -813,6 +863,13 @@ export default function ProductRecipePage() {
       <OpenLCAConfigDialog
         open={showOpenLCAConfig}
         onOpenChange={setShowOpenLCAConfig}
+      />
+
+      <BOMImportFlow
+        open={showBOMImport}
+        onOpenChange={setShowBOMImport}
+        onImportComplete={handleBOMImportComplete}
+        organizationId={currentOrganization?.id || ''}
       />
     </div>
   );
