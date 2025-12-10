@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { useAuth } from '@/hooks/useAuth'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +17,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Plus, Search } from 'lucide-react'
 import { CommandPalette } from '@/components/dashboard/CommandPalette'
-import type { User as SupabaseUser } from '@supabase/supabase-js'
 import {
   Command,
   CommandEmpty,
@@ -42,33 +41,13 @@ interface HeaderProps {
 export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
   const router = useRouter()
   const { currentOrganization, organizations, switchOrganization } = useOrganization()
-  const [user, setUser] = useState<SupabaseUser | null>(null)
+  const { user, signOut } = useAuth()
   const [signingOut, setSigningOut] = useState(false)
   const [orgPopoverOpen, setOrgPopoverOpen] = useState(false)
 
-  useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-    }
-
-    getUser()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
   const handleSignOut = async () => {
     setSigningOut(true)
-    await supabase.auth.signOut()
-    router.push('/login')
+    await signOut()
     router.refresh()
   }
 

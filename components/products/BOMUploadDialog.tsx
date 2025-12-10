@@ -151,10 +151,8 @@ export function BOMUploadDialog({
 
       setExtractedCount(result.items.length);
       setUploadState('success');
-      console.log('[BOMUploadDialog] Extraction successful, found', result.items.length, 'items');
 
       setTimeout(() => {
-        console.log('[BOMUploadDialog] Calling onItemsExtracted');
         onItemsExtracted(result.items, result.metadata);
         resetState();
       }, 1500);

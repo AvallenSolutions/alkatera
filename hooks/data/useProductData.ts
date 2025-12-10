@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 export interface ProductIngredient {
@@ -88,7 +88,7 @@ export function useProductData(productId: string | undefined) {
     error: null,
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     if (!productId) {
       setData(prev => ({ ...prev, loading: false, error: "No product ID provided" }));
       return;
@@ -204,11 +204,11 @@ export function useProductData(productId: string | undefined) {
         error: error.message || "Failed to fetch product data",
       }));
     }
-  };
+  }, [productId]);
 
   useEffect(() => {
     fetchData();
-  }, [productId]);
+  }, [fetchData]);
 
   return { ...data, refetch: fetchData };
 }

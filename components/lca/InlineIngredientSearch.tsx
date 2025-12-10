@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield } from "lucide-react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { supabase } from "@/lib/supabaseClient";
 import type { DataSource } from "@/lib/types/lca";
 
 interface SearchResult {
@@ -69,7 +69,6 @@ export function InlineIngredientSearch({
   const [dataSource, setDataSource] = useState<string | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const supabase = createClientComponentClient();
 
   useEffect(() => {
     setQuery(value);

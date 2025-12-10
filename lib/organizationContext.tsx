@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { useAuth } from '@/hooks/useAuth'
 import type { User } from '@supabase/supabase-js'
@@ -47,10 +47,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [organizations, setOrganizations] = useState<Organization[]>([])
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isFetching, setIsFetching] = useState(false)
+  const isFetchingRef = useRef(false)
   const { user, session, loading: authLoading } = useAuth()
 
-  const fetchOrganizations = async () => {
+  const fetchOrganizations = useCallback(async () => {
     if (authLoading) {
       console.log('⏳ OrganizationContext: Waiting for auth to complete...')
       return
@@ -75,12 +75,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       hasAccessToken: !!session.access_token
     })
 
-    if (isFetching) {
+    if (isFetchingRef.current) {
       console.log('⏳ OrganizationContext: Already fetching, skipping...')
       return
     }
 
-    setIsFetching(true)
+    isFetchingRef.current = true
     setIsLoading(true)
     try {
       // Use the supabase client directly - it already has the session from AuthProvider
@@ -151,9 +151,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       console.error('❌ OrganizationContext: Fatal error in fetchOrganizations:', error)
     } finally {
       setIsLoading(false)
-      setIsFetching(false)
+      isFetchingRef.current = false
     }
-  }
+  }, [user, session, authLoading])
 
   const switchOrganization = async (orgId: string) => {
     const org = organizations.find(o => o.id === orgId)
@@ -209,10 +209,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   };
 
   useEffect(() => {
-    if (!authLoading && user && !isFetching) {
+    if (!authLoading && user) {
       fetchOrganizations()
     }
-  }, [user, authLoading])
+  }, [user, authLoading, fetchOrganizations])
 
   const value = {
     currentOrganization,

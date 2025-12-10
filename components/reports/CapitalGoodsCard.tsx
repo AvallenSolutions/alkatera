@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,8 +44,12 @@ export function CapitalGoodsCard({ reportId, entries, onUpdate }: CapitalGoodsCa
   const [description, setDescription] = useState("");
   const [assetType, setAssetType] = useState("machinery");
   const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setDate(new Date().toISOString().split("T")[0]);
+  }, []);
 
   const totalCO2e = entries.reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
   const totalSpend = entries.reduce((sum, entry) => sum + entry.spend_amount, 0);
