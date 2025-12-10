@@ -42,31 +42,48 @@ export default function LcasPage() {
       setLoading(true);
       const supabase = getSupabaseBrowserClient();
 
-      // Fetch product LCAs with results
-      const { data: lcas, error } = await supabase
+      // Fetch all product LCAs for the organization
+      const { data: lcas, error: lcaError } = await supabase
         .from('product_lcas')
-        .select(`
-          id,
-          product_id,
-          product_name,
-          functional_unit,
-          status,
-          system_boundary,
-          created_at,
-          updated_at,
-          product_lca_results(impact_category, value, unit)
-        `)
+        .select('*')
         .eq('organization_id', currentOrganization!.id)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching LCAs:', error);
+      if (lcaError) {
+        console.error('Error fetching LCAs:', lcaError);
+        setReports([]);
         return;
       }
 
+      if (!lcas || lcas.length === 0) {
+        setReports([]);
+        return;
+      }
+
+      // Fetch results for all LCAs
+      const lcaIds = lcas.map(lca => lca.id);
+      const { data: results, error: resultsError } = await supabase
+        .from('product_lca_results')
+        .select('product_lca_id, impact_category, value, unit')
+        .in('product_lca_id', lcaIds);
+
+      if (resultsError) {
+        console.error('Error fetching LCA results:', resultsError);
+      }
+
+      // Group results by LCA ID
+      const resultsByLcaId: Record<string, any[]> = {};
+      (results || []).forEach(result => {
+        if (!resultsByLcaId[result.product_lca_id]) {
+          resultsByLcaId[result.product_lca_id] = [];
+        }
+        resultsByLcaId[result.product_lca_id].push(result);
+      });
+
       // Transform the data
-      const transformedReports: LCAReport[] = (lcas || []).map((lca: any) => {
-        const climateResult = lca.product_lca_results?.find(
+      const transformedReports: LCAReport[] = lcas.map((lca: any) => {
+        const lcaResults = resultsByLcaId[lca.id] || [];
+        const climateResult = lcaResults.find(
           (r: any) => r.impact_category === 'Climate Change'
         );
         const totalCO2e = climateResult ? parseFloat(climateResult.value) : 0;
@@ -74,7 +91,7 @@ export default function LcasPage() {
         // Calculate a simple DQI score based on status and data completeness
         let dqiScore = 50;
         if (lca.status === 'completed') dqiScore = 85;
-        if (lca.product_lca_results?.length >= 4) dqiScore += 10;
+        if (lcaResults.length >= 4) dqiScore += 10;
 
         return {
           id: lca.id,
@@ -95,6 +112,7 @@ export default function LcasPage() {
       setReports(transformedReports);
     } catch (error) {
       console.error('Failed to fetch LCA reports:', error);
+      setReports([]);
     } finally {
       setLoading(false);
     }
