@@ -60,15 +60,17 @@ export function WaterImpactSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
-        <SheetHeader className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100">
-              <Droplets className="h-5 w-5 text-blue-600" />
+      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto bg-gradient-to-br from-blue-50/50 to-cyan-50/50 dark:from-blue-950/20 dark:to-cyan-950/20">
+        <SheetHeader className="space-y-4 mb-8 pb-6 border-b border-blue-200 dark:border-blue-800/50">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/50 dark:to-cyan-900/50 shadow-sm">
+              <Droplets className="h-6 w-6 text-blue-700 dark:text-blue-400" />
             </div>
             <div className="flex-1">
-              <SheetTitle>Water Impact by Facility</SheetTitle>
-              <SheetDescription className="mt-1">
+              <SheetTitle className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                Water Impact Analysis
+              </SheetTitle>
+              <SheetDescription className="mt-2 text-base">
                 Location-specific water consumption and scarcity risk assessment using AWARE methodology
               </SheetDescription>
             </div>

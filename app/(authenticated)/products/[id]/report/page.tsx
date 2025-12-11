@@ -68,22 +68,47 @@ function SafeDetailButton({
   size?: string;
   className?: string;
 }) {
-  const handleClick = (e: React.MouseEvent) => {
+  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setTimeout(() => onClick(), 0);
+    if (e.nativeEvent) {
+      e.nativeEvent.stopImmediatePropagation();
+    }
+    requestAnimationFrame(() => {
+      onClick();
+    });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.nativeEvent) {
+        e.nativeEvent.stopImmediatePropagation();
+      }
+      requestAnimationFrame(() => {
+        onClick();
+      });
+    }
   };
 
   return (
-    <Button
-      variant={variant as any}
-      size={size as any}
-      className={`w-full ${className}`}
-      onMouseDown={handleClick}
-      onTouchStart={handleClick}
+    <button
+      type="button"
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 ${className} ${
+        variant === "secondary" ? "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80" : ""
+      } ${
+        size === "sm" ? "h-8 px-3 text-xs" : "h-9 px-4 py-2"
+      } w-full`}
+      onMouseDown={handleInteraction}
+      onClick={handleInteraction}
+      onTouchStart={handleInteraction}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="button"
     >
       {children}
-    </Button>
+    </button>
   );
 }
 

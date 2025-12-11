@@ -65,16 +65,18 @@ export function CarbonBreakdownSheet({
 }: CarbonBreakdownSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-4xl overflow-y-auto">
-        <SheetHeader className="space-y-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-100">
-              <Leaf className="h-5 w-5 text-orange-600" />
+      <SheetContent side="right" className="w-full sm:max-w-4xl overflow-y-auto bg-gradient-to-br from-green-50/50 to-emerald-50/50 dark:from-green-950/20 dark:to-emerald-950/20">
+        <SheetHeader className="space-y-4 mb-8 pb-6 border-b border-green-200 dark:border-green-800/50">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/50 dark:to-emerald-900/50 shadow-sm">
+              <Leaf className="h-6 w-6 text-green-700 dark:text-green-400" />
             </div>
             <div className="flex-1">
-              <SheetTitle>Carbon Footprint Breakdown</SheetTitle>
-              <SheetDescription className="mt-1">
-                Detailed GHG emissions breakdown by scope and category following GHG Protocol
+              <SheetTitle className="text-2xl font-bold text-green-900 dark:text-green-100">
+                Climate Impact Breakdown
+              </SheetTitle>
+              <SheetDescription className="mt-2 text-base">
+                Comprehensive GHG emissions analysis following ISO 14067 and GHG Protocol standards
               </SheetDescription>
             </div>
           </div>

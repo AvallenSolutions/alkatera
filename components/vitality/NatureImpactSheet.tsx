@@ -50,15 +50,17 @@ export function NatureImpactSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
-        <SheetHeader className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-100">
-              <Mountain className="h-5 w-5 text-green-600" />
+      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto bg-gradient-to-br from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/20 dark:to-teal-950/20">
+        <SheetHeader className="space-y-4 mb-8 pb-6 border-b border-emerald-200 dark:border-emerald-800/50">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 dark:from-emerald-900/50 dark:to-teal-900/50 shadow-sm">
+              <Mountain className="h-6 w-6 text-emerald-700 dark:text-emerald-400" />
             </div>
             <div className="flex-1">
-              <SheetTitle>Nature & Biodiversity Impact</SheetTitle>
-              <SheetDescription className="mt-1">
+              <SheetTitle className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">
+                Nature & Land Use Impact
+              </SheetTitle>
+              <SheetDescription className="mt-2 text-base">
                 Land use footprint by agricultural ingredient showing occupation and transformation impacts
               </SheetDescription>
             </div>

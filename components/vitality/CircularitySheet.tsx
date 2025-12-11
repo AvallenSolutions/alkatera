@@ -67,15 +67,17 @@ export function CircularitySheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto">
-        <SheetHeader className="space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-amber-100">
-              <Recycle className="h-5 w-5 text-amber-600" />
+      <SheetContent side="right" className="w-full sm:max-w-3xl overflow-y-auto bg-gradient-to-br from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/20">
+        <SheetHeader className="space-y-4 mb-8 pb-6 border-b border-amber-200 dark:border-amber-800/50">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/50 dark:to-orange-900/50 shadow-sm">
+              <Recycle className="h-6 w-6 text-amber-700 dark:text-amber-400" />
             </div>
             <div className="flex-1">
-              <SheetTitle>Circularity & Waste Streams</SheetTitle>
-              <SheetDescription className="mt-1">
+              <SheetTitle className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+                Circularity & Waste Streams
+              </SheetTitle>
+              <SheetDescription className="mt-2 text-base">
                 Material flow analysis showing the fate of waste streams and circular economy performance
               </SheetDescription>
             </div>
