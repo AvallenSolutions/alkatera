@@ -68,18 +68,40 @@ function SafeDetailButton({
   size?: string;
   className?: string;
 }) {
-  const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
+  const buttonRef = React.useRef<HTMLButtonElement>(null);
+
+  const handleInteraction = React.useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.nativeEvent) {
       e.nativeEvent.stopImmediatePropagation();
     }
+
+    const allEvents = ['keydown', 'keyup', 'keypress', 'click', 'mousedown', 'mouseup'];
+    const blockAll = (evt: Event) => {
+      evt.stopPropagation();
+      evt.stopImmediatePropagation();
+      evt.preventDefault();
+    };
+
+    allEvents.forEach(eventType => {
+      document.addEventListener(eventType, blockAll, { capture: true, once: true });
+      window.addEventListener(eventType, blockAll, { capture: true, once: true });
+    });
+
+    setTimeout(() => {
+      allEvents.forEach(eventType => {
+        document.removeEventListener(eventType, blockAll, { capture: true });
+        window.removeEventListener(eventType, blockAll, { capture: true });
+      });
+    }, 100);
+
     requestAnimationFrame(() => {
       onClick();
     });
-  };
+  }, [onClick]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       e.stopPropagation();
@@ -90,10 +112,11 @@ function SafeDetailButton({
         onClick();
       });
     }
-  };
+  }, [onClick]);
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 ${className} ${
         variant === "secondary" ? "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80" : ""
@@ -443,7 +466,13 @@ export default function ProductLcaReportPage() {
                 </div>
                 <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
               </div>
-              <SafeDetailButton onClick={() => setCarbonSheetOpen(true)} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
+              <SafeDetailButton onClick={() => {
+                setTimeout(() => {
+                  requestAnimationFrame(() => {
+                    setCarbonSheetOpen(true);
+                  });
+                }, 50);
+              }} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
                 Explore Breakdown
               </SafeDetailButton>
             </div>
