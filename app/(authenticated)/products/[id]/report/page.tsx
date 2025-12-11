@@ -55,6 +55,38 @@ const DATA_SOURCES = [
   { name: 'OpenLCA v2.0', description: 'Impact assessment calculations', count: 1 },
 ];
 
+function SafeDetailButton({
+  onClick,
+  children,
+  variant = "secondary",
+  size = "sm",
+  className = ""
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+  variant?: string;
+  size?: string;
+  className?: string;
+}) {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTimeout(() => onClick(), 0);
+  };
+
+  return (
+    <Button
+      variant={variant as any}
+      size={size as any}
+      className={`w-full ${className}`}
+      onMouseDown={handleClick}
+      onTouchStart={handleClick}
+    >
+      {children}
+    </Button>
+  );
+}
+
 export default function ProductLcaReportPage() {
   const params = useParams();
   const productId = params?.id as string;
@@ -68,6 +100,7 @@ export default function ProductLcaReportPage() {
   const [lcaData, setLcaData] = useState<any>(null);
   const [productData, setProductData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -88,6 +121,13 @@ export default function ProductLcaReportPage() {
         }
 
         setProductData(product);
+
+        if (product?.main_image_path) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('product_images')
+            .getPublicUrl(product.main_image_path);
+          setProductImageUrl(publicUrl);
+        }
 
         const { data: lca, error: lcaError } = await supabase
           .from('product_lcas')
@@ -280,250 +320,262 @@ export default function ProductLcaReportPage() {
   const displayFunctionalUnit = lcaData?.functional_unit || MOCK_LCA_REPORT.functional_unit;
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-2 flex-1">
-          <Link href={`/products/${productId}`}>
-            <Button variant="ghost" size="sm" className="gap-2 mb-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Product
-            </Button>
-          </Link>
-          <h1 className="text-4xl font-bold tracking-tight">{displayTitle}</h1>
-          <div className="flex items-center gap-4">
-            <p className="text-lg text-muted-foreground">{displayProductName}</p>
-            <Badge variant="default" className="bg-green-600">
-              {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
-            </Badge>
-            <Badge variant="outline">v{displayVersion}</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Assessment Period: {displayPeriod} • Published: {displayPublished}
-          </p>
+    <div className="container mx-auto py-8 space-y-8">
+      {/* Header with Product Image */}
+      <Link href={`/products/${productId}`}>
+        <Button variant="ghost" size="sm" className="gap-2 mb-4">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Product
+        </Button>
+      </Link>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Left: Product Image */}
+        <div className="lg:col-span-1">
+          {productImageUrl ? (
+            <div className="relative rounded-2xl overflow-hidden shadow-lg h-80 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800">
+              <img
+                src={productImageUrl}
+                alt={displayProductName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="relative rounded-2xl overflow-hidden shadow-lg h-80 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+              <div className="text-center">
+                <FileText className="h-16 w-16 text-slate-300 mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">No image available</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-start gap-3">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={handleDownloadPdf}
-            disabled={isGeneratingPdf}
-          >
-            <Download className="h-4 w-4" />
-            {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
-          </Button>
-          <Button variant="outline" className="gap-2">
-            <Share2 className="h-4 w-4" />
-            Share Report
-          </Button>
+        {/* Right: Title & Info */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <h1 className="text-4xl font-bold tracking-tight">{displayTitle}</h1>
+                <p className="text-xl text-muted-foreground">{displayProductName}</p>
+              </div>
+              <div className="flex gap-2">
+                <Badge className="bg-emerald-600 hover:bg-emerald-700">
+                  {displayStatus.charAt(0).toUpperCase() + displayStatus.slice(1)}
+                </Badge>
+                <Badge variant="outline">v{displayVersion}</Badge>
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Cradle-to-gate assessment • {displayPeriod} • Published {displayPublished}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+              <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Functional Unit</p>
+              <p className="text-sm font-medium">{displayFunctionalUnit}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
+              <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-1">Assessment Period</p>
+              <p className="text-sm font-medium">{displayPeriod}</p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              className="gap-2 bg-blue-600 hover:bg-blue-700"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+            >
+              <Download className="h-4 w-4" />
+              {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
+            </Button>
+            <Button variant="outline" className="gap-2">
+              <Share2 className="h-4 w-4" />
+              Share
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Bento Box Grid Layout */}
+      {/* Impact Cards Grid */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        {/* DQI Score - 1x2 */}
-        <Card className="col-span-1 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Activity className="h-4 w-4 text-blue-600" />
-              Data Quality
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center">
-            <DQIGauge score={displayDqi} size="sm" />
-            <p className="text-xs text-center text-muted-foreground mt-3">
-              High confidence with full traceability
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Climate Impact - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Cloud className="h-4 w-4 text-green-600" />
-              Climate Change
+        {/* Climate Impact */}
+        <Card className="col-span-1 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
+                <Cloud className="h-4 w-4 text-green-700 dark:text-green-400" />
+              </div>
+              Climate
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <div className="text-3xl font-bold text-green-600">
+                <div className="text-3xl font-bold text-green-700 dark:text-green-400">
                   {impacts.climate_change_gwp100.toFixed(3)}
                 </div>
                 <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
               </div>
-              <div className="pt-3 border-t">
-                <div className="text-xs font-medium mb-1">GHG Protocol Compliant</div>
-                <Badge variant="outline" className="text-xs">ISO 14067</Badge>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full"
-                onClick={() => setCarbonSheetOpen(true)}
-              >
-                View Details
-              </Button>
+              <SafeDetailButton onClick={() => setCarbonSheetOpen(true)} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
+                Explore Breakdown
+              </SafeDetailButton>
             </div>
           </CardContent>
         </Card>
 
-        {/* Water Consumption - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Droplets className="h-4 w-4 text-blue-600" />
-              Water Impact
+        {/* Water Impact */}
+        <Card className="col-span-1 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border-blue-200 dark:border-blue-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                <Droplets className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+              </div>
+              Water
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <div className="text-3xl font-bold text-blue-600">
-                  {waterConsumption.toFixed(2)}
+                <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
+                  {waterConsumption.toFixed(1)}
                 </div>
                 <div className="text-xs text-muted-foreground">Litres consumed</div>
               </div>
-              <div className="pt-3 border-t">
-                <div className="text-xs text-muted-foreground">Scarcity-weighted</div>
-                <div className="text-sm font-semibold">{waterScarcityImpact.toFixed(2)} m³ world eq</div>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full"
-                onClick={() => setWaterSheetOpen(true)}
-              >
-                View Details
-              </Button>
+              <SafeDetailButton onClick={() => setWaterSheetOpen(true)} className="bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/50 text-blue-700 dark:text-blue-300">
+                Scarcity Details
+              </SafeDetailButton>
             </div>
           </CardContent>
         </Card>
 
-        {/* Circularity - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Recycle className="h-4 w-4 text-amber-600" />
+        {/* Circularity */}
+        <Card className="col-span-1 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                <Recycle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+              </div>
               Circularity
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <div className="text-3xl font-bold text-amber-600">
+                <div className="text-3xl font-bold text-amber-700 dark:text-amber-400">
                   {circularityPercentage}%
                 </div>
-                <div className="text-xs text-muted-foreground">Material recovery rate</div>
+                <div className="text-xs text-muted-foreground">Recovery rate</div>
               </div>
-              <div className="pt-3 border-t">
-                <div className="text-xs text-muted-foreground">Total waste</div>
-                <div className="text-sm font-semibold">{totalWaste.toFixed(3)} kg per unit</div>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full"
-                onClick={() => setCircularitySheetOpen(true)}
-              >
-                View Details
-              </Button>
+              <SafeDetailButton onClick={() => setCircularitySheetOpen(true)} className="bg-amber-100 dark:bg-amber-900/50 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-700 dark:text-amber-300">
+                Waste Streams
+              </SafeDetailButton>
             </div>
           </CardContent>
         </Card>
 
-        {/* System Boundary - 2x1 */}
-        <Card className="col-span-1 md:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Eye className="h-4 w-4 text-slate-600" />
-              System Boundary
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm mb-4">{displayBoundary}</p>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="p-3 border rounded-lg bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-                <h5 className="font-semibold text-xs mb-2 flex items-center gap-1 text-green-700 dark:text-green-400">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Included
-                </h5>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Raw material extraction</li>
-                  <li>• Primary production</li>
-                  <li>• Packaging manufacture</li>
-                  <li>• Factory operations</li>
-                </ul>
+        {/* Land Use */}
+        <Card className="col-span-1 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
+                <MapPin className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
               </div>
-              <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-800">
-                <h5 className="font-semibold text-xs mb-2 flex items-center gap-1 text-slate-700 dark:text-slate-400">
-                  <EyeOff className="h-3 w-3" />
-                  Excluded
-                </h5>
-                <ul className="text-xs text-muted-foreground space-y-1">
-                  <li>• Distribution to retailers</li>
-                  <li>• Consumer use phase</li>
-                  <li>• End-of-life disposal</li>
-                  <li>• Capital goods</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Land Use - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-emerald-600" />
               Land Use
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div>
-                <div className="text-3xl font-bold text-emerald-600">
-                  {totalLandUse.toFixed(2)}
+                <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                  {totalLandUse.toFixed(1)}
                 </div>
                 <div className="text-xs text-muted-foreground">m² per unit</div>
               </div>
-              <div className="pt-3 border-t">
-                <div className="text-xs font-medium mb-1">Agricultural footprint</div>
-                <div className="text-xs text-muted-foreground">{landUseItems.length} materials tracked</div>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full"
-                onClick={() => setNatureSheetOpen(true)}
-              >
-                View Details
-              </Button>
+              <SafeDetailButton onClick={() => setNatureSheetOpen(true)} className="bg-emerald-100 dark:bg-emerald-900/50 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-300">
+                Agricultural Impact
+              </SafeDetailButton>
             </div>
           </CardContent>
         </Card>
 
-        {/* Resource Scarcity - 1x2 */}
-        <Card className="col-span-1">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <ThermometerSun className="h-4 w-4 text-orange-600" />
-              Resource Use
+        {/* Data Quality - Minimal */}
+        <Card className="col-span-1 bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900/50 dark:to-blue-900/30 border-slate-200 dark:border-slate-800/50 group hover:shadow-lg transition-all duration-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="p-2 bg-slate-100 dark:bg-slate-800/50 rounded-lg group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                <Activity className="h-4 w-4 text-slate-700 dark:text-slate-400 group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors" />
+              </div>
+              Data Quality
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center group-hover:scale-110 transition-transform">
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">{displayDqi}%</div>
+              <div className="text-xs text-muted-foreground mt-2">Hover for details</div>
+              <div className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                High confidence • Full traceability
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Resource Scarcity */}
+        <Card className="col-span-1 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-200 dark:border-orange-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="p-2 bg-orange-100 dark:bg-orange-900/50 rounded-lg">
+                <ThermometerSun className="h-4 w-4 text-orange-700 dark:text-orange-400" />
+              </div>
+              Resources
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <div>
-                <div className="text-3xl font-bold text-orange-600">
+                <div className="text-3xl font-bold text-orange-700 dark:text-orange-400">
                   {impacts.fossil_resource_scarcity?.toFixed(3) || '0.035'}
                 </div>
-                <div className="text-xs text-muted-foreground">kg oil eq</div>
+                <div className="text-xs text-muted-foreground">kg oil equivalent</div>
               </div>
-              <div className="pt-3 border-t">
-                <div className="text-xs font-medium mb-1">Fossil resources</div>
-                <div className="text-xs text-muted-foreground">Energy and materials</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System Boundary - 2x2 */}
+        <Card className="col-span-1 md:col-span-2 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/30 dark:to-slate-800/30 border-slate-200 dark:border-slate-800/50">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Eye className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+              System Boundary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/50">
+                <h5 className="font-semibold text-xs mb-3 flex items-center gap-2 text-green-700 dark:text-green-400">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Included
+                </h5>
+                <ul className="text-xs text-muted-foreground space-y-2">
+                  <li>Raw material extraction</li>
+                  <li>Primary production</li>
+                  <li>Packaging manufacture</li>
+                  <li>Factory operations</li>
+                </ul>
+              </div>
+              <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/50">
+                <h5 className="font-semibold text-xs mb-3 flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <AlertCircle className="h-4 w-4" />
+                  Excluded
+                </h5>
+                <ul className="text-xs text-muted-foreground space-y-2">
+                  <li>Distribution to retailers</li>
+                  <li>Consumer use phase</li>
+                  <li>End-of-life disposal</li>
+                  <li>Capital goods</li>
+                </ul>
               </div>
             </div>
           </CardContent>
