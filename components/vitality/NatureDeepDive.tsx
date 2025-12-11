@@ -89,6 +89,14 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
               const percentageOfMax = metric.maxValue > 0 ? (metric.value / metric.maxValue) * 100 : 0;
               const relativeIntensity = maxMetricValue > 0 ? (percentageOfMax / maxMetricValue) * 100 : 0;
 
+              const getTitleClass = () => {
+                if (metric.name === 'Land Use') return 'text-green-900';
+                if (metric.name === 'Terrestrial Ecotoxicity') return 'text-green-900';
+                if (metric.name === 'Freshwater Eutrophication') return 'text-blue-900';
+                if (metric.name === 'Terrestrial Acidification') return 'text-purple-900';
+                return 'text-slate-900';
+              };
+
               return (
                 <Card key={metric.name} className={`border-2 ${metric.bgColor} border-opacity-30`}>
                   <CardHeader className="pb-3">
@@ -96,13 +104,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                       <div className={`p-2 rounded-lg ${metric.bgColor}`}>
                         <IconComponent className={`h-4 w-4 ${metric.color}`} />
                       </div>
-                      <CardTitle className={`text-sm ${
-                        metric.name === 'Land Use' ? 'text-green-900 dark:text-green-50' :
-                        metric.name === 'Terrestrial Ecotoxicity' ? 'text-green-900 dark:text-green-50' :
-                        metric.name === 'Freshwater Eutrophication' ? 'text-blue-900 dark:text-blue-50' :
-                        metric.name === 'Terrestrial Acidification' ? 'text-purple-900 dark:text-purple-50' :
-                        'text-slate-900 dark:text-slate-50'
-                      }`}>{metric.name}</CardTitle>
+                      <CardTitle className={`text-sm ${getTitleClass()}`}>{metric.name}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
