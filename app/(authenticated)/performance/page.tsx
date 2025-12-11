@@ -148,10 +148,10 @@ function HotspotCard({
       </CardHeader>
       <CardContent className="space-y-3">
         {items.map((item, idx) => (
-          <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
+          <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
             <div className="flex-1">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium">{item.label}</span>
+                <span className="text-sm font-medium text-slate-900 dark:text-slate-50">{item.label}</span>
                 <Badge
                   variant="outline"
                   className={
@@ -164,8 +164,8 @@ function HotspotCard({
                 </Badge>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-lg font-semibold">{typeof item.value === 'number' ? item.value.toLocaleString('en-GB', { maximumFractionDigits: 2 }) : '0'}</span>
-                <span className="text-xs text-muted-foreground">kg CO₂eq</span>
+                <span className="text-lg font-semibold text-slate-900 dark:text-slate-50">{typeof item.value === 'number' ? item.value.toLocaleString('en-GB', { maximumFractionDigits: 2 }) : '0'}</span>
+                <span className="text-xs text-slate-600 dark:text-slate-400">kg CO₂eq</span>
               </div>
             </div>
           </div>
@@ -278,20 +278,20 @@ function ComplianceOverview({ metrics }: { metrics: any }) {
         </div>
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
-            <span className="text-sm font-medium">ISO 14044:2006</span>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">ISO 14044:2006</span>
             <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
           </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
-            <span className="text-sm font-medium">GHG Protocol</span>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">GHG Protocol</span>
             <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
           </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
-            <span className="text-sm font-medium">ReCiPe 2016 (H)</span>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">ReCiPe 2016 (H)</span>
             <Badge variant="outline" className="border-green-500 text-green-700">Active</Badge>
           </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
-            <span className="text-sm font-medium">TNFD LEAP</span>
+          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
+            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">TNFD LEAP</span>
             <Badge variant="outline" className="border-blue-500 text-blue-700">In Progress</Badge>
           </div>
         </div>
