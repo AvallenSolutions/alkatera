@@ -7,7 +7,85 @@ import { X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-const Sheet = SheetPrimitive.Root;
+const SheetContext = React.createContext<{ isOpen: boolean }>({ isOpen: false });
+
+function SheetRoot({ children, open, onOpenChange, ...props }: React.ComponentPropsWithoutRef<typeof SheetPrimitive.Root>) {
+  React.useEffect(() => {
+    if (!open) return;
+
+    const blockBoltShortcuts = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      const isMeta = e.metaKey || e.ctrlKey;
+      const isAlt = e.altKey;
+
+      const boltShortcuts = [
+        isMeta && key === 'k',
+        isMeta && key === '\\',
+        isMeta && key === 'b',
+        isMeta && key === 'j',
+        isMeta && key === 'p',
+        isMeta && key === '`',
+        isMeta && isAlt && key === 'f',
+        isMeta && key === 'e',
+        key === 'f1',
+        key === 'f2',
+        key === 'f3',
+        key === 'f4',
+        key === 'f5' && (isMeta || e.shiftKey),
+      ];
+
+      if (boltShortcuts.some(Boolean)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+
+    const blockWindowEvents = (e: Event) => {
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    };
+
+    document.addEventListener('keydown', blockBoltShortcuts, { capture: true, passive: false });
+    document.addEventListener('keyup', blockBoltShortcuts, { capture: true, passive: false });
+    window.addEventListener('keydown', blockWindowEvents, { capture: true });
+    window.addEventListener('keyup', blockWindowEvents, { capture: true });
+
+    const style = document.createElement('style');
+    style.id = 'sheet-event-blocker';
+    style.textContent = `
+      body.sheet-open { overflow: hidden; }
+      body.sheet-open * { pointer-events: auto !important; }
+    `;
+    document.head.appendChild(style);
+    document.body.classList.add('sheet-open');
+    document.body.setAttribute('data-sheet-open', 'true');
+    document.body.setAttribute('data-radix-dialog-open', 'true');
+
+    return () => {
+      document.removeEventListener('keydown', blockBoltShortcuts, { capture: true });
+      document.removeEventListener('keyup', blockBoltShortcuts, { capture: true });
+      window.removeEventListener('keydown', blockWindowEvents, { capture: true });
+      window.removeEventListener('keyup', blockWindowEvents, { capture: true });
+      document.body.classList.remove('sheet-open');
+      document.body.removeAttribute('data-sheet-open');
+      document.body.removeAttribute('data-radix-dialog-open');
+      const styleEl = document.getElementById('sheet-event-blocker');
+      if (styleEl) styleEl.remove();
+    };
+  }, [open]);
+
+  return (
+    <SheetContext.Provider value={{ isOpen: !!open }}>
+      <SheetPrimitive.Root open={open} onOpenChange={onOpenChange} {...props}>
+        {children}
+      </SheetPrimitive.Root>
+    </SheetContext.Provider>
+  );
+}
+
+const Sheet = SheetRoot;
 
 const SheetTrigger = SheetPrimitive.Trigger;
 
@@ -21,7 +99,7 @@ const SheetOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
     className={cn(
-      'fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      'fixed inset-0 z-[9999] bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className
     )}
     {...props}
@@ -31,7 +109,7 @@ const SheetOverlay = React.forwardRef<
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  'fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
+  'fixed z-[9999] gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
   {
     variants: {
       side: {
