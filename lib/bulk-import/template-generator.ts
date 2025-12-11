@@ -1,5 +1,7 @@
 'use client';
 
+import * as XLSX from 'xlsx';
+
 export interface TemplateData {
   companySheet: CompanyRowData[];
   productsSheet: ProductRowData[];
@@ -76,7 +78,7 @@ function createDataValidationComment(field: string): string {
     'Ingredient Unit 1': UNIT_OPTIONS,
     'Ingredient Unit 2': UNIT_OPTIONS,
     'Ingredient Unit 3': UNIT_OPTIONS,
-    'Packaging Type': PACKAGING_TYPES,
+    'Packaging Category (Container)': PACKAGING_CATEGORIES,
     'Packaging Material': PACKAGING_MATERIALS,
   };
 
@@ -194,14 +196,98 @@ export function generateCompanyCSVHeaders(): string {
   return headers.map(h => csvEscape(h)).join(',') + '\n';
 }
 
+export function downloadTemplateAsExcel(): void {
+  const workbook = XLSX.utils.book_new();
+
+  const instructionsData = [
+    ['INSTRUCTIONS FOR USING THIS TEMPLATE'],
+    [],
+    ['1. COMPANY SHEET: Enter your company information'],
+    ['   - Only "Company Name" is required'],
+    ['   - Leave other fields blank if not applicable'],
+    ['   - Complete once per upload'],
+    [],
+    ['2. PRODUCTS SHEET: Add your products'],
+    ['   - Enter one product per row'],
+    ['   - List up to 20 ingredients per product'],
+    ['   - Define packaging by category: Container, Label, Closure, Secondary'],
+    ['   - Each packaging category has its own material and weight fields'],
+    [],
+    ['3. INGREDIENTS:'],
+    ['   - Fill in Ingredient Name, Quantity, and Unit'],
+    ['   - Leave blank for unused ingredient slots (up to 20 available)'],
+    ['   - Units: ml, L, g, kg, or unit'],
+    [],
+    ['4. PACKAGING BREAKDOWN:'],
+    ['   - Container: Primary packaging (e.g., bottle, can)'],
+    ['   - Label: Label material and weight'],
+    ['   - Closure: Cap, cork, or closure mechanism'],
+    ['   - Secondary: Outer packaging (e.g., box, carton)'],
+    ['   - Fill only the categories you use'],
+    [],
+    ['5. DATA VALIDATION:'],
+    ['   - Category: Select from beverage category list'],
+    ['   - Company Size: Use provided options'],
+    ['   - Packaging Categories: Container, Label, Closure, Secondary'],
+    ['   - Packaging Materials: Glass, Plastic, Aluminium, etc.'],
+    [],
+    ['6. WHEN READY:'],
+    ['   - Download or export as Excel'],
+    ['   - Upload to the import page'],
+    ['   - Review the preview before confirming'],
+  ];
+
+  const instructionsSheet = XLSX.utils.aoa_to_sheet(instructionsData);
+  XLSX.utils.book_append_sheet(workbook, instructionsSheet, 'Instructions');
+
+  const companyHeaders = [
+    'Company Name*',
+    'Registration Number',
+    'Headquarters Location',
+    'Website',
+    'Primary Contact Name',
+    'Email',
+    'Phone',
+    'Business Type',
+    'Company Size',
+    'Sustainability Goals',
+    'Operational Regions',
+    'Certifications',
+    'Notes',
+  ];
+
+  const companySampleRow = [
+    'Your Company Ltd',
+    'REG123456',
+    'London - United Kingdom',
+    'www.example.com',
+    'Jane Doe',
+    'jane@company.com',
+    '+44 20 7946 0958',
+    'Manufacturing',
+    '51-250',
+    'Net zero by 2030',
+    'UK, EU, US',
+    'ISO 14001, B Corp',
+    'Family business since 1980',
+  ];
+
+  const companyData = [companyHeaders, companySampleRow];
+  const companySheet = XLSX.utils.aoa_to_sheet(companyData);
+  XLSX.utils.book_append_sheet(workbook, companySheet, 'Company');
+
+  const productHeaders = generateProductHeaders();
+  const productSampleRow = generateProductSampleRow();
+
+  const productData = [productHeaders, productSampleRow];
+  const productSheet = XLSX.utils.aoa_to_sheet(productData);
+  XLSX.utils.book_append_sheet(workbook, productSheet, 'Products');
+
+  XLSX.writeFile(workbook, 'product_data_template.xlsx');
+}
+
 export function downloadTemplateAsCSV(): void {
-  const csv = generateTemplateCSV();
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'product_data_template.csv';
-  link.click();
-  URL.revokeObjectURL(link.href);
+  downloadTemplateAsExcel();
 }
 
 export function getValidationOptions(fieldName: string): string[] {
