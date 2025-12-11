@@ -5,13 +5,9 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, Share2, Eye, EyeOff, Leaf, Droplets, Recycle, MapPin, ThermometerSun, Cloud, Activity, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Download, Share2, Eye, EyeOff, Leaf, Droplets, Recycle, MapPin, ThermometerSun, Cloud, Activity, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import { DQIGauge } from '@/components/lca/DQIGauge';
-import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
-import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
-import { CircularitySheet } from '@/components/vitality/CircularitySheet';
-import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
 import { generateLcaReportPdf } from '@/lib/pdf-generator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
@@ -55,82 +51,17 @@ const DATA_SOURCES = [
   { name: 'OpenLCA v2.0', description: 'Impact assessment calculations', count: 1 },
 ];
 
-function SafeDetailButton({
-  onClick,
-  children,
-  className = ""
-}: {
-  onClick: () => void;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  const handleClick = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
-    onClick();
-  }, [onClick]);
-
-  const handleMouseDown = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
-  }, []);
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      onMouseUp={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
-      onTouchEnd={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-      onPointerUp={(e) => e.stopPropagation()}
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2 w-full ${className}`}
-      style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
-      data-bolt-ignore="true"
-      data-no-bolt-intercept="true"
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function ProductLcaReportPage() {
   const params = useParams();
   const productId = params?.id as string;
   const { toast } = useToast();
 
-  const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);
-  const [waterSheetOpen, setWaterSheetOpen] = useState(false);
-  const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
-  const [natureSheetOpen, setNatureSheetOpen] = useState(false);
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [lcaData, setLcaData] = useState<any>(null);
   const [productData, setProductData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
-
-  // Block Bolt's event interception on this page
-  useEffect(() => {
-    const blockBoltInterception = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('[data-bolt-ignore]') || target.closest('[data-no-bolt-intercept]')) {
-        e.stopImmediatePropagation();
-      }
-    };
-
-    // Add capture phase listeners to block Bolt
-    document.addEventListener('click', blockBoltInterception, { capture: true });
-    document.addEventListener('mousedown', blockBoltInterception, { capture: true });
-    document.addEventListener('pointerdown', blockBoltInterception, { capture: true });
-
-    return () => {
-      document.removeEventListener('click', blockBoltInterception, { capture: true });
-      document.removeEventListener('mousedown', blockBoltInterception, { capture: true });
-      document.removeEventListener('pointerdown', blockBoltInterception, { capture: true });
-    };
-  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -351,7 +282,6 @@ export default function ProductLcaReportPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      {/* Header with Product Image */}
       <Link href={`/products/${productId}`}>
         <Button variant="ghost" size="sm" className="gap-2 mb-4">
           <ArrowLeft className="h-4 w-4" />
@@ -360,7 +290,6 @@ export default function ProductLcaReportPage() {
       </Link>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left: Product Image */}
         <div className="lg:col-span-1">
           {productImageUrl ? (
             <div className="relative rounded-2xl overflow-hidden shadow-lg h-80 bg-gradient-to-br from-slate-100 to-slate-50 dark:from-slate-900 dark:to-slate-800">
@@ -380,7 +309,6 @@ export default function ProductLcaReportPage() {
           )}
         </div>
 
-        {/* Right: Title & Info */}
         <div className="lg:col-span-2 space-y-6">
           <div className="space-y-3">
             <div className="flex items-start justify-between gap-4">
@@ -429,116 +357,218 @@ export default function ProductLcaReportPage() {
       </div>
 
       {/* Impact Cards Grid */}
-      <div
-        className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
-        onClickCapture={(e) => {
-          const target = e.target as HTMLElement;
-          if (target.tagName === 'BUTTON' || target.closest('button')) {
-            e.stopPropagation();
-          }
-        }}
-      >
-        {/* Climate Impact */}
-        <Card className="col-span-1 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
-                <Cloud className="h-4 w-4 text-green-700 dark:text-green-400" />
-              </div>
-              Climate
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="text-3xl font-bold text-green-700 dark:text-green-400">
-                  {impacts.climate_change_gwp100.toFixed(3)}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        {/* Climate Impact - Expandable */}
+        <div className={`${expandedCard === 'climate' ? 'md:col-span-2' : 'col-span-1'} transition-all duration-300`}>
+          <Card
+            className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+            onClick={() => setExpandedCard(expandedCard === 'climate' ? null : 'climate')}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
+                    <Cloud className="h-4 w-4 text-green-700 dark:text-green-400" />
+                  </div>
+                  Climate
                 </div>
-                <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
-              </div>
-              <SafeDetailButton onClick={() => setCarbonSheetOpen(true)} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
-                GHG Breakdown
-              </SafeDetailButton>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Water Impact */}
-        <Card className="col-span-1 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border-blue-200 dark:border-blue-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
-                <Droplets className="h-4 w-4 text-blue-700 dark:text-blue-400" />
-              </div>
-              Water
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
-                  {waterConsumption.toFixed(1)}
+                {expandedCard === 'climate' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-3xl font-bold text-green-700 dark:text-green-400">
+                    {impacts.climate_change_gwp100.toFixed(3)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
                 </div>
-                <div className="text-xs text-muted-foreground">Litres consumed</div>
-              </div>
-              <SafeDetailButton onClick={() => setWaterSheetOpen(true)} className="bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-800/50 text-blue-700 dark:text-blue-300">
-                Scarcity Details
-              </SafeDetailButton>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Circularity */}
-        <Card className="col-span-1 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
-                <Recycle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                {expandedCard === 'climate' && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h4 className="font-semibold text-sm">GHG Breakdown</h4>
+                    {breakdown?.by_ghg && (
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span>CO₂ (Fossil)</span>
+                          <span className="font-medium">{(breakdown.by_ghg.co2_fossil || 0).toFixed(3)} kg</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>CO₂ (Biogenic)</span>
+                          <span className="font-medium">{(breakdown.by_ghg.co2_biogenic || 0).toFixed(3)} kg</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Methane (CH₄)</span>
+                          <span className="font-medium">{(breakdown.by_ghg.ch4 || 0).toFixed(3)} kg CO₂eq</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>Nitrous Oxide (N₂O)</span>
+                          <span className="font-medium">{(breakdown.by_ghg.n2o || 0).toFixed(3)} kg CO₂eq</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              Circularity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="text-3xl font-bold text-amber-700 dark:text-amber-400">
-                  {circularityPercentage}%
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Water Impact - Expandable */}
+        <div className={`${expandedCard === 'water' ? 'md:col-span-2' : 'col-span-1'} transition-all duration-300`}>
+          <Card
+            className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border-blue-200 dark:border-blue-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+            onClick={() => setExpandedCard(expandedCard === 'water' ? null : 'water')}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                    <Droplets className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                  </div>
+                  Water
                 </div>
-                <div className="text-xs text-muted-foreground">Recovery rate</div>
-              </div>
-              <SafeDetailButton onClick={() => setCircularitySheetOpen(true)} className="bg-amber-100 dark:bg-amber-900/50 hover:bg-amber-200 dark:hover:bg-amber-800/50 text-amber-700 dark:text-amber-300">
-                Waste Streams
-              </SafeDetailButton>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Land Use */}
-        <Card className="col-span-1 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
-                <MapPin className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-              </div>
-              Land Use
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
-                  {totalLandUse.toFixed(1)}
+                {expandedCard === 'water' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
+                    {waterConsumption.toFixed(1)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Litres consumed</div>
                 </div>
-                <div className="text-xs text-muted-foreground">m² per unit</div>
-              </div>
-              <SafeDetailButton onClick={() => setNatureSheetOpen(true)} className="bg-emerald-100 dark:bg-emerald-900/50 hover:bg-emerald-200 dark:hover:bg-emerald-800/50 text-emerald-700 dark:text-emerald-300">
-                Agricultural Impact
-              </SafeDetailButton>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Data Quality - Minimal */}
+                {expandedCard === 'water' && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h4 className="font-semibold text-sm">Water Sources</h4>
+                    <div className="space-y-2">
+                      {waterSourceItems.slice(0, 3).map((item) => (
+                        <div key={item.id} className="flex justify-between text-xs">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.source}</div>
+                            <div className="text-muted-foreground">{item.location}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">{item.consumption.toFixed(2)}L</div>
+                            <Badge variant={item.riskLevel === 'high' ? 'destructive' : item.riskLevel === 'medium' ? 'default' : 'secondary'} className="text-xs">
+                              {item.riskLevel}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Circularity - Expandable */}
+        <div className={`${expandedCard === 'circularity' ? 'md:col-span-2' : 'col-span-1'} transition-all duration-300`}>
+          <Card
+            className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+            onClick={() => setExpandedCard(expandedCard === 'circularity' ? null : 'circularity')}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                    <Recycle className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+                  </div>
+                  Circularity
+                </div>
+                {expandedCard === 'circularity' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-3xl font-bold text-amber-700 dark:text-amber-400">
+                    {circularityPercentage}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">Recovery rate</div>
+                </div>
+
+                {expandedCard === 'circularity' && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h4 className="font-semibold text-sm">Waste Streams</h4>
+                    <div className="space-y-2">
+                      {wasteStreams.map((item) => (
+                        <div key={item.id} className="flex justify-between text-xs">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.stream}</div>
+                            <div className="text-muted-foreground capitalize">{item.disposition}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">{item.mass}g</div>
+                            <Badge variant={item.circularityScore === 100 ? 'secondary' : 'destructive'} className="text-xs">
+                              {item.circularityScore}%
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Land Use - Expandable */}
+        <div className={`${expandedCard === 'land' ? 'md:col-span-2' : 'col-span-1'} transition-all duration-300`}>
+          <Card
+            className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800/50 hover:shadow-lg transition-all duration-200 cursor-pointer"
+            onClick={() => setExpandedCard(expandedCard === 'land' ? null : 'land')}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
+                    <MapPin className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                  </div>
+                  Land Use
+                </div>
+                {expandedCard === 'land' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
+                    {totalLandUse.toFixed(1)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">m² per unit</div>
+                </div>
+
+                {expandedCard === 'land' && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <h4 className="font-semibold text-sm">Agricultural Impact</h4>
+                    <div className="space-y-2">
+                      {landUseItems.slice(0, 4).map((item) => (
+                        <div key={item.id} className="flex justify-between text-xs">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.ingredient}</div>
+                            <div className="text-muted-foreground">{item.origin}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-medium">{item.totalFootprint.toFixed(2)}m²</div>
+                            <div className="text-muted-foreground">{(item.mass * 1000).toFixed(0)}g</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Data Quality - Non-expandable */}
         <Card className="col-span-1 bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900/50 dark:to-blue-900/30 border-slate-200 dark:border-slate-800/50 group hover:shadow-lg transition-all duration-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -559,7 +589,7 @@ export default function ProductLcaReportPage() {
           </CardContent>
         </Card>
 
-        {/* Resource Scarcity */}
+        {/* Resource Scarcity - Non-expandable */}
         <Card className="col-span-1 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 border-orange-200 dark:border-orange-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -581,7 +611,7 @@ export default function ProductLcaReportPage() {
           </CardContent>
         </Card>
 
-        {/* System Boundary - 2x2 */}
+        {/* System Boundary */}
         <Card className="col-span-1 md:col-span-2 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/30 dark:to-slate-800/30 border-slate-200 dark:border-slate-800/50">
           <CardHeader>
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -619,7 +649,7 @@ export default function ProductLcaReportPage() {
           </CardContent>
         </Card>
 
-        {/* Compliance Standards - 2x1 */}
+        {/* Compliance Standards */}
         <Card className="col-span-1 md:col-span-2">
           <CardHeader>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -646,7 +676,7 @@ export default function ProductLcaReportPage() {
           </CardContent>
         </Card>
 
-        {/* Functional Unit - 1x2 */}
+        {/* Functional Unit */}
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle className="text-sm font-medium">Functional Unit</CardTitle>
@@ -659,7 +689,7 @@ export default function ProductLcaReportPage() {
           </CardContent>
         </Card>
 
-        {/* Data Provenance - Full Width */}
+        {/* Data Provenance */}
         <Card className="col-span-full">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -695,83 +725,6 @@ export default function ProductLcaReportPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Evidence Drawers */}
-      <CarbonBreakdownSheet
-        open={carbonSheetOpen}
-        onOpenChange={setCarbonSheetOpen}
-        scopeBreakdown={breakdown?.by_scope ? {
-          scope1: breakdown.by_scope.scope1 || 0,
-          scope2: breakdown.by_scope.scope2 || 0,
-          scope3: breakdown.by_scope.scope3 || 0,
-        } : null}
-        totalCO2={impacts.climate_change_gwp100 || 0}
-        materialBreakdown={breakdown?.by_material?.map((m: any) => ({
-          name: m.name,
-          quantity: m.quantity,
-          unit: m.unit,
-          climate: m.emissions,
-          source: m.dataSource,
-        }))}
-        ghgBreakdown={breakdown?.by_ghg ? {
-          carbon_origin: {
-            fossil: breakdown.by_ghg.co2_fossil || 0,
-            biogenic: breakdown.by_ghg.co2_biogenic || 0,
-            land_use_change: 0,
-          },
-          gas_inventory: {
-            co2_fossil: breakdown.by_ghg.co2_fossil || 0,
-            co2_biogenic: breakdown.by_ghg.co2_biogenic || 0,
-            methane: breakdown.by_ghg.ch4 || 0,
-            nitrous_oxide: breakdown.by_ghg.n2o || 0,
-            hfc_pfc: 0,
-          },
-          gwp_factors: {
-            methane_gwp100: 28,
-            n2o_gwp100: 265,
-            method: 'IPCC AR6',
-          },
-        } : null}
-        lifecycleStageBreakdown={breakdown?.by_lifecycle_stage ? [
-          { stage_name: 'Raw Materials', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.raw_materials, percentage: 0, material_count: 0, top_contributors: [] },
-          { stage_name: 'Processing', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.processing, percentage: 0, material_count: 0, top_contributors: [] },
-          { stage_name: 'Packaging', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.packaging_stage, percentage: 0, material_count: 0, top_contributors: [] },
-          { stage_name: 'Distribution', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.distribution, percentage: 0, material_count: 0, top_contributors: [] },
-          { stage_name: 'Use Phase', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.use_phase, percentage: 0, material_count: 0, top_contributors: [] },
-          { stage_name: 'End of Life', sub_stage_name: null, total_impact: breakdown.by_lifecycle_stage.end_of_life, percentage: 0, material_count: 0, top_contributors: [] },
-        ] : undefined}
-        facilityEmissionsBreakdown={breakdown?.by_facility?.map((f: any) => ({
-          facility_name: f.facility_name,
-          emissions: f.emissions,
-          percentage: f.percentage,
-          scope_1: f.scope1,
-          scope_2: f.scope2,
-        }))}
-      />
-
-      <WaterImpactSheet
-        open={waterSheetOpen}
-        onOpenChange={setWaterSheetOpen}
-        totalConsumption={totalWaterConsumption}
-        totalImpact={totalWaterImpact}
-        sourceItems={waterSourceItems}
-      />
-
-      <CircularitySheet
-        open={circularitySheetOpen}
-        onOpenChange={setCircularitySheetOpen}
-        totalWaste={totalWaste}
-        circularityRate={circularityRate}
-        wasteStreams={wasteStreams}
-      />
-
-      <NatureImpactSheet
-        open={natureSheetOpen}
-        onOpenChange={setNatureSheetOpen}
-        totalLandUse={totalLandUseSum}
-        ingredientCount={landUseItems.length}
-        landUseItems={landUseItems}
-      />
     </div>
   );
 }
