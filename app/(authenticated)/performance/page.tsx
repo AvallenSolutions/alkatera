@@ -160,11 +160,11 @@ function HotspotCard({
                     'border-green-500 text-green-700'
                   }
                 >
-                  {item.percentage.toFixed(0)}%
+                  {(item.percentage || 0).toFixed(0)}%
                 </Badge>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-lg font-semibold">{item.value.toLocaleString('en-GB', { maximumFractionDigits: 2 })}</span>
+                <span className="text-lg font-semibold">{typeof item.value === 'number' ? item.value.toLocaleString('en-GB', { maximumFractionDigits: 2 }) : '0'}</span>
                 <span className="text-xs text-muted-foreground">kg CO₂eq</span>
               </div>
             </div>
