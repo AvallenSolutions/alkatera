@@ -109,7 +109,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-bold">
+                      <span className={`text-2xl font-bold ${getTitleClass()}`}>
                         {metric.value.toLocaleString('en-GB', { maximumFractionDigits: 2 })}
                       </span>
                       <span className="text-xs text-muted-foreground">{metric.unit}</span>
@@ -157,7 +157,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-green-900">Reduce Land Footprint</p>
                     <p className="text-xs text-muted-foreground">
-                      Optimize sourcing from low-impact suppliers and prioritise regenerative agriculture
+                      Optimise sourcing from low-impact suppliers and prioritise regenerative agriculture
                     </p>
                   </div>
                 </div>
@@ -165,7 +165,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-green-200">
                   <Leaf className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-green-900">Minimize Ecotoxicity</p>
+                    <p className="text-sm font-medium text-green-900">Minimise Ecotoxicity</p>
                     <p className="text-xs text-muted-foreground">
                       Phase out harmful chemicals and support organic/sustainable farming practices
                     </p>
