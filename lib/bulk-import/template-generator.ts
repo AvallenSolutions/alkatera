@@ -29,19 +29,7 @@ export interface ProductRowData {
   'Unit Size (Value)': string;
   'Unit Size (Unit)': string;
   'Description': string;
-  'Ingredient Name 1': string;
-  'Ingredient Qty 1': string;
-  'Ingredient Unit 1': string;
-  'Ingredient Name 2': string;
-  'Ingredient Qty 2': string;
-  'Ingredient Unit 2': string;
-  'Ingredient Name 3': string;
-  'Ingredient Qty 3': string;
-  'Ingredient Unit 3': string;
-  'Packaging Type': string;
-  'Packaging Material': string;
-  'Packaging Weight': string;
-  'Reusable': string;
+  [key: string]: string;
 }
 
 const PRODUCT_CATEGORIES = [
@@ -64,10 +52,7 @@ const COMPANY_SIZE_OPTIONS = ['1-10', '11-50', '51-250', '251-1000', '1000+'];
 
 const UNIT_OPTIONS = ['ml', 'L', 'g', 'kg', 'unit'];
 
-const PACKAGING_TYPES = [
-  'Glass Bottle', 'Plastic Bottle', 'Can', 'Pouch', 'Carton',
-  'PET Bottle', 'Aluminium Can', 'Glass Jar', 'Cardboard Box'
-];
+const PACKAGING_CATEGORIES = ['Container', 'Label', 'Closure', 'Secondary'];
 
 const PACKAGING_MATERIALS = [
   'Glass', 'Plastic (PET)', 'Aluminium', 'Cardboard', 'Paper',
@@ -224,14 +209,91 @@ export function getValidationOptions(fieldName: string): string[] {
     'Category': PRODUCT_CATEGORIES,
     'Company Size': COMPANY_SIZE_OPTIONS,
     'Unit Size (Unit)': UNIT_OPTIONS,
-    'Ingredient Unit 1': UNIT_OPTIONS,
-    'Ingredient Unit 2': UNIT_OPTIONS,
-    'Ingredient Unit 3': UNIT_OPTIONS,
-    'Packaging Type': PACKAGING_TYPES,
+    'Packaging Category': PACKAGING_CATEGORIES,
     'Packaging Material': PACKAGING_MATERIALS,
   };
 
+  if (fieldName.match(/Ingredient Unit \d+/)) {
+    return UNIT_OPTIONS;
+  }
+
   return validations[fieldName] || [];
+}
+
+function generateProductHeaders(): string[] {
+  const headers = [
+    'Product Name*',
+    'SKU',
+    'Category',
+    'Unit Size (Value)',
+    'Unit Size (Unit)',
+    'Description',
+  ];
+
+  for (let i = 1; i <= 20; i++) {
+    headers.push(`Ingredient Name ${i}`);
+    headers.push(`Ingredient Qty ${i}`);
+    headers.push(`Ingredient Unit ${i}`);
+  }
+
+  headers.push(
+    'Packaging Category (Container)',
+    'Packaging Material (Container)',
+    'Packaging Weight (Container)',
+    'Packaging Category (Label)',
+    'Packaging Material (Label)',
+    'Packaging Weight (Label)',
+    'Packaging Category (Closure)',
+    'Packaging Material (Closure)',
+    'Packaging Weight (Closure)',
+    'Packaging Category (Secondary)',
+    'Packaging Material (Secondary)',
+    'Packaging Weight (Secondary)',
+    'Reusable (Yes/No)'
+  );
+
+  return headers;
+}
+
+function generateProductSampleRow(): string[] {
+  const row = [
+    'Premium Gin',
+    'GIN-001',
+    'Gin',
+    '750',
+    'ml',
+    'Classic London Dry gin with botanical infusions',
+  ];
+
+  for (let i = 1; i <= 20; i++) {
+    if (i === 1) {
+      row.push('Juniper berries', '45', 'g');
+    } else if (i === 2) {
+      row.push('Coriander seeds', '12', 'g');
+    } else if (i === 3) {
+      row.push('Angelica root', '8', 'g');
+    } else {
+      row.push('', '', '');
+    }
+  }
+
+  row.push(
+    'Container',
+    'Glass',
+    '500',
+    'Label',
+    'Paper',
+    '50',
+    'Closure',
+    'Steel',
+    '25',
+    'Secondary',
+    'Cardboard',
+    '100',
+    'No'
+  );
+
+  return row;
 }
 
 export function createGoogleSheetsTemplate(): {
@@ -258,18 +320,33 @@ INSTRUCTIONS FOR USING THIS TEMPLATE
 1. COMPANY SHEET: Enter your company information
    - Only "Company Name" is required
    - Leave other fields blank if not applicable
+   - Complete once per upload
 
 2. PRODUCTS SHEET: Add your products
    - Enter one product per row
-   - List up to 3 ingredients per product
-   - All fields are optional except product name
+   - List up to 20 ingredients per product
+   - Define packaging by category: Container, Label, Closure, Secondary
+   - Each packaging category has its own material and weight fields
 
-3. DATA VALIDATION:
-   - Category: Select from dropdown list
-   - Company Size: Use provided options
+3. INGREDIENTS:
+   - Fill in Ingredient Name, Quantity, and Unit
+   - Leave blank for unused ingredient slots (up to 20 available)
    - Units: ml, L, g, kg, or unit
 
-4. WHEN READY:
+4. PACKAGING BREAKDOWN:
+   - Container: Primary packaging (e.g., bottle, can)
+   - Label: Label material and weight
+   - Closure: Cap, cork, or closure mechanism
+   - Secondary: Outer packaging (e.g., box, carton)
+   - Fill only the categories you use
+
+5. DATA VALIDATION:
+   - Category: Select from beverage category list
+   - Company Size: Use provided options
+   - Packaging Categories: Container, Label, Closure, Secondary
+   - Packaging Materials: Glass, Plastic, Aluminium, etc.
+
+6. WHEN READY:
    - Download or export as Excel
    - Upload to the import page
    - Review the preview before confirming
@@ -315,49 +392,9 @@ to add missing information after the initial import.
       },
       {
         name: 'Products',
-        headers: [
-          'Product Name*',
-          'SKU',
-          'Category',
-          'Unit Size (Value)',
-          'Unit Size (Unit)',
-          'Description',
-          'Ingredient Name 1',
-          'Ingredient Qty 1',
-          'Ingredient Unit 1',
-          'Ingredient Name 2',
-          'Ingredient Qty 2',
-          'Ingredient Unit 2',
-          'Ingredient Name 3',
-          'Ingredient Qty 3',
-          'Ingredient Unit 3',
-          'Packaging Type',
-          'Packaging Material',
-          'Packaging Weight',
-          'Reusable (Yes/No)',
-        ],
-        sampleRow: [
-          'Premium Gin',
-          'GIN-001',
-          'Gin',
-          '750',
-          'ml',
-          'Classic London Dry gin with botanical infusions',
-          'Juniper berries',
-          '45',
-          'g',
-          'Coriander seeds',
-          '12',
-          'g',
-          'Angelica root',
-          '8',
-          'g',
-          'Glass Bottle',
-          'Glass',
-          '500',
-          'No',
-        ],
-        notes: 'Add one product per row. Leave ingredient fields blank if fewer than 3 ingredients. All fields optional except product name.'
+        headers: generateProductHeaders(),
+        sampleRow: generateProductSampleRow(),
+        notes: 'Add one product per row. Leave ingredient fields blank if not needed. All fields optional except product name.'
       }
     ]
   };
