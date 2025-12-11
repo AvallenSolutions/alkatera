@@ -19,7 +19,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isMounted, setIsMounted] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -154,6 +159,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signOut,
     refreshSession,
+  }
+
+  if (!isMounted) {
+    return <AuthContext.Provider value={value}>{null}</AuthContext.Provider>
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
