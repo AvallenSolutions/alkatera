@@ -58,84 +58,21 @@ const DATA_SOURCES = [
 function SafeDetailButton({
   onClick,
   children,
-  variant = "secondary",
-  size = "sm",
   className = ""
 }: {
   onClick: () => void;
   children: React.ReactNode;
-  variant?: string;
-  size?: string;
   className?: string;
 }) {
-  const buttonRef = React.useRef<HTMLButtonElement>(null);
-
-  const handleInteraction = React.useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.nativeEvent) {
-      e.nativeEvent.stopImmediatePropagation();
-    }
-
-    const allEvents = ['keydown', 'keyup', 'keypress', 'click', 'mousedown', 'mouseup'];
-    const blockAll = (evt: Event) => {
-      evt.stopPropagation();
-      evt.stopImmediatePropagation();
-      evt.preventDefault();
-    };
-
-    allEvents.forEach(eventType => {
-      document.addEventListener(eventType, blockAll, { capture: true, once: true });
-      window.addEventListener(eventType, blockAll, { capture: true, once: true });
-    });
-
-    setTimeout(() => {
-      allEvents.forEach(eventType => {
-        document.removeEventListener(eventType, blockAll, { capture: true });
-        window.removeEventListener(eventType, blockAll, { capture: true });
-      });
-    }, 100);
-
-    requestAnimationFrame(() => {
-      onClick();
-    });
-  }, [onClick]);
-
-  const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.nativeEvent) {
-        e.nativeEvent.stopImmediatePropagation();
-      }
-      requestAnimationFrame(() => {
-        onClick();
-      });
-    }
-  }, [onClick]);
-
   return (
     <button
-      ref={buttonRef}
       type="button"
-      data-no-navigation="true"
-      data-prevent-bolt="true"
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 ${className} ${
-        variant === "secondary" ? "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80" : ""
-      } ${
-        size === "sm" ? "h-8 px-3 text-xs" : "h-9 px-4 py-2"
-      } w-full`}
-      onMouseDown={handleInteraction}
-      onClick={handleInteraction}
-      onTouchStart={handleInteraction}
-      onKeyDown={handleKeyDown}
-      onContextMenu={(e) => {
+      onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        onClick();
       }}
-      tabIndex={0}
-      role="button"
-      aria-label={typeof children === 'string' ? children : 'Open details'}
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2 w-full ${className}`}
     >
       {children}
     </button>
@@ -456,7 +393,7 @@ export default function ProductLcaReportPage() {
       {/* Impact Cards Grid */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         {/* Climate Impact */}
-        <Card className="col-span-1 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 cursor-default [&>*]:cursor-default">
+        <Card className="col-span-1 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
@@ -465,7 +402,7 @@ export default function ProductLcaReportPage() {
               Climate
             </CardTitle>
           </CardHeader>
-          <CardContent className="cursor-default">
+          <CardContent>
             <div className="space-y-4">
               <div>
                 <div className="text-3xl font-bold text-green-700 dark:text-green-400">
@@ -473,25 +410,9 @@ export default function ProductLcaReportPage() {
                 </div>
                 <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
               </div>
-              <div
-                onClickCapture={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onMouseDownCapture={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <SafeDetailButton onClick={() => {
-                  setTimeout(() => {
-                    requestAnimationFrame(() => {
-                      setCarbonSheetOpen(true);
-                    });
-                  }, 50);
-                }} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
-                  Explore Breakdown
-                </SafeDetailButton>
-              </div>
+              <SafeDetailButton onClick={() => setCarbonSheetOpen(true)} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
+                GHG Breakdown
+              </SafeDetailButton>
             </div>
           </CardContent>
         </Card>

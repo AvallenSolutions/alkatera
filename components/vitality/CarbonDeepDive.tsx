@@ -166,6 +166,38 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
 
         {/* Overview Tab with Scope Breakdown */}
         <TabsContent value="overview" className="space-y-4 mt-6">
+          {/* Compliance Standards Banner */}
+          <Card className="border-blue-300 bg-gradient-to-br from-blue-50 to-indigo-50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="space-y-2 flex-1">
+                  <p className="text-sm font-semibold text-blue-900">Reporting Standards Compliance</p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                        ISO 14067
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">Carbon footprint quantification</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+                        GHG Protocol
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">Scope 1, 2, 3 accounting</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="bg-purple-100 text-purple-800 border-purple-300">
+                        CSRD E1-6
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">EU sustainability reporting</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Data Quality Validation Banner */}
           {ghgBreakdown && (
             (() => {
@@ -633,6 +665,40 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                             Global Warming Potentials calculated using {ghgBreakdown.gwp_factors.method} characterisation factors.
                             All emissions converted to 100-year CO₂ equivalents per IPCC methodology.
                           </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* CSRD E1 Compliance Note */}
+                  <Card className="bg-purple-50 border-purple-200">
+                    <CardContent className="p-4">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold text-purple-900">CSRD E1-6: GHG Emissions</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            This breakdown satisfies European Sustainability Reporting Standards (ESRS) E1-6 disclosure requirements for gross Scope 1, 2, and 3 GHG emissions,
+                            including disaggregation by greenhouse gas type (CO₂, CH₄, N₂O, HFCs) and biogenic/fossil origin distinction as required for EU sustainability reporting.
+                          </p>
+                          <div className="grid grid-cols-2 gap-2 mt-3">
+                            <div className="text-xs">
+                              <Badge variant="outline" className="bg-green-100 text-green-800 text-[10px] mb-1">Required</Badge>
+                              <p className="text-muted-foreground">Scope 1, 2, 3 totals</p>
+                            </div>
+                            <div className="text-xs">
+                              <Badge variant="outline" className="bg-green-100 text-green-800 text-[10px] mb-1">Required</Badge>
+                              <p className="text-muted-foreground">Gas-by-gas breakdown</p>
+                            </div>
+                            <div className="text-xs">
+                              <Badge variant="outline" className="bg-green-100 text-green-800 text-[10px] mb-1">Required</Badge>
+                              <p className="text-muted-foreground">Biogenic CO₂ separate</p>
+                            </div>
+                            <div className="text-xs">
+                              <Badge variant="outline" className="bg-blue-100 text-blue-800 text-[10px] mb-1">Optional</Badge>
+                              <p className="text-muted-foreground">Land use change</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </CardContent>
