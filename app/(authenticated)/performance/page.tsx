@@ -210,7 +210,7 @@ function ActionGuidanceCard() {
   return (
     <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
           <Target className="h-5 w-5 text-blue-600" />
           Priority Actions
         </CardTitle>
@@ -231,12 +231,12 @@ function ActionGuidanceCard() {
             </div>
             <div className="flex-1">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold">{action.category}</span>
+                <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{action.category}</span>
                 <Badge variant={action.priority === 'high' ? 'destructive' : 'default'} className="text-xs">
                   {action.priority === 'high' ? 'High Priority' : 'Medium Priority'}
                 </Badge>
               </div>
-              <p className="text-sm mb-1">{action.action}</p>
+              <p className="text-sm mb-1 text-slate-700 dark:text-slate-300">{action.action}</p>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Activity className="h-3 w-3" />
                 {action.impact}
@@ -253,7 +253,7 @@ function ComplianceOverview({ metrics }: { metrics: any }) {
   return (
     <Card className="border-2 border-green-200">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
           <Award className="h-5 w-5 text-green-600" />
           Compliance & Standards
         </CardTitle>
@@ -265,15 +265,15 @@ function ComplianceOverview({ metrics }: { metrics: any }) {
             <div className="flex items-center justify-center mb-2">
               <CheckCircle2 className="h-6 w-6 text-green-600" />
             </div>
-            <div className="text-2xl font-bold">{metrics?.csrd_compliant_percentage || 0}%</div>
-            <div className="text-xs text-muted-foreground mt-1">CSRD Ready</div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-50">{metrics?.csrd_compliant_percentage || 0}%</div>
+            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">CSRD Ready</div>
           </div>
           <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20">
             <div className="flex items-center justify-center mb-2">
               <CheckCircle2 className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="text-2xl font-bold">{metrics?.total_products_assessed || 0}</div>
-            <div className="text-xs text-muted-foreground mt-1">Products Assessed</div>
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-50">{metrics?.total_products_assessed || 0}</div>
+            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">Products Assessed</div>
           </div>
         </div>
 
