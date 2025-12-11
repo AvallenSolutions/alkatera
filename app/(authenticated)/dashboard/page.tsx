@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useOrganization } from '@/lib/organizationContext';
 import { useDashboardPreferences } from '@/hooks/data/useDashboardPreferences';
 import { DashboardCustomiseModal } from '@/components/dashboard/DashboardCustomiseModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Settings2, RefreshCw } from 'lucide-react';
+import { Settings2, RefreshCw, Upload } from 'lucide-react';
 
 import {
   HeadlineMetricsWidget,
@@ -80,6 +81,7 @@ function EmptyDashboard() {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { currentOrganization } = useOrganization();
   const { enabledWidgets, loading, error, refetch } = useDashboardPreferences();
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -142,6 +144,13 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            onClick={() => router.push('/products/import')}
+            className="gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Import Products
+          </Button>
           <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh dashboard">
             <RefreshCw className="h-4 w-4" />
           </Button>
