@@ -3,17 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Lock, Download, Share2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Download, Share2, Eye, EyeOff, Leaf, Droplets, Recycle, MapPin, ThermometerSun, Cloud, Activity, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { DQIGauge } from '@/components/lca/DQIGauge';
-import { ClimateCard } from '@/components/vitality/ClimateCard';
-import { WaterCard } from '@/components/vitality/WaterCard';
-import { WasteCard } from '@/components/vitality/WasteCard';
-import { NatureCard } from '@/components/vitality/NatureCard';
 import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
 import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
 import { CircularitySheet } from '@/components/vitality/CircularitySheet';
@@ -22,7 +16,6 @@ import { generateLcaReportPdf } from '@/lib/pdf-generator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
 
-// Mock LCA Report Data
 const MOCK_LCA_REPORT = {
   id: '550e8400-e29b-41d4-a716-446655440000',
   product_id: 1,
@@ -41,8 +34,8 @@ const MOCK_LCA_REPORT = {
 const MOCK_METRICS = {
   total_impacts: {
     climate_change_gwp100: 0.185,
-    water_consumption: 0.82, // IMPORTANT: Always stored in m³ (cubic meters). Convert Liters: value / 1000
-    water_scarcity_aware: 3.2, // m³ world eq (AWARE-weighted)
+    water_consumption: 0.82,
+    water_scarcity_aware: 3.2,
     land_use: 1.85,
     terrestrial_ecotoxicity: 0.42,
     freshwater_eutrophication: 0.008,
@@ -67,7 +60,6 @@ export default function ProductLcaReportPage() {
   const productId = params?.id as string;
   const { toast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('planet');
   const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
@@ -77,7 +69,6 @@ export default function ProductLcaReportPage() {
   const [productData, setProductData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch real product and LCA data
   useEffect(() => {
     async function fetchData() {
       if (!productId) return;
@@ -85,7 +76,6 @@ export default function ProductLcaReportPage() {
       try {
         setLoading(true);
 
-        // Fetch product details
         const { data: product, error: productError } = await supabase
           .from('products')
           .select('*')
@@ -97,10 +87,8 @@ export default function ProductLcaReportPage() {
           return;
         }
 
-        console.log('[ProductReport] Fetched product:', product);
         setProductData(product);
 
-        // Fetch the latest completed LCA for this product
         const { data: lca, error: lcaError } = await supabase
           .from('product_lcas')
           .select('*')
@@ -115,10 +103,7 @@ export default function ProductLcaReportPage() {
           return;
         }
 
-        console.log('[ProductReport] Fetched LCA:', lca);
-
         if (lca) {
-          // Fetch materials for this LCA
           const { data: materials, error: materialsError } = await supabase
             .from('product_lca_materials')
             .select('*')
@@ -126,13 +111,9 @@ export default function ProductLcaReportPage() {
 
           if (!materialsError && materials) {
             lca.materials = materials;
-            console.log('[ProductReport] Fetched materials:', materials.length);
           }
 
-          console.log('[ProductReport] LCA aggregated_impacts:', lca.aggregated_impacts);
           setLcaData(lca);
-        } else {
-          console.log('[ProductReport] No completed LCA found for product:', productId);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -144,19 +125,16 @@ export default function ProductLcaReportPage() {
     fetchData();
   }, [productId]);
 
-  // Use real LCA data if available, otherwise use mock data
   const impacts = lcaData?.aggregated_impacts || MOCK_METRICS.total_impacts;
   const breakdown = lcaData?.aggregated_impacts?.breakdown;
 
   const waterConsumption = impacts.water_consumption || MOCK_METRICS.total_impacts.water_consumption;
   const waterScarcityImpact = impacts.water_scarcity_aware || MOCK_METRICS.total_impacts.water_scarcity_aware;
 
-  // Transform materials data into water source items
   const waterSourceItems = lcaData?.materials?.length > 0
     ? lcaData.materials.map((material: any, idx: number) => {
         const waterImpact = Number(material.impact_water) || 0;
         const waterScarcity = Number(material.impact_water_scarcity) || 0;
-        const totalWater = waterConsumption > 0 ? waterConsumption : 1;
 
         let riskLevel: 'low' | 'medium' | 'high' = 'low';
         if (waterScarcity > waterImpact * 20) {
@@ -206,7 +184,7 @@ export default function ProductLcaReportPage() {
       ];
 
   const circularityPercentage = MOCK_METRICS.circularity_percentage;
-  const estimatedTotalWaste = 0.45; // kg per unit
+  const estimatedTotalWaste = 0.45;
   const linearWasteMass = estimatedTotalWaste * (100 - circularityPercentage) / 100;
   const circularWasteMass = estimatedTotalWaste * circularityPercentage / 100;
 
@@ -219,7 +197,6 @@ export default function ProductLcaReportPage() {
 
   const totalLandUse = impacts.land_use || MOCK_METRICS.total_impacts.land_use;
 
-  // Transform materials data into land use items
   const landUseItems = lcaData?.materials?.length > 0
     ? lcaData.materials
         .filter((m: any) => Number(m.impact_land) > 0)
@@ -246,7 +223,7 @@ export default function ProductLcaReportPage() {
 
   const totalWaterConsumption = waterSourceItems.reduce((sum: number, item: any) => sum + item.consumption, 0);
   const totalWaterImpact = waterSourceItems.reduce((sum: number, item: any) => sum + item.netImpact, 0);
-  const totalWaste = wasteStreams.reduce((sum: number, item: any) => sum + item.mass, 0) / 1000; // Convert to kg
+  const totalWaste = wasteStreams.reduce((sum: number, item: any) => sum + item.mass, 0) / 1000;
   const circularWaste = wasteStreams.reduce((sum: number, item: any) => sum + (item.mass * item.circularityScore / 100), 0) / 1000;
   const circularityRate = (circularWaste / totalWaste) * 100;
   const totalLandUseSum = landUseItems.reduce((sum: number, item: any) => sum + item.totalFootprint, 0);
@@ -292,7 +269,6 @@ export default function ProductLcaReportPage() {
     }
   };
 
-  // Determine display values - use real data if available, fallback to mock
   const displayTitle = lcaData ? '2025 Product Impact Assessment' : MOCK_LCA_REPORT.title;
   const displayProductName = productData?.name || lcaData?.product_name || MOCK_LCA_REPORT.product_name;
   const displayStatus = lcaData?.status || MOCK_LCA_REPORT.status;
@@ -304,7 +280,7 @@ export default function ProductLcaReportPage() {
   const displayFunctionalUnit = lcaData?.functional_unit || MOCK_LCA_REPORT.functional_unit;
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
+    <div className="container mx-auto py-8 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="space-y-2 flex-1">
@@ -344,193 +320,259 @@ export default function ProductLcaReportPage() {
         </div>
       </div>
 
-      {/* Trust Signal: DQI Gauge */}
-      <div className="grid md:grid-cols-4 gap-6">
-        <div className="md:col-span-1">
-          <DQIGauge score={displayDqi} size="md" />
-        </div>
-        <div className="md:col-span-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Report Summary</CardTitle>
-              <CardDescription>Key information about this LCA assessment</CardDescription>
-            </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-6">
+      {/* Bento Box Grid Layout */}
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+        {/* DQI Score - 1x2 */}
+        <Card className="col-span-1 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-blue-200 dark:border-blue-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Activity className="h-4 w-4 text-blue-600" />
+              Data Quality
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center justify-center">
+            <DQIGauge score={displayDqi} size="sm" />
+            <p className="text-xs text-center text-muted-foreground mt-3">
+              High confidence with full traceability
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Climate Impact - 1x2 */}
+        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setCarbonSheetOpen(true)}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Cloud className="h-4 w-4 text-green-600" />
+              Climate Change
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
               <div>
-                <h4 className="text-sm font-semibold mb-2">System Boundary</h4>
-                <p className="text-sm text-muted-foreground">{displayBoundary}</p>
+                <div className="text-3xl font-bold text-green-600">
+                  {impacts.climate_change_gwp100.toFixed(3)}
+                </div>
+                <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
               </div>
-              <div>
-                <h4 className="text-sm font-semibold mb-2">Functional Unit</h4>
-                <p className="text-sm text-muted-foreground">{displayFunctionalUnit}</p>
+              <div className="pt-3 border-t">
+                <div className="text-xs font-medium mb-1">GHG Protocol Compliant</div>
+                <Badge variant="outline" className="text-xs">ISO 14067</Badge>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Water Consumption - 1x2 */}
+        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setWaterSheetOpen(true)}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Droplets className="h-4 w-4 text-blue-600" />
+              Water Impact
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
               <div>
-                <h4 className="text-sm font-semibold mb-2">Standards</h4>
-                <div className="flex gap-2">
+                <div className="text-3xl font-bold text-blue-600">
+                  {waterConsumption.toFixed(2)}
+                </div>
+                <div className="text-xs text-muted-foreground">Litres consumed</div>
+              </div>
+              <div className="pt-3 border-t">
+                <div className="text-xs text-muted-foreground">Scarcity-weighted</div>
+                <div className="text-sm font-semibold">{waterScarcityImpact.toFixed(2)} m³ world eq</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Circularity - 1x2 */}
+        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setCircularitySheetOpen(true)}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Recycle className="h-4 w-4 text-amber-600" />
+              Circularity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div>
+                <div className="text-3xl font-bold text-amber-600">
+                  {circularityPercentage}%
+                </div>
+                <div className="text-xs text-muted-foreground">Material recovery rate</div>
+              </div>
+              <div className="pt-3 border-t">
+                <div className="text-xs text-muted-foreground">Total waste</div>
+                <div className="text-sm font-semibold">{totalWaste.toFixed(3)} kg per unit</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System Boundary - 2x1 */}
+        <Card className="col-span-1 md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Eye className="h-4 w-4 text-slate-600" />
+              System Boundary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm mb-4">{displayBoundary}</p>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="p-3 border rounded-lg bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                <h5 className="font-semibold text-xs mb-2 flex items-center gap-1 text-green-700 dark:text-green-400">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Included
+                </h5>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>• Raw material extraction</li>
+                  <li>• Primary production</li>
+                  <li>• Packaging manufacture</li>
+                  <li>• Factory operations</li>
+                </ul>
+              </div>
+              <div className="p-3 border rounded-lg bg-slate-50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-800">
+                <h5 className="font-semibold text-xs mb-2 flex items-center gap-1 text-slate-700 dark:text-slate-400">
+                  <EyeOff className="h-3 w-3" />
+                  Excluded
+                </h5>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>• Distribution to retailers</li>
+                  <li>• Consumer use phase</li>
+                  <li>• End-of-life disposal</li>
+                  <li>• Capital goods</li>
+                </ul>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Land Use - 1x2 */}
+        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setNatureSheetOpen(true)}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-emerald-600" />
+              Land Use
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div>
+                <div className="text-3xl font-bold text-emerald-600">
+                  {totalLandUse.toFixed(2)}
+                </div>
+                <div className="text-xs text-muted-foreground">m² per unit</div>
+              </div>
+              <div className="pt-3 border-t">
+                <div className="text-xs font-medium mb-1">Agricultural footprint</div>
+                <div className="text-xs text-muted-foreground">{landUseItems.length} materials tracked</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Resource Scarcity - 1x2 */}
+        <Card className="col-span-1">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <ThermometerSun className="h-4 w-4 text-orange-600" />
+              Resource Use
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div>
+                <div className="text-3xl font-bold text-orange-600">
+                  {impacts.fossil_resource_scarcity?.toFixed(3) || '0.035'}
+                </div>
+                <div className="text-xs text-muted-foreground">kg oil eq</div>
+              </div>
+              <div className="pt-3 border-t">
+                <div className="text-xs font-medium mb-1">Fossil resources</div>
+                <div className="text-xs text-muted-foreground">Energy and materials</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Compliance Standards - 2x1 */}
+        <Card className="col-span-1 md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <FileText className="h-4 w-4 text-slate-600" />
+              Compliance Framework
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-xs font-semibold mb-2">Standards</h4>
+                <div className="flex flex-wrap gap-2">
                   <Badge variant="outline" className="text-xs">ISO 14044:2006</Badge>
+                  <Badge variant="outline" className="text-xs">ISO 14067:2018</Badge>
                   <Badge variant="outline" className="text-xs">CSRD E1</Badge>
                   <Badge variant="outline" className="text-xs">GHG Protocol</Badge>
                 </div>
               </div>
               <div>
-                <h4 className="text-sm font-semibold mb-2">Assessment Method</h4>
-                <p className="text-sm text-muted-foreground">ReCiPe 2016 Midpoint (H)</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Main Content: Tabbed Interface */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="planet">Planet</TabsTrigger>
-          <TabsTrigger value="people" disabled>
-            <Lock className="h-3 w-3 mr-2" />
-            People
-          </TabsTrigger>
-          <TabsTrigger value="transparency">Transparency</TabsTrigger>
-        </TabsList>
-
-        {/* Tab A: Planet (Active) */}
-        <TabsContent value="planet" className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <ClimateCard
-              metrics={{
-                total_impacts: impacts,
-                total_products_assessed: 1,
-                csrd_compliant_percentage: 100,
-              } as any}
-              loading={loading}
-              onViewBreakdown={() => setCarbonSheetOpen(true)}
-            />
-            <WaterCard
-              metrics={{
-                total_impacts: impacts,
-                total_products_assessed: 1,
-              } as any}
-              loading={loading}
-              onClick={() => setWaterSheetOpen(true)}
-            />
-            <WasteCard
-              metrics={{
-                total_impacts: impacts,
-                circularity_percentage: MOCK_METRICS.circularity_percentage,
-              } as any}
-              loading={loading}
-              onClick={() => setCircularitySheetOpen(true)}
-            />
-            <NatureCard
-              metrics={{
-                total_impacts: impacts,
-              } as any}
-              loading={loading}
-              onClick={() => setNatureSheetOpen(true)}
-            />
-          </div>
-        </TabsContent>
-
-        {/* Tab B: People (Locked/Roadmap) */}
-        <TabsContent value="people" className="space-y-6">
-          <Card className="relative overflow-hidden">
-            <div className="absolute inset-0 backdrop-blur-sm bg-white/60 z-10 flex items-center justify-center">
-              <div className="text-center space-y-4 p-8">
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-200">
-                  <Lock className="h-10 w-10 text-gray-500" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold mb-2">Social Impact Module</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Status: In Development (Q3 2026)
-                  </p>
-                  <p className="text-sm text-muted-foreground max-w-md">
-                    Tracks UN S-LCA indicators for Labour & Community including Fair Wage, Working Conditions, and Local Economic Impact.
-                  </p>
-                </div>
-                <Badge variant="outline" className="text-xs">Roadmap Feature</Badge>
+                <h4 className="text-xs font-semibold mb-2">Assessment Method</h4>
+                <p className="text-xs text-muted-foreground">ReCiPe 2016 Midpoint (H) - Hierarchist perspective</p>
               </div>
             </div>
-            <CardContent className="p-12 space-y-8">
-              <Skeleton className="h-64 w-full" />
-              <div className="grid md:grid-cols-3 gap-4">
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
-                <Skeleton className="h-32 w-full" />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+          </CardContent>
+        </Card>
 
-        {/* Tab C: Transparency (Active) */}
-        <TabsContent value="transparency" className="space-y-6">
-          {/* Section 1: Data Provenance */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Data Provenance</CardTitle>
-              <CardDescription>
-                Complete traceability of all data sources used in this assessment
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        {/* Functional Unit - 1x2 */}
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Functional Unit</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold mb-1">{displayFunctionalUnit}</div>
+            <p className="text-xs text-muted-foreground">
+              All environmental impacts are calculated per functional unit
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Data Provenance - Full Width */}
+        <Card className="col-span-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Data Provenance & Transparency
+            </CardTitle>
+            <CardDescription>
+              Complete traceability of all data sources used in this assessment
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
               {DATA_SOURCES.map((source, idx) => (
-                <div key={idx} className="flex items-start justify-between border-b pb-4 last:border-0">
-                  <div className="space-y-1">
+                <div key={idx} className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900/50">
+                  <div className="flex items-start justify-between mb-2">
                     <h4 className="font-semibold text-sm">{source.name}</h4>
-                    <p className="text-sm text-muted-foreground">{source.description}</p>
+                    <Badge variant="secondary" className="text-xs">{source.count}</Badge>
                   </div>
-                  <Badge variant="outline">{source.count} processes</Badge>
+                  <p className="text-xs text-muted-foreground">{source.description}</p>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-
-          {/* Section 2: System Boundary */}
-          <Card>
-            <CardHeader>
-              <CardTitle>System Boundary</CardTitle>
-              <CardDescription>
-                Scope and boundaries of this LCA assessment
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <h4 className="font-semibold text-sm mb-2">Boundary Definition</h4>
-                <p className="text-sm text-muted-foreground">
-                  {displayBoundary}
-                </p>
-              </div>
-              <div className="grid md:grid-cols-3 gap-4 mt-4">
-                <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-                  <Eye className="h-5 w-5 text-green-600 mb-2" />
-                  <h5 className="font-semibold text-sm mb-1">Included</h5>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• Raw material extraction</li>
-                    <li>• Primary production</li>
-                    <li>• Packaging manufacture</li>
-                    <li>• Factory operations</li>
-                  </ul>
-                </div>
-                <div className="p-4 border rounded-lg bg-gray-50 border-gray-200">
-                  <EyeOff className="h-5 w-5 text-gray-600 mb-2" />
-                  <h5 className="font-semibold text-sm mb-1">Excluded</h5>
-                  <ul className="text-xs text-muted-foreground space-y-1">
-                    <li>• Distribution to retailers</li>
-                    <li>• Consumer use phase</li>
-                    <li>• End-of-life disposal</li>
-                    <li>• Capital goods</li>
-                  </ul>
-                </div>
-                <div className="p-4 border rounded-lg bg-amber-50 border-amber-200">
-                  <Badge variant="outline" className="mb-2 text-xs">Cut-off Criteria</Badge>
-                  <p className="text-xs text-muted-foreground">
-                    Processes contributing less than 1% to total impact and cumulatively less than 5% were excluded per ISO 14044.
+            </div>
+            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h5 className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">Cut-off Criteria</h5>
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Processes contributing less than 1% to total impact and cumulatively less than 5% were excluded per ISO 14044 requirements.
                   </p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Evidence Drawers */}
       <CarbonBreakdownSheet
