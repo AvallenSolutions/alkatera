@@ -96,7 +96,13 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                       <div className={`p-2 rounded-lg ${metric.bgColor}`}>
                         <IconComponent className={`h-4 w-4 ${metric.color}`} />
                       </div>
-                      <CardTitle className="text-sm">{metric.name}</CardTitle>
+                      <CardTitle className={`text-sm ${
+                        metric.name === 'Land Use' ? 'text-green-900 dark:text-green-50' :
+                        metric.name === 'Terrestrial Ecotoxicity' ? 'text-green-900 dark:text-green-50' :
+                        metric.name === 'Freshwater Eutrophication' ? 'text-blue-900 dark:text-blue-50' :
+                        metric.name === 'Terrestrial Acidification' ? 'text-purple-900 dark:text-purple-50' :
+                        'text-slate-900 dark:text-slate-50'
+                      }`}>{metric.name}</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -147,7 +153,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-green-200">
                   <Mountain className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Reduce Land Footprint</p>
+                    <p className="text-sm font-medium text-green-900">Reduce Land Footprint</p>
                     <p className="text-xs text-muted-foreground">
                       Optimize sourcing from low-impact suppliers and prioritise regenerative agriculture
                     </p>
@@ -157,7 +163,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-green-200">
                   <Leaf className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Minimize Ecotoxicity</p>
+                    <p className="text-sm font-medium text-green-900">Minimize Ecotoxicity</p>
                     <p className="text-xs text-muted-foreground">
                       Phase out harmful chemicals and support organic/sustainable farming practices
                     </p>
@@ -167,7 +173,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                 <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-green-200">
                   <Droplets className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="text-sm font-medium">Control Nutrient Loading</p>
+                    <p className="text-sm font-medium text-green-900">Control Nutrient Loading</p>
                     <p className="text-xs text-muted-foreground">
                       Improve wastewater treatment and reduce agricultural runoff in supply chain
                     </p>
