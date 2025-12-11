@@ -339,7 +339,7 @@ export default function ProductLcaReportPage() {
         </Card>
 
         {/* Climate Impact - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setCarbonSheetOpen(true)}>
+        <Card className="col-span-1 hover:shadow-lg transition-shadow">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Cloud className="h-4 w-4 text-green-600" />
@@ -347,7 +347,7 @@ export default function ProductLcaReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
                 <div className="text-3xl font-bold text-green-600">
                   {impacts.climate_change_gwp100.toFixed(3)}
@@ -358,12 +358,20 @@ export default function ProductLcaReportPage() {
                 <div className="text-xs font-medium mb-1">GHG Protocol Compliant</div>
                 <Badge variant="outline" className="text-xs">ISO 14067</Badge>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => setCarbonSheetOpen(true)}
+              >
+                View Details
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Water Consumption - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setWaterSheetOpen(true)}>
+        <Card className="col-span-1 hover:shadow-lg transition-shadow">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Droplets className="h-4 w-4 text-blue-600" />
@@ -371,7 +379,7 @@ export default function ProductLcaReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
                 <div className="text-3xl font-bold text-blue-600">
                   {waterConsumption.toFixed(2)}
@@ -382,12 +390,20 @@ export default function ProductLcaReportPage() {
                 <div className="text-xs text-muted-foreground">Scarcity-weighted</div>
                 <div className="text-sm font-semibold">{waterScarcityImpact.toFixed(2)} m³ world eq</div>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => setWaterSheetOpen(true)}
+              >
+                View Details
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         {/* Circularity - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setCircularitySheetOpen(true)}>
+        <Card className="col-span-1 hover:shadow-lg transition-shadow">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Recycle className="h-4 w-4 text-amber-600" />
@@ -395,7 +411,7 @@ export default function ProductLcaReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
                 <div className="text-3xl font-bold text-amber-600">
                   {circularityPercentage}%
@@ -406,6 +422,14 @@ export default function ProductLcaReportPage() {
                 <div className="text-xs text-muted-foreground">Total waste</div>
                 <div className="text-sm font-semibold">{totalWaste.toFixed(3)} kg per unit</div>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => setCircularitySheetOpen(true)}
+              >
+                View Details
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -450,7 +474,7 @@ export default function ProductLcaReportPage() {
         </Card>
 
         {/* Land Use - 1x2 */}
-        <Card className="col-span-1 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setNatureSheetOpen(true)}>
+        <Card className="col-span-1 hover:shadow-lg transition-shadow">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <MapPin className="h-4 w-4 text-emerald-600" />
@@ -458,7 +482,7 @@ export default function ProductLcaReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div>
                 <div className="text-3xl font-bold text-emerald-600">
                   {totalLandUse.toFixed(2)}
@@ -469,6 +493,14 @@ export default function ProductLcaReportPage() {
                 <div className="text-xs font-medium mb-1">Agricultural footprint</div>
                 <div className="text-xs text-muted-foreground">{landUseItems.length} materials tracked</div>
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => setNatureSheetOpen(true)}
+              >
+                View Details
+              </Button>
             </div>
           </CardContent>
         </Card>
