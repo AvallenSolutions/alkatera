@@ -279,20 +279,23 @@ export default function ProductLcaReportPage() {
   const displayBoundary = lcaData?.system_boundary || MOCK_LCA_REPORT.system_boundary;
   const displayFunctionalUnit = lcaData?.functional_unit || MOCK_LCA_REPORT.functional_unit;
 
-  // Calculate scope breakdowns (mock values if no data)
-  const scope1 = breakdown?.by_scope?.scope1 || 0.028;
-  const scope2 = breakdown?.by_scope?.scope2 || 0.042;
-  const scope3 = breakdown?.by_scope?.scope3 || 0.115;
-  const totalEmissions = scope1 + scope2 + scope3;
+  // Calculate scope breakdowns (use real data, not mocks)
+  const scope1 = breakdown?.by_scope?.scope1 || 0;
+  const scope2 = breakdown?.by_scope?.scope2 || 0;
+  const scope3 = breakdown?.by_scope?.scope3 || 0;
+  const totalEmissions = impacts.climate_change_gwp100;
 
-  // Lifecycle stage breakdowns
+  // Check if we have facility data
+  const hasFacilityData = scope1 > 0 || scope2 > 0;
+
+  // Lifecycle stage breakdowns (use real data)
   const lifecycleStages = breakdown?.by_lifecycle_stage || {
-    raw_materials: 0.085,
-    processing: 0.035,
-    packaging_stage: 0.045,
-    distribution: 0.015,
+    raw_materials: 0,
+    processing: 0,
+    packaging_stage: 0,
+    distribution: 0,
     use_phase: 0,
-    end_of_life: 0.005,
+    end_of_life: 0,
   };
 
   return (
@@ -486,6 +489,21 @@ export default function ProductLcaReportPage() {
                           <Badge variant="outline" className="text-xs">GHG Protocol</Badge>
                           Emissions by Scope
                         </h4>
+
+                        {!hasFacilityData && totalEmissions > 0 && (
+                          <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">Production Site Data Missing</p>
+                                <p className="text-xs text-amber-800 dark:text-amber-200">
+                                  Scope 1 & 2 emissions require production site allocation. Visit the <strong>Production Sites</strong> tab to link facilities and calculate manufacturing emissions.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div className="space-y-3">
                           <div className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
                             <div className="flex justify-between items-start mb-2">
@@ -543,6 +561,13 @@ export default function ProductLcaReportPage() {
                           <Badge variant="outline" className="text-xs">ISO 14044</Badge>
                           Emissions by Lifecycle Stage
                         </h4>
+
+                        {!hasFacilityData && totalEmissions > 0 && (
+                          <p className="text-xs text-muted-foreground mb-3 italic">
+                            Note: Processing stage emissions are currently 0 because production site data has not been linked. This data comes from facility-level Scope 1 & 2 reporting.
+                          </p>
+                        )}
+
                         <div className="grid md:grid-cols-2 gap-3">
                           <div className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
                             <div className="flex justify-between items-center">
