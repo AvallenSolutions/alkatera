@@ -112,12 +112,12 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                       <span className={`text-2xl font-bold ${getTitleClass()}`}>
                         {metric.value.toLocaleString('en-GB', { maximumFractionDigits: 2 })}
                       </span>
-                      <span className="text-xs text-muted-foreground">{metric.unit}</span>
+                      <span className={`text-xs ${getTitleClass()}`}>{metric.unit}</span>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-muted-foreground font-medium">{metric.interpretation}</span>
+                        <span className={`font-medium ${getTitleClass()}`}>{metric.interpretation}</span>
                         <Badge variant="outline" className="text-xs">Impact Level</Badge>
                       </div>
                       <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
@@ -126,12 +126,12 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                           style={{ width: `${Math.min(relativeIntensity, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={`text-xs ${getTitleClass()}`}>
                         {metric.description}
                       </p>
                       <div className="pt-2 border-t">
-                        <p className="text-xs font-medium text-muted-foreground">Benchmark:</p>
-                        <p className="text-xs text-muted-foreground mt-1">{metric.targetGuidance}</p>
+                        <p className={`text-xs font-medium ${getTitleClass()}`}>Benchmark:</p>
+                        <p className={`text-xs mt-1 ${getTitleClass()}`}>{metric.targetGuidance}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -156,7 +156,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                   <Mountain className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-green-900">Reduce Land Footprint</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-green-700">
                       Optimise sourcing from low-impact suppliers and prioritise regenerative agriculture
                     </p>
                   </div>
@@ -166,7 +166,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                   <Leaf className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-green-900">Minimise Ecotoxicity</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-green-700">
                       Phase out harmful chemicals and support organic/sustainable farming practices
                     </p>
                   </div>
@@ -176,7 +176,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                   <Droplets className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-green-900">Control Nutrient Loading</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-green-700">
                       Improve wastewater treatment and reduce agricultural runoff in supply chain
                     </p>
                   </div>
@@ -190,7 +190,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
               <p className="text-sm font-semibold text-blue-900">
                 TNFD LEAP Approach
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-blue-700">
                 These metrics support the Taskforce on Nature-related Financial Disclosures (TNFD) framework. Use this data to identify nature-related dependencies, impacts, risks, and opportunities across your value chain.
               </p>
             </CardContent>
