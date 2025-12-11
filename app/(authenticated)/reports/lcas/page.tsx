@@ -297,7 +297,7 @@ export default function LcasPage() {
                     <div className="flex items-center gap-6">
                       <div>
                         <p className="text-xs text-muted-foreground">Total GHG Emissions</p>
-                        <p className="text-lg font-semibold">{report.total_co2e} kg CO₂eq</p>
+                        <p className="text-lg font-semibold">{report.total_co2e.toFixed(3)} kg CO₂eq</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">System Boundary</p>
