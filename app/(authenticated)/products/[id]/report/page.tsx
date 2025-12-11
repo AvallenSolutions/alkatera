@@ -118,6 +118,8 @@ function SafeDetailButton({
     <button
       ref={buttonRef}
       type="button"
+      data-no-navigation="true"
+      data-prevent-bolt="true"
       className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 ${className} ${
         variant === "secondary" ? "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80" : ""
       } ${
@@ -127,8 +129,13 @@ function SafeDetailButton({
       onClick={handleInteraction}
       onTouchStart={handleInteraction}
       onKeyDown={handleKeyDown}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       tabIndex={0}
       role="button"
+      aria-label={typeof children === 'string' ? children : 'Open details'}
     >
       {children}
     </button>
@@ -449,7 +456,7 @@ export default function ProductLcaReportPage() {
       {/* Impact Cards Grid */}
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
         {/* Climate Impact */}
-        <Card className="col-span-1 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
+        <Card className="col-span-1 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 cursor-default [&>*]:cursor-default">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <div className="p-2 bg-green-100 dark:bg-green-900/50 rounded-lg">
@@ -458,7 +465,7 @@ export default function ProductLcaReportPage() {
               Climate
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="cursor-default">
             <div className="space-y-4">
               <div>
                 <div className="text-3xl font-bold text-green-700 dark:text-green-400">
@@ -466,15 +473,25 @@ export default function ProductLcaReportPage() {
                 </div>
                 <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
               </div>
-              <SafeDetailButton onClick={() => {
-                setTimeout(() => {
-                  requestAnimationFrame(() => {
-                    setCarbonSheetOpen(true);
-                  });
-                }, 50);
-              }} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
-                Explore Breakdown
-              </SafeDetailButton>
+              <div
+                onClickCapture={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
+                onMouseDownCapture={(e) => {
+                  e.stopPropagation();
+                }}
+              >
+                <SafeDetailButton onClick={() => {
+                  setTimeout(() => {
+                    requestAnimationFrame(() => {
+                      setCarbonSheetOpen(true);
+                    });
+                  }, 50);
+                }} className="bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-800/50 text-green-700 dark:text-green-300">
+                  Explore Breakdown
+                </SafeDetailButton>
+              </div>
             </div>
           </CardContent>
         </Card>
