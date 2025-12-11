@@ -64,15 +64,32 @@ function SafeDetailButton({
   children: React.ReactNode;
   className?: string;
 }) {
+  const handleClick = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+    onClick();
+  }, [onClick]);
+
+  const handleMouseDown = React.useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
+  }, []);
+
   return (
     <button
       type="button"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onClick();
-      }}
+      onClick={handleClick}
+      onMouseDown={handleMouseDown}
+      onMouseUp={(e) => e.stopPropagation()}
+      onTouchStart={(e) => e.stopPropagation()}
+      onTouchEnd={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
       className={`inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 h-9 px-4 py-2 w-full ${className}`}
+      style={{ pointerEvents: 'auto', position: 'relative', zIndex: 10 }}
+      data-bolt-ignore="true"
+      data-no-bolt-intercept="true"
     >
       {children}
     </button>
@@ -93,6 +110,27 @@ export default function ProductLcaReportPage() {
   const [productData, setProductData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
+
+  // Block Bolt's event interception on this page
+  useEffect(() => {
+    const blockBoltInterception = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-bolt-ignore]') || target.closest('[data-no-bolt-intercept]')) {
+        e.stopImmediatePropagation();
+      }
+    };
+
+    // Add capture phase listeners to block Bolt
+    document.addEventListener('click', blockBoltInterception, { capture: true });
+    document.addEventListener('mousedown', blockBoltInterception, { capture: true });
+    document.addEventListener('pointerdown', blockBoltInterception, { capture: true });
+
+    return () => {
+      document.removeEventListener('click', blockBoltInterception, { capture: true });
+      document.removeEventListener('mousedown', blockBoltInterception, { capture: true });
+      document.removeEventListener('pointerdown', blockBoltInterception, { capture: true });
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -391,7 +429,15 @@ export default function ProductLcaReportPage() {
       </div>
 
       {/* Impact Cards Grid */}
-      <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+      <div
+        className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4"
+        onClickCapture={(e) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'BUTTON' || target.closest('button')) {
+            e.stopPropagation();
+          }
+        }}
+      >
         {/* Climate Impact */}
         <Card className="col-span-1 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800/50 hover:shadow-lg hover:scale-105 transition-all duration-200">
           <CardHeader className="pb-2">
