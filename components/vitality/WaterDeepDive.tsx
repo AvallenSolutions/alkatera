@@ -312,7 +312,7 @@ export function WaterDeepDive({ facilityWaterRisks }: WaterDeepDiveProps) {
                           <div className="space-y-2 flex-1">
                             <div className="flex items-center gap-2">
                               <MapPin className={`h-4 w-4 ${config.textColor}`} />
-                              <span className="font-semibold">{facility.facility_name}</span>
+                              <span className="font-semibold text-slate-900">{facility.facility_name}</span>
                             </div>
                             <div className="flex items-center gap-4 text-sm text-slate-900">
                               <span>Location: {facility.location_country_code}</span>
@@ -343,9 +343,9 @@ export function WaterDeepDive({ facilityWaterRisks }: WaterDeepDiveProps) {
                 AWARE (Available WAter REmaining) is a spatially-explicit characterisation factor that measures water scarcity at country/regional level. Higher factors indicate greater water stress. This method is required for CSRD E3 reporting.
               </p>
               <div className="flex flex-wrap gap-2 mt-3">
-                <Badge variant="outline" className="text-xs">UNEP SETAC</Badge>
-                <Badge variant="outline" className="text-xs">ISO 14046</Badge>
-                <Badge variant="outline" className="text-xs">CSRD E3 Compliant</Badge>
+                <Badge variant="outline" className="text-xs text-slate-900">UNEP SETAC</Badge>
+                <Badge variant="outline" className="text-xs text-slate-900">ISO 14046</Badge>
+                <Badge variant="outline" className="text-xs text-slate-900">CSRD E3 Compliant</Badge>
               </div>
             </CardContent>
           </Card>

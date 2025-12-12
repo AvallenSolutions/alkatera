@@ -118,7 +118,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span className={`font-medium ${getTitleClass()}`}>{metric.interpretation}</span>
-                        <Badge variant="outline" className="text-xs">Impact Level</Badge>
+                        <Badge variant="outline" className="text-xs text-slate-900">Impact Level</Badge>
                       </div>
                       <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                         <div

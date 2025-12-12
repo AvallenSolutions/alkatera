@@ -254,7 +254,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 1 (Direct)</span>
-                        <Badge variant="outline" className="bg-red-50">
+                        <Badge variant="outline" className="bg-red-50 text-slate-900">
                           {scopeBreakdown.scope1.toFixed(3)} kg CO₂eq
                         </Badge>
                       </div>
@@ -272,7 +272,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 2 (Energy)</span>
-                        <Badge variant="outline" className="bg-orange-50">
+                        <Badge variant="outline" className="bg-orange-50 text-slate-900">
                           {scopeBreakdown.scope2.toFixed(3)} kg CO₂eq
                         </Badge>
                       </div>
@@ -290,7 +290,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 3 (Value Chain)</span>
-                        <Badge variant="outline" className="bg-yellow-50">
+                        <Badge variant="outline" className="bg-yellow-50 text-slate-900">
                           {scopeBreakdown.scope3.toFixed(3)} kg CO₂eq
                         </Badge>
                       </div>
