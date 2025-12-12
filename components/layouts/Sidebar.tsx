@@ -215,6 +215,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [pendingCount, setPendingCount] = useState(0)
 
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
+  const isDevelopment = process.env.NODE_ENV === 'development'
 
   useEffect(() => {
     async function checkAlkateraAdmin() {
@@ -404,7 +405,7 @@ export function Sidebar({ className }: SidebarProps) {
             )}
 
             {/* Alkatera Admin Only Links */}
-            {isAlkateraAdmin && (
+            {(isAlkateraAdmin || isDevelopment) && (
               <>
                 <Link
                   href="/admin/platform/"
@@ -420,6 +421,9 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/platform/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Platform Dashboard</span>
+                  {isDevelopment && !isAlkateraAdmin && (
+                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
+                  )}
                 </Link>
 
                 <Link
@@ -436,6 +440,9 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/supplier-verification/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Supplier Verification</span>
+                  {isDevelopment && !isAlkateraAdmin && (
+                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
+                  )}
                 </Link>
               </>
             )}
