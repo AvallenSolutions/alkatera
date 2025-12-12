@@ -22,6 +22,8 @@ import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
 import Link from "next/link";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from "@/lib/product-categories";
+import { useProductLimit } from "@/hooks/useSubscription";
+import { LimitReachedBanner, UpgradePromptModal } from "@/components/subscription";
 
 interface ProductFormData {
   name: string;
@@ -62,6 +64,19 @@ export default function NewProductLCAPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  const {
+    currentCount,
+    maxCount,
+    isUnlimited,
+    percentage,
+    checkLimit,
+    isLoading: limitLoading
+  } = useProductLimit();
+
+  const isAtLimit = !isUnlimited && maxCount !== null && maxCount !== undefined && currentCount >= maxCount;
+  const isNearLimit = !isUnlimited && maxCount !== null && maxCount !== undefined && percentage >= 80;
 
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
@@ -175,6 +190,13 @@ export default function NewProductLCAPage() {
       return;
     }
 
+    const limitCheck = await checkLimit();
+    if (!limitCheck.allowed) {
+      setShowUpgradeModal(true);
+      toast.error(limitCheck.reason || "Product limit reached");
+      return;
+    }
+
     if (isDraft) {
       setIsSavingDraft(true);
     } else {
@@ -228,12 +250,15 @@ export default function NewProductLCAPage() {
 
       if (error) throw error;
 
+      await supabase.rpc("increment_product_count", {
+        p_organization_id: currentOrganization.id,
+      });
+
       if (isDraft) {
         toast.success("Product draft saved successfully");
         router.push(`/products/${data.id}`);
       } else {
         toast.success("Product created successfully");
-        // Redirect to recipe builder flow
         router.push(`/products/${data.id}/recipe`);
       }
     } catch (error: any) {
@@ -271,6 +296,12 @@ export default function NewProductLCAPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
+      <UpgradePromptModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        limitType="products"
+      />
+
       <div className="flex items-center gap-4">
         <Link href="/products">
           <Button variant="outline" size="icon">
@@ -284,6 +315,15 @@ export default function NewProductLCAPage() {
           </p>
         </div>
       </div>
+
+      {!limitLoading && !isUnlimited && maxCount !== null && maxCount !== undefined && (
+        <LimitReachedBanner
+          type="products"
+          current={currentCount}
+          max={maxCount}
+          onUpgrade={() => setShowUpgradeModal(true)}
+        />
+      )}
 
       <Card>
         <CardHeader>

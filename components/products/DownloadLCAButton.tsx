@@ -8,10 +8,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Download, ShieldAlert } from "lucide-react";
+import { Download, ShieldAlert, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useAllocationStatus } from "@/hooks/data/useAllocationStatus";
+import { useReportLimit } from "@/hooks/useSubscription";
+import { UpgradePromptModal } from "@/components/subscription";
 
 interface DownloadLCAButtonProps {
   lcaId: string;
@@ -31,15 +33,25 @@ export function DownloadLCAButton({
   allowProvisional = false,
 }: DownloadLCAButtonProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const allocationStatus = useAllocationStatus(productId || null);
+  const { currentCount, maxCount, isUnlimited, checkLimit } = useReportLimit();
 
   const isBlocked = !allowProvisional && allocationStatus.hasProvisionalAllocations;
+  const isAtReportLimit = !isUnlimited && maxCount !== null && maxCount !== undefined && currentCount >= maxCount;
 
   const handleDownload = async () => {
     if (isBlocked) {
       toast.error(
         "Cannot generate final report: This product has provisional allocations pending verification"
       );
+      return;
+    }
+
+    const limitCheck = await checkLimit();
+    if (!limitCheck.allowed) {
+      setShowUpgradeModal(true);
+      toast.error(limitCheck.reason || "Monthly report limit reached");
       return;
     }
 
@@ -104,6 +116,18 @@ export function DownloadLCAButton({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
+      const { data: lca2 } = await supabase
+        .from("product_lcas")
+        .select("organization_id")
+        .eq("id", lcaId)
+        .single();
+
+      if (lca2?.organization_id) {
+        await supabase.rpc("increment_report_count", {
+          p_organization_id: lca2.organization_id,
+        });
+      }
+
       toast.success("LCA report downloaded");
     } catch (error: any) {
       console.error("Error downloading LCA:", error);
@@ -142,15 +166,57 @@ export function DownloadLCAButton({
     );
   }
 
+  if (isAtReportLimit) {
+    return (
+      <>
+        <UpgradePromptModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          limitType="reports"
+        />
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant={variant}
+                  size={size}
+                  onClick={() => setShowUpgradeModal(true)}
+                  className="border-amber-500/50"
+                >
+                  <Lock className="h-4 w-4 mr-2 text-amber-500" />
+                  Upgrade
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <p>
+                Monthly report limit reached ({currentCount}/{maxCount}).
+                Upgrade to generate more reports.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </>
+    );
+  }
+
   return (
-    <Button
-      variant={variant}
-      size={size}
-      onClick={handleDownload}
-      disabled={isGenerating || allocationStatus.loading}
-    >
-      <Download className="h-4 w-4 mr-2" />
-      {isGenerating ? "Generating..." : "Download"}
-    </Button>
+    <>
+      <UpgradePromptModal
+        open={showUpgradeModal}
+        onOpenChange={setShowUpgradeModal}
+        limitType="reports"
+      />
+      <Button
+        variant={variant}
+        size={size}
+        onClick={handleDownload}
+        disabled={isGenerating || allocationStatus.loading}
+      >
+        <Download className="h-4 w-4 mr-2" />
+        {isGenerating ? "Generating..." : "Download"}
+      </Button>
+    </>
   );
 }

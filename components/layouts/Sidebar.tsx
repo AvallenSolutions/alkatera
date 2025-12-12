@@ -38,10 +38,14 @@ import {
   Shield,
   CheckSquare,
   Activity,
+  CreditCard,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 import { Badge } from '@/components/ui/badge'
+import { useSubscription } from '@/hooks/useSubscription'
+import { TierBadge } from '@/components/subscription/TierBadge'
+import { UsageMeterCompact } from '@/components/subscription/UsageMeter'
 
 interface NavItem {
   name: string
@@ -213,6 +217,7 @@ export function Sidebar({ className }: SidebarProps) {
   const { userRole, currentOrganization } = useOrganization()
   const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
+  const { usage, tierName, isLoading: subscriptionLoading } = useSubscription()
 
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
   const isDevelopment = process.env.NODE_ENV === 'development'
@@ -481,6 +486,39 @@ export function Sidebar({ className }: SidebarProps) {
           })}
         </div>
       </nav>
+
+      {/* Subscription Status Footer */}
+      {!subscriptionLoading && usage && (
+        <div className="mt-auto border-t border-border pt-4 px-3">
+          <Link
+            href="/settings/"
+            className="block rounded-lg p-3 hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center justify-between mb-2">
+              <TierBadge tier={tierName} size="sm" />
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Products</span>
+                <UsageMeterCompact
+                  current={usage.usage.products.current}
+                  max={usage.usage.products.max}
+                  isUnlimited={usage.usage.products.is_unlimited}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Reports</span>
+                <UsageMeterCompact
+                  current={usage.usage.reports_monthly.current}
+                  max={usage.usage.reports_monthly.max}
+                  isUnlimited={usage.usage.reports_monthly.is_unlimited}
+                />
+              </div>
+            </div>
+          </Link>
+        </div>
+      )}
     </aside>
   )
 }
