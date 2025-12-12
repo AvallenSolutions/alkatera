@@ -82,6 +82,8 @@ interface OrganizationInfo {
 
 export default function PlatformDashboardPage() {
   const { isAlkateraAdmin, isLoading: authLoading } = useIsAlkateraAdmin();
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const hasAccess = isAlkateraAdmin || isDevelopment;
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [featureAdoption, setFeatureAdoption] = useState<FeatureAdoption | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([]);
@@ -114,12 +116,12 @@ export default function PlatformDashboardPage() {
   };
 
   useEffect(() => {
-    if (isAlkateraAdmin) {
+    if (hasAccess) {
       fetchData();
     } else if (!authLoading) {
       setLoading(false);
     }
-  }, [isAlkateraAdmin, authLoading]);
+  }, [hasAccess, authLoading]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -142,7 +144,7 @@ export default function PlatformDashboardPage() {
     );
   }
 
-  if (!isAlkateraAdmin) {
+  if (!hasAccess) {
     return (
       <div className="p-6">
         <Alert variant="destructive">
@@ -167,9 +169,16 @@ export default function PlatformDashboardPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Platform Dashboard
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+              Platform Dashboard
+            </h1>
+            {isDevelopment && !isAlkateraAdmin && (
+              <Badge variant="secondary" className="text-xs">
+                Development Mode
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Platform-wide analytics and metrics (no private data)
           </p>
