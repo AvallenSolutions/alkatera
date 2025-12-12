@@ -97,7 +97,7 @@ function VitalityMetricCard({
           <span className="text-3xl font-bold">
             {typeof value === 'number' ? value.toLocaleString('en-GB', { maximumFractionDigits: 1 }) : value}
           </span>
-          <span className="text-sm text-muted-foreground">{unit}</span>
+          <span className="text-sm text-green-700 dark:text-green-500">{unit}</span>
         </div>
 
         {trend && trendValue && (
