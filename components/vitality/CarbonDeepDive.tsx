@@ -264,7 +264,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                           style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope1 / totalCO2) * 100 : 0}%` }}
                         />
                       </div>
-                      <p className="text-xs text-slate-700 dark:text-slate-300">
+                      <p className="text-xs text-slate-900">
                         {totalCO2 > 0 ? ((scopeBreakdown.scope1 / totalCO2) * 100).toFixed(1) : 0}% - Facility operations
                       </p>
                     </div>
@@ -282,7 +282,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                           style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope2 / totalCO2) * 100 : 0}%` }}
                         />
                       </div>
-                      <p className="text-xs text-slate-700 dark:text-slate-300">
+                      <p className="text-xs text-slate-900">
                         {totalCO2 > 0 ? ((scopeBreakdown.scope2 / totalCO2) * 100).toFixed(1) : 0}% - Purchased electricity
                       </p>
                     </div>
@@ -300,7 +300,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                           style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope3 / totalCO2) * 100 : 0}%` }}
                         />
                       </div>
-                      <p className="text-xs text-slate-700 dark:text-slate-300">
+                      <p className="text-xs text-slate-900">
                         {totalCO2 > 0 ? ((scopeBreakdown.scope3 / totalCO2) * 100).toFixed(1) : 0}% - Materials, transport, end-of-life
                       </p>
                     </div>
@@ -317,7 +317,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-50">Total Emissions</span>
+                    <span className="text-sm font-medium text-slate-900">Total Emissions</span>
                     <span className="text-lg font-bold text-orange-900">
                       {totalCO2.toFixed(3)} kg CO₂eq
                     </span>
@@ -326,21 +326,21 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                   {materialBreakdown && materialBreakdown.length > 0 && (
                     <>
                       <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-900 dark:text-slate-50">Materials Tracked</span>
+                        <span className="text-sm font-medium text-slate-900">Materials Tracked</span>
                         <span className="text-lg font-bold text-blue-900">
                           {materialBreakdown.length}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-900 dark:text-slate-50">Top Contributor</span>
+                        <span className="text-sm font-medium text-slate-900">Top Contributor</span>
                         <span className="text-sm font-bold text-green-900">
                           {materialBreakdown[0]?.name}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                        <span className="text-sm font-medium text-slate-900 dark:text-slate-50">Contribution</span>
+                        <span className="text-sm font-medium text-slate-900">Contribution</span>
                         <span className="text-sm font-bold text-purple-900">
                           {materialBreakdown[0] && totalCO2 > 0
                             ? ((materialBreakdown[0].climate / totalCO2) * 100).toFixed(1)

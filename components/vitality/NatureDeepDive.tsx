@@ -90,11 +90,11 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
               const relativeIntensity = maxMetricValue > 0 ? (percentageOfMax / maxMetricValue) * 100 : 0;
 
               const getTitleClass = () => {
-                if (metric.name === 'Land Use') return 'text-green-900 dark:text-green-100';
-                if (metric.name === 'Terrestrial Ecotoxicity') return 'text-green-900 dark:text-green-100';
-                if (metric.name === 'Freshwater Eutrophication') return 'text-blue-900 dark:text-blue-100';
-                if (metric.name === 'Terrestrial Acidification') return 'text-purple-900 dark:text-purple-100';
-                return 'text-slate-900 dark:text-slate-100';
+                if (metric.name === 'Land Use') return 'text-green-900';
+                if (metric.name === 'Terrestrial Ecotoxicity') return 'text-green-900';
+                if (metric.name === 'Freshwater Eutrophication') return 'text-blue-900';
+                if (metric.name === 'Terrestrial Acidification') return 'text-purple-900';
+                return 'text-slate-900';
               };
 
               return (

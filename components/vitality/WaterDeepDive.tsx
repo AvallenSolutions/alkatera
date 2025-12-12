@@ -226,7 +226,7 @@ export function WaterDeepDive({ facilityWaterRisks }: WaterDeepDiveProps) {
                 <div className="text-3xl font-bold text-red-900">
                   {highRiskFacilities.length}
                 </div>
-                <p className="text-xs text-slate-700 dark:text-slate-300">
+                <p className="text-xs text-slate-900">
                   Facilities in water-stressed regions
                 </p>
               </CardContent>
@@ -243,7 +243,7 @@ export function WaterDeepDive({ facilityWaterRisks }: WaterDeepDiveProps) {
                 <div className="text-3xl font-bold text-amber-900">
                   {mediumRiskFacilities.length}
                 </div>
-                <p className="text-xs text-slate-700 dark:text-slate-300">
+                <p className="text-xs text-slate-900">
                   Moderate water scarcity concern
                 </p>
               </CardContent>
@@ -260,7 +260,7 @@ export function WaterDeepDive({ facilityWaterRisks }: WaterDeepDiveProps) {
                 <div className="text-3xl font-bold text-green-900">
                   {lowRiskFacilities.length}
                 </div>
-                <p className="text-xs text-slate-700 dark:text-slate-300">
+                <p className="text-xs text-slate-900">
                   Abundant water resources
                 </p>
               </CardContent>
@@ -314,7 +314,7 @@ export function WaterDeepDive({ facilityWaterRisks }: WaterDeepDiveProps) {
                               <MapPin className={`h-4 w-4 ${config.textColor}`} />
                               <span className="font-semibold">{facility.facility_name}</span>
                             </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-700 dark:text-slate-300">
+                            <div className="flex items-center gap-4 text-sm text-slate-900">
                               <span>Location: {facility.location_country_code}</span>
                               <span>AWARE Factor: {facility.water_scarcity_aware.toFixed(1)} m³ world eq/m³</span>
                             </div>
