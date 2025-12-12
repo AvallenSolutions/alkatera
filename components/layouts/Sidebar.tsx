@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -35,13 +35,20 @@ import {
   Briefcase,
   GraduationCap,
   AlertCircle,
+  Shield,
+  CheckSquare,
+  Activity,
 } from 'lucide-react'
+import { supabase } from '@/lib/supabaseClient'
+import { useOrganization } from '@/lib/organizationContext'
+import { Badge } from '@/components/ui/badge'
 
 interface NavItem {
   name: string
   href: string
   icon: any
   children?: NavItem[]
+  badge?: number
 }
 
 const navigationStructure: NavItem[] = [
@@ -203,6 +210,36 @@ interface SidebarProps {
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname()
   const [expandedMenus, setExpandedMenus] = useState<string[]>([])
+  const { userRole, currentOrganization } = useOrganization()
+  const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
+
+  useEffect(() => {
+    async function checkAlkateraAdmin() {
+      try {
+        const { data } = await supabase.rpc('is_alkatera_admin')
+        setIsAlkateraAdmin(data === true)
+      } catch (err) {
+        console.error('Error checking admin status:', err)
+      }
+    }
+    checkAlkateraAdmin()
+  }, [])
+
+  useEffect(() => {
+    async function fetchPendingCount() {
+      if (!isOrgAdmin || !currentOrganization?.id) return
+      try {
+        const { data } = await supabase.rpc('get_pending_approval_count')
+        setPendingCount(data || 0)
+      } catch (err) {
+        console.error('Error fetching pending count:', err)
+      }
+    }
+    fetchPendingCount()
+  }, [isOrgAdmin, currentOrganization?.id])
 
   const isActive = (path: string) => {
     if (!pathname) return false
@@ -332,6 +369,78 @@ export function Sidebar({ className }: SidebarProps) {
             </Link>
           )
         })}
+
+        {/* Admin Section - Only visible to admins */}
+        {(isOrgAdmin || isAlkateraAdmin) && (
+          <div className="pt-4 mt-4 border-t border-border">
+            <div className="px-3 mb-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Admin
+              </h3>
+            </div>
+
+            {/* Approval Queue - For Org Admins */}
+            {isOrgAdmin && (
+              <Link
+                href="/admin/approvals/"
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                  isActive('/admin/approvals/')
+                    ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                    : 'text-sidebar-foreground hover:bg-secondary/50'
+                )}
+              >
+                <CheckSquare className={cn(
+                  'h-4 w-4 flex-shrink-0 transition-colors',
+                  isActive('/admin/approvals/') ? 'text-neon-lime' : ''
+                )} />
+                <span className="truncate flex-1">Approval Queue</span>
+                {pendingCount > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                    {pendingCount}
+                  </Badge>
+                )}
+              </Link>
+            )}
+
+            {/* Alkatera Admin Only Links */}
+            {isAlkateraAdmin && (
+              <>
+                <Link
+                  href="/admin/platform/"
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                    isActive('/admin/platform/')
+                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                      : 'text-sidebar-foreground hover:bg-secondary/50'
+                  )}
+                >
+                  <Activity className={cn(
+                    'h-4 w-4 flex-shrink-0 transition-colors',
+                    isActive('/admin/platform/') ? 'text-neon-lime' : ''
+                  )} />
+                  <span className="truncate">Platform Dashboard</span>
+                </Link>
+
+                <Link
+                  href="/admin/supplier-verification/"
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                    isActive('/admin/supplier-verification/')
+                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                      : 'text-sidebar-foreground hover:bg-secondary/50'
+                  )}
+                >
+                  <Shield className={cn(
+                    'h-4 w-4 flex-shrink-0 transition-colors',
+                    isActive('/admin/supplier-verification/') ? 'text-neon-lime' : ''
+                  )} />
+                  <span className="truncate">Supplier Verification</span>
+                </Link>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Development Section */}
         <div className="pt-4 mt-4 border-t border-border">
