@@ -151,7 +151,7 @@ function formatValue(value: number, decimals: number = 4): string {
   return value.toLocaleString('en-GB', { maximumFractionDigits: 2 });
 }
 
-export function EF31ImpactCategoriesTable({
+function EF31ImpactCategoriesTableComponent({
   ef31Impacts,
   showNormalised = true,
   showWeighted = true,
@@ -285,3 +285,5 @@ export function EF31ImpactCategoriesTable({
     </Card>
   );
 }
+
+export default EF31ImpactCategoriesTableComponent;

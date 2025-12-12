@@ -10,6 +10,9 @@ import Link from 'next/link';
 import { generateLcaReportPdf } from '@/lib/pdf-generator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
+import MethodologyToggle from '@/components/lca/MethodologyToggle';
+import EF31SingleScoreCard from '@/components/lca/EF31SingleScoreCard';
+import EF31ImpactCategoriesTable from '@/components/lca/EF31ImpactCategoriesTable';
 
 const MOCK_LCA_REPORT = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -61,6 +64,8 @@ export default function ProductLcaReportPage() {
   const [productData, setProductData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
+  const [methodology, setMethodology] = useState<'recipe_2016' | 'ef_31'>('recipe_2016');
+  const [hasEF31Access, setHasEF31Access] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -114,6 +119,23 @@ export default function ProductLcaReportPage() {
           }
 
           setLcaData(lca);
+
+          const { data: org } = await supabase
+            .from('organizations')
+            .select('subscription_tier, subscription_status')
+            .eq('id', lca.organization_id)
+            .maybeSingle();
+
+          if (org) {
+            const activeTiers = ['premium', 'enterprise'];
+            const activeStatuses = ['active', 'trial'];
+            const hasAccess = activeTiers.includes(org.subscription_tier) && activeStatuses.includes(org.subscription_status);
+            setHasEF31Access(hasAccess);
+
+            if (lca.ef31_impacts && hasAccess) {
+              setMethodology('ef_31');
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -325,6 +347,17 @@ export default function ProductLcaReportPage() {
               </div>
             </div>
           )}
+
+          {hasEF31Access && lcaData?.ef31_impacts && (
+            <div className="mt-6">
+              <MethodologyToggle
+                currentMethodology={methodology}
+                onMethodologyChange={setMethodology}
+                hasEF31Access={hasEF31Access}
+                ef31Available={!!lcaData?.ef31_impacts}
+              />
+            </div>
+          )}
         </div>
 
         <div className="lg:col-span-2 space-y-6">
@@ -446,7 +479,37 @@ export default function ProductLcaReportPage() {
 
       {/* Impact Cards Grid */}
       <div className="space-y-6">
-        <h2 className="text-2xl font-bold">Environmental Impact Summary</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Environmental Impact Summary</h2>
+          {hasEF31Access && lcaData?.ef31_impacts && (
+            <Badge variant={methodology === 'ef_31' ? 'default' : 'outline'} className="text-xs">
+              {methodology === 'ef_31' ? 'Environmental Footprint 3.1' : 'ReCiPe 2016'}
+            </Badge>
+          )}
+        </div>
+
+        {methodology === 'ef_31' && lcaData?.ef31_impacts ? (
+          <div className="space-y-6">
+            <EF31SingleScoreCard
+              ef31Impacts={lcaData.ef31_impacts}
+            />
+            <Card>
+              <CardHeader>
+                <CardTitle>Impact Category Breakdown</CardTitle>
+                <CardDescription>
+                  All 16 mandatory Environmental Footprint 3.1 impact categories
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EF31ImpactCategoriesTable
+                  ef31Impacts={lcaData.ef31_impacts}
+                  showNormalised={true}
+                  showWeighted={true}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
           {/* Climate Impact - Comprehensive Expandable */}

@@ -18,7 +18,7 @@ interface MethodologyToggleProps {
   ef31Available: boolean;
 }
 
-export function MethodologyToggle({
+function MethodologyToggleComponent({
   currentMethodology,
   onMethodologyChange,
   hasEF31Access,
@@ -70,3 +70,5 @@ export function MethodologyToggle({
     </div>
   );
 }
+
+export default MethodologyToggleComponent;

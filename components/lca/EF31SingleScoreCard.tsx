@@ -58,7 +58,7 @@ const CATEGORY_LABELS: Record<string, { name: string; shortName: string; descrip
   RUM: { name: 'Resource Use (Minerals)', shortName: 'Res Mineral', description: 'Mineral and metal resource depletion' },
 };
 
-export function EF31SingleScoreCard({
+function EF31SingleScoreCardComponent({
   ef31Impacts,
   previousScore,
   industryAverage,
@@ -200,3 +200,5 @@ export function EF31SingleScoreCard({
     </Card>
   );
 }
+
+export default EF31SingleScoreCardComponent;
