@@ -264,7 +264,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                           style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope1 / totalCO2) * 100 : 0}%` }}
                         />
                       </div>
-                      <p className="text-xs text-slate-900">
+                      <p className="text-xs text-muted-foreground">
                         {totalCO2 > 0 ? ((scopeBreakdown.scope1 / totalCO2) * 100).toFixed(1) : 0}% - Facility operations
                       </p>
                     </div>
@@ -282,7 +282,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                           style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope2 / totalCO2) * 100 : 0}%` }}
                         />
                       </div>
-                      <p className="text-xs text-slate-900">
+                      <p className="text-xs text-muted-foreground">
                         {totalCO2 > 0 ? ((scopeBreakdown.scope2 / totalCO2) * 100).toFixed(1) : 0}% - Purchased electricity
                       </p>
                     </div>
@@ -300,7 +300,7 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                           style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope3 / totalCO2) * 100 : 0}%` }}
                         />
                       </div>
-                      <p className="text-xs text-slate-900">
+                      <p className="text-xs text-muted-foreground">
                         {totalCO2 > 0 ? ((scopeBreakdown.scope3 / totalCO2) * 100).toFixed(1) : 0}% - Materials, transport, end-of-life
                       </p>
                     </div>
