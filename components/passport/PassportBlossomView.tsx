@@ -45,7 +45,7 @@ export default function PassportBlossomView({ product, lca, materials, organizat
 
   return (
     <div className="space-y-8">
-      <Card className="border-neutral-200 shadow-lg overflow-hidden">
+      <Card className="border-neutral-200 shadow-lg overflow-hidden bg-white">
         <div className="grid md:grid-cols-2 gap-6 p-6">
           <div className="space-y-4">
             <div className="relative w-full h-64 rounded-lg overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-green-50 flex items-center justify-center">
@@ -145,16 +145,16 @@ export default function PassportBlossomView({ product, lca, materials, organizat
             </div>
 
             {hasBreakdown && (
-              <Card className="border-neutral-200">
+              <Card className="border-neutral-200 bg-white">
                 <CardHeader>
-                  <CardTitle className="text-base">GHG Emissions Breakdown</CardTitle>
-                  <CardDescription>By lifecycle stage</CardDescription>
+                  <CardTitle className="text-base text-neutral-900">GHG Emissions Breakdown</CardTitle>
+                  <CardDescription className="text-neutral-600">By lifecycle stage</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {ingredients > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-neutral-600">Ingredients</span>
+                        <span className="text-sm text-neutral-700">Raw Materials</span>
                         <span className="font-semibold text-neutral-900">
                           {ingredients.toFixed(3)} kg CO₂eq
                         </span>
@@ -162,7 +162,7 @@ export default function PassportBlossomView({ product, lca, materials, organizat
                     )}
                     {packaging > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-neutral-600">Packaging</span>
+                        <span className="text-sm text-neutral-700">Packaging</span>
                         <span className="font-semibold text-neutral-900">
                           {packaging.toFixed(3)} kg CO₂eq
                         </span>
@@ -170,7 +170,7 @@ export default function PassportBlossomView({ product, lca, materials, organizat
                     )}
                     {processing > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-neutral-600">Processing</span>
+                        <span className="text-sm text-neutral-700">Processing</span>
                         <span className="font-semibold text-neutral-900">
                           {processing.toFixed(3)} kg CO₂eq
                         </span>
@@ -178,7 +178,7 @@ export default function PassportBlossomView({ product, lca, materials, organizat
                     )}
                     {transportation > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-neutral-600">Transportation</span>
+                        <span className="text-sm text-neutral-700">Distribution</span>
                         <span className="font-semibold text-neutral-900">
                           {transportation.toFixed(3)} kg CO₂eq
                         </span>
@@ -190,25 +190,25 @@ export default function PassportBlossomView({ product, lca, materials, organizat
             )}
           </div>
 
-          <Card className="border-neutral-200 bg-neutral-50/50">
+          <Card className="border-neutral-200 bg-white">
             <CardHeader>
-              <CardTitle className="text-base">Assessment Methodology</CardTitle>
+              <CardTitle className="text-base text-neutral-900">Assessment Methodology</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               {hasRecipe && (
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">ReCiPe 2016 Midpoint (H)</Badge>
-                  <span className="text-neutral-600">Multi-capital impact assessment</span>
+                  <Badge variant="secondary" className="text-xs bg-neutral-100 text-neutral-800">ReCiPe 2016 Midpoint (H)</Badge>
+                  <span className="text-neutral-700">Multi-capital impact assessment</span>
                 </div>
               )}
               {hasEF31 && (
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">EF 3.1</Badge>
-                  <span className="text-neutral-600">European Commission methodology</span>
+                  <Badge variant="secondary" className="text-xs bg-neutral-100 text-neutral-800">EF 3.1</Badge>
+                  <span className="text-neutral-700">European Commission methodology</span>
                 </div>
               )}
               {lca?.updated_at && (
-                <p className="text-xs text-neutral-500 mt-3">
+                <p className="text-xs text-neutral-600 mt-3">
                   Last updated: {new Date(lca.updated_at).toLocaleDateString('en-GB', {
                     day: 'numeric',
                     month: 'long',

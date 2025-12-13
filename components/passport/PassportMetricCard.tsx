@@ -50,10 +50,10 @@ export default function PassportMetricCard({
   const styles = colorStyles[color];
 
   return (
-    <Card className="overflow-hidden border-neutral-200 shadow-sm hover:shadow-md transition-shadow">
+    <Card className="overflow-hidden border-neutral-200 shadow-sm hover:shadow-md transition-shadow bg-white">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-neutral-600">
+          <CardTitle className="text-sm font-medium text-neutral-700">
             {title}
           </CardTitle>
           <div className={`p-2 rounded-lg ${styles.bg}`}>
@@ -66,15 +66,15 @@ export default function PassportMetricCard({
           <span className={`text-3xl font-bold ${styles.text}`}>
             {typeof value === 'number' ? value.toFixed(2) : value}
           </span>
-          <span className="text-sm text-neutral-500">{unit}</span>
+          <span className="text-sm text-neutral-600">{unit}</span>
         </div>
 
         {description && (
-          <p className="text-xs text-neutral-500">{description}</p>
+          <p className="text-xs text-neutral-600">{description}</p>
         )}
 
         {comparison && (
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs text-neutral-700">
             {comparison.label}: {comparison.value}
           </Badge>
         )}
