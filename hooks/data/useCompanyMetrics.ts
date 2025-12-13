@@ -281,9 +281,9 @@ export function useCompanyMetrics() {
         console.error('[useCompanyMetrics] extractBreakdownFromAggregatedImpacts failed:', err);
       }
 
-      // Fetch scope breakdown (from calculated emissions) - FALLBACK
+      // Fetch scope breakdown (from calculated emissions) and MERGE with product LCA data
       try {
-        console.log('[useCompanyMetrics] Calling fetchScopeBreakdown...');
+        console.log('[useCompanyMetrics] Calling fetchScopeBreakdown to merge corporate emissions...');
         await fetchScopeBreakdown();
         console.log('[useCompanyMetrics] fetchScopeBreakdown completed');
       } catch (err) {
@@ -408,9 +408,11 @@ export function useCompanyMetrics() {
       }
     });
 
-    // Set scope breakdown
+    // Set scope breakdown from product LCAs
+    // NOTE: Corporate emissions (Scope 1 & 2 from ghg_emissions table) will be merged later
+    // in fetchScopeBreakdown() to give a complete picture
     if (scopeTotal.scope1 > 0 || scopeTotal.scope2 > 0 || scopeTotal.scope3 > 0) {
-      console.log('[useCompanyMetrics] Setting scope breakdown:', scopeTotal);
+      console.log('[useCompanyMetrics] Setting product LCA scope breakdown:', scopeTotal);
 
       // Validate that scopes add up to total emissions
       const scopeSum = scopeTotal.scope1 + scopeTotal.scope2 + scopeTotal.scope3;
@@ -484,7 +486,7 @@ export function useCompanyMetrics() {
 
       if (error) throw error;
 
-      const breakdown: ScopeBreakdown = {
+      const corporateBreakdown: ScopeBreakdown = {
         scope1: 0,
         scope2: 0,
         scope3: 0,
@@ -494,12 +496,32 @@ export function useCompanyMetrics() {
         const scope = emission.ghg_categories?.scope;
         const value = emission.total_emissions || 0;
 
-        if (scope === 1) breakdown.scope1 += value;
-        else if (scope === 2) breakdown.scope2 += value;
-        else if (scope === 3) breakdown.scope3 += value;
+        if (scope === 1) corporateBreakdown.scope1 += value;
+        else if (scope === 2) corporateBreakdown.scope2 += value;
+        else if (scope === 3) corporateBreakdown.scope3 += value;
       });
 
-      setScopeBreakdown(breakdown);
+      // Merge corporate emissions with existing product LCA scope breakdown
+      setScopeBreakdown(prevBreakdown => {
+        if (!prevBreakdown) {
+          // If no product LCA data exists, use only corporate emissions
+          console.log('[useCompanyMetrics] No product LCA scope data, using corporate emissions only:', corporateBreakdown);
+          return corporateBreakdown;
+        }
+
+        // Merge both sources: Product LCA (primarily Scope 3) + Corporate operations (Scope 1 & 2)
+        const merged = {
+          scope1: prevBreakdown.scope1 + corporateBreakdown.scope1,
+          scope2: prevBreakdown.scope2 + corporateBreakdown.scope2,
+          scope3: prevBreakdown.scope3 + corporateBreakdown.scope3,
+        };
+        console.log('[useCompanyMetrics] Merged scope breakdown:', {
+          productLCA: prevBreakdown,
+          corporate: corporateBreakdown,
+          merged
+        });
+        return merged;
+      });
     } catch (err) {
       console.error('Error fetching scope breakdown:', err);
     }
