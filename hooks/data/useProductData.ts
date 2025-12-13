@@ -65,6 +65,10 @@ export interface Product {
   unit_size_value: number;
   unit_size_unit: string;
   organization_id: string;
+  passport_enabled?: boolean;
+  passport_token?: string | null;
+  passport_views_count?: number;
+  passport_last_viewed_at?: string | null;
 }
 
 export interface ProductData {

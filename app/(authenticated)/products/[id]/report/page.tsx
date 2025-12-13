@@ -769,7 +769,7 @@ export default function ProductLcaReportPage() {
                       <div>
                         <h4 className="font-semibold text-sm mb-3">Water Sources by Location</h4>
                         <div className="space-y-3">
-                          {waterSourceItems.map((item) => (
+                          {waterSourceItems.map((item: any) => (
                             <div key={item.id} className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
                               <div className="flex justify-between items-start mb-2">
                                 <div className="flex-1">
@@ -939,7 +939,7 @@ export default function ProductLcaReportPage() {
                       <div>
                         <h4 className="font-semibold text-sm mb-3">Land Use by Ingredient</h4>
                         <div className="space-y-3">
-                          {landUseItems.map((item) => (
+                          {landUseItems.map((item: any) => (
                             <div key={item.id} className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
                               <div className="flex justify-between items-start mb-2">
                                 <div className="flex-1">

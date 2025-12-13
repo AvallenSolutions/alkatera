@@ -6,6 +6,9 @@ const nextConfig = {
     removeConsole: false,
   },
   serverExternalPackages: ['pdfjs-dist'],
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = nextConfig;

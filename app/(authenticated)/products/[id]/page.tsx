@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info, Calculator, Factory } from "lucide-react";
+import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info, Calculator, Factory, Globe } from "lucide-react";
 import { ProductHeader } from "@/components/products/ProductHeader";
 import { OverviewTab } from "@/components/products/OverviewTab";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
 import { ProductionSitesTab } from "@/components/products/ProductionSitesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
+import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
 import { useProductData } from "@/hooks/data/useProductData";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
@@ -175,7 +176,7 @@ export default function ProductDashboardPage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-3xl backdrop-blur-xl bg-white/5 border border-white/10 p-1">
+          <TabsList className="grid w-full grid-cols-5 max-w-4xl backdrop-blur-xl bg-white/5 border border-white/10 p-1">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
@@ -196,6 +197,13 @@ export default function ProductDashboardPage() {
             >
               <Factory className="mr-2 h-4 w-4" />
               Production Sites
+            </TabsTrigger>
+            <TabsTrigger
+              value="passport"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+            >
+              <Globe className="mr-2 h-4 w-4" />
+              Passport
             </TabsTrigger>
             <TabsTrigger
               value="settings"
@@ -231,6 +239,17 @@ export default function ProductDashboardPage() {
                 organizationId={currentOrganization.id}
               />
             )}
+          </TabsContent>
+
+          <TabsContent value="passport" className="space-y-6">
+            <PassportManagementPanel
+              productId={productId}
+              productName={product.name}
+              initialPassportEnabled={product.passport_enabled || false}
+              initialPassportToken={product.passport_token || null}
+              initialViewsCount={product.passport_views_count || 0}
+              initialLastViewedAt={product.passport_last_viewed_at || null}
+            />
           </TabsContent>
 
           <TabsContent value="settings" className="space-y-6">

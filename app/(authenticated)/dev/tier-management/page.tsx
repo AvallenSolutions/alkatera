@@ -222,7 +222,7 @@ export default function TierManagementPage() {
                         {tiers.map(tier => (
                           <TableCell key={tier.id} className="text-right">
                             <Badge variant="outline">
-                              {formatLimit((tier as Record<string, unknown>)[key] as number | null)}
+                              {formatLimit((tier as any)[key] as number | null)}
                             </Badge>
                           </TableCell>
                         ))}
