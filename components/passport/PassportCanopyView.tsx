@@ -24,9 +24,9 @@ export default function PassportCanopyView({ product, lca, materials, organizati
   const freshwaterEutro = impacts.freshwater_eutrophication || 0;
   const terrestrialAcid = impacts.terrestrial_acidification || 0;
 
-  const functionalUnit = product.functional_unit || product.unit_size_value
-    ? `${product.unit_size_value} ${product.unit_size_unit}`
-    : 'per unit';
+  const functionalUnit = product.functional_unit
+    || (product.unit_size_value && product.unit_size_unit ? `${product.unit_size_value} ${product.unit_size_unit}` : null)
+    || 'per unit';
 
   const hasValidData = ghgEmissions > 0 || waterConsumption > 0;
 
@@ -43,16 +43,21 @@ export default function PassportCanopyView({ product, lca, materials, organizati
       <Card className="border-amber-200 shadow-xl overflow-hidden bg-gradient-to-br from-white to-amber-50/30">
         <div className="grid md:grid-cols-2 gap-6 p-6">
           <div className="space-y-4">
-            {product.image_url && (
-              <div className="relative w-full h-64 rounded-lg overflow-hidden bg-neutral-100 ring-2 ring-amber-200">
+            <div className="relative w-full h-64 rounded-lg overflow-hidden bg-gradient-to-br from-amber-50 via-yellow-50 to-green-50 ring-2 ring-amber-200 flex items-center justify-center">
+              {product.image_url ? (
                 <Image
                   src={product.image_url}
                   alt={product.name}
                   fill
                   className="object-cover"
                 />
-              </div>
-            )}
+              ) : (
+                <div className="text-center p-8">
+                  <Crown className="h-16 w-16 text-amber-300 mx-auto mb-2" />
+                  <p className="text-sm text-amber-600 font-medium">{product.name}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">

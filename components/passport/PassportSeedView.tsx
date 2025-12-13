@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { Cloud, Award, Info, TrendingDown } from 'lucide-react';
+import { Cloud, Award, Info, TrendingDown, Leaf } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -14,9 +14,9 @@ interface PassportSeedViewProps {
 
 export default function PassportSeedView({ product, lca, materials, organization }: PassportSeedViewProps) {
   const ghgEmissions = lca?.aggregated_impacts?.climate_change_gwp100 || 0;
-  const functionalUnit = product.functional_unit || product.unit_size_value
-    ? `${product.unit_size_value} ${product.unit_size_unit}`
-    : 'per unit';
+  const functionalUnit = product.functional_unit
+    || (product.unit_size_value && product.unit_size_unit ? `${product.unit_size_value} ${product.unit_size_unit}` : null)
+    || 'per unit';
 
   const ghgBreakdown = lca?.aggregated_impacts?.breakdown?.ghg || {};
   const scope1 = ghgBreakdown.scope_1 || 0;
@@ -30,16 +30,21 @@ export default function PassportSeedView({ product, lca, materials, organization
       <Card className="border-neutral-200 shadow-lg overflow-hidden">
         <div className="grid md:grid-cols-2 gap-6 p-6">
           <div className="space-y-4">
-            {product.image_url && (
-              <div className="relative w-full h-64 rounded-lg overflow-hidden bg-neutral-100">
+            <div className="relative w-full h-64 rounded-lg overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
+              {product.image_url ? (
                 <Image
                   src={product.image_url}
                   alt={product.name}
                   fill
                   className="object-cover"
                 />
-              </div>
-            )}
+              ) : (
+                <div className="text-center p-8">
+                  <Leaf className="h-16 w-16 text-green-300 mx-auto mb-2" />
+                  <p className="text-sm text-green-600 font-medium">{product.name}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">

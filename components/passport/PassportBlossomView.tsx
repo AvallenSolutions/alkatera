@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { Cloud, Droplets, Recycle, Award, Info, TrendingDown, Sparkles } from 'lucide-react';
+import { Cloud, Droplets, Recycle, Award, Info, TrendingDown, Sparkles, Leaf } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -18,9 +18,9 @@ export default function PassportBlossomView({ product, lca, materials, organizat
   const waterConsumption = impacts.water_consumption || 0;
   const wasteGenerated = impacts.waste_generated || 0;
 
-  const functionalUnit = product.functional_unit || product.unit_size_value
-    ? `${product.unit_size_value} ${product.unit_size_unit}`
-    : 'per unit';
+  const functionalUnit = product.functional_unit
+    || (product.unit_size_value && product.unit_size_unit ? `${product.unit_size_value} ${product.unit_size_unit}` : null)
+    || 'per unit';
 
   const hasValidData = ghgEmissions > 0 || waterConsumption > 0 || wasteGenerated > 0;
 
@@ -37,16 +37,21 @@ export default function PassportBlossomView({ product, lca, materials, organizat
       <Card className="border-neutral-200 shadow-lg overflow-hidden">
         <div className="grid md:grid-cols-2 gap-6 p-6">
           <div className="space-y-4">
-            {product.image_url && (
-              <div className="relative w-full h-64 rounded-lg overflow-hidden bg-neutral-100">
+            <div className="relative w-full h-64 rounded-lg overflow-hidden bg-gradient-to-br from-green-50 via-emerald-50 to-green-50 flex items-center justify-center">
+              {product.image_url ? (
                 <Image
                   src={product.image_url}
                   alt={product.name}
                   fill
                   className="object-cover"
                 />
-              </div>
-            )}
+              ) : (
+                <div className="text-center p-8">
+                  <Sparkles className="h-16 w-16 text-green-300 mx-auto mb-2" />
+                  <p className="text-sm text-green-600 font-medium">{product.name}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="space-y-4">
