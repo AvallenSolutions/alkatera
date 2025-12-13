@@ -278,7 +278,7 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'flex flex-col gap-2 border-r border-border bg-sidebar px-3 py-4 transition-colors',
+        'flex flex-col gap-2 border-r border-border bg-sidebar px-3 py-4 transition-colors h-screen',
         className
       )}
     >
@@ -294,7 +294,7 @@ export function Sidebar({ className }: SidebarProps) {
         <p className="text-xs text-muted-foreground">Carbon Management</p>
       </div>
 
-      <nav className="flex-1 space-y-1">
+      <nav className="flex-1 space-y-1 overflow-y-auto">
         {navigationStructure.map((item) => {
           const IconComponent = item.icon
           const active = isActive(item.href)
