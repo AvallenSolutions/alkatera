@@ -15,14 +15,11 @@ import {
   Calendar,
   ExternalLink,
   Info,
-  Sparkles,
-  Crown,
   Loader2
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { toast } from 'sonner';
 import QRCodeDisplay from './QRCodeDisplay';
-import { FeatureGate } from '@/components/subscription';
 import Link from 'next/link';
 
 interface PassportManagementPanelProps {
@@ -121,179 +118,122 @@ export default function PassportManagementPanel({
   }, [isEnabled]);
 
   return (
-    <FeatureGate
-      feature="live_passport"
-      fallback={
-        <Card className="border-amber-200 bg-gradient-to-br from-white to-amber-50/30">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-amber-600" />
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
               <CardTitle>Live Product Passport</CardTitle>
+              <CardDescription>
+                Share environmental impact data publicly. Data displayed varies by subscription tier.
+              </CardDescription>
             </div>
-            <CardDescription>
-              Create public-facing product pages with environmental impact data
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Alert className="border-amber-200 bg-amber-50">
-              <Info className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-900">
-                Upgrade to Blossom or Canopy tier to enable Live Product Passports
-              </AlertDescription>
-            </Alert>
+            <Badge variant={isEnabled ? 'default' : 'secondary'} className="gap-1">
+              {isEnabled ? (
+                <>
+                  <Globe className="h-3 w-3" />
+                  Public
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3 w-3" />
+                  Private
+                </>
+              )}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-900 text-sm">
+              <strong>Tier-based display:</strong> Seed shows GHG only, Blossom adds Water + Waste, Canopy adds Biodiversity metrics
+            </AlertDescription>
+          </Alert>
 
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <Globe className="h-5 w-5 text-neutral-400 mt-0.5" />
-                <div>
-                  <p className="font-medium text-neutral-900">Public Product Pages</p>
-                  <p className="text-sm text-neutral-600">
-                    Share environmental data with customers and stakeholders
-                  </p>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="passport-toggle" className="flex items-center gap-2">
+              <span>Enable Product Passport</span>
+            </Label>
+            <Switch
+              id="passport-toggle"
+              checked={isEnabled}
+              onCheckedChange={handleTogglePassport}
+              disabled={isLoading}
+            />
+          </div>
+
+          {isLoading && (
+            <div className="flex items-center gap-2 text-sm text-neutral-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Updating passport...</span>
+            </div>
+          )}
+
+          {isEnabled && token && (
+            <>
+              <Separator />
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-neutral-500" />
+                    <span className="text-sm font-medium">Total Views</span>
+                  </div>
+                  <span className="text-2xl font-bold text-neutral-900">
+                    {viewsCount.toLocaleString()}
+                  </span>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Sparkles className="h-5 w-5 text-neutral-400 mt-0.5" />
-                <div>
-                  <p className="font-medium text-neutral-900">QR Code Generation</p>
-                  <p className="text-sm text-neutral-600">
-                    Downloadable QR codes for packaging and marketing
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Crown className="h-5 w-5 text-neutral-400 mt-0.5" />
-                <div>
-                  <p className="font-medium text-neutral-900">Tier-Based Access</p>
-                  <p className="text-sm text-neutral-600">
-                    Display metrics based on your subscription tier
-                  </p>
-                </div>
-              </div>
-            </div>
 
-            <Separator />
-
-            <Link href="/settings/subscription">
-              <Button className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700">
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade to Access
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      }
-    >
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Live Product Passport</CardTitle>
-                <CardDescription>
-                  Share environmental impact data publicly
-                </CardDescription>
-              </div>
-              <Badge variant={isEnabled ? 'default' : 'secondary'} className="gap-1">
-                {isEnabled ? (
-                  <>
-                    <Globe className="h-3 w-3" />
-                    Public
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-3 w-3" />
-                    Private
-                  </>
-                )}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="passport-toggle" className="flex items-center gap-2">
-                <span>Enable Product Passport</span>
-              </Label>
-              <Switch
-                id="passport-toggle"
-                checked={isEnabled}
-                onCheckedChange={handleTogglePassport}
-                disabled={isLoading}
-              />
-            </div>
-
-            {isLoading && (
-              <div className="flex items-center gap-2 text-sm text-neutral-600">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Updating passport...</span>
-              </div>
-            )}
-
-            {isEnabled && token && (
-              <>
-                <Separator />
-
-                <div className="space-y-3">
+                {lastViewedAt && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Eye className="h-4 w-4 text-neutral-500" />
-                      <span className="text-sm font-medium">Total Views</span>
+                      <Calendar className="h-4 w-4 text-neutral-500" />
+                      <span className="text-sm font-medium">Last Viewed</span>
                     </div>
-                    <span className="text-2xl font-bold text-neutral-900">
-                      {viewsCount.toLocaleString()}
+                    <span className="text-sm text-neutral-600">
+                      {new Date(lastViewedAt).toLocaleDateString('en-GB', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                     </span>
                   </div>
+                )}
+              </div>
 
-                  {lastViewedAt && (
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-neutral-500" />
-                        <span className="text-sm font-medium">Last Viewed</span>
-                      </div>
-                      <span className="text-sm text-neutral-600">
-                        {new Date(lastViewedAt).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </span>
-                    </div>
-                  )}
-                </div>
+              <Separator />
 
-                <Separator />
+              <div>
+                <Link href={passportUrl} target="_blank">
+                  <Button variant="outline" className="w-full" size="sm">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View Live Passport
+                  </Button>
+                </Link>
+              </div>
+            </>
+          )}
 
-                <div>
-                  <Link href={passportUrl} target="_blank">
-                    <Button variant="outline" className="w-full" size="sm">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View Live Passport
-                    </Button>
-                  </Link>
-                </div>
-              </>
-            )}
+          {!isEnabled && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                Enable the passport to generate a public URL and QR code for this product
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
 
-            {!isEnabled && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  Enable the passport to generate a public URL and QR code for this product
-                </AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-
-        {isEnabled && token && (
-          <QRCodeDisplay
-            url={passportUrl}
-            productName={productName}
-          />
-        )}
-      </div>
-    </FeatureGate>
+      {isEnabled && token && (
+        <QRCodeDisplay
+          url={passportUrl}
+          productName={productName}
+        />
+      )}
+    </div>
   );
 }
