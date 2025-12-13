@@ -19,7 +19,7 @@ async function getProductByToken(token: string) {
     .from('products')
     .select(`
       *,
-      organization:organizations!products_organization_id_fkey (
+      organization:organizations (
         id,
         name,
         logo_url,
