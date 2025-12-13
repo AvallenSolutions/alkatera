@@ -20,6 +20,11 @@ export default function PassportView({ data, token }: PassportViewProps) {
   const { product, lca, materials } = data;
   // Supabase returns joined data as an array, get the first element
   const organization = Array.isArray(product.organization) ? product.organization[0] : product.organization;
+
+  console.log('PassportView - product.organization:', product.organization);
+  console.log('PassportView - organization:', organization);
+  console.log('PassportView - tier:', organization?.subscription_tier);
+
   const tier = organization?.subscription_tier || 'seed';
   const subscriptionStatus = organization?.subscription_status || 'active';
 
@@ -58,6 +63,7 @@ export default function PassportView({ data, token }: PassportViewProps) {
         <div className="flex items-center gap-2 mb-8 justify-center">
           <Leaf className="h-6 w-6 text-green-600" />
           <span className="text-sm font-medium text-neutral-600">Product Passport</span>
+          <span className="text-xs text-neutral-400">({effectiveTier})</span>
         </div>
 
         {effectiveTier === 'seed' && <PassportSeedView {...commonProps} />}
