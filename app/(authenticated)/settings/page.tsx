@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Crown, Gem, Star, Infinity } from 'lucide-react'
+import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Link from 'next/link'
 import { useSubscription, TierName } from '@/hooks/useSubscription'
@@ -110,22 +110,22 @@ export default function SettingsPage() {
                       isUnlimited={usage.usage.products.is_unlimited}
                     />
                     <UsageMeter
+                      label="Facilities"
+                      current={usage.usage.facilities.current}
+                      max={usage.usage.facilities.max}
+                      isUnlimited={usage.usage.facilities.is_unlimited}
+                    />
+                    <UsageMeter
+                      label="Users"
+                      current={usage.usage.team_members.current}
+                      max={usage.usage.team_members.max}
+                      isUnlimited={usage.usage.team_members.is_unlimited}
+                    />
+                    <UsageMeter
                       label="Reports (Monthly)"
                       current={usage.usage.reports_monthly.current}
                       max={usage.usage.reports_monthly.max}
                       isUnlimited={usage.usage.reports_monthly.is_unlimited}
-                    />
-                    <UsageMeter
-                      label="LCAs"
-                      current={usage.usage.lcas.current}
-                      max={usage.usage.lcas.max}
-                      isUnlimited={usage.usage.lcas.is_unlimited}
-                    />
-                    <UsageMeter
-                      label="Team Members"
-                      current={usage.usage.team_members.current}
-                      max={usage.usage.team_members.max}
-                      isUnlimited={usage.usage.team_members.is_unlimited}
                     />
                   </>
                 )}
@@ -145,9 +145,9 @@ export default function SettingsPage() {
                 {allTiers.map((tier) => {
                   const isCurrent = tier.tier_name === tierName
                   const tierIcons: Record<TierName, React.ComponentType<{ className?: string }>> = {
-                    basic: Star,
-                    premium: Gem,
-                    enterprise: Crown,
+                    seed: Leaf,
+                    blossom: Flower2,
+                    canopy: TreeDeciduous,
                   }
                   const Icon = tierIcons[tier.tier_name]
 
@@ -157,7 +157,7 @@ export default function SettingsPage() {
                       className={cn(
                         "relative rounded-lg border p-6",
                         isCurrent && "border-neon-lime bg-neon-lime/5",
-                        tier.tier_name === 'premium' && !isCurrent && "border-blue-200"
+                        tier.tier_name === 'blossom' && !isCurrent && "border-pink-200"
                       )}
                     >
                       {isCurrent && (
@@ -167,9 +167,9 @@ export default function SettingsPage() {
                           </span>
                         </div>
                       )}
-                      {tier.tier_name === 'premium' && !isCurrent && (
+                      {tier.tier_name === 'blossom' && !isCurrent && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="rounded-full bg-blue-500 px-3 py-1 text-xs font-medium text-white">
+                          <span className="rounded-full bg-pink-500 px-3 py-1 text-xs font-medium text-white">
                             Popular
                           </span>
                         </div>
@@ -178,12 +178,19 @@ export default function SettingsPage() {
                       <div className="mb-4 flex items-center gap-2 pt-2">
                         <Icon className={cn(
                           "h-5 w-5",
-                          tier.tier_name === 'basic' && "text-slate-500",
-                          tier.tier_name === 'premium' && "text-blue-500",
-                          tier.tier_name === 'enterprise' && "text-amber-500"
+                          tier.tier_name === 'seed' && "text-emerald-500",
+                          tier.tier_name === 'blossom' && "text-pink-500",
+                          tier.tier_name === 'canopy' && "text-teal-500"
                         )} />
                         <span className="font-semibold">{tier.display_name}</span>
                       </div>
+
+                      {tier.monthly_price_gbp && (
+                        <div className="mb-4">
+                          <span className="text-2xl font-bold">£{tier.monthly_price_gbp}</span>
+                          <span className="text-sm text-muted-foreground">/month</span>
+                        </div>
+                      )}
 
                       <p className="text-sm text-muted-foreground mb-4 min-h-[40px]">
                         {tier.description}
@@ -196,15 +203,15 @@ export default function SettingsPage() {
                         </li>
                         <li className="flex items-center gap-2 text-sm">
                           <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                          <span>{tier.max_facilities ?? <Infinity className="h-3 w-3 inline" />} Facilities</span>
+                        </li>
+                        <li className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                          <span>{tier.max_team_members ?? <Infinity className="h-3 w-3 inline" />} Users</span>
+                        </li>
+                        <li className="flex items-center gap-2 text-sm">
+                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
                           <span>{tier.max_reports_per_month ?? <Infinity className="h-3 w-3 inline" />} Reports/month</span>
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
-                          <span>{tier.max_team_members ?? <Infinity className="h-3 w-3 inline" />} Team members</span>
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
-                          <span>{tier.max_lcas ?? <Infinity className="h-3 w-3 inline" />} LCAs</span>
                         </li>
                       </ul>
 
@@ -214,7 +221,7 @@ export default function SettingsPage() {
                         </Button>
                       ) : (
                         <Button
-                          variant={tier.tier_name === 'premium' ? 'default' : 'outline'}
+                          variant={tier.tier_name === 'blossom' ? 'default' : 'outline'}
                           className="w-full"
                         >
                           {tier.tier_level > (allTiers.find(t => t.tier_name === tierName)?.tier_level || 1) ? 'Upgrade' : 'Contact Us'}

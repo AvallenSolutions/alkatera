@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Crown, Gem, Star } from "lucide-react";
+import { Leaf, Flower2, TreeDeciduous } from "lucide-react";
 import { TierName, TierLevel } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -22,27 +22,27 @@ export function TierBadge({
   const tierName: TierName =
     typeof tier === "number"
       ? tier === 1
-        ? "basic"
+        ? "seed"
         : tier === 2
-        ? "premium"
-        : "enterprise"
+        ? "blossom"
+        : "canopy"
       : tier;
 
   const config = {
-    basic: {
-      label: "Starter",
-      icon: Star,
-      className: "bg-slate-100 text-slate-700 border-slate-200",
+    seed: {
+      label: "Seed",
+      icon: Leaf,
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
     },
-    premium: {
-      label: "Professional",
-      icon: Gem,
-      className: "bg-blue-100 text-blue-700 border-blue-200",
+    blossom: {
+      label: "Blossom",
+      icon: Flower2,
+      className: "bg-pink-50 text-pink-700 border-pink-200",
     },
-    enterprise: {
-      label: "Enterprise",
-      icon: Crown,
-      className: "bg-amber-100 text-amber-700 border-amber-200",
+    canopy: {
+      label: "Canopy",
+      icon: TreeDeciduous,
+      className: "bg-teal-50 text-teal-700 border-teal-200",
     },
   };
 

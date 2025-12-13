@@ -12,9 +12,21 @@ export type FeatureCode =
   | "pef_reports"
   | "api_access"
   | "product_comparison"
-  | "white_label";
+  | "white_label"
+  | "ghg_emissions"
+  | "water_footprint"
+  | "waste_circularity"
+  | "biodiversity_tracking"
+  | "b_corp_assessment"
+  | "live_passport"
+  | "monthly_analytics"
+  | "sandbox_analytics"
+  | "email_support"
+  | "priority_chat"
+  | "automated_verification"
+  | "verified_data";
 
-export type TierName = "basic" | "premium" | "enterprise";
+export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
 
 export interface UsageInfo {
@@ -150,7 +162,7 @@ export function useSubscription() {
         return {
           allowed: false,
           reason: "No organisation selected",
-          tier: "basic",
+          tier: "seed",
           feature: featureCode,
         };
       }
@@ -164,7 +176,7 @@ export function useSubscription() {
         return {
           allowed: false,
           reason: error.message,
-          tier: "basic",
+          tier: "seed",
           feature: featureCode,
         };
       }
@@ -181,7 +193,7 @@ export function useSubscription() {
         reason: "No organisation selected",
         current_count: 0,
         max_count: 0,
-        tier: "basic",
+        tier: "seed",
         is_unlimited: false,
       };
     }
@@ -196,7 +208,7 @@ export function useSubscription() {
         reason: error.message,
         current_count: 0,
         max_count: 0,
-        tier: "basic",
+        tier: "seed",
         is_unlimited: false,
       };
     }
@@ -211,7 +223,7 @@ export function useSubscription() {
         reason: "No organisation selected",
         current_count: 0,
         max_count: 0,
-        tier: "basic",
+        tier: "seed",
         is_unlimited: false,
       };
     }
@@ -226,7 +238,7 @@ export function useSubscription() {
         reason: error.message,
         current_count: 0,
         max_count: 0,
-        tier: "basic",
+        tier: "seed",
         is_unlimited: false,
       };
     }
@@ -241,7 +253,7 @@ export function useSubscription() {
         reason: "No organisation selected",
         current_count: 0,
         max_count: 0,
-        tier: "basic",
+        tier: "seed",
         is_unlimited: false,
       };
     }
@@ -256,7 +268,7 @@ export function useSubscription() {
         reason: error.message,
         current_count: 0,
         max_count: 0,
-        tier: "basic",
+        tier: "seed",
         is_unlimited: false,
       };
     }
@@ -311,9 +323,9 @@ export function useSubscription() {
 
   return {
     ...state,
-    tierName: state.usage?.tier?.name || "basic",
+    tierName: state.usage?.tier?.name || "seed",
     tierLevel: state.usage?.tier?.level || 1,
-    tierDisplayName: state.usage?.tier?.display_name || "Starter",
+    tierDisplayName: state.usage?.tier?.display_name || "Seed",
     subscriptionStatus: state.usage?.tier?.status || "active",
     hasFeature,
     getTierLevel,
@@ -344,17 +356,28 @@ export function useFeatureGate(featureCode: FeatureCode) {
 }
 
 function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
-  const premiumFeatures: FeatureCode[] = [
+  const blossomFeatures: FeatureCode[] = [
     "ef_31",
     "ef_31_single_score",
     "pef_reports",
     "api_access",
+    "water_footprint",
+    "waste_circularity",
+    "monthly_analytics",
   ];
-  const enterpriseFeatures: FeatureCode[] = ["custom_weighting", "white_label"];
+  const canopyFeatures: FeatureCode[] = [
+    "custom_weighting",
+    "white_label",
+    "biodiversity_tracking",
+    "b_corp_assessment",
+    "sandbox_analytics",
+    "priority_chat",
+    "verified_data",
+  ];
 
-  if (enterpriseFeatures.includes(featureCode)) return "enterprise";
-  if (premiumFeatures.includes(featureCode)) return "premium";
-  return "basic";
+  if (canopyFeatures.includes(featureCode)) return "canopy";
+  if (blossomFeatures.includes(featureCode)) return "blossom";
+  return "seed";
 }
 
 export function useProductLimit() {

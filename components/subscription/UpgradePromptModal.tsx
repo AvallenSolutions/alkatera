@@ -3,11 +3,11 @@
 import React from "react";
 import {
   Check,
-  Crown,
-  Gem,
+  Leaf,
+  Flower2,
+  TreeDeciduous,
   Lock,
   Sparkles,
-  Star,
   X,
   Zap,
 } from "lucide-react";
@@ -105,9 +105,9 @@ function TierComparisonCard({
   isRecommended,
 }: TierComparisonCardProps) {
   const tierIcons: Record<TierName, React.ComponentType<{ className?: string }>> = {
-    basic: Star,
-    premium: Gem,
-    enterprise: Crown,
+    seed: Leaf,
+    blossom: Flower2,
+    canopy: TreeDeciduous,
   };
 
   const Icon = tierIcons[tier.tier_name];
@@ -118,16 +118,16 @@ function TierComparisonCard({
       value: tier.max_products ?? "Unlimited",
     },
     {
+      label: "Facilities",
+      value: tier.max_facilities ?? "Unlimited",
+    },
+    {
+      label: "Users",
+      value: tier.max_team_members ?? "Unlimited",
+    },
+    {
       label: "Reports/month",
       value: tier.max_reports_per_month ?? "Unlimited",
-    },
-    {
-      label: "LCAs",
-      value: tier.max_lcas ?? "Unlimited",
-    },
-    {
-      label: "Team members",
-      value: tier.max_team_members ?? "Unlimited",
     },
   ];
 

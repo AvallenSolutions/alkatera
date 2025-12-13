@@ -83,12 +83,24 @@ function LockedFeatureCard({
     api_access: "API Access",
     product_comparison: "Product Comparison",
     white_label: "White-label Reports",
+    ghg_emissions: "GHG Emissions Module",
+    water_footprint: "Water Footprint Module",
+    waste_circularity: "Waste & Circularity Module",
+    biodiversity_tracking: "Biodiversity Module",
+    b_corp_assessment: "B Corp Assessment",
+    live_passport: "Live Passport Analytics",
+    monthly_analytics: "Monthly Analytics",
+    sandbox_analytics: "Sandbox Environment",
+    email_support: "Email Support",
+    priority_chat: "Priority Chat Support",
+    automated_verification: "Automated Verification",
+    verified_data: "Verified Data",
   };
 
   const tierDisplayNames: Record<TierName, string> = {
-    basic: "Starter",
-    premium: "Professional",
-    enterprise: "Enterprise",
+    seed: "Seed",
+    blossom: "Blossom",
+    canopy: "Canopy",
   };
 
   return (
@@ -142,9 +154,9 @@ export function FeatureGateInline({
   }
 
   const tierDisplayNames: Record<TierName, string> = {
-    basic: "Starter",
-    premium: "Professional",
-    enterprise: "Enterprise",
+    seed: "Seed",
+    blossom: "Blossom",
+    canopy: "Canopy",
   };
 
   return (
@@ -180,9 +192,9 @@ export function FeatureLockIcon({ feature, className }: FeatureLockIconProps) {
   }
 
   const tierDisplayNames: Record<TierName, string> = {
-    basic: "Starter",
-    premium: "Professional",
-    enterprise: "Enterprise",
+    seed: "Seed",
+    blossom: "Blossom",
+    canopy: "Canopy",
   };
 
   return (
