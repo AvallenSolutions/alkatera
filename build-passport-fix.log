@@ -1,0 +1,119 @@
+
+> nextjs@0.1.0 build
+> next build
+
+ ⚠ Invalid next.config.js options detected: 
+ ⚠     Unrecognized key(s) in object: 'serverExternalPackages'
+ ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
+  ▲ Next.js 14.2.5
+  - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+Warning: Please use the `legacy` build in Node.js environments.
+   Generating static pages (0/64) ...
+Warning: Please use the `legacy` build in Node.js environments.
+✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
+✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
+✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
+   Generating static pages (16/64) 
+   Generating static pages (32/64) 
+   Generating static pages (48/64) 
+ ✓ Generating static pages (64/64)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                  Size     First Load JS
+┌ ○ /                                        179 B          94.5 kB
+├ ○ /_not-found                              879 B          88.4 kB
+├ ƒ /admin/allocation-review                 7.06 kB         204 kB
+├ ƒ /admin/approvals                         8.98 kB         186 kB
+├ ƒ /admin/platform                          6.15 kB         164 kB
+├ ƒ /admin/supplier-verification             9.12 kB         175 kB
+├ ƒ /api/bom/parse                           0 B                0 B
+├ ƒ /api/bulk-import/[id]/confirm            0 B                0 B
+├ ƒ /api/bulk-import/upload                  0 B                0 B
+├ ƒ /api/ingredients/search                  0 B                0 B
+├ ƒ /api/places/autocomplete                 0 B                0 B
+├ ƒ /api/places/details                      0 B                0 B
+├ ƒ /api/supplier-products/search            0 B                0 B
+├ ƒ /company/facilities                      2.12 kB         210 kB
+├ ƒ /company/facilities/[id]                 14 kB           205 kB
+├ ƒ /company/fleet                           5.16 kB         107 kB
+├ ƒ /company/overview                        12.1 kB         176 kB
+├ ○ /create-organization                     7.08 kB         157 kB
+├ ƒ /dashboard                               18.9 kB         206 kB
+├ ƒ /dashboard/data-hub/scope-1              3.59 kB         105 kB
+├ ƒ /dashboard/data-hub/scope-2              3.71 kB         105 kB
+├ ƒ /dashboard/data-hub/scope-3              4.43 kB         106 kB
+├ ƒ /dashboard/products                      3.61 kB         203 kB
+├ ● /dashboard/products/[id]/edit            2 kB            196 kB
+├ ƒ /dashboard/products/create               8.37 kB         192 kB
+├ ƒ /dashboard/reports/product-lca           11 kB           187 kB
+├ ƒ /dashboard/settings/profile              6.6 kB          157 kB
+├ ƒ /dashboard/settings/team                 11.3 kB         193 kB
+├ ƒ /data/ingest                             4 kB            209 kB
+├ ƒ /data/quality                            14.5 kB         174 kB
+├ ƒ /data/scope-1-2                          10.6 kB         252 kB
+├ ƒ /data/waste-and-circularity              7.68 kB         213 kB
+├ ƒ /data/water-footprint                    9.27 kB         221 kB
+├ ƒ /dev/calculation-verifier                17 kB           170 kB
+├ ƒ /dev/docs/fleet-implementation           4.18 kB        98.7 kB
+├ ƒ /dev/docs/iso-14044-compliance           12.8 kB         107 kB
+├ ƒ /dev/docs/iso-compliance-tests           7.75 kB         102 kB
+├ ƒ /dev/docs/lca-calculation-testing        5.54 kB         100 kB
+├ ƒ /dev/docs/lca-testing-summary            6.21 kB         101 kB
+├ ƒ /dev/docs/reporting-standards            14.3 kB         112 kB
+├ ƒ /dev/docs/technical-debt                 2.02 kB        96.6 kB
+├ ƒ /dev/docs/ui-documentation               4.79 kB        99.4 kB
+├ ƒ /dev/docs/verification-tests             4 kB           98.6 kB
+├ ƒ /dev/test-harness                        4.12 kB         154 kB
+├ ƒ /dev/tier-management                     8.1 kB          161 kB
+├ ƒ /knowledge-bank                          6.93 kB         206 kB
+├ ƒ /knowledge-bank/categories/[categoryId]  4.13 kB         175 kB
+├ ƒ /knowledge-bank/items/[itemId]           4.76 kB         175 kB
+├ ƒ /knowledge-bank/new                      4.14 kB         199 kB
+├ ○ /login                                   151 B           163 kB
+├ ƒ /operations                              1.78 kB         210 kB
+├ ƒ /passport/[token]                        9.02 kB         165 kB
+├ ○ /password-reset                          4.46 kB         161 kB
+├ ƒ /performance                             22.2 kB         208 kB
+├ ƒ /production                              20.8 kB         226 kB
+├ ƒ /products                                3.65 kB         203 kB
+├ ƒ /products/[id]                           82.5 kB         304 kB
+├ ƒ /products/[id]/calculate-lca             10.1 kB         165 kB
+├ ƒ /products/[id]/core-operations           9.53 kB         193 kB
+├ ƒ /products/[id]/distribution              3.87 kB        98.4 kB
+├ ƒ /products/[id]/end-of-life               3.86 kB        98.4 kB
+├ ƒ /products/[id]/materials                 6.63 kB         193 kB
+├ ƒ /products/[id]/recipe                    20.9 kB         236 kB
+├ ƒ /products/[id]/report                    163 kB          340 kB
+├ ƒ /products/detail                         5.77 kB         163 kB
+├ ƒ /products/import                         105 kB          274 kB
+├ ƒ /products/new                            10.8 kB         215 kB
+├ ƒ /reporting/calculations                  6.64 kB         162 kB
+├ ƒ /reports                                 6.28 kB         111 kB
+├ ƒ /reports/company-footprint               6.33 kB         162 kB
+├ ƒ /reports/company-footprint/[year]        8.36 kB         235 kB
+├ ƒ /reports/lcas                            8.64 kB         166 kB
+├ ƒ /reports/sustainability                  4.29 kB         106 kB
+├ ƒ /settings                                11.1 kB         191 kB
+├ ○ /signup                                  152 B           163 kB
+├ ○ /supplier-onboarding                     5.87 kB         163 kB
+├ ƒ /suppliers                               4.98 kB         208 kB
+├ ƒ /suppliers/[id]                          16.5 kB         231 kB
+├ ƒ /suppliers/new                           5.65 kB         200 kB
+└ ○ /update-password                         4.66 kB         155 kB
++ First Load JS shared by all                87.5 kB
+  ├ chunks/7023-ee342533d0ee96f6.js          31.7 kB
+  ├ chunks/fd9d1056-bc60071db6726b83.js      53.6 kB
+  └ other shared chunks (total)              2.13 kB
+
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses getStaticProps)
+ƒ  (Dynamic)  server-rendered on demand
+

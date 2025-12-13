@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { createClient } from '@supabase/supabase-js';
 import PassportView from '@/components/passport/PassportView';
 
 interface PassportPageProps {
@@ -10,7 +10,10 @@ interface PassportPageProps {
 }
 
 async function getProductByToken(token: string) {
-  const supabase = getSupabaseBrowserClient();
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const { data: product, error } = await supabase
     .from('products')
@@ -34,11 +37,7 @@ async function getProductByToken(token: string) {
 
   const { data: lca } = await supabase
     .from('product_lcas')
-    .select(`
-      *,
-      aggregated_impacts,
-      ef31_impacts
-    `)
+    .select('*')
     .eq('product_id', product.id)
     .eq('status', 'completed')
     .order('updated_at', { ascending: false })
@@ -59,7 +58,8 @@ async function getProductByToken(token: string) {
 }
 
 export async function generateMetadata({ params }: PassportPageProps): Promise<Metadata> {
-  const data = await getProductByToken(params.token);
+  const { token } = params;
+  const data = await getProductByToken(token);
 
   if (!data) {
     return {
@@ -79,11 +79,12 @@ export async function generateMetadata({ params }: PassportPageProps): Promise<M
 }
 
 export default async function PassportPage({ params }: PassportPageProps) {
-  const data = await getProductByToken(params.token);
+  const { token } = params;
+  const data = await getProductByToken(token);
 
   if (!data) {
     notFound();
   }
 
-  return <PassportView data={data} token={params.token} />;
+  return <PassportView data={data} token={token} />;
 }
