@@ -359,11 +359,10 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
   const blossomFeatures: FeatureCode[] = [
     "ef_31",
     "ef_31_single_score",
-    "pef_reports",
-    "api_access",
     "water_footprint",
     "waste_circularity",
     "monthly_analytics",
+    "product_comparison",
   ];
   const canopyFeatures: FeatureCode[] = [
     "custom_weighting",
@@ -373,6 +372,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "sandbox_analytics",
     "priority_chat",
     "verified_data",
+    "pef_reports",
+    "api_access",
   ];
 
   if (canopyFeatures.includes(featureCode)) return "canopy";
