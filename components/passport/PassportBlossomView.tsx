@@ -14,9 +14,15 @@ interface PassportBlossomViewProps {
 
 export default function PassportBlossomView({ product, lca, materials, organization }: PassportBlossomViewProps) {
   const impacts = lca?.aggregated_impacts || {};
+
+  console.log('LCA:', lca);
+  console.log('Impacts:', impacts);
+  console.log('Breakdown:', impacts.breakdown);
+  console.log('Organization:', organization);
+
   const ghgEmissions = impacts.climate_change_gwp100 || 0;
   const waterConsumption = impacts.water_consumption || 0;
-  const wasteGenerated = impacts.waste_generated || 0;
+  const wasteGenerated = impacts.waste || 0;
 
   const functionalUnit = product.functional_unit
     || (product.unit_size_value && product.unit_size_unit ? `${product.unit_size_value} ${product.unit_size_unit}` : null)
@@ -30,6 +36,9 @@ export default function PassportBlossomView({ product, lca, materials, organizat
   const transportation = categoryBreakdown.transport || 0;
   const processing = categoryBreakdown.production || 0;
   const hasBreakdown = ingredients > 0 || packaging > 0 || transportation > 0 || processing > 0;
+
+  console.log('Category Breakdown:', categoryBreakdown);
+  console.log('Has breakdown?', hasBreakdown, { ingredients, packaging, transportation, processing });
 
   const hasEF31 = !!lca?.ef31_impacts;
   const hasRecipe = !!impacts;

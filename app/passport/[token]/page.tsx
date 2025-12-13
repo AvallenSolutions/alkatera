@@ -32,8 +32,11 @@ async function getProductByToken(token: string) {
     .maybeSingle();
 
   if (error || !product) {
+    console.error('Product fetch error:', error);
     return null;
   }
+
+  console.log('Product with organization:', JSON.stringify(product, null, 2));
 
   const { data: lca } = await supabase
     .from('product_lcas')
@@ -44,11 +47,15 @@ async function getProductByToken(token: string) {
     .limit(1)
     .maybeSingle();
 
+  console.log('LCA data:', JSON.stringify(lca, null, 2));
+
   const { data: materials } = await supabase
     .from('product_lca_materials')
     .select('*')
     .eq('product_lca_id', lca?.id || '')
     .order('created_at');
+
+  console.log('Materials count:', materials?.length);
 
   return {
     product,
