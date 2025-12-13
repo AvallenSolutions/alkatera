@@ -18,7 +18,8 @@ interface PassportViewProps {
 
 export default function PassportView({ data, token }: PassportViewProps) {
   const { product, lca, materials } = data;
-  const organization = product.organization;
+  // Supabase returns joined data as an array, get the first element
+  const organization = Array.isArray(product.organization) ? product.organization[0] : product.organization;
   const tier = organization?.subscription_tier || 'seed';
   const subscriptionStatus = organization?.subscription_status || 'active';
 
