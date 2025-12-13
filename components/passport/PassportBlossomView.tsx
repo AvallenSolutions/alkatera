@@ -24,10 +24,10 @@ export default function PassportBlossomView({ product, lca, materials, organizat
 
   const hasValidData = ghgEmissions > 0 || waterConsumption > 0 || wasteGenerated > 0;
 
-  const ghgBreakdown = impacts.breakdown?.ghg || {};
-  const scope1 = ghgBreakdown.scope_1 || 0;
-  const scope2 = ghgBreakdown.scope_2 || 0;
-  const scope3 = ghgBreakdown.scope_3 || 0;
+  const ghgBreakdown = impacts.breakdown?.by_scope || {};
+  const scope1 = ghgBreakdown.scope1 || 0;
+  const scope2 = ghgBreakdown.scope2 || 0;
+  const scope3 = ghgBreakdown.scope3 || 0;
 
   const hasEF31 = !!lca?.ef31_impacts;
   const hasRecipe = !!impacts;
