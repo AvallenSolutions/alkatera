@@ -24,10 +24,12 @@ export default function PassportBlossomView({ product, lca, materials, organizat
 
   const hasValidData = ghgEmissions > 0 || waterConsumption > 0 || wasteGenerated > 0;
 
-  const ghgBreakdown = impacts.breakdown?.by_scope || {};
-  const scope1 = ghgBreakdown.scope1 || 0;
-  const scope2 = ghgBreakdown.scope2 || 0;
-  const scope3 = ghgBreakdown.scope3 || 0;
+  const categoryBreakdown = impacts.breakdown?.by_category || {};
+  const ingredients = categoryBreakdown.materials || 0;
+  const packaging = categoryBreakdown.packaging || 0;
+  const transportation = categoryBreakdown.transport || 0;
+  const processing = categoryBreakdown.production || 0;
+  const hasBreakdown = ingredients > 0 || packaging > 0 || transportation > 0 || processing > 0;
 
   const hasEF31 = !!lca?.ef31_impacts;
   const hasRecipe = !!impacts;
@@ -133,35 +135,43 @@ export default function PassportBlossomView({ product, lca, materials, organizat
               />
             </div>
 
-            {(scope1 > 0 || scope2 > 0 || scope3 > 0) && (
+            {hasBreakdown && (
               <Card className="border-neutral-200">
                 <CardHeader>
                   <CardTitle className="text-base">GHG Emissions Breakdown</CardTitle>
-                  <CardDescription>By greenhouse gas protocol scope</CardDescription>
+                  <CardDescription>By lifecycle stage</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {scope1 > 0 && (
+                    {ingredients > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-neutral-600">Scope 1 (Direct)</span>
+                        <span className="text-sm text-neutral-600">Ingredients</span>
                         <span className="font-semibold text-neutral-900">
-                          {scope1.toFixed(2)} kg CO₂eq
+                          {ingredients.toFixed(3)} kg CO₂eq
                         </span>
                       </div>
                     )}
-                    {scope2 > 0 && (
+                    {packaging > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-neutral-600">Scope 2 (Energy)</span>
+                        <span className="text-sm text-neutral-600">Packaging</span>
                         <span className="font-semibold text-neutral-900">
-                          {scope2.toFixed(2)} kg CO₂eq
+                          {packaging.toFixed(3)} kg CO₂eq
                         </span>
                       </div>
                     )}
-                    {scope3 > 0 && (
+                    {processing > 0 && (
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-neutral-600">Scope 3 (Supply Chain)</span>
+                        <span className="text-sm text-neutral-600">Processing</span>
                         <span className="font-semibold text-neutral-900">
-                          {scope3.toFixed(2)} kg CO₂eq
+                          {processing.toFixed(3)} kg CO₂eq
+                        </span>
+                      </div>
+                    )}
+                    {transportation > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-neutral-600">Transportation</span>
+                        <span className="font-semibold text-neutral-900">
+                          {transportation.toFixed(3)} kg CO₂eq
                         </span>
                       </div>
                     )}
