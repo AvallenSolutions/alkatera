@@ -413,36 +413,7 @@ export function useCompanyMetrics() {
     // in fetchScopeBreakdown() to give a complete picture
     if (scopeTotal.scope1 > 0 || scopeTotal.scope2 > 0 || scopeTotal.scope3 > 0) {
       console.log('[useCompanyMetrics] Setting product LCA scope breakdown:', scopeTotal);
-
-      // Validate that scopes add up to total emissions
-      const scopeSum = scopeTotal.scope1 + scopeTotal.scope2 + scopeTotal.scope3;
-      const totalEmissions = lcas.reduce((sum, lca) => {
-        return sum + (lca.aggregated_impacts?.climate_change_gwp100 || 0);
-      }, 0);
-
-      // If there's a significant mismatch, attribute the difference to Scope 3
-      // (Product LCAs are primarily Scope 3 - upstream materials)
-      if (totalEmissions > 0 && scopeSum < totalEmissions * 0.95) {
-        const missing = totalEmissions - scopeSum;
-        console.log('[useCompanyMetrics] Scope breakdown incomplete. Missing:', missing, 'kg. Attributing to Scope 3.');
-        scopeTotal.scope3 += missing;
-      }
-
       setScopeBreakdown(scopeTotal);
-    } else {
-      // If no scope breakdown data at all, attribute all emissions to Scope 3
-      const totalEmissions = lcas.reduce((sum, lca) => {
-        return sum + (lca.aggregated_impacts?.climate_change_gwp100 || 0);
-      }, 0);
-
-      if (totalEmissions > 0) {
-        console.log('[useCompanyMetrics] No scope breakdown found. Attributing all emissions to Scope 3 (product materials).');
-        setScopeBreakdown({
-          scope1: 0,
-          scope2: 0,
-          scope3: totalEmissions
-        });
-      }
     }
 
     // Set material breakdown

@@ -141,6 +141,11 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
   const ingredientsTotal = ingredients.reduce((sum, m) => sum + m.climate, 0);
   const packagingTotal = packaging.reduce((sum, m) => sum + m.climate, 0);
 
+  // Calculate scope total for percentage calculations
+  const scopeTotal = scopeBreakdown
+    ? scopeBreakdown.scope1 + scopeBreakdown.scope2 + scopeBreakdown.scope3
+    : 0;
+
   const getDataSourceBadge = (source?: string) => {
     const config: Record<string, { label: string; className: string }> = {
       primary: { label: 'Primary Data', className: 'bg-green-600' },
@@ -261,11 +266,11 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-red-600 h-2 rounded-full"
-                          style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope1 / totalCO2) * 100 : 0}%` }}
+                          style={{ width: `${scopeTotal > 0 ? (scopeBreakdown.scope1 / scopeTotal) * 100 : 0}%` }}
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {totalCO2 > 0 ? ((scopeBreakdown.scope1 / totalCO2) * 100).toFixed(1) : 0}% - Facility operations
+                        {scopeTotal > 0 ? ((scopeBreakdown.scope1 / scopeTotal) * 100).toFixed(1) : 0}% - Facility operations
                       </p>
                     </div>
 
@@ -279,11 +284,11 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-orange-600 h-2 rounded-full"
-                          style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope2 / totalCO2) * 100 : 0}%` }}
+                          style={{ width: `${scopeTotal > 0 ? (scopeBreakdown.scope2 / scopeTotal) * 100 : 0}%` }}
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {totalCO2 > 0 ? ((scopeBreakdown.scope2 / totalCO2) * 100).toFixed(1) : 0}% - Purchased electricity
+                        {scopeTotal > 0 ? ((scopeBreakdown.scope2 / scopeTotal) * 100).toFixed(1) : 0}% - Purchased electricity
                       </p>
                     </div>
 
@@ -297,11 +302,11 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className="bg-yellow-600 h-2 rounded-full"
-                          style={{ width: `${totalCO2 > 0 ? (scopeBreakdown.scope3 / totalCO2) * 100 : 0}%` }}
+                          style={{ width: `${scopeTotal > 0 ? (scopeBreakdown.scope3 / scopeTotal) * 100 : 0}%` }}
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {totalCO2 > 0 ? ((scopeBreakdown.scope3 / totalCO2) * 100).toFixed(1) : 0}% - Materials, transport, end-of-life
+                        {scopeTotal > 0 ? ((scopeBreakdown.scope3 / scopeTotal) * 100).toFixed(1) : 0}% - Materials, transport, end-of-life
                       </p>
                     </div>
                   </div>
