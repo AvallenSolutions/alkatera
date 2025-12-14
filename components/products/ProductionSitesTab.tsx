@@ -89,8 +89,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
 
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showAllocationForm, setShowAllocationForm] = useState(false);
+  const [dialogStep, setDialogStep] = useState<"closed" | "facility_selection" | "allocation_form">("closed");
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [facilityType, setFacilityType] = useState<"owned" | "contract_manufacturer">("contract_manufacturer");
 
@@ -125,7 +124,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
   };
 
   const handleAddFacility = () => {
-    setShowAddDialog(true);
+    setDialogStep("facility_selection");
     setSelectedFacility(null);
     setFacilityType("contract_manufacturer");
   };
@@ -155,19 +154,26 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
 
     if (facilityType === "contract_manufacturer") {
       console.log("Opening allocation form");
-      setShowAddDialog(false);
-      setTimeout(() => {
-        setShowAllocationForm(true);
-      }, 100);
+      setDialogStep("allocation_form");
     } else {
       toast.info("Owned facility allocation coming soon");
+      setDialogStep("closed");
     }
   };
 
   const handleAllocationSuccess = () => {
-    setShowAllocationForm(false);
+    setDialogStep("closed");
     setSelectedFacility(null);
     loadData();
+  };
+
+  const handleCloseDialog = () => {
+    setDialogStep("closed");
+  };
+
+  const handleCancelAllocation = () => {
+    setDialogStep("closed");
+    setSelectedFacility(null);
   };
 
   const getStatusBadge = (status: string, isEnergyIntensive: boolean, usesProxyData?: boolean) => {
@@ -365,7 +371,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
         </>
       )}
 
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+      <Dialog open={dialogStep === "facility_selection"} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Production Site</DialogTitle>
@@ -455,7 +461,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
             )}
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="ghost" onClick={() => setShowAddDialog(false)}>
+              <Button type="button" variant="ghost" onClick={handleCloseDialog}>
                 Cancel
               </Button>
               <Button
@@ -472,7 +478,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showAllocationForm} onOpenChange={setShowAllocationForm}>
+      <Dialog open={dialogStep === "allocation_form"} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Contract Manufacturer Allocation</DialogTitle>
@@ -488,7 +494,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
               facilityName={selectedFacility.name}
               organizationId={organizationId}
               onSuccess={handleAllocationSuccess}
-              onCancel={() => setShowAllocationForm(false)}
+              onCancel={handleCancelAllocation}
             />
           )}
         </DialogContent>
