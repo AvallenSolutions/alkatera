@@ -1,5 +1,57 @@
 import type { LCAReportData } from '@/components/lca-report/types';
 
+interface AggregatedImpacts {
+  climate_change_gwp100?: number;
+  water_consumption?: number;
+  water_scarcity_aware?: number;
+  land_use?: number;
+  waste?: number;
+  circularity_percentage?: number;
+  climate_fossil?: number;
+  climate_biogenic?: number;
+  climate_dluc?: number;
+  data_quality?: {
+    score?: number;
+    rating?: string;
+    breakdown?: {
+      primary_verified_count?: number;
+      primary_verified_share?: string;
+      secondary_modelled_count?: number;
+      secondary_modelled_share?: string;
+    };
+    total_materials?: number;
+  };
+  breakdown?: {
+    by_lifecycle_stage?: {
+      raw_materials?: number;
+      packaging_stage?: number;
+      distribution?: number;
+      processing?: number;
+      use_phase?: number;
+      end_of_life?: number;
+    };
+    by_scope?: {
+      scope1?: number;
+      scope2?: number;
+      scope3?: number;
+    };
+    by_ghg?: {
+      co2_fossil?: number;
+      co2_biogenic?: number;
+      ch4?: number;
+      n2o?: number;
+    };
+    by_material?: Array<{
+      name: string;
+      category: string;
+      quantity: number;
+      emissions: number;
+      percentage: number;
+      unit?: string;
+    }>;
+  };
+}
+
 interface LCADatabaseData {
   id: string;
   product_name: string;
@@ -8,7 +60,9 @@ interface LCADatabaseData {
   created_at: string;
   version?: string;
   organization_id?: string;
+  aggregated_impacts?: AggregatedImpacts;
   product_lca_materials?: any[];
+  data_quality_summary?: any;
 }
 
 interface CalculationLogData {
@@ -25,20 +79,54 @@ export function transformLCADataForReport(
   calculationLog: CalculationLogData | null,
   organization: OrganizationData | null
 ): LCAReportData {
-  const responseData = calculationLog?.response_data || {};
-  const totalCarbon = responseData?.total_impacts?.climate_change_gwp100 || 1.33;
-  const waterConsumption = responseData?.total_impacts?.water_consumption || 0.6;
-  const waterScarcity = responseData?.total_impacts?.water_scarcity_aware || 11.3;
-  const landUse = responseData?.total_impacts?.land_use || 0.04;
+  const impacts = lca.aggregated_impacts || {};
+  const breakdown = impacts.breakdown || {};
+  const lifecycleStages = breakdown.by_lifecycle_stage || {};
+  const scopeBreakdown = breakdown.by_scope || {};
+  const ghgBreakdown = breakdown.by_ghg || {};
+  const materialBreakdown = breakdown.by_material || [];
+  const dataQuality = impacts.data_quality || {};
 
-  const defaultBreakdown = [
-    { name: "Raw Materials", value: 63.5, color: "#22c55e" },
-    { name: "Packaging", value: 29.3, color: "#eab308" },
-    { name: "Distribution", value: 4.2, color: "#f97316" },
-    { name: "Processing", value: 3.0, color: "#3b82f6" }
-  ];
+  const totalCarbon = impacts.climate_change_gwp100 || 0;
+  const waterConsumption = impacts.water_consumption || 0;
+  const waterScarcity = impacts.water_scarcity_aware || 0;
+  const landUse = impacts.land_use || 0;
+
+  const rawMaterials = lifecycleStages.raw_materials || 0;
+  const packaging = lifecycleStages.packaging_stage || 0;
+  const distribution = lifecycleStages.distribution || 0;
+  const processing = lifecycleStages.processing || 0;
+
+  const totalFromStages = rawMaterials + packaging + distribution + processing;
+  const rawMaterialsPct = totalFromStages > 0 ? (rawMaterials / totalFromStages) * 100 : 0;
+  const packagingPct = totalFromStages > 0 ? (packaging / totalFromStages) * 100 : 0;
+  const distributionPct = totalFromStages > 0 ? (distribution / totalFromStages) * 100 : 0;
+  const processingPct = totalFromStages > 0 ? (processing / totalFromStages) * 100 : 0;
+
+  const scope1 = scopeBreakdown.scope1 || 0;
+  const scope2 = scopeBreakdown.scope2 || 0;
+  const scope3 = scopeBreakdown.scope3 || 0;
+  const totalScopes = scope1 + scope2 + scope3;
+  const scope1Pct = totalScopes > 0 ? (scope1 / totalScopes) * 100 : 0;
+  const scope2Pct = totalScopes > 0 ? (scope2 / totalScopes) * 100 : 0;
+  const scope3Pct = totalScopes > 0 ? (scope3 / totalScopes) * 100 : 100;
 
   const materials = lca.product_lca_materials || [];
+  const dqScore = dataQuality.score || 70;
+
+  const chartBreakdown = [
+    { name: "Raw Materials", value: rawMaterialsPct, color: "#22c55e" },
+    { name: "Packaging", value: packagingPct, color: "#eab308" },
+    { name: "Distribution", value: distributionPct, color: "#f97316" },
+    { name: "Processing", value: processingPct, color: "#3b82f6" }
+  ].filter(item => item.value > 0);
+
+  const wasteStream = [
+    { label: "Glass Bottle", value: "0.253 kg", recycled: true },
+    { label: "Label (Paper)", value: "0.063 kg", recycled: true },
+    { label: "Cap (Aluminium)", value: "0.035 kg", recycled: true },
+    { label: "Process Waste", value: "0.099 kg", recycled: false }
+  ];
 
   return {
     meta: {
@@ -47,7 +135,7 @@ export function transformLCADataForReport(
       date: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
       organization: organization?.name || 'Your Organisation',
       generatedBy: 'AlkaTera Platform',
-      version: lca.version || 'v1.0.0',
+      version: '1.0',
       assessmentPeriod: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
       publishedDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
       heroImage: undefined,
@@ -61,9 +149,9 @@ export function transformLCADataForReport(
       keyHighlight: {
         value: totalCarbon.toFixed(3),
         label: "kg CO₂eq per unit",
-        subtext: "with high data quality"
+        subtext: `with ${dqScore}% data quality`
       },
-      dataQualityScore: 85
+      dataQualityScore: dqScore
     },
     methodology: {
       includedStages: [
@@ -79,31 +167,31 @@ export function transformLCADataForReport(
         "Capital goods"
       ],
       dataSources: [
-        { name: "Primary Supplier Data", count: materials.length || 3 },
-        { name: "Ecoinvent 3.12", count: 12 },
+        { name: "Primary Supplier Data", count: dataQuality.breakdown?.primary_verified_count || 0 },
+        { name: "Ecoinvent 3.12", count: dataQuality.breakdown?.secondary_modelled_count || materials.length },
         { name: "DEFRA 2024", count: 5 }
       ]
     },
     climateImpact: {
       totalCarbon,
-      breakdown: responseData?.breakdown || defaultBreakdown,
+      breakdown: chartBreakdown,
       stages: [
-        { label: "Raw Materials", value: totalCarbon * 0.635, unit: "kg CO₂eq", percentage: 63.5, color: "green" },
-        { label: "Packaging", value: totalCarbon * 0.293, unit: "kg CO₂eq", percentage: 29.3, color: "yellow" },
-        { label: "Distribution", value: totalCarbon * 0.042, unit: "kg CO₂eq", percentage: 4.2, color: "orange" },
-        { label: "Processing", value: totalCarbon * 0.030, unit: "kg CO₂eq", percentage: 3.0, color: "blue" }
-      ],
+        { label: "Raw Materials", value: rawMaterials, unit: "kg CO₂eq", percentage: rawMaterialsPct, color: "green" },
+        { label: "Packaging", value: packaging, unit: "kg CO₂eq", percentage: packagingPct, color: "yellow" },
+        { label: "Distribution", value: distribution, unit: "kg CO₂eq", percentage: distributionPct, color: "orange" },
+        { label: "Processing", value: processing, unit: "kg CO₂eq", percentage: processingPct, color: "blue" }
+      ].filter(stage => stage.value > 0),
       scopes: [
-        { name: "Scope 1 (Direct)", value: 1.2 },
-        { name: "Scope 2 (Energy)", value: 0.5 },
-        { name: "Scope 3 (Value Chain)", value: 98.3 }
+        { name: "Scope 1 (Direct)", value: scope1Pct },
+        { name: "Scope 2 (Energy)", value: scope2Pct },
+        { name: "Scope 3 (Value Chain)", value: scope3Pct }
       ],
       methodology: {
         ghgBreakdown: [
-          { label: "CO2 Fossil", value: (totalCarbon * 0.79).toFixed(4), unit: "kg CO₂e", gwp: "1" },
-          { label: "CO2 Biogenic", value: (totalCarbon * 0.14).toFixed(4), unit: "kg CO₂e", gwp: "1*" },
-          { label: "CH4", value: (totalCarbon * 0.05).toFixed(4), unit: "kg CO₂e", gwp: "29.8" },
-          { label: "N2O", value: (totalCarbon * 0.02).toFixed(4), unit: "kg CO₂e", gwp: "273" }
+          { label: "CO₂ Fossil", value: (ghgBreakdown.co2_fossil || impacts.climate_fossil || 0).toFixed(4), unit: "kg CO₂e", gwp: "1" },
+          { label: "CO₂ Biogenic", value: (ghgBreakdown.co2_biogenic || impacts.climate_biogenic || 0).toFixed(4), unit: "kg CO₂e", gwp: "1*" },
+          { label: "CH₄", value: (ghgBreakdown.ch4 || 0).toFixed(4), unit: "kg CO₂e", gwp: "29.8" },
+          { label: "N₂O", value: (ghgBreakdown.n2o || 0).toFixed(4), unit: "kg CO₂e", gwp: "273" }
         ],
         standards: [
           "ISO 14067:2018 — Greenhouse gases — Carbon footprint of products",
@@ -115,19 +203,20 @@ export function transformLCADataForReport(
     },
     waterFootprint: {
       totalConsumption: `${waterConsumption.toFixed(1)}L`,
-      scarcityWeighted: `${waterScarcity.toFixed(1)}L eq.`,
-      breakdown: [
-        { name: "Raw Materials", value: 60, color: "#2563eb" },
-        { name: "Packaging", value: 20, color: "#3b82f6" },
-        { name: "Processing", value: 15, color: "#60a5fa" },
-        { name: "Other", value: 5, color: "#1d4ed8" }
-      ],
-      sources: materials.slice(0, 6).map((m: any, i: number) => ({
-        source: m.material_name || `Material ${i + 1}`,
-        location: m.origin_country || "Unknown",
-        volume: `${(waterConsumption / materials.length).toFixed(2)} L`,
-        risk: "MEDIUM",
-        score: 20.0
+      scarcityWeighted: `${waterScarcity.toFixed(2)}L eq.`,
+      breakdown: chartBreakdown.map(item => ({
+        name: item.name,
+        value: item.value,
+        color: item.name === "Raw Materials" ? "#2563eb" :
+               item.name === "Packaging" ? "#3b82f6" :
+               item.name === "Processing" ? "#60a5fa" : "#1d4ed8"
+      })),
+      sources: materials.slice(0, 8).map((m: any) => ({
+        source: m.material_name || "Material",
+        location: m.origin_country || m.country_of_origin || "Unknown",
+        volume: `${((m.impact_water || 0) * (m.quantity || 1)).toFixed(1)} L`,
+        risk: waterScarcity > 50 ? "HIGH" : waterScarcity > 20 ? "MEDIUM" : "LOW",
+        score: 10.0
       })),
       methodology: {
         steps: [
@@ -143,16 +232,13 @@ export function transformLCADataForReport(
       }
     },
     circularity: {
-      totalWaste: "0.45kg",
+      totalWaste: `${(impacts.waste || 0.45).toFixed(3)}kg`,
       recyclingRate: 78,
       circularityScore: "7.8 / 10",
-      wasteStream: [
-        { label: "Packaging", value: "0.350 kg", recycled: true },
-        { label: "Process Waste", value: "0.100 kg", recycled: false }
-      ],
+      wasteStream,
       methodology: {
         formula: {
-          text: "MCI = [LFI × U/L) + (V/2) + (W/2) × F(X)",
+          text: "MCI = (LFI × U/L) + (V/2) + (W/2) × F(X)",
           definitions: [
             { term: "LFI", definition: "Linear Flow Index (virgin material input)" },
             { term: "U", definition: "Utility of product (functional performance)" },
@@ -173,10 +259,10 @@ export function transformLCADataForReport(
       totalLandUse: `${landUse.toFixed(2)}m²`,
       breakdown: materials.slice(0, 8).map((m: any) => ({
         material: m.material_name || "Material",
-        origin: m.origin_country || "Unknown",
+        origin: m.origin_country || m.country_of_origin || "Unknown",
         mass: `${(m.quantity || 0).toFixed(3)} kg`,
-        intensity: 0.5,
-        footprint: `${(landUse / materials.length).toFixed(3)} m²`
+        intensity: (m.impact_land || 0) / (m.quantity || 1),
+        footprint: `${(m.impact_land || landUse / Math.max(materials.length, 1)).toFixed(4)} m²`
       })),
       methodology: {
         categories: [
@@ -191,17 +277,24 @@ export function transformLCADataForReport(
       }
     },
     supplyChain: {
-      totalDistance: "281km",
-      verifiedSuppliers: "0%",
+      totalDistance: `${materials.reduce((sum: number, m: any) => sum + (m.distance_km || 0), 0).toFixed(0)}km`,
+      verifiedSuppliers: `${dataQuality.breakdown?.primary_verified_share || "0%"}`,
       network: [
         {
           category: "MATERIAL SUPPLIERS",
-          items: materials.slice(0, 5).map((m: any, i: number) => ({
-            name: m.material_name || `Supplier ${i + 1}`,
-            location: m.origin_country || "Unknown",
-            distance: `${Math.floor(Math.random() * 1000)} km`,
-            co2: `${(Math.random() * 0.5).toFixed(3)} kg CO₂e`
-          }))
+          items: materialBreakdown.length > 0
+            ? materialBreakdown.slice(0, 8).map((m: any) => ({
+                name: m.name,
+                location: materials.find((mat: any) => mat.material_name === m.name)?.origin_country || "Various",
+                distance: `${materials.find((mat: any) => mat.material_name === m.name)?.distance_km || "-"} km`,
+                co2: `${m.emissions.toFixed(3)} kg CO₂e`
+              }))
+            : materials.slice(0, 8).map((m: any) => ({
+                name: m.material_name || "Supplier",
+                location: m.origin_country || m.country_of_origin || "Unknown",
+                distance: `${m.distance_km || "-"} km`,
+                co2: `${(m.impact_climate || 0).toFixed(3)} kg CO₂e`
+              }))
         }
       ]
     },
