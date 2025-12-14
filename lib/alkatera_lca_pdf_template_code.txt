@@ -1,0 +1,1658 @@
+﻿Readme.md
+
+# AlkaTera Product LCA Report (PDF Template)
+
+
+A print-optimized React component designed to generate high-fidelity PDF reports for Product Life Cycle Assessments.
+
+
+## Overview
+
+
+This component renders a sequence of A4-sized pages using CSS print media queries. It is designed to be printed directly from the browser (Print > Save as PDF).
+
+
+### Key Features
+- **A4 Layout**: Fixed dimensions (794px x 1123px) ensuring pixel-perfect PDF output.
+- **Hybrid Theme**: Alternates between Dark Mode (Impact Data) and Light Mode (Methodology/Text).
+- **Dynamic Charts**: Uses Recharts for data visualization (Donut, Gauge, Pie).
+- **Structured Data**: Fully typed TypeScript interface (`LCAData`) for easy integration.
+
+
+## Usage
+
+
+```tsx
+import { AlkaTeraProductLCA, LCAData } from '@/sd-components/2c0edbd7-59d5-48bf-b458-ad55cefd82a7';
+
+
+const reportData: LCAData = { ... };
+
+
+export default function Page() {
+ return <AlkaTeraProductLCA data={reportData} />;
+}
+```
+
+
+## Printing Instructions
+1. Open the page in a browser.
+2. Press `Cmd+P` (Mac) or `Ctrl+P` (Windows).
+3. Select "Save as PDF".
+4. **Settings**:
+  - Paper Size: A4
+  - Margins: None / 0
+  - Options: Check "Background graphics"
+
+
+## Component Structure
+- `src/types.ts`: TypeScript interfaces.
+- `src/components/Layout.tsx`: Shared page wrappers and headers.
+- `src/components/Charts.tsx`: Recharts implementations.
+- `src/sections/Part1.tsx`: Pages 1-4 (Cover, Summary, Methodology, Climate).
+- `src/sections/Part2.tsx`: Pages 5-8 (Water, Circularity, Land, Commitment).
+
+
+
+
+
+
+Package.json
+
+{
+ "name": "alkatera-product-lca",
+ "version": "1.0.0",
+ "description": "A print-optimized PDF report template for Product LCA",
+ "dependencies": {
+   "react": "^18.2.0",
+   "react-dom": "^18.2.0",
+   "framer-motion": "^10.16.4",
+   "lucide-react": "^0.292.0",
+   "clsx": "^2.0.0",
+   "tailwind-merge": "^2.0.0",
+   "recharts": "^2.10.3",
+   "date-fns": "^2.30.0"
+ },
+ "type": "module",
+ "scripts": {
+   "dev": "vite",
+   "build": "tsc -b && vite build",
+   "preview": "vite preview"
+ },
+ "devDependencies": {
+   "@types/react": "^18.3.12",
+   "@types/react-dom": "^18.3.1",
+   "@vitejs/plugin-react": "^4.3.3",
+   "autoprefixer": "^10.4.20",
+   "postcss": "^8.4.47",
+   "tailwindcss": "^3.4.15",
+   "typescript": "~5.6.2",
+   "vite": "^5.4.10"
+ }
+}
+
+
+postcss.config.js
+export default {
+ plugins: {
+   tailwindcss: {},
+   autoprefixer: {},
+ },
+}
+
+
+
+
+tailwind.config.ts        
+
+
+import type { Config } from "tailwindcss";
+
+
+export default {
+ darkMode: "class",
+ content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+ theme: {
+   extend: {
+     colors: {
+       background: "hsl(var(--background))",
+       foreground: "hsl(var(--foreground))",
+       card: {
+         DEFAULT: "hsl(var(--card))",
+         foreground: "hsl(var(--card-foreground))",
+       },
+       popover: {
+         DEFAULT: "hsl(var(--popover))",
+         foreground: "hsl(var(--popover-foreground))",
+       },
+       primary: {
+         DEFAULT: "hsl(var(--primary))",
+         foreground: "hsl(var(--primary-foreground))",
+       },
+       secondary: {
+         DEFAULT: "hsl(var(--secondary))",
+         foreground: "hsl(var(--secondary-foreground))",
+       },
+       muted: {
+         DEFAULT: "hsl(var(--muted))",
+         foreground: "hsl(var(--muted-foreground))",
+       },
+       accent: {
+         DEFAULT: "hsl(var(--accent))",
+         foreground: "hsl(var(--accent-foreground))",
+       },
+       destructive: {
+         DEFAULT: "hsl(var(--destructive))",
+         foreground: "hsl(var(--destructive-foreground))",
+       },
+       border: "hsl(var(--border))",
+       input: "hsl(var(--input))",
+       ring: "hsl(var(--ring))",
+     },
+     borderRadius: {
+       lg: "var(--radius)",
+       md: "calc(var(--radius) - 2px)",
+       sm: "calc(var(--radius) - 4px)",
+     },
+   },
+ },
+ plugins: [],
+} satisfies Config;
+
+
+
+
+Tsconfig.json
+
+{
+ "files": [],
+ "references": [
+   { "path": "./tsconfig.node.json" }
+ ],
+ "compilerOptions": {
+   "target": "ES2020",
+   "useDefineForClassFields": true,
+   "lib": ["ES2020", "DOM", "DOM.Iterable"],
+   "module": "ESNext",
+   "skipLibCheck": true,
+
+
+   /* Bundler mode */
+   "moduleResolution": "bundler",
+   "allowImportingTsExtensions": true,
+   "isolatedModules": true,
+   "moduleDetection": "force",
+   "noEmit": true,
+   "jsx": "react-jsx",
+
+
+   /* Linting */
+   "strict": true,
+   "noUnusedLocals": true,
+   "noUnusedParameters": true,
+   "noFallthroughCasesInSwitch": true,
+   "noUncheckedSideEffectImports": true
+ }
+}
+
+
+
+
+Tsconfig.node.json
+
+{
+ "compilerOptions": {
+   "target": "ES2022",
+   "lib": ["ES2023"],
+   "module": "ESNext",
+   "skipLibCheck": true,
+
+
+   /* Bundler mode */
+   "moduleResolution": "bundler",
+   "allowImportingTsExtensions": true,
+   "isolatedModules": true,
+   "moduleDetection": "force",
+   "noEmit": true,
+
+
+   /* Linting */
+   "strict": true,
+   "noUnusedLocals": true,
+   "noUnusedParameters": true,
+   "noFallthroughCasesInSwitch": true,
+   "noUncheckedSideEffectImports": true
+ },
+ "include": ["vite.config.ts"]
+}
+
+
+
+
+vite.config.ts
+
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+
+// https://vite.dev/config/
+export default defineConfig({
+ plugins: [react()],
+})
+
+
+
+App.tsx
+
+import React from 'react';
+import { AlkaTeraProductLCA as LCATemplate, type LCAData } from './Component';
+
+
+// --- Default Data / Content Slot Simulation ---
+const sampleData: LCAData = {
+ meta: {
+   title: "Carbon Footprint Report",
+   productName: "Test Spiced Rum 700ml",
+   version: "v1.2.0",
+   date: "January 2025",
+   author: "AlkaTera Sustainability Team",
+   heroImage: "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2070&auto=format&fit=crop",
+   assessmentPeriod: "January 2025",
+   publishedDate: "11 December 2025",
+   refId: "LCA-0E874AC7",
+   organization: "Test Spiced Rum 700ml",
+   generatedBy: "AlkaTera Platform"
+ },
+ functionalUnit: {
+   value: "1 unit of Test Spiced Rum 700ml",
+   description: "All environmental impacts in this report are calculated per functional unit. This ensures fair comparison"
+ },
+ executiveSummary: {
+   heading: "Executive Summary",
+   content: "This comprehensive lifecycle assessment evaluates the environmental footprint of Test Spiced Rum 700ml. The assessment follows ISO 14044 standards and provides transparent, traceable data on climate impact, water consumption, waste generation, and land use across the product's supply chain.",
+   keyHighlight: {
+     value: "1.332",
+     label: "kg CO₂eq per unit",
+     subtext: "with 78% Recyclability"
+   },
+   dataQualityScore: 92
+ },
+ methodology: {
+   includedStages: ["Raw material extraction", "Primary production", "Packaging manufacture", "Factory operations"],
+   excludedStages: ["Distribution to retailers", "Consumer use phase", "End-of-life disposal", "Capital goods"],
+   dataSources: [
+     { name: "Primary Supplier Data", count: 3 },
+     { name: "Ecoinvent 3.12", count: 12 },
+     { name: "DEFRA 2024", count: 5 },
+     { name: "OpenLCA v2.0", count: 1 }
+   ]
+ },
+ climateImpact: {
+   totalCarbon: 1.33,
+   breakdown: [
+     { name: "Processing", value: 3.0, color: "#3b82f6" },
+     { name: "Distribution", value: 4.2, color: "#f97316" },
+     { name: "Raw Materials", value: 63.5, color: "#22c55e" },
+     { name: "Packaging", value: 29.3, color: "#eab308" }
+   ],
+   stages: [
+     { label: "Processing", value: 0.040, unit: "kg CO₂eq", percentage: 3.0, color: "blue" },
+     { label: "Distribution", value: 0.055, unit: "kg CO₂eq", percentage: 4.2, color: "orange" },
+     { label: "Raw Materials", value: 0.846, unit: "kg CO₂eq", percentage: 63.5, color: "green" },
+     { label: "Packaging", value: 0.390, unit: "kg CO₂eq", percentage: 29.3, color: "yellow" }
+   ],
+   scopes: [
+     { name: "Scope 1 (Direct)", value: 1.2 },
+     { name: "Scope 2 (Energy)", value: 0.5 },
+     { name: "Scope 3 (Value Chain)", value: 98.3 }
+   ],
+   methodology: {
+     ghgBreakdown: [
+       { label: "CO2 Fossil", value: "1.0511", unit: "kg CO₂e", gwp: "1" },
+       { label: "CO2 Biogenic", value: "0.1855", unit: "kg CO₂e", gwp: "1*" },
+       { label: "CH4", value: "0.0000", unit: "kg CO₂e", gwp: "29.8" },
+       { label: "N2O", value: "0.0000", unit: "kg CO₂e", gwp: "273" }
+     ],
+     standards: [
+       "ISO 14067:2018 — Greenhouse gases — Carbon footprint of products",
+       "ISO 14040/14044 — Life Cycle Assessment principles and framework",
+       "GHG Protocol — Product Life Cycle Accounting and Reporting Standard",
+       "PAS 2050:2011 — Specification for the assessment of life cycle GHG emissions"
+     ]
+   }
+ },
+ waterFootprint: {
+   totalConsumption: "0.6L",
+   scarcityWeighted: "11.3L eq.",
+   breakdown: [
+     { name: "Natural Cork", value: 5, color: "#60a5fa" },
+     { name: "PVC Capsule", value: 5, color: "#3b82f6" },
+     { name: "Glass Bottle", value: 60, color: "#2563eb" },
+     { name: "Label", value: 5, color: "#1d4ed8" },
+     { name: "Cinnamon", value: 5, color: "#1e40af" },
+     { name: "Ethanol", value: 10, color: "#1e3a8a" },
+     { name: "Water", value: 10, color: "#172554" }
+   ],
+   sources: [
+     { source: "Natural cork stopper", location: "Portugal", volume: "0.0 L", risk: "MEDIUM", score: 20.00 },
+     { source: "PVC shrink capsule", location: "United Kingdom", volume: "0.0 L", risk: "MEDIUM", score: 20.00 },
+     { source: "Amber glass bottle 700ml", location: "United Kingdom", volume: "0.0 L", risk: "MEDIUM", score: 20.00 },
+     { source: "Printed paper label", location: "United Kingdom", volume: "0.0 L", risk: "MEDIUM", score: 20.00 },
+     { source: "Cinnamon sticks (ground)", location: "Ananthapuram, Sri Lanka", volume: "0.0 L", risk: "MEDIUM", score: 20.00 },
+     { source: "Ethanol from molasses", location: "Unknown", volume: "0.4 L", risk: "MEDIUM", score: 20.00 }
+   ],
+   methodology: {
+     steps: [
+       { step: 1, title: "Inventory Phase", description: "Quantify water consumption (litres) for each process and material in the product system" },
+       { step: 2, title: "Geographic Attribution", description: "Assign water consumption to specific watersheds based on production locations" },
+       { step: 3, title: "AWARE Factors", description: "Apply watershed-specific AWARE characterisation factors (CF) from global database" },
+       { step: 4, title: "Impact Calculation", description: "Multiply water volume by AWARE CF: Impact = Volume (m³) × CF (dimensionless)" }
+     ],
+     standards: [
+       "ISO 14046:2014 — Environmental management — Water footprint",
+       "AWARE v1.3 — UNEP-SETAC water scarcity characterisation model"
+     ]
+   }
+ },
+ circularity: {
+   totalWaste: "0.45kg",
+   recyclingRate: 78,
+   circularityScore: "7.8 / 10",
+   wasteStream: [
+     { label: "Glass Bottle", value: "0.253 kg", recycled: true },
+     { label: "Label (Paper)", value: "0.063 kg", recycled: true },
+     { label: "Cap (Aluminium)", value: "0.035 kg", recycled: true },
+     { label: "Process Waste", value: "0.099 kg", recycled: false }
+   ],
+   methodology: {
+     formula: {
+       text: "MCI = [LFI × U/L) + (V/2) + (W/2) × F(X)",
+       definitions: [
+         { term: "LFI", definition: "Linear Flow Index (virgin material input)" },
+         { term: "U", definition: "Utility of product (functional performance)" },
+         { term: "L", definition: "Average lifetime relative to industry" },
+         { term: "V", definition: "Mass of recycled feedstock / Total mass input" },
+         { term: "W", definition: "Mass recovered for recycling / Total mass output" },
+         { term: "F(X)", definition: "Collection efficiency factor" }
+       ]
+     },
+     standards: [
+       "ISO 14040/14044   LCA framework for waste streams",
+       "MCI v1.0   Material Circularity Indicator (Ellen MacArthur Foundation)",
+       "Directive 2008/98/EC   EU Waste Framework Directive"
+     ]
+   }
+ },
+ landUse: {
+   totalLandUse: "0.0m²",
+   breakdown: [
+     { material: "Natural cork stopper", origin: "Portugal", mass: "0.004 kg", intensity: 0.35, footprint: "0.001 m²" },
+     { material: "PVC shrink capsule", origin: "United Kingdom", mass: "0.001 kg", intensity: 0.01, footprint: "0.000 m²" },
+     { material: "Amber glass bottle 700ml", origin: "United Kingdom", mass: "0.350 kg", intensity: 0.02, footprint: "0.007 m²" },
+     { material: "Printed paper label", origin: "United Kingdom", mass: "0.002 kg", intensity: 1.80, footprint: "0.004 m²" },
+     { material: "Cinnamon sticks (ground)", origin: "Ananthapuram", mass: "0.000 kg", intensity: 1.50, footprint: "0.000 m²" },
+     { material: "Ethanol from molasses", origin: "Unknown", mass: "0.450 kg", intensity: 0.05, footprint: "0.023 m²" },
+     { material: "Purified water", origin: "United Kingdom", mass: "0.200 kg", intensity: 0.00, footprint: "0.000 m²" },
+     { material: "Natural vanilla essence", origin: "Madagascar", mass: "0.002 kg", intensity: 2.80, footprint: "0.004 m²" }
+   ],
+   methodology: {
+     categories: [
+       { title: "Land Occupation", value: "m² · year", description: "Area × time (m²·yr) that land is occupied for production processes" },
+       { title: "Land Transformation", value: "m² transformed", description: "Permanent conversion of natural ecosystems to agricultural or industrial use" },
+       { title: "Soil Quality", value: "quality points", description: "Degradation of soil organic matter, structure, and biotic activity" }
+     ],
+     standards: [
+       "ReCiPe 2016   Land use impact characterisation methodology",
+       "ISO 14040/14044   LCA framework for land use assessment"
+     ]
+   }
+ },
+ supplyChain: {
+   totalDistance: "281km",
+   verifiedSuppliers: "0%",
+   network: [
+     {
+       category: "INGREDIENT SUPPLIERS",
+       items: [
+         { name: "Cinnamon sticks (ground)", location: "Ananthapuram, Sri Lanka", distance: "8675 km", co2: "0.001 kg CO₂e" },
+         { name: "Ethanol from molasses", location: "Unknown", distance: "8800 km", co2: "0.833 kg CO₂e" },
+         { name: "Purified water", location: "United Kingdom", distance: "25 km", co2: "0.000 kg CO₂e" },
+         { name: "Natural vanilla essence", location: "Madagascar", distance: "8500 km", co2: "0.013 kg CO₂e" }
+       ]
+     },
+     {
+       category: "PACKAGING SUPPLIERS",
+       items: [
+         { name: "Natural cork stopper", location: "Portugal", distance: "1800 km", co2: "0.002 kg CO₂e" },
+         { name: "PVC shrink capsule", location: "United Kingdom", distance: "120 km", co2: "0.002 kg CO₂e" },
+         { name: "Amber glass bottle 700ml", location: "United Kingdom", distance: "150 km", co2: "0.385 kg CO₂e" },
+         { name: "Printed paper label", location: "United Kingdom", distance: "30 km", co2: "0.002 kg CO₂e" }
+       ]
+     }
+   ]
+ },
+ commitment: {
+   text: "This environmental assessment demonstrates our commitment to understanding and reducing the environmental impact of Test Spiced Rum 700ml. By measuring and reporting our footprint, we can identify opportunities for improvement and make informed decisions that benefit both our business and the planet."
+ }
+};
+
+
+export default function App() {
+ return (
+   <div className="w-full min-h-screen">
+     <LCATemplate data={sampleData} />
+   </div>
+ );
+}
+
+
+
+
+Component.tsx
+
+import React from 'react';
+import {
+ CoverPage,
+ ExecSummaryPage,
+ MethodologyPage,
+ ClimatePage
+} from './sections/Part1';
+import {
+ WaterPage,
+ CircularityPage,
+ LandUsePage,
+ CommitmentPage
+} from './sections/Part2';
+import {
+ ClimateMethodologyPage,
+ WaterMethodologyPage,
+ CircularityMethodologyPage,
+ LandUseMethodologyPage
+} from './sections/Methodologies';
+import { SupplyChainPage } from './sections/SupplyChain';
+
+
+import { LCAData } from './types';
+
+
+/**
+* Main PDF Report Component
+* Renders all pages in sequence for printing
+*/
+export const AlkaTeraProductLCA = ({ data }: { data: LCAData }) => {
+ return (
+   <div className="bg-neutral-100 min-h-screen py-8 print:bg-white print:py-0">
+     <div className="print:hidden text-center mb-8 text-neutral-500">
+       <p>Press Cmd+P / Ctrl+P to save as PDF</p>
+       <p className="text-xs mt-2">Recommended settings: A4, No Margins, Background Graphics ON</p>
+     </div>
+    
+     <CoverPage data={data} />
+     <ExecSummaryPage data={data} />
+     <MethodologyPage data={data} />
+     <ClimatePage data={data} />
+     <ClimateMethodologyPage data={data} />
+     <WaterPage data={data} />
+     <WaterMethodologyPage data={data} />
+     <CircularityPage data={data} />
+     <CircularityMethodologyPage data={data} />
+     <LandUsePage data={data} />
+     <LandUseMethodologyPage data={data} />
+     <SupplyChainPage data={data} />
+     <CommitmentPage data={data} />
+   </div>
+ );
+};
+
+
+
+Charts.tsx
+/**
+* Reusable Chart Components using Recharts
+* - DonutChart
+* - GaugeChart (RadialBar)
+* - PieChart
+*/
+import React from 'react';
+import {
+ PieChart, Pie, Cell, ResponsiveContainer, RadialBarChart, RadialBar, PolarAngleAxis
+} from 'recharts';
+
+
+export const DonutChart = ({
+ data,
+ innerRadius = 80,
+ outerRadius = 140
+}: {
+ data: any[];
+ innerRadius?: number;
+ outerRadius?: number;
+}) => {
+ return (
+   <div className="w-full h-[400px]">
+     <ResponsiveContainer width="100%" height="100%">
+       <PieChart>
+         <Pie
+           data={data}
+           cx="50%"
+           cy="50%"
+           innerRadius={innerRadius}
+           outerRadius={outerRadius}
+           paddingAngle={2}
+           dataKey="value"
+           stroke="none"
+         >
+           {data.map((entry, index) => (
+             <Cell key={`cell-${index}`} fill={entry.color} />
+           ))}
+         </Pie>
+       </PieChart>
+     </ResponsiveContainer>
+   </div>
+ );
+};
+
+
+export const GaugeChart = ({ score }: { score: number }) => {
+ const data = [{ name: 'score', value: score, fill: '#65a30d' }]; // Lime-600
+  return (
+   <div className="w-full h-[250px] relative">
+     <ResponsiveContainer width="100%" height="100%">
+       <RadialBarChart
+         innerRadius="80%"
+         outerRadius="100%"
+         barSize={20}
+         data={data}
+         startAngle={180}
+         endAngle={0}
+       >
+         <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+         <RadialBar
+           background
+           dataKey="value"
+           cornerRadius={30}
+           fill="#ccff00"
+         />
+       </RadialBarChart>
+     </ResponsiveContainer>
+     <div className="absolute inset-0 flex items-center justify-center pt-10">
+       <span className="text-5xl font-bold font-serif text-[#65a30d]">{score}%</span>
+     </div>
+   </div>
+ );
+};
+
+
+export const SimplePieChart = ({ data }: { data: any[] }) => {
+ return (
+   <div className="w-full h-[300px]">
+     <ResponsiveContainer width="100%" height="100%">
+       <PieChart>
+         <Pie
+           data={data}
+           cx="50%"
+           cy="50%"
+           outerRadius={140}
+           dataKey="value"
+           stroke="none"
+         >
+           {data.map((entry, index) => (
+             <Cell key={`cell-${index}`} fill={entry.color} />
+           ))}
+         </Pie>
+       </PieChart>
+     </ResponsiveContainer>
+   </div>
+ );
+};
+
+
+
+
+Layout.tsx
+/**
+* Shared layout components for the PDF report
+* - PageWrapper: A4 container with print styles
+* - SectionHeader: Standardized numbered header
+*/
+import React from 'react';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+
+// A4 Dimensions in pixels (96 DPI): 794px x 1123px
+// We use a fixed width container that scales
+export const PageWrapper = ({
+ children,
+ className,
+ theme = 'light',
+ pageNumber
+}: {
+ children: React.ReactNode;
+ className?: string;
+ theme?: 'light' | 'dark';
+ pageNumber?: number;
+}) => {
+ const isDark = theme === 'dark';
+  return (
+   <div className="w-[794px] h-[1123px] relative mx-auto my-8 bg-white shadow-xl overflow-hidden print:shadow-none print:m-0 print:break-after-page">
+     <div
+       className={twMerge(
+         "w-full h-full flex flex-col p-12 relative",
+         isDark ? "bg-[#1c1917] text-white" : "bg-[#f5f5f4] text-neutral-900",
+         className
+       )}
+     >
+       {children}
+      
+       {/* Footer */}
+       <div className="absolute bottom-12 left-12 right-12 flex justify-between items-end text-[10px] font-mono opacity-40 uppercase tracking-widest border-t border-current pt-4">
+         <div className="flex gap-8">
+           <span>Generated by</span>
+           <span className="font-bold">AlkaTera</span>
+           <span>Platform</span>
+         </div>
+         {pageNumber && <div className="font-bold text-sm">{pageNumber}</div>}
+         <div className="text-right">ISO 14040/44 Compliant | 14 December 2025</div>
+       </div>
+     </div>
+   </div>
+ );
+};
+
+
+export const SectionHeader = ({
+ number,
+ title,
+ theme = 'light',
+ className
+}: {
+ number: string;
+ title: string;
+ theme?: 'light' | 'dark';
+ className?: string;
+}) => {
+ return (
+   <div className={twMerge(
+     "flex items-baseline gap-4 mb-16 border-b pb-4",
+     theme === 'dark' ? "border-white/20" : "border-black/10",
+     className
+   )}>
+     <span className="text-[#ccff00] font-mono text-sm font-bold tracking-widest">{number}</span>
+     <h2 className="text-4xl font-serif font-light">{title}</h2>
+   </div>
+ );
+};
+
+
+
+
+Logo.tsx
+import React from 'react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+
+function cn(...inputs: ClassValue[]) {
+ return twMerge(clsx(inputs));
+}
+
+
+/**
+* The Icon: "The Alchemical Leaf"
+* An inverted triangle (Earth symbol in alchemy) fused with a leaf.
+*/
+export const AlkaTeraIcon = ({ className }: { className?: string }) => (
+ <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+   {/* Background Triangle (Alchemy Earth Symbol) - Subtle */}
+   <path d="M50 10L90 80H10L50 10Z" stroke="currentColor" strokeWidth="2" className="opacity-30" />
+  
+   {/* Leaf Shape (Biology) - Prominent */}
+   <path d="M50 10C50 10 30 40 30 60C30 71.0457 38.9543 80 50 80C61.0457 80 70 71.0457 70 60C70 40 50 10 50 10Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+  
+   {/* Veins / Structure */}
+   <path d="M50 10V80" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+   <path d="M50 40L70 25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+   <path d="M50 55L30 45" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+ </svg>
+);
+
+
+/**
+* The Wordmark: "Geometric Bloom" style
+* Sans-serif, extralight, tracking-widest, lowercase.
+*/
+export const AlkaTeraWordmark = ({ className }: { className?: string }) => (
+ <div className={cn("font-sans font-extralight tracking-[0.2em] lowercase leading-none", className)}>
+   alka<span className="font-normal">tera</span>
+ </div>
+);
+
+
+/**
+* Full Horizontal Lockup
+*/
+export const AlkaTeraLogoHorizontal = ({
+ className,
+ iconSize = "h-10 w-10",
+ textSize = "text-3xl",
+ iconClassName,
+ wordmarkClassName
+}: {
+ className?: string,
+ iconSize?: string,
+ textSize?: string,
+ iconClassName?: string,
+ wordmarkClassName?: string
+}) => (
+ <div className={cn("flex items-center gap-4", className)}>
+   <AlkaTeraIcon className={cn(iconSize, iconClassName)} />
+   <AlkaTeraWordmark className={cn(textSize, wordmarkClassName)} />
+ </div>
+);
+
+
+/**
+* Full Vertical Lockup
+*/
+export const AlkaTeraLogoVertical = ({
+ className,
+ iconSize = "h-16 w-16",
+ textSize = "text-3xl",
+ iconClassName,
+ wordmarkClassName
+}: {
+ className?: string,
+ iconSize?: string,
+ textSize?: string,
+ iconClassName?: string,
+ wordmarkClassName?: string
+}) => (
+ <div className={cn("flex flex-col items-center gap-4", className)}>
+   <AlkaTeraIcon className={cn(iconSize, iconClassName)} />
+   <AlkaTeraWordmark className={cn(textSize, wordmarkClassName)} />
+ </div>
+);
+
+
+
+
+Index.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+Main.tsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App'
+import './index.css'
+
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+ <React.StrictMode>
+   <App />
+ </React.StrictMode>,
+)
+
+
+
+
+Methodologies.tsx
+**
+* Methodology Pages
+* - Climate Impact Methodology
+* - Water Impact Methodology
+* - Waste & Circularity Methodology
+* - Land Use & Nature Methodology
+*/
+import React from 'react';
+import { PageWrapper, SectionHeader } from '../components/Layout';
+import { LCAData } from '../types';
+
+
+// --- Climate Methodology ---
+export const ClimateMethodologyPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="light" pageNumber={5}>
+   <SectionHeader number="3A" title="Climate Impact Methodology" theme="light" className="mb-8" />
+  
+   <div className="mb-8">
+     <h3 className="text-sm uppercase tracking-wider text-neutral-500 mb-3 font-medium">Calculation Methodology</h3>
+     <p className="text-neutral-600 text-sm leading-relaxed max-w-3xl">
+       Carbon footprint calculated using ISO 14067:2018 methodology for quantification and communication of greenhouse gas emissions.
+       All greenhouse gases are converted to CO2 equivalents using IPCC AR6 100-year Global Warming Potential (GWP100) factors.
+       Calculations follow the attributional life cycle assessment approach.
+     </p>
+   </div>
+
+
+   <div className="mb-8">
+     <h3 className="text-xl font-normal mb-6 text-neutral-800">IPCC AR6 GHG Breakdown</h3>
+     <div className="space-y-3">
+       {data.climateImpact.methodology.ghgBreakdown.map((item, i) => (
+         <div key={i} className="flex items-center justify-between bg-neutral-50 rounded-xl p-5 border border-neutral-100">
+           <div className="flex items-center gap-4">
+             <span className="font-mono text-lg text-emerald-600 font-medium italic">{item.label}</span>
+           </div>
+           <div className="font-mono font-medium text-lg">{item.value} <span className="text-neutral-400 text-base">{item.unit}</span></div>
+           <div className="text-xs text-neutral-400 font-mono">GWP: {item.gwp}</div>
+         </div>
+       ))}
+     </div>
+   </div>
+
+
+   <div>
+     <h3 className="text-xl font-normal mb-4 text-neutral-800">Compliance Standards</h3>
+     <div className="space-y-2">
+       {data.climateImpact.methodology.standards.map((std, i) => (
+         <div key={i} className="flex items-start gap-3">
+           <div className="w-1.5 h-1.5 rounded-full bg-neutral-800 mt-2"></div>
+           <p className="font-mono text-sm text-neutral-600">{std}</p>
+         </div>
+       ))}
+     </div>
+   </div>
+ </PageWrapper>
+);
+
+
+// --- Water Methodology ---
+export const WaterMethodologyPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="light" pageNumber={8}>
+   <SectionHeader number="4A" title="Water Impact Methodology" theme="light" className="mb-8" />
+
+
+   <div className="mb-8">
+     <h3 className="text-sm uppercase tracking-wider text-neutral-500 mb-3 font-medium">AWARE Methodology</h3>
+     <p className="text-neutral-600 text-sm leading-relaxed max-w-3xl">
+       Water scarcity assessment uses the AWARE (Available WAter REmaining) methodology developed by UNEP-SETAC Life Cycle Initiative.
+       AWARE characterizes the relative available water remaining per area in a watershed, after human and aquatic ecosystem demands have been met.
+       Results are expressed in cubic metres world-equivalent (m³ eq.).
+     </p>
+   </div>
+
+
+   <div className="mb-8">
+     <h3 className="text-xl font-normal mb-6 text-neutral-800">Calculation Approach</h3>
+     <div className="space-y-4">
+       {data.waterFootprint.methodology.steps.map((step, i) => (
+         <div key={i} className="flex items-start gap-5">
+           <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">
+             {step.step}
+           </div>
+           <div className="pt-0.5">
+             <h4 className="font-medium text-neutral-900 mb-0.5 text-sm">{step.title}</h4>
+             <p className="text-neutral-500 text-xs leading-relaxed">{step.description}</p>
+           </div>
+         </div>
+       ))}
+     </div>
+   </div>
+
+
+   <div className="mt-auto">
+     <h3 className="text-xl font-normal mb-4 text-neutral-800">Compliance Standards</h3>
+     <div className="space-y-2">
+       {data.waterFootprint.methodology.standards.map((std, i) => (
+         <div key={i} className="flex items-start gap-6">
+           <span className="font-mono text-sm font-bold text-neutral-900 min-w-[100px]">{std.split('—')[0]}</span>
+           <span className="text-sm text-neutral-500">{std.split('—')[1] || std}</span>
+         </div>
+       ))}
+     </div>
+   </div>
+ </PageWrapper>
+);
+
+
+// --- Circularity Methodology ---
+export const CircularityMethodologyPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="light" pageNumber={10}>
+   <SectionHeader number="5A" title="Waste & Circularity Methodology" theme="light" className="mb-8" />
+
+
+   <div className="mb-8">
+     <p className="text-neutral-600 text-sm leading-relaxed max-w-3xl">
+       Waste assessment follows the circular economy principles, quantifying material flows and end-of-life scenarios.
+       Circularity metrics evaluate how well materials are kept in use through recycling, reuse, and recovery pathways.
+       Calculations align with the Ellen MacArthur Foundation Material Circularity Indicator and EU Waste Framework Directive.
+     </p>
+   </div>
+
+
+   <div className="mb-10">
+     <h3 className="text-xl font-normal mb-6 text-neutral-800">Circularity Calculation</h3>
+     <div className="font-mono text-xs text-neutral-500 mb-6 p-4 bg-neutral-50 rounded-lg inline-block border border-neutral-100">
+       {data.circularity.methodology.formula.text}
+     </div>
+
+
+     <div className="space-y-2 pl-2 border-l-2 border-neutral-100">
+       {data.circularity.methodology.formula.definitions.map((def, i) => (
+         <div key={i} className="text-xs">
+           <span className="font-medium text-neutral-700">{def.term}</span>
+           <span className="text-neutral-400 mx-2">=</span>
+           <span className="text-neutral-500">{def.definition}</span>
+         </div>
+       ))}
+     </div>
+   </div>
+
+
+   <div className="mt-auto">
+     <h3 className="text-xl font-normal mb-4 text-neutral-800">Compliance Standards</h3>
+     <div className="space-y-3">
+       {data.circularity.methodology.standards.map((std, i) => (
+         <div key={i} className="grid grid-cols-[180px_1fr] gap-4 items-baseline">
+           <span className="font-mono text-sm font-bold text-neutral-900 italic">{std.split('   ')[0]}</span>
+           <span className="text-sm text-neutral-500">{std.split('   ')[1] || std}</span>
+         </div>
+       ))}
+     </div>
+   </div>
+ </PageWrapper>
+);
+
+
+// --- Land Use Methodology ---
+export const LandUseMethodologyPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper pageNumber={12}>
+   <SectionHeader number="06" title="Land Use & Nature Methodology" className="mb-6" />
+
+
+   <div className="grid grid-cols-12 gap-8">
+     {/* Left Column - Main Content */}
+     <div className="col-span-8 space-y-6">
+       <div className="bg-white border border-neutral-200 p-6 rounded-lg">
+         <h3 className="font-serif text-xl mb-4">Impact Assessment Categories</h3>
+         <div className="space-y-4">
+           {data.landUse.methodology.categories.map((cat, i) => (
+             <div key={i} className="border-b border-neutral-100 last:border-0 pb-4 last:pb-0">
+               <div className="flex justify-between items-baseline mb-1">
+                 <span className="font-bold text-neutral-900">{cat.title}</span>
+                 <span className="font-mono text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{cat.value}</span>
+               </div>
+               <p className="text-sm text-neutral-600 leading-relaxed">{cat.description}</p>
+             </div>
+           ))}
+         </div>
+       </div>
+
+
+       <div className="bg-neutral-50 p-6 rounded-lg">
+         <h4 className="font-bold text-sm mb-3">Biodiversity Risk Filter</h4>
+         <p className="text-sm text-neutral-600 leading-relaxed">
+           Spatial analysis performed using WWF Biodiversity Risk Filter to identify high-value conservation areas within the supply chain. Analysis resolution: 10km².
+         </p>
+       </div>
+     </div>
+
+
+     {/* Right Column - Standards & Notes */}
+     <div className="col-span-4 space-y-6">
+       <div className="bg-neutral-900 text-white p-6 rounded-lg">
+         <h4 className="font-mono text-xs text-[#ccff00] mb-4 uppercase tracking-wider">Methodological Standards</h4>
+         <ul className="space-y-2">
+           {data.landUse.methodology.standards.map((std, i) => (
+             <li key={i} className="text-sm border-l-2 border-[#ccff00] pl-3 py-1">
+               {std}
+             </li>
+           ))}
+         </ul>
+       </div>
+
+
+       <div className="border border-neutral-200 p-5 rounded-lg">
+         <h4 className="font-bold text-sm mb-2">Key Assumptions</h4>
+         <ul className="text-xs text-neutral-600 space-y-2 list-disc pl-4">
+           <li>Land occupation calculated based on average yield data for region</li>
+           <li>Transformation impacts amortized over 20 years</li>
+           <li>Indirect land use change (iLUC) excluded from primary analysis</li>
+         </ul>
+       </div>
+     </div>
+   </div>
+ </PageWrapper>
+);
+
+Part1.tsx
+/**
+* Part 1 of the Report (Pages 1-4)
+* - Cover
+* - Exec Summary
+* - Methodology
+* - Climate Impact
+*/
+import React from 'react';
+import { PageWrapper, SectionHeader } from '../components/Layout';
+import { DonutChart, GaugeChart } from '../components/Charts';
+import { LCAData } from '../types';
+import { Check, X, Image } from 'lucide-react';
+import { AlkaTeraLogoVertical } from '../components/Logo';
+
+
+export const CoverPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="dark" className="justify-between overflow-hidden relative">
+   {/* Beautiful Background Image */}
+   <div className="absolute inset-0 z-0">
+     <img
+       src="https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=2070&auto=format&fit=crop"
+       alt="Background"
+       className="w-full h-full object-cover opacity-60"
+     />
+     <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/80" />
+   </div>
+  
+   <div className="relative z-10 pt-12">
+     <AlkaTeraLogoVertical
+       className="items-start"
+       iconSize="w-12 h-12"
+       textSize="text-2xl"
+       iconClassName="text-[#ccff00]"
+       wordmarkClassName="text-white"
+     />
+   </div>
+
+
+   <div className="relative z-10 w-full max-w-2xl">
+     <div className="bg-[#ccff00] text-black p-8 rounded-xl shadow-2xl mb-24 transform -rotate-1 backdrop-blur-sm bg-opacity-90">
+       <h2 className="font-mono font-bold italic text-2xl tracking-tighter">PRODUCT LIFECYCLE ANALYSIS</h2>
+     </div>
+    
+     <h1 className="text-8xl font-serif font-light leading-tight mb-4 text-white drop-shadow-lg">
+       {data.meta.productName}
+     </h1>
+     <p className="text-2xl text-neutral-200 font-light drop-shadow-md mb-12">{data.meta.organization}</p>
+   </div>
+
+
+   <div className="relative z-10 border border-white/20 rounded-3xl p-8 bg-black/40 backdrop-blur-md mb-20 shadow-xl">
+     <div className="text-xs font-mono text-[#ccff00] mb-2 uppercase tracking-widest">Functional Unit</div>
+     <div className="text-4xl font-serif mb-2 text-white">1 unit of {data.meta.productName}</div>
+     <p className="text-neutral-300 text-sm max-w-lg">{data.functionalUnit.description}</p>
+   </div>
+
+
+   <div className="absolute top-12 right-12 text-right font-mono text-xs opacity-70 text-white z-10">
+     <div>REF: {data.meta.refId}</div>
+     <div>{data.meta.date}</div>
+   </div>
+ </PageWrapper>
+);
+
+
+export const ExecSummaryPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="light" pageNumber={1}>
+   <div className="mb-8">
+       <SectionHeader number="01" title="Executive Summary" />
+   </div>
+  
+   <div className="flex flex-col flex-1 pb-20 relative">
+     {/* Top Section: Image & Content */}
+     <div className="grid grid-cols-12 gap-6 mb-6">
+       {/* Left Column: Product Image (Reduced width to 3 cols, keeping portrait) */}
+       <div className="col-span-3">
+         <div className="w-full aspect-[2/3] border-2 border-dashed border-neutral-300 rounded-2xl flex flex-col items-center justify-center bg-neutral-50 group cursor-pointer hover:border-[#4d7c0f]/50 transition-colors relative">
+           <div className="flex flex-col items-center justify-center p-6 text-center">
+             <Image className="w-8 h-8 text-neutral-400 mb-3 group-hover:text-[#4d7c0f] transition-colors" />
+             <span className="text-neutral-400 font-mono text-[10px] uppercase tracking-widest group-hover:text-neutral-600 transition-colors">Product Image</span>
+             <span className="text-neutral-300 text-[9px] mt-1 font-mono">(Bottle Portrait)</span>
+           </div>
+         </div>
+       </div>
+
+
+       {/* Right Column: Text Content (Expanded to 9 cols) */}
+       <div className="col-span-9 flex flex-col">
+         <div className="prose prose-neutral max-w-none text-sm leading-relaxed text-justify text-neutral-600 columns-2 gap-8">
+           <p className="mt-0">
+             {data.executiveSummary.content}
+           </p>
+           <p>
+             The assessment demonstrates reduced carbon emissions via recycled materials and logistics optimization. This profile sets a new benchmark for our sustainability targets.
+           </p>
+           <p>
+             Analysis covers all direct and indirect emissions adhering to ISO 14040/44. Expanded boundaries provide granular visibility into supply chain impacts.
+           </p>
+         </div>
+       </div>
+     </div>
+
+
+     {/* Middle Section: Highlights & Data */}
+     <div className="grid grid-cols-12 gap-6 mb-auto">
+       {/* Key Highlight (7 cols) */}
+       <div className="col-span-7 bg-[#4d7c0f] text-white p-6 rounded-2xl relative overflow-hidden flex flex-col justify-between min-h-[140px]">
+           <div className="relative z-10">
+               <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-[#ccff00]" />
+                  <div className="font-mono italic text-[#ccff00] text-[10px] uppercase tracking-wider">Key Insight</div>
+               </div>
+               <div className="text-3xl font-serif leading-none mb-2">
+                 {data.executiveSummary.keyHighlight.value}
+               </div>
+               <div className="text-white/90 text-sm leading-snug max-w-md">
+                  {data.executiveSummary.keyHighlight.label} — {data.executiveSummary.keyHighlight.subtext}
+               </div>
+           </div>
+           {/* Decoration */}
+           <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-[#ccff00] rounded-full blur-[60px] opacity-30 pointer-events-none" />
+       </div>
+
+
+       {/* Data Quality (5 cols) */}
+       <div className="col-span-5 bg-white p-6 rounded-2xl border border-neutral-200 shadow-sm flex items-center justify-between min-h-[140px]">
+           <div className="flex flex-col justify-center h-full">
+              <h3 className="text-sm font-bold font-serif text-neutral-800 uppercase tracking-wider mb-1">Data Quality</h3>
+              <div className="text-[10px] font-mono text-neutral-400 mb-2">ISO VERIFIED</div>
+             
+              <div className="space-y-1 text-[10px] text-neutral-500">
+                 <div className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-green-500"></span>Primary Data: 65%</div>
+                 <div className="flex items-center gap-1.5"><span className="w-1 h-1 rounded-full bg-green-500"></span>Temporal: High</div>
+              </div>
+           </div>
+          
+           <div className="flex flex-col items-center">
+               <div className="w-20">
+                  <GaugeChart score={data.executiveSummary.dataQualityScore} />
+               </div>
+               <span className="text-[10px] font-mono font-bold text-neutral-400 -mt-1">DQI SCORE</span>
+           </div>
+       </div>
+     </div>
+
+
+     {/* Bottom Section: Meta Data Bar */}
+     <div className="mt-6 pt-4 border-t border-neutral-100 mb-6">
+       <div className="flex justify-between items-center text-xs font-mono text-neutral-500 bg-neutral-50 p-3 rounded-lg border border-neutral-200">
+         <div className="flex gap-6">
+            <span className="uppercase tracking-widest text-neutral-400">Assessment Scope</span>
+            <span className="font-bold text-neutral-700">Cradle-to-Gate</span>
+         </div>
+         <div className="flex gap-6">
+            <span className="text-neutral-400">Period: <span className="text-neutral-700 font-bold">{data.meta.assessmentPeriod}</span></span>
+            <span className="text-neutral-400">Published: <span className="text-neutral-700 font-bold">{data.meta.publishedDate}</span></span>
+            <span className="text-neutral-400">Ver: <span className="text-neutral-700 font-bold">{data.meta.version}</span></span>
+         </div>
+       </div>
+     </div>
+   </div>
+ </PageWrapper>
+);
+
+
+export const MethodologyPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="light" pageNumber={2}>
+   <SectionHeader number="02" title="Methodology" />
+
+
+   <div className="mb-12">
+     <h3 className="text-2xl font-serif mb-2">System Boundary</h3>
+     <p className="text-neutral-500 font-mono text-sm">cradle-to-gate</p>
+   </div>
+
+
+   <div className="grid grid-cols-2 gap-8 mb-16">
+     <div className="bg-neutral-50 rounded-2xl p-8 border border-neutral-100">
+       <div className="text-[#65a30d] font-mono italic text-sm mb-6 uppercase">Included Stages</div>
+       <ul className="space-y-6">
+         {data.methodology.includedStages.map(stage => (
+           <li key={stage} className="flex items-center gap-4 text-neutral-700">
+             <Check className="w-4 h-4 text-[#65a30d]" />
+             {stage}
+           </li>
+         ))}
+       </ul>
+     </div>
+     <div className="bg-neutral-50 rounded-2xl p-8 border border-neutral-100">
+       <div className="text-red-500 font-mono italic text-sm mb-6 uppercase">Excluded Stages</div>
+       <ul className="space-y-6">
+         {data.methodology.excludedStages.map(stage => (
+           <li key={stage} className="flex items-center gap-4 text-neutral-400">
+             <X className="w-4 h-4 text-red-400" />
+             {stage}
+           </li>
+         ))}
+       </ul>
+     </div>
+   </div>
+
+
+   <h3 className="text-2xl font-serif mb-8">Data Sources</h3>
+   <div className="grid grid-cols-3 gap-6">
+     {data.methodology.dataSources.map(source => (
+       <div key={source.name} className="bg-white border rounded-xl p-6 relative">
+         <div className="absolute top-4 right-4 bg-[#4d7c0f] text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
+           {source.count}
+         </div>
+         <div className="font-bold text-lg mt-4">{source.name}</div>
+       </div>
+     ))}
+   </div>
+ </PageWrapper>
+);
+
+
+export const ClimatePage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="dark" pageNumber={3}>
+   <SectionHeader number="03" title="Climate Impact" theme="dark" />
+  
+   <div className="flex items-center justify-between mb-8">
+     <div className="w-1/3">
+       <div className="text-sm font-mono text-neutral-500 mb-2">TOTAL CARBON FOOTPRINT</div>
+       <div className="text-8xl font-serif text-[#ccff00] leading-none">
+         {data.climateImpact.totalCarbon}
+         <span className="text-2xl text-neutral-500 ml-2 font-sans">kg CO₂e</span>
+       </div>
+     </div>
+     <div className="w-2/3">
+       <div className="h-[300px]">
+         <DonutChart data={data.climateImpact.breakdown} />
+       </div>
+     </div>
+   </div>
+
+
+   <h3 className="text-xl font-serif mb-6">Lifecycle Breakdown</h3>
+   <div className="grid grid-cols-4 gap-4 mb-10">
+     {data.climateImpact.stages.map((stage) => (
+       <div key={stage.label} className="bg-[#292524] p-4 rounded-xl border border-white/5">
+         <div className="w-3 h-3 rounded-full mb-3" style={{ backgroundColor: stage.color }} />
+         <div className="text-[10px] font-mono uppercase text-neutral-500 mb-2">{stage.label}</div>
+         <div className="text-lg font-bold mb-1">{stage.value.toFixed(3)} <span className="text-xs font-normal opacity-50">kg</span></div>
+         <div className="text-[#ccff00] font-mono text-xs">{stage.percentage}%</div>
+       </div>
+     ))}
+   </div>
+
+
+   <h3 className="text-xl font-serif mb-6">GHG Protocol Scope Breakdown</h3>
+   <div className="space-y-4">
+     {data.climateImpact.scopes.map((scope) => (
+       <div key={scope.name} className="flex items-center gap-8">
+         <div className="w-48 text-sm text-neutral-400">{scope.name}</div>
+         <div className="flex-1 bg-[#292524] h-6 rounded-full overflow-hidden">
+           <div
+             className="h-full rounded-full"
+             style={{ width: `${scope.value}%`, backgroundColor: scope.name.includes('Scope 3') ? '#fbbf24' : '#4b5563' }}
+           />
+         </div>
+         <div className="w-12 text-right font-mono text-sm">{scope.value}%</div>
+       </div>
+     ))}
+   </div>
+ </PageWrapper>
+);
+
+
+
+
+Part2.tsx
+/**
+* Part 2 of the Report (Pages 5-8)
+* - Water Footprint
+* - Circularity
+* - Land Use
+* - Commitment
+*/
+import React from 'react';
+import { PageWrapper, SectionHeader } from '../components/Layout';
+import { SimplePieChart } from '../components/Charts';
+import { LCAData } from '../types';
+import { AlkaTeraLogoVertical } from '../components/Logo';
+
+
+export const WaterPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="dark" pageNumber={4}>
+   <SectionHeader number="04" title="Water Footprint" theme="dark" />
+
+
+   <div className="grid grid-cols-2 gap-8 mb-10">
+     <div className="bg-[#292524] p-6 rounded-2xl border border-white/5">
+       <div className="text-xs font-mono text-neutral-500 mb-4 uppercase">Total Water Consumption</div>
+       <div className="text-6xl font-serif text-[#3b82f6]">{data.waterFootprint.totalConsumption}</div>
+     </div>
+     <div className="bg-[#292524] p-6 rounded-2xl border border-white/5">
+       <div className="text-xs font-mono text-neutral-500 mb-4 uppercase">Scarcity Weighted (AWARE)</div>
+       <div className="text-6xl font-serif text-[#3b82f6] opacity-80">{data.waterFootprint.scarcityWeighted}</div>
+     </div>
+   </div>
+
+
+   <h3 className="text-xl font-serif mb-6">Water Sources Breakdown</h3>
+   <div className="flex gap-12 mb-10">
+     <div className="w-1/2 h-[250px]">
+       <SimplePieChart data={data.waterFootprint.breakdown} />
+     </div>
+     <div className="w-1/2 flex flex-col justify-center gap-3">
+       {data.waterFootprint.breakdown.map((item) => (
+         <div key={item.name} className="flex items-center gap-4">
+           <div className="w-3 h-3 rounded shadow-sm" style={{ backgroundColor: item.color }} />
+           <span className="text-sm text-neutral-300">{item.name}</span>
+         </div>
+       ))}
+     </div>
+   </div>
+
+
+   <h3 className="text-xl font-serif mb-4">Water Sources by Location</h3>
+   <div className="w-full text-sm">
+     <div className="flex text-[10px] font-mono text-neutral-500 uppercase border-b border-white/10 pb-2 mb-2">
+       <div className="w-1/4">Source</div>
+       <div className="w-1/4">Location</div>
+       <div className="w-1/4 text-right">Volume</div>
+       <div className="w-1/4 text-right">Risk Score</div>
+     </div>
+     {data.waterFootprint.sources.map((source, i) => (
+       <div key={i} className="flex py-2 border-b border-white/5 text-neutral-300">
+         <div className="w-1/4 truncate pr-2">{source.source}</div>
+         <div className="w-1/4 text-neutral-500 truncate pr-2">{source.location}</div>
+         <div className="w-1/4 text-right">{source.volume}</div>
+         <div className="w-1/4 text-right flex items-center justify-end gap-2">
+           <span className={source.risk === 'MEDIUM' ? 'text-yellow-500' : 'text-green-500'}>{source.risk}</span>
+           <span className="font-mono text-xs opacity-50">{source.score.toFixed(2)}</span>
+         </div>
+       </div>
+     ))}
+   </div>
+ </PageWrapper>
+);
+
+
+export const CircularityPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="dark" pageNumber={5}>
+   <SectionHeader number="05" title="Circularity & Waste" theme="dark" />
+
+
+   <div className="grid grid-cols-3 gap-6 mb-16">
+     <div className="bg-[#292524] p-8 rounded-2xl border border-white/5 aspect-square flex flex-col justify-center">
+       <div className="text-xs font-mono text-neutral-500 mb-4 uppercase">Total Waste</div>
+       <div className="text-5xl font-serif text-orange-500">{data.circularity.totalWaste}</div>
+     </div>
+     <div className="bg-[#292524] p-8 rounded-2xl border border-white/5 aspect-square flex flex-col justify-center">
+       <div className="text-xs font-mono text-neutral-500 mb-4 uppercase">Recycling Rate</div>
+       <div className="text-5xl font-serif text-green-500">{data.circularity.recyclingRate}%</div>
+     </div>
+     <div className="bg-[#292524] p-8 rounded-2xl border border-white/5 aspect-square flex flex-col justify-center">
+       <div className="text-xs font-mono text-neutral-500 mb-4 uppercase">Circularity Score</div>
+       <div className="text-5xl font-serif text-[#ccff00]">{data.circularity.circularityScore}</div>
+     </div>
+   </div>
+
+
+   <h3 className="text-xl font-serif mb-8">Waste Stream Breakdown</h3>
+   <div className="space-y-8">
+     {data.circularity.wasteStream.map((stream) => (
+       <div key={stream.label} className="flex items-center gap-8">
+         <div className="w-32 text-sm text-neutral-400">{stream.label}</div>
+         <div className="flex-1 h-8 bg-[#292524] rounded-full overflow-hidden flex">
+           <div
+             className="h-full bg-green-500"
+             style={{ width: stream.recycled ? '70%' : '30%' }}
+           />
+           <div
+             className="h-full bg-neutral-700"
+             style={{ width: stream.recycled ? '30%' : '70%' }}
+           />
+         </div>
+         <div className="w-24 text-right font-mono text-sm">
+           {stream.value}
+           <span className={`ml-4 ${stream.recycled ? 'text-green-500' : 'text-red-500'}`}>
+             {stream.recycled ? 'R' : 'X'}
+           </span>
+         </div>
+       </div>
+     ))}
+   </div>
+ </PageWrapper>
+);
+
+
+export const LandUsePage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="dark" pageNumber={6}>
+   <SectionHeader number="06" title="Land Use & Nature" theme="dark" />
+
+
+   <div className="bg-[#292524] p-12 rounded-3xl border border-white/5 mb-16 inline-block min-w-[300px]">
+     <div className="text-xs font-mono text-neutral-500 mb-4 uppercase">Total Land Use</div>
+     <div className="text-6xl font-serif text-emerald-500">{data.landUse.totalLandUse}</div>
+   </div>
+
+
+   <h3 className="text-xl font-serif mb-6">Material Land Footprint</h3>
+   <div className="w-full text-sm">
+     <div className="flex text-[10px] font-mono text-neutral-500 uppercase border-b border-white/10 pb-2 mb-4">
+       <div className="w-1/4">Material</div>
+       <div className="w-1/4">Origin</div>
+       <div className="w-1/6 text-right">Mass</div>
+       <div className="w-1/6 text-right">Intensity</div>
+       <div className="w-1/6 text-right">Footprint</div>
+     </div>
+     {data.landUse.breakdown.map((item, i) => (
+       <div key={i} className="flex py-4 border-b border-white/5 text-neutral-300">
+         <div className="w-1/4">{item.material}</div>
+         <div className="w-1/4 text-neutral-500">{item.origin}</div>
+         <div className="w-1/6 text-right">{item.mass}</div>
+         <div className="w-1/6 text-right opacity-60">{item.intensity}</div>
+         <div className="w-1/6 text-right text-emerald-500">{item.footprint}</div>
+       </div>
+     ))}
+   </div>
+ </PageWrapper>
+);
+
+
+import { Building2 } from 'lucide-react';
+
+
+export const CommitmentPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="light" pageNumber={7} className="flex flex-col justify-between items-center text-center pt-20 pb-32">
+   {/* Organization Logo Placeholder */}
+   <div className="mb-12 flex-none">
+     <div className="w-32 h-32 rounded-full border-2 border-dashed border-neutral-300 flex flex-col items-center justify-center bg-neutral-50">
+        <Building2 className="w-8 h-8 text-neutral-400 mb-2" />
+        <span className="text-[10px] font-mono uppercase text-neutral-400">Org Logo</span>
+     </div>
+   </div>
+
+
+   {/* Content */}
+   <div className="flex-1 flex flex-col justify-center max-w-2xl">
+     <h2 className="text-5xl font-serif mb-12">Commitment to Transparency</h2>
+     <div className="text-xl text-neutral-600 leading-loose">
+       {data.commitment.text}
+     </div>
+   </div>
+
+
+   {/* AlkaTera Logo (Bottom) */}
+   <div className="mt-8 flex-none mb-4">
+     <AlkaTeraLogoVertical
+       iconClassName="text-[#4d7c0f]"
+       wordmarkClassName="text-black"
+       iconSize="w-10 h-10"
+       textSize="text-xl"
+     />
+   </div>
+ </PageWrapper>
+);
+
+
+
+
+Supplychain.tsx
+/**
+* Supply Chain Page
+* Shows transport distance, suppliers, and network map data
+*/
+import React from 'react';
+import { PageWrapper, SectionHeader } from '../components/Layout';
+import { LCAData } from '../types';
+
+
+export const SupplyChainPage = ({ data }: { data: LCAData }) => (
+ <PageWrapper theme="dark" pageNumber={13}>
+   <SectionHeader number="07" title="Supply Chain Mapping" theme="dark" className="mb-6" />
+
+
+   {/* Top Stats Cards */}
+   <div className="grid grid-cols-2 gap-4 mb-6">
+     <div className="bg-[#292524] p-5 rounded-2xl border border-white/5">
+       <div className="text-[10px] font-mono text-neutral-500 mb-2 uppercase tracking-wider">Total Transport Distance</div>
+       <div className="text-3xl text-[#fbbf24] font-light font-mono">
+         {data.supplyChain.totalDistance}
+       </div>
+     </div>
+     <div className="bg-[#292524] p-5 rounded-2xl border border-white/5">
+       <div className="text-[10px] font-mono text-neutral-500 mb-2 uppercase tracking-wider">Verified Suppliers</div>
+       <div className="text-3xl text-[#4ade80] font-light font-mono">
+         {data.supplyChain.verifiedSuppliers}
+       </div>
+     </div>
+   </div>
+
+
+   {/* Supply Chain Network List */}
+   <div className="space-y-4">
+     <h3 className="text-base font-normal mb-4 text-white">Supply Chain Network</h3>
+    
+     <div className="space-y-4">
+       {data.supplyChain.network.map((category, i) => (
+         <div key={i}>
+           <div className="font-mono text-[10px] text-[#4ade80] uppercase tracking-wider mb-2 pl-1">
+             &lt;&gt; {category.category}
+           </div>
+          
+           <div className="space-y-2">
+             {category.items.map((item, j) => (
+               <div key={j} className="bg-[#292524] p-3 rounded-xl border border-white/5 flex items-center justify-between group hover:border-neutral-700 transition-colors">
+                 <div>
+                   <div className="text-white text-sm font-medium mb-0.5">{item.name}</div>
+                   <div className="text-[10px] text-neutral-500">{item.location}</div>
+                 </div>
+                
+                 <div className="flex items-center gap-8 text-right">
+                   <div className="font-mono text-xs text-neutral-400">
+                     {item.distance}
+                   </div>
+                   <div className="font-mono text-xs text-[#fbbf24] min-w-[80px]">
+                     {item.co2}
+                   </div>
+                 </div>
+               </div>
+             ))}
+           </div>
+         </div>
+       ))}
+     </div>
+   </div>
+ </PageWrapper>
+);
+
+
+type.ts
+**
+* LCA Report Data Types
+* Defines the structure for the dynamic content of the PDF report
+*/
+
+
+export interface LCAData {
+ meta: {
+   productName: string;
+   refId: string;
+   date: string;
+   organization: string;
+   generatedBy: string;
+   version: string;
+   assessmentPeriod: string;
+   publishedDate: string;
+ };
+ functionalUnit: {
+   value: string;
+   description: string;
+ };
+ executiveSummary: {
+   content: string;
+   keyHighlight: {
+     value: string;
+     label: string;
+     subtext: string;
+   };
+   dataQualityScore: number; // 0-100
+ };
+ methodology: {
+   includedStages: string[];
+   excludedStages: string[];
+   dataSources: Array<{ name: string; count: number }>;
+ };
+ climateImpact: {
+   totalCarbon: number; // kg CO2e
+   breakdown: Array<{ name: string; value: number; color: string }>; // For donut chart
+   stages: Array<{ label: string; value: number; unit: string; percentage: number; color: string }>;
+   scopes: Array<{ name: string; value: number }>; // For progress bars
+   // Methodology Page Data
+   methodology: {
+     ghgBreakdown: Array<{ label: string; value: string; unit: string; gwp: string }>;
+     standards: string[];
+   };
+ };
+ waterFootprint: {
+   totalConsumption: string;
+   scarcityWeighted: string;
+   breakdown: Array<{ name: string; value: number; color: string }>; // For pie chart
+   sources: Array<{ source: string; location: string; volume: string; risk: string; score: number }>;
+   // Methodology Page Data
+   methodology: {
+     steps: Array<{ step: number; title: string; description: string }>;
+     standards: string[];
+   };
+ };
+ circularity: {
+   totalWaste: string;
+   recyclingRate: number;
+   circularityScore: string;
+   wasteStream: Array<{ label: string; value: string; recycled: boolean }>;
+   // Methodology Page Data
+   methodology: {
+     formula: {
+       text: string;
+       definitions: Array<{ term: string; definition: string }>;
+     };
+     standards: string[];
+   };
+ };
+ landUse: {
+   totalLandUse: string;
+   breakdown: Array<{
+     material: string;
+     origin: string;
+     mass: string;
+     intensity: number;
+     footprint: string;
+   }>;
+   // Methodology Page Data
+   methodology: {
+     categories: Array<{ title: string; value: string; description: string }>;
+     standards: string[];
+   };
+ };
+ supplyChain: {
+   totalDistance: string;
+   verifiedSuppliers: string; // "0%"
+   network: Array<{
+     category: string; // e.g., "INGREDIENT SUPPLIERS"
+     items: Array<{
+       name: string;
+       location: string;
+       distance: string;
+       co2: string;
+     }>;
+   }>;
+ };
+ commitment: {
+   text: string;
+ };
+}
