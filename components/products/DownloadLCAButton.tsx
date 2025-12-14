@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAllocationStatus } from "@/hooks/data/useAllocationStatus";
 import { useReportLimit } from "@/hooks/useSubscription";
 import { UpgradePromptModal } from "@/components/subscription";
+import { generateEnhancedLcaPdf } from "@/lib/enhanced-pdf-generator";
 
 interface DownloadLCAButtonProps {
   lcaId: string;
@@ -57,34 +58,15 @@ export function DownloadLCAButton({
 
     try {
       setIsGenerating(true);
+      toast.info("Generating PDF report...");
 
       const { data: lca, error: lcaError } = await supabase
         .from("product_lcas")
-        .select(`
-          *,
-          product_lca_materials(
-            material_name,
-            quantity,
-            unit,
-            origin_country,
-            is_organic_certified
-          )
-        `)
+        .select("*")
         .eq("id", lcaId)
         .single();
 
       if (lcaError) throw lcaError;
-
-      const { data: calculationLog, error: logError } = await supabase
-        .from("product_lca_calculation_logs")
-        .select("response_data, created_at")
-        .eq("product_lca_id", lcaId)
-        .eq("status", "success")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (logError) throw logError;
 
       const { data: org } = await supabase
         .from("organizations")
@@ -92,34 +74,70 @@ export function DownloadLCAButton({
         .eq("id", lca.organization_id)
         .maybeSingle();
 
-      const reportData = {
-        lca,
-        calculationLog,
-        organization: org,
+      // Extract aggregated impacts
+      const impacts = lca.aggregated_impacts || {};
+      const dataQuality = impacts.data_quality || {};
+      const dataProvenance = impacts.data_provenance || {};
+      const breakdown = impacts.breakdown || {};
+
+      // Transform to PDF format
+      const pdfData = {
+        productName: lca.product_name || productName,
+        version: lca.lca_version || "1.0",
+        assessmentPeriod: `${lca.reference_year || new Date().getFullYear()}`,
+        publishedDate: new Date(lca.updated_at || lca.created_at).toLocaleDateString('en-GB', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        }),
+        functionalUnit: lca.functional_unit || `1 unit of ${productName}`,
+        systemBoundary: lca.system_boundary || "cradle-to-gate",
+        metrics: {
+          climate_change_gwp100: impacts.climate_change_gwp100 || 0,
+          water_consumption: impacts.water_consumption || 0,
+          land_use: impacts.land_use || 0,
+          circularity_percentage: impacts.circularity_percentage || 0,
+        },
+        dataQuality: {
+          averageConfidence: dataQuality.score || 0,
+          rating: dataQuality.rating || "Unknown",
+          highQualityCount: dataQuality.breakdown?.primary_verified_count || 0,
+          mediumQualityCount: dataQuality.breakdown?.regional_standard_count || 0,
+          lowQualityCount: dataQuality.breakdown?.secondary_modelled_count || 0,
+          totalMaterialsCount: dataQuality.total_materials || 0,
+        },
+        dataProvenance: {
+          hybridSourcesCount: dataProvenance.hybrid_sources_count || 0,
+          defraGwpCount: dataProvenance.defra_gwp_count || 0,
+          supplierVerifiedCount: dataProvenance.supplier_verified_count || 0,
+          ecoinventOnlyCount: dataProvenance.ecoinvent_only_count || 0,
+          methodologySummary: dataProvenance.methodology_summary || "Mixed sources",
+        },
+        ghgBreakdown: {
+          co2Fossil: impacts.climate_fossil || 0,
+          co2Biogenic: impacts.climate_biogenic || 0,
+          co2Dluc: impacts.climate_dluc || 0,
+        },
+        complianceFramework: {
+          standards: ["ISO 14044", "ISO 14067", "GHG Protocol Product Standard"],
+          certifications: [],
+        },
       };
 
-      const dataStr = encodeURIComponent(JSON.stringify(reportData));
-      const newWindow = window.open(
-        `/products/${productId}/lca-pdf?data=${dataStr}`,
-        '_blank',
-        'width=1200,height=800'
-      );
+      // Generate and download PDF
+      await generateEnhancedLcaPdf(pdfData);
 
-      if (!newWindow) {
-        toast.error("Please allow pop-ups to view the PDF report");
-        return;
-      }
-
+      // Increment report count
       if (lca.organization_id) {
         await supabase.rpc("increment_report_count", {
           p_organization_id: lca.organization_id,
         });
       }
 
-      toast.success("Opening PDF report in new window. Use Cmd+P or Ctrl+P to print/save as PDF.");
+      toast.success("PDF report downloaded successfully");
     } catch (error: any) {
-      console.error("Error downloading LCA:", error);
-      toast.error("Failed to download LCA report");
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF report");
     } finally {
       setIsGenerating(false);
     }
