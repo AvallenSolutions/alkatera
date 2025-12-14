@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, Share2, Eye, Leaf, Droplets, Recycle, MapPin, ThermometerSun, Cloud, Activity, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import Link from 'next/link';
-import { generateLcaReportPdf } from '@/lib/pdf-generator';
+import { downloadPassportPDF, type PassportPDFData } from '@/lib/passport-pdf-generator';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
 import MethodologyToggle from '@/components/lca/MethodologyToggle';
@@ -256,28 +256,155 @@ export default function ProductLcaReportPage() {
 
       toast({
         title: 'Generating PDF',
-        description: 'Creating your LCA report...',
+        description: 'Creating your product passport report...',
       });
 
-      await generateLcaReportPdf({
-        title: displayTitle,
-        version: displayVersion,
-        productName: displayProductName,
-        assessmentPeriod: displayPeriod,
-        publishedDate: displayPublished,
-        dqiScore: displayDqi,
-        systemBoundary: displayBoundary,
-        functionalUnit: displayFunctionalUnit,
-        metrics: lcaData?.aggregated_impacts ? { ...MOCK_METRICS, total_impacts: lcaData.aggregated_impacts } : MOCK_METRICS,
-        waterSources: waterSourceItems,
-        wasteStreams: wasteStreams,
-        landUseItems: landUseItems,
-        dataSources: DATA_SOURCES,
-      });
+      const lifecycleColors = {
+        raw_materials: '#4ADE80',
+        processing: '#60A5FA',
+        packaging_stage: '#FACC15',
+        distribution: '#FB923C',
+        end_of_life: '#F87171',
+      };
+
+      const lifecycleBreakdown = Object.entries(lifecycleStages)
+        .filter(([_, value]) => (value as number) > 0)
+        .map(([stage, value]) => {
+          const stageLabels: Record<string, string> = {
+            raw_materials: 'Raw Materials',
+            processing: 'Processing',
+            packaging_stage: 'Packaging',
+            distribution: 'Distribution',
+            use_phase: 'Use Phase',
+            end_of_life: 'End of Life',
+          };
+          const numValue = value as number;
+          return {
+            stage: stageLabels[stage] || stage,
+            value: numValue,
+            percentage: totalEmissions > 0 ? (numValue / totalEmissions) * 100 : 0,
+            color: lifecycleColors[stage as keyof typeof lifecycleColors] || '#A8A29E',
+          };
+        });
+
+      const waterBreakdownData = waterSourceItems.map((item: any, idx: number) => ({
+        name: item.source,
+        value: item.consumption,
+        color: idx === 0 ? '#60A5FA' : idx === 1 ? '#3B82F6' : idx === 2 ? '#2563EB' : '#1D4ED8',
+      }));
+
+      const wasteBreakdownData = wasteStreams.map((item) => ({
+        stream: item.stream,
+        disposition: item.disposition,
+        mass: item.mass / 1000,
+        unit: 'kg',
+        circularityScore: item.circularityScore,
+        recyclable: item.circularityScore === 100,
+        color: item.circularityScore === 100 ? '#22C55E' : '#EF4444',
+      }));
+
+      const landUseBreakdownData = landUseItems.map((item: any) => ({
+        material: item.ingredient,
+        origin: item.origin,
+        mass: item.mass,
+        landIntensity: item.landIntensity,
+        totalFootprint: item.totalFootprint,
+        unit: 'm²',
+      }));
+
+      const ghgBreakdownData = breakdown?.by_ghg ? [
+        { gas: 'CO₂ (Fossil)', value: breakdown.by_ghg.co2_fossil || 0, unit: 'kg' },
+        { gas: 'CO₂ (Biogenic)', value: breakdown.by_ghg.co2_biogenic || 0, unit: 'kg' },
+        { gas: 'CH₄', value: breakdown.by_ghg.ch4 || 0, unit: 'kg CO₂eq' },
+        { gas: 'N₂O', value: breakdown.by_ghg.n2o || 0, unit: 'kg CO₂eq' },
+      ].filter(item => item.value > 0) : undefined;
+
+      const waterSourcesData = waterSourceItems.map((item: any) => ({
+        source: item.source,
+        location: item.location,
+        volume: item.consumption,
+        unit: 'L',
+        riskLevel: item.riskLevel.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH',
+        awareFactor: item.riskFactor,
+        scarcityImpact: item.netImpact,
+      }));
+
+      const pdfData: PassportPDFData = {
+        meta: {
+          title: displayTitle,
+          productName: displayProductName,
+          version: displayVersion,
+          date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+          author: 'Alkatera Platform',
+          referenceNumber: lcaData?.id ? `LCA-${lcaData.id.substring(0, 8).toUpperCase()}` : undefined,
+          organizationName: productData?.organization_name || 'Organisation',
+          functionalUnit: displayFunctionalUnit,
+          functionalUnitDescription: 'All environmental impacts in this report are calculated per functional unit. This ensures fair comparison across different products and brands.',
+        },
+        executiveSummary: {
+          heading: 'Product Impact Assessment',
+          content: `This comprehensive lifecycle assessment evaluates the environmental footprint of ${displayProductName}. The assessment follows ISO 14044 standards and provides transparent, traceable data on climate impact, water consumption, waste generation, and land use across the product's supply chain.`,
+          keyHighlight: `Total carbon footprint of ${impacts.climate_change_gwp100.toFixed(3)} kg CO₂eq per ${displayFunctionalUnit}, with ${circularityPercentage}% material circularity.`,
+          assessmentPeriod: displayPeriod,
+          publishedDate: displayPublished,
+        },
+        methodology: {
+          systemBoundary: displayBoundary,
+          includedStages: ['Raw material extraction', 'Primary production', 'Packaging manufacture', 'Factory operations'],
+          excludedStages: ['Distribution to retailers', 'Consumer use phase', 'End-of-life disposal', 'Capital goods'],
+          dataSources: DATA_SOURCES.map(source => ({
+            name: source.name,
+            description: source.description,
+            count: source.count,
+          })),
+          standards: ['ISO 14044:2006', 'ISO 14067:2018', 'GHG Protocol', 'CSRD E1'],
+          cutOffCriteria: 'Processes contributing less than 1% to total impact and cumulatively less than 5% were excluded per ISO 14044 requirements.',
+        },
+        climateImpact: {
+          totalCarbon: impacts.climate_change_gwp100,
+          unit: 'kg CO₂eq',
+          lifecycleBreakdown: lifecycleBreakdown,
+          scope1: scope1,
+          scope2: scope2,
+          scope3: scope3,
+          ghgBreakdown: ghgBreakdownData,
+        },
+        waterFootprint: {
+          total: totalWaterConsumption,
+          unit: 'L',
+          scarcityWeighted: totalWaterImpact,
+          breakdown: waterBreakdownData,
+          sources: waterSourcesData,
+        },
+        wasteFootprint: {
+          total: totalWaste,
+          unit: 'kg',
+          recyclingRate: Math.round(circularityRate),
+          circularityScore: circularityPercentage / 10,
+          breakdown: wasteBreakdownData,
+        },
+        landUse: {
+          total: totalLandUseSum,
+          unit: 'm²',
+          breakdown: landUseBreakdownData,
+        },
+        dataQuality: {
+          overallScore: displayDqi,
+          primaryDataPercentage: 65,
+          temporalCoverage: displayPeriod,
+          geographicCoverage: 'UK & Europe',
+        },
+        conclusion: {
+          title: 'Commitment to Transparency',
+          content: `This environmental assessment demonstrates our commitment to understanding and reducing the environmental impact of ${displayProductName}. By measuring and reporting our footprint, we can identify opportunities for improvement and make informed decisions that benefit both our business and the planet.`,
+        },
+      };
+
+      downloadPassportPDF(pdfData);
 
       toast({
         title: 'PDF Generated',
-        description: 'Your LCA report has been downloaded successfully.',
+        description: 'Your product passport report has been downloaded successfully.',
       });
     } catch (error) {
       console.error('PDF generation error:', error);
