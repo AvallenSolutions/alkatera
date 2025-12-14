@@ -263,26 +263,12 @@ export default function ProductLcaReportPage() {
       setIsGeneratingPdf(true);
 
       toast({
-        title: 'Generating PDF',
-        description: 'Opening PDF report in new window...',
+        title: 'Opening PDF Report',
+        description: 'Loading PDF view...',
       });
 
-      const { data: org } = await supabase
-        .from('organizations')
-        .select('name')
-        .eq('id', lcaData.organization_id)
-        .maybeSingle();
-
-      const reportData = {
-        lca: lcaData,
-        calculationLog: null,
-        organization: org,
-      };
-
-      const dataStr = encodeURIComponent(JSON.stringify(reportData));
-
-      // Navigate to the PDF page directly
-      window.location.href = `/products/${productId}/lca-pdf?data=${dataStr}`;
+      // Navigate to the PDF page - it will fetch data from the database
+      window.location.href = `/products/${productId}/lca-pdf`;
     } catch (error) {
       console.error('PDF generation error:', error);
       toast({

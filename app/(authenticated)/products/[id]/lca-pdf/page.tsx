@@ -1,37 +1,72 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { AlkaTeraProductLCA } from "@/components/lca-report";
 import { transformLCADataForReport } from "@/lib/utils/lca-report-transformer";
 import type { LCAReportData } from "@/components/lca-report/types";
 
 export default function LCAPDFPage() {
-  const searchParams = useSearchParams();
+  const params = useParams();
+  const productId = params.id as string;
   const [reportData, setReportData] = useState<LCAReportData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const dataParam = searchParams.get("data");
-      if (!dataParam) {
-        setError("No data provided");
-        return;
+    async function fetchLCAData() {
+      try {
+        const supabase = getSupabaseBrowserClient();
+
+        // Fetch the latest completed LCA for this product
+        const { data: lca, error: lcaError } = await supabase
+          .from('product_lcas')
+          .select('*')
+          .eq('product_id', productId)
+          .eq('status', 'completed')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lcaError || !lca) {
+          setError("LCA not found");
+          return;
+        }
+
+        // Fetch materials for this LCA
+        const { data: materials } = await supabase
+          .from('product_lca_materials')
+          .select('*')
+          .eq('product_lca_id', lca.id);
+
+        if (materials) {
+          lca.materials = materials;
+        }
+
+        // Fetch organization
+        const { data: organization } = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('id', lca.organization_id)
+          .maybeSingle();
+
+        const transformed = transformLCADataForReport(
+          lca,
+          null,
+          organization
+        );
+
+        setReportData(transformed);
+      } catch (err) {
+        console.error("Error loading report data:", err);
+        setError("Failed to load report data");
       }
-
-      const decoded = JSON.parse(decodeURIComponent(dataParam));
-      const transformed = transformLCADataForReport(
-        decoded.lca,
-        decoded.calculationLog,
-        decoded.organization
-      );
-
-      setReportData(transformed);
-    } catch (err) {
-      console.error("Error loading report data:", err);
-      setError("Failed to load report data");
     }
-  }, [searchParams]);
+
+    if (productId) {
+      fetchLCAData();
+    }
+  }, [productId]);
 
   if (error) {
     return (
