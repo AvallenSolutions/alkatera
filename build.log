@@ -20,6 +20,7 @@ https://nextjs.org/telemetry
    Collecting page data ...
 Warning: Please use the `legacy` build in Node.js environments.
    Generating static pages (0/66) ...
+Warning: Please use the `legacy` build in Node.js environments.
 ✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
 ✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
 ✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
@@ -97,7 +98,7 @@ Route (app)                                  Size     First Load JS
 ├ ƒ /products/[id]/lca-pdf                   15.3 kB         208 kB
 ├ ƒ /products/[id]/materials                 6.63 kB         194 kB
 ├ ƒ /products/[id]/recipe                    20.9 kB         237 kB
-├ ƒ /products/[id]/report                    20.2 kB         198 kB
+├ ƒ /products/[id]/report                    20.1 kB         197 kB
 ├ ƒ /products/detail                         6.21 kB         163 kB
 ├ ƒ /products/import                         105 kB          275 kB
 ├ ƒ /products/new                            10.8 kB         215 kB

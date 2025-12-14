@@ -280,25 +280,9 @@ export default function ProductLcaReportPage() {
       };
 
       const dataStr = encodeURIComponent(JSON.stringify(reportData));
-      const newWindow = window.open(
-        `/products/${productId}/lca-pdf?data=${dataStr}`,
-        '_blank',
-        'width=1200,height=800'
-      );
 
-      if (!newWindow) {
-        toast({
-          title: 'Pop-up Blocked',
-          description: 'Please allow pop-ups to view the PDF report.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      toast({
-        title: 'PDF Report Opened',
-        description: 'Use Cmd+P or Ctrl+P in the new window to print or save as PDF.',
-      });
+      // Navigate to the PDF page directly
+      window.location.href = `/products/${productId}/lca-pdf?data=${dataStr}`;
     } catch (error) {
       console.error('PDF generation error:', error);
       toast({
