@@ -329,6 +329,24 @@ export default function ProductLcaReportPage() {
         scarcityImpact: item.netImpact,
       }));
 
+      const supplyChainNodes = lcaData?.materials
+        ? lcaData.materials
+            .filter((m: any) => m.material_name && Number(m.impact_climate) > 0)
+            .map((material: any) => ({
+              name: material.material_name,
+              location: material.origin_address || undefined,
+              country: material.origin_country || material.country_of_origin || undefined,
+              type: (material.material_type === 'ingredient' ? 'ingredient' : 'packaging') as 'facility' | 'ingredient' | 'packaging' | 'transport',
+              verified: material.data_quality_tag === 'Primary_Verified' || material.supplier_product_id !== null,
+              emissions: Number(material.impact_climate) || 0,
+              distance: material.distance_km ? Number(material.distance_km) : undefined,
+            }))
+        : [];
+
+      const totalSupplyChainDistance = supplyChainNodes.reduce((sum: number, node: any) => sum + (node.distance || 0), 0);
+      const verifiedNodesCount = supplyChainNodes.filter((n: any) => n.verified).length;
+      const verifiedPercentage = supplyChainNodes.length > 0 ? (verifiedNodesCount / supplyChainNodes.length) * 100 : 0;
+
       const pdfData: PassportPDFData = {
         meta: {
           title: displayTitle,
@@ -368,6 +386,11 @@ export default function ProductLcaReportPage() {
           scope2: scope2,
           scope3: scope3,
           ghgBreakdown: ghgBreakdownData,
+          co2Fossil: breakdown?.by_ghg?.co2_fossil || 0,
+          co2Biogenic: breakdown?.by_ghg?.co2_biogenic || 0,
+          ch4: breakdown?.by_ghg?.ch4 || 0,
+          n2o: breakdown?.by_ghg?.n2o || 0,
+          fGases: 0,
         },
         waterFootprint: {
           total: totalWaterConsumption,
@@ -394,6 +417,11 @@ export default function ProductLcaReportPage() {
           temporalCoverage: displayPeriod,
           geographicCoverage: 'UK & Europe',
         },
+        supplyChain: supplyChainNodes.length > 0 ? {
+          nodes: supplyChainNodes,
+          totalDistance: totalSupplyChainDistance,
+          verifiedPercentage: verifiedPercentage,
+        } : undefined,
         conclusion: {
           title: 'Commitment to Transparency',
           content: `This environmental assessment demonstrates our commitment to understanding and reducing the environmental impact of ${displayProductName}. By measuring and reporting our footprint, we can identify opportunities for improvement and make informed decisions that benefit both our business and the planet.`,

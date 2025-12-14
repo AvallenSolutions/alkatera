@@ -61,6 +61,16 @@ export interface DataSourceItem {
   count?: number;
 }
 
+export interface SupplyChainNode {
+  name: string;
+  location?: string;
+  country?: string;
+  type: 'facility' | 'ingredient' | 'packaging' | 'transport';
+  verified: boolean;
+  emissions?: number;
+  distance?: number;
+}
+
 export interface PassportPDFData {
   meta: {
     title: string;
@@ -101,6 +111,11 @@ export interface PassportPDFData {
     benchmarkName?: string;
     benchmarkValue?: number;
     reductionPercentage?: number;
+    co2Fossil?: number;
+    co2Biogenic?: number;
+    ch4?: number;
+    n2o?: number;
+    fGases?: number;
   };
   waterFootprint?: {
     total: number;
@@ -126,6 +141,11 @@ export interface PassportPDFData {
     primaryDataPercentage?: number;
     temporalCoverage?: string;
     geographicCoverage?: string;
+  };
+  supplyChain?: {
+    nodes: SupplyChainNode[];
+    totalDistance?: number;
+    verifiedPercentage?: number;
   };
   conclusion: {
     title: string;
@@ -1093,6 +1113,529 @@ function drawLandUsePage(doc: jsPDF, data: PassportPDFData): void {
   addPageFooter(doc, data.meta.date);
 }
 
+function drawClimateMethodologyPage(doc: jsPDF, data: PassportPDFData): void {
+  doc.setFillColor('#FFFFFF');
+  doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
+
+  let y = 30;
+  y = drawSectionHeader(doc, '3A', 'Climate Impact Methodology', y, false);
+
+  y += 5;
+  doc.setFont('times', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor(PASSPORT_COLORS.stone900);
+  doc.text('Calculation Methodology', MARGIN, y);
+
+  y += 10;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(PASSPORT_COLORS.stone600);
+  const methodText = doc.splitTextToSize(
+    'Carbon footprint calculated using ISO 14067:2018 methodology for quantification and ' +
+    'communication of greenhouse gas emissions. All greenhouse gases are converted to CO2 ' +
+    'equivalents using IPCC AR6 100-year Global Warming Potential (GWP100) factors. ' +
+    'Calculations follow the attributional life cycle assessment approach.',
+    CONTENT_WIDTH
+  );
+  doc.text(methodText, MARGIN, y);
+  y += methodText.length * 5 + 12;
+
+  drawSubSectionHeader(doc, 'IPCC AR6 GHG Breakdown', y, false);
+  y += 10;
+
+  if (data.climateImpact.co2Fossil !== undefined) {
+    const ghgDetails = [
+      {
+        gas: 'CO₂ Fossil',
+        value: data.climateImpact.co2Fossil,
+        gwp: '1',
+        description: 'Carbon dioxide from fossil fuel combustion and industrial processes'
+      },
+      {
+        gas: 'CO₂ Biogenic',
+        value: data.climateImpact.co2Biogenic || 0,
+        gwp: '1*',
+        description: 'Carbon dioxide from biomass and biological sources (reported separately)'
+      },
+      {
+        gas: 'CH₄',
+        value: data.climateImpact.ch4 || 0,
+        gwp: '29.8',
+        description: 'Methane from agriculture, waste decomposition, and fuel extraction'
+      },
+      {
+        gas: 'N₂O',
+        value: data.climateImpact.n2o || 0,
+        gwp: '273',
+        description: 'Nitrous oxide from agricultural soils and industrial processes'
+      }
+    ];
+
+    ghgDetails.forEach((item) => {
+      if (y > PAGE_HEIGHT - 60) {
+        addNewPage(doc, data.meta.date);
+        y = 40;
+      }
+
+      drawCard(doc, MARGIN, y, CONTENT_WIDTH, 28, false);
+
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(PASSPORT_COLORS.lime700);
+      doc.text(item.gas, MARGIN + 8, y + 12);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(PASSPORT_COLORS.stone900);
+      doc.text(`${item.value.toFixed(4)} kg CO₂e`, MARGIN + 50, y + 12);
+
+      doc.setFont('courier', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(PASSPORT_COLORS.stone500);
+      doc.text(`GWP: ${item.gwp}`, MARGIN + 110, y + 12);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.setTextColor(PASSPORT_COLORS.stone600);
+      const descLines = doc.splitTextToSize(item.description, CONTENT_WIDTH - 16);
+      doc.text(descLines.slice(0, 1), MARGIN + 8, y + 22);
+
+      y += 33;
+    });
+  }
+
+  y += 5;
+  drawSubSectionHeader(doc, 'Compliance Standards', y, false);
+  y += 8;
+
+  const standards = [
+    { code: 'ISO 14067:2018', desc: 'Greenhouse gases — Carbon footprint of products' },
+    { code: 'ISO 14040/14044', desc: 'Life Cycle Assessment principles and framework' },
+    { code: 'GHG Protocol', desc: 'Product Life Cycle Accounting and Reporting Standard' },
+    { code: 'PAS 2050:2011', desc: 'Specification for the assessment of life cycle GHG emissions' }
+  ];
+
+  standards.forEach((std) => {
+    if (y > PAGE_HEIGHT - 50) {
+      addNewPage(doc, data.meta.date);
+      y = 40;
+    }
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone700);
+    doc.text(`• ${std.code}`, MARGIN, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone600);
+    doc.text(std.desc, MARGIN + 40, y);
+
+    y += 8;
+  });
+
+  addPageFooter(doc, data.meta.date);
+}
+
+function drawWaterMethodologyPage(doc: jsPDF, data: PassportPDFData): void {
+  if (!data.waterFootprint) return;
+
+  doc.setFillColor('#FFFFFF');
+  doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
+
+  let y = 30;
+  y = drawSectionHeader(doc, '4A', 'Water Impact Methodology', y, false);
+
+  y += 5;
+  doc.setFont('times', 'normal');
+  doc.setFontSize(12);
+  doc.setTextColor(PASSPORT_COLORS.stone900);
+  doc.text('AWARE Methodology', MARGIN, y);
+
+  y += 10;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(PASSPORT_COLORS.stone600);
+  const awareText = doc.splitTextToSize(
+    'Water scarcity assessment uses the AWARE (Available WAter REmaining) methodology ' +
+    'developed by UNEP-SETAC Life Cycle Initiative. AWARE characterises the relative ' +
+    'available water remaining per area in a watershed, after human and aquatic ecosystem ' +
+    'demands have been met. Results are expressed in cubic metres world-equivalent (m³ eq.).',
+    CONTENT_WIDTH
+  );
+  doc.text(awareText, MARGIN, y);
+  y += awareText.length * 5 + 15;
+
+  drawSubSectionHeader(doc, 'Calculation Approach', y, false);
+  y += 10;
+
+  const steps = [
+    {
+      step: '1',
+      title: 'Inventory Phase',
+      desc: 'Quantify water consumption (litres) for each process and material in the product system'
+    },
+    {
+      step: '2',
+      title: 'Geographic Attribution',
+      desc: 'Assign water consumption to specific watersheds based on production locations'
+    },
+    {
+      step: '3',
+      title: 'AWARE Factors',
+      desc: 'Apply watershed-specific AWARE characterisation factors (CF) from global database'
+    },
+    {
+      step: '4',
+      title: 'Impact Calculation',
+      desc: 'Multiply water volume by AWARE CF: Impact = Volume (m³) × CF (dimensionless)'
+    }
+  ];
+
+  steps.forEach((item) => {
+    if (y > PAGE_HEIGHT - 70) {
+      addNewPage(doc, data.meta.date);
+      y = 40;
+    }
+
+    doc.setFillColor(PASSPORT_COLORS.blue600);
+    doc.circle(MARGIN + 5, y + 5, 5, 'F');
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor('#FFFFFF');
+    doc.text(item.step, MARGIN + 4, y + 8);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(PASSPORT_COLORS.stone900);
+    doc.text(item.title, MARGIN + 15, y + 8);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone600);
+    const descLines = doc.splitTextToSize(item.desc, CONTENT_WIDTH - 18);
+    doc.text(descLines, MARGIN + 15, y + 17);
+
+    y += descLines.length * 4.5 + 20;
+  });
+
+  y += 5;
+  drawSubSectionHeader(doc, 'Compliance Standards', y, false);
+  y += 8;
+
+  const standards = [
+    { code: 'ISO 14046:2014', desc: 'Environmental management — Water footprint' },
+    { code: 'AWARE v1.3', desc: 'UNEP-SETAC water scarcity characterisation model' }
+  ];
+
+  standards.forEach((std) => {
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone700);
+    doc.text(`• ${std.code}`, MARGIN, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone600);
+    doc.text(std.desc, MARGIN + 40, y);
+
+    y += 8;
+  });
+
+  addPageFooter(doc, data.meta.date);
+}
+
+function drawWasteMethodologyPage(doc: jsPDF, data: PassportPDFData): void {
+  if (!data.wasteFootprint) return;
+
+  doc.setFillColor('#FFFFFF');
+  doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
+
+  let y = 30;
+  y = drawSectionHeader(doc, '5A', 'Waste & Circularity Methodology', y, false);
+
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(PASSPORT_COLORS.stone600);
+  const wasteText = doc.splitTextToSize(
+    'Waste assessment follows the circular economy principles, quantifying material flows ' +
+    'and end-of-life scenarios. Circularity metrics evaluate how well materials are kept in ' +
+    'use through recycling, reuse, and recovery pathways. Calculations align with the Ellen ' +
+    'MacArthur Foundation Material Circularity Indicator and EU Waste Framework Directive.',
+    CONTENT_WIDTH
+  );
+  doc.text(wasteText, MARGIN, y);
+  y += wasteText.length * 5 + 15;
+
+  drawSubSectionHeader(doc, 'Circularity Calculation', y, false);
+  y += 10;
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(PASSPORT_COLORS.stone500);
+  doc.text('MCI = (LFI × U/L) + (V/2) + (W/2) × F(X)', MARGIN, y);
+
+  y += 10;
+  const mciTerms = [
+    'LFI = Linear Flow Index (virgin material input)',
+    'U = Utility of product (functional performance)',
+    'L = Average lifetime relative to industry',
+    'V = Mass of recycled feedstock / Total mass input',
+    'W = Mass recovered for recycling / Total mass output',
+    'F(X) = Collection efficiency factor'
+  ];
+
+  mciTerms.forEach((term) => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(PASSPORT_COLORS.stone600);
+    doc.text(term, MARGIN + 5, y);
+    y += 6;
+  });
+
+  y += 8;
+  drawSubSectionHeader(doc, 'Compliance Standards', y, false);
+  y += 8;
+
+  const standards = [
+    { code: 'ISO 14040/14044', desc: 'LCA framework for waste streams' },
+    { code: 'MCI v1.0', desc: 'Material Circularity Indicator (Ellen MacArthur Foundation)' },
+    { code: 'Directive 2008/98/EC', desc: 'EU Waste Framework Directive' }
+  ];
+
+  standards.forEach((std) => {
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone700);
+    doc.text(`• ${std.code}`, MARGIN, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone600);
+    doc.text(std.desc, MARGIN + 50, y);
+
+    y += 8;
+  });
+
+  addPageFooter(doc, data.meta.date);
+}
+
+function drawLandMethodologyPage(doc: jsPDF, data: PassportPDFData): void {
+  if (!data.landUse) return;
+
+  doc.setFillColor('#FFFFFF');
+  doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
+
+  let y = 30;
+  y = drawSectionHeader(doc, '6A', 'Land Use & Nature Methodology', y, false);
+
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(PASSPORT_COLORS.stone600);
+  const landText = doc.splitTextToSize(
+    'Land use assessment quantifies the area of land occupied and transformed throughout ' +
+    'the product life cycle. This includes agricultural land for raw materials, forest land ' +
+    'for fibre and timber, and industrial sites for processing. Land quality metrics assess ' +
+    'impacts on soil biodiversity and ecosystem services using ReCiPe 2016 methodology.',
+    CONTENT_WIDTH
+  );
+  doc.text(landText, MARGIN, y);
+  y += landText.length * 5 + 15;
+
+  drawSubSectionHeader(doc, 'Land Impact Categories', y, false);
+  y += 10;
+
+  const categories = [
+    {
+      title: 'Land Occupation',
+      desc: 'Area × time (m²·yr) that land is occupied for production processes',
+      unit: 'm² · year'
+    },
+    {
+      title: 'Land Transformation',
+      desc: 'Permanent conversion of natural ecosystems to agricultural or industrial use',
+      unit: 'm² transformed'
+    },
+    {
+      title: 'Soil Quality',
+      desc: 'Degradation of soil organic matter, structure, and biotic activity',
+      unit: 'quality points'
+    }
+  ];
+
+  categories.forEach((cat) => {
+    if (y > PAGE_HEIGHT - 60) {
+      addNewPage(doc, data.meta.date);
+      y = 40;
+    }
+
+    drawCard(doc, MARGIN, y, CONTENT_WIDTH, 22, false);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(PASSPORT_COLORS.stone900);
+    doc.text(cat.title, MARGIN + 8, y + 10);
+
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(PASSPORT_COLORS.emerald600);
+    doc.text(cat.unit, PAGE_WIDTH - MARGIN - 8, y + 10, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(PASSPORT_COLORS.stone600);
+    const descLines = doc.splitTextToSize(cat.desc, CONTENT_WIDTH - 16);
+    doc.text(descLines.slice(0, 1), MARGIN + 8, y + 18);
+
+    y += 27;
+  });
+
+  y += 5;
+  drawSubSectionHeader(doc, 'Compliance Standards', y, false);
+  y += 8;
+
+  const standards = [
+    { code: 'ReCiPe 2016', desc: 'Land use impact characterisation methodology' },
+    { code: 'ISO 14040/14044', desc: 'LCA framework for land use assessment' }
+  ];
+
+  standards.forEach((std) => {
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone700);
+    doc.text(`• ${std.code}`, MARGIN, y);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(PASSPORT_COLORS.stone600);
+    doc.text(std.desc, MARGIN + 35, y);
+
+    y += 8;
+  });
+
+  addPageFooter(doc, data.meta.date);
+}
+
+function drawSupplyChainPage(doc: jsPDF, data: PassportPDFData): void {
+  if (!data.supplyChain || !data.supplyChain.nodes || data.supplyChain.nodes.length === 0) return;
+
+  doc.setFillColor(PASSPORT_COLORS.stone900);
+  doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
+
+  let y = 30;
+  y = drawSectionHeader(doc, '07', 'Supply Chain Mapping', y, true);
+
+  y += 5;
+  const halfWidth = (CONTENT_WIDTH - 10) / 2;
+
+  if (data.supplyChain.totalDistance) {
+    drawMetricCard(
+      doc,
+      MARGIN,
+      y,
+      halfWidth,
+      'Total Transport Distance',
+      data.supplyChain.totalDistance.toFixed(0),
+      'km',
+      PASSPORT_COLORS.amber400,
+      true
+    );
+  }
+
+  if (data.supplyChain.verifiedPercentage !== undefined) {
+    drawMetricCard(
+      doc,
+      MARGIN + halfWidth + 10,
+      y,
+      halfWidth,
+      'Verified Suppliers',
+      data.supplyChain.verifiedPercentage.toFixed(0),
+      '%',
+      PASSPORT_COLORS.green400,
+      true
+    );
+  }
+
+  y += 60;
+
+  drawSubSectionHeader(doc, 'Supply Chain Network', y, true);
+  y += 10;
+
+  const facilityNodes = data.supplyChain.nodes.filter(n => n.type === 'facility');
+  const ingredientNodes = data.supplyChain.nodes.filter(n => n.type === 'ingredient');
+  const packagingNodes = data.supplyChain.nodes.filter(n => n.type === 'packaging');
+
+  const nodeCategories = [
+    { title: 'Production Facilities', nodes: facilityNodes, color: PASSPORT_COLORS.blue500, icon: '🏭' },
+    { title: 'Ingredient Suppliers', nodes: ingredientNodes, color: PASSPORT_COLORS.green500, icon: '🌾' },
+    { title: 'Packaging Suppliers', nodes: packagingNodes, color: PASSPORT_COLORS.purple500, icon: '📦' }
+  ];
+
+  nodeCategories.forEach((category) => {
+    if (category.nodes.length === 0) return;
+
+    if (y > PAGE_HEIGHT - 100) {
+      addNewPage(doc, data.meta.date);
+      y = 40;
+    }
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(category.color);
+    doc.text(`${category.icon} ${category.title.toUpperCase()}`, MARGIN, y);
+    y += 10;
+
+    category.nodes.slice(0, 5).forEach((node) => {
+      drawCard(doc, MARGIN, y, CONTENT_WIDTH, 20, true);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor('#FFFFFF');
+      doc.text(node.name.substring(0, 30), MARGIN + 8, y + 10);
+
+      if (node.location || node.country) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(PASSPORT_COLORS.stone400);
+        const location = node.location || node.country || '';
+        doc.text(location.substring(0, 25), MARGIN + 8, y + 17);
+      }
+
+      if (node.verified) {
+        doc.setFillColor(PASSPORT_COLORS.green500);
+        doc.circle(PAGE_WIDTH - MARGIN - 30, y + 10, 3, 'F');
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(PASSPORT_COLORS.green400);
+        doc.text('VERIFIED', PAGE_WIDTH - MARGIN - 22, y + 12);
+      }
+
+      if (node.distance) {
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(PASSPORT_COLORS.stone400);
+        doc.text(`${node.distance.toFixed(0)} km`, MARGIN + 110, y + 12);
+      }
+
+      if (node.emissions) {
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(PASSPORT_COLORS.amber400);
+        doc.text(`${node.emissions.toFixed(3)} kg CO₂e`, PAGE_WIDTH - MARGIN - 8, y + 17, { align: 'right' });
+      }
+
+      y += 25;
+    });
+
+    y += 5;
+  });
+
+  addPageFooter(doc, data.meta.date);
+}
+
 function drawConclusionPage(doc: jsPDF, data: PassportPDFData): void {
   doc.setFillColor(PASSPORT_COLORS.stone50);
   doc.rect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, 'F');
@@ -1175,19 +1718,36 @@ export async function generatePassportPDF(data: PassportPDFData): Promise<jsPDF>
   addNewPage(doc, data.meta.date);
   drawClimateImpactPage(doc, data);
 
+  addNewPage(doc, data.meta.date);
+  drawClimateMethodologyPage(doc, data);
+
   if (data.waterFootprint) {
     addNewPage(doc, data.meta.date);
     drawWaterFootprintPage(doc, data);
+
+    addNewPage(doc, data.meta.date);
+    drawWaterMethodologyPage(doc, data);
   }
 
   if (data.wasteFootprint) {
     addNewPage(doc, data.meta.date);
     drawWasteFootprintPage(doc, data);
+
+    addNewPage(doc, data.meta.date);
+    drawWasteMethodologyPage(doc, data);
   }
 
   if (data.landUse && data.landUse.total > 0) {
     addNewPage(doc, data.meta.date);
     drawLandUsePage(doc, data);
+
+    addNewPage(doc, data.meta.date);
+    drawLandMethodologyPage(doc, data);
+  }
+
+  if (data.supplyChain && data.supplyChain.nodes && data.supplyChain.nodes.length > 0) {
+    addNewPage(doc, data.meta.date);
+    drawSupplyChainPage(doc, data);
   }
 
   addNewPage(doc, data.meta.date);
