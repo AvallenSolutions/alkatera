@@ -142,15 +142,23 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
     }
   };
 
-  const handleProceedToAllocation = () => {
+  const handleProceedToAllocation = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+
+    console.log("Continue clicked", { selectedFacility, facilityType });
+
     if (!selectedFacility) {
       toast.error("Please select a facility");
       return;
     }
 
     if (facilityType === "contract_manufacturer") {
+      console.log("Opening allocation form");
       setShowAddDialog(false);
-      setShowAllocationForm(true);
+      setTimeout(() => {
+        setShowAllocationForm(true);
+      }, 100);
     } else {
       toast.info("Owned facility allocation coming soon");
     }
@@ -447,10 +455,11 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
             )}
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button variant="ghost" onClick={() => setShowAddDialog(false)}>
+              <Button type="button" variant="ghost" onClick={() => setShowAddDialog(false)}>
                 Cancel
               </Button>
               <Button
+                type="button"
                 onClick={handleProceedToAllocation}
                 disabled={!selectedFacility}
                 className="bg-lime-500 hover:bg-lime-600 text-black"
