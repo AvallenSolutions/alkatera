@@ -86,49 +86,37 @@ export function DownloadLCAButton({
 
       if (logError) throw logError;
 
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", lca.organization_id)
+        .maybeSingle();
+
       const reportData = {
-        product: {
-          name: lca.product_name,
-          functional_unit: lca.functional_unit,
-          system_boundary: lca.system_boundary,
-        },
-        results: calculationLog?.response_data || null,
-        materials: lca.product_lca_materials || [],
-        calculatedAt: calculationLog?.created_at || null,
-        createdAt: lca.created_at,
-        allocationStatus: {
-          hasProvisionalAllocations: allocationStatus.hasProvisionalAllocations,
-          provisionalCount: allocationStatus.provisionalCount,
-          verifiedCount: allocationStatus.verifiedCount,
-          totalAllocatedEmissions: allocationStatus.totalAllocatedEmissions,
-        },
+        lca,
+        calculationLog,
+        organization: org,
       };
 
-      const jsonBlob = new Blob([JSON.stringify(reportData, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(jsonBlob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${productName.replace(/[^a-z0-9]/gi, "_")}_LCA_${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      const dataStr = encodeURIComponent(JSON.stringify(reportData));
+      const newWindow = window.open(
+        `/products/${productId}/lca-pdf?data=${dataStr}`,
+        '_blank',
+        'width=1200,height=800'
+      );
 
-      const { data: lca2 } = await supabase
-        .from("product_lcas")
-        .select("organization_id")
-        .eq("id", lcaId)
-        .single();
+      if (!newWindow) {
+        toast.error("Please allow pop-ups to view the PDF report");
+        return;
+      }
 
-      if (lca2?.organization_id) {
+      if (lca.organization_id) {
         await supabase.rpc("increment_report_count", {
-          p_organization_id: lca2.organization_id,
+          p_organization_id: lca.organization_id,
         });
       }
 
-      toast.success("LCA report downloaded");
+      toast.success("Opening PDF report in new window. Use Cmd+P or Ctrl+P to print/save as PDF.");
     } catch (error: any) {
       console.error("Error downloading LCA:", error);
       toast.error("Failed to download LCA report");
