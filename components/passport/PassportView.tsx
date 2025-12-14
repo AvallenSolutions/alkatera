@@ -1,29 +1,72 @@
 "use client";
 
-import { useEffect } from 'react';
-import { Leaf } from 'lucide-react';
-import PassportSeedView from './PassportSeedView';
-import PassportBlossomView from './PassportBlossomView';
-import PassportCanopyView from './PassportCanopyView';
+import { useEffect, useMemo } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { transformToLCAData } from '@/lib/utils/passport-data-transformer';
+import type { SubscriptionTier } from '@/lib/types/passport';
+import LCAPassportTemplate from './LCAPassportTemplate';
 
 interface PassportViewProps {
   data: {
-    product: any;
-    lca: any;
-    materials: any[];
+    product: {
+      id: string;
+      name: string;
+      product_description?: string | null;
+      image_url?: string | null;
+      functional_unit?: string | null;
+      unit_size_value?: number | null;
+      unit_size_unit?: string | null;
+      certifications?: Array<{ name: string }> | null;
+      created_at: string;
+      updated_at: string;
+      organization?: Array<{
+        id: string;
+        name: string;
+        logo_url?: string | null;
+        subscription_tier?: SubscriptionTier;
+        subscription_status?: string;
+      }> | {
+        id: string;
+        name: string;
+        logo_url?: string | null;
+        subscription_tier?: SubscriptionTier;
+        subscription_status?: string;
+      };
+    };
+    lca: {
+      id?: string;
+      aggregated_impacts?: {
+        climate_change_gwp100?: number;
+        water_consumption?: number;
+        waste?: number;
+        land_use?: number;
+        breakdown?: {
+          by_category?: {
+            materials?: number;
+            packaging?: number;
+            transport?: number;
+            production?: number;
+          };
+        };
+      };
+      methodology?: string;
+      updated_at?: string;
+    } | null;
+    materials: Array<{
+      name?: string;
+      material_type?: string;
+      quantity?: number;
+    }>;
   };
   token: string;
 }
 
 export default function PassportView({ data, token }: PassportViewProps) {
   const { product, lca, materials } = data;
-  // Supabase returns joined data as an array, get the first element
-  const organization = Array.isArray(product.organization) ? product.organization[0] : product.organization;
 
-  console.log('PassportView - product.organization:', product.organization);
-  console.log('PassportView - organization:', organization);
-  console.log('PassportView - tier:', organization?.subscription_tier);
+  const organization = Array.isArray(product.organization)
+    ? product.organization[0]
+    : product.organization;
 
   const tier = organization?.subscription_tier || 'seed';
   const subscriptionStatus = organization?.subscription_status || 'active';
@@ -46,37 +89,70 @@ export default function PassportView({ data, token }: PassportViewProps) {
     recordView();
   }, [token]);
 
-  const isSubscriptionActive = ['active', 'trial', 'trialing'].includes(subscriptionStatus);
+  const isSubscriptionActive = ['active', 'trial', 'trialing'].includes(
+    subscriptionStatus
+  );
+  const effectiveTier: SubscriptionTier = isSubscriptionActive ? tier : 'seed';
 
-  const effectiveTier = isSubscriptionActive ? tier : 'seed';
+  const lcaData = useMemo(() => {
+    const normalizedOrganization = organization
+      ? {
+          id: organization.id,
+          name: organization.name,
+          logo_url: organization.logo_url || null,
+          subscription_tier: organization.subscription_tier,
+          subscription_status: organization.subscription_status,
+        }
+      : null;
 
-  const commonProps = {
-    product,
-    lca,
-    materials,
-    organization,
+    return transformToLCAData(
+      {
+        product: {
+          id: product.id,
+          name: product.name,
+          product_description: product.product_description,
+          image_url: product.image_url,
+          functional_unit: product.functional_unit,
+          unit_size_value: product.unit_size_value,
+          unit_size_unit: product.unit_size_unit,
+          certifications: product.certifications,
+          created_at: product.created_at,
+          updated_at: product.updated_at,
+        },
+        lca,
+        materials,
+        organization: normalizedOrganization,
+      },
+      effectiveTier
+    );
+  }, [product, lca, materials, organization, effectiveTier]);
+
+  const handleDownloadPDF = () => {
+    window.print();
+  };
+
+  const handleShare = async () => {
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `${product.name} - Product Passport`,
+          text: `View the environmental impact data for ${product.name}`,
+          url: window.location.href,
+        });
+      } catch {
+        navigator.clipboard?.writeText(window.location.href);
+      }
+    } else {
+      navigator.clipboard?.writeText(window.location.href);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-neutral-50 via-green-50/30 to-neutral-50">
-      <div className="container max-w-4xl mx-auto px-4 py-12">
-        <div className="flex items-center gap-2 mb-8 justify-center">
-          <Leaf className="h-6 w-6 text-green-600" />
-          <span className="text-sm font-medium text-neutral-600">Product Passport</span>
-          <span className="text-xs text-neutral-400">({effectiveTier})</span>
-        </div>
-
-        {effectiveTier === 'seed' && <PassportSeedView {...commonProps} />}
-        {effectiveTier === 'blossom' && <PassportBlossomView {...commonProps} />}
-        {effectiveTier === 'canopy' && <PassportCanopyView {...commonProps} />}
-
-        <footer className="mt-16 text-center text-sm text-neutral-500">
-          <p>Environmental data provided by {organization?.name || 'Organization'}</p>
-          <p className="mt-2">
-            Powered by <span className="font-semibold text-neutral-700">Alkatera</span> Product Passport
-          </p>
-        </footer>
-      </div>
-    </div>
+    <LCAPassportTemplate
+      data={lcaData}
+      tier={effectiveTier}
+      onDownloadPDF={handleDownloadPDF}
+      onShare={handleShare}
+    />
   );
 }
