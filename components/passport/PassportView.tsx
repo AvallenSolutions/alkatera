@@ -122,10 +122,11 @@ export default function PassportView({ data, token }: PassportViewProps) {
         lca,
         materials,
         organization: normalizedOrganization,
+        token,
       },
       effectiveTier
     );
-  }, [product, lca, materials, organization, effectiveTier]);
+  }, [product, lca, materials, organization, effectiveTier, token]);
 
   const handleDownloadPDF = () => {
     window.print();

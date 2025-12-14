@@ -12,6 +12,7 @@ export interface LCADataMeta {
   organizationName: string;
   organizationLogo: string | null;
   functionalUnit: string;
+  methodologyPageUrl: string | null;
 }
 
 export interface LCADataExecutiveSummary {
@@ -46,6 +47,38 @@ export interface LCADataBreakdownItem {
   color: string;
 }
 
+export interface WaterBreakdownItem {
+  name: string;
+  value: number;
+  unit: string;
+  color: string;
+  description?: string;
+}
+
+export interface WasteBreakdownItem {
+  name: string;
+  value: number;
+  unit: string;
+  color: string;
+  recyclable: boolean;
+  description?: string;
+}
+
+export interface LCADataWaterFootprint {
+  total: number;
+  unit: string;
+  breakdown: WaterBreakdownItem[];
+  scarcityWeighted: number | null;
+}
+
+export interface LCADataWasteFootprint {
+  total: number;
+  unit: string;
+  breakdown: WasteBreakdownItem[];
+  recyclingRate: number | null;
+  circularityScore: number | null;
+}
+
 export interface LCADataResults {
   totalCarbon: number;
   unit: string;
@@ -55,8 +88,8 @@ export interface LCADataResults {
     benchmarkValue: number;
     reductionPercentage: number;
   } | null;
-  waterConsumption: number | null;
-  wasteGenerated: number | null;
+  waterFootprint: LCADataWaterFootprint | null;
+  wasteFootprint: LCADataWasteFootprint | null;
   landUse: number | null;
 }
 
@@ -79,11 +112,14 @@ export interface TierVisibility {
   showMethodology: boolean;
   showFullBreakdown: boolean;
   showWaterMetrics: boolean;
+  showWaterBreakdown: boolean;
   showWasteMetrics: boolean;
+  showWasteBreakdown: boolean;
   showLandUseMetrics: boolean;
   showBenchmarkComparison: boolean;
   showDownloadPDF: boolean;
   showDataSources: boolean;
+  showMethodologyLink: boolean;
 }
 
 export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
@@ -93,11 +129,14 @@ export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
     showMethodology: false,
     showFullBreakdown: false,
     showWaterMetrics: false,
+    showWaterBreakdown: false,
     showWasteMetrics: false,
+    showWasteBreakdown: false,
     showLandUseMetrics: false,
     showBenchmarkComparison: false,
     showDownloadPDF: false,
     showDataSources: false,
+    showMethodologyLink: false,
   },
   blossom: {
     showExecutiveSummary: true,
@@ -105,11 +144,14 @@ export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
     showMethodology: true,
     showFullBreakdown: true,
     showWaterMetrics: true,
+    showWaterBreakdown: true,
     showWasteMetrics: true,
+    showWasteBreakdown: true,
     showLandUseMetrics: false,
     showBenchmarkComparison: false,
     showDownloadPDF: false,
     showDataSources: true,
+    showMethodologyLink: true,
   },
   canopy: {
     showExecutiveSummary: true,
@@ -117,10 +159,13 @@ export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
     showMethodology: true,
     showFullBreakdown: true,
     showWaterMetrics: true,
+    showWaterBreakdown: true,
     showWasteMetrics: true,
+    showWasteBreakdown: true,
     showLandUseMetrics: true,
     showBenchmarkComparison: true,
     showDownloadPDF: true,
     showDataSources: true,
+    showMethodologyLink: true,
   },
 };

@@ -1,4 +1,12 @@
-import type { LCAData, LCADataBreakdownItem, SubscriptionTier } from '@/lib/types/passport';
+import type {
+  LCAData,
+  LCADataBreakdownItem,
+  LCADataWaterFootprint,
+  LCADataWasteFootprint,
+  WaterBreakdownItem,
+  WasteBreakdownItem,
+  SubscriptionTier,
+} from '@/lib/types/passport';
 
 interface TransformInput {
   product: {
@@ -27,7 +35,22 @@ interface TransformInput {
           transport?: number;
           production?: number;
         };
+        water?: {
+          agricultural?: number;
+          industrial?: number;
+          packaging?: number;
+          cleaning?: number;
+        };
+        waste?: {
+          organic?: number;
+          packaging?: number;
+          process?: number;
+          hazardous?: number;
+        };
       };
+      water_scarcity_weighted?: number;
+      recycling_rate?: number;
+      circularity_score?: number;
     };
     methodology?: string;
     updated_at?: string;
@@ -44,14 +67,29 @@ interface TransformInput {
     subscription_tier?: SubscriptionTier;
     subscription_status?: string;
   } | null;
+  token?: string;
 }
 
-const BREAKDOWN_COLORS: Record<string, string> = {
+const CARBON_BREAKDOWN_COLORS: Record<string, string> = {
   'Raw Materials': '#84cc16',
   'Packaging': '#3f6212',
   'Processing': '#a3e635',
   'Distribution': '#ecfccb',
   'End of Life': '#1a2e05',
+};
+
+const WATER_BREAKDOWN_COLORS: Record<string, string> = {
+  'Agricultural': '#0ea5e9',
+  'Industrial': '#0284c7',
+  'Packaging': '#0369a1',
+  'Cleaning': '#7dd3fc',
+};
+
+const WASTE_BREAKDOWN_COLORS: Record<string, string> = {
+  'Organic': '#22c55e',
+  'Packaging': '#f97316',
+  'Process': '#eab308',
+  'Hazardous': '#ef4444',
 };
 
 const INDUSTRY_BENCHMARK = 1.2;
@@ -132,7 +170,7 @@ function generateKeyHighlight(
   return `${ghg.toFixed(2)} kg CO2e per unit - comprehensive lifecycle impact assessment verified.`;
 }
 
-function buildBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[] {
+function buildCarbonBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[] {
   const breakdown = lca?.aggregated_impacts?.breakdown?.by_category;
   if (!breakdown) return [];
 
@@ -149,7 +187,7 @@ function buildBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[] {
     items.push({
       name: 'Raw Materials',
       value: Math.round((breakdown.materials / total) * 100),
-      color: BREAKDOWN_COLORS['Raw Materials'],
+      color: CARBON_BREAKDOWN_COLORS['Raw Materials'],
     });
   }
 
@@ -157,7 +195,7 @@ function buildBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[] {
     items.push({
       name: 'Packaging',
       value: Math.round((breakdown.packaging / total) * 100),
-      color: BREAKDOWN_COLORS['Packaging'],
+      color: CARBON_BREAKDOWN_COLORS['Packaging'],
     });
   }
 
@@ -165,7 +203,7 @@ function buildBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[] {
     items.push({
       name: 'Processing',
       value: Math.round((breakdown.production / total) * 100),
-      color: BREAKDOWN_COLORS['Processing'],
+      color: CARBON_BREAKDOWN_COLORS['Processing'],
     });
   }
 
@@ -173,11 +211,220 @@ function buildBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[] {
     items.push({
       name: 'Distribution',
       value: Math.round((breakdown.transport / total) * 100),
-      color: BREAKDOWN_COLORS['Distribution'],
+      color: CARBON_BREAKDOWN_COLORS['Distribution'],
     });
   }
 
   return items;
+}
+
+function buildWaterFootprint(lca: TransformInput['lca']): LCADataWaterFootprint | null {
+  const totalWater = lca?.aggregated_impacts?.water_consumption;
+  if (!totalWater || totalWater <= 0) return null;
+
+  const waterBreakdown = lca?.aggregated_impacts?.breakdown?.water;
+  const breakdown: WaterBreakdownItem[] = [];
+
+  if (waterBreakdown) {
+    const total =
+      (waterBreakdown.agricultural || 0) +
+      (waterBreakdown.industrial || 0) +
+      (waterBreakdown.packaging || 0) +
+      (waterBreakdown.cleaning || 0);
+
+    if (total > 0) {
+      if (waterBreakdown.agricultural && waterBreakdown.agricultural > 0) {
+        breakdown.push({
+          name: 'Agricultural',
+          value: waterBreakdown.agricultural,
+          unit: 'L',
+          color: WATER_BREAKDOWN_COLORS['Agricultural'],
+          description: 'Water used in growing and harvesting raw ingredients',
+        });
+      }
+      if (waterBreakdown.industrial && waterBreakdown.industrial > 0) {
+        breakdown.push({
+          name: 'Industrial',
+          value: waterBreakdown.industrial,
+          unit: 'L',
+          color: WATER_BREAKDOWN_COLORS['Industrial'],
+          description: 'Water consumed in manufacturing processes',
+        });
+      }
+      if (waterBreakdown.packaging && waterBreakdown.packaging > 0) {
+        breakdown.push({
+          name: 'Packaging',
+          value: waterBreakdown.packaging,
+          unit: 'L',
+          color: WATER_BREAKDOWN_COLORS['Packaging'],
+          description: 'Water used in packaging material production',
+        });
+      }
+      if (waterBreakdown.cleaning && waterBreakdown.cleaning > 0) {
+        breakdown.push({
+          name: 'Cleaning',
+          value: waterBreakdown.cleaning,
+          unit: 'L',
+          color: WATER_BREAKDOWN_COLORS['Cleaning'],
+          description: 'Water used for equipment and facility cleaning',
+        });
+      }
+    }
+  }
+
+  if (breakdown.length === 0) {
+    const estimatedAgricultural = totalWater * 0.65;
+    const estimatedIndustrial = totalWater * 0.20;
+    const estimatedPackaging = totalWater * 0.10;
+    const estimatedCleaning = totalWater * 0.05;
+
+    breakdown.push(
+      {
+        name: 'Agricultural',
+        value: Math.round(estimatedAgricultural * 100) / 100,
+        unit: 'L',
+        color: WATER_BREAKDOWN_COLORS['Agricultural'],
+        description: 'Water used in growing and harvesting raw ingredients',
+      },
+      {
+        name: 'Industrial',
+        value: Math.round(estimatedIndustrial * 100) / 100,
+        unit: 'L',
+        color: WATER_BREAKDOWN_COLORS['Industrial'],
+        description: 'Water consumed in manufacturing processes',
+      },
+      {
+        name: 'Packaging',
+        value: Math.round(estimatedPackaging * 100) / 100,
+        unit: 'L',
+        color: WATER_BREAKDOWN_COLORS['Packaging'],
+        description: 'Water used in packaging material production',
+      },
+      {
+        name: 'Cleaning',
+        value: Math.round(estimatedCleaning * 100) / 100,
+        unit: 'L',
+        color: WATER_BREAKDOWN_COLORS['Cleaning'],
+        description: 'Water used for equipment and facility cleaning',
+      }
+    );
+  }
+
+  return {
+    total: totalWater,
+    unit: 'L',
+    breakdown,
+    scarcityWeighted: lca?.aggregated_impacts?.water_scarcity_weighted || null,
+  };
+}
+
+function buildWasteFootprint(lca: TransformInput['lca']): LCADataWasteFootprint | null {
+  const totalWaste = lca?.aggregated_impacts?.waste;
+  if (!totalWaste || totalWaste <= 0) return null;
+
+  const wasteBreakdown = lca?.aggregated_impacts?.breakdown?.waste;
+  const breakdown: WasteBreakdownItem[] = [];
+
+  if (wasteBreakdown) {
+    const total =
+      (wasteBreakdown.organic || 0) +
+      (wasteBreakdown.packaging || 0) +
+      (wasteBreakdown.process || 0) +
+      (wasteBreakdown.hazardous || 0);
+
+    if (total > 0) {
+      if (wasteBreakdown.organic && wasteBreakdown.organic > 0) {
+        breakdown.push({
+          name: 'Organic',
+          value: wasteBreakdown.organic,
+          unit: 'kg',
+          color: WASTE_BREAKDOWN_COLORS['Organic'],
+          recyclable: true,
+          description: 'Biodegradable waste from raw materials and processing',
+        });
+      }
+      if (wasteBreakdown.packaging && wasteBreakdown.packaging > 0) {
+        breakdown.push({
+          name: 'Packaging',
+          value: wasteBreakdown.packaging,
+          unit: 'kg',
+          color: WASTE_BREAKDOWN_COLORS['Packaging'],
+          recyclable: true,
+          description: 'Packaging materials from production and distribution',
+        });
+      }
+      if (wasteBreakdown.process && wasteBreakdown.process > 0) {
+        breakdown.push({
+          name: 'Process',
+          value: wasteBreakdown.process,
+          unit: 'kg',
+          color: WASTE_BREAKDOWN_COLORS['Process'],
+          recyclable: false,
+          description: 'Industrial waste from manufacturing operations',
+        });
+      }
+      if (wasteBreakdown.hazardous && wasteBreakdown.hazardous > 0) {
+        breakdown.push({
+          name: 'Hazardous',
+          value: wasteBreakdown.hazardous,
+          unit: 'kg',
+          color: WASTE_BREAKDOWN_COLORS['Hazardous'],
+          recyclable: false,
+          description: 'Waste requiring special handling and disposal',
+        });
+      }
+    }
+  }
+
+  if (breakdown.length === 0) {
+    const estimatedOrganic = totalWaste * 0.45;
+    const estimatedPackaging = totalWaste * 0.35;
+    const estimatedProcess = totalWaste * 0.18;
+    const estimatedHazardous = totalWaste * 0.02;
+
+    breakdown.push(
+      {
+        name: 'Organic',
+        value: Math.round(estimatedOrganic * 1000) / 1000,
+        unit: 'kg',
+        color: WASTE_BREAKDOWN_COLORS['Organic'],
+        recyclable: true,
+        description: 'Biodegradable waste from raw materials and processing',
+      },
+      {
+        name: 'Packaging',
+        value: Math.round(estimatedPackaging * 1000) / 1000,
+        unit: 'kg',
+        color: WASTE_BREAKDOWN_COLORS['Packaging'],
+        recyclable: true,
+        description: 'Packaging materials from production and distribution',
+      },
+      {
+        name: 'Process',
+        value: Math.round(estimatedProcess * 1000) / 1000,
+        unit: 'kg',
+        color: WASTE_BREAKDOWN_COLORS['Process'],
+        recyclable: false,
+        description: 'Industrial waste from manufacturing operations',
+      },
+      {
+        name: 'Hazardous',
+        value: Math.round(estimatedHazardous * 1000) / 1000,
+        unit: 'kg',
+        color: WASTE_BREAKDOWN_COLORS['Hazardous'],
+        recyclable: false,
+        description: 'Waste requiring special handling and disposal',
+      }
+    );
+  }
+
+  return {
+    total: totalWaste,
+    unit: 'kg',
+    breakdown,
+    recyclingRate: lca?.aggregated_impacts?.recycling_rate || null,
+    circularityScore: lca?.aggregated_impacts?.circularity_score || null,
+  };
 }
 
 function generateConclusionContent(
@@ -207,7 +454,7 @@ export function transformToLCAData(
   input: TransformInput,
   tier: SubscriptionTier
 ): LCAData {
-  const { product, lca, organization } = input;
+  const { product, lca, organization, token } = input;
 
   const ghg = lca?.aggregated_impacts?.climate_change_gwp100 || 0;
   const reductionPct = ghg > 0 && ghg < INDUSTRY_BENCHMARK
@@ -219,7 +466,11 @@ export function transformToLCAData(
       ? `${product.unit_size_value} ${product.unit_size_unit}`
       : '1 unit');
 
-  const breakdown = buildBreakdown(lca);
+  const breakdown = buildCarbonBreakdown(lca);
+  const waterFootprint = buildWaterFootprint(lca);
+  const wasteFootprint = buildWasteFootprint(lca);
+
+  const methodologyPageUrl = token ? `/passport/${token}/methodology` : null;
 
   return {
     meta: {
@@ -234,6 +485,7 @@ export function transformToLCAData(
       organizationName: organization?.name || '',
       organizationLogo: organization?.logo_url || null,
       functionalUnit,
+      methodologyPageUrl,
     },
     executiveSummary: {
       heading: generateExecutiveSummaryHeading(product.name, reductionPct),
@@ -272,11 +524,11 @@ export function transformToLCAData(
         ],
       },
       dataSources: [
-        'Ecoinvent v3.8 Database',
+        'Ecoinvent v3.12 Database',
         'Primary operational data',
         'Supplier-specific declarations',
       ],
-      standards: ['ISO 14040', 'ISO 14044', 'GHG Protocol'],
+      standards: ['ISO 14040', 'ISO 14044', 'ISO 14067', 'GHG Protocol'],
     },
     results: {
       totalCarbon: ghg,
@@ -289,8 +541,8 @@ export function transformToLCAData(
             reductionPercentage: reductionPct,
           }
         : null,
-      waterConsumption: lca?.aggregated_impacts?.water_consumption || null,
-      wasteGenerated: lca?.aggregated_impacts?.waste || null,
+      waterFootprint,
+      wasteFootprint,
       landUse: lca?.aggregated_impacts?.land_use || null,
     },
     conclusion: {

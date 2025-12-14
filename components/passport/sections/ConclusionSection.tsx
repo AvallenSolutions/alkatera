@@ -1,5 +1,7 @@
 "use client";
 
+import Link from 'next/link';
+import { BookOpen, ArrowRight } from 'lucide-react';
 import type { LCADataConclusion, LCADataMeta, TierVisibility } from '@/lib/types/passport';
 
 interface ConclusionSectionProps {
@@ -46,6 +48,27 @@ export default function ConclusionSection({
       <p className="text-stone-600 leading-relaxed text-lg max-w-2xl mx-auto mb-12">
         {data.content}
       </p>
+
+      {visibility.showMethodologyLink && meta.methodologyPageUrl && (
+        <div className="mb-12 p-6 bg-white rounded-xl border border-stone-200 max-w-xl mx-auto">
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <BookOpen className="w-5 h-5 text-lime-600" />
+            <h3 className="font-mono text-xs uppercase tracking-widest text-stone-500">
+              Technical Documentation
+            </h3>
+          </div>
+          <p className="text-sm text-stone-600 mb-4">
+            Learn more about the standards, tools, and methodology used to calculate this LCA.
+          </p>
+          <Link
+            href={meta.methodologyPageUrl}
+            className="inline-flex items-center gap-2 text-lime-700 hover:text-lime-800 font-medium transition-colors"
+          >
+            <span>View Full Methodology</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row justify-center gap-6">
         {visibility.showDownloadPDF && (
