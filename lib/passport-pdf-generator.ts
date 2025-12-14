@@ -1298,7 +1298,7 @@ function drawWaterMethodologyPage(doc: jsPDF, data: PassportPDFData): void {
       y = 40;
     }
 
-    doc.setFillColor(PASSPORT_COLORS.blue600);
+    doc.setFillColor(PASSPORT_COLORS.blue500);
     doc.circle(MARGIN + 5, y + 5, 5, 'F');
 
     doc.setFont('courier', 'bold');
@@ -1481,7 +1481,7 @@ function drawLandMethodologyPage(doc: jsPDF, data: PassportPDFData): void {
 
     doc.setFont('courier', 'normal');
     doc.setFontSize(7);
-    doc.setTextColor(PASSPORT_COLORS.emerald600);
+    doc.setTextColor(PASSPORT_COLORS.emerald500);
     doc.text(cat.unit, PAGE_WIDTH - MARGIN - 8, y + 10, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
@@ -1571,7 +1571,7 @@ function drawSupplyChainPage(doc: jsPDF, data: PassportPDFData): void {
   const nodeCategories = [
     { title: 'Production Facilities', nodes: facilityNodes, color: PASSPORT_COLORS.blue500, icon: '🏭' },
     { title: 'Ingredient Suppliers', nodes: ingredientNodes, color: PASSPORT_COLORS.green500, icon: '🌾' },
-    { title: 'Packaging Suppliers', nodes: packagingNodes, color: PASSPORT_COLORS.purple500, icon: '📦' }
+    { title: 'Packaging Suppliers', nodes: packagingNodes, color: PASSPORT_COLORS.orange500, icon: '📦' }
   ];
 
   nodeCategories.forEach((category) => {
