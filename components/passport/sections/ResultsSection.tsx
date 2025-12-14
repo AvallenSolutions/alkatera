@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import { Droplets, Recycle, TreeDeciduous, CheckCircle2, XCircle } from 'lucide-react';
+import { Droplets, Recycle, TreeDeciduous, CheckCircle2, XCircle, Factory } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import type { LCADataResults, TierVisibility, LCADataWaterFootprint, LCADataWasteFootprint } from '@/lib/types/passport';
+import type { LCADataResults, TierVisibility, LCADataWaterFootprint, LCADataWasteFootprint, LCADataBreakdownItem } from '@/lib/types/passport';
 
 interface SectionHeadingProps {
   children: React.ReactNode;
@@ -32,6 +32,145 @@ function SubSectionHeading({ children, icon: Icon }: { children: React.ReactNode
   );
 }
 
+const CARBON_STAGE_DESCRIPTIONS: Record<string, string> = {
+  'Raw Materials': 'Emissions from extraction and processing of raw materials',
+  'Packaging': 'Emissions from packaging material production',
+  'Processing': 'Emissions from manufacturing and assembly operations',
+  'Distribution': 'Emissions from transport to distribution and retail',
+  'End of Life': 'Emissions from disposal and waste treatment',
+};
+
+interface CarbonFootprintSectionProps {
+  data: LCADataResults;
+  showBreakdown: boolean;
+  showBenchmark: boolean;
+  showLandUse: boolean;
+}
+
+function CarbonFootprintSection({ data, showBreakdown, showBenchmark, showLandUse }: CarbonFootprintSectionProps) {
+  const totalPercentage = data.breakdown.reduce((sum, item) => sum + item.value, 0);
+  const carbonValues = data.breakdown.map(item => ({
+    ...item,
+    absoluteValue: (item.value / 100) * data.totalCarbon,
+  }));
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-xl p-8 backdrop-blur-sm">
+      <SubSectionHeading icon={Factory}>Carbon Footprint</SubSectionHeading>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div>
+          <div className="mb-2 font-mono text-stone-400 uppercase tracking-widest text-xs">
+            Total Carbon Footprint
+          </div>
+          <div className="flex items-baseline gap-2 mb-6">
+            <span className="font-serif text-6xl text-brand-accent">
+              {data.totalCarbon.toFixed(2)}
+            </span>
+            <span className="font-serif text-xl text-stone-400">{data.unit}</span>
+          </div>
+
+          {showBenchmark && data.comparison && (
+            <div className="bg-lime-500/10 border border-lime-500/20 rounded-lg p-4 mb-4">
+              <div className="flex justify-between items-end mb-2">
+                <span className="text-xs font-mono text-lime-300 uppercase tracking-wider">
+                  vs. {data.comparison.benchmarkName}
+                </span>
+                <span className="text-xl font-bold text-brand-accent">
+                  -{data.comparison.reductionPercentage}%
+                </span>
+              </div>
+              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  whileInView={{ width: `${data.comparison.reductionPercentage}%` }}
+                  transition={{ duration: 1.5, ease: 'easeOut' }}
+                  className="h-full bg-brand-accent"
+                />
+              </div>
+              <p className="text-xs text-stone-500 mt-2">
+                Reduction vs industry average
+              </p>
+            </div>
+          )}
+
+          {showLandUse && data.landUse !== null && data.landUse > 0 && (
+            <div className="bg-white/5 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <TreeDeciduous className="w-4 h-4 text-green-400" />
+                <span className="text-xs font-mono text-stone-400 uppercase">Land Use</span>
+              </div>
+              <span className="text-xl font-semibold text-white">
+                {data.landUse.toFixed(2)}
+              </span>
+              <span className="text-xs text-stone-500 ml-1">m2a</span>
+            </div>
+          )}
+        </div>
+
+        {showBreakdown && data.breakdown.length > 0 && (
+          <div className="h-[280px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={data.breakdown}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={110}
+                  paddingAngle={2}
+                  dataKey="value"
+                  stroke="none"
+                >
+                  {data.breakdown.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#1c1917',
+                    border: '1px solid #333',
+                    color: '#fff',
+                    fontFamily: 'monospace',
+                  }}
+                  formatter={(value: number) => `${value}%`}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {showBreakdown && data.breakdown.length > 0 && (
+        <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+          {carbonValues.map((item, i) => (
+            <div key={i} className="bg-white/5 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-xs font-mono text-stone-400 uppercase">
+                  {item.name}
+                </span>
+              </div>
+              <div className="text-lg font-semibold text-white">
+                {item.absoluteValue.toFixed(3)} {data.unit}
+              </div>
+              <div className="text-sm text-brand-accent font-mono">
+                {item.value}%
+              </div>
+              <p className="text-xs text-stone-500 mt-1 line-clamp-2">
+                {CARBON_STAGE_DESCRIPTIONS[item.name] || 'Lifecycle stage emissions'}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface WaterFootprintSectionProps {
   data: LCADataWaterFootprint;
   showBreakdown: boolean;
@@ -48,7 +187,7 @@ function WaterFootprintSection({ data, showBreakdown }: WaterFootprintSectionPro
     <div className="bg-white/5 border border-white/10 rounded-xl p-8 backdrop-blur-sm">
       <SubSectionHeading icon={Droplets}>Water Footprint</SubSectionHeading>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <div>
           <div className="mb-2 font-mono text-stone-400 uppercase tracking-widest text-xs">
             Total Water Consumption
@@ -161,7 +300,7 @@ function WasteFootprintSection({ data, showBreakdown }: WasteFootprintSectionPro
     <div className="bg-white/5 border border-white/10 rounded-xl p-8 backdrop-blur-sm">
       <SubSectionHeading icon={Recycle}>Waste Footprint</SubSectionHeading>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <div>
           <div className="mb-2 font-mono text-stone-400 uppercase tracking-widest text-xs">
             Total Waste Generated
@@ -295,8 +434,6 @@ export default function ResultsSection({
   data,
   visibility,
 }: ResultsSectionProps) {
-  const showCarbonBreakdownChart = visibility.showFullBreakdown && data.breakdown.length > 0;
-
   return (
     <section className="py-24 px-6 md:px-12 bg-stone-900 text-white overflow-hidden relative">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-accent rounded-full blur-[150px] opacity-10 pointer-events-none" />
@@ -304,126 +441,28 @@ export default function ResultsSection({
       <div className="max-w-7xl mx-auto relative z-10">
         <SectionHeading number="03">Impact Results</SectionHeading>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mb-16">
-          <div className="flex flex-col">
-            <div className="mb-2 font-mono text-stone-400 uppercase tracking-widest">
-              Total Carbon Footprint
-            </div>
-            <div className="flex items-baseline gap-4 mb-6">
-              <span className="font-serif text-7xl md:text-[8rem] leading-none text-brand-accent">
-                {data.totalCarbon.toFixed(2)}
-              </span>
-              <span className="font-serif text-2xl md:text-4xl text-stone-400">
-                {data.unit}
-              </span>
-            </div>
+        <div className="space-y-8">
+          <CarbonFootprintSection
+            data={data}
+            showBreakdown={visibility.showFullBreakdown}
+            showBenchmark={visibility.showBenchmarkComparison}
+            showLandUse={visibility.showLandUseMetrics}
+          />
 
-            {visibility.showBenchmarkComparison && data.comparison && (
-              <div className="bg-white/5 border border-white/10 p-6 rounded-lg backdrop-blur-sm max-w-md">
-                <div className="flex justify-between items-end mb-2">
-                  <span className="text-sm font-mono text-stone-300">
-                    vs. {data.comparison.benchmarkName}
-                  </span>
-                  <span className="text-2xl font-bold text-brand-accent">
-                    {data.comparison.reductionPercentage}%
-                  </span>
-                </div>
-                <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    whileInView={{ width: `${data.comparison.reductionPercentage}%` }}
-                    transition={{ duration: 1.5, ease: 'easeOut' }}
-                    className="h-full bg-brand-accent"
-                  />
-                </div>
-                <p className="text-xs text-stone-500 mt-2">
-                  Reduction achieved compared to industry average.
-                </p>
-              </div>
-            )}
-
-            {visibility.showLandUseMetrics && data.landUse !== null && data.landUse > 0 && (
-              <div className="mt-6 bg-white/5 border border-white/10 p-4 rounded-lg max-w-md">
-                <div className="flex items-center gap-2 mb-2">
-                  <TreeDeciduous className="w-4 h-4 text-green-400" />
-                  <span className="text-xs font-mono text-stone-400 uppercase">Land Use</span>
-                </div>
-                <span className="text-xl font-semibold text-white">
-                  {data.landUse.toFixed(2)}
-                </span>
-                <span className="text-xs text-stone-500 ml-1">m2a</span>
-              </div>
-            )}
-          </div>
-
-          {showCarbonBreakdownChart && (
-            <div className="h-[400px] w-full">
-              <h4 className="font-mono text-sm text-center mb-8 uppercase tracking-widest text-stone-400">
-                Emission Breakdown by Stage
-              </h4>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data.breakdown}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={80}
-                    outerRadius={140}
-                    paddingAngle={2}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {data.breakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1c1917',
-                      border: '1px solid #333',
-                      color: '#fff',
-                      fontFamily: 'monospace',
-                    }}
-                    itemStyle={{ color: '#ccff00' }}
-                    formatter={(value: number) => `${value}%`}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-
-              <div className="flex flex-wrap justify-center gap-6 mt-4">
-                {data.breakdown.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: item.color }}
-                    />
-                    <span className="text-xs font-mono text-stone-400">
-                      {item.name} ({item.value}%)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {visibility.showWaterMetrics && data.waterFootprint && (
-          <div className="mb-12">
+          {visibility.showWaterMetrics && data.waterFootprint && (
             <WaterFootprintSection
               data={data.waterFootprint}
               showBreakdown={visibility.showWaterBreakdown}
             />
-          </div>
-        )}
+          )}
 
-        {visibility.showWasteMetrics && data.wasteFootprint && (
-          <div>
+          {visibility.showWasteMetrics && data.wasteFootprint && (
             <WasteFootprintSection
               data={data.wasteFootprint}
               showBreakdown={visibility.showWasteBreakdown}
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </section>
   );

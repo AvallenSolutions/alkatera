@@ -470,7 +470,9 @@ export function transformToLCAData(
   const waterFootprint = buildWaterFootprint(lca);
   const wasteFootprint = buildWasteFootprint(lca);
 
-  const methodologyPageUrl = token ? `/passport/${token}/methodology` : null;
+  const methodologyPageUrl = tier !== 'seed'
+    ? `/passport/methodology/${tier}`
+    : null;
 
   return {
     meta: {

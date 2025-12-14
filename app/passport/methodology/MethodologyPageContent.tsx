@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Database,
-  FileCheck,
   Globe,
   Leaf,
   Scale,
@@ -15,13 +14,13 @@ import {
   BookOpen,
   Layers,
   Target,
+  Lock,
 } from 'lucide-react';
 
-interface MethodologyContentProps {
-  productName: string;
-  organizationName: string;
-  functionalUnit: string;
-  token: string;
+type Tier = 'blossom' | 'canopy';
+
+interface MethodologyPageContentProps {
+  tier: Tier;
 }
 
 const standards = [
@@ -31,6 +30,7 @@ const standards = [
     description:
       'Establishes the general framework, principles, and requirements for conducting and reporting life cycle assessment studies. This standard provides the foundational methodology for our LCA approach.',
     url: 'https://www.iso.org/standard/37456.html',
+    tier: 'blossom' as Tier,
   },
   {
     name: 'ISO 14044:2006',
@@ -38,6 +38,7 @@ const standards = [
     description:
       'Specifies requirements and provides guidelines for life cycle assessment including goal and scope definition, inventory analysis, impact assessment, and interpretation phases.',
     url: 'https://www.iso.org/standard/38498.html',
+    tier: 'blossom' as Tier,
   },
   {
     name: 'ISO 14067:2018',
@@ -45,6 +46,7 @@ const standards = [
     description:
       'Specifies principles, requirements, and guidelines for the quantification and communication of the carbon footprint of products, based on ISO 14040 and ISO 14044.',
     url: 'https://www.iso.org/standard/71206.html',
+    tier: 'canopy' as Tier,
   },
   {
     name: 'GHG Protocol Product Standard',
@@ -52,6 +54,7 @@ const standards = [
     description:
       'The most widely used international accounting tool for understanding, quantifying, and managing greenhouse gas emissions from products across their lifecycle.',
     url: 'https://ghgprotocol.org/product-standard',
+    tier: 'canopy' as Tier,
   },
 ];
 
@@ -68,7 +71,6 @@ const tools = [
       'Comparison of scenarios',
     ],
     url: 'https://www.openlca.org/',
-    logo: '/images/openlca-logo.png',
   },
   {
     name: 'ecoinvent',
@@ -82,7 +84,6 @@ const tools = [
       'Regular updates',
     ],
     url: 'https://ecoinvent.org/',
-    logo: '/images/ecoinvent-logo.png',
   },
 ];
 
@@ -92,24 +93,28 @@ const impactCategories = [
     unit: 'kg CO2 eq.',
     method: 'IPCC 2021',
     description: 'Global warming potential over 100-year time horizon',
+    tier: 'blossom' as Tier,
   },
   {
     name: 'Water Consumption',
     unit: 'L',
     method: 'AWARE',
     description: 'Freshwater consumption weighted by regional scarcity',
+    tier: 'blossom' as Tier,
   },
   {
     name: 'Land Use',
     unit: 'm2a crop eq.',
     method: 'Soil Quality Index',
     description: 'Land occupation and transformation impacts',
+    tier: 'canopy' as Tier,
   },
   {
     name: 'Resource Depletion',
     unit: 'kg Sb eq.',
     method: 'CML-IA',
     description: 'Depletion of abiotic resources (minerals and metals)',
+    tier: 'canopy' as Tier,
   },
 ];
 
@@ -151,22 +156,47 @@ const systemBoundaryStages = [
   },
 ];
 
-export default function MethodologyContent({
-  productName,
-  organizationName,
-  functionalUnit,
-  token,
-}: MethodologyContentProps) {
+const TIER_CONFIG = {
+  blossom: {
+    title: 'Blossom Tier',
+    description: 'Standard methodology documentation for Blossom tier subscribers.',
+    showAllStandards: false,
+    showAllImpacts: false,
+    showDataQuality: true,
+    showReferences: true,
+    accentColor: 'lime',
+  },
+  canopy: {
+    title: 'Canopy Tier',
+    description: 'Comprehensive methodology documentation with full technical details for Canopy tier subscribers.',
+    showAllStandards: true,
+    showAllImpacts: true,
+    showDataQuality: true,
+    showReferences: true,
+    accentColor: 'emerald',
+  },
+};
+
+function isAccessible(itemTier: Tier, currentTier: Tier): boolean {
+  if (currentTier === 'canopy') return true;
+  return itemTier === 'blossom';
+}
+
+export default function MethodologyPageContent({ tier }: MethodologyPageContentProps) {
+  const config = TIER_CONFIG[tier];
+  const visibleStandards = standards.filter(s => config.showAllStandards || isAccessible(s.tier, tier));
+  const visibleImpacts = impactCategories.filter(i => config.showAllImpacts || isAccessible(i.tier, tier));
+
   return (
     <div className="min-h-screen bg-stone-50">
       <header className="bg-stone-900 text-white py-12 px-6">
         <div className="max-w-5xl mx-auto">
           <Link
-            href={`/passport/${token}`}
+            href="/"
             className="inline-flex items-center gap-2 text-stone-400 hover:text-white transition-colors mb-8"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="font-mono text-sm">Back to Passport</span>
+            <span className="font-mono text-sm">Back</span>
           </Link>
 
           <motion.div
@@ -176,15 +206,14 @@ export default function MethodologyContent({
           >
             <div className="inline-block bg-brand-accent px-3 py-1 mb-4">
               <span className="font-mono text-xs font-bold text-black uppercase tracking-widest">
-                Technical Documentation
+                {config.title} Documentation
               </span>
             </div>
             <h1 className="font-serif text-4xl md:text-5xl mb-4">
               LCA Methodology
             </h1>
             <p className="text-stone-400 max-w-2xl">
-              Comprehensive documentation of the life cycle assessment methodology,
-              data sources, and calculation standards used for {productName}.
+              {config.description}
             </p>
           </motion.div>
         </div>
@@ -206,7 +235,7 @@ export default function MethodologyContent({
                   Functional Unit
                 </h3>
                 <p className="text-lg font-semibold text-stone-900 mb-2">
-                  {functionalUnit}
+                  Product-specific
                 </p>
                 <p className="text-sm text-stone-600">
                   All environmental impacts are expressed per functional unit,
@@ -242,10 +271,10 @@ export default function MethodologyContent({
 
               <div>
                 <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500 mb-2">
-                  Commissioning Organisation
+                  Assessment Platform
                 </h3>
                 <p className="text-lg font-semibold text-stone-900 mb-2">
-                  {organizationName}
+                  Alkatera
                 </p>
                 <p className="text-sm text-stone-600">
                   LCA conducted using the Alkatera platform with
@@ -315,7 +344,7 @@ export default function MethodologyContent({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {standards.map((standard, i) => (
+            {visibleStandards.map((standard, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 20 }}
@@ -339,6 +368,14 @@ export default function MethodologyContent({
                 <p className="text-sm text-stone-600">{standard.description}</p>
               </motion.div>
             ))}
+            {tier === 'blossom' && (
+              <div className="bg-stone-100 rounded-xl border border-stone-200 p-6 flex flex-col items-center justify-center text-center">
+                <Lock className="w-8 h-8 text-stone-400 mb-3" />
+                <p className="text-sm text-stone-500">
+                  Additional standards documentation available with Canopy tier
+                </p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -426,7 +463,7 @@ export default function MethodologyContent({
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
-                {impactCategories.map((category, i) => (
+                {visibleImpacts.map((category, i) => (
                   <tr key={i}>
                     <td className="px-6 py-4 font-medium text-stone-900">
                       {category.name}
@@ -442,137 +479,154 @@ export default function MethodologyContent({
                     </td>
                   </tr>
                 ))}
+                {tier === 'blossom' && (
+                  <tr className="bg-stone-50/50">
+                    <td colSpan={4} className="px-6 py-4 text-center text-sm text-stone-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <Lock className="w-4 h-4" />
+                        Additional impact categories available with Canopy tier
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </section>
 
-        <section className="mb-16">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-lime-100 rounded-lg">
-              <Workflow className="w-5 h-5 text-lime-700" />
-            </div>
-            <h2 className="font-serif text-2xl text-stone-900">Data Quality</h2>
-          </div>
-
-          <div className="bg-white rounded-xl border border-stone-200 p-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div>
-                <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500 mb-3">
-                  Primary Data
-                </h3>
-                <p className="text-sm text-stone-600 mb-4">
-                  Primary data collected directly from {organizationName}&apos;s
-                  operations, including:
-                </p>
-                <ul className="space-y-2 text-sm text-stone-600">
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
-                    Bill of materials quantities
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
-                    Energy consumption records
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
-                    Production volumes
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
-                    Transport distances
-                  </li>
-                </ul>
+        {config.showDataQuality && (
+          <section className="mb-16">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-lime-100 rounded-lg">
+                <Workflow className="w-5 h-5 text-lime-700" />
               </div>
+              <h2 className="font-serif text-2xl text-stone-900">Data Quality</h2>
+            </div>
 
-              <div>
-                <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500 mb-3">
-                  Secondary Data
-                </h3>
-                <p className="text-sm text-stone-600 mb-4">
-                  Background data sourced from ecoinvent v3.12, covering:
-                </p>
-                <ul className="space-y-2 text-sm text-stone-600">
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
-                    Raw material production
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
-                    Energy grid mixes
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
-                    Transport processes
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
-                    Packaging materials
-                  </li>
-                </ul>
-              </div>
+            <div className="bg-white rounded-xl border border-stone-200 p-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                  <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500 mb-3">
+                    Primary Data
+                  </h3>
+                  <p className="text-sm text-stone-600 mb-4">
+                    Primary data collected directly from operations, including:
+                  </p>
+                  <ul className="space-y-2 text-sm text-stone-600">
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
+                      Bill of materials quantities
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
+                      Energy consumption records
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
+                      Production volumes
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-lime-500 mt-1.5" />
+                      Transport distances
+                    </li>
+                  </ul>
+                </div>
 
-              <div>
-                <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500 mb-3">
-                  Quality Indicators
-                </h3>
-                <p className="text-sm text-stone-600 mb-4">
-                  Data quality assessed using pedigree matrix approach:
-                </p>
-                <ul className="space-y-2 text-sm text-stone-600">
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
-                    Temporal representativeness
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
-                    Geographical representativeness
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
-                    Technological representativeness
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
-                    Completeness
-                  </li>
-                </ul>
+                <div>
+                  <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500 mb-3">
+                    Secondary Data
+                  </h3>
+                  <p className="text-sm text-stone-600 mb-4">
+                    Background data sourced from ecoinvent v3.12, covering:
+                  </p>
+                  <ul className="space-y-2 text-sm text-stone-600">
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
+                      Raw material production
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
+                      Energy grid mixes
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
+                      Transport processes
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5" />
+                      Packaging materials
+                    </li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="font-mono text-xs uppercase tracking-wider text-stone-500 mb-3">
+                    Quality Indicators
+                  </h3>
+                  <p className="text-sm text-stone-600 mb-4">
+                    Data quality assessed using pedigree matrix approach:
+                  </p>
+                  <ul className="space-y-2 text-sm text-stone-600">
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
+                      Temporal representativeness
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
+                      Geographical representativeness
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
+                      Technological representativeness
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
+                      Completeness
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-lime-100 rounded-lg">
-              <BookOpen className="w-5 h-5 text-lime-700" />
+        {config.showReferences && (
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-lime-100 rounded-lg">
+                <BookOpen className="w-5 h-5 text-lime-700" />
+              </div>
+              <h2 className="font-serif text-2xl text-stone-900">References</h2>
             </div>
-            <h2 className="font-serif text-2xl text-stone-900">References</h2>
-          </div>
 
-          <div className="bg-white rounded-xl border border-stone-200 p-8">
-            <ul className="space-y-4 text-sm text-stone-600">
-              <li>
-                ISO 14040:2006 - Environmental management - Life cycle assessment - Principles and framework
-              </li>
-              <li>
-                ISO 14044:2006 - Environmental management - Life cycle assessment - Requirements and guidelines
-              </li>
-              <li>
-                ISO 14067:2018 - Greenhouse gases - Carbon footprint of products - Requirements and guidelines
-              </li>
-              <li>
-                WRI/WBCSD (2011). Product Life Cycle Accounting and Reporting Standard. GHG Protocol.
-              </li>
-              <li>
-                Wernet, G., et al. (2016). The ecoinvent database version 3. Int J Life Cycle Assess.
-              </li>
-              <li>
-                IPCC (2021). Climate Change 2021: The Physical Science Basis. Sixth Assessment Report.
-              </li>
-            </ul>
-          </div>
-        </section>
+            <div className="bg-white rounded-xl border border-stone-200 p-8">
+              <ul className="space-y-4 text-sm text-stone-600">
+                <li>
+                  ISO 14040:2006 - Environmental management - Life cycle assessment - Principles and framework
+                </li>
+                <li>
+                  ISO 14044:2006 - Environmental management - Life cycle assessment - Requirements and guidelines
+                </li>
+                {tier === 'canopy' && (
+                  <>
+                    <li>
+                      ISO 14067:2018 - Greenhouse gases - Carbon footprint of products - Requirements and guidelines
+                    </li>
+                    <li>
+                      WRI/WBCSD (2011). Product Life Cycle Accounting and Reporting Standard. GHG Protocol.
+                    </li>
+                  </>
+                )}
+                <li>
+                  Wernet, G., et al. (2016). The ecoinvent database version 3. Int J Life Cycle Assess.
+                </li>
+                <li>
+                  IPCC (2021). Climate Change 2021: The Physical Science Basis. Sixth Assessment Report.
+                </li>
+              </ul>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="bg-stone-100 py-12 px-6 mt-16">
