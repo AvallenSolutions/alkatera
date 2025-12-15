@@ -263,7 +263,7 @@ export default function ProductLcaReportPage() {
       setIsGeneratingPdf(true);
 
       // Open the beautiful PDF report page
-      const pdfUrl = `/products/${productId}/lca-pdf`;
+      const pdfUrl = `/lca-report/${lcaData.id}`;
       window.open(pdfUrl, '_blank');
 
       toast({

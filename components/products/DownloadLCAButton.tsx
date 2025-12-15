@@ -74,7 +74,7 @@ export function DownloadLCAButton({
       }
 
       // Open the beautiful PDF report page
-      const pdfUrl = `/products/${productId}/lca-pdf`;
+      const pdfUrl = `/lca-report/${lcaId}`;
       window.open(pdfUrl, '_blank');
 
       toast.success("Report opened - use your browser's print function to save as PDF", {
