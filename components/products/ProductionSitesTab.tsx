@@ -42,6 +42,7 @@ import {
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { ContractManufacturerAllocationForm } from "@/components/facilities/ContractManufacturerAllocationForm";
+import { OwnedFacilityProductionForm } from "@/components/facilities/OwnedFacilityProductionForm";
 import { format } from "date-fns";
 
 interface ProductionSitesTabProps {
@@ -476,14 +477,29 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
       <Dialog open={dialogStep === "allocation_form"} onOpenChange={(open) => !open && handleCloseDialog()}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Contract Manufacturer Allocation</DialogTitle>
+            <DialogTitle>
+              {facilityType === "owned" ? "Owned Facility Production" : "Contract Manufacturer Allocation"}
+            </DialogTitle>
             <DialogDescription>
-              Enter facility data for {selectedFacility?.name} to calculate allocated emissions
+              {facilityType === "owned"
+                ? `Enter production data for ${selectedFacility?.name}`
+                : `Enter facility data for ${selectedFacility?.name} to calculate allocated emissions`}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedFacility && (
+          {selectedFacility && facilityType === "contract_manufacturer" && (
             <ContractManufacturerAllocationForm
+              productId={productId}
+              facilityId={selectedFacility.id}
+              facilityName={selectedFacility.name}
+              organizationId={organizationId}
+              onSuccess={handleAllocationSuccess}
+              onCancel={handleCancelAllocation}
+            />
+          )}
+
+          {selectedFacility && facilityType === "owned" && (
+            <OwnedFacilityProductionForm
               productId={productId}
               facilityId={selectedFacility.id}
               facilityName={selectedFacility.name}
