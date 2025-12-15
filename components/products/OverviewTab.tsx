@@ -709,11 +709,11 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                         {formatDistanceToNow(new Date(lca.created_at), { addSuffix: true })}
                       </span>
                     </div>
-                    {lca.aggregated_impacts && (
+                    {lca.aggregated_impacts?.totals?.climate && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-slate-300">Total Impact</span>
                         <span className="text-sm font-bold text-white">
-                          {lca.aggregated_impacts.climate_change_gwp100.toFixed(2)} kg CO₂e
+                          {lca.aggregated_impacts.totals.climate.toFixed(2)} kg CO₂e
                         </span>
                       </div>
                     )}

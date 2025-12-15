@@ -296,7 +296,7 @@ export default function ProductLcaReportPage() {
   const scope1 = breakdown?.by_scope?.scope1 || 0;
   const scope2 = breakdown?.by_scope?.scope2 || 0;
   const scope3 = breakdown?.by_scope?.scope3 || 0;
-  const totalEmissions = impacts.climate_change_gwp100;
+  const totalEmissions = impacts?.totals?.climate || 0;
 
   // Check if we have facility data
   const hasFacilityData = scope1 > 0 || scope2 > 0;
@@ -524,7 +524,7 @@ export default function ProductLcaReportPage() {
                 <div className="space-y-4">
                   <div>
                     <div className="text-3xl font-bold text-green-700 dark:text-green-400">
-                      {impacts.climate_change_gwp100.toFixed(3)}
+                      {totalEmissions.toFixed(3)}
                     </div>
                     <div className="text-xs text-muted-foreground">kg CO₂eq per unit</div>
                   </div>
@@ -533,7 +533,7 @@ export default function ProductLcaReportPage() {
                     <div className="space-y-6 pt-4 border-t">
                       <div>
                         <p className="text-sm text-muted-foreground mb-4">
-                          This product generates {impacts.climate_change_gwp100.toFixed(3)} kg of greenhouse gas emissions per {displayFunctionalUnit}. This includes all direct and indirect emissions across the supply chain.
+                          This product generates {totalEmissions.toFixed(3)} kg of greenhouse gas emissions per {displayFunctionalUnit}. This includes all direct and indirect emissions across the supply chain.
                         </p>
                       </div>
 
