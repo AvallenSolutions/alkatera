@@ -12,7 +12,6 @@ import { supabase } from '@/lib/supabaseClient';
 import MethodologyToggle from '@/components/lca/MethodologyToggle';
 import EF31SingleScoreCard from '@/components/lca/EF31SingleScoreCard';
 import EF31ImpactCategoriesTable from '@/components/lca/EF31ImpactCategoriesTable';
-import { generateEnhancedLcaPdf } from '@/lib/enhanced-pdf-generator';
 
 const MOCK_LCA_REPORT = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -263,72 +262,19 @@ export default function ProductLcaReportPage() {
     try {
       setIsGeneratingPdf(true);
 
-      toast({
-        title: 'Generating PDF',
-        description: 'Creating your report...',
-      });
-
-      // Extract data from LCA
-      const lcaImpacts = lcaData.aggregated_impacts || {};
-      const lcaDataQuality = lcaImpacts.data_quality || {};
-      const lcaDataProvenance = lcaImpacts.data_provenance || {};
-
-      // Transform data for PDF generation
-      const pdfData = {
-        productName: lcaData.product_name || productData?.name || 'Product',
-        version: lcaData.lca_version || "1.0",
-        assessmentPeriod: `${lcaData.reference_year || new Date().getFullYear()}`,
-        publishedDate: new Date(lcaData.updated_at || lcaData.created_at).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        }),
-        functionalUnit: lcaData.functional_unit || `1 unit`,
-        systemBoundary: lcaData.system_boundary || "cradle-to-gate",
-        metrics: {
-          climate_change_gwp100: lcaImpacts.climate_change_gwp100 || 0,
-          water_consumption: lcaImpacts.water_consumption || 0,
-          land_use: lcaImpacts.land_use || 0,
-          circularity_percentage: lcaImpacts.circularity_percentage || 0,
-        },
-        dataQuality: {
-          averageConfidence: lcaDataQuality.score || 0,
-          rating: lcaDataQuality.rating || "Unknown",
-          highQualityCount: lcaDataQuality.breakdown?.primary_verified_count || 0,
-          mediumQualityCount: lcaDataQuality.breakdown?.regional_standard_count || 0,
-          lowQualityCount: lcaDataQuality.breakdown?.secondary_modelled_count || 0,
-          totalMaterialsCount: lcaDataQuality.total_materials || 0,
-        },
-        dataProvenance: {
-          hybridSourcesCount: lcaDataProvenance.hybrid_sources_count || 0,
-          defraGwpCount: lcaDataProvenance.defra_gwp_count || 0,
-          supplierVerifiedCount: lcaDataProvenance.supplier_verified_count || 0,
-          ecoinventOnlyCount: lcaDataProvenance.ecoinvent_only_count || 0,
-          methodologySummary: lcaDataProvenance.methodology_summary || "Mixed sources",
-        },
-        ghgBreakdown: {
-          co2Fossil: lcaImpacts.climate_fossil || 0,
-          co2Biogenic: lcaImpacts.climate_biogenic || 0,
-          co2Dluc: lcaImpacts.climate_dluc || 0,
-        },
-        complianceFramework: {
-          standards: ["ISO 14044", "ISO 14067", "GHG Protocol Product Standard"],
-          certifications: [],
-        },
-      };
-
-      // Generate and download PDF
-      await generateEnhancedLcaPdf(pdfData);
+      // Open the beautiful PDF report page
+      const pdfUrl = `/products/${productId}/lca-pdf`;
+      window.open(pdfUrl, '_blank');
 
       toast({
-        title: 'Success',
-        description: 'PDF report has been downloaded',
+        title: 'Report Opened',
+        description: 'Use your browser\'s print function (Cmd+P / Ctrl+P) to save as PDF',
       });
     } catch (error) {
-      console.error('PDF generation error:', error);
+      console.error('Error opening PDF:', error);
       toast({
         title: 'Error',
-        description: 'Failed to generate PDF report. Please try again.',
+        description: 'Failed to open PDF report. Please try again.',
         variant: 'destructive',
       });
     } finally {
