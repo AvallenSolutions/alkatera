@@ -204,7 +204,7 @@ export default function ProductLcaReportPage() {
         },
       ];
 
-  const circularityPercentage = MOCK_METRICS.circularity_percentage;
+  const circularityPercentage = impacts.circularity_percentage || MOCK_METRICS.circularity_percentage;
   const estimatedTotalWaste = 0.45;
   const linearWasteMass = estimatedTotalWaste * (100 - circularityPercentage) / 100;
   const circularWasteMass = estimatedTotalWaste * circularityPercentage / 100;

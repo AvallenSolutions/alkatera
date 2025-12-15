@@ -178,6 +178,7 @@ Deno.serve(async (req: Request) => {
     let scope1Total = 0, scope2Total = 0, scope3Total = 0;
     let materialsTotal = 0, packagingTotal = 0, productionTotal = 0, transportTotal = 0, eolTotal = 0;
     let rawMaterialsTotal = 0, processingTotal = 0, packagingStageTotal = 0, distributionTotal = 0;
+    let totalPackagingMass = 0, recyclablePackagingMass = 0;
 
     const materialBreakdown: MaterialBreakdownItem[] = [];
 
@@ -222,6 +223,25 @@ Deno.serve(async (req: Request) => {
 
       if (isPackaging) {
         packagingTotal += climate; packagingStageTotal += climate;
+        totalPackagingMass += quantity;
+
+        // Determine recyclability based on material name
+        const materialNameLower = (material.name || '').toLowerCase();
+        const isRecyclable =
+          materialNameLower.includes('glass') ||
+          materialNameLower.includes('aluminium') ||
+          materialNameLower.includes('aluminum') ||
+          materialNameLower.includes('steel') ||
+          materialNameLower.includes('paper') ||
+          materialNameLower.includes('cardboard') ||
+          materialNameLower.includes('pet') ||
+          materialNameLower.includes('hdpe') ||
+          materialNameLower.includes('metal') ||
+          materialNameLower.includes('cork');
+
+        if (isRecyclable) {
+          recyclablePackagingMass += quantity;
+        }
       } else {
         materialsTotal += climate; rawMaterialsTotal += climate;
       }
@@ -343,6 +363,13 @@ Deno.serve(async (req: Request) => {
       ecoinvent_only: ecoinventOnlyCount
     };
 
+    // Calculate circularity percentage based on recyclable packaging mass
+    const circularityPercentage = totalPackagingMass > 0
+      ? Math.round((recyclablePackagingMass / totalPackagingMass) * 100)
+      : 0;
+
+    console.log(`[calculate-product-lca-impacts] Circularity: ${circularityPercentage}% (${recyclablePackagingMass}kg recyclable / ${totalPackagingMass}kg total packaging)`);
+
     const aggregatedImpacts = {
       climate_change_gwp100: totalClimate,
       climate_fossil: climateFossil,
@@ -366,7 +393,7 @@ Deno.serve(async (req: Request) => {
       marine_ecotoxicity: totalMarineEcotox,
       marine_eutrophication: totalMarineEutro,
       mineral_resource_scarcity: totalMineralResource,
-      circularity_percentage: 0,
+      circularity_percentage: circularityPercentage,
       water_risk_level: 'low',
       breakdown: {
         by_scope: {
