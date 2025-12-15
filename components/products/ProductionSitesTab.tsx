@@ -148,11 +148,11 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
       return;
     }
 
-    if (facilityType === "contract_manufacturer") {
+    if (facilityType === "contract_manufacturer" || facilityType === "owned") {
       console.log("Opening allocation form");
       setDialogStep("allocation_form");
     } else {
-      toast.info("Owned facility allocation coming soon");
+      toast.error("Please select a facility type");
       setDialogStep("closed");
     }
   };

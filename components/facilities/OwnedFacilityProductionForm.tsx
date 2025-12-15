@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -19,11 +18,11 @@ import {
   AlertCircle,
   Building2,
   Calendar,
+  Factory,
   Info,
   Loader2,
-  Plus,
-  Trash2,
-  Zap,
+  Percent,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -36,31 +35,6 @@ interface OwnedFacilityProductionFormProps {
   onSuccess?: () => void;
   onCancel?: () => void;
 }
-
-interface EnergyInput {
-  id: string;
-  fuelType: string;
-  consumptionValue: string;
-  consumptionUnit: string;
-  calculatedCo2e: number;
-  emissionFactorUsed: number;
-  emissionFactorYear: number;
-}
-
-const FUEL_TYPES = [
-  { value: "grid_electricity", label: "Grid Electricity", defaultUnit: "kWh" },
-  { value: "natural_gas_kwh", label: "Natural Gas (kWh)", defaultUnit: "kWh" },
-  { value: "natural_gas_m3", label: "Natural Gas (m³)", defaultUnit: "m3" },
-  { value: "diesel_stationary", label: "Diesel (Stationary)", defaultUnit: "litre" },
-  { value: "petrol", label: "Petrol", defaultUnit: "litre" },
-  { value: "lpg_litre", label: "LPG (Litres)", defaultUnit: "litre" },
-  { value: "lpg_kwh", label: "LPG (kWh)", defaultUnit: "kWh" },
-  { value: "heavy_fuel_oil", label: "Heavy Fuel Oil", defaultUnit: "litre" },
-  { value: "heat_steam", label: "Purchased Heat/Steam", defaultUnit: "kWh" },
-  { value: "biomass_wood_chips", label: "Wood Chips", defaultUnit: "kg" },
-  { value: "biomass_wood_pellets", label: "Wood Pellets", defaultUnit: "kg" },
-  { value: "biogas", label: "Biogas", defaultUnit: "kWh" },
-];
 
 const PRODUCTION_UNITS = [
   { value: "units", label: "Units" },
@@ -82,103 +56,72 @@ export function OwnedFacilityProductionForm({
   const supabase = getSupabaseBrowserClient();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [emissionFactors, setEmissionFactors] = useState<Record<string, any>>({});
+  const [loadingFacilityData, setLoadingFacilityData] = useState(false);
 
   const currentYear = new Date().getFullYear();
   const [reportingPeriodStart, setReportingPeriodStart] = useState("");
   const [reportingPeriodEnd, setReportingPeriodEnd] = useState("");
 
-  const [productionVolume, setProductionVolume] = useState("");
-  const [productionVolumeUnit, setProductionVolumeUnit] = useState("units");
-
-  const [co2eEntryMethod, setCo2eEntryMethod] = useState<"direct" | "calculated_from_energy">("calculated_from_energy");
-  const [directCo2eValue, setDirectCo2eValue] = useState("");
+  const [facilityTotalEmissions, setFacilityTotalEmissions] = useState<number | null>(null);
   const [emissionFactorYear, setEmissionFactorYear] = useState(currentYear);
-  const [energyInputs, setEnergyInputs] = useState<EnergyInput[]>([]);
+
+  const [productVolume, setProductVolume] = useState("");
+  const [productVolumeUnit, setProductVolumeUnit] = useState("units");
+  const [totalFacilityVolume, setTotalFacilityVolume] = useState("");
 
   useEffect(() => {
-    loadEmissionFactors();
-  }, [emissionFactorYear]);
+    if (reportingPeriodStart && reportingPeriodEnd) {
+      loadFacilityEmissions();
+    }
+  }, [reportingPeriodStart, reportingPeriodEnd, facilityId]);
 
-  const loadEmissionFactors = async () => {
-    const { data, error } = await supabase
-      .from("defra_energy_emission_factors")
-      .select("*")
-      .eq("factor_year", emissionFactorYear);
+  const loadFacilityEmissions = async () => {
+    setLoadingFacilityData(true);
+    try {
+      const { data, error } = await supabase
+        .from("facility_emissions_aggregated")
+        .select("total_co2e_kg, reporting_period_start, reporting_period_end")
+        .eq("facility_id", facilityId)
+        .gte("reporting_period_end", reportingPeriodStart)
+        .lte("reporting_period_start", reportingPeriodEnd)
+        .order("reporting_period_start", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (data) {
-      const factorsMap: Record<string, any> = {};
-      data.forEach((factor) => {
-        factorsMap[factor.fuel_type] = factor;
-      });
-      setEmissionFactors(factorsMap);
+      if (error) throw error;
+
+      if (data) {
+        setFacilityTotalEmissions(data.total_co2e_kg);
+        toast.success(`Found facility emissions data: ${data.total_co2e_kg.toLocaleString()} kg CO2e`);
+      } else {
+        setFacilityTotalEmissions(null);
+        toast.info("No facility emissions data found for this period. You'll need to enter it manually.");
+      }
+    } catch (error: any) {
+      console.error("Error loading facility emissions:", error);
+      toast.error("Could not load facility emissions data");
+    } finally {
+      setLoadingFacilityData(false);
     }
   };
 
-  const totalCo2e = useMemo(() => {
-    if (co2eEntryMethod === "direct") {
-      return parseFloat(directCo2eValue) || 0;
-    }
-    return energyInputs.reduce((sum, input) => sum + (input.calculatedCo2e || 0), 0);
-  }, [co2eEntryMethod, directCo2eValue, energyInputs]);
+  const allocationPercentage = useMemo(() => {
+    const prodVol = parseFloat(productVolume) || 0;
+    const totalVol = parseFloat(totalFacilityVolume) || 0;
+    if (totalVol <= 0) return 0;
+    return (prodVol / totalVol) * 100;
+  }, [productVolume, totalFacilityVolume]);
+
+  const allocatedEmissions = useMemo(() => {
+    if (!facilityTotalEmissions) return 0;
+    return (facilityTotalEmissions * allocationPercentage) / 100;
+  }, [facilityTotalEmissions, allocationPercentage]);
 
   const emissionIntensity = useMemo(() => {
-    const volume = parseFloat(productionVolume) || 0;
+    const volume = parseFloat(productVolume) || 0;
     if (volume <= 0) return 0;
-    return totalCo2e / volume;
-  }, [totalCo2e, productionVolume]);
-
-  const addEnergyInput = () => {
-    setEnergyInputs([
-      ...energyInputs,
-      {
-        id: crypto.randomUUID(),
-        fuelType: "",
-        consumptionValue: "",
-        consumptionUnit: "",
-        calculatedCo2e: 0,
-        emissionFactorUsed: 0,
-        emissionFactorYear: emissionFactorYear,
-      },
-    ]);
-  };
-
-  const removeEnergyInput = (id: string) => {
-    setEnergyInputs(energyInputs.filter((input) => input.id !== id));
-  };
-
-  const updateEnergyInput = (id: string, field: keyof EnergyInput, value: string | number) => {
-    setEnergyInputs(
-      energyInputs.map((input) => {
-        if (input.id !== id) return input;
-
-        const updated = { ...input, [field]: value };
-
-        if (field === "fuelType") {
-          const fuelType = FUEL_TYPES.find((f) => f.value === value);
-          if (fuelType) {
-            updated.consumptionUnit = fuelType.defaultUnit;
-          }
-          const factor = emissionFactors[value as string];
-          if (factor) {
-            updated.emissionFactorUsed = factor.co2e_factor;
-            updated.emissionFactorYear = factor.factor_year;
-          }
-        }
-
-        if (field === "consumptionValue" || field === "fuelType") {
-          const consumption = parseFloat(field === "consumptionValue" ? (value as string) : updated.consumptionValue) || 0;
-          const factor = emissionFactors[updated.fuelType];
-          if (factor) {
-            updated.calculatedCo2e = consumption * factor.co2e_factor;
-            updated.emissionFactorUsed = factor.co2e_factor;
-          }
-        }
-
-        return updated;
-      })
-    );
-  };
+    return allocatedEmissions / volume;
+  }, [allocatedEmissions, productVolume]);
 
   const validateForm = (): string | null => {
     if (!reportingPeriodStart || !reportingPeriodEnd) {
@@ -187,14 +130,17 @@ export function OwnedFacilityProductionForm({
     if (new Date(reportingPeriodEnd) <= new Date(reportingPeriodStart)) {
       return "End date must be after start date";
     }
-    if (!productionVolume || parseFloat(productionVolume) <= 0) {
-      return "Please enter the production volume";
+    if (!facilityTotalEmissions || facilityTotalEmissions <= 0) {
+      return "Facility total emissions data is required";
     }
-    if (co2eEntryMethod === "direct" && (!directCo2eValue || parseFloat(directCo2eValue) < 0)) {
-      return "Please enter the total CO2e";
+    if (!productVolume || parseFloat(productVolume) <= 0) {
+      return "Please enter the product volume";
     }
-    if (co2eEntryMethod === "calculated_from_energy" && energyInputs.length === 0) {
-      return "Please add at least one energy input";
+    if (!totalFacilityVolume || parseFloat(totalFacilityVolume) <= 0) {
+      return "Please enter the total facility volume";
+    }
+    if (parseFloat(productVolume) > parseFloat(totalFacilityVolume)) {
+      return "Product volume cannot exceed total facility volume";
     }
     return null;
   };
@@ -218,57 +164,28 @@ export function OwnedFacilityProductionForm({
         is_primary_site: false,
         reporting_period_start: reportingPeriodStart,
         reporting_period_end: reportingPeriodEnd,
-        production_volume: parseFloat(productionVolume),
-        production_volume_unit: productionVolumeUnit,
-        total_co2e_kg: totalCo2e,
+        production_volume: parseFloat(productVolume),
+        production_volume_unit: productVolumeUnit,
+        total_co2e_kg: allocatedEmissions,
         emission_intensity: emissionIntensity,
-        data_quality_score: co2eEntryMethod === "calculated_from_energy" ? 4 : 3,
+        production_share_percent: allocationPercentage,
+        data_quality_score: 5,
         created_by: user?.id,
         metadata: {
-          co2e_entry_method: co2eEntryMethod,
+          allocation_method: "production_volume",
+          facility_total_emissions_kg: facilityTotalEmissions,
+          facility_total_volume: parseFloat(totalFacilityVolume),
+          facility_volume_unit: productVolumeUnit,
           emission_factor_year: emissionFactorYear,
-          emission_factor_source: "DEFRA",
           scope_category: "Scope 1 & 2",
         },
       };
 
-      const { data: productionSite, error: siteError } = await supabase
+      const { error: siteError } = await supabase
         .from("product_lca_production_sites")
-        .insert(productionSiteData)
-        .select()
-        .single();
+        .insert(productionSiteData);
 
       if (siteError) throw siteError;
-
-      if (co2eEntryMethod === "calculated_from_energy" && energyInputs.length > 0) {
-        const energyLogs = energyInputs.map((input) => ({
-          organization_id: organizationId,
-          facility_id: facilityId,
-          activity_type: "energy_consumption",
-          data_source: "manual_entry",
-          reporting_period_start: reportingPeriodStart,
-          reporting_period_end: reportingPeriodEnd,
-          activity_value: parseFloat(input.consumptionValue),
-          activity_unit: input.consumptionUnit,
-          emission_factor_source: "DEFRA",
-          emission_factor_value: input.emissionFactorUsed,
-          emission_factor_unit: `kgCO2e/${input.consumptionUnit}`,
-          calculated_co2e_kg: input.calculatedCo2e,
-          scope_category: input.fuelType.includes("electricity") || input.fuelType.includes("heat_steam") ? "Scope 2" : "Scope 1",
-          metadata: {
-            fuel_type: input.fuelType,
-            linked_product_id: productId,
-            linked_production_site_id: productionSite.id,
-          },
-          created_by: user?.id,
-        }));
-
-        const { error: energyError } = await supabase
-          .from("activity_data")
-          .insert(energyLogs);
-
-        if (energyError) throw energyError;
-      }
 
       toast.success("Production site linked successfully");
       onSuccess?.();
@@ -285,8 +202,8 @@ export function OwnedFacilityProductionForm({
       <Alert className="bg-blue-500/10 border-blue-500/20">
         <Info className="h-4 w-4 text-blue-400" />
         <AlertDescription className="text-blue-200">
-          <strong>Owned Facility:</strong> This facility is under your operational control.
-          Emissions are recorded as Scope 1 & 2 and attributed 100% to this product's production volume.
+          <strong>Owned Facility Allocation:</strong> This facility is under your operational control.
+          Emissions will be allocated based on the proportion of this product's volume to total facility output.
         </AlertDescription>
       </Alert>
 
@@ -297,7 +214,7 @@ export function OwnedFacilityProductionForm({
             Reporting Period
           </CardTitle>
           <CardDescription>
-            Define the time period for this production data
+            Select the time period for this production data
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -323,245 +240,195 @@ export function OwnedFacilityProductionForm({
               />
             </div>
           </div>
+
+          {loadingFacilityData && (
+            <div className="flex items-center gap-2 text-sm text-blue-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading facility emissions data...
+            </div>
+          )}
+
+          {facilityTotalEmissions !== null && (
+            <Alert className="bg-green-500/10 border-green-500/20">
+              <Factory className="h-4 w-4 text-green-400" />
+              <AlertDescription className="text-green-200">
+                <strong>Facility Total Emissions:</strong> {facilityTotalEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO2e
+                <div className="text-xs text-green-300 mt-1">
+                  Data from facility emissions records (Scope 1 & 2)
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
+
+      {facilityTotalEmissions === null && reportingPeriodStart && reportingPeriodEnd && (
+        <Card className="bg-amber-900/20 border-amber-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-200">
+              <AlertCircle className="h-5 w-5" />
+              Manual Entry Required
+            </CardTitle>
+            <CardDescription>
+              No facility emissions data found for the selected period
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="manualEmissions">Facility Total Emissions (kg CO2e)</Label>
+              <Input
+                id="manualEmissions"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g., 100000"
+                value={facilityTotalEmissions || ""}
+                onChange={(e) => setFacilityTotalEmissions(parseFloat(e.target.value) || null)}
+                className="bg-slate-800 border-slate-700"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Enter the total Scope 1 & 2 emissions for {facilityName} during this period
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="bg-slate-900/50 border-slate-800">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <Building2 className="h-5 w-5 text-blue-400" />
-            Production Volume
+            Production Volumes
           </CardTitle>
           <CardDescription>
-            Volume of this product manufactured at {facilityName}
+            Enter production data to calculate allocation
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="volume">Production Volume</Label>
-              <Input
-                id="volume"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="e.g., 100000"
-                value={productionVolume}
-                onChange={(e) => setProductionVolume(e.target.value)}
-                className="bg-slate-800 border-slate-700"
-              />
-            </div>
-            <div>
-              <Label htmlFor="volumeUnit">Unit</Label>
-              <Select value={productionVolumeUnit} onValueChange={setProductionVolumeUnit}>
-                <SelectTrigger className="bg-slate-800 border-slate-700">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRODUCTION_UNITS.map((unit) => (
-                    <SelectItem key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-slate-900/50 border-slate-800">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Zap className="h-5 w-5 text-blue-400" />
-            Facility Energy & Emissions
-          </CardTitle>
-          <CardDescription>
-            Total facility emissions during this period (Scope 1 & 2)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs value={co2eEntryMethod} onValueChange={(v) => setCo2eEntryMethod(v as "direct" | "calculated_from_energy")}>
-            <TabsList className="grid w-full grid-cols-2 bg-slate-800">
-              <TabsTrigger value="calculated_from_energy">From Energy Bills</TabsTrigger>
-              <TabsTrigger value="direct">Direct CO2e Entry</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="calculated_from_energy" className="space-y-4 pt-4">
-              <div className="flex items-center justify-between">
+              <Label className="text-base font-medium text-white">This Product</Label>
+              <p className="text-xs text-slate-400 mb-2">Volume of this specific product manufactured</p>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Emission Factor Year</Label>
-                  <Select
-                    value={emissionFactorYear.toString()}
-                    onValueChange={(v) => setEmissionFactorYear(parseInt(v))}
-                  >
-                    <SelectTrigger className="w-32 bg-slate-800 border-slate-700">
+                  <Label htmlFor="productVolume">Volume</Label>
+                  <Input
+                    id="productVolume"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="e.g., 50000"
+                    value={productVolume}
+                    onChange={(e) => setProductVolume(e.target.value)}
+                    className="bg-slate-800 border-slate-700"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="productUnit">Unit</Label>
+                  <Select value={productVolumeUnit} onValueChange={setProductVolumeUnit}>
+                    <SelectTrigger className="bg-slate-800 border-slate-700">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {[2024, 2023, 2022].map((year) => (
-                        <SelectItem key={year} value={year.toString()}>
-                          DEFRA {year}
+                      {PRODUCTION_UNITS.map((unit) => (
+                        <SelectItem key={unit.value} value={unit.value}>
+                          {unit.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <Button variant="outline" size="sm" onClick={addEnergyInput}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Energy Source
-                </Button>
               </div>
+            </div>
 
-              {energyInputs.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">
-                  No energy sources added. Click "Add Energy Source" to begin.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {energyInputs.map((input) => (
-                    <Card key={input.id} className="bg-slate-800/50 border-slate-700">
-                      <CardContent className="p-4">
-                        <div className="grid grid-cols-12 gap-3 items-end">
-                          <div className="col-span-4">
-                            <Label className="text-xs">Fuel Type</Label>
-                            <Select
-                              value={input.fuelType}
-                              onValueChange={(v) => updateEnergyInput(input.id, "fuelType", v)}
-                            >
-                              <SelectTrigger className="bg-slate-900 border-slate-600">
-                                <SelectValue placeholder="Select fuel" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {FUEL_TYPES.map((fuel) => (
-                                  <SelectItem key={fuel.value} value={fuel.value}>
-                                    {fuel.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="col-span-3">
-                            <Label className="text-xs">Consumption</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0"
-                              value={input.consumptionValue}
-                              onChange={(e) => updateEnergyInput(input.id, "consumptionValue", e.target.value)}
-                              className="bg-slate-900 border-slate-600"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <Label className="text-xs">Unit</Label>
-                            <Input
-                              value={input.consumptionUnit}
-                              disabled
-                              className="bg-slate-900 border-slate-600"
-                            />
-                          </div>
-                          <div className="col-span-2">
-                            <Label className="text-xs">CO2e (kg)</Label>
-                            <div className="h-10 px-3 flex items-center bg-slate-900 border border-slate-600 rounded-md text-blue-400 font-mono">
-                              {input.calculatedCo2e.toFixed(2)}
-                            </div>
-                          </div>
-                          <div className="col-span-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeEnergyInput(input.id)}
-                              className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                        {input.emissionFactorUsed > 0 && (
-                          <p className="text-xs text-slate-500 mt-2">
-                            Factor: {input.emissionFactorUsed} kgCO2e/{input.consumptionUnit} (DEFRA {input.emissionFactorYear})
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {energyInputs.length > 0 && (
-                <div className="flex justify-end pt-2">
-                  <div className="text-right">
-                    <p className="text-xs text-slate-400">Total Facility CO2e</p>
-                    <p className="text-xl font-bold text-blue-400 font-mono">
-                      {totalCo2e.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg
-                    </p>
-                  </div>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="direct" className="space-y-4 pt-4">
+            <div className="pt-4 border-t border-slate-700">
+              <Label className="text-base font-medium text-white">Total Facility Output</Label>
+              <p className="text-xs text-slate-400 mb-2">Total volume of all products at this facility (same units)</p>
               <div>
-                <Label htmlFor="directCo2e">Total Facility CO2e (kg)</Label>
+                <Label htmlFor="totalVolume">Total Volume ({productVolumeUnit})</Label>
                 <Input
-                  id="directCo2e"
+                  id="totalVolume"
                   type="number"
                   min="0"
                   step="0.01"
-                  placeholder="e.g., 50000"
-                  value={directCo2eValue}
-                  onChange={(e) => setDirectCo2eValue(e.target.value)}
+                  placeholder="e.g., 200000"
+                  value={totalFacilityVolume}
+                  onChange={(e) => setTotalFacilityVolume(e.target.value)}
                   className="bg-slate-800 border-slate-700"
                 />
                 <p className="text-xs text-slate-400 mt-1">
-                  Enter the total CO2e if already calculated from your sustainability reports
+                  Include all products manufactured at this facility during the period
                 </p>
               </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-blue-900/20 border-blue-500/30">
-        <CardHeader>
-          <CardTitle className="text-blue-200">Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-slate-400">Total CO2e</p>
-              <p className="text-2xl font-bold text-white font-mono">
-                {totalCo2e.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Emission Intensity</p>
-              <p className="text-2xl font-bold text-blue-400 font-mono">
-                {emissionIntensity.toFixed(4)}
-              </p>
-              <p className="text-xs text-slate-500">kg CO2e / {productionVolumeUnit}</p>
-            </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-slate-700">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className="text-slate-300">
-                {co2eEntryMethod === "direct" ? "Direct Entry" : "Calculated from Energy"}
-              </Badge>
-              <Badge variant="outline" className="text-slate-300">
-                DEFRA {emissionFactorYear}
-              </Badge>
-              <Badge className="bg-blue-500/20 text-blue-300">
-                Scope 1 & 2
-              </Badge>
-              <Badge className="bg-green-500/20 text-green-300">
-                Verified
-              </Badge>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {allocationPercentage > 0 && (
+        <Card className="bg-blue-900/20 border-blue-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-200">
+              <TrendingUp className="h-5 w-5" />
+              Allocation Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Percent className="h-4 w-4 text-blue-400" />
+                  <p className="text-xs text-slate-400">Allocation %</p>
+                </div>
+                <p className="text-3xl font-bold text-blue-400 font-mono">
+                  {allocationPercentage.toFixed(2)}%
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  of facility emissions
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Factory className="h-4 w-4 text-white" />
+                  <p className="text-xs text-slate-400">Allocated Emissions</p>
+                </div>
+                <p className="text-3xl font-bold text-white font-mono">
+                  {allocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  kg CO2e total
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Building2 className="h-4 w-4 text-lime-400" />
+                  <p className="text-xs text-slate-400">Emission Intensity</p>
+                </div>
+                <p className="text-3xl font-bold text-lime-400 font-mono">
+                  {emissionIntensity.toFixed(4)}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  kg CO2e / {productVolumeUnit}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t border-slate-700">
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <p className="text-slate-400">Calculation Method:</p>
+                  <p className="text-white font-medium">Production Volume Allocation</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <Badge className="bg-blue-500/20 text-blue-300">Scope 1 & 2</Badge>
+                  <Badge className="bg-green-500/20 text-green-300">Owned Facility</Badge>
+                  <Badge variant="outline" className="text-slate-300">DEFRA {emissionFactorYear}</Badge>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex items-center justify-end gap-3 pt-4">
         {onCancel && (
@@ -571,7 +438,7 @@ export function OwnedFacilityProductionForm({
         )}
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || !facilityTotalEmissions || allocationPercentage === 0}
           className="bg-blue-500 hover:bg-blue-600 text-white"
         >
           {isSubmitting ? (
