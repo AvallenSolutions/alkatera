@@ -345,8 +345,8 @@ Deno.serve(async (req: Request) => {
           {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+            }
+          );
       }
     }
 
@@ -358,6 +358,17 @@ Deno.serve(async (req: Request) => {
       // Sum up all calculated emissions for this organization
       const totalEmissions = calculationResults.reduce((sum, result) => sum + result.calculated_value_co2e, 0);
       console.log(`Total emissions calculated: ${totalEmissions.toFixed(2)} kg CO₂e from ${calculationResults.length} activities`);
+
+      // Calculate scope breakdown from the calculation results
+      const scope1Total = calculationResults
+        .filter((_, idx) => activityData[idx]?.category === 'Scope 1')
+        .reduce((sum, result) => sum + result.calculated_value_co2e, 0);
+
+      const scope2Total = calculationResults
+        .filter((_, idx) => activityData[idx]?.category === 'Scope 2')
+        .reduce((sum, result) => sum + result.calculated_value_co2e, 0);
+
+      console.log(`Scope breakdown - Scope 1: ${scope1Total.toFixed(2)} kg CO₂e, Scope 2: ${scope2Total.toFixed(2)} kg CO₂e`);
 
       // Query existing facility_emissions_aggregated records that need updating
       // These are records with production volume (update ALL records, not just those with zero emissions)
@@ -387,6 +398,10 @@ Deno.serve(async (req: Request) => {
                 activity_count: calculationResults.length,
                 status: 'calculated',
                 calculation_date: new Date().toISOString(),
+                scope_breakdown: {
+                  scope1: scope1Total,
+                  scope2: scope2Total,
+                },
               },
             })
             .eq('id', record.id);
@@ -394,44 +409,29 @@ Deno.serve(async (req: Request) => {
           if (updateError) {
             console.error(`Warning: Failed to update facility_emissions_aggregated record ${record.id}:`, updateError);
           } else {
-            console.log(`✓ Updated facility ${record.facility_id}: ${totalEmissions.toFixed(2)} kg CO₂e / ${record.total_production_volume} units`);
-            console.log(`  Intensity will be auto-calculated by database trigger`);
+            console.log(`Successfully updated facility_emissions_aggregated record ${record.id} with ${totalEmissions.toFixed(2)} kg CO₂e`);
           }
         }
-
-        console.log(`Successfully updated ${facilityRecords.length} facility record(s)`);
       } else {
-        console.log('No facility records found awaiting emissions calculation');
+        console.log('No facility_emissions_aggregated records found with production volume data.');
       }
     } catch (aggError) {
-      console.error('Error during facility aggregation:', aggError);
-      // Don't fail the entire calculation, just log the warning
+      console.error('Error during facility emissions aggregation:', aggError);
+      // Don't fail the entire function if aggregation fails
     }
 
-    // Prepare summary message
-    let message = `Successfully calculated Scope 1 & 2 emissions for ${calculationResults.length} activity record(s) and created ${insertedRecords.length} cryptographic log(s).`;
-
-    if (unmatchedActivities.length > 0) {
-      message += ` ${unmatchedActivities.length} activity record(s) could not be matched to emissions factors.`;
-    }
-
-    if (facilitiesMap.size > 0) {
-      message += ` Aggregated emissions for ${facilitiesMap.size} facility reporting period(s).`;
-    }
-
+    // Return success response
     return new Response(
       JSON.stringify({
         success: true,
-        message,
+        message: "Scope 1 & 2 emissions calculated successfully",
         calculations_performed: calculationResults.length,
         logs_created: insertedRecords.length,
-        facilities_aggregated: facilitiesMap.size,
-        unmatched_activities: unmatchedActivities.length,
+        unmatched_activities: unmatchedActivities.length > 0 ? unmatchedActivities : undefined,
         details: {
-          total_unprocessed: activityData.length,
+          total_activities_processed: activityData.length,
           matched: calculationResults.length,
           unmatched: unmatchedActivities.length,
-          unmatched_list: unmatchedActivities,
         },
       }),
       {
@@ -440,11 +440,11 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error("Unexpected error:", error);
+    console.error("Error in invoke-scope1-2-calculations:", error);
     return new Response(
-      JSON.stringify({ 
-        error: "Internal server error", 
-        details: error instanceof Error ? error.message : "Unknown error" 
+      JSON.stringify({
+        error: "Internal server error",
+        details: error instanceof Error ? error.message : "Unknown error",
       }),
       {
         status: 500,

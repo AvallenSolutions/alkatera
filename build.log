@@ -20,8 +20,8 @@ https://nextjs.org/telemetry
    Collecting page data ...
 Warning: Please use the `legacy` build in Node.js environments.
    Generating static pages (0/66) ...
-Warning: Please use the `legacy` build in Node.js environments.
 ✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
+Warning: Please use the `legacy` build in Node.js environments.
 ✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
 ✅ Supabase browser client initialising: { url: 'https://dfcezkyaejrxmbwunhry.supabase.co', hasAnonKey: true }
    Generating static pages (16/66) 
@@ -81,6 +81,7 @@ Route (app)                                  Size     First Load JS
 ├ ƒ /knowledge-bank/categories/[categoryId]  4.59 kB         175 kB
 ├ ƒ /knowledge-bank/items/[itemId]           5.21 kB         175 kB
 ├ ƒ /knowledge-bank/new                      4.14 kB         200 kB
+├ ƒ /lca-report/[id]                         809 B           264 kB
 ├ ○ /login                                   152 B           163 kB
 ├ ƒ /operations                              1.79 kB         210 kB
 ├ ƒ /passport/[token]                        19.6 kB         307 kB
@@ -90,15 +91,15 @@ Route (app)                                  Size     First Load JS
 ├ ƒ /performance                             22.2 kB         209 kB
 ├ ƒ /production                              20.8 kB         227 kB
 ├ ƒ /products                                3.66 kB         204 kB
-├ ƒ /products/[id]                           82.4 kB         304 kB
-├ ƒ /products/[id]/calculate-lca             10.5 kB         165 kB
+├ ƒ /products/[id]                           84.8 kB         307 kB
+├ ƒ /products/[id]/calculate-lca             10.8 kB         165 kB
 ├ ƒ /products/[id]/core-operations           9.54 kB         193 kB
 ├ ƒ /products/[id]/distribution              1.02 kB        98.6 kB
 ├ ƒ /products/[id]/end-of-life               1.01 kB        98.6 kB
-├ ƒ /products/[id]/lca-pdf                   15.3 kB         208 kB
+├ ƒ /products/[id]/lca-pdf                   839 B           264 kB
 ├ ƒ /products/[id]/materials                 6.63 kB         194 kB
 ├ ƒ /products/[id]/recipe                    20.9 kB         237 kB
-├ ƒ /products/[id]/report                    20.1 kB         197 kB
+├ ƒ /products/[id]/report                    20 kB           197 kB
 ├ ƒ /products/detail                         6.21 kB         163 kB
 ├ ƒ /products/import                         105 kB          275 kB
 ├ ƒ /products/new                            10.8 kB         215 kB

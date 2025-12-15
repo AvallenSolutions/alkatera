@@ -259,31 +259,19 @@ Deno.serve(async (req: Request) => {
       if (allocatedEmissions > 0) {
         const { data: facilityEmissions } = await supabase
           .from("facility_emissions_aggregated")
-          .select("total_co2e")
+          .select("total_co2e, results_payload")
           .eq("facility_id", facility.id)
           .order("reporting_period_end", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        const { data: scope1Data } = await supabase
-          .from("calculated_emissions")
-          .select("calculated_value_co2e, activity_data(category)")
-          .eq("organization_id", lca.organization_id)
-          .ilike("activity_data.category", "Scope 1")
-          .order("calculation_timestamp", { ascending: false });
-
-        const { data: scope2Data } = await supabase
-          .from("calculated_emissions")
-          .select("calculated_value_co2e, activity_data(category)")
-          .eq("organization_id", lca.organization_id)
-          .ilike("activity_data.category", "Scope 2")
-          .order("calculation_timestamp", { ascending: false });
-
-        const actualScope1Total = scope1Data?.reduce((sum, item) => sum + (Number(item.calculated_value_co2e) || 0), 0) || 0;
-        const actualScope2Total = scope2Data?.reduce((sum, item) => sum + (Number(item.calculated_value_co2e) || 0), 0) || 0;
+        // Extract scope breakdown from facility's results_payload
+        const scopeBreakdown = facilityEmissions?.results_payload?.scope_breakdown;
+        const actualScope1Total = scopeBreakdown?.scope1 || 0;
+        const actualScope2Total = scopeBreakdown?.scope2 || 0;
         const actualTotalEmissions = actualScope1Total + actualScope2Total;
 
-        console.log(`[calculate-product-lca-impacts] Actual facility emissions - Scope 1: ${actualScope1Total}, Scope 2: ${actualScope2Total}, Total: ${actualTotalEmissions}`);
+        console.log(`[calculate-product-lca-impacts] Facility-specific emissions - Scope 1: ${actualScope1Total}, Scope 2: ${actualScope2Total}, Total: ${actualTotalEmissions}`);
 
         let allocatedScope1 = 0;
         let allocatedScope2 = 0;
@@ -295,9 +283,9 @@ Deno.serve(async (req: Request) => {
           allocatedScope1 = allocatedEmissions * scope1Ratio;
           allocatedScope2 = allocatedEmissions * scope2Ratio;
 
-          console.log(`[calculate-product-lca-impacts] Using actual scope ratios - Scope 1: ${(scope1Ratio * 100).toFixed(1)}%, Scope 2: ${(scope2Ratio * 100).toFixed(1)}%`);
+          console.log(`[calculate-product-lca-impacts] Using facility scope ratios - Scope 1: ${(scope1Ratio * 100).toFixed(1)}%, Scope 2: ${(scope2Ratio * 100).toFixed(1)}%`);
         } else {
-          console.log(`[calculate-product-lca-impacts] No actual scope data found, treating as Scope 3 upstream emissions`);
+          console.log(`[calculate-product-lca-impacts] No scope breakdown found in facility data, treating as Scope 3 upstream emissions`);
           allocatedScope1 = 0;
           allocatedScope2 = 0;
         }
@@ -356,63 +344,68 @@ Deno.serve(async (req: Request) => {
     };
 
     const aggregatedImpacts = {
-      totals: {
-        climate: totalClimate,
-        climate_fossil: climateFossil,
-        climate_biogenic: climateBiogenic,
-        climate_dluc: climateDluc,
-        water: totalWater,
-        water_scarcity: totalWaterScarcity,
-        land: totalLand,
-        waste: totalWaste,
-        terrestrial_ecotoxicity: totalTerrestrialEcotox,
-        freshwater_eutrophication: totalFreshwaterEutro,
-        terrestrial_acidification: totalTerrestrialAcid,
-        fossil_resource_scarcity: totalFossilResource,
-        ozone_depletion: totalOzoneDepletion,
-        photochemical_ozone: totalPhotochemicalOzone,
-        ionising_radiation: totalIonisingRadiation,
-        particulate_matter: totalParticulateMatter,
-        human_tox_carcinogenic: totalHumanToxCarcinogenic,
-        human_tox_non_carcinogenic: totalHumanToxNonCarcinogenic,
-        freshwater_ecotoxicity: totalFreshwaterEcotox,
-        marine_ecotoxicity: totalMarineEcotox,
-        marine_eutrophication: totalMarineEutro,
-        mineral_resource_scarcity: totalMineralResource,
-        materials: materialsTotal,
-        packaging: packagingTotal,
-        production: productionTotal,
-        transport: transportTotal,
-        end_of_life: eolTotal,
-        raw_materials: rawMaterialsTotal,
-        processing: processingTotal,
-        packaging_stage: packagingStageTotal,
-        distribution: distributionTotal
-      },
+      climate_change_gwp100: totalClimate,
+      climate_fossil: climateFossil,
+      climate_biogenic: climateBiogenic,
+      climate_dluc: climateDluc,
+      water_consumption: totalWater,
+      water_scarcity_aware: totalWaterScarcity,
+      land_use: totalLand,
+      waste: totalWaste,
+      terrestrial_ecotoxicity: totalTerrestrialEcotox,
+      freshwater_eutrophication: totalFreshwaterEutro,
+      terrestrial_acidification: totalTerrestrialAcid,
+      fossil_resource_scarcity: totalFossilResource,
+      ozone_depletion: totalOzoneDepletion,
+      photochemical_ozone_formation: totalPhotochemicalOzone,
+      ionising_radiation: totalIonisingRadiation,
+      particulate_matter: totalParticulateMatter,
+      human_toxicity_carcinogenic: totalHumanToxCarcinogenic,
+      human_toxicity_non_carcinogenic: totalHumanToxNonCarcinogenic,
+      freshwater_ecotoxicity: totalFreshwaterEcotox,
+      marine_ecotoxicity: totalMarineEcotox,
+      marine_eutrophication: totalMarineEutro,
+      mineral_resource_scarcity: totalMineralResource,
+      circularity_percentage: 0,
+      water_risk_level: 'low',
       breakdown: {
         by_scope: {
           scope1: scope1Total,
           scope2: scope2Total,
           scope3: scope3Total
         },
-        by_lifecycle: {
+        by_category: {
           materials: materialsTotal,
           packaging: packagingTotal,
           production: productionTotal,
           transport: transportTotal,
-          distribution: distributionTotal,
           end_of_life: eolTotal
         },
-        by_stage: {
+        by_lifecycle_stage: {
           raw_materials: rawMaterialsTotal,
           processing: processingTotal,
-          packaging: packagingStageTotal,
-          distribution: distributionTotal
+          packaging_stage: packagingStageTotal,
+          distribution: distributionTotal,
+          use_phase: 0,
+          end_of_life: eolTotal
+        },
+        by_ghg: {
+          co2_fossil: climateFossil,
+          co2_biogenic: climateBiogenic,
+          ch4: 0,
+          n2o: 0
         },
         by_material: materialBreakdown.slice(0, 20),
         by_facility: facilityBreakdown
       },
-      data_quality: dataQualitySummary
+      data_quality: dataQualitySummary,
+      data_provenance: {
+        methodology_summary: '',
+        hybrid_sources_count: hybridSourcesCount,
+        defra_gwp_count: defraGwpCount,
+        supplier_verified_count: supplierVerifiedCount,
+        ecoinvent_only_count: ecoinventOnlyCount
+      }
     };
 
     const { error: updateError } = await supabase
