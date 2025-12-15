@@ -133,11 +133,6 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
     const facility = facilities.find((f) => f.id === facilityId);
     if (facility) {
       setSelectedFacility(facility);
-      if (facility.operational_control === "third_party") {
-        setFacilityType("contract_manufacturer");
-      } else {
-        setFacilityType("owned");
-      }
     }
   };
 
