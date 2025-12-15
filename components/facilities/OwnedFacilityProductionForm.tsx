@@ -197,13 +197,25 @@ export function OwnedFacilityProductionForm({
 
       // If no LCA exists for this product, create one
       if (!productLCA) {
+        // Fetch the product details to get the name
+        const { data: product, error: productError } = await supabase
+          .from("products")
+          .select("name")
+          .eq("id", productId)
+          .single();
+
+        if (productError) throw productError;
+
         const { data: newLCA, error: createError } = await supabase
           .from("product_lcas")
           .insert({
             product_id: productId,
             organization_id: organizationId,
+            product_name: product.name,
+            functional_unit: "1 unit",
+            reference_year: new Date().getFullYear(),
             status: "draft",
-            methodology: "ISO 14067",
+            lca_methodology: "recipe_2016",
           })
           .select("id")
           .single();
@@ -231,7 +243,13 @@ export function OwnedFacilityProductionForm({
       onSuccess?.();
     } catch (error: any) {
       console.error("Error saving production site:", error);
-      toast.error(error.message || "Failed to save production site");
+      console.error("Error details:", {
+        message: error?.message,
+        details: error?.details,
+        hint: error?.hint,
+        code: error?.code,
+      });
+      toast.error(error?.message || error?.details || "Failed to save production site");
     } finally {
       setIsSubmitting(false);
     }
