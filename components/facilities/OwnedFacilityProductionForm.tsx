@@ -80,7 +80,7 @@ export function OwnedFacilityProductionForm({
     try {
       const { data, error } = await supabase
         .from("facility_emissions_aggregated")
-        .select("total_co2e_kg, reporting_period_start, reporting_period_end")
+        .select("total_co2e, total_production_volume, volume_unit, reporting_period_start, reporting_period_end")
         .eq("facility_id", facilityId)
         .gte("reporting_period_end", reportingPeriodStart)
         .lte("reporting_period_start", reportingPeriodEnd)
@@ -91,10 +91,27 @@ export function OwnedFacilityProductionForm({
       if (error) throw error;
 
       if (data) {
-        setFacilityTotalEmissions(data.total_co2e_kg);
-        toast.success(`Found facility emissions data: ${data.total_co2e_kg.toLocaleString()} kg CO2e`);
+        setFacilityTotalEmissions(data.total_co2e);
+
+        // Auto-populate Total Facility Output if available
+        if (data.total_production_volume && data.volume_unit) {
+          setTotalFacilityVolume(data.total_production_volume.toString());
+          // Map the volume_unit from the database to the select options
+          const unitMapping: Record<string, string> = {
+            'Litres': 'litres',
+            'Hectolitres': 'litres',
+            'Units': 'units',
+            'kg': 'kg',
+          };
+          const mappedUnit = unitMapping[data.volume_unit] || 'litres';
+          setProductVolumeUnit(mappedUnit);
+          toast.success(`Found facility data: ${data.total_co2e.toLocaleString()} kg CO2e, ${data.total_production_volume.toLocaleString()} ${data.volume_unit}`);
+        } else {
+          toast.success(`Found facility emissions data: ${data.total_co2e.toLocaleString()} kg CO2e`);
+        }
       } else {
         setFacilityTotalEmissions(null);
+        setTotalFacilityVolume("");
         toast.info("No facility emissions data found for this period. You'll need to enter it manually.");
       }
     } catch (error: any) {
@@ -343,7 +360,11 @@ export function OwnedFacilityProductionForm({
 
             <div className="pt-4 border-t border-slate-700">
               <Label className="text-base font-medium text-white">Total Facility Output</Label>
-              <p className="text-xs text-slate-400 mb-2">Total volume of all products at this facility (same units)</p>
+              <p className="text-xs text-slate-400 mb-2">
+                {totalFacilityVolume
+                  ? "Auto-filled from facility production data"
+                  : "Total volume of all products at this facility (same units)"}
+              </p>
               <div>
                 <Label htmlFor="totalVolume">Total Volume ({productVolumeUnit})</Label>
                 <Input
@@ -354,10 +375,13 @@ export function OwnedFacilityProductionForm({
                   placeholder="e.g., 200000"
                   value={totalFacilityVolume}
                   onChange={(e) => setTotalFacilityVolume(e.target.value)}
-                  className="bg-slate-800 border-slate-700"
+                  disabled={!!totalFacilityVolume && facilityTotalEmissions !== null}
+                  className={`bg-slate-800 border-slate-700 ${totalFacilityVolume && facilityTotalEmissions !== null ? 'opacity-75 cursor-not-allowed' : ''}`}
                 />
                 <p className="text-xs text-slate-400 mt-1">
-                  Include all products manufactured at this facility during the period
+                  {totalFacilityVolume && facilityTotalEmissions !== null
+                    ? "Value loaded from facility emissions data"
+                    : "Include all products manufactured at this facility during the period"}
                 </p>
               </div>
             </div>
