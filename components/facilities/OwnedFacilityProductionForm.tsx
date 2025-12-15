@@ -186,14 +186,18 @@ export function OwnedFacilityProductionForm({
 
     setIsSubmitting(true);
     try {
-      // First, find or create the product_lca for this product
-      let { data: productLCA, error: lcaError } = await supabase
+      // First, find the most recent product_lca for this product
+      // Note: There may be multiple LCAs per product (versioning), so we get the latest one
+      const { data: productLCAs, error: lcaError } = await supabase
         .from("product_lcas")
         .select("id")
         .eq("product_id", productId)
-        .maybeSingle();
+        .order("created_at", { ascending: false })
+        .limit(1);
 
       if (lcaError) throw lcaError;
+
+      let productLCA = productLCAs?.[0] || null;
 
       // If no LCA exists for this product, create one
       if (!productLCA) {
