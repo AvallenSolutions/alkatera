@@ -162,6 +162,8 @@ Deno.serve(async (req: Request) => {
       .select(`*, facility:facilities(id, name, calculated_metrics)`)
       .eq("product_lca_id", product_lca_id);
 
+    console.log(`[calculate-product-lca-impacts] Found ${productionSites?.length || 0} production sites`);
+
     let totalClimate = 0, totalWater = 0, totalWaterScarcity = 0, totalLand = 0, totalWaste = 0;
     let totalOzoneDepletion = 0, totalPhotochemicalOzone = 0, totalIonisingRadiation = 0, totalParticulateMatter = 0;
     let totalHumanToxCarcinogenic = 0, totalHumanToxNonCarcinogenic = 0, totalTerrestrialEcotox = 0;
@@ -252,26 +254,46 @@ Deno.serve(async (req: Request) => {
 
     const facilityBreakdown: FacilityBreakdownItem[] = [];
     productionSites?.forEach((site: any) => {
-      const sharePercent = Number(site.production_volume_share_percent) || 0;
+      const productionVolume = Number(site.production_volume) || 0;
+      const facilityIntensity = Number(site.facility_intensity) || 0;
       const facility = site.facility;
-      if (!facility || sharePercent === 0) return;
-      const calculatedMetrics = facility.calculated_metrics || {};
-      const facilityIntensity = Number(calculatedMetrics.emissions_intensity_kg_co2e_per_kg) || 0;
-      const allocatedEmissions = (lca.functional_unit || 1) * (sharePercent / 100) * facilityIntensity;
+
+      console.log(`[calculate-product-lca-impacts] Processing site: ${facility?.name}, volume: ${productionVolume}, intensity: ${facilityIntensity}`);
+
+      if (!facility || productionVolume === 0 || facilityIntensity === 0) {
+        console.log(`[calculate-product-lca-impacts] Skipping site - missing data`);
+        return;
+      }
+
+      // Calculate allocated emissions: production volume × facility intensity
+      const allocatedEmissions = productionVolume * facilityIntensity;
+
+      console.log(`[calculate-product-lca-impacts] Allocated emissions: ${allocatedEmissions} kg CO2e`);
+
       if (allocatedEmissions > 0) {
-        const scope1 = Number(calculatedMetrics.total_scope_1_emissions) || 0;
-        const scope2 = Number(calculatedMetrics.total_scope_2_emissions) || 0;
-        const totalFacilityEmissions = scope1 + scope2;
-        const allocatedScope1 = totalFacilityEmissions > 0 ? (scope1 / totalFacilityEmissions) * allocatedEmissions : 0;
-        const allocatedScope2 = totalFacilityEmissions > 0 ? (scope2 / totalFacilityEmissions) * allocatedEmissions : 0;
-        totalClimate += allocatedEmissions; scope1Total += allocatedScope1; scope2Total += allocatedScope2;
-        productionTotal += allocatedEmissions; processingTotal += allocatedEmissions;
+        // For now, assume 80% Scope 2 (electricity) and 20% Scope 1 (direct) for processing
+        // This is a reasonable default for beverage production facilities
+        const allocatedScope2 = allocatedEmissions * 0.8;
+        const allocatedScope1 = allocatedEmissions * 0.2;
+
+        totalClimate += allocatedEmissions;
+        scope1Total += allocatedScope1;
+        scope2Total += allocatedScope2;
+        productionTotal += allocatedEmissions;
+        processingTotal += allocatedEmissions;
+
         facilityBreakdown.push({
-          facility_name: facility.name, emissions: allocatedEmissions,
-          percentage: 0, scope1: allocatedScope1, scope2: allocatedScope2,
+          facility_name: facility.name,
+          emissions: allocatedEmissions,
+          percentage: 0,
+          scope1: allocatedScope1,
+          scope2: allocatedScope2,
         });
       }
     });
+
+    console.log(`[calculate-product-lca-impacts] Total processing emissions: ${processingTotal} kg CO2e`);
+    console.log(`[calculate-product-lca-impacts] Total climate: ${totalClimate} kg CO2e`);
 
     if (totalClimate > 0) {
       materialBreakdown.forEach(item => { item.percentage = (item.emissions / totalClimate) * 100; });
