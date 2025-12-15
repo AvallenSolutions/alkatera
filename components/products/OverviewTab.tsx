@@ -37,14 +37,14 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
       return null;
     }
 
-    const stages = latestLCA.aggregated_impacts?.breakdown?.by_stage;
+    const stages = latestLCA.aggregated_impacts?.breakdown?.by_lifecycle_stage;
 
     if (!stages) {
       return null;
     }
 
     const rawMaterialsTotal = stages.raw_materials || 0;
-    const packagingTotal = stages.packaging || 0;
+    const packagingTotal = stages.packaging_stage || 0;
     const processingTotal = stages.processing || 0;
     const transportationTotal = stages.distribution || 0;
 
@@ -60,7 +60,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
   };
 
   const breakdown = calculateMaterialBreakdown();
-  const totalCarbon = hasLCAData && latestLCA.aggregated_impacts?.totals?.climate ? latestLCA.aggregated_impacts.totals.climate : 0;
+  const totalCarbon = hasLCAData && latestLCA.aggregated_impacts?.climate_change_gwp100 ? latestLCA.aggregated_impacts.climate_change_gwp100 : 0;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -709,11 +709,11 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                         {formatDistanceToNow(new Date(lca.created_at), { addSuffix: true })}
                       </span>
                     </div>
-                    {lca.aggregated_impacts?.totals?.climate && (
+                    {lca.aggregated_impacts?.climate_change_gwp100 && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-slate-300">Total Impact</span>
                         <span className="text-sm font-bold text-white">
-                          {lca.aggregated_impacts.totals.climate.toFixed(2)} kg CO₂e
+                          {lca.aggregated_impacts.climate_change_gwp100.toFixed(2)} kg CO₂e
                         </span>
                       </div>
                     )}

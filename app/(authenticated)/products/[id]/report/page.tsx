@@ -296,7 +296,7 @@ export default function ProductLcaReportPage() {
   const scope1 = breakdown?.by_scope?.scope1 || 0;
   const scope2 = breakdown?.by_scope?.scope2 || 0;
   const scope3 = breakdown?.by_scope?.scope3 || 0;
-  const totalEmissions = impacts?.totals?.climate || 0;
+  const totalEmissions = impacts?.climate_change_gwp100 || 0;
 
   // Check if we have facility data
   const hasFacilityData = scope1 > 0 || scope2 > 0;
