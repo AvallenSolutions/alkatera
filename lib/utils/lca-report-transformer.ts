@@ -173,25 +173,25 @@ export function transformLCADataForReport(
       ]
     },
     climateImpact: {
-      totalCarbon,
+      totalCarbon: totalCarbon.toFixed(3),
       breakdown: chartBreakdown,
       stages: [
-        { label: "Raw Materials", value: rawMaterials, unit: "kg CO₂eq", percentage: rawMaterialsPct, color: "green" },
-        { label: "Packaging", value: packaging, unit: "kg CO₂eq", percentage: packagingPct, color: "yellow" },
-        { label: "Distribution", value: distribution, unit: "kg CO₂eq", percentage: distributionPct, color: "orange" },
-        { label: "Processing", value: processing, unit: "kg CO₂eq", percentage: processingPct, color: "blue" }
+        { label: "Raw Materials", value: rawMaterials, unit: "kg CO₂eq", percentage: rawMaterialsPct.toFixed(1), color: "green" },
+        { label: "Packaging", value: packaging, unit: "kg CO₂eq", percentage: packagingPct.toFixed(1), color: "yellow" },
+        { label: "Distribution", value: distribution, unit: "kg CO₂eq", percentage: distributionPct.toFixed(1), color: "orange" },
+        { label: "Processing", value: processing, unit: "kg CO₂eq", percentage: processingPct.toFixed(1), color: "blue" }
       ].filter(stage => stage.value > 0),
       scopes: [
-        { name: "Scope 1 (Direct)", value: scope1Pct },
-        { name: "Scope 2 (Energy)", value: scope2Pct },
-        { name: "Scope 3 (Value Chain)", value: scope3Pct }
+        { name: "Scope 1 (Direct)", value: scope1Pct.toFixed(1) },
+        { name: "Scope 2 (Energy)", value: scope2Pct.toFixed(1) },
+        { name: "Scope 3 (Value Chain)", value: scope3Pct.toFixed(1) }
       ],
       methodology: {
         ghgBreakdown: [
-          { label: "CO₂ Fossil", value: (ghgBreakdown.co2_fossil || impacts.climate_fossil || 0).toFixed(4), unit: "kg CO₂e", gwp: "1" },
-          { label: "CO₂ Biogenic", value: (ghgBreakdown.co2_biogenic || impacts.climate_biogenic || 0).toFixed(4), unit: "kg CO₂e", gwp: "1*" },
-          { label: "CH₄", value: (ghgBreakdown.ch4 || 0).toFixed(4), unit: "kg CO₂e", gwp: "29.8" },
-          { label: "N₂O", value: (ghgBreakdown.n2o || 0).toFixed(4), unit: "kg CO₂e", gwp: "273" }
+          { label: "CO₂ Fossil", value: (ghgBreakdown.co2_fossil || impacts.climate_fossil || 0).toFixed(3), unit: "kg CO₂e", gwp: "1" },
+          { label: "CO₂ Biogenic", value: (ghgBreakdown.co2_biogenic || impacts.climate_biogenic || 0).toFixed(3), unit: "kg CO₂e", gwp: "1*" },
+          { label: "CH₄", value: (ghgBreakdown.ch4 || 0).toFixed(3), unit: "kg CO₂e", gwp: "29.8" },
+          { label: "N₂O", value: (ghgBreakdown.n2o || 0).toFixed(3), unit: "kg CO₂e", gwp: "273" }
         ],
         standards: [
           "ISO 14067:2018 — Greenhouse gases — Carbon footprint of products",
@@ -202,8 +202,8 @@ export function transformLCADataForReport(
       }
     },
     waterFootprint: {
-      totalConsumption: `${waterConsumption.toFixed(1)}L`,
-      scarcityWeighted: `${waterScarcity.toFixed(2)}L eq.`,
+      totalConsumption: `${waterConsumption.toFixed(3)}L`,
+      scarcityWeighted: `${waterScarcity.toFixed(3)}L eq.`,
       breakdown: chartBreakdown.map(item => ({
         name: item.name,
         value: item.value,
@@ -214,9 +214,9 @@ export function transformLCADataForReport(
       sources: materials.slice(0, 8).map((m: any) => ({
         source: m.material_name || "Material",
         location: m.origin_country || m.country_of_origin || "Unknown",
-        volume: `${((m.impact_water || 0) * (m.quantity || 1)).toFixed(1)} L`,
+        volume: `${((m.impact_water || 0) * (m.quantity || 1)).toFixed(3)} L`,
         risk: waterScarcity > 50 ? "HIGH" : waterScarcity > 20 ? "MEDIUM" : "LOW",
-        score: 10.0
+        score: parseFloat((10.0).toFixed(3))
       })),
       methodology: {
         steps: [
@@ -256,13 +256,13 @@ export function transformLCADataForReport(
       }
     },
     landUse: {
-      totalLandUse: `${landUse.toFixed(2)}m²`,
+      totalLandUse: `${landUse.toFixed(3)}m²`,
       breakdown: materials.slice(0, 8).map((m: any) => ({
         material: m.material_name || "Material",
         origin: m.origin_country || m.country_of_origin || "Unknown",
         mass: `${(m.quantity || 0).toFixed(3)} kg`,
-        intensity: (m.impact_land || 0) / (m.quantity || 1),
-        footprint: `${(m.impact_land || landUse / Math.max(materials.length, 1)).toFixed(4)} m²`
+        intensity: parseFloat(((m.impact_land || 0) / (m.quantity || 1)).toFixed(3)),
+        footprint: `${(m.impact_land || landUse / Math.max(materials.length, 1)).toFixed(3)} m²`
       })),
       methodology: {
         categories: [

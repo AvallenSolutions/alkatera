@@ -51,7 +51,7 @@ export const WaterPage = ({ data }: { data: LCAReportData }) => (
           <div className="w-1/4 text-right">{source.volume}</div>
           <div className="w-1/4 text-right flex items-center justify-end gap-2">
             <span className={source.risk === 'MEDIUM' ? 'text-yellow-500' : source.risk === 'HIGH' ? 'text-red-500' : 'text-green-500'}>{source.risk}</span>
-            <span className="font-mono text-xs opacity-50">{source.score.toFixed(2)}</span>
+            <span className="font-mono text-xs opacity-50">{source.score.toFixed(3)}</span>
           </div>
         </div>
       ))}

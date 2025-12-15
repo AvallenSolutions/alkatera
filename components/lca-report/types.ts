@@ -29,10 +29,10 @@ export interface LCAReportData {
     dataSources: Array<{ name: string; count: number }>;
   };
   climateImpact: {
-    totalCarbon: number;
+    totalCarbon: string;
     breakdown: Array<{ name: string; value: number; color: string }>;
-    stages: Array<{ label: string; value: number; unit: string; percentage: number; color: string }>;
-    scopes: Array<{ name: string; value: number }>;
+    stages: Array<{ label: string; value: number; unit: string; percentage: string; color: string }>;
+    scopes: Array<{ name: string; value: string }>;
     methodology: {
       ghgBreakdown: Array<{ label: string; value: string; unit: string; gwp: string }>;
       standards: string[];
