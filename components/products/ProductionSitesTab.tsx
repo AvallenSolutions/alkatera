@@ -101,7 +101,17 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
   const loadData = async () => {
     setLoading(true);
     try {
-      const [facilitiesRes, allocationsRes] = await Promise.all([
+      // First get the product_lca_id for this product
+      const { data: productLCAs } = await supabase
+        .from("product_lcas")
+        .select("id")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const productLcaId = productLCAs?.[0]?.id;
+
+      const [facilitiesRes, allocationsRes, productionSitesRes] = await Promise.all([
         supabase
           .from("facilities")
           .select("id, name, operational_control, address_city, address_country, functions")
@@ -112,10 +122,56 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
           .eq("product_id", productId)
           .eq("organization_id", organizationId)
           .order("reporting_period_start", { ascending: false }),
+        // Fetch owned facility production sites
+        productLcaId ? supabase
+          .from("product_lca_production_sites")
+          .select(`
+            id,
+            facility_id,
+            production_volume,
+            share_of_production,
+            facility_intensity,
+            data_source,
+            created_at,
+            facilities!inner (
+              name,
+              address_city,
+              address_country
+            )
+          `)
+          .eq("product_lca_id", productLcaId)
+          .order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
       ]);
 
       if (facilitiesRes.data) setFacilities(facilitiesRes.data);
-      if (allocationsRes.data) setAllocations(allocationsRes.data);
+
+      // Merge contract manufacturer allocations with owned facility production sites
+      const cmAllocations = allocationsRes.data || [];
+      const ownedSites = (productionSitesRes.data || []).map((site: any) => ({
+        id: site.id,
+        facility_id: site.facility_id,
+        facility_name: site.facilities.name,
+        facility_city: site.facilities.address_city,
+        facility_country: site.facilities.address_country,
+        supplier_name: null,
+        reporting_period_start: site.created_at,
+        reporting_period_end: site.created_at,
+        total_facility_production_volume: site.production_volume,
+        production_volume_unit: "units",
+        client_production_volume: site.production_volume,
+        attribution_ratio: (site.share_of_production || 100) / 100,
+        allocated_emissions_kg_co2e: (site.facility_intensity || 0) * site.production_volume,
+        emission_intensity_kg_co2e_per_unit: site.facility_intensity || 0,
+        status: site.data_source === "Verified" ? "verified" : "provisional",
+        is_energy_intensive_process: false,
+        uses_proxy_data: site.data_source !== "Verified",
+        data_source_tag: site.data_source,
+        co2e_entry_method: "Production Volume Allocation",
+        created_at: site.created_at,
+        days_pending: null,
+      }));
+
+      setAllocations([...cmAllocations, ...ownedSites]);
     } catch (error) {
       console.error("Error loading production sites data:", error);
       toast.error("Failed to load production sites");
