@@ -148,19 +148,23 @@ Deno.serve(async (req: Request) => {
       .eq("product_lca_id", product_lca_id);
 
     if (materialsError) {
-      console.error("[calculate-product-lca-impacts] Materials fetch error:", materialsError);
+      console.error("[calculate-product-lca-impacts] Error loading materials:", materialsError);
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to fetch materials" }),
+        JSON.stringify({ success: false, error: "Failed to load materials" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     console.log(`[calculate-product-lca-impacts] Found ${materials?.length || 0} materials`);
 
-    const { data: productionSites } = await supabase
+    const { data: productionSites, error: sitesError } = await supabase
       .from("product_lca_production_sites")
-      .select(`*, facility:facilities(id, name, calculated_metrics)`)
+      .select(`*, facility:facilities(id, name)`)
       .eq("product_lca_id", product_lca_id);
+
+    if (sitesError) {
+      console.error("[calculate-product-lca-impacts] Error loading production sites:", sitesError);
+    }
 
     console.log(`[calculate-product-lca-impacts] Found ${productionSites?.length || 0} production sites`);
 
@@ -182,51 +186,33 @@ Deno.serve(async (req: Request) => {
       const climate = Number(material.impact_climate) || 0;
       const transport = Number(material.impact_transport) || 0;
       const water = Number(material.impact_water) || 0;
-      const waterScarcity = Number(material.impact_water_scarcity) || water * 20;
+      const waterScarcity = Number(material.impact_water_scarcity) || 0;
       const land = Number(material.impact_land) || 0;
       const waste = Number(material.impact_waste) || 0;
-
-      const ozoneDepletion = Number(material.impact_ozone_depletion) || 0;
-      const photochemicalOzone = Number(material.impact_photochemical_ozone_formation) || 0;
-      const ionisingRadiation = Number(material.impact_ionising_radiation) || 0;
-      const particulateMatter = Number(material.impact_particulate_matter) || 0;
-      const humanToxCarcinogenic = Number(material.impact_human_toxicity_carcinogenic) || 0;
-      const humanToxNonCarcinogenic = Number(material.impact_human_toxicity_non_carcinogenic) || 0;
       const terrestrialEcotox = Number(material.impact_terrestrial_ecotoxicity) || 0;
-      const freshwaterEcotox = Number(material.impact_freshwater_ecotoxicity) || 0;
-      const marineEcotox = Number(material.impact_marine_ecotoxicity) || 0;
       const freshwaterEutro = Number(material.impact_freshwater_eutrophication) || 0;
-      const marineEutro = Number(material.impact_marine_eutrophication) || 0;
       const terrestrialAcid = Number(material.impact_terrestrial_acidification) || 0;
-      const mineralResource = Number(material.impact_mineral_resource_scarcity) || 0;
       const fossilResource = Number(material.impact_fossil_resource_scarcity) || 0;
 
-      const climateF = Number(material.impact_climate_fossil) || 0;
-      const climateB = Number(material.impact_climate_biogenic) || 0;
-      const climateD = Number(material.impact_climate_dluc) || 0;
+      totalClimate += climate;
+      totalWater += water;
+      totalWaterScarcity += waterScarcity;
+      totalLand += land;
+      totalWaste += waste;
+      totalTerrestrialEcotox += terrestrialEcotox;
+      totalFreshwaterEutro += freshwaterEutro;
+      totalTerrestrialAcid += terrestrialAcid;
+      totalFossilResource += fossilResource;
 
-      const isHybrid = material.is_hybrid_source || false;
-      const gwpSource = material.gwp_data_source || '';
-      const dataQualityGrade = material.data_quality_grade || '';
+      climateFossil += Number(material.impact_climate_fossil) || 0;
+      climateBiogenic += Number(material.impact_climate_biogenic) || 0;
+      climateDluc += Number(material.impact_climate_dluc) || 0;
 
-      if (isHybrid && gwpSource.includes('DEFRA')) {
-        hybridSourcesCount++; defraGwpCount++;
-      } else if (dataQualityGrade === 'HIGH' || gwpSource.includes('Supplier')) {
-        supplierVerifiedCount++;
-      } else if (gwpSource.includes('Ecoinvent') && !isHybrid) {
-        ecoinventOnlyCount++;
-      }
-
-      totalClimate += climate; totalWater += water; totalWaterScarcity += waterScarcity;
-      totalLand += land; totalWaste += waste;
-      totalOzoneDepletion += ozoneDepletion; totalPhotochemicalOzone += photochemicalOzone;
-      totalIonisingRadiation += ionisingRadiation; totalParticulateMatter += particulateMatter;
-      totalHumanToxCarcinogenic += humanToxCarcinogenic; totalHumanToxNonCarcinogenic += humanToxNonCarcinogenic;
-      totalTerrestrialEcotox += terrestrialEcotox; totalFreshwaterEcotox += freshwaterEcotox;
-      totalMarineEcotox += marineEcotox; totalFreshwaterEutro += freshwaterEutro;
-      totalMarineEutro += marineEutro; totalTerrestrialAcid += terrestrialAcid;
-      totalMineralResource += mineralResource; totalFossilResource += fossilResource;
-      climateFossil += climateF; climateBiogenic += climateB; climateDluc += climateD;
+      const dataSource = material.impact_source || material.data_source || 'unknown';
+      if (dataSource.includes('hybrid')) hybridSourcesCount++;
+      else if (dataSource.includes('defra')) defraGwpCount++;
+      else if (dataSource.includes('supplier')) supplierVerifiedCount++;
+      else if (dataSource.includes('ecoinvent')) ecoinventOnlyCount++;
 
       totalClimate += transport; transportTotal += transport;
       scope3Total += climate + transport;
@@ -357,204 +343,116 @@ Deno.serve(async (req: Request) => {
     else if (dataQualityScore >= 70) dataQualityRating = 'Medium';
 
     const dataQualitySummary = {
-      score: dataQualityScore, rating: dataQualityRating, total_materials: totalMaterialCount,
-      breakdown: {
-        primary_verified_count: priority1Count,
-        primary_verified_share: `${totalMaterialCount > 0 ? Math.round((priority1Count / totalMaterialCount) * 100) : 0}%`,
-        regional_standard_count: priority2Count,
-        regional_standard_share: `${totalMaterialCount > 0 ? Math.round((priority2Count / totalMaterialCount) * 100) : 0}%`,
-        secondary_modelled_count: priority3Count,
-        secondary_modelled_share: `${totalMaterialCount > 0 ? Math.round((priority3Count / totalMaterialCount) * 100) : 0}%`,
-      },
+      overall_score: dataQualityScore,
+      rating: dataQualityRating,
+      material_count: totalMaterialCount,
+      primary_data_count: priority1Count,
+      regional_data_count: priority2Count,
+      modelled_data_count: priority3Count,
+      hybrid_sources: hybridSourcesCount,
+      defra_gwp: defraGwpCount,
+      supplier_verified: supplierVerifiedCount,
+      ecoinvent_only: ecoinventOnlyCount
     };
-
-    const enrichedMaterialBreakdown = materialBreakdown.map((item: any) => {
-      const material = materials?.find((m: any) => m.name === item.name);
-      return {
-        ...item,
-        data_quality_tag: material?.data_quality_tag || 'Unknown',
-        confidence_score: material?.confidence_score || 0,
-        source_reference: material?.source_reference || 'Unknown',
-        methodology: material?.methodology || 'Unknown',
-      };
-    });
-
-    const methodologySummary = [];
-    if (defraGwpCount > 0) methodologySummary.push(`DEFRA 2025 GHG factors (${defraGwpCount} materials)`);
-    if (supplierVerifiedCount > 0) methodologySummary.push(`Supplier verified EPDs (${supplierVerifiedCount} materials)`);
-    if (ecoinventOnlyCount > 0) methodologySummary.push(`Ecoinvent 3.12 full dataset (${ecoinventOnlyCount} materials)`);
-    if (hybridSourcesCount > 0) methodologySummary.push(`Hybrid sources (${hybridSourcesCount} materials)`);
 
     const aggregatedImpacts = {
-      climate_change_gwp100: totalClimate, water_consumption: totalWater, water_scarcity_aware: totalWaterScarcity, land_use: totalLand,
-      ozone_depletion: totalOzoneDepletion, photochemical_ozone_formation: totalPhotochemicalOzone,
-      ionising_radiation: totalIonisingRadiation, particulate_matter: totalParticulateMatter,
-      human_toxicity_carcinogenic: totalHumanToxCarcinogenic, human_toxicity_non_carcinogenic: totalHumanToxNonCarcinogenic,
-      terrestrial_ecotoxicity: totalTerrestrialEcotox, freshwater_ecotoxicity: totalFreshwaterEcotox,
-      marine_ecotoxicity: totalMarineEcotox, freshwater_eutrophication: totalFreshwaterEutro,
-      marine_eutrophication: totalMarineEutro, terrestrial_acidification: totalTerrestrialAcid,
-      mineral_resource_scarcity: totalMineralResource, fossil_resource_scarcity: totalFossilResource, waste: totalWaste,
-      climate_fossil: climateFossil, climate_biogenic: climateBiogenic, climate_dluc: climateDluc,
-      circularity_percentage: 0, water_risk_level: 'low', data_quality: dataQualitySummary,
-      data_provenance: {
-        hybrid_sources_count: hybridSourcesCount, defra_gwp_count: defraGwpCount,
-        supplier_verified_count: supplierVerifiedCount, ecoinvent_only_count: ecoinventOnlyCount,
-        methodology_summary: methodologySummary.join('; '),
+      totals: {
+        climate: totalClimate,
+        climate_fossil: climateFossil,
+        climate_biogenic: climateBiogenic,
+        climate_dluc: climateDluc,
+        water: totalWater,
+        water_scarcity: totalWaterScarcity,
+        land: totalLand,
+        waste: totalWaste,
+        terrestrial_ecotoxicity: totalTerrestrialEcotox,
+        freshwater_eutrophication: totalFreshwaterEutro,
+        terrestrial_acidification: totalTerrestrialAcid,
+        fossil_resource_scarcity: totalFossilResource,
+        ozone_depletion: totalOzoneDepletion,
+        photochemical_ozone: totalPhotochemicalOzone,
+        ionising_radiation: totalIonisingRadiation,
+        particulate_matter: totalParticulateMatter,
+        human_tox_carcinogenic: totalHumanToxCarcinogenic,
+        human_tox_non_carcinogenic: totalHumanToxNonCarcinogenic,
+        freshwater_ecotoxicity: totalFreshwaterEcotox,
+        marine_ecotoxicity: totalMarineEcotox,
+        marine_eutrophication: totalMarineEutro,
+        mineral_resource_scarcity: totalMineralResource,
+        materials: materialsTotal,
+        packaging: packagingTotal,
+        production: productionTotal,
+        transport: transportTotal,
+        end_of_life: eolTotal,
+        raw_materials: rawMaterialsTotal,
+        processing: processingTotal,
+        packaging_stage: packagingStageTotal,
+        distribution: distributionTotal
       },
       breakdown: {
-        by_scope: { scope1: scope1Total, scope2: scope2Total, scope3: scope3Total },
-        by_category: { materials: materialsTotal, packaging: packagingTotal, production: productionTotal, transport: transportTotal, end_of_life: eolTotal },
-        by_ghg: { co2_fossil: climateFossil, co2_biogenic: climateBiogenic, ch4: 0, n2o: 0 },
-        by_lifecycle_stage: {
-          raw_materials: rawMaterialsTotal, processing: processingTotal, packaging_stage: packagingStageTotal,
-          distribution: distributionTotal, use_phase: 0, end_of_life: 0,
+        by_scope: {
+          scope1: scope1Total,
+          scope2: scope2Total,
+          scope3: scope3Total
         },
-        by_material: enrichedMaterialBreakdown,
-        by_facility: facilityBreakdown,
+        by_lifecycle: {
+          materials: materialsTotal,
+          packaging: packagingTotal,
+          production: productionTotal,
+          transport: transportTotal,
+          distribution: distributionTotal,
+          end_of_life: eolTotal
+        },
+        by_stage: {
+          raw_materials: rawMaterialsTotal,
+          processing: processingTotal,
+          packaging: packagingStageTotal,
+          distribution: distributionTotal
+        },
+        by_material: materialBreakdown.slice(0, 20),
+        by_facility: facilityBreakdown
       },
+      data_quality: dataQualitySummary
     };
-
-    let ef31Impacts: any = null;
-    let ef31SingleScore: number | null = null;
-
-    if (hasEF31Access || force_ef31) {
-      console.log("[calculate-product-lca-impacts] Calculating EF 3.1 impacts...");
-
-      const ef31RawImpacts: EF31ImpactValues = {
-        climate_change_total: 0, climate_change_fossil: 0, climate_change_biogenic: 0, climate_change_luluc: 0,
-        ozone_depletion: 0, ionising_radiation: 0, photochemical_ozone_formation: 0, particulate_matter: 0,
-        human_toxicity_cancer: 0, human_toxicity_non_cancer: 0, acidification: 0,
-        eutrophication_freshwater: 0, eutrophication_marine: 0, eutrophication_terrestrial: 0,
-        ecotoxicity_freshwater: 0, land_use: 0, water_use: 0, resource_use_fossils: 0, resource_use_minerals_metals: 0,
-      };
-
-      materials?.forEach((material: any) => {
-        ef31RawImpacts.climate_change_total += Number(material.ef_climate_change_total) || Number(material.impact_climate) || 0;
-        ef31RawImpacts.climate_change_fossil += Number(material.ef_climate_change_fossil) || (Number(material.impact_climate) || 0) * 0.85;
-        ef31RawImpacts.climate_change_biogenic += Number(material.ef_climate_change_biogenic) || (Number(material.impact_climate) || 0) * 0.10;
-        ef31RawImpacts.climate_change_luluc += Number(material.ef_climate_change_luluc) || (Number(material.impact_climate) || 0) * 0.05;
-        ef31RawImpacts.ozone_depletion += Number(material.ef_ozone_depletion) || Number(material.impact_ozone_depletion) || 0;
-        ef31RawImpacts.ionising_radiation += Number(material.ef_ionising_radiation) || Number(material.impact_ionising_radiation) || 0;
-        ef31RawImpacts.photochemical_ozone_formation += Number(material.ef_photochemical_ozone_formation) || Number(material.impact_photochemical_ozone_formation) || 0;
-        ef31RawImpacts.particulate_matter += Number(material.ef_particulate_matter) || Number(material.impact_particulate_matter) || 0;
-        ef31RawImpacts.human_toxicity_cancer += Number(material.ef_human_toxicity_cancer) || Number(material.impact_human_toxicity_carcinogenic) || 0;
-        ef31RawImpacts.human_toxicity_non_cancer += Number(material.ef_human_toxicity_non_cancer) || Number(material.impact_human_toxicity_non_carcinogenic) || 0;
-        ef31RawImpacts.acidification += Number(material.ef_acidification) || Number(material.impact_terrestrial_acidification) || 0;
-        ef31RawImpacts.eutrophication_freshwater += Number(material.ef_eutrophication_freshwater) || Number(material.impact_freshwater_eutrophication) || 0;
-        ef31RawImpacts.eutrophication_marine += Number(material.ef_eutrophication_marine) || Number(material.impact_marine_eutrophication) || 0;
-        ef31RawImpacts.eutrophication_terrestrial += Number(material.ef_eutrophication_terrestrial) || 0;
-        ef31RawImpacts.ecotoxicity_freshwater += Number(material.ef_ecotoxicity_freshwater) || Number(material.impact_freshwater_ecotoxicity) || 0;
-        ef31RawImpacts.land_use += Number(material.ef_land_use) || Number(material.impact_land) || 0;
-        ef31RawImpacts.water_use += Number(material.ef_water_use) || Number(material.impact_water) || 0;
-        ef31RawImpacts.resource_use_fossils += Number(material.ef_resource_use_fossils) || Number(material.impact_fossil_resource_scarcity) || 0;
-        ef31RawImpacts.resource_use_minerals_metals += Number(material.ef_resource_use_minerals_metals) || Number(material.impact_mineral_resource_scarcity) || 0;
-      });
-
-      const normalisedImpacts: Record<string, number> = {
-        CC: ef31RawImpacts.climate_change_total / EU27_2010_NORMALISATION_FACTORS.CC,
-        OD: ef31RawImpacts.ozone_depletion / EU27_2010_NORMALISATION_FACTORS.OD,
-        IR: ef31RawImpacts.ionising_radiation / EU27_2010_NORMALISATION_FACTORS.IR,
-        POF: ef31RawImpacts.photochemical_ozone_formation / EU27_2010_NORMALISATION_FACTORS.POF,
-        PM: ef31RawImpacts.particulate_matter / EU27_2010_NORMALISATION_FACTORS.PM,
-        HTC: ef31RawImpacts.human_toxicity_cancer / EU27_2010_NORMALISATION_FACTORS.HTC,
-        HTNC: ef31RawImpacts.human_toxicity_non_cancer / EU27_2010_NORMALISATION_FACTORS.HTNC,
-        AC: ef31RawImpacts.acidification / EU27_2010_NORMALISATION_FACTORS.AC,
-        EUF: ef31RawImpacts.eutrophication_freshwater / EU27_2010_NORMALISATION_FACTORS.EUF,
-        EUM: ef31RawImpacts.eutrophication_marine / EU27_2010_NORMALISATION_FACTORS.EUM,
-        EUT: ef31RawImpacts.eutrophication_terrestrial / EU27_2010_NORMALISATION_FACTORS.EUT,
-        ETF: ef31RawImpacts.ecotoxicity_freshwater / EU27_2010_NORMALISATION_FACTORS.ETF,
-        LU: ef31RawImpacts.land_use / EU27_2010_NORMALISATION_FACTORS.LU,
-        WU: ef31RawImpacts.water_use / EU27_2010_NORMALISATION_FACTORS.WU,
-        RUF: ef31RawImpacts.resource_use_fossils / EU27_2010_NORMALISATION_FACTORS.RUF,
-        RUM: ef31RawImpacts.resource_use_minerals_metals / EU27_2010_NORMALISATION_FACTORS.RUM,
-      };
-
-      const weightedImpacts: Record<string, number> = {};
-      let singleScoreSum = 0;
-      for (const [code, normValue] of Object.entries(normalisedImpacts)) {
-        const weight = DEFAULT_WEIGHTING_FACTORS[code as keyof typeof DEFAULT_WEIGHTING_FACTORS] || 0;
-        weightedImpacts[code] = normValue * weight;
-        singleScoreSum += weightedImpacts[code];
-      }
-
-      ef31SingleScore = singleScoreSum;
-
-      ef31Impacts = {
-        raw_impacts: ef31RawImpacts,
-        normalised_impacts: normalisedImpacts,
-        weighted_impacts: weightedImpacts,
-        single_score: ef31SingleScore,
-        methodology_version: '3.1',
-        calculated_at: new Date().toISOString(),
-        units: {
-          CC: 'kg CO2 eq', OD: 'kg CFC-11 eq', IR: 'kBq U235 eq', POF: 'kg NMVOC eq',
-          PM: 'disease incidence', HTC: 'CTUh', HTNC: 'CTUh', AC: 'mol H+ eq',
-          EUF: 'kg P eq', EUM: 'kg N eq', EUT: 'mol N eq', ETF: 'CTUe',
-          LU: 'pt', WU: 'm3 world eq', RUF: 'MJ', RUM: 'kg Sb eq',
-        },
-      };
-
-      console.log("[calculate-product-lca-impacts] EF 3.1 single score:", ef31SingleScore);
-    }
-
-    const updatePayload: any = {
-      aggregated_impacts: aggregatedImpacts,
-      status: 'completed',
-      updated_at: new Date().toISOString(),
-      lca_methodology: 'recipe_2016',
-    };
-
-    if (ef31Impacts) {
-      updatePayload.ef31_impacts = ef31Impacts;
-      updatePayload.ef31_single_score = ef31SingleScore;
-      updatePayload.ef31_calculated_at = new Date().toISOString();
-    }
 
     const { error: updateError } = await supabase
       .from("product_lcas")
-      .update(updatePayload)
+      .update({
+        aggregated_impacts: aggregatedImpacts,
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      })
       .eq("id", product_lca_id);
 
     if (updateError) {
-      console.error("[calculate-product-lca-impacts] Update error:", updateError);
+      console.error("[calculate-product-lca-impacts] Error updating LCA:", updateError);
       return new Response(
-        JSON.stringify({ success: false, error: "Failed to update LCA" }),
+        JSON.stringify({ success: false, error: "Failed to update LCA results" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("[calculate-product-lca-impacts] Successfully updated LCA with impacts");
+    console.log("[calculate-product-lca-impacts] Calculation completed successfully");
 
-    const responsePayload: any = {
-      success: true,
-      aggregated_impacts: aggregatedImpacts,
-      methodology: 'recipe_2016',
-    };
-
-    if (ef31Impacts) {
-      responsePayload.ef31_impacts = ef31Impacts;
-      responsePayload.ef31_single_score = ef31SingleScore;
-      responsePayload.methodologies = ['recipe_2016', 'ef_31'];
-    }
-
-    return new Response(
-      JSON.stringify(responsePayload),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  } catch (error) {
-    console.error("[calculate-product-lca-impacts] Error:", error);
     return new Response(
       JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        success: true,
+        total_climate: totalClimate,
+        scope1: scope1Total,
+        scope2: scope2Total,
+        scope3: scope3Total,
+        material_count: materials?.length || 0,
+        production_sites: productionSites?.length || 0,
+        data_quality_score: dataQualityScore
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+
+  } catch (error: any) {
+    console.error("[calculate-product-lca-impacts] Unexpected error:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message || "Internal server error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
