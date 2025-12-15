@@ -319,7 +319,6 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
               .update({
                 total_production_volume: parseFloat(productionVolume),
                 volume_unit: productionUnit as any,
-                updated_at: new Date().toISOString(),
               })
               .eq('facility_id', facilityId)
               .eq('reporting_period_start', periodStart)
