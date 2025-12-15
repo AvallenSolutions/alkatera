@@ -37,14 +37,14 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
       return null;
     }
 
-    const stages = latestLCA.aggregated_impacts?.breakdown?.by_lifecycle_stage;
+    const stages = latestLCA.aggregated_impacts?.breakdown?.by_stage;
 
     if (!stages) {
       return null;
     }
 
     const rawMaterialsTotal = stages.raw_materials || 0;
-    const packagingTotal = stages.packaging_stage || 0;
+    const packagingTotal = stages.packaging || 0;
     const processingTotal = stages.processing || 0;
     const transportationTotal = stages.distribution || 0;
 
@@ -60,7 +60,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
   };
 
   const breakdown = calculateMaterialBreakdown();
-  const totalCarbon = hasLCAData && latestLCA.aggregated_impacts ? latestLCA.aggregated_impacts.climate_change_gwp100 : 0;
+  const totalCarbon = hasLCAData && latestLCA.aggregated_impacts?.totals?.climate ? latestLCA.aggregated_impacts.totals.climate : 0;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -73,7 +73,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <CardTitle className="text-2xl text-white truncate max-w-md">{product.name}</CardTitle>
               <CardDescription className="text-slate-400">Carbon Impact Visualisation</CardDescription>
             </div>
-            {hasLCAData && (
+            {hasLCAData && totalCarbon > 0 && (
               <Badge className="bg-lime-500/20 text-lime-400 border-lime-500/30">
                 {totalCarbon.toFixed(2)} kg CO₂e
               </Badge>
