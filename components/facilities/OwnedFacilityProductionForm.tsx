@@ -224,32 +224,57 @@ export function OwnedFacilityProductionForm({
         productLCA = newLCA;
       }
 
-      // Prepare the production site data matching the actual table schema
-      const productionSiteData = {
-        product_lca_id: productLCA.id,
-        facility_id: facilityId,
-        organization_id: organizationId,
-        production_volume: parseFloat(productVolume),
-        data_source: "Verified",
-      };
-
-      const { error: siteError } = await supabase
+      // Check if this facility is already linked to this product LCA
+      const { data: existingSite } = await supabase
         .from("product_lca_production_sites")
-        .insert(productionSiteData);
+        .select("id")
+        .eq("product_lca_id", productLCA.id)
+        .eq("facility_id", facilityId)
+        .maybeSingle();
 
-      if (siteError) throw siteError;
+      if (existingSite) {
+        // Update existing site instead of inserting
+        const { error: updateError } = await supabase
+          .from("product_lca_production_sites")
+          .update({
+            production_volume: parseFloat(productVolume),
+            data_source: "Verified",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingSite.id);
 
-      toast.success("Production site linked successfully");
+        if (updateError) throw updateError;
+        toast.success("Production site updated successfully");
+      } else {
+        // Prepare the production site data matching the actual table schema
+        const productionSiteData = {
+          product_lca_id: productLCA.id,
+          facility_id: facilityId,
+          organization_id: organizationId,
+          production_volume: parseFloat(productVolume),
+          data_source: "Verified",
+        };
+
+        const { error: siteError } = await supabase
+          .from("product_lca_production_sites")
+          .insert(productionSiteData);
+
+        if (siteError) throw siteError;
+        toast.success("Production site linked successfully");
+      }
+
       onSuccess?.();
     } catch (error: any) {
       console.error("Error saving production site:", error);
-      console.error("Error details:", {
+      console.error("Error details:", JSON.stringify({
         message: error?.message,
         details: error?.details,
         hint: error?.hint,
         code: error?.code,
-      });
-      toast.error(error?.message || error?.details || "Failed to save production site");
+      }, null, 2));
+
+      const errorMessage = error?.message || error?.details || JSON.stringify(error) || "Failed to save production site";
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
