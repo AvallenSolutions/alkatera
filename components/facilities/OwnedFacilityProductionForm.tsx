@@ -186,31 +186,39 @@ export function OwnedFacilityProductionForm({
 
     setIsSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      // First, find or create the product_lca for this product
+      let { data: productLCA, error: lcaError } = await supabase
+        .from("product_lcas")
+        .select("id")
+        .eq("product_id", productId)
+        .maybeSingle();
 
+      if (lcaError) throw lcaError;
+
+      // If no LCA exists for this product, create one
+      if (!productLCA) {
+        const { data: newLCA, error: createError } = await supabase
+          .from("product_lcas")
+          .insert({
+            product_id: productId,
+            organization_id: organizationId,
+            status: "draft",
+            methodology: "ISO 14067",
+          })
+          .select("id")
+          .single();
+
+        if (createError) throw createError;
+        productLCA = newLCA;
+      }
+
+      // Prepare the production site data matching the actual table schema
       const productionSiteData = {
-        organization_id: organizationId,
-        product_id: productId,
+        product_lca_id: productLCA.id,
         facility_id: facilityId,
-        operational_control: "owned" as const,
-        is_primary_site: false,
-        reporting_period_start: reportingPeriodStart,
-        reporting_period_end: reportingPeriodEnd,
+        organization_id: organizationId,
         production_volume: parseFloat(productVolume),
-        production_volume_unit: productVolumeUnit,
-        total_co2e_kg: allocatedEmissions,
-        emission_intensity: emissionIntensity,
-        production_share_percent: allocationPercentage,
-        data_quality_score: 5,
-        created_by: user?.id,
-        metadata: {
-          allocation_method: "production_volume",
-          facility_total_emissions_kg: facilityTotalEmissions,
-          facility_total_volume: parseFloat(totalFacilityVolume),
-          facility_volume_unit: productVolumeUnit,
-          emission_factor_year: emissionFactorYear,
-          scope_category: "Scope 1 & 2",
-        },
+        data_source: "Verified",
       };
 
       const { error: siteError } = await supabase
