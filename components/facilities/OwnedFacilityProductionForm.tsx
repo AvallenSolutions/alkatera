@@ -78,15 +78,30 @@ export function OwnedFacilityProductionForm({
   const loadFacilityEmissions = async () => {
     setLoadingFacilityData(true);
     try {
-      const { data, error } = await supabase
+      // First try exact match
+      let { data, error } = await supabase
         .from("facility_emissions_aggregated")
         .select("total_co2e, total_production_volume, volume_unit, reporting_period_start, reporting_period_end")
         .eq("facility_id", facilityId)
-        .gte("reporting_period_end", reportingPeriodStart)
-        .lte("reporting_period_start", reportingPeriodEnd)
-        .order("reporting_period_start", { ascending: false })
-        .limit(1)
+        .eq("reporting_period_start", reportingPeriodStart)
+        .eq("reporting_period_end", reportingPeriodEnd)
         .maybeSingle();
+
+      // If no exact match, try overlapping periods
+      if (!data && !error) {
+        const result = await supabase
+          .from("facility_emissions_aggregated")
+          .select("total_co2e, total_production_volume, volume_unit, reporting_period_start, reporting_period_end")
+          .eq("facility_id", facilityId)
+          .lte("reporting_period_start", reportingPeriodEnd)
+          .gte("reporting_period_end", reportingPeriodStart)
+          .order("reporting_period_start", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) throw error;
 
