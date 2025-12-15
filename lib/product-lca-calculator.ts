@@ -204,7 +204,56 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
 
     console.log(`[calculateProductLCA] Inserted ${lcaMaterialsWithImpacts.length} materials into database`);
 
-    // 7. Call aggregation edge function to calculate totals
+    // 7. Copy production sites from product to this LCA
+    // First, check if there are any production sites configured for the product
+    const { data: existingProductionSites } = await supabase
+      .from('product_lca_production_sites')
+      .select('*')
+      .eq('product_lca_id', lca.id);
+
+    // If no production sites exist for this LCA, check if we can copy from another LCA of the same product
+    if (!existingProductionSites || existingProductionSites.length === 0) {
+      const { data: previousLCAs } = await supabase
+        .from('product_lcas')
+        .select('id')
+        .eq('product_id', parseInt(productId))
+        .neq('id', lca.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (previousLCAs && previousLCAs.length > 0) {
+        const previousLCAId = previousLCAs[0].id;
+
+        // Get production sites from previous LCA
+        const { data: sitesToCopy } = await supabase
+          .from('product_lca_production_sites')
+          .select('facility_id, production_volume, share_of_production, facility_intensity')
+          .eq('product_lca_id', previousLCAId);
+
+        if (sitesToCopy && sitesToCopy.length > 0) {
+          // Copy production sites to new LCA
+          const newSites = sitesToCopy.map(site => ({
+            product_lca_id: lca.id,
+            facility_id: site.facility_id,
+            production_volume: site.production_volume,
+            share_of_production: site.share_of_production,
+            facility_intensity: site.facility_intensity
+          }));
+
+          const { error: sitesError } = await supabase
+            .from('product_lca_production_sites')
+            .insert(newSites);
+
+          if (sitesError) {
+            console.warn('[calculateProductLCA] Failed to copy production sites:', sitesError.message);
+          } else {
+            console.log(`[calculateProductLCA] Copied ${newSites.length} production sites from previous LCA`);
+          }
+        }
+      }
+    }
+
+    // 8. Call aggregation edge function to calculate totals
     console.log(`[calculateProductLCA] Calling aggregation engine...`);
 
     const { data: aggregationResult, error: aggregationError } = await supabase.functions.invoke(
