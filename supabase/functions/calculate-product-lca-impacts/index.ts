@@ -253,7 +253,8 @@ Deno.serve(async (req: Request) => {
     });
 
     const facilityBreakdown: FacilityBreakdownItem[] = [];
-    productionSites?.forEach((site: any) => {
+
+    for (const site of productionSites || []) {
       const productionVolume = Number(site.production_volume) || 0;
       const facilityIntensity = Number(site.facility_intensity) || 0;
       const facility = site.facility;
@@ -262,23 +263,67 @@ Deno.serve(async (req: Request) => {
 
       if (!facility || productionVolume === 0 || facilityIntensity === 0) {
         console.log(`[calculate-product-lca-impacts] Skipping site - missing data`);
-        return;
+        continue;
       }
 
-      // Calculate allocated emissions: production volume × facility intensity
       const allocatedEmissions = productionVolume * facilityIntensity;
 
       console.log(`[calculate-product-lca-impacts] Allocated emissions: ${allocatedEmissions} kg CO2e`);
 
       if (allocatedEmissions > 0) {
-        // For now, assume 80% Scope 2 (electricity) and 20% Scope 1 (direct) for processing
-        // This is a reasonable default for beverage production facilities
-        const allocatedScope2 = allocatedEmissions * 0.8;
-        const allocatedScope1 = allocatedEmissions * 0.2;
+        const { data: facilityEmissions } = await supabase
+          .from("facility_emissions_aggregated")
+          .select("total_co2e")
+          .eq("facility_id", facility.id)
+          .order("reporting_period_end", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const { data: scope1Data } = await supabase
+          .from("calculated_emissions")
+          .select("calculated_value_co2e, activity_data(category)")
+          .eq("organization_id", lca.organization_id)
+          .ilike("activity_data.category", "Scope 1")
+          .order("calculation_timestamp", { ascending: false });
+
+        const { data: scope2Data } = await supabase
+          .from("calculated_emissions")
+          .select("calculated_value_co2e, activity_data(category)")
+          .eq("organization_id", lca.organization_id)
+          .ilike("activity_data.category", "Scope 2")
+          .order("calculation_timestamp", { ascending: false });
+
+        const actualScope1Total = scope1Data?.reduce((sum, item) => sum + (Number(item.calculated_value_co2e) || 0), 0) || 0;
+        const actualScope2Total = scope2Data?.reduce((sum, item) => sum + (Number(item.calculated_value_co2e) || 0), 0) || 0;
+        const actualTotalEmissions = actualScope1Total + actualScope2Total;
+
+        console.log(`[calculate-product-lca-impacts] Actual facility emissions - Scope 1: ${actualScope1Total}, Scope 2: ${actualScope2Total}, Total: ${actualTotalEmissions}`);
+
+        let allocatedScope1 = 0;
+        let allocatedScope2 = 0;
+
+        if (actualTotalEmissions > 0) {
+          const scope1Ratio = actualScope1Total / actualTotalEmissions;
+          const scope2Ratio = actualScope2Total / actualTotalEmissions;
+
+          allocatedScope1 = allocatedEmissions * scope1Ratio;
+          allocatedScope2 = allocatedEmissions * scope2Ratio;
+
+          console.log(`[calculate-product-lca-impacts] Using actual scope ratios - Scope 1: ${(scope1Ratio * 100).toFixed(1)}%, Scope 2: ${(scope2Ratio * 100).toFixed(1)}%`);
+        } else {
+          console.log(`[calculate-product-lca-impacts] No actual scope data found, treating as Scope 3 upstream emissions`);
+          allocatedScope1 = 0;
+          allocatedScope2 = 0;
+        }
 
         totalClimate += allocatedEmissions;
         scope1Total += allocatedScope1;
         scope2Total += allocatedScope2;
+
+        if (allocatedScope1 === 0 && allocatedScope2 === 0) {
+          scope3Total += allocatedEmissions;
+        }
+
         productionTotal += allocatedEmissions;
         processingTotal += allocatedEmissions;
 
@@ -290,7 +335,7 @@ Deno.serve(async (req: Request) => {
           scope2: allocatedScope2,
         });
       }
-    });
+    }
 
     console.log(`[calculate-product-lca-impacts] Total processing emissions: ${processingTotal} kg CO2e`);
     console.log(`[calculate-product-lca-impacts] Total climate: ${totalClimate} kg CO2e`);
