@@ -227,17 +227,19 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
         // Get production sites from previous LCA
         const { data: sitesToCopy } = await supabase
           .from('product_lca_production_sites')
-          .select('facility_id, production_volume, share_of_production, facility_intensity')
+          .select('facility_id, production_volume, share_of_production, facility_intensity, data_source')
           .eq('product_lca_id', previousLCAId);
 
         if (sitesToCopy && sitesToCopy.length > 0) {
-          // Copy production sites to new LCA
+          // Copy production sites to new LCA with all required fields
           const newSites = sitesToCopy.map(site => ({
             product_lca_id: lca.id,
             facility_id: site.facility_id,
+            organization_id: product.organization_id,
             production_volume: site.production_volume,
             share_of_production: site.share_of_production,
-            facility_intensity: site.facility_intensity
+            facility_intensity: site.facility_intensity,
+            data_source: site.data_source || 'Verified'
           }));
 
           const { error: sitesError } = await supabase
