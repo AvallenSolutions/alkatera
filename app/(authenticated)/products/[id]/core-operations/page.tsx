@@ -326,7 +326,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
                 )}
               </div>
               <p className="text-2xl font-bold text-primary">
-                {selectedIntensity.calculatedIntensity?.toFixed(4)} kg CO₂e / {selectedIntensity.volumeUnit}
+                {selectedIntensity.calculatedIntensity?.toFixed(3)} kg CO₂e / {selectedIntensity.volumeUnit}
               </p>
               <p className="text-xs text-muted-foreground">
                 Based on data from {new Date(selectedIntensity.reportingPeriodStart).toLocaleDateString()} to{' '}
@@ -394,7 +394,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {(allocatedImpacts.co2e_per_unit ?? 0).toFixed(4)}
+                    {(allocatedImpacts.co2e_per_unit ?? 0).toFixed(3)}
                   </div>
                   <p className="text-xs text-muted-foreground">kg CO₂e per unit</p>
                 </CardContent>
@@ -406,7 +406,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {(allocatedImpacts.water_per_unit ?? 0).toFixed(4)}
+                    {(allocatedImpacts.water_per_unit ?? 0).toFixed(3)}
                   </div>
                   <p className="text-xs text-muted-foreground">litres per unit</p>
                 </CardContent>
@@ -418,7 +418,7 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {(allocatedImpacts.waste_per_unit ?? 0).toFixed(4)}
+                    {(allocatedImpacts.waste_per_unit ?? 0).toFixed(3)}
                   </div>
                   <p className="text-xs text-muted-foreground">kg per unit</p>
                 </CardContent>

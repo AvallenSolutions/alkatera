@@ -75,7 +75,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             </div>
             {hasLCAData && totalCarbon > 0 && (
               <Badge className="bg-lime-500/20 text-lime-400 border-lime-500/30">
-                {totalCarbon.toFixed(2)} kg CO₂e
+                {totalCarbon.toFixed(3)} kg CO₂e
               </Badge>
             )}
           </div>
@@ -713,7 +713,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-slate-300">Total Impact</span>
                         <span className="text-sm font-bold text-white">
-                          {lca.aggregated_impacts.climate_change_gwp100.toFixed(2)} kg CO₂e
+                          {lca.aggregated_impacts.climate_change_gwp100.toFixed(3)} kg CO₂e
                         </span>
                       </div>
                     )}

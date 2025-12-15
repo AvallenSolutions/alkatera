@@ -705,8 +705,8 @@ export default function CompanyEmissionsPage() {
                         <div className="text-sm text-muted-foreground mb-2">Total Footprint</div>
                         <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
                           {report.total_emissions >= 1000
-                            ? `${(report.total_emissions / 1000).toFixed(2)} tCO2e`
-                            : `${report.total_emissions.toFixed(2)} kgCO2e`}
+                            ? `${(report.total_emissions / 1000).toFixed(3)} tCO2e`
+                            : `${report.total_emissions.toFixed(3)} kgCO2e`}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           Last calculated: {new Date(report.updated_at).toLocaleString('en-GB')}
@@ -730,7 +730,7 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {operationsCO2e > 0
-                              ? `${operationsCO2e.toFixed(2)} kgCO2e`
+                              ? `${operationsCO2e.toFixed(3)} kgCO2e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Direct emissions</p>
@@ -745,7 +745,7 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {operationsCO2e > 0
-                              ? `${operationsCO2e.toFixed(2)} kgCO2e`
+                              ? `${operationsCO2e.toFixed(3)} kgCO2e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Indirect emissions</p>
@@ -760,7 +760,7 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {productsCO2e + fleetCO2e > 0
-                              ? `${(productsCO2e + fleetCO2e).toFixed(2)} kgCO2e`
+                              ? `${(productsCO2e + fleetCO2e).toFixed(3)} kgCO2e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>

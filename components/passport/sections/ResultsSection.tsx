@@ -101,7 +101,7 @@ function CarbonFootprintSection({ data, showBreakdown, showBenchmark, showLandUs
                 <span className="text-xs font-mono text-stone-400 uppercase">Land Use</span>
               </div>
               <span className="text-xl font-semibold text-white">
-                {data.landUse.toFixed(2)}
+                {data.landUse.toFixed(3)}
               </span>
               <span className="text-xs text-stone-500 ml-1">m2a</span>
             </div>

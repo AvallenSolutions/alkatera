@@ -744,7 +744,7 @@ export default function ProductLcaReportPage() {
                 <div className="space-y-4">
                   <div>
                     <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
-                      {waterConsumption.toFixed(1)}
+                      {waterConsumption.toFixed(3)}
                     </div>
                     <div className="text-xs text-muted-foreground">Litres consumed</div>
                   </div>
@@ -753,7 +753,7 @@ export default function ProductLcaReportPage() {
                     <div className="space-y-6 pt-4 border-t">
                       <div>
                         <p className="text-sm text-muted-foreground mb-4">
-                          This product uses {waterConsumption.toFixed(1)} litres of water across its lifecycle. Water scarcity varies by region, so we assess both consumption and location-specific scarcity impacts.
+                          This product uses {waterConsumption.toFixed(3)} litres of water across its lifecycle. Water scarcity varies by region, so we assess both consumption and location-specific scarcity impacts.
                         </p>
                       </div>
 
@@ -773,8 +773,8 @@ export default function ProductLcaReportPage() {
                                   <p className="text-xs text-muted-foreground">{item.location}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-sm font-bold">{item.consumption.toFixed(2)}L</p>
-                                  <p className="text-xs text-muted-foreground">Scarcity: {item.netImpact.toFixed(2)}L eq</p>
+                                  <p className="text-sm font-bold">{item.consumption.toFixed(3)}L</p>
+                                  <p className="text-xs text-muted-foreground">Scarcity: {item.netImpact.toFixed(3)}L eq</p>
                                 </div>
                               </div>
                               <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
@@ -914,7 +914,7 @@ export default function ProductLcaReportPage() {
                 <div className="space-y-4">
                   <div>
                     <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-400">
-                      {totalLandUse.toFixed(1)}
+                      {totalLandUse.toFixed(3)}
                     </div>
                     <div className="text-xs text-muted-foreground">m² per unit</div>
                   </div>
@@ -923,7 +923,7 @@ export default function ProductLcaReportPage() {
                     <div className="space-y-6 pt-4 border-t">
                       <div>
                         <p className="text-sm text-muted-foreground mb-4">
-                          This product requires {totalLandUse.toFixed(1)} square metres of agricultural and industrial land. This includes land for growing ingredients, extracting raw materials, and manufacturing.
+                          This product requires {totalLandUse.toFixed(3)} square metres of agricultural and industrial land. This includes land for growing ingredients, extracting raw materials, and manufacturing.
                         </p>
                       </div>
 
@@ -938,8 +938,8 @@ export default function ProductLcaReportPage() {
                                   <p className="text-xs text-muted-foreground">{item.origin} • {(item.mass * 1000).toFixed(0)}g</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-sm font-bold">{item.totalFootprint.toFixed(2)}m²</p>
-                                  <p className="text-xs text-muted-foreground">{(item.landIntensity * 1000).toFixed(1)}m²/kg</p>
+                                  <p className="text-sm font-bold">{item.totalFootprint.toFixed(3)}m²</p>
+                                  <p className="text-xs text-muted-foreground">{(item.landIntensity * 1000).toFixed(3)}m²/kg</p>
                                 </div>
                               </div>
                               <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
@@ -985,7 +985,7 @@ export default function ProductLcaReportPage() {
               <div className="space-y-2">
                 <div>
                   <div className="text-3xl font-bold text-orange-700 dark:text-orange-400">
-                    {impacts.fossil_resource_scarcity?.toFixed(3) || '0.035'}
+                    {Number(impacts.fossil_resource_scarcity || 0).toFixed(3)}
                   </div>
                   <div className="text-xs text-muted-foreground">kg oil equivalent</div>
                 </div>
