@@ -14,7 +14,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAllocationStatus } from "@/hooks/data/useAllocationStatus";
 import { useReportLimit } from "@/hooks/useSubscription";
 import { UpgradePromptModal } from "@/components/subscription";
-import { generateEnhancedLcaPdf } from "@/lib/enhanced-pdf-generator";
 
 interface DownloadLCAButtonProps {
   lcaId: string;
@@ -58,7 +57,6 @@ export function DownloadLCAButton({
 
     try {
       setIsGenerating(true);
-      toast.info("Generating PDF report...");
 
       const { data: lca, error: lcaError } = await supabase
         .from("product_lcas")
@@ -68,65 +66,6 @@ export function DownloadLCAButton({
 
       if (lcaError) throw lcaError;
 
-      const { data: org } = await supabase
-        .from("organizations")
-        .select("name")
-        .eq("id", lca.organization_id)
-        .maybeSingle();
-
-      // Extract aggregated impacts
-      const impacts = lca.aggregated_impacts || {};
-      const dataQuality = impacts.data_quality || {};
-      const dataProvenance = impacts.data_provenance || {};
-      const breakdown = impacts.breakdown || {};
-
-      // Transform to PDF format
-      const pdfData = {
-        productName: lca.product_name || productName,
-        version: lca.lca_version || "1.0",
-        assessmentPeriod: `${lca.reference_year || new Date().getFullYear()}`,
-        publishedDate: new Date(lca.updated_at || lca.created_at).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        }),
-        functionalUnit: lca.functional_unit || `1 unit of ${productName}`,
-        systemBoundary: lca.system_boundary || "cradle-to-gate",
-        metrics: {
-          climate_change_gwp100: impacts.climate_change_gwp100 || 0,
-          water_consumption: impacts.water_consumption || 0,
-          land_use: impacts.land_use || 0,
-          circularity_percentage: impacts.circularity_percentage || 0,
-        },
-        dataQuality: {
-          averageConfidence: dataQuality.score || 0,
-          rating: dataQuality.rating || "Unknown",
-          highQualityCount: dataQuality.breakdown?.primary_verified_count || 0,
-          mediumQualityCount: dataQuality.breakdown?.regional_standard_count || 0,
-          lowQualityCount: dataQuality.breakdown?.secondary_modelled_count || 0,
-          totalMaterialsCount: dataQuality.total_materials || 0,
-        },
-        dataProvenance: {
-          hybridSourcesCount: dataProvenance.hybrid_sources_count || 0,
-          defraGwpCount: dataProvenance.defra_gwp_count || 0,
-          supplierVerifiedCount: dataProvenance.supplier_verified_count || 0,
-          ecoinventOnlyCount: dataProvenance.ecoinvent_only_count || 0,
-          methodologySummary: dataProvenance.methodology_summary || "Mixed sources",
-        },
-        ghgBreakdown: {
-          co2Fossil: impacts.climate_fossil || 0,
-          co2Biogenic: impacts.climate_biogenic || 0,
-          co2Dluc: impacts.climate_dluc || 0,
-        },
-        complianceFramework: {
-          standards: ["ISO 14044", "ISO 14067", "GHG Protocol Product Standard"],
-          certifications: [],
-        },
-      };
-
-      // Generate and download PDF
-      await generateEnhancedLcaPdf(pdfData);
-
       // Increment report count
       if (lca.organization_id) {
         await supabase.rpc("increment_report_count", {
@@ -134,10 +73,16 @@ export function DownloadLCAButton({
         });
       }
 
-      toast.success("PDF report downloaded successfully");
+      // Open the beautiful PDF report page
+      const pdfUrl = `/products/${productId}/lca-pdf`;
+      window.open(pdfUrl, '_blank');
+
+      toast.success("Report opened - use your browser's print function to save as PDF", {
+        duration: 5000,
+      });
     } catch (error: any) {
-      console.error("Error generating PDF:", error);
-      toast.error("Failed to generate PDF report");
+      console.error("Error opening PDF:", error);
+      toast.error("Failed to open PDF report");
     } finally {
       setIsGenerating(false);
     }
@@ -221,7 +166,7 @@ export function DownloadLCAButton({
         disabled={isGenerating || allocationStatus.loading}
       >
         <Download className="h-4 w-4 mr-2" />
-        {isGenerating ? "Generating..." : "Download"}
+        {isGenerating ? "Opening..." : "Download PDF"}
       </Button>
     </>
   );
