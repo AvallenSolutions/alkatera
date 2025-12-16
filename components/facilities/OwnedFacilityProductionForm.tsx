@@ -63,6 +63,8 @@ export function OwnedFacilityProductionForm({
   const [reportingPeriodEnd, setReportingPeriodEnd] = useState("");
 
   const [facilityTotalEmissions, setFacilityTotalEmissions] = useState<number | null>(null);
+  const [facilityTotalWater, setFacilityTotalWater] = useState<number | null>(null);
+  const [facilityTotalWaste, setFacilityTotalWaste] = useState<number | null>(null);
   const [emissionFactorYear, setEmissionFactorYear] = useState(currentYear);
 
   const [productVolume, setProductVolume] = useState("");
@@ -81,7 +83,7 @@ export function OwnedFacilityProductionForm({
       // First try exact match
       let { data, error } = await supabase
         .from("facility_emissions_aggregated")
-        .select("total_co2e, total_production_volume, volume_unit, reporting_period_start, reporting_period_end")
+        .select("total_co2e, total_production_volume, volume_unit, reporting_period_start, reporting_period_end, results_payload")
         .eq("facility_id", facilityId)
         .eq("reporting_period_start", reportingPeriodStart)
         .eq("reporting_period_end", reportingPeriodEnd)
@@ -91,7 +93,7 @@ export function OwnedFacilityProductionForm({
       if (!data && !error) {
         const result = await supabase
           .from("facility_emissions_aggregated")
-          .select("total_co2e, total_production_volume, volume_unit, reporting_period_start, reporting_period_end")
+          .select("total_co2e, total_production_volume, volume_unit, reporting_period_start, reporting_period_end, results_payload")
           .eq("facility_id", facilityId)
           .lte("reporting_period_start", reportingPeriodEnd)
           .gte("reporting_period_end", reportingPeriodStart)
@@ -108,6 +110,27 @@ export function OwnedFacilityProductionForm({
       if (data) {
         setFacilityTotalEmissions(data.total_co2e);
 
+        // Extract water and waste from results_payload
+        const payload = data.results_payload || {};
+        let totalWater = 0;
+        let totalWaste = 0;
+
+        // Try different paths where water/waste might be stored
+        if (payload.total_water_consumption?.value) {
+          totalWater = Number(payload.total_water_consumption.value) || 0;
+        } else if (payload.total_water_usage) {
+          totalWater = Number(payload.total_water_usage) || 0;
+        }
+
+        if (payload.total_waste_generated?.value) {
+          totalWaste = Number(payload.total_waste_generated.value) || 0;
+        } else if (payload.total_waste_generated) {
+          totalWaste = Number(payload.total_waste_generated) || 0;
+        }
+
+        setFacilityTotalWater(totalWater);
+        setFacilityTotalWaste(totalWaste);
+
         // Auto-load facility total production for allocation calculation
         if (data.total_production_volume) {
           setFacilityTotalProduction(data.total_production_volume);
@@ -120,12 +143,19 @@ export function OwnedFacilityProductionForm({
           };
           const mappedUnit = unitMapping[data.volume_unit] || 'litres';
           setProductVolumeUnit(mappedUnit);
-          toast.success(`Found facility data: ${data.total_co2e.toLocaleString()} kg CO2e from ${data.total_production_volume.toLocaleString()} ${data.volume_unit}`);
+
+          const metrics = [`${data.total_co2e.toLocaleString()} kg CO2e`];
+          if (totalWater > 0) metrics.push(`${totalWater.toLocaleString()} L water`);
+          if (totalWaste > 0) metrics.push(`${totalWaste.toLocaleString()} kg waste`);
+
+          toast.success(`Found facility data: ${metrics.join(', ')} from ${data.total_production_volume.toLocaleString()} ${data.volume_unit}`);
         } else {
           toast.success(`Found facility emissions data: ${data.total_co2e.toLocaleString()} kg CO2e`);
         }
       } else {
         setFacilityTotalEmissions(null);
+        setFacilityTotalWater(null);
+        setFacilityTotalWaste(null);
         setFacilityTotalProduction(null);
         toast.info("No facility emissions data found for this period. You'll need to enter it manually.");
       }
@@ -236,27 +266,56 @@ export function OwnedFacilityProductionForm({
         .eq("facility_id", facilityId)
         .maybeSingle();
 
+      // Calculate allocated water and waste using actual facility data
+      const allocatedWaterTotal = facilityTotalWater
+        ? (facilityTotalWater * allocationPercentage / 100)
+        : 0;
+      const allocatedWasteTotal = facilityTotalWaste
+        ? (facilityTotalWaste * allocationPercentage / 100)
+        : 0;
+
+      const productVolNum = parseFloat(productVolume);
+      const waterPerUnit = productVolNum > 0 ? allocatedWaterTotal / productVolNum : 0;
+      const wastePerUnit = productVolNum > 0 ? allocatedWasteTotal / productVolNum : 0;
+
+      const allocationData = {
+        production_volume: productVolNum,
+        total_facility_production_volume: facilityTotalProduction,
+        production_volume_unit: productVolumeUnit,
+        attribution_ratio: allocationPercentage / 100,
+        allocated_emissions_kg_co2e: allocatedEmissions,
+        allocated_water_litres: allocatedWaterTotal,
+        allocated_waste_kg: allocatedWasteTotal,
+        emission_intensity_kg_co2e_per_unit: emissionIntensity,
+        water_intensity_litres_per_unit: waterPerUnit,
+        waste_intensity_kg_per_unit: wastePerUnit,
+        reporting_period_start: reportingPeriodStart,
+        reporting_period_end: reportingPeriodEnd,
+        status: "verified",
+        co2e_entry_method: "allocation",
+        data_source: "Verified",
+        data_source_tag: "Owned Facility",
+        is_energy_intensive_process: false,
+        uses_proxy_data: false,
+        updated_at: new Date().toISOString(),
+      };
+
       if (existingSite) {
-        // Update existing site instead of inserting
+        // Update existing site with full allocation data
         const { error: updateError } = await supabase
           .from("product_lca_production_sites")
-          .update({
-            production_volume: parseFloat(productVolume),
-            data_source: "Verified",
-            updated_at: new Date().toISOString(),
-          })
+          .update(allocationData)
           .eq("id", existingSite.id);
 
         if (updateError) throw updateError;
-        toast.success("Production site updated successfully");
+        toast.success("Production site allocation updated successfully");
       } else {
-        // Prepare the production site data matching the actual table schema
+        // Insert new site with full allocation data
         const productionSiteData = {
           product_lca_id: productLCA.id,
           facility_id: facilityId,
           organization_id: organizationId,
-          production_volume: parseFloat(productVolume),
-          data_source: "Verified",
+          ...allocationData,
         };
 
         const { error: siteError } = await supabase
@@ -264,7 +323,7 @@ export function OwnedFacilityProductionForm({
           .insert(productionSiteData);
 
         if (siteError) throw siteError;
-        toast.success("Production site linked successfully");
+        toast.success("Production site allocation saved successfully");
       }
 
       onSuccess?.();
@@ -455,41 +514,65 @@ export function OwnedFacilityProductionForm({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-6">
-              <div>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="p-4 bg-blue-500/10 rounded-md border border-blue-500/20">
                 <div className="flex items-center gap-2 mb-1">
                   <Percent className="h-4 w-4 text-blue-400" />
                   <p className="text-xs text-slate-400">Allocation %</p>
                 </div>
-                <p className="text-3xl font-bold text-blue-400 font-mono">
+                <p className="text-2xl font-bold text-blue-400 font-mono">
                   {allocationPercentage.toFixed(2)}%
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  of facility emissions
+                  of facility output
                 </p>
               </div>
-              <div>
+              <div className="p-4 bg-lime-500/10 rounded-md border border-lime-500/20">
                 <div className="flex items-center gap-2 mb-1">
-                  <Factory className="h-4 w-4 text-white" />
-                  <p className="text-xs text-slate-400">Allocated Emissions</p>
+                  <Factory className="h-4 w-4 text-lime-400" />
+                  <p className="text-xs text-slate-400">CO₂e</p>
                 </div>
-                <p className="text-3xl font-bold text-white font-mono">
+                <p className="text-2xl font-bold text-lime-400 font-mono">
                   {allocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  kg CO2e total
+                  kg CO₂e ({emissionIntensity.toFixed(4)}/{productVolumeUnit})
                 </p>
               </div>
-              <div>
+              <div className="p-4 bg-blue-400/10 rounded-md border border-blue-400/20">
                 <div className="flex items-center gap-2 mb-1">
-                  <Building2 className="h-4 w-4 text-lime-400" />
-                  <p className="text-xs text-slate-400">Emission Intensity</p>
+                  <Building2 className="h-4 w-4 text-blue-400" />
+                  <p className="text-xs text-slate-400">Water</p>
                 </div>
-                <p className="text-3xl font-bold text-lime-400 font-mono">
-                  {emissionIntensity.toFixed(4)}
+                <p className="text-2xl font-bold text-blue-400 font-mono">
+                  {((facilityTotalWater || 0) * allocationPercentage / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  kg CO2e / {productVolumeUnit}
+                  litres ({((facilityTotalWater || 0) * allocationPercentage / 100 / (parseFloat(productVolume) || 1)).toFixed(4)}/{productVolumeUnit})
+                </p>
+              </div>
+              <div className="p-4 bg-amber-500/10 rounded-md border border-amber-500/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <Building2 className="h-4 w-4 text-amber-400" />
+                  <p className="text-xs text-slate-400">Waste</p>
+                </div>
+                <p className="text-2xl font-bold text-amber-400 font-mono">
+                  {((facilityTotalWaste || 0) * allocationPercentage / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  kg ({((facilityTotalWaste || 0) * allocationPercentage / 100 / (parseFloat(productVolume) || 1)).toFixed(4)}/{productVolumeUnit})
+                </p>
+              </div>
+              <div className="p-4 bg-slate-700/30 rounded-md border border-slate-600/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <Factory className="h-4 w-4 text-slate-400" />
+                  <p className="text-xs text-slate-400">Facility Total</p>
+                </div>
+                <p className="text-2xl font-bold text-white font-mono">
+                  {(facilityTotalProduction || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {productVolumeUnit}
                 </p>
               </div>
             </div>
