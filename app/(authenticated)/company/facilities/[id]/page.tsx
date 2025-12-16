@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Building2, Zap, Pencil, Droplets, Recycle } from "lucide-react";
+import { ArrowLeft, Trash2, Building2, Zap, Pencil, Droplets, Recycle, Calendar } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -215,6 +215,10 @@ export default function FacilityDetailPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
+          <TabsTrigger value="report-period">
+            <Calendar className="h-4 w-4 mr-2" />
+            Report Period
+          </TabsTrigger>
           <TabsTrigger value="data-entry">
             <Zap className="h-4 w-4 mr-2" />
             Utilities
@@ -233,24 +237,72 @@ export default function FacilityDetailPage() {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="report-period" className="space-y-6 mt-6">
+          <ReportingSessionSetup
+            facilityId={facilityId}
+            organizationId={facility?.organization_id || ''}
+            onSessionCreated={(sessionId) => {
+              setActiveSessionId(sessionId);
+              refetchSessions();
+            }}
+          />
+
+          {sessions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Reporting Periods</CardTitle>
+                <CardDescription>
+                  Manage reporting periods and production volumes for this facility
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {sessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="p-4 border rounded-lg"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">
+                            {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
+                            {new Date(session.reporting_period_end).toLocaleDateString()}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Production Volume: {session.total_production_volume} {session.volume_unit}
+                          </p>
+                        </div>
+                        <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
+                          {session.data_source_type}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         <TabsContent value="data-entry" className="space-y-6 mt-6">
           {!activeSessionId ? (
             <>
-              <ReportingSessionSetup
-                facilityId={facilityId}
-                organizationId={facility?.organization_id || ''}
-                onSessionCreated={(sessionId) => {
-                  setActiveSessionId(sessionId);
-                  refetchSessions();
-                }}
-              />
-
-              {sessions.length > 0 && (
+              {sessions.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-400" />
+                      <p className="font-medium">No reporting periods found</p>
+                      <p className="text-sm mt-1">Create a reporting period in the Report Period tab first</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
                 <Card>
                   <CardHeader>
-                    <CardTitle>Active Reporting Sessions</CardTitle>
+                    <CardTitle>Select Reporting Period</CardTitle>
                     <CardDescription>
-                      Click on a session to add utility data
+                      Choose a reporting period to add Scope 1 & 2 utility data
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
