@@ -78,6 +78,8 @@ export default function FacilityDetailPage() {
   const [activeTab, setActiveTab] = useState("data-entry");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeWaterSessionId, setActiveWaterSessionId] = useState<string | null>(null);
+  const [activeWasteSessionId, setActiveWasteSessionId] = useState<string | null>(null);
   const { sessions, loading: sessionsLoading, refetch: refetchSessions } = useReportingSession(facilityId);
 
   const loadFacilityData = useCallback(async () => {
@@ -433,56 +435,156 @@ export default function FacilityDetailPage() {
         </TabsContent>
 
         <TabsContent value="water" className="space-y-6 mt-6">
-          {sessions.length === 0 ? (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Droplets className="h-12 w-12 mx-auto mb-4 text-blue-400" />
-                  <p className="font-medium">No reporting sessions found</p>
-                  <p className="text-sm mt-1">Create a reporting session in the Utilities tab first to log water data</p>
-                </div>
-              </CardContent>
-            </Card>
+          {!activeWaterSessionId ? (
+            <>
+              {sessions.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Droplets className="h-12 w-12 mx-auto mb-4 text-blue-400" />
+                      <p className="font-medium">No reporting periods found</p>
+                      <p className="text-sm mt-1">Create a reporting period in the Report Period tab first</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Select Reporting Period</CardTitle>
+                    <CardDescription>
+                      Choose a reporting period to add water data
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition"
+                          onClick={() => setActiveWaterSessionId(session.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">
+                                {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
+                                {new Date(session.reporting_period_end).toLocaleDateString()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Production Volume: {session.total_production_volume} {session.volume_unit}
+                              </p>
+                            </div>
+                            <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
+                              {session.data_source_type}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           ) : (
-            sessions.map((session) => (
-              <WaterDataEntry
-                key={session.id}
-                facilityId={facilityId}
-                organizationId={facility?.organization_id || ''}
-                sessionId={session.id}
-                periodStart={session.reporting_period_start}
-                periodEnd={session.reporting_period_end}
-                isThirdParty={facility?.operational_control === 'third_party'}
-                onEntryAdded={loadFacilityData}
-              />
-            ))
+            <>
+              {activeWaterSessionId && sessions.find((s) => s.id === activeWaterSessionId) && (
+                <>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveWaterSessionId(null)}
+                    >
+                      ← Back to Periods
+                    </Button>
+                  </div>
+                  <WaterDataEntry
+                    facilityId={facilityId}
+                    organizationId={facility?.organization_id || ''}
+                    sessionId={activeWaterSessionId}
+                    periodStart={sessions.find((s) => s.id === activeWaterSessionId)?.reporting_period_start || ''}
+                    periodEnd={sessions.find((s) => s.id === activeWaterSessionId)?.reporting_period_end || ''}
+                    isThirdParty={facility?.operational_control === 'third_party'}
+                    onEntryAdded={loadFacilityData}
+                  />
+                </>
+              )}
+            </>
           )}
         </TabsContent>
 
         <TabsContent value="waste" className="space-y-6 mt-6">
-          {sessions.length === 0 ? (
-            <Card>
-              <CardContent className="p-6">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Recycle className="h-12 w-12 mx-auto mb-4 text-orange-400" />
-                  <p className="font-medium">No reporting sessions found</p>
-                  <p className="text-sm mt-1">Create a reporting session in the Utilities tab first to log waste data</p>
-                </div>
-              </CardContent>
-            </Card>
+          {!activeWasteSessionId ? (
+            <>
+              {sessions.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Recycle className="h-12 w-12 mx-auto mb-4 text-orange-400" />
+                      <p className="font-medium">No reporting periods found</p>
+                      <p className="text-sm mt-1">Create a reporting period in the Report Period tab first</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Select Reporting Period</CardTitle>
+                    <CardDescription>
+                      Choose a reporting period to add waste data
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition"
+                          onClick={() => setActiveWasteSessionId(session.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">
+                                {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
+                                {new Date(session.reporting_period_end).toLocaleDateString()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Production Volume: {session.total_production_volume} {session.volume_unit}
+                              </p>
+                            </div>
+                            <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
+                              {session.data_source_type}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           ) : (
-            sessions.map((session) => (
-              <WasteDataEntry
-                key={session.id}
-                facilityId={facilityId}
-                organizationId={facility?.organization_id || ''}
-                sessionId={session.id}
-                periodStart={session.reporting_period_start}
-                periodEnd={session.reporting_period_end}
-                isThirdParty={facility?.operational_control === 'third_party'}
-                onEntryAdded={loadFacilityData}
-              />
-            ))
+            <>
+              {activeWasteSessionId && sessions.find((s) => s.id === activeWasteSessionId) && (
+                <>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveWasteSessionId(null)}
+                    >
+                      ← Back to Periods
+                    </Button>
+                  </div>
+                  <WasteDataEntry
+                    facilityId={facilityId}
+                    organizationId={facility?.organization_id || ''}
+                    sessionId={activeWasteSessionId}
+                    periodStart={sessions.find((s) => s.id === activeWasteSessionId)?.reporting_period_start || ''}
+                    periodEnd={sessions.find((s) => s.id === activeWasteSessionId)?.reporting_period_end || ''}
+                    isThirdParty={facility?.operational_control === 'third_party'}
+                    onEntryAdded={loadFacilityData}
+                  />
+                </>
+              )}
+            </>
           )}
         </TabsContent>
 
