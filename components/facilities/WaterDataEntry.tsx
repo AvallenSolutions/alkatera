@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Droplets, Info, AlertTriangle } from "lucide-react";
+import { Droplets, Info, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -22,6 +21,18 @@ interface WaterDataEntryProps {
   isThirdParty?: boolean;
   onEntryAdded?: () => void;
 }
+
+// AWARE-based water stress countries (WRI Aqueduct High or Extremely High stress)
+// Source: WRI Aqueduct Water Risk Atlas
+const WATER_STRESSED_COUNTRIES = [
+  'AE', 'AF', 'BH', 'DJ', 'DZ', 'EG', 'ER', 'IL', 'IN', 'IQ', 'IR', 'JO',
+  'KW', 'LB', 'LY', 'MA', 'OM', 'PK', 'PS', 'QA', 'SA', 'SD', 'SY', 'TN',
+  'YE', // Middle East & North Africa
+  'CN', 'MN', // East Asia (partial)
+  'ES', 'GR', 'IT', // Mediterranean Europe (partial)
+  'MX', // North America (partial)
+  'ZA', // Southern Africa (partial)
+];
 
 const WATER_CATEGORIES = [
   { value: "water_intake", label: "Water Intake", description: "Fresh water consumed" },
@@ -69,6 +80,14 @@ export function WaterDataEntry({
   onEntryAdded,
 }: WaterDataEntryProps) {
   const [saving, setSaving] = useState(false);
+  const [loadingFacility, setLoadingFacility] = useState(true);
+  const [facilityLocation, setFacilityLocation] = useState<{
+    country: string | null;
+    countryCode: string | null;
+    city: string | null;
+    isWaterStressed: boolean;
+  }>({ country: null, countryCode: null, city: null, isWaterStressed: false });
+
   const [formData, setFormData] = useState({
     activity_category: "",
     quantity: "",
@@ -87,6 +106,42 @@ export function WaterDataEntry({
 
   const selectedProvenance = DATA_PROVENANCES.find(p => p.value === formData.data_provenance);
   const showAllocationFields = isThirdParty && formData.allocation_basis !== "none";
+
+  // Fetch facility location and auto-calculate water stress using AWARE protocol
+  useEffect(() => {
+    async function loadFacilityLocation() {
+      try {
+        const { data, error } = await supabase
+          .from('facilities')
+          .select('address_country, location_country_code, address_city')
+          .eq('id', facilityId)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          const countryCode = data.location_country_code || null;
+          const isWaterStressed = countryCode ? WATER_STRESSED_COUNTRIES.includes(countryCode) : false;
+
+          setFacilityLocation({
+            country: data.address_country || null,
+            countryCode: countryCode,
+            city: data.address_city || null,
+            isWaterStressed,
+          });
+
+          // Auto-set water stress flag based on AWARE protocol
+          setFormData(prev => ({ ...prev, water_stress_area_flag: isWaterStressed }));
+        }
+      } catch (error) {
+        console.error('Error loading facility location:', error);
+      } finally {
+        setLoadingFacility(false);
+      }
+    }
+
+    loadFacilityLocation();
+  }, [facilityId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,12 +462,52 @@ export function WaterDataEntry({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch
-              checked={formData.water_stress_area_flag}
-              onCheckedChange={(checked) => setFormData({ ...formData, water_stress_area_flag: checked })}
-            />
-            <Label>Facility is in a water-stressed region (WRI Aqueduct)</Label>
+          <div className="border rounded-lg p-4 bg-muted/30">
+            <div className="flex items-start gap-3">
+              {loadingFacility ? (
+                <div className="h-5 w-5 animate-pulse bg-muted rounded" />
+              ) : facilityLocation.isWaterStressed ? (
+                <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+              ) : (
+                <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Label className="font-semibold">Water Stress Assessment (AWARE Protocol)</Label>
+                  {facilityLocation.isWaterStressed ? (
+                    <Badge variant="destructive" className="text-xs">High Stress</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">Low-Medium Stress</Badge>
+                  )}
+                </div>
+                {loadingFacility ? (
+                  <p className="text-sm text-muted-foreground">Loading facility location...</p>
+                ) : facilityLocation.countryCode ? (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      Location: {facilityLocation.city && `${facilityLocation.city}, `}{facilityLocation.country || facilityLocation.countryCode}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {facilityLocation.isWaterStressed ? (
+                        <span className="text-amber-600 dark:text-amber-500">
+                          This facility is located in a water-stressed region according to WRI Aqueduct data.
+                          Water consumption should be carefully monitored and reported.
+                        </span>
+                      ) : (
+                        <span className="text-green-600 dark:text-green-500">
+                          This facility is not located in a water-stressed region. Normal water management protocols apply.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-amber-600 dark:text-amber-500">
+                    <AlertTriangle className="h-4 w-4 inline mr-1" />
+                    Facility location not set. Please add a country to the facility details for water stress assessment.
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">
