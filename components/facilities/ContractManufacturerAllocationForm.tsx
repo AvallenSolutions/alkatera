@@ -87,6 +87,7 @@ export function ContractManufacturerAllocationForm({
   const supabase = getSupabaseBrowserClient();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingFacilityData, setLoadingFacilityData] = useState(false);
   const [emissionFactors, setEmissionFactors] = useState<Record<string, any>>({});
 
   const currentYear = new Date().getFullYear();
@@ -95,6 +96,9 @@ export function ContractManufacturerAllocationForm({
 
   const [totalFacilityProductionVolume, setTotalFacilityProductionVolume] = useState("");
   const [productionVolumeUnit, setProductionVolumeUnit] = useState("units");
+
+  const [facilityTotalWater, setFacilityTotalWater] = useState<number>(0);
+  const [facilityTotalWaste, setFacilityTotalWaste] = useState<number>(0);
 
   const [useProxyData, setUseProxyData] = useState(false);
   const [productCategory, setProductCategory] = useState("");
@@ -125,6 +129,12 @@ export function ContractManufacturerAllocationForm({
       setProxyMapping(null);
     }
   }, [useProxyData, productCategory]);
+
+  useEffect(() => {
+    if (reportingPeriodStart && reportingPeriodEnd && facilityId) {
+      loadFacilityEmissions();
+    }
+  }, [reportingPeriodStart, reportingPeriodEnd, facilityId]);
 
   const loadEmissionFactors = async () => {
     const { data, error } = await supabase
@@ -169,6 +179,81 @@ export function ContractManufacturerAllocationForm({
     }
   };
 
+  const loadFacilityEmissions = async () => {
+    setLoadingFacilityData(true);
+    try {
+      let { data, error } = await supabase
+        .from("facility_emissions_aggregated")
+        .select("total_co2e, total_production_volume, volume_unit, results_payload")
+        .eq("facility_id", facilityId)
+        .eq("reporting_period_start", reportingPeriodStart)
+        .eq("reporting_period_end", reportingPeriodEnd)
+        .maybeSingle();
+
+      if (!data && !error) {
+        const result = await supabase
+          .from("facility_emissions_aggregated")
+          .select("total_co2e, total_production_volume, volume_unit, results_payload")
+          .eq("facility_id", facilityId)
+          .lte("reporting_period_start", reportingPeriodEnd)
+          .gte("reporting_period_end", reportingPeriodStart)
+          .order("reporting_period_start", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        data = result.data;
+        error = result.error;
+      }
+
+      if (error) throw error;
+
+      if (data) {
+        setDirectCo2eValue(data.total_co2e.toString());
+
+        const payload = data.results_payload || {};
+        let totalWater = 0;
+        let totalWaste = 0;
+
+        if (payload.total_water_consumption?.value) {
+          totalWater = Number(payload.total_water_consumption.value) || 0;
+        } else if (payload.total_water_usage) {
+          totalWater = Number(payload.total_water_usage) || 0;
+        }
+
+        if (payload.total_waste_generated?.value) {
+          totalWaste = Number(payload.total_waste_generated.value) || 0;
+        } else if (payload.total_waste_generated) {
+          totalWaste = Number(payload.total_waste_generated) || 0;
+        }
+
+        setFacilityTotalWater(totalWater);
+        setFacilityTotalWaste(totalWaste);
+
+        if (data.total_production_volume) {
+          setTotalFacilityProductionVolume(data.total_production_volume.toString());
+          const unitMapping: Record<string, string> = {
+            'Litres': 'litres',
+            'Hectolitres': 'litres',
+            'Units': 'units',
+            'kg': 'kg',
+          };
+          const mappedUnit = unitMapping[data.volume_unit] || 'litres';
+          setProductionVolumeUnit(mappedUnit);
+
+          const metrics = [`${data.total_co2e.toLocaleString()} kg CO2e`];
+          if (totalWater > 0) metrics.push(`${totalWater.toLocaleString()} L water`);
+          if (totalWaste > 0) metrics.push(`${totalWaste.toLocaleString()} kg waste`);
+
+          toast.success(`Loaded facility data: ${metrics.join(', ')}`);
+        }
+      }
+    } catch (error: any) {
+      console.error("Error loading facility emissions:", error);
+    } finally {
+      setLoadingFacilityData(false);
+    }
+  };
+
   const totalFacilityCo2e = useMemo(() => {
     if (useProxyData && proxyMapping) {
       const totalVolume = parseFloat(totalFacilityProductionVolume) || 0;
@@ -198,6 +283,26 @@ export function ContractManufacturerAllocationForm({
     if (clientVolume <= 0) return 0;
     return allocatedEmissions / clientVolume;
   }, [allocatedEmissions, clientProductionVolume]);
+
+  const allocatedWater = useMemo(() => {
+    return facilityTotalWater * attributionRatio;
+  }, [facilityTotalWater, attributionRatio]);
+
+  const allocatedWaste = useMemo(() => {
+    return facilityTotalWaste * attributionRatio;
+  }, [facilityTotalWaste, attributionRatio]);
+
+  const waterIntensity = useMemo(() => {
+    const clientVolume = parseFloat(clientProductionVolume) || 0;
+    if (clientVolume <= 0) return 0;
+    return allocatedWater / clientVolume;
+  }, [allocatedWater, clientProductionVolume]);
+
+  const wasteIntensity = useMemo(() => {
+    const clientVolume = parseFloat(clientProductionVolume) || 0;
+    if (clientVolume <= 0) return 0;
+    return allocatedWaste / clientVolume;
+  }, [allocatedWaste, clientProductionVolume]);
 
   const addEnergyInput = () => {
     setEnergyInputs([
@@ -415,13 +520,22 @@ export function ContractManufacturerAllocationForm({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <Factory className="h-5 w-5 text-lime-400" />
-            Input A: Total Facility Production
+            Total Facility Production
+            {loadingFacilityData && <Loader2 className="h-4 w-4 animate-spin text-blue-400" />}
           </CardTitle>
           <CardDescription>
-            Total production volume across ALL products at {facilityName}
+            Auto-loaded from facility data or enter manually
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {loadingFacilityData && (
+            <Alert className="bg-blue-500/10 border-blue-500/20">
+              <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
+              <AlertDescription className="text-blue-200">
+                Loading facility production data...
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="totalVolume">Total Production Volume</Label>
@@ -434,11 +548,12 @@ export function ContractManufacturerAllocationForm({
                 value={totalFacilityProductionVolume}
                 onChange={(e) => setTotalFacilityProductionVolume(e.target.value)}
                 className="bg-slate-800 border-slate-700"
+                disabled={loadingFacilityData}
               />
             </div>
             <div>
               <Label htmlFor="volumeUnit">Unit</Label>
-              <Select value={productionVolumeUnit} onValueChange={setProductionVolumeUnit}>
+              <Select value={productionVolumeUnit} onValueChange={setProductionVolumeUnit} disabled={loadingFacilityData}>
                 <SelectTrigger className="bg-slate-800 border-slate-700">
                   <SelectValue />
                 </SelectTrigger>
@@ -760,31 +875,47 @@ export function ContractManufacturerAllocationForm({
           <CardTitle className="text-lime-200">Calculation Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+            <div className="p-4 bg-blue-500/10 rounded-md border border-blue-500/20">
               <p className="text-xs text-slate-400">Attribution Ratio</p>
-              <p className="text-2xl font-bold text-white font-mono">
+              <p className="text-2xl font-bold text-blue-400 font-mono">
                 {(attributionRatio * 100).toFixed(2)}%
               </p>
+              <p className="text-xs text-slate-500 mt-1">of facility output</p>
             </div>
-            <div>
-              <p className="text-xs text-slate-400">Total Facility CO2e</p>
+            <div className="p-4 bg-lime-500/10 rounded-md border border-lime-500/20">
+              <p className="text-xs text-slate-400">CO₂e</p>
+              <p className="text-2xl font-bold text-lime-400 font-mono">
+                {allocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                kg ({emissionIntensity.toFixed(4)}/{productionVolumeUnit})
+              </p>
+            </div>
+            <div className="p-4 bg-blue-400/10 rounded-md border border-blue-400/20">
+              <p className="text-xs text-slate-400">Water</p>
+              <p className="text-2xl font-bold text-blue-400 font-mono">
+                {allocatedWater.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                litres ({waterIntensity.toFixed(4)}/{productionVolumeUnit})
+              </p>
+            </div>
+            <div className="p-4 bg-amber-500/10 rounded-md border border-amber-500/20">
+              <p className="text-xs text-slate-400">Waste</p>
+              <p className="text-2xl font-bold text-amber-400 font-mono">
+                {allocatedWaste.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                kg ({wasteIntensity.toFixed(4)}/{productionVolumeUnit})
+              </p>
+            </div>
+            <div className="p-4 bg-slate-700/30 rounded-md border border-slate-600/20">
+              <p className="text-xs text-slate-400">Total Facility</p>
               <p className="text-2xl font-bold text-white font-mono">
-                {totalFacilityCo2e.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg
+                {totalFacilityCo2e.toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Allocated Emissions</p>
-              <p className="text-2xl font-bold text-lime-400 font-mono">
-                {allocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 2 })} kg
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Emission Intensity</p>
-              <p className="text-2xl font-bold text-lime-400 font-mono">
-                {emissionIntensity.toFixed(4)}
-              </p>
-              <p className="text-xs text-slate-500">kg CO2e / {productionVolumeUnit}</p>
+              <p className="text-xs text-slate-500 mt-1">kg CO₂e</p>
             </div>
           </div>
 
