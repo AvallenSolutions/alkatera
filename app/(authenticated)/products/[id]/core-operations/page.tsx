@@ -386,39 +386,39 @@ export default function CoreOperationsPage({ params }: CoreOperationsPageProps) 
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
-              <Card>
+              <Card className="border-lime-500/20 bg-lime-500/5">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">
+                  <CardTitle className="text-sm font-medium text-lime-400">
                     Scope 1 & 2 CO₂e
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
-                    {(allocatedImpacts.co2e_per_unit ?? 0).toFixed(3)}
+                  <div className="text-2xl font-bold text-lime-400">
+                    {(allocatedImpacts.co2e_per_unit ?? 0).toFixed(4)}
                   </div>
                   <p className="text-xs text-muted-foreground">kg CO₂e per unit</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-blue-500/20 bg-blue-500/5">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Water Use</CardTitle>
+                  <CardTitle className="text-sm font-medium text-blue-400">Water Usage</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
-                    {(allocatedImpacts.water_per_unit ?? 0).toFixed(3)}
+                  <div className="text-2xl font-bold text-blue-400">
+                    {(allocatedImpacts.water_per_unit ?? 0).toFixed(4)}
                   </div>
                   <p className="text-xs text-muted-foreground">litres per unit</p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="border-amber-500/20 bg-amber-500/5">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">Waste Generated</CardTitle>
+                  <CardTitle className="text-sm font-medium text-amber-400">Waste Generated</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">
-                    {(allocatedImpacts.waste_per_unit ?? 0).toFixed(3)}
+                  <div className="text-2xl font-bold text-amber-400">
+                    {(allocatedImpacts.waste_per_unit ?? 0).toFixed(4)}
                   </div>
                   <p className="text-xs text-muted-foreground">kg per unit</p>
                 </CardContent>

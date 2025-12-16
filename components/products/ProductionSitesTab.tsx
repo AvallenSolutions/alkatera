@@ -73,7 +73,11 @@ interface Allocation {
   client_production_volume: number;
   attribution_ratio: number;
   allocated_emissions_kg_co2e: number;
+  allocated_water_litres?: number;
+  allocated_waste_kg?: number;
   emission_intensity_kg_co2e_per_unit: number;
+  water_intensity_litres_per_unit?: number;
+  waste_intensity_kg_per_unit?: number;
   status: string;
   is_energy_intensive_process: boolean;
   uses_proxy_data?: boolean;
@@ -245,6 +249,14 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
     .filter((a) => a.status !== "draft")
     .reduce((sum, a) => sum + (a.allocated_emissions_kg_co2e || 0), 0);
 
+  const totalAllocatedWater = allocations
+    .filter((a) => a.status !== "draft")
+    .reduce((sum, a) => sum + (a.allocated_water_litres || 0), 0);
+
+  const totalAllocatedWaste = allocations
+    .filter((a) => a.status !== "draft")
+    .reduce((sum, a) => sum + (a.allocated_waste_kg || 0), 0);
+
   const hasProvisionalAllocations = allocations.some(
     (a) => a.status === "provisional" || a.is_energy_intensive_process || a.uses_proxy_data
   );
@@ -298,7 +310,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card className="bg-slate-900/50 border-slate-800">
               <CardContent className="pt-6">
                 <div className="text-center">
@@ -310,33 +322,56 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
             <Card className="bg-slate-900/50 border-slate-800">
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Allocated Emissions</p>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">CO₂e Emissions</p>
                   <p className="text-3xl font-bold text-lime-400 mt-1">
                     {totalAllocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
-                  <p className="text-xs text-slate-500">kg CO2e</p>
+                  <p className="text-xs text-slate-500">kg CO₂e</p>
                 </div>
               </CardContent>
             </Card>
             <Card className="bg-slate-900/50 border-slate-800">
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Verification Status</p>
-                  <div className="mt-2">
-                    {hasProvisionalAllocations ? (
-                      <Badge className="bg-amber-500/20 text-amber-300 text-lg px-4 py-1">
-                        Pending Review
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-lime-500/20 text-lime-300 text-lg px-4 py-1">
-                        All Verified
-                      </Badge>
-                    )}
-                  </div>
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Water Usage</p>
+                  <p className="text-3xl font-bold text-blue-400 mt-1">
+                    {totalAllocatedWater.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-slate-500">litres</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-xs text-slate-400 uppercase tracking-wider">Waste Generated</p>
+                  <p className="text-3xl font-bold text-amber-400 mt-1">
+                    {totalAllocatedWaste.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-slate-500">kg</p>
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          <Card className="bg-slate-900/50 border-slate-800">
+            <CardContent className="pt-6">
+              <div className="text-center">
+                <p className="text-xs text-slate-400 uppercase tracking-wider">Verification Status</p>
+                <div className="mt-2">
+                  {hasProvisionalAllocations ? (
+                    <Badge className="bg-amber-500/20 text-amber-300 text-lg px-4 py-1">
+                      Pending Review
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-lime-500/20 text-lime-300 text-lg px-4 py-1">
+                      All Verified
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card className="bg-slate-900/50 border-slate-800">
             <CardHeader>
@@ -352,8 +387,9 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
                     <TableHead className="text-slate-400">Facility</TableHead>
                     <TableHead className="text-slate-400">Period</TableHead>
                     <TableHead className="text-slate-400 text-right">Attribution</TableHead>
-                    <TableHead className="text-slate-400 text-right">Allocated CO2e</TableHead>
-                    <TableHead className="text-slate-400 text-right">Intensity</TableHead>
+                    <TableHead className="text-slate-400 text-right">CO₂e</TableHead>
+                    <TableHead className="text-slate-400 text-right">Water</TableHead>
+                    <TableHead className="text-slate-400 text-right">Waste</TableHead>
                     <TableHead className="text-slate-400">Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -392,17 +428,25 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
                         <span className="font-mono text-lime-400">
                           {allocation.allocated_emissions_kg_co2e?.toLocaleString(undefined, {
                             maximumFractionDigits: 0,
-                          })}{" "}
-                          kg
+                          })}
                         </span>
+                        <span className="text-xs text-slate-500 ml-1">kg</span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-mono text-slate-300">
-                          {allocation.emission_intensity_kg_co2e_per_unit?.toFixed(4)}
+                        <span className="font-mono text-blue-400">
+                          {(allocation.allocated_water_litres || 0).toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
-                        <span className="text-xs text-slate-500 ml-1">
-                          kg/{allocation.production_volume_unit}
+                        <span className="text-xs text-slate-500 ml-1">L</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-mono text-amber-400">
+                          {(allocation.allocated_waste_kg || 0).toLocaleString(undefined, {
+                            maximumFractionDigits: 0,
+                          })}
                         </span>
+                        <span className="text-xs text-slate-500 ml-1">kg</span>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

@@ -67,7 +67,7 @@ export function OwnedFacilityProductionForm({
 
   const [productVolume, setProductVolume] = useState("");
   const [productVolumeUnit, setProductVolumeUnit] = useState("units");
-  const [totalFacilityVolume, setTotalFacilityVolume] = useState("");
+  const [facilityTotalProduction, setFacilityTotalProduction] = useState<number | null>(null);
 
   useEffect(() => {
     if (reportingPeriodStart && reportingPeriodEnd) {
@@ -108,9 +108,9 @@ export function OwnedFacilityProductionForm({
       if (data) {
         setFacilityTotalEmissions(data.total_co2e);
 
-        // Auto-populate Total Facility Output if available
-        if (data.total_production_volume && data.volume_unit) {
-          setTotalFacilityVolume(data.total_production_volume.toString());
+        // Auto-load facility total production for allocation calculation
+        if (data.total_production_volume) {
+          setFacilityTotalProduction(data.total_production_volume);
           // Map the volume_unit from the database to the select options
           const unitMapping: Record<string, string> = {
             'Litres': 'litres',
@@ -120,13 +120,13 @@ export function OwnedFacilityProductionForm({
           };
           const mappedUnit = unitMapping[data.volume_unit] || 'litres';
           setProductVolumeUnit(mappedUnit);
-          toast.success(`Found facility data: ${data.total_co2e.toLocaleString()} kg CO2e, ${data.total_production_volume.toLocaleString()} ${data.volume_unit}`);
+          toast.success(`Found facility data: ${data.total_co2e.toLocaleString()} kg CO2e from ${data.total_production_volume.toLocaleString()} ${data.volume_unit}`);
         } else {
           toast.success(`Found facility emissions data: ${data.total_co2e.toLocaleString()} kg CO2e`);
         }
       } else {
         setFacilityTotalEmissions(null);
-        setTotalFacilityVolume("");
+        setFacilityTotalProduction(null);
         toast.info("No facility emissions data found for this period. You'll need to enter it manually.");
       }
     } catch (error: any) {
@@ -139,10 +139,10 @@ export function OwnedFacilityProductionForm({
 
   const allocationPercentage = useMemo(() => {
     const prodVol = parseFloat(productVolume) || 0;
-    const totalVol = parseFloat(totalFacilityVolume) || 0;
+    const totalVol = facilityTotalProduction || 0;
     if (totalVol <= 0) return 0;
     return (prodVol / totalVol) * 100;
-  }, [productVolume, totalFacilityVolume]);
+  }, [productVolume, facilityTotalProduction]);
 
   const allocatedEmissions = useMemo(() => {
     if (!facilityTotalEmissions) return 0;
@@ -168,10 +168,10 @@ export function OwnedFacilityProductionForm({
     if (!productVolume || parseFloat(productVolume) <= 0) {
       return "Please enter the product volume";
     }
-    if (!totalFacilityVolume || parseFloat(totalFacilityVolume) <= 0) {
-      return "Please enter the total facility volume";
+    if (!facilityTotalProduction || facilityTotalProduction <= 0) {
+      return "Facility total production volume is required";
     }
-    if (parseFloat(productVolume) > parseFloat(totalFacilityVolume)) {
+    if (parseFloat(productVolume) > facilityTotalProduction) {
       return "Product volume cannot exceed total facility volume";
     }
     return null;
@@ -289,8 +289,8 @@ export function OwnedFacilityProductionForm({
       <Alert className="bg-blue-500/10 border-blue-500/20">
         <Info className="h-4 w-4 text-blue-400" />
         <AlertDescription className="text-blue-200">
-          <strong>Owned Facility Allocation:</strong> This facility is under your operational control.
-          Emissions will be allocated based on the proportion of this product's volume to total facility output.
+          <strong>Owned Facility Allocation:</strong> Enter only the product volume produced.
+          The system will automatically allocate emissions based on the percentage of total facility output.
         </AlertDescription>
       </Alert>
 
@@ -385,17 +385,17 @@ export function OwnedFacilityProductionForm({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">
             <Building2 className="h-5 w-5 text-blue-400" />
-            Production Volumes
+            Product Production Volume
           </CardTitle>
           <CardDescription>
-            Enter production data to calculate allocation
+            Enter the quantity of this product produced during the reporting period
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
             <div>
-              <Label className="text-base font-medium text-white">This Product</Label>
-              <p className="text-xs text-slate-400 mb-2">Volume of this specific product manufactured</p>
+              <Label className="text-base font-medium text-white">Product Volume</Label>
+              <p className="text-xs text-slate-400 mb-2">The amount of this specific product manufactured</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="productVolume">Volume</Label>
@@ -428,33 +428,20 @@ export function OwnedFacilityProductionForm({
               </div>
             </div>
 
-            <div className="pt-4 border-t border-slate-700">
-              <Label className="text-base font-medium text-white">Total Facility Output</Label>
-              <p className="text-xs text-slate-400 mb-2">
-                {totalFacilityVolume
-                  ? "Auto-filled from facility production data"
-                  : "Total volume of all products at this facility (same units)"}
-              </p>
-              <div>
-                <Label htmlFor="totalVolume">Total Volume ({productVolumeUnit})</Label>
-                <Input
-                  id="totalVolume"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="e.g., 200000"
-                  value={totalFacilityVolume}
-                  onChange={(e) => setTotalFacilityVolume(e.target.value)}
-                  disabled={!!totalFacilityVolume && facilityTotalEmissions !== null}
-                  className={`bg-slate-800 border-slate-700 ${totalFacilityVolume && facilityTotalEmissions !== null ? 'opacity-75 cursor-not-allowed' : ''}`}
-                />
-                <p className="text-xs text-slate-400 mt-1">
-                  {totalFacilityVolume && facilityTotalEmissions !== null
-                    ? "Value loaded from facility emissions data"
-                    : "Include all products manufactured at this facility during the period"}
+            {facilityTotalProduction && (
+              <div className="pt-4 border-t border-slate-700">
+                <Label className="text-base font-medium text-white">Facility Total Production</Label>
+                <p className="text-xs text-slate-400 mb-2">
+                  Auto-loaded from facility data for allocation calculation
                 </p>
+                <div className="p-4 bg-slate-800/50 rounded-md border border-slate-700">
+                  <p className="text-2xl font-bold text-white">
+                    {facilityTotalProduction.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">{productVolumeUnit}</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>

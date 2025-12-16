@@ -144,8 +144,24 @@ Deno.serve(async (req: Request) => {
     const allocationRatio = product_production_volume / total_production_volume;
 
     const totalCO2e = Number(emissionsData.total_co2e) || 0;
-    const totalWater = Number(emissionsData.results_payload?.total_water_usage) || 0;
-    const totalWaste = Number(emissionsData.results_payload?.total_waste_generated) || 0;
+
+    // Extract water and waste from results_payload (they may be nested in different structures)
+    const payload = emissionsData.results_payload || {};
+    let totalWater = 0;
+    let totalWaste = 0;
+
+    // Try different paths where water/waste might be stored
+    if (payload.total_water_consumption?.value) {
+      totalWater = Number(payload.total_water_consumption.value) || 0;
+    } else if (payload.total_water_usage) {
+      totalWater = Number(payload.total_water_usage) || 0;
+    }
+
+    if (payload.total_waste_generated?.value) {
+      totalWaste = Number(payload.total_waste_generated.value) || 0;
+    } else if (payload.total_waste_generated) {
+      totalWaste = Number(payload.total_waste_generated) || 0;
+    }
 
     const allocatedCO2e = totalCO2e * allocationRatio;
     const allocatedWater = totalWater * allocationRatio;
@@ -197,9 +213,13 @@ Deno.serve(async (req: Request) => {
         calculation_details: {
           facility_name: facilityData.name,
           total_co2e: totalCO2e,
+          total_co2e_unit: 'kg CO2e',
           total_water: totalWater,
+          total_water_unit: 'litres',
           total_waste: totalWaste,
+          total_waste_unit: 'kg',
           allocation_ratio: allocationRatio,
+          allocation_percentage: (allocationRatio * 100).toFixed(2),
           allocated_co2e: allocatedCO2e,
           allocated_water: allocatedWater,
           allocated_waste: allocatedWaste,
