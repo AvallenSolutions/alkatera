@@ -14,6 +14,9 @@ import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
 import { LogEmissionsWithProduction } from "@/components/facilities/LogEmissionsWithProduction";
 import { EditFacilityDialog } from "@/components/facilities/EditFacilityDialog";
+import { ReportingSessionSetup } from "@/components/facilities/ReportingSessionSetup";
+import { AddUtilityToSession } from "@/components/facilities/AddUtilityToSession";
+import { useReportingSession } from "@/hooks/data/useReportingSession";
 
 interface Facility {
   id: string;
@@ -71,6 +74,8 @@ export default function FacilityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("data-entry");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const { sessions, loading: sessionsLoading, refetch: refetchSessions } = useReportingSession(facilityId);
 
   const loadFacilityData = useCallback(async () => {
     try {
@@ -218,11 +223,82 @@ export default function FacilityDetailPage() {
         </TabsList>
 
         <TabsContent value="data-entry" className="space-y-6 mt-6">
-          <LogEmissionsWithProduction
-            facilityId={facilityId}
-            organizationId={facility?.organization_id || ''}
-            onSuccess={loadFacilityData}
-          />
+          {!activeSessionId ? (
+            <>
+              <ReportingSessionSetup
+                facilityId={facilityId}
+                organizationId={facility?.organization_id || ''}
+                onSessionCreated={(sessionId) => {
+                  setActiveSessionId(sessionId);
+                  refetchSessions();
+                }}
+              />
+
+              {sessions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Active Reporting Sessions</CardTitle>
+                    <CardDescription>
+                      Click on a session to add utility data
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {sessions.map((session) => (
+                        <div
+                          key={session.id}
+                          className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition"
+                          onClick={() => setActiveSessionId(session.id)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">
+                                {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
+                                {new Date(session.reporting_period_end).toLocaleDateString()}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Production Volume: {session.total_production_volume} {session.volume_unit}
+                              </p>
+                            </div>
+                            <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
+                              {session.data_source_type}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          ) : (
+            <>
+              {activeSessionId && sessions.find((s) => s.id === activeSessionId) && (
+                <>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setActiveSessionId(null)}
+                    >
+                      ← Back to Sessions
+                    </Button>
+                  </div>
+                  <AddUtilityToSession
+                    sessionId={activeSessionId}
+                    facilityId={facilityId}
+                    organizationId={facility?.organization_id || ''}
+                    periodStart={sessions.find((s) => s.id === activeSessionId)?.reporting_period_start || ''}
+                    periodEnd={sessions.find((s) => s.id === activeSessionId)?.reporting_period_end || ''}
+                    productionVolume={sessions.find((s) => s.id === activeSessionId)?.total_production_volume || 0}
+                    volumeUnit={sessions.find((s) => s.id === activeSessionId)?.volume_unit || ''}
+                    onUtilityAdded={() => {
+                      loadFacilityData();
+                    }}
+                  />
+                </>
+              )}
+            </>
+          )}
 
           <Card>
             <CardHeader>
