@@ -53,6 +53,22 @@ interface UtilityDataEntry {
   created_at: string;
 }
 
+interface FacilityActivityEntry {
+  id: string;
+  activity_category: string;
+  quantity: number;
+  unit: string;
+  reporting_period_start: string;
+  reporting_period_end: string;
+  data_provenance: string;
+  notes: string | null;
+  created_at: string;
+  water_source_type?: string;
+  water_classification?: string;
+  waste_category?: string;
+  waste_treatment_method?: string;
+}
+
 const UTILITY_TYPES = [
   { value: 'electricity_grid', label: 'Purchased Electricity', defaultUnit: 'kWh' },
   { value: 'heat_steam_purchased', label: 'Purchased Heat / Steam', defaultUnit: 'kWh' },
@@ -74,6 +90,8 @@ export default function FacilityDetailPage() {
   const [facility, setFacility] = useState<Facility | null>(null);
   const [dataContracts, setDataContracts] = useState<DataContract[]>([]);
   const [utilityData, setUtilityData] = useState<UtilityDataEntry[]>([]);
+  const [waterData, setWaterData] = useState<FacilityActivityEntry[]>([]);
+  const [wasteData, setWasteData] = useState<FacilityActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("data-entry");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -86,7 +104,7 @@ export default function FacilityDetailPage() {
     try {
       setLoading(true);
 
-      const [facilityResult, contractsResult, dataResult] = await Promise.all([
+      const [facilityResult, contractsResult, utilityResult, waterResult, wasteResult] = await Promise.all([
         supabase
           .from('facilities')
           .select('*')
@@ -101,15 +119,31 @@ export default function FacilityDetailPage() {
           .select('*')
           .eq('facility_id', facilityId)
           .order('reporting_period_start', { ascending: false }),
+        supabase
+          .from('facility_activity_entries')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .in('activity_category', ['water_intake', 'water_discharge', 'water_recycled'])
+          .order('reporting_period_start', { ascending: false }),
+        supabase
+          .from('facility_activity_entries')
+          .select('*')
+          .eq('facility_id', facilityId)
+          .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
+          .order('reporting_period_start', { ascending: false }),
       ]);
 
       if (facilityResult.error) throw facilityResult.error;
       if (contractsResult.error) throw contractsResult.error;
-      if (dataResult.error) throw dataResult.error;
+      if (utilityResult.error) throw utilityResult.error;
+      if (waterResult.error) throw waterResult.error;
+      if (wasteResult.error) throw wasteResult.error;
 
       setFacility(facilityResult.data);
       setDataContracts(contractsResult.data || []);
-      setUtilityData(dataResult.data || []);
+      setUtilityData(utilityResult.data || []);
+      setWaterData(waterResult.data || []);
+      setWasteData(wasteResult.data || []);
     } catch (error: any) {
       console.error('Error loading facility data:', error);
       toast.error(error.message || 'Failed to load facility data');
@@ -509,6 +543,104 @@ export default function FacilityDetailPage() {
               )}
             </>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Water Data History</CardTitle>
+              <CardDescription>
+                All water intake, discharge, and recycling data for this facility
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {waterData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No water data recorded yet</p>
+                  <p className="text-sm mt-1">Add your first entry above</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Activity Type</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Data Quality</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {waterData.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell className="font-medium">
+                          {entry.activity_category === 'water_intake' && 'Water Intake'}
+                          {entry.activity_category === 'water_discharge' && 'Wastewater Discharge'}
+                          {entry.activity_category === 'water_recycled' && 'Recycled Water'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                            <br />
+                            {new Date(entry.reporting_period_end).toLocaleDateString()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {entry.quantity.toLocaleString()} {entry.unit}
+                        </TableCell>
+                        <TableCell>
+                          {entry.water_source_type ? (
+                            <Badge variant="outline" className="text-xs">
+                              {entry.water_source_type.replace('_', ' ')}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              entry.data_provenance?.includes('primary')
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}
+                          >
+                            {entry.data_provenance?.includes('verified') && 'Verified'}
+                            {entry.data_provenance?.includes('measured') && 'Measured'}
+                            {entry.data_provenance?.includes('allocated') && 'Allocated'}
+                            {entry.data_provenance?.includes('modelled') && 'Modelled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              if (!confirm('Are you sure you want to delete this entry?')) return;
+                              try {
+                                const { error } = await supabase
+                                  .from('facility_activity_entries')
+                                  .delete()
+                                  .eq('id', entry.id);
+                                if (error) throw error;
+                                toast.success('Entry deleted');
+                                await loadFacilityData();
+                              } catch (error: any) {
+                                console.error('Error deleting entry:', error);
+                                toast.error(error.message || 'Failed to delete entry');
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="waste" className="space-y-6 mt-6">
@@ -586,6 +718,104 @@ export default function FacilityDetailPage() {
               )}
             </>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Waste Data History</CardTitle>
+              <CardDescription>
+                All waste generation, recycling, and disposal data for this facility
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {wasteData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No waste data recorded yet</p>
+                  <p className="text-sm mt-1">Add your first entry above</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Waste Category</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Quantity</TableHead>
+                      <TableHead>Treatment Method</TableHead>
+                      <TableHead>Data Quality</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {wasteData.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell className="font-medium">
+                          {entry.activity_category === 'waste_general' && 'General Waste'}
+                          {entry.activity_category === 'waste_hazardous' && 'Hazardous Waste'}
+                          {entry.activity_category === 'waste_recycling' && 'Recycling'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                            <br />
+                            {new Date(entry.reporting_period_end).toLocaleDateString()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {entry.quantity.toLocaleString()} {entry.unit}
+                        </TableCell>
+                        <TableCell>
+                          {entry.waste_treatment_method ? (
+                            <Badge variant="outline" className="text-xs">
+                              {entry.waste_treatment_method.replace('_', ' ')}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs ${
+                              entry.data_provenance?.includes('primary')
+                                ? 'bg-green-50 text-green-700 border-green-200'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}
+                          >
+                            {entry.data_provenance?.includes('verified') && 'Verified'}
+                            {entry.data_provenance?.includes('measured') && 'Measured'}
+                            {entry.data_provenance?.includes('allocated') && 'Allocated'}
+                            {entry.data_provenance?.includes('modelled') && 'Modelled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={async () => {
+                              if (!confirm('Are you sure you want to delete this entry?')) return;
+                              try {
+                                const { error } = await supabase
+                                  .from('facility_activity_entries')
+                                  .delete()
+                                  .eq('id', entry.id);
+                                if (error) throw error;
+                                toast.success('Entry deleted');
+                                await loadFacilityData();
+                              } catch (error: any) {
+                                console.error('Error deleting entry:', error);
+                                toast.error(error.message || 'Failed to delete entry');
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="overview" className="mt-6">
