@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Building2, Zap, Pencil } from "lucide-react";
+import { ArrowLeft, Trash2, Building2, Zap, Pencil, Droplets, Recycle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,9 @@ import { EditFacilityDialog } from "@/components/facilities/EditFacilityDialog";
 import { ReportingSessionSetup } from "@/components/facilities/ReportingSessionSetup";
 import { AddUtilityToSession } from "@/components/facilities/AddUtilityToSession";
 import { useReportingSession } from "@/hooks/data/useReportingSession";
+import { WaterDataEntry } from "@/components/facilities/WaterDataEntry";
+import { WasteDataEntry } from "@/components/facilities/WasteDataEntry";
+import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
 
 interface Facility {
   id: string;
@@ -214,7 +217,15 @@ export default function FacilityDetailPage() {
         <TabsList>
           <TabsTrigger value="data-entry">
             <Zap className="h-4 w-4 mr-2" />
-            Utility Data Entry
+            Utilities
+          </TabsTrigger>
+          <TabsTrigger value="water">
+            <Droplets className="h-4 w-4 mr-2" />
+            Water
+          </TabsTrigger>
+          <TabsTrigger value="waste">
+            <Recycle className="h-4 w-4 mr-2" />
+            Waste
           </TabsTrigger>
           <TabsTrigger value="overview">
             <Building2 className="h-4 w-4 mr-2" />
@@ -369,11 +380,66 @@ export default function FacilityDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="overview" className="mt-6">
-          <div className="space-y-6">
+        <TabsContent value="water" className="space-y-6 mt-6">
+          {sessions.length === 0 ? (
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+              <CardContent className="p-6">
+                <div className="text-center py-8 text-muted-foreground">
+                  <Droplets className="h-12 w-12 mx-auto mb-4 text-blue-400" />
+                  <p className="font-medium">No reporting sessions found</p>
+                  <p className="text-sm mt-1">Create a reporting session in the Utilities tab first to log water data</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            sessions.map((session) => (
+              <WaterDataEntry
+                key={session.id}
+                facilityId={facilityId}
+                organizationId={facility?.organization_id || ''}
+                sessionId={session.id}
+                periodStart={session.reporting_period_start}
+                periodEnd={session.reporting_period_end}
+                isThirdParty={facility?.operational_control === 'third_party'}
+                onEntryAdded={loadFacilityData}
+              />
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="waste" className="space-y-6 mt-6">
+          {sessions.length === 0 ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center py-8 text-muted-foreground">
+                  <Recycle className="h-12 w-12 mx-auto mb-4 text-orange-400" />
+                  <p className="font-medium">No reporting sessions found</p>
+                  <p className="text-sm mt-1">Create a reporting session in the Utilities tab first to log waste data</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            sessions.map((session) => (
+              <WasteDataEntry
+                key={session.id}
+                facilityId={facilityId}
+                organizationId={facility?.organization_id || ''}
+                sessionId={session.id}
+                periodStart={session.reporting_period_start}
+                periodEnd={session.reporting_period_end}
+                isThirdParty={facility?.operational_control === 'third_party'}
+                onEntryAdded={loadFacilityData}
+              />
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="overview" className="mt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
                   <CardTitle>Facility Information</CardTitle>
                   <div className="flex gap-2">
                     <Button
@@ -436,6 +502,13 @@ export default function FacilityDetailPage() {
                 </div>
               </CardContent>
             </Card>
+            </div>
+            <div className="lg:col-span-1">
+              <DataQualityConfidenceCard
+                facilityId={facilityId}
+                organizationId={facility?.organization_id || ''}
+              />
+            </div>
           </div>
         </TabsContent>
       </Tabs>
