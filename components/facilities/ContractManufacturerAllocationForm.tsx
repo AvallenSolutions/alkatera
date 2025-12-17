@@ -100,6 +100,9 @@ export function ContractManufacturerAllocationForm({
   const [facilityTotalWater, setFacilityTotalWater] = useState<number>(0);
   const [facilityTotalWaste, setFacilityTotalWaste] = useState<number>(0);
   const [isDataAutoLoaded, setIsDataAutoLoaded] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationPending, setCalculationPending] = useState(false);
+  const [facilityAggregatedId, setFacilityAggregatedId] = useState<string | null>(null);
 
   const [useProxyData, setUseProxyData] = useState(false);
   const [productCategory, setProductCategory] = useState("");
@@ -183,10 +186,11 @@ export function ContractManufacturerAllocationForm({
   const loadFacilityEmissions = async () => {
     setLoadingFacilityData(true);
     setIsDataAutoLoaded(false);
+    setCalculationPending(false);
     try {
       let { data, error } = await supabase
         .from("facility_emissions_aggregated")
-        .select("total_co2e, total_production_volume, volume_unit, results_payload")
+        .select("id, total_co2e, total_production_volume, volume_unit, results_payload")
         .eq("facility_id", facilityId)
         .eq("reporting_period_start", reportingPeriodStart)
         .eq("reporting_period_end", reportingPeriodEnd)
@@ -195,7 +199,7 @@ export function ContractManufacturerAllocationForm({
       if (!data && !error) {
         const result = await supabase
           .from("facility_emissions_aggregated")
-          .select("total_co2e, total_production_volume, volume_unit, results_payload")
+          .select("id, total_co2e, total_production_volume, volume_unit, results_payload")
           .eq("facility_id", facilityId)
           .lte("reporting_period_start", reportingPeriodEnd)
           .gte("reporting_period_end", reportingPeriodStart)
@@ -210,9 +214,19 @@ export function ContractManufacturerAllocationForm({
       if (error) throw error;
 
       if (data) {
-        setDirectCo2eValue(data.total_co2e.toString());
+        setFacilityAggregatedId(data.id);
+        const co2eValue = Number(data.total_co2e) || 0;
+        setDirectCo2eValue(co2eValue.toString());
 
         const payload = data.results_payload || {};
+        const status = payload?.status || "";
+
+        // Check if calculation is pending
+        if (status === "awaiting_calculation" || (co2eValue === 0 && data.total_production_volume)) {
+          setCalculationPending(true);
+          toast.warning("Facility data found but emissions calculation is pending. Click 'Run Calculation' to process.");
+        }
+
         let totalWater = 0;
         let totalWaste = 0;
 
@@ -247,11 +261,13 @@ export function ContractManufacturerAllocationForm({
           setProductionVolumeUnit(mappedUnit);
           setIsDataAutoLoaded(true);
 
-          const metrics = [`${Number(data.total_co2e).toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO2e`];
-          if (totalWater > 0) metrics.push(`${totalWater.toLocaleString(undefined, { maximumFractionDigits: 0 })} L water`);
-          if (totalWaste > 0) metrics.push(`${totalWaste.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg waste`);
+          if (!calculationPending && co2eValue > 0) {
+            const metrics = [`${co2eValue.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO2e`];
+            if (totalWater > 0) metrics.push(`${totalWater.toLocaleString(undefined, { maximumFractionDigits: 0 })} L water`);
+            if (totalWaste > 0) metrics.push(`${totalWaste.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg waste`);
 
-          toast.success(`Loaded facility data: ${metrics.join(', ')}`);
+            toast.success(`Loaded facility data: ${metrics.join(', ')}`);
+          }
         }
       }
     } catch (error: any) {
@@ -259,6 +275,50 @@ export function ContractManufacturerAllocationForm({
       setIsDataAutoLoaded(false);
     } finally {
       setLoadingFacilityData(false);
+    }
+  };
+
+  const triggerFacilityCalculation = async () => {
+    if (!facilityAggregatedId) {
+      toast.error("No facility data found to calculate");
+      return;
+    }
+
+    setIsCalculating(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-scope1-2-calculations`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            facility_id: facilityId,
+            reporting_period_start: reportingPeriodStart,
+            reporting_period_end: reportingPeriodEnd,
+            organization_id: organizationId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Calculation failed: ${errorText}`);
+      }
+
+      const result = await response.json();
+      toast.success("Facility emissions calculated successfully!");
+
+      // Reload facility data
+      await loadFacilityEmissions();
+      setCalculationPending(false);
+    } catch (error: any) {
+      console.error("Error triggering calculation:", error);
+      toast.error(error.message || "Failed to calculate facility emissions");
+    } finally {
+      setIsCalculating(false);
     }
   };
 
@@ -487,6 +547,37 @@ export function ContractManufacturerAllocationForm({
           locked record. Data from different years uses the appropriate emission factors for temporal accuracy.
         </AlertDescription>
       </Alert>
+
+      {calculationPending && (
+        <Alert className="bg-amber-500/10 border-amber-500/30">
+          <AlertCircle className="h-4 w-4 text-amber-400" />
+          <AlertDescription className="text-amber-200">
+            <div className="flex items-center justify-between">
+              <span>
+                <strong>Calculation Required:</strong> Facility has production data but emissions have not been calculated yet.
+              </span>
+              <Button
+                onClick={triggerFacilityCalculation}
+                disabled={isCalculating}
+                className="ml-4 bg-amber-500 hover:bg-amber-600 text-black"
+                size="sm"
+              >
+                {isCalculating ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="mr-2 h-3 w-3" />
+                    Run Calculation
+                  </>
+                )}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card className="bg-slate-900/50 border-slate-800">
         <CardHeader>
