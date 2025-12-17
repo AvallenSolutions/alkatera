@@ -114,14 +114,23 @@ export default function ProductRecipePage() {
         .eq("organization_id", currentOrganization?.id);
 
       if (!facilitiesError && facilitiesData) {
+        console.log('Raw facilities from DB:', facilitiesData);
         // Convert lat/lng from string to number (Supabase returns numeric columns as strings)
         const facilitiesWithNumbers = facilitiesData
           .filter(f => f.address_lat && f.address_lng)
-          .map(f => ({
-            ...f,
-            address_lat: typeof f.address_lat === 'string' ? parseFloat(f.address_lat) : f.address_lat,
-            address_lng: typeof f.address_lng === 'string' ? parseFloat(f.address_lng) : f.address_lng,
-          })) as ProductionFacility[];
+          .map(f => {
+            const converted = {
+              ...f,
+              address_lat: typeof f.address_lat === 'string' ? parseFloat(f.address_lat) : f.address_lat,
+              address_lng: typeof f.address_lng === 'string' ? parseFloat(f.address_lng) : f.address_lng,
+            };
+            console.log('Converted facility:', f.name, {
+              before: { lat: f.address_lat, lng: f.address_lng, types: [typeof f.address_lat, typeof f.address_lng] },
+              after: { lat: converted.address_lat, lng: converted.address_lng, types: [typeof converted.address_lat, typeof converted.address_lng] }
+            });
+            return converted;
+          }) as ProductionFacility[];
+        console.log('Final facilities with numbers:', facilitiesWithNumbers);
         setProductionFacilities(facilitiesWithNumbers);
       }
 
