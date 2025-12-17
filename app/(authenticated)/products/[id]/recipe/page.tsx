@@ -114,7 +114,15 @@ export default function ProductRecipePage() {
         .eq("organization_id", currentOrganization?.id);
 
       if (!facilitiesError && facilitiesData) {
-        setProductionFacilities(facilitiesData.filter(f => f.address_lat && f.address_lng) as ProductionFacility[]);
+        // Convert lat/lng from string to number (Supabase returns numeric columns as strings)
+        const facilitiesWithNumbers = facilitiesData
+          .filter(f => f.address_lat && f.address_lng)
+          .map(f => ({
+            ...f,
+            address_lat: typeof f.address_lat === 'string' ? parseFloat(f.address_lat) : f.address_lat,
+            address_lng: typeof f.address_lng === 'string' ? parseFloat(f.address_lng) : f.address_lng,
+          })) as ProductionFacility[];
+        setProductionFacilities(facilitiesWithNumbers);
       }
 
       const { data: materialsData, error: materialsError } = await supabase
