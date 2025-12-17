@@ -501,6 +501,18 @@ export function ContractManufacturerAllocationForm({
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      const clientVolume = parseFloat(clientProductionVolume);
+      const facilityVolume = parseFloat(totalFacilityProductionVolume);
+      const attributionRatio = facilityVolume > 0 ? clientVolume / facilityVolume : 0;
+
+      const allocatedCo2e = totalFacilityCo2e * attributionRatio;
+      const allocatedWater = facilityTotalWater * attributionRatio;
+      const allocatedWaste = facilityTotalWaste * attributionRatio;
+
+      const co2eIntensity = clientVolume > 0 ? allocatedCo2e / clientVolume : 0;
+      const waterIntensity = clientVolume > 0 ? allocatedWater / clientVolume : 0;
+      const wasteIntensity = clientVolume > 0 ? allocatedWaste / clientVolume : 0;
+
       const allocationData = {
         organization_id: organizationId,
         product_id: productId,
@@ -508,13 +520,22 @@ export function ContractManufacturerAllocationForm({
         supplier_id: supplierId || null,
         reporting_period_start: reportingPeriodStart,
         reporting_period_end: reportingPeriodEnd,
-        total_facility_production_volume: parseFloat(totalFacilityProductionVolume),
+        total_facility_production_volume: facilityVolume,
         production_volume_unit: productionVolumeUnit,
         total_facility_co2e_kg: totalFacilityCo2e,
+        total_facility_water_litres: facilityTotalWater,
+        total_facility_waste_kg: facilityTotalWaste,
         co2e_entry_method: useProxyData ? "proxy" : co2eEntryMethod,
         emission_factor_year: emissionFactorYear,
         emission_factor_source: useProxyData ? "Ecoinvent" : "DEFRA",
-        client_production_volume: parseFloat(clientProductionVolume),
+        client_production_volume: clientVolume,
+        attribution_ratio: attributionRatio,
+        allocated_emissions_kg_co2e: allocatedCo2e,
+        allocated_water_litres: allocatedWater,
+        allocated_waste_kg: allocatedWaste,
+        emission_intensity_kg_co2e_per_unit: co2eIntensity,
+        water_intensity_litres_per_unit: waterIntensity,
+        waste_intensity_kg_per_unit: wasteIntensity,
         is_energy_intensive_process: isEnergyIntensiveProcess,
         energy_intensive_notes: isEnergyIntensiveProcess ? energyIntensiveNotes : null,
         created_by: user?.id,
