@@ -99,6 +99,7 @@ export function ContractManufacturerAllocationForm({
 
   const [facilityTotalWater, setFacilityTotalWater] = useState<number>(0);
   const [facilityTotalWaste, setFacilityTotalWaste] = useState<number>(0);
+  const [isDataAutoLoaded, setIsDataAutoLoaded] = useState(false);
 
   const [useProxyData, setUseProxyData] = useState(false);
   const [productCategory, setProductCategory] = useState("");
@@ -181,6 +182,7 @@ export function ContractManufacturerAllocationForm({
 
   const loadFacilityEmissions = async () => {
     setLoadingFacilityData(true);
+    setIsDataAutoLoaded(false);
     try {
       let { data, error } = await supabase
         .from("facility_emissions_aggregated")
@@ -214,15 +216,19 @@ export function ContractManufacturerAllocationForm({
         let totalWater = 0;
         let totalWaste = 0;
 
-        if (payload.total_water_consumption?.value) {
+        if (payload?.disaggregated_summary?.total_water_consumption) {
+          totalWater = Number(payload.disaggregated_summary.total_water_consumption) || 0;
+        } else if (payload?.total_water_consumption?.value) {
           totalWater = Number(payload.total_water_consumption.value) || 0;
-        } else if (payload.total_water_usage) {
-          totalWater = Number(payload.total_water_usage) || 0;
+        } else if (payload?.total_water_consumption) {
+          totalWater = Number(payload.total_water_consumption) || 0;
         }
 
-        if (payload.total_waste_generated?.value) {
+        if (payload?.disaggregated_summary?.total_waste) {
+          totalWaste = Number(payload.disaggregated_summary.total_waste) || 0;
+        } else if (payload?.total_waste_generated?.value) {
           totalWaste = Number(payload.total_waste_generated.value) || 0;
-        } else if (payload.total_waste_generated) {
+        } else if (payload?.total_waste_generated) {
           totalWaste = Number(payload.total_waste_generated) || 0;
         }
 
@@ -239,16 +245,18 @@ export function ContractManufacturerAllocationForm({
           };
           const mappedUnit = unitMapping[data.volume_unit] || 'litres';
           setProductionVolumeUnit(mappedUnit);
+          setIsDataAutoLoaded(true);
 
-          const metrics = [`${data.total_co2e.toLocaleString()} kg CO2e`];
-          if (totalWater > 0) metrics.push(`${totalWater.toLocaleString()} L water`);
-          if (totalWaste > 0) metrics.push(`${totalWaste.toLocaleString()} kg waste`);
+          const metrics = [`${Number(data.total_co2e).toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO2e`];
+          if (totalWater > 0) metrics.push(`${totalWater.toLocaleString(undefined, { maximumFractionDigits: 0 })} L water`);
+          if (totalWaste > 0) metrics.push(`${totalWaste.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg waste`);
 
           toast.success(`Loaded facility data: ${metrics.join(', ')}`);
         }
       }
     } catch (error: any) {
       console.error("Error loading facility emissions:", error);
+      setIsDataAutoLoaded(false);
     } finally {
       setLoadingFacilityData(false);
     }
@@ -538,7 +546,10 @@ export function ContractManufacturerAllocationForm({
           )}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="totalVolume">Total Production Volume</Label>
+              <Label htmlFor="totalVolume" className="flex items-center gap-2">
+                Total Production Volume
+                {isDataAutoLoaded && <Badge className="bg-blue-500/20 text-blue-300 text-xs">Auto-loaded</Badge>}
+              </Label>
               <Input
                 id="totalVolume"
                 type="number"
@@ -546,15 +557,19 @@ export function ContractManufacturerAllocationForm({
                 step="0.01"
                 placeholder="e.g., 1000000"
                 value={totalFacilityProductionVolume}
-                onChange={(e) => setTotalFacilityProductionVolume(e.target.value)}
-                className="bg-slate-800 border-slate-700"
-                disabled={loadingFacilityData}
+                onChange={(e) => !isDataAutoLoaded && setTotalFacilityProductionVolume(e.target.value)}
+                className={`bg-slate-800 border-slate-700 ${isDataAutoLoaded ? 'opacity-60 cursor-not-allowed' : ''}`}
+                disabled={loadingFacilityData || isDataAutoLoaded}
+                readOnly={isDataAutoLoaded}
               />
             </div>
             <div>
-              <Label htmlFor="volumeUnit">Unit</Label>
-              <Select value={productionVolumeUnit} onValueChange={setProductionVolumeUnit} disabled={loadingFacilityData}>
-                <SelectTrigger className="bg-slate-800 border-slate-700">
+              <Label htmlFor="volumeUnit" className="flex items-center gap-2">
+                Unit
+                {isDataAutoLoaded && <Badge className="bg-blue-500/20 text-blue-300 text-xs">Auto-loaded</Badge>}
+              </Label>
+              <Select value={productionVolumeUnit} onValueChange={(value) => !isDataAutoLoaded && setProductionVolumeUnit(value)} disabled={loadingFacilityData || isDataAutoLoaded}>
+                <SelectTrigger className={`bg-slate-800 border-slate-700 ${isDataAutoLoaded ? 'opacity-60' : ''}`}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
