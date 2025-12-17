@@ -100,7 +100,6 @@ export function ContractManufacturerAllocationForm({
   const [facilityTotalWater, setFacilityTotalWater] = useState<number>(0);
   const [facilityTotalWaste, setFacilityTotalWaste] = useState<number>(0);
   const [isDataAutoLoaded, setIsDataAutoLoaded] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
   const [calculationPending, setCalculationPending] = useState(false);
   const [facilityAggregatedId, setFacilityAggregatedId] = useState<string | null>(null);
 
@@ -221,10 +220,88 @@ export function ContractManufacturerAllocationForm({
         const payload = data.results_payload || {};
         const status = payload?.status || "";
 
-        // Check if calculation is pending
+        // Check if calculation is pending and auto-trigger
         if (status === "awaiting_calculation" || (co2eValue === 0 && data.total_production_volume)) {
           setCalculationPending(true);
-          toast.warning("Facility data found but emissions calculation is pending. Click 'Run Calculation' to process.");
+          toast.info("Calculating facility emissions in background...", { duration: 2000 });
+
+          // Auto-trigger calculation without user intervention
+          setTimeout(async () => {
+            try {
+              const response = await fetch(
+                `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-scope1-2-calculations`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                  },
+                  body: JSON.stringify({
+                    facility_id: facilityId,
+                    reporting_period_start: reportingPeriodStart,
+                    reporting_period_end: reportingPeriodEnd,
+                    organization_id: organizationId,
+                  }),
+                }
+              );
+
+              if (response.ok) {
+                // Brief delay for DB to update
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                // Reload facility data after calculation
+                setLoadingFacilityData(true);
+                const { data: updatedData, error: updatedError } = await supabase
+                  .from("facility_emissions_aggregated")
+                  .select("id, total_co2e, total_production_volume, volume_unit, results_payload")
+                  .eq("facility_id", facilityId)
+                  .eq("reporting_period_start", reportingPeriodStart)
+                  .eq("reporting_period_end", reportingPeriodEnd)
+                  .maybeSingle();
+
+                if (updatedData && !updatedError) {
+                  const updatedCo2e = Number(updatedData.total_co2e) || 0;
+                  setDirectCo2eValue(updatedCo2e.toString());
+                  setCalculationPending(false);
+
+                  const updatedPayload = updatedData.results_payload || {};
+                  let water = 0;
+                  let waste = 0;
+
+                  if (updatedPayload?.disaggregated_summary?.total_water_consumption) {
+                    water = Number(updatedPayload.disaggregated_summary.total_water_consumption) || 0;
+                  } else if (updatedPayload?.total_water_consumption?.value) {
+                    water = Number(updatedPayload.total_water_consumption.value) || 0;
+                  } else if (updatedPayload?.total_water_consumption) {
+                    water = Number(updatedPayload.total_water_consumption) || 0;
+                  }
+
+                  if (updatedPayload?.disaggregated_summary?.total_waste) {
+                    waste = Number(updatedPayload.disaggregated_summary.total_waste) || 0;
+                  } else if (updatedPayload?.total_waste_generated?.value) {
+                    waste = Number(updatedPayload.total_waste_generated.value) || 0;
+                  } else if (updatedPayload?.total_waste_generated) {
+                    waste = Number(updatedPayload.total_waste_generated) || 0;
+                  }
+
+                  setFacilityTotalWater(water);
+                  setFacilityTotalWaste(waste);
+
+                  const metrics = [`${updatedCo2e.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO2e`];
+                  if (water > 0) metrics.push(`${water.toLocaleString(undefined, { maximumFractionDigits: 0 })} L water`);
+                  if (waste > 0) metrics.push(`${waste.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg waste`);
+
+                  toast.success(`Facility emissions calculated: ${metrics.join(', ')}`);
+                }
+                setLoadingFacilityData(false);
+              }
+            } catch (error) {
+              console.error("Background calculation error:", error);
+              setCalculationPending(false);
+              setLoadingFacilityData(false);
+            }
+          }, 500);
+
+          // Continue with setting initial values while calculation runs
         }
 
         let totalWater = 0;
@@ -275,50 +352,6 @@ export function ContractManufacturerAllocationForm({
       setIsDataAutoLoaded(false);
     } finally {
       setLoadingFacilityData(false);
-    }
-  };
-
-  const triggerFacilityCalculation = async () => {
-    if (!facilityAggregatedId) {
-      toast.error("No facility data found to calculate");
-      return;
-    }
-
-    setIsCalculating(true);
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-scope1-2-calculations`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            facility_id: facilityId,
-            reporting_period_start: reportingPeriodStart,
-            reporting_period_end: reportingPeriodEnd,
-            organization_id: organizationId,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Calculation failed: ${errorText}`);
-      }
-
-      const result = await response.json();
-      toast.success("Facility emissions calculated successfully!");
-
-      // Reload facility data
-      await loadFacilityEmissions();
-      setCalculationPending(false);
-    } catch (error: any) {
-      console.error("Error triggering calculation:", error);
-      toast.error(error.message || "Failed to calculate facility emissions");
-    } finally {
-      setIsCalculating(false);
     }
   };
 
@@ -547,37 +580,6 @@ export function ContractManufacturerAllocationForm({
           locked record. Data from different years uses the appropriate emission factors for temporal accuracy.
         </AlertDescription>
       </Alert>
-
-      {calculationPending && (
-        <Alert className="bg-amber-500/10 border-amber-500/30">
-          <AlertCircle className="h-4 w-4 text-amber-400" />
-          <AlertDescription className="text-amber-200">
-            <div className="flex items-center justify-between">
-              <span>
-                <strong>Calculation Required:</strong> Facility has production data but emissions have not been calculated yet.
-              </span>
-              <Button
-                onClick={triggerFacilityCalculation}
-                disabled={isCalculating}
-                className="ml-4 bg-amber-500 hover:bg-amber-600 text-black"
-                size="sm"
-              >
-                {isCalculating ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    Calculating...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="mr-2 h-3 w-3" />
-                    Run Calculation
-                  </>
-                )}
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
 
       <Card className="bg-slate-900/50 border-slate-800">
         <CardHeader>
