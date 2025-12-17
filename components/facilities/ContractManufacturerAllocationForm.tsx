@@ -228,13 +228,18 @@ export function ContractManufacturerAllocationForm({
           // Auto-trigger calculation without user intervention
           setTimeout(async () => {
             try {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) {
+                throw new Error("No active session");
+              }
+
               const response = await fetch(
                 `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-scope1-2-calculations`,
                 {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`,
+                    "Authorization": `Bearer ${session.access_token}`,
                   },
                   body: JSON.stringify({
                     facility_id: facilityId,
