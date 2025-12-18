@@ -132,18 +132,20 @@ export function IngredientFormCard({
       }
     }
 
-    // Find the nearest facility instead of averaging all facilities
-    let minDistance = Infinity;
+    // Calculate weighted average distance based on production share
+    let totalWeightedDistance = 0;
+    let totalWeight = 0;
+
     for (const facility of productionFacilities) {
       if (facility.address_lat && facility.address_lng) {
         const distance = calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
-        if (distance < minDistance) {
-          minDistance = distance;
-        }
+        const weight = facility.production_share || (100 / productionFacilities.length); // Equal weight if no share specified
+        totalWeightedDistance += distance * weight;
+        totalWeight += weight;
       }
     }
 
-    return minDistance === Infinity ? 0 : Math.round(minDistance);
+    return totalWeight > 0 ? Math.round(totalWeightedDistance / totalWeight) : 0;
   };
 
   const handleSearchSelect = (selection: {

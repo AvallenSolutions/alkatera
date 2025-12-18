@@ -108,20 +108,43 @@ export default function ProductRecipePage() {
       if (productError) throw productError;
       setProduct(productData);
 
-      const { data: facilitiesData, error: facilitiesError } = await supabase
-        .from("facilities")
-        .select("id, name, address_lat, address_lng")
-        .eq("organization_id", currentOrganization?.id);
+      // Fetch only the selected production sites for this product's latest LCA
+      let productionSitesData = null;
+      let productionSitesError = null;
 
-      if (!facilitiesError && facilitiesData) {
-        // Convert lat/lng from string to number (Supabase returns numeric columns as strings)
-        const facilitiesWithNumbers = facilitiesData
-          .filter(f => f.address_lat && f.address_lng)
-          .map(f => ({
-            ...f,
-            address_lat: typeof f.address_lat === 'string' ? parseFloat(f.address_lat) : f.address_lat,
-            address_lng: typeof f.address_lng === 'string' ? parseFloat(f.address_lng) : f.address_lng,
-          })) as ProductionFacility[];
+      if (productData.latest_lca_id) {
+        const result = await supabase
+          .from("product_lca_production_sites")
+          .select(`
+            id,
+            share_of_production,
+            facilities:facility_id (
+              id,
+              name,
+              address_lat,
+              address_lng
+            )
+          `)
+          .eq("product_lca_id", productData.latest_lca_id);
+
+        productionSitesData = result.data;
+        productionSitesError = result.error;
+      }
+
+      if (!productionSitesError && productionSitesData) {
+        // Extract facilities from the join and convert coordinates to numbers
+        const facilitiesWithNumbers = productionSitesData
+          .filter((ps: any) => ps.facilities && ps.facilities.address_lat && ps.facilities.address_lng)
+          .map((ps: any) => {
+            const facility = ps.facilities;
+            return {
+              id: facility.id,
+              name: facility.name,
+              address_lat: typeof facility.address_lat === 'string' ? parseFloat(facility.address_lat) : facility.address_lat,
+              address_lng: typeof facility.address_lng === 'string' ? parseFloat(facility.address_lng) : facility.address_lng,
+              production_share: ps.share_of_production || 0,
+            };
+          }) as ProductionFacility[];
         setProductionFacilities(facilitiesWithNumbers);
       }
 
