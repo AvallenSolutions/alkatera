@@ -32,18 +32,37 @@ export function calculateDistance(
   lat2: number,
   lng2: number
 ): number {
+  // Log inputs for debugging
+  console.log('calculateDistance called with:', {
+    lat1, lng1, lat2, lng2,
+    types: [typeof lat1, typeof lng1, typeof lat2, typeof lng2],
+    values: { lat1: Number(lat1), lng1: Number(lng1), lat2: Number(lat2), lng2: Number(lng2) }
+  });
+
+  // Ensure all inputs are numbers
+  const numLat1 = Number(lat1);
+  const numLng1 = Number(lng1);
+  const numLat2 = Number(lat2);
+  const numLng2 = Number(lng2);
+
+  // Validate
+  if (isNaN(numLat1) || isNaN(numLng1) || isNaN(numLat2) || isNaN(numLng2)) {
+    console.error('Invalid coordinates:', { lat1, lng1, lat2, lng2 });
+    return 0;
+  }
+
   // Earth's radius in kilometres
   const R = 6371;
 
   // Convert latitude and longitude differences to radians
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
+  const dLat = toRad(numLat2 - numLat1);
+  const dLng = toRad(numLng2 - numLng1);
 
   // Haversine formula
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-    Math.cos(toRad(lat2)) *
+    Math.cos(toRad(numLat1)) *
+    Math.cos(toRad(numLat2)) *
     Math.sin(dLng / 2) *
     Math.sin(dLng / 2);
 
@@ -51,6 +70,8 @@ export function calculateDistance(
 
   // Distance in kilometres
   const distance = R * c;
+
+  console.log('Calculated distance:', Math.round(distance), 'km');
 
   // Return rounded distance
   return Math.round(distance);
