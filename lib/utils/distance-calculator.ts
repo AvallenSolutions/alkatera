@@ -32,13 +32,6 @@ export function calculateDistance(
   lat2: number,
   lng2: number
 ): number {
-  // Log inputs for debugging
-  console.log('calculateDistance called with:', {
-    lat1, lng1, lat2, lng2,
-    types: [typeof lat1, typeof lng1, typeof lat2, typeof lng2],
-    values: { lat1: Number(lat1), lng1: Number(lng1), lat2: Number(lat2), lng2: Number(lng2) }
-  });
-
   // Ensure all inputs are numbers
   const numLat1 = Number(lat1);
   const numLng1 = Number(lng1);
@@ -70,8 +63,6 @@ export function calculateDistance(
 
   // Distance in kilometres
   const distance = R * c;
-
-  console.log('Calculated distance:', Math.round(distance), 'km');
 
   // Return rounded distance
   return Math.round(distance);

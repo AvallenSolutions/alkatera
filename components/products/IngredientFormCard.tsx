@@ -128,24 +128,22 @@ export function IngredientFormCard({
     if (productionFacilities.length === 1) {
       const facility = productionFacilities[0];
       if (facility.address_lat && facility.address_lng) {
-        console.log('Distance calculation:', {
-          origin: { lat: originLat, lng: originLng, types: [typeof originLat, typeof originLng] },
-          facility: { lat: facility.address_lat, lng: facility.address_lng, types: [typeof facility.address_lat, typeof facility.address_lng] }
-        });
-        const distance = calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
-        console.log('Calculated distance:', distance, 'km');
-        return distance;
+        return calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
       }
     }
 
-    const totalDistance = productionFacilities.reduce((sum, facility) => {
+    // Find the nearest facility instead of averaging all facilities
+    let minDistance = Infinity;
+    for (const facility of productionFacilities) {
       if (facility.address_lat && facility.address_lng) {
-        return sum + calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
+        const distance = calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
+        if (distance < minDistance) {
+          minDistance = distance;
+        }
       }
-      return sum;
-    }, 0);
+    }
 
-    return Math.round(totalDistance / productionFacilities.length);
+    return minDistance === Infinity ? 0 : Math.round(minDistance);
   };
 
   const handleSearchSelect = (selection: {
