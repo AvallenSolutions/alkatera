@@ -18,6 +18,8 @@ export interface Organization {
   founding_year?: number | null
   company_size?: string | null
   description?: string | null
+  address_lat?: number | null
+  address_lng?: number | null
 }
 
 interface OrganizationMember {

@@ -884,6 +884,8 @@ export default function ProductRecipePage() {
                     index={index}
                     organizationId={currentOrganization?.id || ''}
                     productionFacilities={productionFacilities}
+                    organizationLat={currentOrganization?.address_lat}
+                    organizationLng={currentOrganization?.address_lng}
                     onUpdate={updateIngredient}
                     onRemove={removeIngredient}
                     canRemove={ingredientForms.length > 1}
@@ -950,6 +952,8 @@ export default function ProductRecipePage() {
                     index={index}
                     organizationId={currentOrganization?.id || ''}
                     productionFacilities={productionFacilities}
+                    organizationLat={currentOrganization?.address_lat}
+                    organizationLng={currentOrganization?.address_lng}
                     onUpdate={updatePackaging}
                     onRemove={removePackaging}
                     canRemove={packagingForms.length > 1}

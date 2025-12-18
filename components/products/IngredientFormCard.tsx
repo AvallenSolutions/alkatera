@@ -56,6 +56,8 @@ interface IngredientFormCardProps {
   index: number;
   organizationId: string;
   productionFacilities: ProductionFacility[];
+  organizationLat?: number | null;
+  organizationLng?: number | null;
   onUpdate: (tempId: string, updates: Partial<IngredientFormData>) => void;
   onRemove: (tempId: string) => void;
   canRemove: boolean;
@@ -66,6 +68,8 @@ export function IngredientFormCard({
   index,
   organizationId,
   productionFacilities,
+  organizationLat,
+  organizationLng,
   onUpdate,
   onRemove,
   canRemove,
@@ -121,28 +125,44 @@ export function IngredientFormCard({
   };
 
   const calculateAndSetDistance = (originLat: number, originLng: number) => {
-    if (productionFacilities.length === 0) {
+    // Determine destination facilities: use production facilities if available, otherwise fall back to organization location
+    const facilitiesToUse: Array<{ lat: number; lng: number; weight: number }> = [];
+
+    if (productionFacilities.length > 0) {
+      // Use production facilities with their shares
+      for (const facility of productionFacilities) {
+        if (facility.address_lat && facility.address_lng) {
+          facilitiesToUse.push({
+            lat: facility.address_lat,
+            lng: facility.address_lng,
+            weight: facility.production_share || (100 / productionFacilities.length),
+          });
+        }
+      }
+    } else if (organizationLat && organizationLng) {
+      // Fall back to organization location if no production facilities
+      facilitiesToUse.push({
+        lat: organizationLat,
+        lng: organizationLng,
+        weight: 100,
+      });
+    } else {
+      // No location data available
       return 0;
     }
 
-    if (productionFacilities.length === 1) {
-      const facility = productionFacilities[0];
-      if (facility.address_lat && facility.address_lng) {
-        return calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
-      }
+    if (facilitiesToUse.length === 0) {
+      return 0;
     }
 
-    // Calculate weighted average distance based on production share
+    // Calculate weighted average distance
     let totalWeightedDistance = 0;
     let totalWeight = 0;
 
-    for (const facility of productionFacilities) {
-      if (facility.address_lat && facility.address_lng) {
-        const distance = calculateDistance(originLat, originLng, facility.address_lat, facility.address_lng);
-        const weight = facility.production_share || (100 / productionFacilities.length); // Equal weight if no share specified
-        totalWeightedDistance += distance * weight;
-        totalWeight += weight;
-      }
+    for (const facility of facilitiesToUse) {
+      const distance = calculateDistance(originLat, originLng, facility.lat, facility.lng);
+      totalWeightedDistance += distance * facility.weight;
+      totalWeight += facility.weight;
     }
 
     return totalWeight > 0 ? Math.round(totalWeightedDistance / totalWeight) : 0;
