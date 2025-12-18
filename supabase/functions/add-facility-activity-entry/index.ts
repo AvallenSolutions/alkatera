@@ -139,7 +139,7 @@ Deno.serve(async (req: Request) => {
       .from("organization_members")
       .select("id")
       .eq("organization_id", payload.organization_id)
-      .eq("user_id", user.id)
+      .eq("id", user.id)
       .maybeSingle();
 
     if (memberError || !memberCheck) {

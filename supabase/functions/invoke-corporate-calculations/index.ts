@@ -91,7 +91,7 @@ Deno.serve(async (req: Request) => {
       .from("organization_members")
       .select("id, role")
       .eq("organization_id", facility.organization_id)
-      .eq("user_id", user.id)
+      .eq("id", user.id)
       .single();
 
     if (membershipError || !membership) {

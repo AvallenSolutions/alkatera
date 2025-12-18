@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
     const { data: memberData, error: memberError } = await supabaseAdmin
       .from("organization_members")
       .select("organization_id")
-      .eq("user_id", user.id)
+      .eq("id", user.id)
       .single();
 
     if (memberError || !memberData) {

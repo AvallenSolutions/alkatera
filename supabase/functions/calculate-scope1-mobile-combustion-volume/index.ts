@@ -2,7 +2,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 // === GOVERNANCE: CALCULATION UTILITIES START ===
-import { createClient } from "npm:@supabase/supabase-js@2";
 import type { SupabaseClient, User } from "npm:@supabase/supabase-js@2";
 
 export interface LogPayload {
@@ -88,14 +87,20 @@ export async function enforceRLS(request: Request): Promise<EnforceRLSResult> {
   const { data: profileData, error: profileError } = await supabaseClient
     .from("profiles")
     .select("active_organization_id")
-    .eq("user_id", user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   if (profileError || !profileData || !profileData.active_organization_id) {
     throw new Response(
       JSON.stringify({
         error: "No active organisation found for user",
-        details: profileError?.message
+        details: profileError?.message,
+        debug: {
+          hasError: !!profileError,
+          hasData: !!profileData,
+          hasActiveOrg: !!profileData?.active_organization_id,
+          userId: user.id
+        }
       }),
       {
         status: 403,
