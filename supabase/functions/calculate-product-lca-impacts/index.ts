@@ -135,18 +135,36 @@ Deno.serve(async (req: Request) => {
 
     // Combine both sources into a unified production sites array
     // Map contract manufacturer allocations to the same structure as production sites
-    const contractMfgSites = (contractMfgAllocations || []).map(cm => ({
-      id: cm.id,
-      facility_id: cm.facility_id,
-      allocated_emissions_kg_co2e: cm.allocated_emissions_kg_co2e || 0,
-      allocated_water_litres: cm.allocated_water_litres || 0,
-      allocated_waste_kg: cm.allocated_waste_kg || 0,
-      scope1_emissions_kg_co2e: cm.scope1_emissions_kg_co2e || 0,
-      scope2_emissions_kg_co2e: cm.scope2_emissions_kg_co2e || 0,
-      scope3_emissions_kg_co2e: cm.scope3_emissions_kg_co2e || 0,
-      share_of_production: (cm.attribution_ratio || 0) * 100,
-      source: 'contract_manufacturer'
-    }));
+    // IMPORTANT: Contract manufacturer allocations store TOTAL emissions for the production run
+    // We need to convert to PER UNIT emissions for LCA calculation
+    const contractMfgSites = (contractMfgAllocations || []).map(cm => {
+      const productionVolume = cm.client_production_volume || 1;
+
+      // Calculate per-unit emissions by dividing total allocated emissions by production volume
+      const emissionsPerUnit = (cm.allocated_emissions_kg_co2e || 0) / productionVolume;
+      const scope1PerUnit = (cm.scope1_emissions_kg_co2e || 0) / productionVolume;
+      const scope2PerUnit = (cm.scope2_emissions_kg_co2e || 0) / productionVolume;
+      const scope3PerUnit = (cm.scope3_emissions_kg_co2e || 0) / productionVolume;
+      const waterPerUnit = (cm.allocated_water_litres || 0) / productionVolume;
+      const wastePerUnit = (cm.allocated_waste_kg || 0) / productionVolume;
+
+      return {
+        id: cm.id,
+        facility_id: cm.facility_id,
+        // Store per-unit values for LCA calculation
+        allocated_emissions_kg_co2e: emissionsPerUnit,
+        allocated_water_litres: waterPerUnit,
+        allocated_waste_kg: wastePerUnit,
+        scope1_emissions_kg_co2e: scope1PerUnit,
+        scope2_emissions_kg_co2e: scope2PerUnit,
+        scope3_emissions_kg_co2e: scope3PerUnit,
+        share_of_production: (cm.attribution_ratio || 0) * 100,
+        source: 'contract_manufacturer',
+        // Keep original values for logging/debugging
+        _total_allocated_emissions: cm.allocated_emissions_kg_co2e,
+        _production_volume: productionVolume
+      };
+    });
 
     const productionSites = [
       ...(ownedSites || []).map(s => ({ ...s, source: 'owned' })),
@@ -155,6 +173,14 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[calculate-product-lca-impacts] Found ${ownedSites?.length || 0} owned production sites`);
     console.log(`[calculate-product-lca-impacts] Found ${contractMfgAllocations?.length || 0} contract manufacturer sites`);
+
+    if (contractMfgSites.length > 0) {
+      contractMfgSites.forEach(site => {
+        console.log(`[calculate-product-lca-impacts] CM Site: Total ${site._total_allocated_emissions?.toFixed(2)} kg for ${site._production_volume} units = ${site.allocated_emissions_kg_co2e.toFixed(6)} kg per unit`);
+        console.log(`[calculate-product-lca-impacts] CM Scopes per unit: S1=${site.scope1_emissions_kg_co2e.toFixed(6)}, S2=${site.scope2_emissions_kg_co2e.toFixed(6)}, S3=${site.scope3_emissions_kg_co2e.toFixed(6)}`);
+      });
+    }
+
     console.log(`[calculate-product-lca-impacts] Total production sites: ${productionSites.length}`);
 
     let scope1Emissions = 0;
