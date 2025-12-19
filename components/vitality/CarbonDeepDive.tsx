@@ -20,22 +20,6 @@ interface CarbonDeepDiveProps {
 export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown, lifecycleStageBreakdown, facilityEmissionsBreakdown }: CarbonDeepDiveProps) {
   const [sortBy, setSortBy] = useState<'impact' | 'name' | 'quantity'>('impact');
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('[Carbon DeepDive] Component mounted with props:', {
-      hasScopeBreakdown: !!scopeBreakdown,
-      totalCO2,
-      materialBreakdownCount: materialBreakdown?.length || 0,
-      hasGhgBreakdown: !!ghgBreakdown,
-    });
-    if (materialBreakdown) {
-      console.log('[Carbon DeepDive] Materials received:', materialBreakdown.map(m => `${m.name}: ${(m.climate ?? 0).toFixed(3)}`));
-    }
-    if (ghgBreakdown) {
-      console.log('[Carbon DeepDive] GHG breakdown received:', ghgBreakdown.carbon_origin);
-    }
-  }, [scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown]);
-
   // Check if we have any data to display
   const hasMaterialData = materialBreakdown && materialBreakdown.length > 0;
   const hasGhgData = ghgBreakdown && ghgBreakdown.carbon_origin;
@@ -45,14 +29,6 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
 
   // We have data if we have ANY of these
   const hasData = hasMaterialData || hasGhgData || hasScopeData || hasLifecycleData || hasFacilityData;
-
-  console.log('[Carbon DeepDive] hasData check:', hasData, '- Breakdown:', {
-    scopeBreakdown: hasScopeData,
-    materialCount: materialBreakdown?.length || 0,
-    ghg: hasGhgData,
-    lifecycle: hasLifecycleData,
-    facilities: hasFacilityData,
-  });
 
   if (!hasData) {
     // Provide context-specific empty states
