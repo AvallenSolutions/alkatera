@@ -215,7 +215,37 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
       .eq('organization_id', product.organization_id)
       .order('reporting_period_start', { ascending: false });
 
-    if (!cmError && cmAllocations && cmAllocations.length > 0) {
+    if (cmError) {
+      console.error('[calculateProductLCA] ❌ Failed to query contract manufacturer allocations');
+      console.error('[calculateProductLCA] Error details:', cmError);
+      console.error('[calculateProductLCA] This might indicate:');
+      console.error('[calculateProductLCA]   - RLS policy blocking access');
+      console.error('[calculateProductLCA]   - Database connection issue');
+      console.error('[calculateProductLCA]   - Missing table/columns (run: supabase db reset --local)');
+
+      throw new Error(`Failed to fetch production site data: ${cmError.message}`);
+    }
+
+    console.log(`[calculateProductLCA] ✓ Contract manufacturer query successful`);
+    console.log(`[calculateProductLCA] Found ${cmAllocations?.length || 0} allocations for product ${productId}`);
+
+    if (!cmAllocations || cmAllocations.length === 0) {
+      console.warn('[calculateProductLCA] ⚠️  No contract manufacturer allocations found');
+      console.warn('[calculateProductLCA] Expected at least 1 allocation for TEST CALVADOS');
+      console.warn('[calculateProductLCA] Check if migration 20251219165224 was applied: supabase db reset --local');
+      console.warn('[calculateProductLCA] Or create allocation manually in Production Sites tab');
+    } else {
+      console.log('[calculateProductLCA] Allocation details:', cmAllocations.map(a => ({
+        id: a.id,
+        facility_id: a.facility_id,
+        emissions: a.allocated_emissions_kg_co2e,
+        scope1: a.scope1_emissions_kg_co2e,
+        scope2: a.scope2_emissions_kg_co2e,
+        status: a.status
+      })));
+    }
+
+    if (cmAllocations && cmAllocations.length > 0) {
       console.log(`[calculateProductLCA] Found ${cmAllocations.length} contract manufacturer allocations`);
 
       // Check which allocations are already in product_lca_production_sites
@@ -268,21 +298,82 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
         }));
 
       if (newAllocationSites.length > 0) {
-        const { error: insertError } = await supabase
+        console.log(`[calculateProductLCA] Preparing to insert ${newAllocationSites.length} production sites`);
+        console.log('[calculateProductLCA] Sites to insert:', newAllocationSites.map(s => ({
+          facility_id: s.facility_id,
+          emissions: s.allocated_emissions_kg_co2e,
+          scope1: s.scope1_emissions_kg_co2e,
+          scope2: s.scope2_emissions_kg_co2e,
+        })));
+
+        const { data: insertedData, error: insertError } = await supabase
           .from('product_lca_production_sites')
-          .insert(newAllocationSites);
+          .insert(newAllocationSites)
+          .select();
 
         if (insertError) {
-          console.warn('[calculateProductLCA] Failed to import contract manufacturer allocations:', insertError.message);
+          console.error('[calculateProductLCA] ❌ Failed to insert production sites');
+          console.error('[calculateProductLCA] Error message:', insertError.message);
+          console.error('[calculateProductLCA] Error code:', insertError.code);
+          console.error('[calculateProductLCA] Error details:', insertError);
+
+          // Check for specific error types
+          if (insertError.message?.includes('column') || insertError.message?.includes('does not exist')) {
+            console.error('[calculateProductLCA] 🔴 MISSING COLUMNS - Run: supabase db reset --local');
+            console.error('[calculateProductLCA] Required migration: 20251219165023_add_scope_breakdown_to_production_sites.sql');
+          }
+
+          if (insertError.code === '23505') {
+            console.error('[calculateProductLCA] Duplicate key error - sites already exist');
+          }
+
+          if (insertError.code === '42501') {
+            console.error('[calculateProductLCA] Permission denied - check RLS policies');
+          }
+
+          throw new Error(`Failed to insert production sites: ${insertError.message}`);
         } else {
           const totalAllocationEmissions = newAllocationSites.reduce((sum, site) => sum + (site.allocated_emissions_kg_co2e || 0), 0);
-          console.log(`[calculateProductLCA] ✓ Imported ${newAllocationSites.length} contract manufacturer allocations (${totalAllocationEmissions.toFixed(2)} kg CO2e)`);
+          console.log(`[calculateProductLCA] ✅ Successfully inserted ${newAllocationSites.length} production sites`);
+          console.log(`[calculateProductLCA] Total emissions imported: ${totalAllocationEmissions.toFixed(2)} kg CO2e`);
+
+          if (insertedData) {
+            console.log('[calculateProductLCA] Inserted records:', insertedData.map(s => ({
+              id: s.id,
+              facility_id: s.facility_id,
+              emissions: s.allocated_emissions_kg_co2e
+            })));
+          }
         }
       } else {
-        console.log(`[calculateProductLCA] All allocations already present in production sites`);
+        console.log(`[calculateProductLCA] All ${cmAllocations.length} allocations already present in production sites`);
       }
     } else {
       console.log(`[calculateProductLCA] No contract manufacturer allocations found for this product`);
+    }
+
+    // Verify production sites were created
+    console.log('[calculateProductLCA] 🔍 Verifying production sites in database...');
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('product_lca_production_sites')
+      .select('id, facility_id, allocated_emissions_kg_co2e, scope1_emissions_kg_co2e, scope2_emissions_kg_co2e')
+      .eq('product_lca_id', lca.id);
+
+    if (verifyError) {
+      console.error('[calculateProductLCA] ❌ Verification query failed:', verifyError);
+    } else {
+      console.log(`[calculateProductLCA] Verification result: ${verifyData?.length || 0} production sites found`);
+      if (verifyData && verifyData.length > 0) {
+        const totalVerifiedEmissions = verifyData.reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0);
+        console.log(`[calculateProductLCA] ✅ Total verified emissions: ${totalVerifiedEmissions.toFixed(2)} kg CO2e`);
+        console.log('[calculateProductLCA] Verified sites:', verifyData);
+      } else {
+        console.error('[calculateProductLCA] 🔴 NO PRODUCTION SITES FOUND AFTER IMPORT!');
+        console.error('[calculateProductLCA] This indicates a database issue. Check:');
+        console.error('[calculateProductLCA]   1. Run: supabase db reset --local');
+        console.error('[calculateProductLCA]   2. Check RLS policies on product_lca_production_sites');
+        console.error('[calculateProductLCA]   3. Verify migrations 20251219165023 and 20251219165224 applied');
+      }
     }
 
     // 8. Call aggregation edge function to calculate totals
