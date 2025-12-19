@@ -117,10 +117,6 @@ function VitalityMetricCard({
           </div>
         )}
 
-        <div className="mt-3 flex items-center text-xs text-muted-foreground group-hover:text-primary transition-colors">
-          View details
-          <ArrowRight className="h-3 w-3 ml-1" />
-        </div>
       </CardContent>
     </Card>
   );
