@@ -239,6 +239,9 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
             emission_intensity_kg_co2e_per_unit,
             water_intensity_litres_per_unit,
             waste_intensity_kg_per_unit,
+            scope1_emissions_kg_co2e,
+            scope2_emissions_kg_co2e,
+            scope3_emissions_kg_co2e,
             status,
             reporting_period_start,
             reporting_period_end,
@@ -270,6 +273,9 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
             emission_intensity_kg_co2e_per_unit: site.emission_intensity_kg_co2e_per_unit || 0,
             water_intensity_litres_per_unit: site.water_intensity_litres_per_unit || 0,
             waste_intensity_kg_per_unit: site.waste_intensity_kg_per_unit || 0,
+            scope1_emissions_kg_co2e: site.scope1_emissions_kg_co2e || 0,
+            scope2_emissions_kg_co2e: site.scope2_emissions_kg_co2e || 0,
+            scope3_emissions_kg_co2e: site.scope3_emissions_kg_co2e || 0,
             status: site.status || 'draft',
             reporting_period_start: site.reporting_period_start || null,
             reporting_period_end: site.reporting_period_end || null,
@@ -297,6 +303,87 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
           }
         }
       }
+    }
+
+    // 7b. Import contract manufacturer allocations into production sites
+    // This ensures fresh allocation data is always included in new LCAs
+    console.log(`[calculateProductLCA] Checking for contract manufacturer allocations...`);
+
+    const { data: cmAllocations, error: cmError } = await supabase
+      .from('contract_manufacturer_allocations')
+      .select('*')
+      .eq('product_id', parseInt(productId))
+      .eq('organization_id', product.organization_id)
+      .order('reporting_period_start', { ascending: false });
+
+    if (!cmError && cmAllocations && cmAllocations.length > 0) {
+      console.log(`[calculateProductLCA] Found ${cmAllocations.length} contract manufacturer allocations`);
+
+      // Check which allocations are already in product_lca_production_sites
+      const { data: existingSites } = await supabase
+        .from('product_lca_production_sites')
+        .select('facility_id')
+        .eq('product_lca_id', lca.id);
+
+      const existingFacilityIds = new Set(existingSites?.map(s => s.facility_id) || []);
+
+      // Create production sites from allocations that aren't already present
+      const newAllocationSites = cmAllocations
+        .filter(allocation => !existingFacilityIds.has(allocation.facility_id))
+        .map(allocation => ({
+          product_lca_id: lca.id,
+          facility_id: allocation.facility_id,
+          organization_id: allocation.organization_id,
+          production_volume: allocation.client_production_volume,
+          share_of_production: (allocation.attribution_ratio || 0) * 100,
+          facility_intensity: allocation.emission_intensity_kg_co2e_per_unit || 0,
+          data_source: allocation.data_source_tag || 'Industry_Average',
+
+          // Key allocation fields
+          allocated_emissions_kg_co2e: allocation.allocated_emissions_kg_co2e || 0,
+          allocated_water_litres: allocation.allocated_water_litres || 0,
+          allocated_waste_kg: allocation.allocated_waste_kg || 0,
+
+          // Intensity fields
+          emission_intensity_kg_co2e_per_unit: allocation.emission_intensity_kg_co2e_per_unit || 0,
+          water_intensity_litres_per_unit: 0,
+          waste_intensity_kg_per_unit: 0,
+
+          // Scope breakdown
+          scope1_emissions_kg_co2e: allocation.scope1_emissions_kg_co2e || 0,
+          scope2_emissions_kg_co2e: allocation.scope2_emissions_kg_co2e || 0,
+          scope3_emissions_kg_co2e: allocation.scope3_emissions_kg_co2e || 0,
+
+          // Metadata
+          status: allocation.status || 'verified',
+          reporting_period_start: allocation.reporting_period_start,
+          reporting_period_end: allocation.reporting_period_end,
+          co2e_entry_method: allocation.co2e_entry_method || 'Physical Allocation',
+          data_source_tag: allocation.data_source_tag || 'Primary - Allocated',
+          is_energy_intensive_process: allocation.is_energy_intensive_process || false,
+          uses_proxy_data: allocation.data_quality_score ? allocation.data_quality_score < 3 : false,
+          total_facility_production_volume: allocation.total_facility_production_volume,
+          production_volume_unit: allocation.production_volume_unit || 'units',
+          attribution_ratio: allocation.attribution_ratio || 0,
+          supplier_id: allocation.supplier_id || null,
+        }));
+
+      if (newAllocationSites.length > 0) {
+        const { error: insertError } = await supabase
+          .from('product_lca_production_sites')
+          .insert(newAllocationSites);
+
+        if (insertError) {
+          console.warn('[calculateProductLCA] Failed to import contract manufacturer allocations:', insertError.message);
+        } else {
+          const totalAllocationEmissions = newAllocationSites.reduce((sum, site) => sum + (site.allocated_emissions_kg_co2e || 0), 0);
+          console.log(`[calculateProductLCA] ✓ Imported ${newAllocationSites.length} contract manufacturer allocations (${totalAllocationEmissions.toFixed(2)} kg CO2e)`);
+        }
+      } else {
+        console.log(`[calculateProductLCA] All allocations already present in production sites`);
+      }
+    } else {
+      console.log(`[calculateProductLCA] No contract manufacturer allocations found for this product`);
     }
 
     // 8. Call aggregation edge function to calculate totals
