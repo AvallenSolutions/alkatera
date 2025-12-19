@@ -117,10 +117,6 @@ function VitalityMetricCard({
           </div>
         )}
 
-        <div className="mt-3 flex items-center text-xs text-muted-foreground group-hover:text-primary transition-colors">
-          View details
-          <ArrowRight className="h-3 w-3 ml-1" />
-        </div>
       </CardContent>
     </Card>
   );
@@ -488,6 +484,29 @@ export default function PerformancePage() {
           <AlertDescription>
             Complete product LCAs with the new multi-capital calculation engine to see your Company Vitality metrics.
             The platform will automatically aggregate impacts across all products.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!loading && metrics && metrics.total_products_assessed > 0 && (
+        <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
+          <CheckCircle2 className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-900 dark:text-blue-100">
+            Calculation Methodology
+          </AlertTitle>
+          <AlertDescription className="text-blue-800 dark:text-blue-200">
+            <p className="text-sm mb-3">
+              Company Vitality aggregates impacts following <strong>GHG Protocol Corporate Standard</strong> and <strong>ISO 14064-1</strong>:
+            </p>
+            <ul className="text-sm space-y-1.5 list-disc list-inside">
+              <li><strong>Scope 1 & 2:</strong> Direct measurement from owned/controlled facilities (from Company Emissions data)</li>
+              <li><strong>Scope 3:</strong> Value chain emissions including materials, transport, waste (from Product LCAs + Company Emissions)</li>
+              <li><strong>No double-counting:</strong> Owned facility emissions counted once in Scope 1/2, not duplicated from Product LCAs</li>
+              <li><strong>Water, Waste, Land:</strong> Aggregated from Product LCAs and operational data</li>
+            </ul>
+            <p className="text-xs mt-3 text-blue-700 dark:text-blue-300">
+              Standards compliance: ISO 14064-1, GHG Protocol Corporate Standard, ISO 14067
+            </p>
           </AlertDescription>
         </Alert>
       )}

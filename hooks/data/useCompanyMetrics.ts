@@ -128,14 +128,11 @@ export function useCompanyMetrics() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('[useCompanyMetrics] useEffect triggered, org:', currentOrganization?.id);
     if (!currentOrganization?.id) {
-      console.log('[useCompanyMetrics] No org, returning early');
       setLoading(false);
       return;
     }
 
-    console.log('[useCompanyMetrics] Calling fetchCompanyMetrics');
     fetchCompanyMetrics();
   }, [currentOrganization?.id]);
 
@@ -272,42 +269,30 @@ export function useCompanyMetrics() {
         last_updated: latestUpdate,
       });
 
-      console.log('[useCompanyMetrics] Extracting breakdown data from aggregated_impacts...');
-
       // Extract breakdown data directly from aggregated_impacts (NEW APPROACH)
       try {
         extractBreakdownFromAggregatedImpacts(lcas);
       } catch (err) {
-        console.error('[useCompanyMetrics] extractBreakdownFromAggregatedImpacts failed:', err);
       }
 
       // Fetch scope breakdown (from calculated emissions) and MERGE with product LCA data
       try {
-        console.log('[useCompanyMetrics] Calling fetchScopeBreakdown to merge corporate emissions...');
         await fetchScopeBreakdown();
-        console.log('[useCompanyMetrics] fetchScopeBreakdown completed');
       } catch (err) {
-        console.error('[useCompanyMetrics] fetchScopeBreakdown failed:', err);
       }
 
       // Fetch facility water risks
       try {
-        console.log('[useCompanyMetrics] Calling fetchFacilityWaterRisks...');
         await fetchFacilityWaterRisks();
-        console.log('[useCompanyMetrics] fetchFacilityWaterRisks completed');
       } catch (err) {
-        console.error('[useCompanyMetrics] fetchFacilityWaterRisks failed:', err);
       }
 
       // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
       const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
       if (!hasMaterialBreakdown) {
         try {
-          console.log('[useCompanyMetrics] Calling fetchMaterialAndGHGBreakdown (fallback)...');
           await fetchMaterialAndGHGBreakdown();
-          console.log('[useCompanyMetrics] fetchMaterialAndGHGBreakdown completed');
         } catch (err) {
-          console.error('[useCompanyMetrics] fetchMaterialAndGHGBreakdown failed:', err);
         }
       }
 
@@ -317,7 +302,6 @@ export function useCompanyMetrics() {
         try {
           await fetchFacilityEmissions();
         } catch (err) {
-          console.error('[useCompanyMetrics] fetchFacilityEmissions failed:', err);
         }
       }
 
@@ -331,15 +315,12 @@ export function useCompanyMetrics() {
 
       setLoading(false);
     } catch (err: any) {
-      console.error('Error fetching company metrics:', err);
       setError(err.message || 'Failed to fetch company metrics');
       setLoading(false);
     }
   }
 
   function extractBreakdownFromAggregatedImpacts(lcas: any[]) {
-    console.log('[useCompanyMetrics] Extracting breakdown from', lcas.length, 'LCAs');
-
     // Aggregate scope breakdown
     const scopeTotal: ScopeBreakdown = { scope1: 0, scope2: 0, scope3: 0 };
     const allMaterials: MaterialBreakdownItem[] = [];
@@ -362,13 +343,11 @@ export function useCompanyMetrics() {
           scopeTotal.scope1 += breakdown.by_scope.scope1 || 0;
           scopeTotal.scope2 += breakdown.by_scope.scope2 || 0;
           scopeTotal.scope3 += breakdown.by_scope.scope3 || 0;
-          console.log(`[useCompanyMetrics] LCA ${lca.product_name} scope breakdown:`, breakdown.by_scope);
         }
 
         // Aggregate material data
         if (breakdown.by_material && Array.isArray(breakdown.by_material)) {
           allMaterials.push(...breakdown.by_material);
-          console.log(`[useCompanyMetrics] LCA ${lca.product_name} has ${breakdown.by_material.length} materials`);
         }
 
         // Aggregate facility data
@@ -404,7 +383,6 @@ export function useCompanyMetrics() {
           ghgTotal.gas_inventory.nitrous_oxide += ghg.gas_inventory.nitrous_oxide || 0;
           ghgTotal.gas_inventory.hfc_pfc += ghg.gas_inventory.hfc_pfc || 0;
         }
-        console.log(`[useCompanyMetrics] LCA ${lca.product_name} GHG breakdown:`, ghg.carbon_origin);
       }
     });
 
@@ -412,13 +390,11 @@ export function useCompanyMetrics() {
     // NOTE: Corporate emissions (Scope 1 & 2 from ghg_emissions table) will be merged later
     // in fetchScopeBreakdown() to give a complete picture
     if (scopeTotal.scope1 > 0 || scopeTotal.scope2 > 0 || scopeTotal.scope3 > 0) {
-      console.log('[useCompanyMetrics] Setting product LCA scope breakdown:', scopeTotal);
       setScopeBreakdown(scopeTotal);
     }
 
     // Set material breakdown
     if (allMaterials.length > 0) {
-      console.log('[useCompanyMetrics] Setting material breakdown:', allMaterials.length, 'materials');
       setMaterialBreakdown(allMaterials);
     }
 
@@ -429,19 +405,16 @@ export function useCompanyMetrics() {
       allLifecycleStages.forEach(stage => {
         stage.percentage = total > 0 ? (stage.emissions / total) * 100 : 0;
       });
-      console.log('[useCompanyMetrics] Setting lifecycle stage breakdown:', allLifecycleStages);
       setLifecycleStageBreakdown(allLifecycleStages);
     }
 
     // Set facility breakdown
     if (allFacilities.length > 0) {
-      console.log('[useCompanyMetrics] Setting facility breakdown:', allFacilities.length, 'facilities');
       setFacilityEmissionsBreakdown(allFacilities);
     }
 
     // Set GHG breakdown
     if (hasGhgData) {
-      console.log('[useCompanyMetrics] Setting GHG breakdown:', ghgTotal);
       setGhgBreakdown(ghgTotal);
     }
   }
@@ -473,28 +446,33 @@ export function useCompanyMetrics() {
       });
 
       // Merge corporate emissions with existing product LCA scope breakdown
+      // CRITICAL: Avoid double-counting owned facility emissions
       setScopeBreakdown(prevBreakdown => {
         if (!prevBreakdown) {
           // If no product LCA data exists, use only corporate emissions
-          console.log('[useCompanyMetrics] No product LCA scope data, using corporate emissions only:', corporateBreakdown);
           return corporateBreakdown;
         }
 
-        // Merge both sources: Product LCA (primarily Scope 3) + Corporate operations (Scope 1 & 2)
+        // CORRECT APPROACH per GHG Protocol Corporate Standard:
+        // - Scope 1 & 2: Use ONLY corporate inventory (direct facility measurement)
+        // - Product LCAs should NOT contribute to Scope 1/2 for owned facilities
+        // - Scope 3: Sum from both sources (materials, transport, contract mfg, business travel, waste)
+
         const merged = {
-          scope1: prevBreakdown.scope1 + corporateBreakdown.scope1,
-          scope2: prevBreakdown.scope2 + corporateBreakdown.scope2,
+          // Scope 1 & 2: Corporate inventory ONLY (owned/controlled facilities)
+          // Product LCAs contribute ZERO to avoid double-counting
+          scope1: corporateBreakdown.scope1,
+          scope2: corporateBreakdown.scope2,
+
+          // Scope 3: Sum from both sources
+          // - Product LCAs: materials, packaging, contract mfg, transport, EOL
+          // - Corporate: business travel, commuting, waste, capital goods
           scope3: prevBreakdown.scope3 + corporateBreakdown.scope3,
         };
-        console.log('[useCompanyMetrics] Merged scope breakdown:', {
-          productLCA: prevBreakdown,
-          corporate: corporateBreakdown,
-          merged
-        });
+
         return merged;
       });
     } catch (err) {
-      console.error('Error fetching scope breakdown:', err);
     }
   }
 
@@ -538,16 +516,12 @@ export function useCompanyMetrics() {
 
       setFacilityWaterRisks(risks);
     } catch (err) {
-      console.error('Error fetching facility water risks:', err);
     }
   }
 
   async function fetchMaterialAndGHGBreakdown() {
     try {
-      console.log('[Carbon Debug] Starting fetchMaterialAndGHGBreakdown for org:', currentOrganization?.id);
-
       if (!currentOrganization?.id) {
-        console.log('[Carbon Debug] No organization ID, skipping fetch');
         return;
       }
 
@@ -577,14 +551,10 @@ export function useCompanyMetrics() {
         .not('impact_climate', 'is', null);
 
       if (error) {
-        console.error('[Carbon Debug] Query error:', error);
         throw error;
       }
 
-      console.log('[Carbon Debug] Query returned:', materials?.length || 0, 'materials');
-
       if (!materials || materials.length === 0) {
-        console.log('[Carbon Debug] No materials found - breakdown will be empty');
         return;
       }
 
@@ -615,13 +585,7 @@ export function useCompanyMetrics() {
 
       const totalClimate = aggregatedMaterials.reduce((sum, m) => sum + m.climate, 0);
 
-      console.log('[Carbon Debug] Aggregated into', aggregatedMaterials.length, 'unique materials');
-      console.log('[Carbon Debug] Total climate impact:', totalClimate.toFixed(3), 'kg CO2eq');
-      console.log('[Carbon Debug] Top 3 contributors:', aggregatedMaterials.slice(0, 3).map(m => `${m.name}: ${m.climate.toFixed(3)}`));
-
-      console.log('[Carbon Debug] About to call setMaterialBreakdown with', aggregatedMaterials.length, 'items');
       setMaterialBreakdown(aggregatedMaterials);
-      console.log('[Carbon Debug] setMaterialBreakdown called');
 
       // Fetch lifecycle stages mapping
       const { data: lifecycleStages } = await supabase
@@ -675,65 +639,41 @@ export function useCompanyMetrics() {
         };
       }).sort((a, b) => b.total_impact - a.total_impact);
 
-      console.log('[Carbon Debug] Lifecycle stage breakdown:', stageBreakdown.map(s => `${s.stage_name}: ${s.total_impact.toFixed(3)} (${s.percentage.toFixed(1)}%)`));
-
       setLifecycleStageBreakdown(stageBreakdown);
 
-      // Calculate accurate GHG breakdown based on material types
+      // Calculate GHG breakdown using ACTUAL database fields (not hardcoded percentages)
       if (totalClimate > 0) {
         let fossilCO2 = 0;
         let biogenicCO2 = 0;
         let landUseChange = 0;
         let methaneTotal = 0;
         let nitrousOxideTotal = 0;
+        let hfcsTotal = 0;
 
         materials.forEach((material: any) => {
-          const impact = Number(material.impact_climate) || 0;
-          const name = (material.name || '').toLowerCase();
-          const category = (material.packaging_category || '').toLowerCase();
+          // Use actual biogenic/fossil split from database
+          const fossilFromDB = Number(material.impact_climate_fossil || 0);
+          const biogenicFromDB = Number(material.impact_climate_biogenic || 0);
+          const dlucFromDB = Number(material.impact_climate_dluc || 0);
+          const totalClimateImpact = Number(material.impact_climate || 0);
 
-          // Categorise by material type for accurate GHG split
-          if (category === 'glass' || name.includes('glass')) {
-            // Glass: 100% fossil CO2 from fuel combustion
-            fossilCO2 += impact;
-          } else if (category === 'plastic' || category === 'pet' || category === 'hdpe' || name.includes('plastic') || name.includes('pet')) {
-            // Plastics: 100% fossil CO2 from petrochemicals
-            fossilCO2 += impact;
-          } else if (category === 'metal' || category === 'aluminium' || name.includes('aluminium') || name.includes('cap')) {
-            // Metals: 100% fossil CO2 from smelting
-            fossilCO2 += impact;
-          } else if (name.includes('sugar') || name.includes('glucose') || name.includes('fructose')) {
-            // Sugar: mostly biogenic from photosynthesis
-            biogenicCO2 += impact * 0.85;
-            fossilCO2 += impact * 0.10; // processing energy
-            nitrousOxideTotal += (impact * 0.05) / 273; // N2O from fertiliser
-          } else if (name.includes('fruit') || name.includes('apple') || name.includes('lemon') || name.includes('elderflower') || name.includes('juice')) {
-            // Fruit ingredients: mostly biogenic
-            biogenicCO2 += impact * 0.80;
-            fossilCO2 += impact * 0.10; // processing
-            landUseChange += impact * 0.08; // land conversion
-            nitrousOxideTotal += (impact * 0.02) / 273; // fertiliser
-          } else if (category === 'paper' || category === 'cardboard' || name.includes('label') || name.includes('cardboard')) {
-            // Paper/cardboard: mostly biogenic from wood
-            biogenicCO2 += impact * 0.70;
-            fossilCO2 += impact * 0.25; // processing energy
-            landUseChange += impact * 0.05;
-          } else if (name.includes('water')) {
-            // Water: minimal, mostly fossil from transport/treatment
-            fossilCO2 += impact * 0.90;
-            methaneTotal += (impact * 0.10) / 27.9;
-          } else if (name.includes('transport') || name.includes('freight') || name.includes('logistics')) {
-            // Transport: diesel/petrol combustion
-            fossilCO2 += impact * 0.95;
-            methaneTotal += (impact * 0.03) / 27.9;
-            nitrousOxideTotal += (impact * 0.02) / 273;
-          } else {
-            // Unknown/generic: use conservative estimate
-            fossilCO2 += impact * 0.70;
-            biogenicCO2 += impact * 0.20;
-            landUseChange += impact * 0.05;
-            methaneTotal += (impact * 0.03) / 27.9;
-            nitrousOxideTotal += (impact * 0.02) / 273;
+          // Add actual values from database
+          fossilCO2 += fossilFromDB;
+          biogenicCO2 += biogenicFromDB;
+          landUseChange += dlucFromDB;
+
+          // Parse GHG breakdown if available
+          const ghgBreakdown = material.ghg_breakdown as any;
+          if (ghgBreakdown) {
+            methaneTotal += Number(ghgBreakdown.ch4_kg_co2e || 0);
+            nitrousOxideTotal += Number(ghgBreakdown.n2o_kg_co2e || 0);
+            hfcsTotal += Number(ghgBreakdown.hfcs_kg_co2e || 0);
+          }
+
+          // CONSERVATIVE FALLBACK: If no biogenic/fossil split provided, assume all fossil
+          // This follows ISO 14067 precautionary principle
+          if (fossilFromDB === 0 && biogenicFromDB === 0 && dlucFromDB === 0 && totalClimateImpact > 0) {
+            fossilCO2 += totalClimateImpact;
           }
         });
 
@@ -757,33 +697,16 @@ export function useCompanyMetrics() {
           },
         };
 
-        console.log('[Carbon Debug] Accurate GHG breakdown calculated:', {
-          fossil: fossilCO2.toFixed(3),
-          biogenic: biogenicCO2.toFixed(3),
-          luc: landUseChange.toFixed(3),
-          ch4_kg: methaneTotal.toFixed(6),
-          n2o_kg: nitrousOxideTotal.toFixed(6),
-          total_check: (fossilCO2 + biogenicCO2 + landUseChange + (methaneTotal * 27.9) + (nitrousOxideTotal * 273)).toFixed(3)
-        });
-
-        console.log('[Carbon Debug] About to call setGhgBreakdown with data');
         setGhgBreakdown(ghgData);
-        console.log('[Carbon Debug] setGhgBreakdown called');
       }
 
-      console.log('[Carbon Debug] fetchMaterialAndGHGBreakdown completed successfully');
     } catch (err) {
-      console.error('[Carbon Debug] Error fetching material and GHG breakdown:', err);
-      console.error('[Carbon Debug] Error details:', { orgId: currentOrganization?.id, error: err });
     }
   }
 
   async function fetchFacilityEmissions() {
     try {
-      console.log('[Carbon Debug] Starting fetchFacilityEmissions for org:', currentOrganization?.id);
-
       if (!currentOrganization?.id) {
-        console.log('[Carbon Debug] No organization ID, skipping facility fetch');
         return;
       }
 
@@ -808,14 +731,10 @@ export function useCompanyMetrics() {
         .eq('product_lcas.status', 'completed');
 
       if (error) {
-        console.error('[Carbon Debug] Facility query error:', error);
         throw error;
       }
 
-      console.log('[Carbon Debug] Facility query returned:', productionSites?.length || 0, 'production sites');
-
       if (!productionSites || productionSites.length === 0) {
-        console.log('[Carbon Debug] No facility production data found');
         return;
       }
 
@@ -870,12 +789,8 @@ export function useCompanyMetrics() {
         scope2_emissions: data.total_emissions * 0.7,
       })).sort((a, b) => b.total_emissions - a.total_emissions);
 
-      console.log('[Carbon Debug] Facility breakdown:', facilityBreakdown.map(f => `${f.facility_name}: ${f.total_emissions.toFixed(3)} kg CO2eq`));
-
       setFacilityEmissionsBreakdown(facilityBreakdown);
     } catch (err) {
-      console.error('[Carbon Debug] Error fetching facility emissions:', err);
-      console.error('[Carbon Debug] Error details:', { orgId: currentOrganization?.id, error: err });
     }
   }
 

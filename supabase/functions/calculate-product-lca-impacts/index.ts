@@ -298,17 +298,35 @@ Deno.serve(async (req: Request) => {
             console.warn(`[calculate-product-lca-impacts] Facility ${site.facility_id} lacks Scope breakdown. Applied standard manufacturing allocation (Scope 1: 35%, Scope 2: 65%). Total: ${attributableEmissions.toFixed(2)} kg CO2e`);
           }
 
-          // Add to totals
-          scope1Emissions += facilityScope1;
-          scope2Emissions += facilityScope2;
-          scope3Emissions += facilityScope3;
-          processingEmissions += attributableEmissions;
+          // CRITICAL: Scope assignment depends on facility ownership per GHG Protocol
+          // - CONTRACT manufacturer: ALL emissions → Scope 3 Cat 1 (Purchased Goods & Services)
+          // - OWNED facility: Scope 1/2 → Corporate inventory, shown in product LCA for completeness
+          const isContractManufacturer = (site as any).source === 'contract_manufacturer';
 
+          if (isContractManufacturer) {
+            // Contract manufacturer: ALL emissions are Scope 3 for the buying company
+            scope3Emissions += attributableEmissions;
+            console.log(`[calculate-product-lca-impacts] ✓ CONTRACT MFG Facility ${site.facility_id}: ${attributableEmissions.toFixed(4)} kg CO2e → Scope 3 (Purchased Goods)`);
+          } else {
+            // Owned/controlled facility: Add to product LCA scope breakdown
+            // NOTE: These same emissions are ALSO in corporate Scope 1/2
+            // Company Vitality Dashboard will use corporate inventory to avoid double-counting
+            scope1Emissions += facilityScope1;
+            scope2Emissions += facilityScope2;
+            scope3Emissions += facilityScope3;
+            console.log(`[calculate-product-lca-impacts] ✓ OWNED Facility ${site.facility_id}:`, {
+              total: attributableEmissions.toFixed(4),
+              scope1: facilityScope1.toFixed(4),
+              scope2: facilityScope2.toFixed(4),
+              scope3: facilityScope3.toFixed(4),
+              note: 'Also in corporate Scope 1/2 inventory'
+            });
+          }
+
+          processingEmissions += attributableEmissions;
           totalClimate += attributableEmissions;
           totalClimateFossil += attributableEmissions;
           totalCO2Fossil += attributableEmissions;
-
-          console.log(`[calculate-product-lca-impacts] ✓ Facility ${site.facility_id}: Total: ${attributableEmissions.toFixed(2)} kg CO2e | Scope 1: ${facilityScope1.toFixed(2)}, Scope 2: ${facilityScope2.toFixed(2)}, Scope 3: ${facilityScope3.toFixed(2)} kg CO2e (${(shareOfProduction * 100).toFixed(1)}% share)`);
         }
       }
     }
