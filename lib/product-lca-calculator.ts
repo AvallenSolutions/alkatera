@@ -246,134 +246,53 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
     }
 
     if (cmAllocations && cmAllocations.length > 0) {
+      // Contract manufacturer allocations stay in their own table
+      // The Edge Function will read from both product_lca_production_sites AND contract_manufacturer_allocations
       console.log(`[calculateProductLCA] Found ${cmAllocations.length} contract manufacturer allocations`);
+      console.log(`[calculateProductLCA] These will be read directly by the Edge Function from contract_manufacturer_allocations table`);
+      console.log('[calculateProductLCA] Contract manufacturers:', cmAllocations.map(a => ({
+        facility_id: a.facility_id,
+        emissions: a.allocated_emissions_kg_co2e,
+        scope1: a.scope1_emissions_kg_co2e,
+        scope2: a.scope2_emissions_kg_co2e,
+        status: a.status
+      })));
 
-      // Check which allocations are already in product_lca_production_sites
-      const { data: existingSites } = await supabase
-        .from('product_lca_production_sites')
-        .select('facility_id')
-        .eq('product_lca_id', lca.id);
-
-      const existingFacilityIds = new Set(existingSites?.map(s => s.facility_id) || []);
-
-      // Create production sites from allocations that aren't already present
-      const newAllocationSites = cmAllocations
-        .filter(allocation => !existingFacilityIds.has(allocation.facility_id))
-        .map(allocation => ({
-          product_lca_id: lca.id,
-          facility_id: allocation.facility_id,
-          organization_id: allocation.organization_id,
-          production_volume: allocation.client_production_volume,
-          share_of_production: (allocation.attribution_ratio || 0) * 100,
-          facility_intensity: allocation.emission_intensity_kg_co2e_per_unit || 0,
-          data_source: allocation.data_source_tag || 'Industry_Average',
-
-          // Key allocation fields
-          allocated_emissions_kg_co2e: allocation.allocated_emissions_kg_co2e || 0,
-          allocated_water_litres: allocation.allocated_water_litres || 0,
-          allocated_waste_kg: allocation.allocated_waste_kg || 0,
-
-          // Intensity fields
-          emission_intensity_kg_co2e_per_unit: allocation.emission_intensity_kg_co2e_per_unit || 0,
-          water_intensity_litres_per_unit: 0,
-          waste_intensity_kg_per_unit: 0,
-
-          // Scope breakdown
-          scope1_emissions_kg_co2e: allocation.scope1_emissions_kg_co2e || 0,
-          scope2_emissions_kg_co2e: allocation.scope2_emissions_kg_co2e || 0,
-          scope3_emissions_kg_co2e: allocation.scope3_emissions_kg_co2e || 0,
-
-          // Metadata
-          status: allocation.status || 'verified',
-          reporting_period_start: allocation.reporting_period_start,
-          reporting_period_end: allocation.reporting_period_end,
-          co2e_entry_method: allocation.co2e_entry_method || 'Physical Allocation',
-          data_source_tag: allocation.data_source_tag || 'Primary - Allocated',
-          is_energy_intensive_process: allocation.is_energy_intensive_process || false,
-          uses_proxy_data: allocation.data_quality_score ? allocation.data_quality_score < 3 : false,
-          total_facility_production_volume: allocation.total_facility_production_volume,
-          production_volume_unit: allocation.production_volume_unit || 'units',
-          attribution_ratio: allocation.attribution_ratio || 0,
-          supplier_id: allocation.supplier_id || null,
-        }));
-
-      if (newAllocationSites.length > 0) {
-        console.log(`[calculateProductLCA] Preparing to insert ${newAllocationSites.length} production sites`);
-        console.log('[calculateProductLCA] Sites to insert:', newAllocationSites.map(s => ({
-          facility_id: s.facility_id,
-          emissions: s.allocated_emissions_kg_co2e,
-          scope1: s.scope1_emissions_kg_co2e,
-          scope2: s.scope2_emissions_kg_co2e,
-        })));
-
-        const { data: insertedData, error: insertError } = await supabase
-          .from('product_lca_production_sites')
-          .insert(newAllocationSites)
-          .select();
-
-        if (insertError) {
-          console.error('[calculateProductLCA] ❌ Failed to insert production sites');
-          console.error('[calculateProductLCA] Error message:', insertError.message);
-          console.error('[calculateProductLCA] Error code:', insertError.code);
-          console.error('[calculateProductLCA] Error details:', insertError);
-
-          // Check for specific error types
-          if (insertError.message?.includes('column') || insertError.message?.includes('does not exist')) {
-            console.error('[calculateProductLCA] 🔴 MISSING COLUMNS - Run: supabase db reset --local');
-            console.error('[calculateProductLCA] Required migration: 20251219165023_add_scope_breakdown_to_production_sites.sql');
-          }
-
-          if (insertError.code === '23505') {
-            console.error('[calculateProductLCA] Duplicate key error - sites already exist');
-          }
-
-          if (insertError.code === '42501') {
-            console.error('[calculateProductLCA] Permission denied - check RLS policies');
-          }
-
-          throw new Error(`Failed to insert production sites: ${insertError.message}`);
-        } else {
-          const totalAllocationEmissions = newAllocationSites.reduce((sum, site) => sum + (site.allocated_emissions_kg_co2e || 0), 0);
-          console.log(`[calculateProductLCA] ✅ Successfully inserted ${newAllocationSites.length} production sites`);
-          console.log(`[calculateProductLCA] Total emissions imported: ${totalAllocationEmissions.toFixed(2)} kg CO2e`);
-
-          if (insertedData) {
-            console.log('[calculateProductLCA] Inserted records:', insertedData.map(s => ({
-              id: s.id,
-              facility_id: s.facility_id,
-              emissions: s.allocated_emissions_kg_co2e
-            })));
-          }
-        }
-      } else {
-        console.log(`[calculateProductLCA] All ${cmAllocations.length} allocations already present in production sites`);
-      }
+      const totalAllocationEmissions = cmAllocations.reduce((sum, a) => sum + (a.allocated_emissions_kg_co2e || 0), 0);
+      console.log(`[calculateProductLCA] Total contract manufacturer emissions: ${totalAllocationEmissions.toFixed(2)} kg CO2e`);
     } else {
       console.log(`[calculateProductLCA] No contract manufacturer allocations found for this product`);
     }
 
-    // Verify production sites were created
-    console.log('[calculateProductLCA] 🔍 Verifying production sites in database...');
-    const { data: verifyData, error: verifyError } = await supabase
+    // Verify data sources are available
+    console.log('[calculateProductLCA] 🔍 Verifying production data sources...');
+
+    // Check owned production sites
+    const { data: ownedSitesData, error: ownedVerifyError } = await supabase
       .from('product_lca_production_sites')
       .select('id, facility_id, allocated_emissions_kg_co2e, scope1_emissions_kg_co2e, scope2_emissions_kg_co2e')
       .eq('product_lca_id', lca.id);
 
-    if (verifyError) {
-      console.error('[calculateProductLCA] ❌ Verification query failed:', verifyError);
+    if (ownedVerifyError) {
+      console.error('[calculateProductLCA] ❌ Failed to verify owned sites:', ownedVerifyError);
     } else {
-      console.log(`[calculateProductLCA] Verification result: ${verifyData?.length || 0} production sites found`);
-      if (verifyData && verifyData.length > 0) {
-        const totalVerifiedEmissions = verifyData.reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0);
-        console.log(`[calculateProductLCA] ✅ Total verified emissions: ${totalVerifiedEmissions.toFixed(2)} kg CO2e`);
-        console.log('[calculateProductLCA] Verified sites:', verifyData);
-      } else {
-        console.error('[calculateProductLCA] 🔴 NO PRODUCTION SITES FOUND AFTER IMPORT!');
-        console.error('[calculateProductLCA] This indicates a database issue. Check:');
-        console.error('[calculateProductLCA]   1. Run: supabase db reset --local');
-        console.error('[calculateProductLCA]   2. Check RLS policies on product_lca_production_sites');
-        console.error('[calculateProductLCA]   3. Verify migrations 20251219165023 and 20251219165224 applied');
-      }
+      const ownedEmissions = (ownedSitesData || []).reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0);
+      console.log(`[calculateProductLCA] Owned production sites: ${ownedSitesData?.length || 0} (${ownedEmissions.toFixed(2)} kg CO2e)`);
+    }
+
+    // Check contract manufacturer allocations
+    const cmEmissions = (cmAllocations || []).reduce((sum, a) => sum + (a.allocated_emissions_kg_co2e || 0), 0);
+    console.log(`[calculateProductLCA] Contract manufacturers: ${cmAllocations?.length || 0} (${cmEmissions.toFixed(2)} kg CO2e)`);
+
+    const totalSites = (ownedSitesData?.length || 0) + (cmAllocations?.length || 0);
+    const totalEmissions = ((ownedSitesData || []).reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0)) + cmEmissions;
+
+    if (totalSites > 0) {
+      console.log(`[calculateProductLCA] ✅ Total production sources: ${totalSites} (${totalEmissions.toFixed(2)} kg CO2e)`);
+      console.log('[calculateProductLCA] Edge Function will read from both tables');
+    } else {
+      console.warn('[calculateProductLCA] ⚠️  No production sites or contract manufacturers found');
+      console.warn('[calculateProductLCA] Processing emissions will be zero unless manually entered');
     }
 
     // 8. Call aggregation edge function to calculate totals

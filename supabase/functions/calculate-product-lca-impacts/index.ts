@@ -105,16 +105,57 @@ Deno.serve(async (req: Request) => {
 
     console.log(`[calculate-product-lca-impacts] Found ${materials.length} materials`);
 
-    const { data: productionSites, error: sitesError } = await supabaseClient
+    // Fetch production sites from BOTH owned facilities AND contract manufacturers
+    const { data: ownedSites, error: ownedSitesError } = await supabaseClient
       .from("product_lca_production_sites")
       .select("*")
       .eq("product_lca_id", product_lca_id);
 
-    if (sitesError) {
-      console.warn("[calculate-product-lca-impacts] Failed to fetch production sites:", sitesError);
+    if (ownedSitesError) {
+      console.warn("[calculate-product-lca-impacts] Failed to fetch owned production sites:", ownedSitesError);
     }
 
-    console.log(`[calculate-product-lca-impacts] Found ${productionSites?.length || 0} production sites`);
+    // Get the product_id from the LCA to query contract manufacturers
+    const { data: lcaData } = await supabaseClient
+      .from("product_lcas")
+      .select("product_id, organization_id")
+      .eq("id", product_lca_id)
+      .single();
+
+    // Fetch contract manufacturer allocations for this product
+    const { data: contractMfgAllocations, error: cmError } = await supabaseClient
+      .from("contract_manufacturer_allocations")
+      .select("*")
+      .eq("product_id", lcaData?.product_id || 0)
+      .eq("organization_id", lcaData?.organization_id || "");
+
+    if (cmError) {
+      console.warn("[calculate-product-lca-impacts] Failed to fetch contract manufacturer allocations:", cmError);
+    }
+
+    // Combine both sources into a unified production sites array
+    // Map contract manufacturer allocations to the same structure as production sites
+    const contractMfgSites = (contractMfgAllocations || []).map(cm => ({
+      id: cm.id,
+      facility_id: cm.facility_id,
+      allocated_emissions_kg_co2e: cm.allocated_emissions_kg_co2e || 0,
+      allocated_water_litres: cm.allocated_water_litres || 0,
+      allocated_waste_kg: cm.allocated_waste_kg || 0,
+      scope1_emissions_kg_co2e: cm.scope1_emissions_kg_co2e || 0,
+      scope2_emissions_kg_co2e: cm.scope2_emissions_kg_co2e || 0,
+      scope3_emissions_kg_co2e: cm.scope3_emissions_kg_co2e || 0,
+      share_of_production: (cm.attribution_ratio || 0) * 100,
+      source: 'contract_manufacturer'
+    }));
+
+    const productionSites = [
+      ...(ownedSites || []).map(s => ({ ...s, source: 'owned' })),
+      ...contractMfgSites
+    ];
+
+    console.log(`[calculate-product-lca-impacts] Found ${ownedSites?.length || 0} owned production sites`);
+    console.log(`[calculate-product-lca-impacts] Found ${contractMfgAllocations?.length || 0} contract manufacturer sites`);
+    console.log(`[calculate-product-lca-impacts] Total production sites: ${productionSites.length}`);
 
     let scope1Emissions = 0;
     let scope2Emissions = 0;
