@@ -313,6 +313,8 @@ export function IngredientFormCard({
                   value={ingredient.origin_address || ''}
                   placeholder="e.g., Munich, Germany or Yorkshire Maltings, UK"
                   onAddressSelect={(address) => {
+                    console.log(`[Address Selected] ${address.formatted_address}`);
+                    console.log(`[Material Origin Coordinates] Lat: ${address.lat}, Lng: ${address.lng}`);
                     const calculatedDistance = calculateAndSetDistance(address.lat, address.lng);
                     onUpdate(ingredient.tempId, {
                       origin_address: address.formatted_address,
@@ -382,6 +384,28 @@ export function IngredientFormCard({
                   )}
                 </div>
               </div>
+
+              {ingredient.origin_lat && ingredient.origin_lng && productionFacilities.length > 0 && (
+                <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <AlertDescription className="text-xs space-y-1">
+                    <div className="font-semibold text-blue-900 dark:text-blue-100">Distance Calculation Details:</div>
+                    <div className="text-blue-800 dark:text-blue-200">
+                      <strong>Material Origin:</strong> {ingredient.origin_address}
+                      <br />
+                      <span className="font-mono text-[10px]">({ingredient.origin_lat?.toFixed(4)}, {ingredient.origin_lng?.toFixed(4)})</span>
+                    </div>
+                    <div className="text-blue-800 dark:text-blue-200">
+                      <strong>Production Facility:</strong> {productionFacilities[0]?.name}
+                      <br />
+                      <span className="font-mono text-[10px]">({productionFacilities[0]?.address_lat?.toFixed(4)}, {productionFacilities[0]?.address_lng?.toFixed(4)})</span>
+                    </div>
+                    <div className="text-blue-900 dark:text-blue-100 font-semibold pt-1">
+                      Calculated Distance: {ingredient.distance_km} km
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           </div>
 

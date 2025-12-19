@@ -377,6 +377,8 @@ export function PackagingFormCard({
                       value={packaging.origin_address || ''}
                       placeholder="e.g., Shanghai, China or Birmingham Glass Factory, UK"
                       onAddressSelect={(address) => {
+                        console.log(`[Address Selected] ${address.formatted_address}`);
+                        console.log(`[Material Origin Coordinates] Lat: ${address.lat}, Lng: ${address.lng}`);
                         const calculatedDistance = calculateAndSetDistance(address.lat, address.lng);
                         onUpdate(packaging.tempId, {
                           origin_address: address.formatted_address,
@@ -445,6 +447,28 @@ export function PackagingFormCard({
                       )}
                     </div>
                   </div>
+
+                  {packaging.origin_lat && packaging.origin_lng && productionFacilities.length > 0 && (
+                    <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <AlertDescription className="text-xs space-y-1">
+                        <div className="font-semibold text-blue-900 dark:text-blue-100">Distance Calculation Details:</div>
+                        <div className="text-blue-800 dark:text-blue-200">
+                          <strong>Material Origin:</strong> {packaging.origin_address}
+                          <br />
+                          <span className="font-mono text-[10px]">({packaging.origin_lat?.toFixed(4)}, {packaging.origin_lng?.toFixed(4)})</span>
+                        </div>
+                        <div className="text-blue-800 dark:text-blue-200">
+                          <strong>Production Facility:</strong> {productionFacilities[0]?.name}
+                          <br />
+                          <span className="font-mono text-[10px]">({productionFacilities[0]?.address_lat?.toFixed(4)}, {productionFacilities[0]?.address_lng?.toFixed(4)})</span>
+                        </div>
+                        <div className="text-blue-900 dark:text-blue-100 font-semibold pt-1">
+                          Calculated Distance: {packaging.distance_km} km
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               </div>
 
