@@ -473,6 +473,7 @@ export function useCompanyMetrics() {
       });
 
       // Merge corporate emissions with existing product LCA scope breakdown
+      // CRITICAL: Avoid double-counting owned facility emissions
       setScopeBreakdown(prevBreakdown => {
         if (!prevBreakdown) {
           // If no product LCA data exists, use only corporate emissions
@@ -480,17 +481,45 @@ export function useCompanyMetrics() {
           return corporateBreakdown;
         }
 
-        // Merge both sources: Product LCA (primarily Scope 3) + Corporate operations (Scope 1 & 2)
+        // CORRECT APPROACH per GHG Protocol Corporate Standard:
+        // - Scope 1 & 2: Use ONLY corporate inventory (direct facility measurement)
+        // - Product LCAs should NOT contribute to Scope 1/2 for owned facilities
+        // - Scope 3: Sum from both sources (materials, transport, contract mfg, business travel, waste)
+
         const merged = {
-          scope1: prevBreakdown.scope1 + corporateBreakdown.scope1,
-          scope2: prevBreakdown.scope2 + corporateBreakdown.scope2,
+          // Scope 1 & 2: Corporate inventory ONLY (owned/controlled facilities)
+          // Product LCAs contribute ZERO to avoid double-counting
+          scope1: corporateBreakdown.scope1,
+          scope2: corporateBreakdown.scope2,
+
+          // Scope 3: Sum from both sources
+          // - Product LCAs: materials, packaging, contract mfg, transport, EOL
+          // - Corporate: business travel, commuting, waste, capital goods
           scope3: prevBreakdown.scope3 + corporateBreakdown.scope3,
         };
-        console.log('[useCompanyMetrics] Merged scope breakdown:', {
-          productLCA: prevBreakdown,
-          corporate: corporateBreakdown,
-          merged
+
+        // VALIDATION: Check for proper aggregation
+        const totalScopes = merged.scope1 + merged.scope2 + merged.scope3;
+        console.log('[useCompanyMetrics] Scope breakdown (NO DOUBLE-COUNTING):', {
+          source_breakdown: {
+            product_lca_scope3_only: prevBreakdown.scope3.toFixed(2),
+            corporate_scope1: corporateBreakdown.scope1.toFixed(2),
+            corporate_scope2: corporateBreakdown.scope2.toFixed(2),
+            corporate_scope3: corporateBreakdown.scope3.toFixed(2),
+          },
+          merged_total: {
+            scope1: merged.scope1.toFixed(2),
+            scope2: merged.scope2.toFixed(2),
+            scope3: merged.scope3.toFixed(2),
+            total: totalScopes.toFixed(2)
+          },
+          validation: {
+            avoided_product_lca_scope1: prevBreakdown.scope1.toFixed(2) + ' kg (in corporate inventory)',
+            avoided_product_lca_scope2: prevBreakdown.scope2.toFixed(2) + ' kg (in corporate inventory)',
+            note: 'Owned facility emissions counted once in corporate Scope 1/2'
+          }
         });
+
         return merged;
       });
     } catch (err) {
@@ -677,65 +706,70 @@ export function useCompanyMetrics() {
 
       console.log('[Carbon Debug] Lifecycle stage breakdown:', stageBreakdown.map(s => `${s.stage_name}: ${s.total_impact.toFixed(3)} (${s.percentage.toFixed(1)}%)`));
 
+      // VALIDATION: Verify lifecycle stages sum to total climate impact
+      const lifecycleSum = stageBreakdown.reduce((sum, stage) => sum + stage.total_impact, 0);
+      if (Math.abs(lifecycleSum - totalClimate) > 0.01) {
+        console.warn('[useCompanyMetrics] ⚠️ VALIDATION: Lifecycle stages don\'t sum to total climate.');
+        console.warn('[useCompanyMetrics] Lifecycle sum:', lifecycleSum.toFixed(2), 'kg CO2e');
+        console.warn('[useCompanyMetrics] Total climate:', totalClimate.toFixed(2), 'kg CO2e');
+        console.warn('[useCompanyMetrics] Discrepancy:', (lifecycleSum - totalClimate).toFixed(2), 'kg CO2e');
+        console.warn('[useCompanyMetrics] This indicates incomplete lifecycle stage data in some product LCAs');
+      } else {
+        console.log('[useCompanyMetrics] ✅ Lifecycle stages validation passed:', {
+          lifecycle_sum: lifecycleSum.toFixed(2),
+          total_climate: totalClimate.toFixed(2),
+          match: 'OK'
+        });
+      }
+
       setLifecycleStageBreakdown(stageBreakdown);
 
-      // Calculate accurate GHG breakdown based on material types
+      // Calculate GHG breakdown using ACTUAL database fields (not hardcoded percentages)
       if (totalClimate > 0) {
         let fossilCO2 = 0;
         let biogenicCO2 = 0;
         let landUseChange = 0;
         let methaneTotal = 0;
         let nitrousOxideTotal = 0;
+        let hfcsTotal = 0;
 
         materials.forEach((material: any) => {
-          const impact = Number(material.impact_climate) || 0;
-          const name = (material.name || '').toLowerCase();
-          const category = (material.packaging_category || '').toLowerCase();
+          // Use actual biogenic/fossil split from database
+          const fossilFromDB = Number(material.impact_climate_fossil || 0);
+          const biogenicFromDB = Number(material.impact_climate_biogenic || 0);
+          const dlucFromDB = Number(material.impact_climate_dluc || 0);
+          const totalClimateImpact = Number(material.impact_climate || 0);
 
-          // Categorise by material type for accurate GHG split
-          if (category === 'glass' || name.includes('glass')) {
-            // Glass: 100% fossil CO2 from fuel combustion
-            fossilCO2 += impact;
-          } else if (category === 'plastic' || category === 'pet' || category === 'hdpe' || name.includes('plastic') || name.includes('pet')) {
-            // Plastics: 100% fossil CO2 from petrochemicals
-            fossilCO2 += impact;
-          } else if (category === 'metal' || category === 'aluminium' || name.includes('aluminium') || name.includes('cap')) {
-            // Metals: 100% fossil CO2 from smelting
-            fossilCO2 += impact;
-          } else if (name.includes('sugar') || name.includes('glucose') || name.includes('fructose')) {
-            // Sugar: mostly biogenic from photosynthesis
-            biogenicCO2 += impact * 0.85;
-            fossilCO2 += impact * 0.10; // processing energy
-            nitrousOxideTotal += (impact * 0.05) / 273; // N2O from fertiliser
-          } else if (name.includes('fruit') || name.includes('apple') || name.includes('lemon') || name.includes('elderflower') || name.includes('juice')) {
-            // Fruit ingredients: mostly biogenic
-            biogenicCO2 += impact * 0.80;
-            fossilCO2 += impact * 0.10; // processing
-            landUseChange += impact * 0.08; // land conversion
-            nitrousOxideTotal += (impact * 0.02) / 273; // fertiliser
-          } else if (category === 'paper' || category === 'cardboard' || name.includes('label') || name.includes('cardboard')) {
-            // Paper/cardboard: mostly biogenic from wood
-            biogenicCO2 += impact * 0.70;
-            fossilCO2 += impact * 0.25; // processing energy
-            landUseChange += impact * 0.05;
-          } else if (name.includes('water')) {
-            // Water: minimal, mostly fossil from transport/treatment
-            fossilCO2 += impact * 0.90;
-            methaneTotal += (impact * 0.10) / 27.9;
-          } else if (name.includes('transport') || name.includes('freight') || name.includes('logistics')) {
-            // Transport: diesel/petrol combustion
-            fossilCO2 += impact * 0.95;
-            methaneTotal += (impact * 0.03) / 27.9;
-            nitrousOxideTotal += (impact * 0.02) / 273;
-          } else {
-            // Unknown/generic: use conservative estimate
-            fossilCO2 += impact * 0.70;
-            biogenicCO2 += impact * 0.20;
-            landUseChange += impact * 0.05;
-            methaneTotal += (impact * 0.03) / 27.9;
-            nitrousOxideTotal += (impact * 0.02) / 273;
+          // Add actual values from database
+          fossilCO2 += fossilFromDB;
+          biogenicCO2 += biogenicFromDB;
+          landUseChange += dlucFromDB;
+
+          // Parse GHG breakdown if available
+          const ghgBreakdown = material.ghg_breakdown as any;
+          if (ghgBreakdown) {
+            methaneTotal += Number(ghgBreakdown.ch4_kg_co2e || 0);
+            nitrousOxideTotal += Number(ghgBreakdown.n2o_kg_co2e || 0);
+            hfcsTotal += Number(ghgBreakdown.hfcs_kg_co2e || 0);
+          }
+
+          // CONSERVATIVE FALLBACK: If no biogenic/fossil split provided, assume all fossil
+          // This follows ISO 14067 precautionary principle
+          if (fossilFromDB === 0 && biogenicFromDB === 0 && dlucFromDB === 0 && totalClimateImpact > 0) {
+            fossilCO2 += totalClimateImpact;
+            console.warn(`[useCompanyMetrics] Material "${material.name}" lacks biogenic/fossil split. Conservative approach: allocated ${totalClimateImpact.toFixed(4)} kg CO2e to fossil.`);
           }
         });
+
+        // VALIDATION: Check that breakdown sums to total
+        const breakdownSum = fossilCO2 + biogenicCO2 + landUseChange + methaneTotal + nitrousOxideTotal + hfcsTotal;
+        if (Math.abs(breakdownSum - totalClimate) > 0.01) {
+          console.warn('[useCompanyMetrics] GHG breakdown validation:', {
+            breakdown_sum: breakdownSum.toFixed(2),
+            total_climate: totalClimate.toFixed(2),
+            discrepancy: (breakdownSum - totalClimate).toFixed(2)
+          });
+        }
 
         const ghgData = {
           carbon_origin: {
