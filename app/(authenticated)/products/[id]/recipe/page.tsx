@@ -108,8 +108,10 @@ export default function ProductRecipePage() {
       if (productError) throw productError;
       setProduct(productData);
 
-      // Fetch production sites from LCA if available
-      let productionSitesData = null;
+      // Fetch ONLY the production sites specifically linked to THIS product
+      // This ensures distance calculations use the correct facility for THIS product
+      let facilitiesToUse: ProductionFacility[] = [];
+
       if (productData.latest_lca_id) {
         const result = await supabase
           .from("product_lca_production_sites")
@@ -125,50 +127,29 @@ export default function ProductRecipePage() {
           `)
           .eq("product_lca_id", productData.latest_lca_id);
 
-        productionSitesData = result.data;
-      }
+        if (result.data && result.data.length > 0) {
+          facilitiesToUse = result.data
+            .filter((ps: any) => ps.facilities && ps.facilities.address_lat && ps.facilities.address_lng)
+            .map((ps: any) => {
+              const facility = ps.facilities;
+              return {
+                id: facility.id,
+                name: facility.name,
+                address_lat: typeof facility.address_lat === 'string' ? parseFloat(facility.address_lat) : facility.address_lat,
+                address_lng: typeof facility.address_lng === 'string' ? parseFloat(facility.address_lng) : facility.address_lng,
+                production_share: ps.share_of_production || 0,
+              };
+            });
 
-      // If we have LCA production sites, use those; otherwise fetch all organization facilities
-      let facilitiesToUse: ProductionFacility[] = [];
-
-      if (productionSitesData && productionSitesData.length > 0) {
-        // Use LCA production sites
-        facilitiesToUse = productionSitesData
-          .filter((ps: any) => ps.facilities && ps.facilities.address_lat && ps.facilities.address_lng)
-          .map((ps: any) => {
-            const facility = ps.facilities;
-            return {
-              id: facility.id,
-              name: facility.name,
-              address_lat: typeof facility.address_lat === 'string' ? parseFloat(facility.address_lat) : facility.address_lat,
-              address_lng: typeof facility.address_lng === 'string' ? parseFloat(facility.address_lng) : facility.address_lng,
-              production_share: ps.share_of_production || 0,
-            };
-          });
-      } else {
-        // Fallback: fetch all owned facilities from the organization
-        const facilitiesResult = await supabase
-          .from("facilities")
-          .select("id, name, address_lat, address_lng")
-          .eq("organization_id", currentOrganization?.id)
-          .eq("operational_control", "owned")
-          .not("address_lat", "is", null)
-          .not("address_lng", "is", null);
-
-        if (facilitiesResult.data) {
-          facilitiesToUse = facilitiesResult.data.map((f: any) => ({
-            id: f.id,
-            name: f.name,
-            address_lat: typeof f.address_lat === 'string' ? parseFloat(f.address_lat) : f.address_lat,
-            address_lng: typeof f.address_lng === 'string' ? parseFloat(f.address_lng) : f.address_lng,
-            production_share: 0,
-          }));
+          console.log(`[Production Sites] Loaded ${facilitiesToUse.length} facilities for product ${productId}:`, facilitiesToUse);
+        } else {
+          console.warn(`[Production Sites] No production sites configured for product ${productId}. Distance calculations will not be available until you configure production sites in the Production Sites tab.`);
         }
+      } else {
+        console.warn(`[Production Sites] Product ${productId} has no LCA configured yet. Please configure production sites via the Production Sites tab.`);
       }
 
-      if (facilitiesToUse.length > 0) {
-        setProductionFacilities(facilitiesToUse);
-      }
+      setProductionFacilities(facilitiesToUse);
 
       const { data: materialsData, error: materialsError } = await supabase
         .from("product_materials")
