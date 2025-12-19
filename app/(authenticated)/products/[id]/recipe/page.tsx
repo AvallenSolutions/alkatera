@@ -108,10 +108,12 @@ export default function ProductRecipePage() {
       if (productError) throw productError;
       setProduct(productData);
 
-      // Fetch ONLY the production sites specifically linked to THIS product
-      // This ensures distance calculations use the correct facility for THIS product
+      // Fetch production sites from BOTH:
+      // 1. Owned facilities (product_lca_production_sites)
+      // 2. Contract manufacturers (contract_manufacturer_allocation_summary)
       let facilitiesToUse: ProductionFacility[] = [];
 
+      // Fetch owned facilities
       if (productData.latest_lca_id) {
         const result = await supabase
           .from("product_lca_production_sites")
@@ -128,7 +130,7 @@ export default function ProductRecipePage() {
           .eq("product_lca_id", productData.latest_lca_id);
 
         if (result.data && result.data.length > 0) {
-          facilitiesToUse = result.data
+          const ownedFacilities = result.data
             .filter((ps: any) => ps.facilities && ps.facilities.address_lat && ps.facilities.address_lng)
             .map((ps: any) => {
               const facility = ps.facilities;
@@ -140,13 +142,53 @@ export default function ProductRecipePage() {
                 production_share: ps.share_of_production || 0,
               };
             });
-
-          console.log(`[Production Sites] Loaded ${facilitiesToUse.length} facilities for product ${productId}:`, facilitiesToUse);
-        } else {
-          console.warn(`[Production Sites] No production sites configured for product ${productId}. Distance calculations will not be available until you configure production sites in the Production Sites tab.`);
+          facilitiesToUse.push(...ownedFacilities);
+          console.log(`[Production Sites] Loaded ${ownedFacilities.length} owned facilities for product ${productId}:`, ownedFacilities);
         }
-      } else {
-        console.warn(`[Production Sites] Product ${productId} has no LCA configured yet. Please configure production sites via the Production Sites tab.`);
+      }
+
+      // Fetch contract manufacturers
+      const { data: contractMfgData } = await supabase
+        .from("contract_manufacturer_allocation_summary")
+        .select(`
+          id,
+          facility_id,
+          facility_name,
+          attribution_ratio
+        `)
+        .eq("product_id", productId);
+
+      if (contractMfgData && contractMfgData.length > 0) {
+        // Get coordinates for contract manufacturer facilities
+        const facilityIds = contractMfgData.map((cm: any) => cm.facility_id);
+        const { data: facilityCoords } = await supabase
+          .from("facilities")
+          .select("id, name, address_lat, address_lng")
+          .in("id", facilityIds);
+
+        if (facilityCoords && facilityCoords.length > 0) {
+          const contractFacilities: ProductionFacility[] = [];
+
+          for (const cm of contractMfgData) {
+            const facilityData = facilityCoords.find((f: any) => f.id === cm.facility_id);
+            if (facilityData && facilityData.address_lat && facilityData.address_lng) {
+              contractFacilities.push({
+                id: facilityData.id,
+                name: facilityData.name,
+                address_lat: typeof facilityData.address_lat === 'string' ? parseFloat(facilityData.address_lat) : facilityData.address_lat,
+                address_lng: typeof facilityData.address_lng === 'string' ? parseFloat(facilityData.address_lng) : facilityData.address_lng,
+                production_share: ((cm.attribution_ratio || 0) * 100),
+              });
+            }
+          }
+
+          facilitiesToUse.push(...contractFacilities);
+          console.log(`[Production Sites] Loaded ${contractFacilities.length} contract manufacturer facilities for product ${productId}:`, contractFacilities);
+        }
+      }
+
+      if (facilitiesToUse.length === 0) {
+        console.warn(`[Production Sites] No production sites configured for product ${productId}. Distance calculations will not be available until you configure production sites in the Production Sites tab.`);
       }
 
       setProductionFacilities(facilitiesToUse);
