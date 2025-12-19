@@ -125,47 +125,50 @@ export function IngredientFormCard({
   };
 
   const calculateAndSetDistance = (originLat: number, originLng: number) => {
-    // Determine destination facilities: use production facilities if available, otherwise fall back to organization location
-    const facilitiesToUse: Array<{ lat: number; lng: number; weight: number }> = [];
+    // Step 1: Identify the primary production facility for this product
+    let targetFacility: { lat: number; lng: number } | null = null;
 
     if (productionFacilities.length > 0) {
-      // Use production facilities with their shares
-      for (const facility of productionFacilities) {
+      // Find the facility with the highest production share, or use the first one
+      const sortedFacilities = [...productionFacilities].sort((a, b) => {
+        const shareA = a.production_share || 0;
+        const shareB = b.production_share || 0;
+        return shareB - shareA;
+      });
+
+      // Get the first facility with valid coordinates
+      for (const facility of sortedFacilities) {
         if (facility.address_lat && facility.address_lng) {
-          facilitiesToUse.push({
+          targetFacility = {
             lat: facility.address_lat,
             lng: facility.address_lng,
-            weight: facility.production_share || (100 / productionFacilities.length),
-          });
+          };
+          console.log(`[Distance] Using facility: ${facility.name} (${facility.address_lat}, ${facility.address_lng})`);
+          break;
         }
       }
-    } else if (organizationLat && organizationLng) {
-      // Fall back to organization location if no production facilities
-      facilitiesToUse.push({
+    }
+
+    // Step 2: Fall back to organization location if no production facilities
+    if (!targetFacility && organizationLat && organizationLng) {
+      targetFacility = {
         lat: organizationLat,
         lng: organizationLng,
-        weight: 100,
-      });
-    } else {
-      // No location data available
+      };
+      console.log(`[Distance] Using organization location: (${organizationLat}, ${organizationLng})`);
+    }
+
+    // Step 3: If no location data available, return 0
+    if (!targetFacility) {
+      console.warn('[Distance] No facility or organization location available');
       return 0;
     }
 
-    if (facilitiesToUse.length === 0) {
-      return 0;
-    }
+    // Step 4: Calculate distance between ONLY these two specific locations
+    const distance = calculateDistance(originLat, originLng, targetFacility.lat, targetFacility.lng);
+    console.log(`[Distance] From (${originLat}, ${originLng}) to (${targetFacility.lat}, ${targetFacility.lng}) = ${distance} km`);
 
-    // Calculate weighted average distance
-    let totalWeightedDistance = 0;
-    let totalWeight = 0;
-
-    for (const facility of facilitiesToUse) {
-      const distance = calculateDistance(originLat, originLng, facility.lat, facility.lng);
-      totalWeightedDistance += distance * facility.weight;
-      totalWeight += facility.weight;
-    }
-
-    return totalWeight > 0 ? Math.round(totalWeightedDistance / totalWeight) : 0;
+    return Math.round(distance);
   };
 
   const handleSearchSelect = (selection: {
