@@ -21,6 +21,9 @@ interface AggregatedImpacts {
   total_freshwater_eutrophication: number;
   total_terrestrial_acidification: number;
   total_fossil_resource_scarcity: number;
+  total_carbon_footprint: number;
+  materials_count: number;
+  calculated_at: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -95,6 +98,9 @@ Deno.serve(async (req: Request) => {
       total_freshwater_eutrophication: 0,
       total_terrestrial_acidification: 0,
       total_fossil_resource_scarcity: 0,
+      total_carbon_footprint: 0,
+      materials_count: materials.length,
+      calculated_at: new Date().toISOString(),
     };
 
     for (const material of materials) {
@@ -113,33 +119,19 @@ Deno.serve(async (req: Request) => {
       impacts.total_fossil_resource_scarcity += Number(material.impact_fossil_resource_scarcity || 0);
     }
 
-    const totalCarbonFootprint = impacts.total_climate + impacts.total_transport;
+    impacts.total_carbon_footprint = impacts.total_climate + impacts.total_transport;
 
     console.log(`[calculate-product-lca-impacts] Aggregated impacts:`, {
       materials: impacts.total_climate.toFixed(4),
       transport: impacts.total_transport.toFixed(4),
-      total: totalCarbonFootprint.toFixed(4),
+      total: impacts.total_carbon_footprint.toFixed(4),
     });
 
     const { error: updateError } = await supabaseClient
       .from("product_lcas")
       .update({
-        total_carbon_footprint: totalCarbonFootprint,
-        total_climate: impacts.total_climate,
-        total_climate_fossil: impacts.total_climate_fossil,
-        total_climate_biogenic: impacts.total_climate_biogenic,
-        total_climate_dluc: impacts.total_climate_dluc,
-        total_transport: impacts.total_transport,
-        total_water: impacts.total_water,
-        total_water_scarcity: impacts.total_water_scarcity,
-        total_land: impacts.total_land,
-        total_waste: impacts.total_waste,
-        total_terrestrial_ecotoxicity: impacts.total_terrestrial_ecotoxicity,
-        total_freshwater_eutrophication: impacts.total_freshwater_eutrophication,
-        total_terrestrial_acidification: impacts.total_terrestrial_acidification,
-        total_fossil_resource_scarcity: impacts.total_fossil_resource_scarcity,
+        aggregated_impacts: impacts,
         status: "completed",
-        calculated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", product_lca_id);
@@ -152,32 +144,32 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { data: product, error: productError } = await supabaseClient
+    const { data: lcaRecord, error: lcaError } = await supabaseClient
       .from("product_lcas")
       .select("product_id")
       .eq("id", product_lca_id)
       .single();
 
-    if (!productError && product) {
+    if (!lcaError && lcaRecord) {
       await supabaseClient
         .from("products")
         .update({
           latest_lca_id: product_lca_id,
-          latest_lca_carbon_footprint: totalCarbonFootprint,
+          latest_lca_carbon_footprint: impacts.total_carbon_footprint,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", product.product_id);
+        .eq("id", lcaRecord.product_id);
 
-      console.log(`[calculate-product-lca-impacts] Updated product ${product.product_id} with latest LCA`);
+      console.log(`[calculate-product-lca-impacts] Updated product ${lcaRecord.product_id} with latest LCA`);
     }
 
-    console.log(`[calculate-product-lca-impacts] ✓ LCA calculation complete: ${product_lca_id}`);
+    console.log(`[calculate-product-lca-impacts] LCA calculation complete: ${product_lca_id}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         lca_id: product_lca_id,
-        total_carbon_footprint: totalCarbonFootprint,
+        total_carbon_footprint: impacts.total_carbon_footprint,
         impacts: {
           materials: impacts.total_climate,
           transport: impacts.total_transport,
