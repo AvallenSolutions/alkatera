@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -21,11 +21,12 @@ import {
   ArrowRight,
   Target,
   Award,
-  Activity
+  Activity,
+  Truck
 } from 'lucide-react';
 import Link from 'next/link';
 
-import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
+import { useCompanyMetrics, CompanyMetrics, ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { ClimateCard } from '@/components/vitality/ClimateCard';
 import { WaterCard } from '@/components/vitality/WaterCard';
 import { WasteCard } from '@/components/vitality/WasteCard';
@@ -143,7 +144,13 @@ function HotspotCard({
         <CardDescription>Highest impact contributors requiring attention</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {items.map((item, idx) => (
+        {items.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <Icon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p className="text-sm font-medium">No material hotspots identified yet</p>
+            <p className="text-xs mt-2">Complete product LCAs to see top contributing materials</p>
+          </div>
+        ) : items.map((item, idx) => (
           <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
             <div className="flex-1">
               <div className="flex items-center justify-between mb-1">
@@ -171,37 +178,120 @@ function HotspotCard({
   );
 }
 
-function ActionGuidanceCard() {
-  const actions = [
-    {
-      priority: 'high',
-      category: 'Raw Materials',
-      action: 'Switch to low-carbon suppliers',
-      impact: 'Up to 40% reduction in Scope 3 emissions',
-      icon: Leaf,
-    },
-    {
-      priority: 'high',
-      category: 'Energy',
-      action: 'Transition to renewable electricity',
-      impact: 'Eliminate Scope 2 market-based emissions',
-      icon: Factory,
-    },
-    {
-      priority: 'medium',
-      category: 'Water',
-      action: 'Reduce consumption in high-risk regions',
-      impact: 'Lower water scarcity impact by 30%',
-      icon: Droplets,
-    },
-    {
-      priority: 'medium',
-      category: 'Circularity',
-      action: 'Increase recycled content in packaging',
-      impact: 'Boost circularity rate above 60%',
-      icon: Trash2,
-    },
-  ];
+function ActionGuidanceCard({
+  metrics,
+  scopeBreakdown,
+  materialHotspots,
+}: {
+  metrics: CompanyMetrics | null;
+  scopeBreakdown: ScopeBreakdown | null;
+  materialHotspots: { label: string; value: number; percentage: number; severity: 'high' | 'medium' | 'low' }[];
+}) {
+  const actions = useMemo(() => {
+    if (!metrics || !scopeBreakdown) {
+      return [{
+        priority: 'high' as const,
+        category: 'Data Quality',
+        action: 'Complete product LCAs to enable insights',
+        impact: 'Unlock personalised reduction strategies',
+        icon: Leaf,
+      }];
+    }
+
+    const totalScopes = scopeBreakdown.scope1 + scopeBreakdown.scope2 + scopeBreakdown.scope3;
+    const scope1Pct = totalScopes > 0 ? (scopeBreakdown.scope1 / totalScopes) * 100 : 0;
+    const scope2Pct = totalScopes > 0 ? (scopeBreakdown.scope2 / totalScopes) * 100 : 0;
+    const scope3Pct = totalScopes > 0 ? (scopeBreakdown.scope3 / totalScopes) * 100 : 0;
+
+    const generated: { priority: 'high' | 'medium'; category: string; action: string; impact: string; icon: any }[] = [];
+
+    if (materialHotspots.length > 0) {
+      const topMaterial = materialHotspots[0];
+      const potentialReduction = (topMaterial.value * 0.4).toFixed(0);
+      generated.push({
+        priority: topMaterial.percentage > 25 ? 'high' : 'medium',
+        category: 'Raw Materials',
+        action: `Optimise ${topMaterial.label} sourcing`,
+        impact: `Reduce by ${potentialReduction} kg CO₂eq (${(topMaterial.percentage * 0.4).toFixed(0)}%)`,
+        icon: Leaf,
+      });
+    }
+
+    if (scope2Pct > 15) {
+      const potentialReduction = (scopeBreakdown.scope2 * 0.8).toFixed(0);
+      generated.push({
+        priority: scope2Pct > 30 ? 'high' : 'medium',
+        category: 'Energy',
+        action: 'Switch to renewable electricity tariff',
+        impact: `Eliminate ${potentialReduction} kg CO₂eq (${(scope2Pct * 0.8).toFixed(0)}% of total)`,
+        icon: Factory,
+      });
+    } else if (scope1Pct > 20) {
+      const potentialReduction = (scopeBreakdown.scope1 * 0.3).toFixed(0);
+      generated.push({
+        priority: 'high',
+        category: 'Direct Emissions',
+        action: 'Improve facility energy efficiency',
+        impact: `Reduce Scope 1 by ${potentialReduction} kg CO₂eq`,
+        icon: Factory,
+      });
+    }
+
+    if (metrics.water_risk_level === 'high') {
+      generated.push({
+        priority: 'high',
+        category: 'Water Risk',
+        action: 'Address high water scarcity facilities',
+        impact: 'Reduce water scarcity impact by 30%',
+        icon: Droplets,
+      });
+    } else if (metrics.total_impacts.water_scarcity_aware > 100) {
+      generated.push({
+        priority: 'medium',
+        category: 'Water',
+        action: 'Implement water efficiency measures',
+        impact: `Lower water impact from ${metrics.total_impacts.water_scarcity_aware.toFixed(0)} m³ world eq`,
+        icon: Droplets,
+      });
+    }
+
+    if (metrics.circularity_percentage < 50) {
+      generated.push({
+        priority: metrics.circularity_percentage < 25 ? 'high' : 'medium',
+        category: 'Circularity',
+        action: 'Increase recyclable packaging content',
+        impact: `Raise circularity from ${metrics.circularity_percentage}% to 60%+`,
+        icon: Trash2,
+      });
+    }
+
+    if (scope3Pct > 70 && materialHotspots.length > 1) {
+      const secondMaterial = materialHotspots[1];
+      generated.push({
+        priority: 'medium',
+        category: 'Supply Chain',
+        action: `Engage suppliers for ${secondMaterial.label}`,
+        impact: `Address ${secondMaterial.percentage.toFixed(0)}% of emissions`,
+        icon: Truck,
+      });
+    }
+
+    while (generated.length < 4) {
+      const defaults = [
+        { priority: 'medium' as const, category: 'Transport', action: 'Optimise logistics routes', impact: 'Reduce transport emissions by 15%', icon: Truck },
+        { priority: 'medium' as const, category: 'Packaging', action: 'Lightweight packaging design', impact: 'Lower material footprint by 10%', icon: Leaf },
+        { priority: 'medium' as const, category: 'Operations', action: 'Implement ISO 14001 practices', impact: 'Systematic environmental improvement', icon: Factory },
+      ];
+      const next = defaults[generated.length - 1];
+      if (next && !generated.some(g => g.category === next.category)) {
+        generated.push(next);
+      } else {
+        break;
+      }
+    }
+
+    return generated.slice(0, 4);
+  }, [metrics, scopeBreakdown, materialHotspots]);
 
   return (
     <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20">
@@ -209,8 +299,9 @@ function ActionGuidanceCard() {
         <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
           <Target className="h-5 w-5 text-blue-600" />
           Priority Actions
+          <Badge variant="outline" className="ml-auto text-xs">Data-Driven</Badge>
         </CardTitle>
-        <CardDescription>Data-driven recommendations to reduce environmental impact</CardDescription>
+        <CardDescription>Personalised recommendations based on your impact profile</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {actions.map((action, idx) => (
@@ -601,14 +692,12 @@ export default function PerformancePage() {
               </Card>
 
               {/* Material Flow Hotspots */}
-              {topMaterialHotspots.length > 0 && (
-                <HotspotCard
-                  title="Material Impact Hotspots"
-                  items={topMaterialHotspots}
-                  icon={AlertTriangle}
-                  color="text-amber-600"
-                />
-              )}
+              <HotspotCard
+                title="Material Impact Hotspots"
+                items={topMaterialHotspots}
+                icon={AlertTriangle}
+                color="text-amber-600"
+              />
 
               {/* Water Risk Analysis */}
               <Card>
@@ -650,7 +739,11 @@ export default function PerformancePage() {
             {/* Right Column - Actions & Compliance */}
             <div className="space-y-6">
               {/* Priority Actions */}
-              <ActionGuidanceCard />
+              <ActionGuidanceCard
+                metrics={metrics}
+                scopeBreakdown={scopeBreakdown}
+                materialHotspots={topMaterialHotspots}
+              />
 
               {/* Facility Hotspots */}
               {topFacilityHotspots.length > 0 && (
