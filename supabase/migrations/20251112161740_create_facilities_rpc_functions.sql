@@ -123,9 +123,9 @@ $$;
 CREATE OR REPLACE FUNCTION create_facility(
   p_name text,
   p_facility_type text,
+  p_country text,
   p_address text DEFAULT NULL,
   p_city text DEFAULT NULL,
-  p_country text,
   p_data_source_type text DEFAULT 'internal',
   p_supplier_id uuid DEFAULT NULL
 )
