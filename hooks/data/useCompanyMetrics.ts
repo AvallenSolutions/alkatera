@@ -244,10 +244,45 @@ export function useCompanyMetrics() {
       if (avgWaterScarcity > 40) waterRiskLevel = 'high';
       else if (avgWaterScarcity > 20) waterRiskLevel = 'medium';
 
-      // Calculate circularity (placeholder - based on fossil resource scarcity as proxy)
-      const circularityPercentage = totalImpacts.fossil_resource_scarcity > 0
-        ? Math.max(0, 100 - (totalImpacts.fossil_resource_scarcity / lcas.length) * 2)
-        : 0;
+      let circularityPercentage = 0;
+      const totalWasteGenerated = lcas.reduce((sum, lca) => {
+        const eolWaste = lca.aggregated_impacts?.end_of_life_waste_kg || 0;
+        return sum + eolWaste;
+      }, 0);
+
+      const recyclableWaste = lcas.reduce((sum, lca) => {
+        const recyclability = lca.aggregated_impacts?.recyclability_percentage || 0;
+        const eolWaste = lca.aggregated_impacts?.end_of_life_waste_kg || 0;
+        return sum + (eolWaste * recyclability / 100);
+      }, 0);
+
+      if (totalWasteGenerated > 0) {
+        circularityPercentage = (recyclableWaste / totalWasteGenerated) * 100;
+      } else {
+        const totalPackagingMass = lcas.reduce((sum, lca) => {
+          const materials = lca.aggregated_impacts?.breakdown?.by_material || [];
+          const packaging = materials.filter((m: any) =>
+            m.name?.toLowerCase().includes('bottle') ||
+            m.name?.toLowerCase().includes('packaging') ||
+            m.name?.toLowerCase().includes('label')
+          );
+          return sum + packaging.reduce((s: number, p: any) => s + (p.quantity || 0), 0);
+        }, 0);
+
+        const recyclablePackaging = lcas.reduce((sum, lca) => {
+          const materials = lca.aggregated_impacts?.breakdown?.by_material || [];
+          const packaging = materials.filter((m: any) =>
+            m.name?.toLowerCase().includes('glass') ||
+            m.name?.toLowerCase().includes('cardboard') ||
+            m.name?.toLowerCase().includes('paper')
+          );
+          return sum + packaging.reduce((s: number, p: any) => s + (p.quantity || 0), 0);
+        }, 0);
+
+        if (totalPackagingMass > 0) {
+          circularityPercentage = (recyclablePackaging / totalPackagingMass) * 100;
+        }
+      }
 
       const csrdCompliantPercentage = lcas.length > 0
         ? (csrdCompliantCount / lcas.length) * 100
@@ -445,28 +480,14 @@ export function useCompanyMetrics() {
         else if (scope === 3) corporateBreakdown.scope3 += value;
       });
 
-      // Merge corporate emissions with existing product LCA scope breakdown
-      // CRITICAL: Avoid double-counting owned facility emissions
       setScopeBreakdown(prevBreakdown => {
         if (!prevBreakdown) {
-          // If no product LCA data exists, use only corporate emissions
           return corporateBreakdown;
         }
 
-        // CORRECT APPROACH per GHG Protocol Corporate Standard:
-        // - Scope 1 & 2: Use ONLY corporate inventory (direct facility measurement)
-        // - Product LCAs should NOT contribute to Scope 1/2 for owned facilities
-        // - Scope 3: Sum from both sources (materials, transport, contract mfg, business travel, waste)
-
         const merged = {
-          // Scope 1 & 2: Corporate inventory ONLY (owned/controlled facilities)
-          // Product LCAs contribute ZERO to avoid double-counting
-          scope1: corporateBreakdown.scope1,
-          scope2: corporateBreakdown.scope2,
-
-          // Scope 3: Sum from both sources
-          // - Product LCAs: materials, packaging, contract mfg, transport, EOL
-          // - Corporate: business travel, commuting, waste, capital goods
+          scope1: corporateBreakdown.scope1 > 0 ? corporateBreakdown.scope1 : prevBreakdown.scope1,
+          scope2: corporateBreakdown.scope2 > 0 ? corporateBreakdown.scope2 : prevBreakdown.scope2,
           scope3: prevBreakdown.scope3 + corporateBreakdown.scope3,
         };
 
