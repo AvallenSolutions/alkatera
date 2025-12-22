@@ -94,16 +94,7 @@ Deno.serve(async (req: Request) => {
     // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA impacts
     const { data: productionLogs, error: productionError } = await supabase
       .from("production_logs")
-      .select(`
-        product_id,
-        volume,
-        unit,
-        products!inner (
-          id,
-          name,
-          functional_unit_quantity
-        )
-      `)
+      .select("product_id, volume, unit, date")
       .eq("organization_id", organization_id)
       .gte("date", yearStart)
       .lte("date", yearEnd);
@@ -116,6 +107,15 @@ Deno.serve(async (req: Request) => {
 
     if (productionLogs) {
       for (const log of productionLogs) {
+        // Get product details
+        const { data: product } = await supabase
+          .from("products")
+          .select("functional_unit_volume")
+          .eq("id", log.product_id)
+          .maybeSingle();
+
+        if (!product) continue;
+
         // Get the latest LCA for this product
         const { data: lca } = await supabase
           .from("product_lcas")
@@ -132,7 +132,8 @@ Deno.serve(async (req: Request) => {
 
           // Calculate total impact for this production
           const unitImpact = lca.total_ghg_emissions; // per functional unit
-          const totalImpact = unitImpact * (volumeInUnits / (log.products.functional_unit_quantity || 1));
+          const functionalUnitVolume = product.functional_unit_volume || 1;
+          const totalImpact = unitImpact * (volumeInUnits / functionalUnitVolume);
 
           scope3ProductsTotal += totalImpact;
         }

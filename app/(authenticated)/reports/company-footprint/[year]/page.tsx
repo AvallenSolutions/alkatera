@@ -167,15 +167,7 @@ export default function FootprintBuilderPage() {
 
       const { data: productionData, error } = await supabase
         .from("production_logs")
-        .select(`
-          product_id,
-          volume,
-          unit,
-          products!inner (
-            id,
-            functional_unit_quantity
-          )
-        `)
+        .select("product_id, volume, unit, date")
         .eq("organization_id", currentOrganization.id)
         .gte("date", yearStart)
         .lte("date", yearEnd);
@@ -186,6 +178,14 @@ export default function FootprintBuilderPage() {
 
       if (productionData) {
         for (const log of productionData) {
+          const { data: product } = await supabase
+            .from("products")
+            .select("functional_unit_volume")
+            .eq("id", log.product_id)
+            .maybeSingle();
+
+          if (!product) continue;
+
           const { data: lca } = await supabase
             .from("product_lcas")
             .select("total_ghg_emissions")
@@ -198,8 +198,8 @@ export default function FootprintBuilderPage() {
           if (lca && lca.total_ghg_emissions) {
             const volumeInUnits = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
             const unitImpact = lca.total_ghg_emissions;
-            const products = Array.isArray(log.products) ? log.products[0] : log.products;
-            const totalImpact = unitImpact * (volumeInUnits / (products.functional_unit_quantity || 1));
+            const functionalUnitVolume = product.functional_unit_volume || 1;
+            const totalImpact = unitImpact * (volumeInUnits / functionalUnitVolume);
             total += totalImpact;
           }
         }
@@ -223,8 +223,8 @@ export default function FootprintBuilderPage() {
         .from("fleet_activities")
         .select("emissions_tco2e")
         .eq("organization_id", currentOrganization.id)
-        .gte("journey_date", yearStart)
-        .lte("journey_date", yearEnd);
+        .gte("activity_date", yearStart)
+        .lte("activity_date", yearEnd);
 
       if (error) throw error;
 

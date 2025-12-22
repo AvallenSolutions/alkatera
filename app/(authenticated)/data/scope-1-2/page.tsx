@@ -490,7 +490,7 @@ export default function CompanyEmissionsPage() {
         for (const log of productionData) {
           const { data: product } = await browserSupabase
             .from('products')
-            .select('functional_unit_quantity')
+            .select('functional_unit_volume')
             .eq('id', log.product_id)
             .maybeSingle();
 
@@ -508,7 +508,8 @@ export default function CompanyEmissionsPage() {
           if (lca && lca.total_ghg_emissions) {
             const volumeInUnits = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
             const unitImpact = lca.total_ghg_emissions;
-            const totalImpact = unitImpact * (volumeInUnits / (product.functional_unit_quantity || 1));
+            const functionalUnitVolume = product.functional_unit_volume || 1;
+            const totalImpact = unitImpact * (volumeInUnits / functionalUnitVolume);
             total += totalImpact;
           }
         }
@@ -580,7 +581,7 @@ export default function CompanyEmissionsPage() {
       for (const log of productionLogs) {
         const { data: product } = await browserSupabase
           .from('products')
-          .select('name, functional_unit_quantity')
+          .select('name, functional_unit_volume')
           .eq('id', log.product_id)
           .maybeSingle();
 
@@ -604,9 +605,10 @@ export default function CompanyEmissionsPage() {
         const materialsPerUnit = materialsStage?.climate_change || 0;
         const packagingPerUnit = packagingStage?.climate_change || 0;
 
+        const functionalUnitVolume = product.functional_unit_volume || 1;
         const volumeInUnits = log.unit === 'Hectolitre'
-          ? log.volume * 100 / (product.functional_unit_quantity || 1)
-          : log.volume / (product.functional_unit_quantity || 1);
+          ? log.volume * 100 / functionalUnitVolume
+          : log.volume / functionalUnitVolume;
 
         const materialsTotal = (materialsPerUnit * volumeInUnits) / 1000;
         const packagingTotal = (packagingPerUnit * volumeInUnits) / 1000;
