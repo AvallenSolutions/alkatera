@@ -62,18 +62,20 @@ export default function LcasPage() {
 
       // Transform the data using total_ghg_emissions from product_lcas
       const transformedReports: LCAReport[] = lcas.map((lca: any) => {
-        // Get total GHG emissions from product_lcas table
-        const totalCO2e = lca.total_ghg_emissions || 0;
+        // Get total GHG emissions from aggregated_impacts JSONB field
+        const totalCO2e = lca.aggregated_impacts?.total_carbon_footprint ||
+                          lca.aggregated_impacts?.total_climate ||
+                          lca.total_ghg_emissions ||
+                          0;
 
         // Calculate DQI score based on status and data completeness
         let dqiScore = 50;
         if (lca.status === 'completed') dqiScore = 85;
 
-        // Check if all lifecycle stages calculated
+        // Check if lifecycle data exists in aggregated_impacts
         const hasLifecycleData =
-          lca.lifecycle_stage_raw_materials > 0 ||
-          lca.lifecycle_stage_processing > 0 ||
-          lca.lifecycle_stage_packaging > 0;
+          lca.aggregated_impacts?.breakdown?.by_lifecycle_stage &&
+          Object.keys(lca.aggregated_impacts.breakdown.by_lifecycle_stage).length > 0;
         if (hasLifecycleData) dqiScore += 10;
 
         // Get product name from stored value in product_lcas
