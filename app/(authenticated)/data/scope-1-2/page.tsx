@@ -679,7 +679,13 @@ export default function CompanyEmissionsPage() {
       }
 
       toast.success('Scope 1 activity data submitted successfully');
-      scope1Form.reset();
+      scope1Form.reset({
+        facility_id: '',
+        fuel_type: '',
+        amount: '',
+        unit: '',
+        activity_date: '',
+      });
       await fetchRecentData();
       await fetchScope1Emissions();
     } catch (error) {
@@ -732,7 +738,13 @@ export default function CompanyEmissionsPage() {
       }
 
       toast.success('Scope 2 activity data submitted successfully');
-      scope2Form.reset();
+      scope2Form.reset({
+        facility_id: '',
+        source_type: '',
+        amount: '',
+        unit: '',
+        activity_date: '',
+      });
       await fetchRecentData();
       await fetchScope2Emissions();
     } catch (error) {
