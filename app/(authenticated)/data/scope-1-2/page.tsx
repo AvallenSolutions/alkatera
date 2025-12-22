@@ -66,9 +66,7 @@ const scope1Schema = z.object({
     (val) => !isNaN(Number(val)) && Number(val) > 0,
     'Amount must be a positive number'
   ),
-  unit: z.enum(['litres', 'kWh', 'cubic meters', 'kg', 'tonnes'], {
-    required_error: 'Unit is required',
-  }),
+  unit: z.string().min(1, 'Unit is required'),
   activity_date: z.string().min(1, 'Activity date is required'),
 });
 
@@ -79,9 +77,7 @@ const scope2Schema = z.object({
     (val) => !isNaN(Number(val)) && Number(val) > 0,
     'Amount must be a positive number'
   ),
-  unit: z.enum(['kWh', 'MWh'], {
-    required_error: 'Unit is required',
-  }),
+  unit: z.string().min(1, 'Unit is required'),
   activity_date: z.string().min(1, 'Activity date is required'),
 });
 
@@ -457,17 +453,7 @@ export default function CompanyEmissionsPage() {
     scope1Form.setValue('fuel_type', fuelTypeName, { shouldValidate: true });
     const source = scope1Sources.find(s => s.source_name === fuelTypeName);
     if (source?.default_unit) {
-      const unitMapping: Record<string, 'litres' | 'kWh' | 'cubic meters' | 'kg' | 'tonnes'> = {
-        'litres': 'litres',
-        'kWh': 'kWh',
-        'cubic meters': 'cubic meters',
-        'kg': 'kg',
-        'tonnes': 'tonnes',
-      };
-      const mappedUnit = unitMapping[source.default_unit];
-      if (mappedUnit) {
-        scope1Form.setValue('unit', mappedUnit, { shouldValidate: true });
-      }
+      scope1Form.setValue('unit', source.default_unit, { shouldValidate: true });
     }
   };
 
@@ -475,8 +461,7 @@ export default function CompanyEmissionsPage() {
     scope2Form.setValue('source_type', sourceName, { shouldValidate: true });
     const source = scope2Sources.find(s => s.source_name === sourceName);
     if (source?.default_unit) {
-      const unit = source.default_unit === 'MWh' ? 'MWh' : 'kWh';
-      scope2Form.setValue('unit', unit, { shouldValidate: true });
+      scope2Form.setValue('unit', source.default_unit, { shouldValidate: true });
     }
   };
 
