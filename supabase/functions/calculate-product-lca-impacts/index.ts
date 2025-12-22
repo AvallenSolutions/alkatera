@@ -515,6 +515,7 @@ Deno.serve(async (req: Request) => {
       .from("product_lcas")
       .update({
         aggregated_impacts: aggregatedImpacts,
+        total_ghg_emissions: totalCarbonFootprint,
         status: "completed",
         updated_at: new Date().toISOString(),
       })
