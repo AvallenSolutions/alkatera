@@ -219,25 +219,17 @@ export default function FootprintBuilderPage() {
           });
 
           if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
-            const volumeInLitres = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
-
-            let productSizeInLitres = product.unit_size_value || 1;
-            if (product.unit_size_unit === 'ml') {
-              productSizeInLitres = productSizeInLitres / 1000;
-            }
-
-            const numberOfUnits = volumeInLitres / productSizeInLitres;
-            const totalImpact = lca.total_ghg_emissions * numberOfUnits;
+            const totalImpact = lca.total_ghg_emissions * log.volume;
             total += totalImpact;
 
             console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Calculated impact', {
               productId: log.product_id,
-              volumeInLitres,
-              productSizeInLitres,
-              numberOfUnits,
-              lcaEmissions: lca.total_ghg_emissions,
+              productionVolume: log.volume,
+              productionUnit: log.unit,
+              lcaEmissionsPerUnit: lca.total_ghg_emissions,
               totalImpact,
-              runningTotal: total
+              runningTotal: total,
+              note: 'LCA emissions are per production unit (e.g., per Hectolitre), not per consumer unit (bottle)'
             });
           } else {
             console.warn('⚠️ [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Skipping product - no valid LCA emissions', {
