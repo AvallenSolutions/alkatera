@@ -299,21 +299,14 @@ export default function CompanyEmissionsPage() {
 
         const { data: lca, error: lcaError } = await browserSupabase
           .from('product_lcas')
-          .select('*')
+          .select('total_ghg_emissions')
           .eq('product_id', log.product_id)
           .eq('status', 'completed')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (lcaError || !lca || !lca.aggregated_impacts) continue;
-
-        const stages = lca.aggregated_impacts.breakdown?.by_lifecycle_stage || [];
-        const materialsStage = stages.find((s: any) => s.stage === 'raw_materials');
-        const packagingStage = stages.find((s: any) => s.stage === 'packaging');
-
-        const materialsPerUnit = materialsStage?.climate_change || 0;
-        const packagingPerUnit = packagingStage?.climate_change || 0;
+        if (lcaError || !lca || !lca.total_ghg_emissions) continue;
 
         const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
 
@@ -323,16 +316,14 @@ export default function CompanyEmissionsPage() {
         }
 
         const numberOfUnits = volumeInLitres / productSizeInLitres;
+        const totalImpact = (lca.total_ghg_emissions * numberOfUnits) / 1000;
 
-        const materialsTotal = (materialsPerUnit * numberOfUnits) / 1000;
-        const packagingTotal = (packagingPerUnit * numberOfUnits) / 1000;
-
-        totalEmissions += materialsTotal + packagingTotal;
+        totalEmissions += totalImpact;
 
         breakdown.push({
           product_name: product.name,
-          materials_tco2e: materialsTotal,
-          packaging_tco2e: packagingTotal,
+          materials_tco2e: totalImpact,
+          packaging_tco2e: 0,
           production_volume: log.volume,
         });
       }
