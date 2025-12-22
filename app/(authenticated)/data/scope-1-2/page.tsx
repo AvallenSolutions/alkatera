@@ -256,6 +256,98 @@ export default function CompanyEmissionsPage() {
     }
   };
 
+  const fetchScope3Cat1FromLCAs = async () => {
+    if (!currentOrganization?.id) return;
+
+    try {
+      const browserSupabase = getSupabaseBrowserClient();
+      const yearStart = `${selectedYear}-01-01`;
+      const yearEnd = `${selectedYear}-12-31`;
+
+      const { data: productionLogs, error: productionError } = await browserSupabase
+        .from('production_logs')
+        .select('product_id, volume, unit, date')
+        .eq('organization_id', currentOrganization.id)
+        .gte('date', yearStart)
+        .lte('date', yearEnd);
+
+      if (productionError) throw productionError;
+
+      if (!productionLogs || productionLogs.length === 0) {
+        setScope3Cat1CO2e(0);
+        setScope3Cat1Breakdown([]);
+        setScope3Cat1DataQuality('No production data for selected year');
+        return;
+      }
+
+      let totalEmissions = 0;
+      const breakdown: Array<{
+        product_name: string;
+        materials_tco2e: number;
+        packaging_tco2e: number;
+        production_volume: number;
+      }> = [];
+
+      for (const log of productionLogs) {
+        const { data: product } = await browserSupabase
+          .from('products')
+          .select('name, unit_size_value, unit_size_unit')
+          .eq('id', log.product_id)
+          .maybeSingle();
+
+        if (!product) continue;
+
+        const { data: lca, error: lcaError } = await browserSupabase
+          .from('product_lcas')
+          .select('*')
+          .eq('product_id', log.product_id)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lcaError || !lca || !lca.aggregated_impacts) continue;
+
+        const stages = lca.aggregated_impacts.breakdown?.by_lifecycle_stage || [];
+        const materialsStage = stages.find((s: any) => s.stage === 'raw_materials');
+        const packagingStage = stages.find((s: any) => s.stage === 'packaging');
+
+        const materialsPerUnit = materialsStage?.climate_change || 0;
+        const packagingPerUnit = packagingStage?.climate_change || 0;
+
+        const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
+
+        let productSizeInLitres = product.unit_size_value || 1;
+        if (product.unit_size_unit === 'ml') {
+          productSizeInLitres = productSizeInLitres / 1000;
+        }
+
+        const numberOfUnits = volumeInLitres / productSizeInLitres;
+
+        const materialsTotal = (materialsPerUnit * numberOfUnits) / 1000;
+        const packagingTotal = (packagingPerUnit * numberOfUnits) / 1000;
+
+        totalEmissions += materialsTotal + packagingTotal;
+
+        breakdown.push({
+          product_name: product.name,
+          materials_tco2e: materialsTotal,
+          packaging_tco2e: packagingTotal,
+          production_volume: log.volume,
+        });
+      }
+
+      setScope3Cat1CO2e(totalEmissions);
+      setScope3Cat1Breakdown(breakdown);
+      setScope3Cat1DataQuality('Tier 1: Primary LCA data from ecoinvent 3.10');
+    } catch (error: any) {
+      console.error('Error fetching Scope 3 Cat 1 from LCAs:', error);
+      setScope3Cat1CO2e(0);
+      setScope3Cat1Breakdown([]);
+      setScope3Cat1DataQuality('Error loading data');
+    }
+  };
+
   const fetchReportData = async () => {
     if (!currentOrganization?.id) return;
 
@@ -548,98 +640,6 @@ export default function CompanyEmissionsPage() {
       setFleetCO2e(total);
     } catch (error: any) {
       console.error('Error fetching fleet emissions:', error);
-    }
-  };
-
-  const fetchScope3Cat1FromLCAs = async () => {
-    if (!currentOrganization?.id) return;
-
-    try {
-      const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
-
-      const { data: productionLogs, error: productionError } = await browserSupabase
-        .from('production_logs')
-        .select('product_id, volume, unit, date')
-        .eq('organization_id', currentOrganization.id)
-        .gte('date', yearStart)
-        .lte('date', yearEnd);
-
-      if (productionError) throw productionError;
-
-      if (!productionLogs || productionLogs.length === 0) {
-        setScope3Cat1CO2e(0);
-        setScope3Cat1Breakdown([]);
-        setScope3Cat1DataQuality('No production data for selected year');
-        return;
-      }
-
-      let totalEmissions = 0;
-      const breakdown: Array<{
-        product_name: string;
-        materials_tco2e: number;
-        packaging_tco2e: number;
-        production_volume: number;
-      }> = [];
-
-      for (const log of productionLogs) {
-        const { data: product } = await browserSupabase
-          .from('products')
-          .select('name, unit_size_value, unit_size_unit')
-          .eq('id', log.product_id)
-          .maybeSingle();
-
-        if (!product) continue;
-
-        const { data: lca, error: lcaError } = await browserSupabase
-          .from('product_lcas')
-          .select('*')
-          .eq('product_id', log.product_id)
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (lcaError || !lca || !lca.aggregated_impacts) continue;
-
-        const stages = lca.aggregated_impacts.breakdown?.by_lifecycle_stage || [];
-        const materialsStage = stages.find((s: any) => s.stage === 'raw_materials');
-        const packagingStage = stages.find((s: any) => s.stage === 'packaging');
-
-        const materialsPerUnit = materialsStage?.climate_change || 0;
-        const packagingPerUnit = packagingStage?.climate_change || 0;
-
-        const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
-
-        let productSizeInLitres = product.unit_size_value || 1;
-        if (product.unit_size_unit === 'ml') {
-          productSizeInLitres = productSizeInLitres / 1000;
-        }
-
-        const numberOfUnits = volumeInLitres / productSizeInLitres;
-
-        const materialsTotal = (materialsPerUnit * numberOfUnits) / 1000;
-        const packagingTotal = (packagingPerUnit * numberOfUnits) / 1000;
-
-        totalEmissions += materialsTotal + packagingTotal;
-
-        breakdown.push({
-          product_name: product.name,
-          materials_tco2e: materialsTotal,
-          packaging_tco2e: packagingTotal,
-          production_volume: log.volume,
-        });
-      }
-
-      setScope3Cat1CO2e(totalEmissions);
-      setScope3Cat1Breakdown(breakdown);
-      setScope3Cat1DataQuality('Tier 1: Primary LCA data from ecoinvent 3.10');
-    } catch (error: any) {
-      console.error('Error fetching Scope 3 Cat 1 from LCAs:', error);
-      setScope3Cat1CO2e(0);
-      setScope3Cat1Breakdown([]);
-      setScope3Cat1DataQuality('Error loading data');
     }
   };
 
