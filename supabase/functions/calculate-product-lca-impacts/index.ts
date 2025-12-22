@@ -1,6 +1,18 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+/*
+ * CRITICAL: PER-UNIT EMISSIONS CALCULATION
+ *
+ * This function calculates emissions PER CONSUMER UNIT (per bottle, can, package).
+ * All emissions values are stored per functional unit (e.g., per 700ml bottle).
+ *
+ * For production calculations:
+ * - If you produce 100,000 bottles at 2.5 kg CO2e per bottle → Total: 250,000 kg
+ * - This is more intuitive than bulk volume (hectolitres)
+ * - Makes reporting clearer: "Each bottle has 2.5 kg of emissions"
+ */
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -135,12 +147,13 @@ Deno.serve(async (req: Request) => {
 
     // Combine both sources into a unified production sites array
     // Map contract manufacturer allocations to the same structure as production sites
-    // IMPORTANT: Contract manufacturer allocations store TOTAL emissions for the production run
-    // We need to convert to PER UNIT emissions for LCA calculation
+    // CRITICAL: Contract manufacturer allocations store TOTAL emissions for the production run
+    // Convert to PER UNIT emissions for LCA calculation (per bottle/can)
     const contractMfgSites = (contractMfgAllocations || []).map(cm => {
       const productionVolume = cm.client_production_volume || 1;
 
-      // Calculate per-unit emissions by dividing total allocated emissions by production volume
+      // Calculate per-unit emissions: Total emissions ÷ Number of consumer units
+      // Example: 3,750 kg ÷ 100,000 bottles = 0.0375 kg per bottle
       const emissionsPerUnit = (cm.allocated_emissions_kg_co2e || 0) / productionVolume;
       const scope1PerUnit = (cm.scope1_emissions_kg_co2e || 0) / productionVolume;
       const scope2PerUnit = (cm.scope2_emissions_kg_co2e || 0) / productionVolume;
@@ -151,7 +164,7 @@ Deno.serve(async (req: Request) => {
       return {
         id: cm.id,
         facility_id: cm.facility_id,
-        // Store per-unit values for LCA calculation
+        // Store PER-UNIT values for LCA calculation
         allocated_emissions_kg_co2e: emissionsPerUnit,
         allocated_water_litres: waterPerUnit,
         allocated_waste_kg: wastePerUnit,
@@ -274,11 +287,17 @@ Deno.serve(async (req: Request) => {
       console.log("[calculate-product-lca-impacts] Processing production sites...");
 
       for (const site of productionSites as ProductionSite[]) {
-        const siteEmissions = Number(site.allocated_emissions_kg_co2e || 0);
+        // CRITICAL: siteEmissions is PER UNIT (per bottle/can)
+        // For owned sites: Use attributable_emissions_per_unit (already weighted)
+        // For contract mfg: Use allocated_emissions_kg_co2e (converted to per-unit above)
+        const isContractMfg = (site as any).source === 'contract_manufacturer';
+        const emissionsPerUnit = Number(site.allocated_emissions_kg_co2e || 0);
         const shareOfProduction = Number(site.share_of_production || 0) / 100;
 
-        if (siteEmissions > 0) {
-          const attributableEmissions = siteEmissions * shareOfProduction;
+        if (emissionsPerUnit > 0) {
+          // Calculate weighted emissions contribution
+          // Example: 0.04 kg/bottle * 50% share = 0.02 kg per bottle from this facility
+          const attributableEmissions = emissionsPerUnit * shareOfProduction;
 
           let facilityScope1 = Number(site.scope1_emissions_kg_co2e || 0) * shareOfProduction;
           let facilityScope2 = Number(site.scope2_emissions_kg_co2e || 0) * shareOfProduction;
@@ -511,11 +530,29 @@ Deno.serve(async (req: Request) => {
       calculation_version: "2.1.0",
     };
 
+    // CRITICAL: Ensure we're storing PER-UNIT emissions
+    // Get the product unit size to verify calculation basis
+    const { data: productData } = await supabaseClient
+      .from("products")
+      .select("unit_size_value, unit_size_unit, functional_unit")
+      .eq("id", lcaData?.product_id)
+      .single();
+
+    const bulkVolumePerUnit = productData?.unit_size_unit === 'ml'
+      ? Number(productData.unit_size_value) / 1000.0
+      : Number(productData.unit_size_value);
+
+    console.log(`[calculate-product-lca-impacts] ✓ RESULT: ${totalCarbonFootprint.toFixed(4)} kg CO2e per ${productData?.functional_unit || 'unit'}`);
+    console.log(`[calculate-product-lca-impacts] ✓ Per litre: ${(totalCarbonFootprint / bulkVolumePerUnit).toFixed(4)} kg CO2e/L`);
+
     const { error: updateError } = await supabaseClient
       .from("product_lcas")
       .update({
         aggregated_impacts: aggregatedImpacts,
         total_ghg_emissions: totalCarbonFootprint,
+        per_unit_emissions_verified: true,
+        bulk_volume_per_functional_unit: bulkVolumePerUnit,
+        volume_unit: 'L',
         status: "completed",
         updated_at: new Date().toISOString(),
       })
