@@ -42,17 +42,10 @@ export default function LcasPage() {
       setLoading(true);
       const supabase = getSupabaseBrowserClient();
 
-      // Fetch all product LCAs for the organization with product details
+      // Fetch all product LCAs for the organization
       const { data: lcas, error: lcaError } = await supabase
         .from('product_lcas')
-        .select(`
-          *,
-          products (
-            name,
-            functional_unit,
-            functional_unit_quantity
-          )
-        `)
+        .select('*')
         .eq('organization_id', currentOrganization!.id)
         .order('created_at', { ascending: false });
 
@@ -83,9 +76,9 @@ export default function LcasPage() {
           lca.lifecycle_stage_packaging > 0;
         if (hasLifecycleData) dqiScore += 10;
 
-        // Get product name from JOIN or fallback to stored value
-        const productName = lca.products?.name || lca.product_name || 'Unknown Product';
-        const functionalUnit = lca.products?.functional_unit || lca.functional_unit || 'per unit';
+        // Get product name from stored value in product_lcas
+        const productName = lca.product_name || 'Unknown Product';
+        const functionalUnit = lca.functional_unit || 'per unit';
 
         return {
           id: lca.id,
