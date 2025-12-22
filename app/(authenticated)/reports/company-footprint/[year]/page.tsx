@@ -160,6 +160,13 @@ export default function FootprintBuilderPage() {
   const fetchProductsEmissions = async () => {
     if (!currentOrganization?.id) return;
 
+    console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Starting fetch', {
+      orgId: currentOrganization.id,
+      year,
+      yearStart: `${year}-01-01`,
+      yearEnd: `${year}-12-31`
+    });
+
     try {
       const supabase = getSupabaseBrowserClient();
       const yearStart = `${year}-01-01`;
@@ -174,6 +181,11 @@ export default function FootprintBuilderPage() {
 
       if (error) throw error;
 
+      console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Production logs', {
+        count: productionData?.length || 0,
+        logs: productionData
+      });
+
       let total = 0;
 
       if (productionData) {
@@ -186,6 +198,11 @@ export default function FootprintBuilderPage() {
 
           if (!product) continue;
 
+          console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Product found', {
+            productId: log.product_id,
+            product
+          });
+
           const { data: lca } = await supabase
             .from("product_lcas")
             .select("total_ghg_emissions")
@@ -194,6 +211,12 @@ export default function FootprintBuilderPage() {
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
+
+          console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] LCA data', {
+            productId: log.product_id,
+            hasLCA: !!lca,
+            total_ghg_emissions: lca?.total_ghg_emissions
+          });
 
           if (lca && lca.total_ghg_emissions) {
             const volumeInLitres = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
@@ -206,9 +229,23 @@ export default function FootprintBuilderPage() {
             const numberOfUnits = volumeInLitres / productSizeInLitres;
             const totalImpact = lca.total_ghg_emissions * numberOfUnits;
             total += totalImpact;
+
+            console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Calculated impact', {
+              productId: log.product_id,
+              volumeInLitres,
+              productSizeInLitres,
+              numberOfUnits,
+              lcaEmissions: lca.total_ghg_emissions,
+              totalImpact,
+              runningTotal: total
+            });
           }
         }
       }
+
+      console.log('✅ [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Final result', {
+        total
+      });
 
       setProductsCO2e(total);
     } catch (error: any) {

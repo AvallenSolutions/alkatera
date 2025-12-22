@@ -259,6 +259,13 @@ export default function CompanyEmissionsPage() {
   const fetchScope3Cat1FromLCAs = async () => {
     if (!currentOrganization?.id) return;
 
+    console.log('🔍 [SCOPE 3 CAT 1] Starting fetch', {
+      orgId: currentOrganization.id,
+      selectedYear,
+      yearStart: `${selectedYear}-01-01`,
+      yearEnd: `${selectedYear}-12-31`
+    });
+
     try {
       const browserSupabase = getSupabaseBrowserClient();
       const yearStart = `${selectedYear}-01-01`;
@@ -272,6 +279,11 @@ export default function CompanyEmissionsPage() {
         .lte('date', yearEnd);
 
       if (productionError) throw productionError;
+
+      console.log('🔍 [SCOPE 3 CAT 1] Production logs', {
+        count: productionLogs?.length || 0,
+        logs: productionLogs
+      });
 
       if (!productionLogs || productionLogs.length === 0) {
         setScope3Cat1CO2e(0);
@@ -297,6 +309,11 @@ export default function CompanyEmissionsPage() {
 
         if (!product) continue;
 
+        console.log('🔍 [SCOPE 3 CAT 1] Product found', {
+          productId: log.product_id,
+          product
+        });
+
         const { data: lca, error: lcaError } = await browserSupabase
           .from('product_lcas')
           .select('total_ghg_emissions')
@@ -305,6 +322,13 @@ export default function CompanyEmissionsPage() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
+
+        console.log('🔍 [SCOPE 3 CAT 1] LCA data', {
+          productId: log.product_id,
+          hasLCA: !!lca,
+          total_ghg_emissions: lca?.total_ghg_emissions,
+          lcaError
+        });
 
         if (lcaError || !lca || !lca.total_ghg_emissions) continue;
 
@@ -320,6 +344,16 @@ export default function CompanyEmissionsPage() {
 
         totalEmissions += totalImpact;
 
+        console.log('🔍 [SCOPE 3 CAT 1] Calculated impact', {
+          product: product.name,
+          volumeInLitres,
+          productSizeInLitres,
+          numberOfUnits,
+          lcaEmissions: lca.total_ghg_emissions,
+          totalImpact,
+          runningTotal: totalEmissions
+        });
+
         breakdown.push({
           product_name: product.name,
           materials_tco2e: totalImpact,
@@ -331,6 +365,12 @@ export default function CompanyEmissionsPage() {
       setScope3Cat1CO2e(totalEmissions);
       setScope3Cat1Breakdown(breakdown);
       setScope3Cat1DataQuality('Tier 1: Primary LCA data from ecoinvent 3.10');
+
+      console.log('✅ [SCOPE 3 CAT 1] Final result', {
+        totalEmissions,
+        breakdownCount: breakdown.length,
+        breakdown
+      });
     } catch (error: any) {
       console.error('Error fetching Scope 3 Cat 1 from LCAs:', error);
       setScope3Cat1CO2e(0);
