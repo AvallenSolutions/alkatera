@@ -205,9 +205,8 @@ export default function FootprintBuilderPage() {
 
           const { data: lca } = await supabase
             .from("product_lcas")
-            .select("total_ghg_emissions")
+            .select("total_ghg_emissions, status")
             .eq("product_id", log.product_id)
-            .eq("status", "completed")
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
@@ -215,10 +214,11 @@ export default function FootprintBuilderPage() {
           console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] LCA data', {
             productId: log.product_id,
             hasLCA: !!lca,
+            status: lca?.status,
             total_ghg_emissions: lca?.total_ghg_emissions
           });
 
-          if (lca && lca.total_ghg_emissions) {
+          if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
             const volumeInLitres = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
 
             let productSizeInLitres = product.unit_size_value || 1;
@@ -238,6 +238,11 @@ export default function FootprintBuilderPage() {
               lcaEmissions: lca.total_ghg_emissions,
               totalImpact,
               runningTotal: total
+            });
+          } else {
+            console.warn('⚠️ [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Skipping product - no valid LCA emissions', {
+              productId: log.product_id,
+              reason: !lca ? 'No LCA found' : !lca.total_ghg_emissions ? 'total_ghg_emissions is null/0' : 'Unknown'
             });
           }
         }

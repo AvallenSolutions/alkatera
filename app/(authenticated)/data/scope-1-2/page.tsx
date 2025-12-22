@@ -316,9 +316,8 @@ export default function CompanyEmissionsPage() {
 
         const { data: lca, error: lcaError } = await browserSupabase
           .from('product_lcas')
-          .select('total_ghg_emissions')
+          .select('total_ghg_emissions, status')
           .eq('product_id', log.product_id)
-          .eq('status', 'completed')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -326,11 +325,19 @@ export default function CompanyEmissionsPage() {
         console.log('🔍 [SCOPE 3 CAT 1] LCA data', {
           productId: log.product_id,
           hasLCA: !!lca,
+          status: lca?.status,
           total_ghg_emissions: lca?.total_ghg_emissions,
           lcaError
         });
 
-        if (lcaError || !lca || !lca.total_ghg_emissions) continue;
+        if (lcaError || !lca || !lca.total_ghg_emissions || lca.total_ghg_emissions === 0) {
+          console.warn('⚠️ [SCOPE 3 CAT 1] Skipping product - no valid LCA emissions', {
+            productId: log.product_id,
+            productName: product.name,
+            reason: !lca ? 'No LCA found' : !lca.total_ghg_emissions ? 'total_ghg_emissions is null/0' : 'Unknown'
+          });
+          continue;
+        }
 
         const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
 
