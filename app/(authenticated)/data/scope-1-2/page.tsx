@@ -170,6 +170,7 @@ export default function CompanyEmissionsPage() {
   const [scope3Cat1DataQuality, setScope3Cat1DataQuality] = useState<string>('');
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [scope3OverheadsCO2e, setScope3OverheadsCO2e] = useState(0);
 
   const scope1Form = useForm<Scope1FormValues>({
     resolver: zodResolver(scope1Schema),
@@ -305,6 +306,7 @@ export default function CompanyEmissionsPage() {
       await fetchProductsEmissions();
       await fetchFleetEmissions();
       await fetchScope3Cat1FromLCAs();
+      await fetchScope3Overheads();
     } catch (error: any) {
       console.error('Error fetching report data:', error);
       toast.error('Failed to load footprint data');
@@ -475,15 +477,7 @@ export default function CompanyEmissionsPage() {
 
       const { data: productionData, error } = await browserSupabase
         .from('production_logs')
-        .select(`
-          product_id,
-          volume,
-          unit,
-          products!inner (
-            id,
-            functional_unit_quantity
-          )
-        `)
+        .select('product_id, volume, unit, date')
         .eq('organization_id', currentOrganization.id)
         .gte('date', yearStart)
         .lte('date', yearEnd);
@@ -494,6 +488,14 @@ export default function CompanyEmissionsPage() {
 
       if (productionData) {
         for (const log of productionData) {
+          const { data: product } = await browserSupabase
+            .from('products')
+            .select('functional_unit_quantity')
+            .eq('id', log.product_id)
+            .maybeSingle();
+
+          if (!product) continue;
+
           const { data: lca } = await browserSupabase
             .from('product_lcas')
             .select('total_ghg_emissions')
@@ -506,8 +508,7 @@ export default function CompanyEmissionsPage() {
           if (lca && lca.total_ghg_emissions) {
             const volumeInUnits = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
             const unitImpact = lca.total_ghg_emissions;
-            const products = Array.isArray(log.products) ? log.products[0] : log.products;
-            const totalImpact = unitImpact * (volumeInUnits / ((products as any).functional_unit_quantity || 1));
+            const totalImpact = unitImpact * (volumeInUnits / (product.functional_unit_quantity || 1));
             total += totalImpact;
           }
         }
@@ -516,6 +517,7 @@ export default function CompanyEmissionsPage() {
       setProductsCO2e(total);
     } catch (error: any) {
       console.error('Error fetching products emissions:', error);
+      setProductsCO2e(0);
     }
   };
 
@@ -531,8 +533,8 @@ export default function CompanyEmissionsPage() {
         .from('fleet_activities')
         .select('emissions_tco2e')
         .eq('organization_id', currentOrganization.id)
-        .gte('journey_date', yearStart)
-        .lte('journey_date', yearEnd);
+        .gte('activity_date', yearStart)
+        .lte('activity_date', yearEnd);
 
       if (error) throw error;
 
@@ -553,16 +555,7 @@ export default function CompanyEmissionsPage() {
 
       const { data: productionLogs, error: productionError } = await browserSupabase
         .from('production_logs')
-        .select(`
-          product_id,
-          volume,
-          unit,
-          products!inner (
-            id,
-            name,
-            functional_unit_quantity
-          )
-        `)
+        .select('product_id, volume, unit, date')
         .eq('organization_id', currentOrganization.id)
         .gte('date', yearStart)
         .lte('date', yearEnd);
@@ -585,6 +578,14 @@ export default function CompanyEmissionsPage() {
       }> = [];
 
       for (const log of productionLogs) {
+        const { data: product } = await browserSupabase
+          .from('products')
+          .select('name, functional_unit_quantity')
+          .eq('id', log.product_id)
+          .maybeSingle();
+
+        if (!product) continue;
+
         const { data: lca, error: lcaError } = await browserSupabase
           .from('product_lcas')
           .select('*')
@@ -603,10 +604,9 @@ export default function CompanyEmissionsPage() {
         const materialsPerUnit = materialsStage?.climate_change || 0;
         const packagingPerUnit = packagingStage?.climate_change || 0;
 
-        const product = Array.isArray(log.products) ? log.products[0] : log.products;
         const volumeInUnits = log.unit === 'Hectolitre'
-          ? log.volume * 100 / ((product as any).functional_unit_quantity || 1)
-          : log.volume / ((product as any).functional_unit_quantity || 1);
+          ? log.volume * 100 / (product.functional_unit_quantity || 1)
+          : log.volume / (product.functional_unit_quantity || 1);
 
         const materialsTotal = (materialsPerUnit * volumeInUnits) / 1000;
         const packagingTotal = (packagingPerUnit * volumeInUnits) / 1000;
@@ -614,7 +614,7 @@ export default function CompanyEmissionsPage() {
         totalEmissions += materialsTotal + packagingTotal;
 
         breakdown.push({
-          product_name: (product as any).name,
+          product_name: product.name,
           materials_tco2e: materialsTotal,
           packaging_tco2e: packagingTotal,
           production_volume: log.volume,
@@ -629,6 +629,39 @@ export default function CompanyEmissionsPage() {
       setScope3Cat1CO2e(0);
       setScope3Cat1Breakdown([]);
       setScope3Cat1DataQuality('Error loading data');
+    }
+  };
+
+  const fetchScope3Overheads = async () => {
+    if (!currentOrganization?.id || !report?.id) return;
+
+    try {
+      const browserSupabase = getSupabaseBrowserClient();
+
+      const { data, error } = await browserSupabase
+        .from('corporate_overheads')
+        .select('category, computed_co2e')
+        .eq('report_id', report.id);
+
+      if (error) throw error;
+
+      const scope3Categories = [
+        'business_travel',
+        'purchased_services',
+        'employee_commuting',
+        'capital_goods',
+        'operational_waste',
+        'downstream_logistics',
+      ];
+
+      const total = data
+        ?.filter(item => scope3Categories.includes(item.category))
+        .reduce((sum, item) => sum + (item.computed_co2e || 0), 0) || 0;
+
+      setScope3OverheadsCO2e(total);
+    } catch (error: any) {
+      console.error('Error fetching Scope 3 overheads:', error);
+      setScope3OverheadsCO2e(0);
     }
   };
 
@@ -1041,8 +1074,8 @@ export default function CompanyEmissionsPage() {
                             <span className="font-medium">Scope 3</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {(scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e > 0
-                              ? `${((scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e).toFixed(3)} kgCO2e`
+                            {(scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e + scope3OverheadsCO2e > 0
+                              ? `${((scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e + scope3OverheadsCO2e).toFixed(3)} kgCO2e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>
