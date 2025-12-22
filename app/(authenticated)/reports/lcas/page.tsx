@@ -42,10 +42,17 @@ export default function LcasPage() {
       setLoading(true);
       const supabase = getSupabaseBrowserClient();
 
-      // Fetch all product LCAs for the organization
+      // Fetch all product LCAs for the organization with product details
       const { data: lcas, error: lcaError } = await supabase
         .from('product_lcas')
-        .select('*')
+        .select(`
+          *,
+          products (
+            name,
+            functional_unit,
+            functional_unit_quantity
+          )
+        `)
         .eq('organization_id', currentOrganization!.id)
         .order('created_at', { ascending: false });
 
@@ -60,49 +67,36 @@ export default function LcasPage() {
         return;
       }
 
-      // Fetch results for all LCAs
-      const lcaIds = lcas.map(lca => lca.id);
-      const { data: results, error: resultsError } = await supabase
-        .from('product_lca_results')
-        .select('product_lca_id, impact_category, value, unit')
-        .in('product_lca_id', lcaIds);
-
-      if (resultsError) {
-        console.error('Error fetching LCA results:', resultsError);
-      }
-
-      // Group results by LCA ID
-      const resultsByLcaId: Record<string, any[]> = {};
-      (results || []).forEach(result => {
-        if (!resultsByLcaId[result.product_lca_id]) {
-          resultsByLcaId[result.product_lca_id] = [];
-        }
-        resultsByLcaId[result.product_lca_id].push(result);
-      });
-
-      // Transform the data
+      // Transform the data using total_ghg_emissions from product_lcas
       const transformedReports: LCAReport[] = lcas.map((lca: any) => {
-        const lcaResults = resultsByLcaId[lca.id] || [];
-        const climateResult = lcaResults.find(
-          (r: any) => r.impact_category === 'Climate Change'
-        );
-        const totalCO2e = climateResult ? parseFloat(climateResult.value) : 0;
+        // Get total GHG emissions from product_lcas table
+        const totalCO2e = lca.total_ghg_emissions || 0;
 
-        // Calculate a simple DQI score based on status and data completeness
+        // Calculate DQI score based on status and data completeness
         let dqiScore = 50;
         if (lca.status === 'completed') dqiScore = 85;
-        if (lcaResults.length >= 4) dqiScore += 10;
+
+        // Check if all lifecycle stages calculated
+        const hasLifecycleData =
+          lca.lifecycle_stage_raw_materials > 0 ||
+          lca.lifecycle_stage_processing > 0 ||
+          lca.lifecycle_stage_packaging > 0;
+        if (hasLifecycleData) dqiScore += 10;
+
+        // Get product name from JOIN or fallback to stored value
+        const productName = lca.products?.name || lca.product_name || 'Unknown Product';
+        const functionalUnit = lca.products?.functional_unit || lca.functional_unit || 'per unit';
 
         return {
           id: lca.id,
           product_id: lca.product_id,
-          product_name: lca.product_name || 'Unknown Product',
+          product_name: productName,
           title: `${new Date(lca.created_at).getFullYear()} LCA Study`,
           version: '1.0',
           status: lca.status === 'completed' ? 'completed' : 'draft',
           dqi_score: dqiScore,
-          system_boundary: lca.system_boundary || 'Cradle-to-Gate',
-          functional_unit: lca.functional_unit || 'per unit',
+          system_boundary: lca.system_boundary || 'cradle-to-gate',
+          functional_unit: functionalUnit,
           assessment_period: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
           published_at: lca.status === 'completed' ? lca.updated_at : null,
           total_co2e: totalCO2e,
