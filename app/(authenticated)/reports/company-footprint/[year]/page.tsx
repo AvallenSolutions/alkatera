@@ -180,7 +180,7 @@ export default function FootprintBuilderPage() {
         for (const log of productionData) {
           const { data: product } = await supabase
             .from("products")
-            .select("functional_unit_volume")
+            .select("unit_size_value, unit_size_unit")
             .eq("id", log.product_id)
             .maybeSingle();
 
@@ -196,10 +196,15 @@ export default function FootprintBuilderPage() {
             .maybeSingle();
 
           if (lca && lca.total_ghg_emissions) {
-            const volumeInUnits = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
-            const unitImpact = lca.total_ghg_emissions;
-            const functionalUnitVolume = product.functional_unit_volume || 1;
-            const totalImpact = unitImpact * (volumeInUnits / functionalUnitVolume);
+            const volumeInLitres = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
+
+            let productSizeInLitres = product.unit_size_value || 1;
+            if (product.unit_size_unit === 'ml') {
+              productSizeInLitres = productSizeInLitres / 1000;
+            }
+
+            const numberOfUnits = volumeInLitres / productSizeInLitres;
+            const totalImpact = lca.total_ghg_emissions * numberOfUnits;
             total += totalImpact;
           }
         }

@@ -490,7 +490,7 @@ export default function CompanyEmissionsPage() {
         for (const log of productionData) {
           const { data: product } = await browserSupabase
             .from('products')
-            .select('functional_unit_volume')
+            .select('unit_size_value, unit_size_unit')
             .eq('id', log.product_id)
             .maybeSingle();
 
@@ -506,10 +506,15 @@ export default function CompanyEmissionsPage() {
             .maybeSingle();
 
           if (lca && lca.total_ghg_emissions) {
-            const volumeInUnits = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
-            const unitImpact = lca.total_ghg_emissions;
-            const functionalUnitVolume = product.functional_unit_volume || 1;
-            const totalImpact = unitImpact * (volumeInUnits / functionalUnitVolume);
+            const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
+
+            let productSizeInLitres = product.unit_size_value || 1;
+            if (product.unit_size_unit === 'ml') {
+              productSizeInLitres = productSizeInLitres / 1000;
+            }
+
+            const numberOfUnits = volumeInLitres / productSizeInLitres;
+            const totalImpact = lca.total_ghg_emissions * numberOfUnits;
             total += totalImpact;
           }
         }
@@ -581,7 +586,7 @@ export default function CompanyEmissionsPage() {
       for (const log of productionLogs) {
         const { data: product } = await browserSupabase
           .from('products')
-          .select('name, functional_unit_volume')
+          .select('name, unit_size_value, unit_size_unit')
           .eq('id', log.product_id)
           .maybeSingle();
 
@@ -605,13 +610,17 @@ export default function CompanyEmissionsPage() {
         const materialsPerUnit = materialsStage?.climate_change || 0;
         const packagingPerUnit = packagingStage?.climate_change || 0;
 
-        const functionalUnitVolume = product.functional_unit_volume || 1;
-        const volumeInUnits = log.unit === 'Hectolitre'
-          ? log.volume * 100 / functionalUnitVolume
-          : log.volume / functionalUnitVolume;
+        const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
 
-        const materialsTotal = (materialsPerUnit * volumeInUnits) / 1000;
-        const packagingTotal = (packagingPerUnit * volumeInUnits) / 1000;
+        let productSizeInLitres = product.unit_size_value || 1;
+        if (product.unit_size_unit === 'ml') {
+          productSizeInLitres = productSizeInLitres / 1000;
+        }
+
+        const numberOfUnits = volumeInLitres / productSizeInLitres;
+
+        const materialsTotal = (materialsPerUnit * numberOfUnits) / 1000;
+        const packagingTotal = (packagingPerUnit * numberOfUnits) / 1000;
 
         totalEmissions += materialsTotal + packagingTotal;
 

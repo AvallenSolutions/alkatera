@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
         // Get product details
         const { data: product } = await supabase
           .from("products")
-          .select("functional_unit_volume")
+          .select("unit_size_value, unit_size_unit")
           .eq("id", log.product_id)
           .maybeSingle();
 
@@ -127,13 +127,18 @@ Deno.serve(async (req: Request) => {
           .maybeSingle();
 
         if (lca && lca.total_ghg_emissions) {
-          // Convert production volume to units
-          const volumeInUnits = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
+          // Convert production volume to litres
+          const volumeInLitres = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
 
-          // Calculate total impact for this production
-          const unitImpact = lca.total_ghg_emissions; // per functional unit
-          const functionalUnitVolume = product.functional_unit_volume || 1;
-          const totalImpact = unitImpact * (volumeInUnits / functionalUnitVolume);
+          // Convert product unit size to litres if needed
+          let productSizeInLitres = product.unit_size_value || 1;
+          if (product.unit_size_unit === "ml") {
+            productSizeInLitres = productSizeInLitres / 1000;
+          }
+
+          // Calculate total impact: (production volume / unit size) × emissions per unit
+          const numberOfUnits = volumeInLitres / productSizeInLitres;
+          const totalImpact = lca.total_ghg_emissions * numberOfUnits;
 
           scope3ProductsTotal += totalImpact;
         }
