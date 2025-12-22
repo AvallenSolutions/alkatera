@@ -12,7 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -72,7 +74,8 @@ const scope1Schema = z.object({
 
 const scope2Schema = z.object({
   facility_id: z.string().min(1, 'Facility is required'),
-  amount: z.string().min(1, 'Electricity consumed is required').refine(
+  source_type: z.string().min(1, 'Source type is required'),
+  amount: z.string().min(1, 'Amount consumed is required').refine(
     (val) => !isNaN(Number(val)) && Number(val) > 0,
     'Amount must be a positive number'
   ),
@@ -128,6 +131,15 @@ interface OverheadEntry {
   disposal_method?: string;
 }
 
+interface EmissionSource {
+  id: string;
+  source_name: string;
+  scope: string;
+  category: string;
+  default_unit: string;
+  emission_factor_id: string | null;
+}
+
 const currentYear = new Date().getFullYear();
 const availableYears = [currentYear, currentYear - 1, currentYear - 2];
 
@@ -150,6 +162,8 @@ export default function CompanyEmissionsPage() {
   const [fleetCO2e, setFleetCO2e] = useState(0);
   const [fuelTypes, setFuelTypes] = useState<string[]>([]);
   const [isLoadingFuelTypes, setIsLoadingFuelTypes] = useState(true);
+  const [scope1Sources, setScope1Sources] = useState<EmissionSource[]>([]);
+  const [scope2Sources, setScope2Sources] = useState<EmissionSource[]>([]);
   const [scope3Cat1CO2e, setScope3Cat1CO2e] = useState(0);
   const [scope3Cat1Breakdown, setScope3Cat1Breakdown] = useState<Array<{
     product_name: string;
@@ -205,23 +219,41 @@ export default function CompanyEmissionsPage() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('activity_data')
-        .select('id, name, category, quantity, unit, activity_date, created_at')
+      const browserSupabase = getSupabaseBrowserClient();
+      const { data, error } = await browserSupabase
+        .from('facility_activity_data')
+        .select(`
+          id,
+          quantity,
+          unit,
+          reporting_period_start,
+          created_at,
+          scope_1_2_emission_sources!inner (
+            source_name,
+            scope,
+            category
+          )
+        `)
         .eq('organization_id', currentOrganization.id)
-        .in('category', ['Scope 1', 'Scope 2'])
         .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) {
         console.error('Error fetching recent data:', error);
-        toast.error('Failed to load recent data');
       } else {
-        setRecentData(data || []);
+        const mappedData: ActivityDataRecord[] = (data || []).map((item: any) => ({
+          id: item.id,
+          name: item.scope_1_2_emission_sources?.source_name || 'Unknown',
+          category: item.scope_1_2_emission_sources?.scope || 'Unknown',
+          quantity: item.quantity,
+          unit: item.unit,
+          activity_date: item.reporting_period_start,
+          created_at: item.created_at,
+        }));
+        setRecentData(mappedData);
       }
     } catch (error) {
       console.error('Error fetching recent data:', error);
-      toast.error('Failed to load recent data');
     } finally {
       setIsLoadingData(false);
     }
@@ -294,19 +326,43 @@ export default function CompanyEmissionsPage() {
       const yearEnd = `${selectedYear}-12-31`;
 
       const { data, error } = await browserSupabase
-        .from('calculated_emissions')
-        .select('total_co2e')
+        .from('facility_activity_data')
+        .select(`
+          quantity,
+          scope_1_2_emission_sources!inner (
+            scope,
+            emission_factor_id
+          )
+        `)
         .eq('organization_id', currentOrganization.id)
-        .gte('date', yearStart)
-        .lte('date', yearEnd)
-        .eq('scope', 1);
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
 
       if (error) throw error;
 
-      const total = data?.reduce((sum, item) => sum + (item.total_co2e || 0), 0) || 0;
+      const scope1Data = data?.filter((item: any) =>
+        item.scope_1_2_emission_sources?.scope === 'Scope 1'
+      ) || [];
+
+      let total = 0;
+      for (const item of scope1Data) {
+        const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
+        if (factorId) {
+          const { data: factor } = await browserSupabase
+            .from('emissions_factors')
+            .select('value')
+            .eq('factor_id', factorId)
+            .maybeSingle();
+          if (factor?.value) {
+            total += item.quantity * parseFloat(factor.value);
+          }
+        }
+      }
+
       setScope1CO2e(total);
     } catch (error: any) {
       console.error('Error fetching Scope 1 emissions:', error);
+      setScope1CO2e(0);
     }
   };
 
@@ -319,46 +375,108 @@ export default function CompanyEmissionsPage() {
       const yearEnd = `${selectedYear}-12-31`;
 
       const { data, error } = await browserSupabase
-        .from('calculated_emissions')
-        .select('total_co2e')
+        .from('facility_activity_data')
+        .select(`
+          quantity,
+          scope_1_2_emission_sources!inner (
+            scope,
+            emission_factor_id
+          )
+        `)
         .eq('organization_id', currentOrganization.id)
-        .gte('date', yearStart)
-        .lte('date', yearEnd)
-        .eq('scope', 2);
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
 
       if (error) throw error;
 
-      const total = data?.reduce((sum, item) => sum + (item.total_co2e || 0), 0) || 0;
+      const scope2Data = data?.filter((item: any) =>
+        item.scope_1_2_emission_sources?.scope === 'Scope 2'
+      ) || [];
+
+      let total = 0;
+      for (const item of scope2Data) {
+        const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
+        if (factorId) {
+          const { data: factor } = await browserSupabase
+            .from('emissions_factors')
+            .select('value')
+            .eq('factor_id', factorId)
+            .maybeSingle();
+          if (factor?.value) {
+            total += item.quantity * parseFloat(factor.value);
+          }
+        }
+      }
+
       setScope2CO2e(total);
     } catch (error: any) {
       console.error('Error fetching Scope 2 emissions:', error);
+      setScope2CO2e(0);
     }
   };
 
-  const fetchFuelTypes = async () => {
-    if (!currentOrganization?.id) {
-      setIsLoadingFuelTypes(false);
-      return;
-    }
-
+  const fetchEmissionSources = async () => {
+    setIsLoadingFuelTypes(true);
     try {
-      const { data, error } = await supabase
-        .from('emissions_factors')
-        .select('name')
-        .eq('category', 'Scope 1')
-        .like('type', 'Stationary Combustion%')
-        .order('name', { ascending: true });
+      const browserSupabase = getSupabaseBrowserClient();
 
-      if (error) {
-        console.error('Error fetching fuel types:', error);
+      const { data: scope1Data, error: scope1Error } = await browserSupabase
+        .from('scope_1_2_emission_sources')
+        .select('id, source_name, scope, category, default_unit, emission_factor_id')
+        .eq('scope', 'Scope 1')
+        .order('category', { ascending: true })
+        .order('source_name', { ascending: true });
+
+      if (scope1Error) {
+        console.error('Error fetching Scope 1 sources:', scope1Error);
       } else {
-        const uniqueNames = Array.from(new Set(data?.map(f => f.name) || []));
+        setScope1Sources(scope1Data || []);
+        const uniqueNames = Array.from(new Set(scope1Data?.map(s => s.source_name) || []));
         setFuelTypes(uniqueNames);
       }
+
+      const { data: scope2Data, error: scope2Error } = await browserSupabase
+        .from('scope_1_2_emission_sources')
+        .select('id, source_name, scope, category, default_unit, emission_factor_id')
+        .eq('scope', 'Scope 2')
+        .order('source_name', { ascending: true });
+
+      if (scope2Error) {
+        console.error('Error fetching Scope 2 sources:', scope2Error);
+      } else {
+        setScope2Sources(scope2Data || []);
+      }
     } catch (error) {
-      console.error('Error fetching fuel types:', error);
+      console.error('Error fetching emission sources:', error);
     } finally {
       setIsLoadingFuelTypes(false);
+    }
+  };
+
+  const handleScope1FuelTypeChange = (fuelTypeName: string) => {
+    scope1Form.setValue('fuel_type', fuelTypeName, { shouldValidate: true });
+    const source = scope1Sources.find(s => s.source_name === fuelTypeName);
+    if (source?.default_unit) {
+      const unitMapping: Record<string, 'litres' | 'kWh' | 'cubic meters' | 'kg' | 'tonnes'> = {
+        'litres': 'litres',
+        'kWh': 'kWh',
+        'cubic meters': 'cubic meters',
+        'kg': 'kg',
+        'tonnes': 'tonnes',
+      };
+      const mappedUnit = unitMapping[source.default_unit];
+      if (mappedUnit) {
+        scope1Form.setValue('unit', mappedUnit, { shouldValidate: true });
+      }
+    }
+  };
+
+  const handleScope2SourceChange = (sourceName: string) => {
+    scope2Form.setValue('source_type', sourceName, { shouldValidate: true });
+    const source = scope2Sources.find(s => s.source_name === sourceName);
+    if (source?.default_unit) {
+      const unit = source.default_unit === 'MWh' ? 'MWh' : 'kWh';
+      scope2Form.setValue('unit', unit, { shouldValidate: true });
     }
   };
 
@@ -532,7 +650,7 @@ export default function CompanyEmissionsPage() {
   useEffect(() => {
     fetchFacilities();
     fetchRecentData();
-    fetchFuelTypes();
+    fetchEmissionSources();
   }, [currentOrganization?.id]);
 
   useEffect(() => {
@@ -550,37 +668,29 @@ export default function CompanyEmissionsPage() {
     setIsSubmitting(true);
 
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const browserSupabase = getSupabaseBrowserClient();
+      const selectedSource = scope1Sources.find(s => s.source_name === data.fuel_type);
 
-      if (!session.session) {
-        toast.error('You must be logged in to submit activity data');
+      if (!selectedSource) {
+        toast.error('Invalid fuel type selected');
         return;
       }
 
-      const facility = facilities.find(f => f.id === data.facility_id);
-      const activityName = `${facility?.name} - ${data.fuel_type}`;
-
-      const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ingest-activity-data`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: activityName,
-          category: 'Scope 1',
-          quantity: Number(data.amount),
+      const { error } = await browserSupabase
+        .from('facility_activity_data')
+        .insert({
+          facility_id: data.facility_id,
+          emission_source_id: selectedSource.id,
+          quantity: parseFloat(data.amount),
           unit: data.unit,
-          activity_date: data.activity_date,
-        }),
-      });
+          reporting_period_start: data.activity_date,
+          reporting_period_end: data.activity_date,
+          organization_id: currentOrganization.id,
+        });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit Scope 1 data');
+      if (error) {
+        console.error('Insert error:', error);
+        throw new Error(error.message || 'Failed to save Scope 1 data');
       }
 
       toast.success('Scope 1 activity data submitted successfully');
@@ -606,37 +716,34 @@ export default function CompanyEmissionsPage() {
     setIsSubmitting(true);
 
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const browserSupabase = getSupabaseBrowserClient();
+      const selectedSource = scope2Sources.find(s => s.source_name === data.source_type);
 
-      if (!session.session) {
-        toast.error('You must be logged in to submit activity data');
+      if (!selectedSource) {
+        toast.error('Invalid source type selected');
         return;
       }
 
-      const facility = facilities.find(f => f.id === data.facility_id);
-      const activityName = `${facility?.name} - Electricity`;
+      let quantity = parseFloat(data.amount);
+      if (data.unit === 'MWh') {
+        quantity = quantity * 1000;
+      }
 
-      const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ingest-activity-data`;
+      const { error } = await browserSupabase
+        .from('facility_activity_data')
+        .insert({
+          facility_id: data.facility_id,
+          emission_source_id: selectedSource.id,
+          quantity: quantity,
+          unit: 'kWh',
+          reporting_period_start: data.activity_date,
+          reporting_period_end: data.activity_date,
+          organization_id: currentOrganization.id,
+        });
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: activityName,
-          category: 'Scope 2',
-          quantity: Number(data.amount),
-          unit: data.unit,
-          activity_date: data.activity_date,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit Scope 2 data');
+      if (error) {
+        console.error('Insert error:', error);
+        throw new Error(error.message || 'Failed to save Scope 2 data');
       }
 
       toast.success('Scope 2 activity data submitted successfully');
@@ -697,33 +804,55 @@ export default function CompanyEmissionsPage() {
     setIsCalculating(true);
 
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const browserSupabase = getSupabaseBrowserClient();
+      const yearStart = `${selectedYear}-01-01`;
+      const yearEnd = `${selectedYear}-12-31`;
 
-      if (!session.session) {
-        toast.error('You must be logged in to run calculations');
-        return;
+      const { data: activityData, error: activityError } = await browserSupabase
+        .from('facility_activity_data')
+        .select(`
+          id,
+          quantity,
+          unit,
+          scope_1_2_emission_sources!inner (
+            source_name,
+            scope,
+            category,
+            emission_factor_id
+          )
+        `)
+        .eq('organization_id', currentOrganization.id)
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      if (activityError) throw activityError;
+
+      let scope1Total = 0;
+      let scope2Total = 0;
+
+      for (const activity of activityData || []) {
+        const source = (activity as any).scope_1_2_emission_sources;
+        const factorId = source?.emission_factor_id;
+
+        if (factorId) {
+          const { data: factor } = await browserSupabase
+            .from('emissions_factors')
+            .select('value')
+            .eq('factor_id', factorId)
+            .maybeSingle();
+
+          if (factor?.value) {
+            const emissions = activity.quantity * parseFloat(factor.value);
+            if (source.scope === 'Scope 1') {
+              scope1Total += emissions;
+            } else if (source.scope === 'Scope 2') {
+              scope2Total += emissions;
+            }
+          }
+        }
       }
 
-      const apiUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invoke-scope1-2-calculations`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          organization_id: currentOrganization.id,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to run calculations');
-      }
-
-      toast.success(result.message || 'Calculations completed successfully');
+      toast.success(`Calculations complete: Scope 1: ${scope1Total.toFixed(2)} kgCO2e, Scope 2: ${scope2Total.toFixed(2)} kgCO2e`);
       await fetchScope1Emissions();
       await fetchScope2Emissions();
     } catch (error) {
@@ -953,9 +1082,9 @@ export default function CompanyEmissionsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Scope 1: Stationary Combustion</CardTitle>
+                    <CardTitle>Scope 1: Direct Emissions</CardTitle>
                     <CardDescription>
-                      Enter data for direct emissions from fuel combustion in owned or controlled equipment
+                      Enter data for direct emissions from fuel combustion, mobile sources, and fugitive emissions
                     </CardDescription>
                   </div>
                   <Button
@@ -1011,25 +1140,52 @@ export default function CompanyEmissionsPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="scope1-fuel-type">Fuel Type</Label>
+                      <Label htmlFor="scope1-fuel-type">Emission Source</Label>
                       <Select
                         value={scope1Form.watch('fuel_type')}
-                        onValueChange={(value) =>
-                          scope1Form.setValue('fuel_type', value, {
-                            shouldValidate: true,
-                          })
-                        }
-                        disabled={isLoadingFuelTypes || fuelTypes.length === 0}
+                        onValueChange={handleScope1FuelTypeChange}
+                        disabled={isLoadingFuelTypes || scope1Sources.length === 0}
                       >
                         <SelectTrigger id="scope1-fuel-type">
-                          <SelectValue placeholder="Select fuel type" />
+                          <SelectValue placeholder="Select emission source" />
                         </SelectTrigger>
                         <SelectContent>
-                          {fuelTypes.map((fuelType) => (
-                            <SelectItem key={fuelType} value={fuelType}>
-                              {fuelType}
-                            </SelectItem>
-                          ))}
+                          {scope1Sources.filter(s => s.category === 'Stationary Combustion').length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Stationary Combustion</SelectLabel>
+                              {scope1Sources
+                                .filter(s => s.category === 'Stationary Combustion')
+                                .map((source) => (
+                                  <SelectItem key={source.id} value={source.source_name}>
+                                    {source.source_name} ({source.default_unit})
+                                  </SelectItem>
+                                ))}
+                            </SelectGroup>
+                          )}
+                          {scope1Sources.filter(s => s.category === 'Mobile Combustion').length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Mobile Combustion</SelectLabel>
+                              {scope1Sources
+                                .filter(s => s.category === 'Mobile Combustion')
+                                .map((source) => (
+                                  <SelectItem key={source.id} value={source.source_name}>
+                                    {source.source_name} ({source.default_unit})
+                                  </SelectItem>
+                                ))}
+                            </SelectGroup>
+                          )}
+                          {scope1Sources.filter(s => s.category === 'Fugitive Emissions').length > 0 && (
+                            <SelectGroup>
+                              <SelectLabel>Fugitive Emissions</SelectLabel>
+                              {scope1Sources
+                                .filter(s => s.category === 'Fugitive Emissions')
+                                .map((source) => (
+                                  <SelectItem key={source.id} value={source.source_name}>
+                                    {source.source_name} ({source.default_unit})
+                                  </SelectItem>
+                                ))}
+                            </SelectGroup>
+                          )}
                         </SelectContent>
                       </Select>
                       {scope1Form.formState.errors.fuel_type && (
@@ -1037,9 +1193,9 @@ export default function CompanyEmissionsPage() {
                           {scope1Form.formState.errors.fuel_type.message}
                         </p>
                       )}
-                      {!isLoadingFuelTypes && fuelTypes.length === 0 && (
+                      {!isLoadingFuelTypes && scope1Sources.length === 0 && (
                         <p className="text-sm text-amber-600">
-                          No fuel types available. Please ensure emissions factors are loaded.
+                          No emission sources available. Please contact support.
                         </p>
                       )}
                     </div>
@@ -1172,9 +1328,9 @@ export default function CompanyEmissionsPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Scope 2: Purchased Electricity</CardTitle>
+                    <CardTitle>Scope 2: Purchased Energy</CardTitle>
                     <CardDescription>
-                      Enter data for indirect emissions from purchased electricity consumption
+                      Enter data for indirect emissions from purchased electricity, heating, cooling, and steam
                     </CardDescription>
                   </div>
                   <Button
@@ -1198,39 +1354,71 @@ export default function CompanyEmissionsPage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={scope2Form.handleSubmit(onSubmitScope2)} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="scope2-facility">Facility</Label>
-                    <Select
-                      value={scope2Form.watch('facility_id')}
-                      onValueChange={(value) =>
-                        scope2Form.setValue('facility_id', value, {
-                          shouldValidate: true,
-                        })
-                      }
-                      disabled={isLoadingFacilities || facilities.length === 0}
-                    >
-                      <SelectTrigger id="scope2-facility">
-                        <SelectValue placeholder="Select facility" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {facilities.map((facility) => (
-                          <SelectItem key={facility.id} value={facility.id}>
-                            {facility.name}
-                            {facility.location && ` (${facility.location})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {scope2Form.formState.errors.facility_id && (
-                      <p className="text-sm text-red-600">
-                        {scope2Form.formState.errors.facility_id.message}
-                      </p>
-                    )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="scope2-facility">Facility</Label>
+                      <Select
+                        value={scope2Form.watch('facility_id')}
+                        onValueChange={(value) =>
+                          scope2Form.setValue('facility_id', value, {
+                            shouldValidate: true,
+                          })
+                        }
+                        disabled={isLoadingFacilities || facilities.length === 0}
+                      >
+                        <SelectTrigger id="scope2-facility">
+                          <SelectValue placeholder="Select facility" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {facilities.map((facility) => (
+                            <SelectItem key={facility.id} value={facility.id}>
+                              {facility.name}
+                              {facility.location && ` (${facility.location})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {scope2Form.formState.errors.facility_id && (
+                        <p className="text-sm text-red-600">
+                          {scope2Form.formState.errors.facility_id.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="scope2-source-type">Energy Source</Label>
+                      <Select
+                        value={scope2Form.watch('source_type')}
+                        onValueChange={handleScope2SourceChange}
+                        disabled={isLoadingFuelTypes || scope2Sources.length === 0}
+                      >
+                        <SelectTrigger id="scope2-source-type">
+                          <SelectValue placeholder="Select energy source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {scope2Sources.map((source) => (
+                            <SelectItem key={source.id} value={source.source_name}>
+                              {source.source_name} ({source.default_unit})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {scope2Form.formState.errors.source_type && (
+                        <p className="text-sm text-red-600">
+                          {scope2Form.formState.errors.source_type.message}
+                        </p>
+                      )}
+                      {!isLoadingFuelTypes && scope2Sources.length === 0 && (
+                        <p className="text-sm text-amber-600">
+                          No energy sources available. Please contact support.
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="scope2-amount">Electricity Consumed</Label>
+                      <Label htmlFor="scope2-amount">Amount Consumed</Label>
                       <Input
                         id="scope2-amount"
                         type="number"
