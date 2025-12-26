@@ -432,8 +432,6 @@ export default function CompanyEmissionsPage() {
 
       if (reportError) throw reportError;
 
-      console.log('Fetched Report Data:', reportData);
-
       if (!reportData) {
         const { data: newReport, error: createError } = await browserSupabase
           .from('corporate_reports')
@@ -451,7 +449,6 @@ export default function CompanyEmissionsPage() {
         setReport(newReport);
         setOverheads([]);
       } else {
-        console.log('Report breakdown_json:', reportData.breakdown_json);
         setReport(reportData);
 
         const { data: overheadData, error: overheadError } = await browserSupabase
@@ -897,8 +894,7 @@ export default function CompanyEmissionsPage() {
         throw new Error(error.error || 'Failed to generate report');
       }
 
-      const result = await response.json();
-      console.log('CCF Report Generated:', result);
+      await response.json();
 
       toast.success('Footprint calculated successfully!');
       await fetchReportData();
@@ -1161,17 +1157,23 @@ export default function CompanyEmissionsPage() {
                           <div className="text-2xl font-bold">
                             {(() => {
                               const scope3Total = report?.breakdown_json?.scope3?.total;
-                              console.log('Scope 3 Display - breakdown_json:', report?.breakdown_json);
-                              console.log('Scope 3 Display - total:', scope3Total);
 
+                              // Use report breakdown if calculated (after clicking Calculate Footprint)
                               if (scope3Total && scope3Total > 0) {
                                 return `${(scope3Total / 1000).toFixed(3)} tCO₂e`;
                               }
+
+                              // Otherwise show frontend-calculated value (before calculation)
+                              if (scope3Cat1CO2e > 0 || scope3OverheadsCO2e > 0) {
+                                const total = scope3Cat1CO2e + (scope3OverheadsCO2e / 1000);
+                                return `${total.toFixed(3)} tCO₂e`;
+                              }
+
                               return 'No data';
                             })()}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>
-                          {report?.breakdown_json?.scope3?.products && report.breakdown_json.scope3.products > 0 && (
+                          {(scope3Cat1CO2e > 0 || (report?.breakdown_json?.scope3?.products && report.breakdown_json.scope3.products > 0)) && (
                             <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                               <CheckCircle2 className="h-3 w-3" />
                               Includes Cat 1 from LCAs (Tier 1 data)
