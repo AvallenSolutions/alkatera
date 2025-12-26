@@ -432,6 +432,8 @@ export default function CompanyEmissionsPage() {
 
       if (reportError) throw reportError;
 
+      console.log('Fetched Report Data:', reportData);
+
       if (!reportData) {
         const { data: newReport, error: createError } = await browserSupabase
           .from('corporate_reports')
@@ -449,6 +451,7 @@ export default function CompanyEmissionsPage() {
         setReport(newReport);
         setOverheads([]);
       } else {
+        console.log('Report breakdown_json:', reportData.breakdown_json);
         setReport(reportData);
 
         const { data: overheadData, error: overheadError } = await browserSupabase
@@ -894,8 +897,11 @@ export default function CompanyEmissionsPage() {
         throw new Error(error.error || 'Failed to generate report');
       }
 
+      const result = await response.json();
+      console.log('CCF Report Generated:', result);
+
       toast.success('Footprint calculated successfully!');
-      fetchReportData();
+      await fetchReportData();
     } catch (error: any) {
       console.error('Error generating report:', error);
       toast.error(error.message || 'Failed to generate report');
@@ -1153,9 +1159,16 @@ export default function CompanyEmissionsPage() {
                             <span className="font-medium">Scope 3</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {report?.breakdown_json?.scope3?.total
-                              ? `${(report.breakdown_json.scope3.total / 1000).toFixed(3)} tCO₂e`
-                              : 'No data'}
+                            {(() => {
+                              const scope3Total = report?.breakdown_json?.scope3?.total;
+                              console.log('Scope 3 Display - breakdown_json:', report?.breakdown_json);
+                              console.log('Scope 3 Display - total:', scope3Total);
+
+                              if (scope3Total && scope3Total > 0) {
+                                return `${(scope3Total / 1000).toFixed(3)} tCO₂e`;
+                              }
+                              return 'No data';
+                            })()}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>
                           {report?.breakdown_json?.scope3?.products && report.breakdown_json.scope3.products > 0 && (
