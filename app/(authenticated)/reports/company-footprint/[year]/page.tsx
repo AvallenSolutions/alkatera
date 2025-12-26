@@ -122,16 +122,7 @@ export default function FootprintBuilderPage() {
           0
         );
 
-        console.log('📊 [COMPANY FOOTPRINT - SCOPE 3 OVERHEADS]', {
-          overheadCount: overheadData?.length || 0,
-          overheadScope3Total,
-          categories: (overheadData || []).map(o => ({
-            category: o.category,
-            co2e: o.computed_co2e
-          }))
-        });
-
-        // Store the overhead total
+        console.log('📊 [SCOPE 3 OVERHEADS]', { total: overheadScope3Total, count: overheadData?.length || 0 });
         setOverheadsCO2e(overheadScope3Total);
       }
 
@@ -179,13 +170,6 @@ export default function FootprintBuilderPage() {
   const fetchProductsEmissions = async () => {
     if (!currentOrganization?.id) return;
 
-    console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Starting fetch', {
-      orgId: currentOrganization.id,
-      year,
-      yearStart: `${year}-01-01`,
-      yearEnd: `${year}-12-31`
-    });
-
     try {
       const supabase = getSupabaseBrowserClient();
       const yearStart = `${year}-01-01`;
@@ -200,28 +184,10 @@ export default function FootprintBuilderPage() {
 
       if (error) throw error;
 
-      console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Production logs', {
-        count: productionData?.length || 0,
-        logs: productionData
-      });
-
       let total = 0;
 
       if (productionData) {
         for (const log of productionData) {
-          const { data: product } = await supabase
-            .from("products")
-            .select("unit_size_value, unit_size_unit")
-            .eq("id", log.product_id)
-            .maybeSingle();
-
-          if (!product) continue;
-
-          console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Product found', {
-            productId: log.product_id,
-            product
-          });
-
           const { data: lca } = await supabase
             .from("product_lcas")
             .select("total_ghg_emissions, status")
@@ -230,39 +196,13 @@ export default function FootprintBuilderPage() {
             .limit(1)
             .maybeSingle();
 
-          console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] LCA data', {
-            productId: log.product_id,
-            hasLCA: !!lca,
-            status: lca?.status,
-            total_ghg_emissions: lca?.total_ghg_emissions
-          });
-
           if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
-            const totalImpact = lca.total_ghg_emissions * log.volume;
-            total += totalImpact;
-
-            console.log('🔍 [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Calculated impact', {
-              productId: log.product_id,
-              productionVolume: log.volume,
-              productionUnit: log.unit,
-              lcaEmissionsPerUnit: lca.total_ghg_emissions,
-              totalImpact,
-              runningTotal: total,
-              note: 'LCA emissions are per production unit (e.g., per Hectolitre), not per consumer unit (bottle)'
-            });
-          } else {
-            console.warn('⚠️ [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Skipping product - no valid LCA emissions', {
-              productId: log.product_id,
-              reason: !lca ? 'No LCA found' : !lca.total_ghg_emissions ? 'total_ghg_emissions is null/0' : 'Unknown'
-            });
+            total += lca.total_ghg_emissions * log.volume;
           }
         }
       }
 
-      console.log('✅ [COMPANY FOOTPRINT - SCOPE 3 CAT 1] Final result', {
-        total
-      });
-
+      console.log('📊 [SCOPE 3 CAT 1]', { productsCO2e: total, count: productionData?.length || 0 });
       setProductsCO2e(total);
     } catch (error: any) {
       console.error("Error fetching products emissions:", error);
@@ -349,36 +289,10 @@ export default function FootprintBuilderPage() {
   // Calculate total Scope 3 (products + all overheads)
   const scope3TotalCO2e = productsCO2e + overheadsCO2e;
 
-  console.log('🔥 [DEBUG - SCOPE 3 CALCULATION]', {
-    productsCO2e,
-    overheadsCO2e,
-    scope3TotalCO2e,
-    timestamp: new Date().toISOString()
-  });
-
   const canGenerate = true; // Always allow generation
 
   return (
     <div className="space-y-6">
-      {/* DEBUG INFO */}
-      <div className="bg-yellow-100 dark:bg-yellow-900 border-2 border-yellow-500 p-4 rounded-lg">
-        <div className="font-bold text-yellow-900 dark:text-yellow-100 mb-2">🔍 DEBUG - Scope 3 Calculation</div>
-        <div className="grid grid-cols-3 gap-4 text-sm font-mono">
-          <div>
-            <div className="text-yellow-700 dark:text-yellow-300">Products (Cat 1):</div>
-            <div className="font-bold">{productsCO2e.toFixed(3)} kg</div>
-          </div>
-          <div>
-            <div className="text-yellow-700 dark:text-yellow-300">Overheads (Other Cats):</div>
-            <div className="font-bold">{overheadsCO2e.toFixed(3)} kg</div>
-          </div>
-          <div>
-            <div className="text-yellow-700 dark:text-yellow-300">Total Scope 3:</div>
-            <div className="font-bold">{scope3TotalCO2e.toFixed(3)} kg</div>
-          </div>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
