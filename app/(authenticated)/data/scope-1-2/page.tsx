@@ -1153,12 +1153,12 @@ export default function CompanyEmissionsPage() {
                             <span className="font-medium">Scope 3</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {(scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e + scope3OverheadsCO2e > 0
-                              ? `${(((scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e + scope3OverheadsCO2e) / 1000).toFixed(3)} tCO₂e`
+                            {report?.breakdown_json?.scope3?.total
+                              ? `${(report.breakdown_json.scope3.total / 1000).toFixed(3)} tCO₂e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>
-                          {scope3Cat1CO2e > 0 && (
+                          {report?.breakdown_json?.scope3?.products && report.breakdown_json.scope3.products > 0 && (
                             <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                               <CheckCircle2 className="h-3 w-3" />
                               Includes Cat 1 from LCAs (Tier 1 data)
