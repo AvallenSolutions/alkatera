@@ -165,7 +165,7 @@ export default function CompanyEmissionsPage() {
     product_name: string;
     materials_tco2e: number;
     packaging_tco2e: number;
-    production_volume: number;
+    production_volume: number; // Now in consumer units (bottles/cans) not hectolitres
   }>>([]);
   const [scope3Cat1DataQuality, setScope3Cat1DataQuality] = useState<string>('');
   const [isLoadingReport, setIsLoadingReport] = useState(false);
@@ -273,7 +273,7 @@ export default function CompanyEmissionsPage() {
 
       const { data: productionLogs, error: productionError } = await browserSupabase
         .from('production_logs')
-        .select('product_id, volume, unit, date')
+        .select('product_id, volume, unit, units_produced, date')
         .eq('organization_id', currentOrganization.id)
         .gte('date', yearStart)
         .lte('date', yearEnd);
@@ -303,7 +303,7 @@ export default function CompanyEmissionsPage() {
       for (const log of productionLogs) {
         const { data: product } = await browserSupabase
           .from('products')
-          .select('name, unit_size_value, unit_size_unit')
+          .select('name')
           .eq('id', log.product_id)
           .maybeSingle();
 
@@ -316,7 +316,7 @@ export default function CompanyEmissionsPage() {
 
         const { data: lca, error: lcaError } = await browserSupabase
           .from('product_lcas')
-          .select('total_ghg_emissions, status')
+          .select('total_ghg_emissions, status, per_unit_emissions_verified')
           .eq('product_id', log.product_id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -327,6 +327,7 @@ export default function CompanyEmissionsPage() {
           hasLCA: !!lca,
           status: lca?.status,
           total_ghg_emissions: lca?.total_ghg_emissions,
+          per_unit_verified: lca?.per_unit_emissions_verified,
           lcaError
         });
 
@@ -339,33 +340,40 @@ export default function CompanyEmissionsPage() {
           continue;
         }
 
-        const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
+        // CRITICAL: Use units_produced (number of bottles/cans) not bulk volume (hectolitres)
+        // LCA emissions are per functional unit (per bottle/can)
+        const unitsProduced = log.units_produced || 0;
 
-        let productSizeInLitres = product.unit_size_value || 1;
-        if (product.unit_size_unit === 'ml') {
-          productSizeInLitres = productSizeInLitres / 1000;
+        if (unitsProduced === 0) {
+          console.warn('⚠️ [SCOPE 3 CAT 1] Skipping - units_produced is 0 or NULL', {
+            productId: log.product_id,
+            productName: product.name,
+            log
+          });
+          continue;
         }
 
-        const numberOfUnits = volumeInLitres / productSizeInLitres;
-        const totalImpact = (lca.total_ghg_emissions * numberOfUnits) / 1000;
+        // Calculate total emissions: emissions per unit × number of units
+        // Example: 2.79 kg CO2e/bottle × 107,143 bottles = 298,929 kg = 298.93 tonnes
+        const totalImpactKg = lca.total_ghg_emissions * unitsProduced;
+        const totalImpactTonnes = totalImpactKg / 1000;
 
-        totalEmissions += totalImpact;
+        totalEmissions += totalImpactTonnes;
 
-        console.log('🔍 [SCOPE 3 CAT 1] Calculated impact', {
+        console.log('✅ [SCOPE 3 CAT 1] Calculated impact', {
           product: product.name,
-          volumeInLitres,
-          productSizeInLitres,
-          numberOfUnits,
-          lcaEmissions: lca.total_ghg_emissions,
-          totalImpact,
+          unitsProduced,
+          emissionsPerUnit: lca.total_ghg_emissions,
+          totalImpactKg,
+          totalImpactTonnes,
           runningTotal: totalEmissions
         });
 
         breakdown.push({
           product_name: product.name,
-          materials_tco2e: totalImpact,
+          materials_tco2e: totalImpactTonnes,
           packaging_tco2e: 0,
-          production_volume: log.volume,
+          production_volume: unitsProduced,
         });
       }
 
