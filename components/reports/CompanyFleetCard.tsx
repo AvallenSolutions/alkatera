@@ -47,7 +47,7 @@ export function CompanyFleetCard({ totalCO2e = 0, year }: CompanyFleetCardProps)
           <div className="space-y-2">
             <div>
               <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                {totalCO2e >= 1 ? `${totalCO2e.toFixed(3)} tCO₂e` : `${(totalCO2e * 1000).toFixed(0)} kgCO₂e`}
+                {totalCO2e.toFixed(3)} tCO₂e
               </div>
               <p className="text-xs text-muted-foreground mt-1">Vehicle journey emissions</p>
             </div>

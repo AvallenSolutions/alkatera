@@ -431,9 +431,7 @@ export default function FootprintBuilderPage() {
             <div className="text-center">
               <div className="text-sm text-muted-foreground mb-2">Total Footprint</div>
               <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                {report.total_emissions >= 1000
-                  ? `${(report.total_emissions / 1000).toFixed(2)} tCO₂e`
-                  : `${report.total_emissions.toFixed(2)} kgCO₂e`}
+                {(report.total_emissions / 1000).toFixed(3)} tCO₂e
               </div>
               <div className="text-sm text-muted-foreground">
                 Last calculated: {new Date(report.updated_at).toLocaleString("en-GB")}

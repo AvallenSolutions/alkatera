@@ -20,10 +20,8 @@ export function ProductsSupplyChainCard({
   isLoading,
 }: ProductsSupplyChainCardProps) {
   const formatEmissions = (value: number) => {
-    if (value >= 1000) {
-      return `${(value / 1000).toFixed(2)} tCO₂e`;
-    }
-    return `${value.toFixed(2)} kgCO₂e`;
+    // Always display in tonnes
+    return `${(value / 1000).toFixed(3)} tCO₂e`;
   };
 
   return (

@@ -42,10 +42,8 @@ export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOv
   const totalSpend = entries.reduce((sum, entry) => sum + entry.spend_amount, 0);
 
   const formatEmissions = (value: number) => {
-    if (value >= 1000) {
-      return `${(value / 1000).toFixed(2)} tCO₂e`;
-    }
-    return `${value.toFixed(2)} kgCO₂e`;
+    // Always display in tonnes
+    return `${(value / 1000).toFixed(3)} tCO₂e`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
