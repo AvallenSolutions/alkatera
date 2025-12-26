@@ -316,7 +316,7 @@ export default function CompanyEmissionsPage() {
 
         const { data: lca, error: lcaError } = await browserSupabase
           .from('product_lcas')
-          .select('total_ghg_emissions, status, per_unit_emissions_verified')
+          .select('id, total_ghg_emissions, status, per_unit_emissions_verified')
           .eq('product_id', log.product_id)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -353,26 +353,48 @@ export default function CompanyEmissionsPage() {
           continue;
         }
 
+        // Fetch materials breakdown to separate materials vs packaging
+        const { data: materials } = await browserSupabase
+          .from('product_lca_materials')
+          .select('material_type, impact_climate')
+          .eq('product_lca_id', lca.id);
+
+        let materialsPerUnit = 0;
+        let packagingPerUnit = 0;
+
+        if (materials) {
+          materials.forEach((m: any) => {
+            if (m.material_type === 'ingredient') {
+              materialsPerUnit += m.impact_climate || 0;
+            } else if (m.material_type === 'packaging') {
+              packagingPerUnit += m.impact_climate || 0;
+            }
+          });
+        }
+
         // Calculate total emissions: emissions per unit × number of units
-        // Example: 2.79 kg CO2e/bottle × 107,143 bottles = 298,929 kg = 298.93 tonnes
-        const totalImpactKg = lca.total_ghg_emissions * unitsProduced;
-        const totalImpactTonnes = totalImpactKg / 1000;
+        const totalMaterialsTonnes = (materialsPerUnit * unitsProduced) / 1000;
+        const totalPackagingTonnes = (packagingPerUnit * unitsProduced) / 1000;
+        const totalImpactTonnes = totalMaterialsTonnes + totalPackagingTonnes;
 
         totalEmissions += totalImpactTonnes;
 
         console.log('✅ [SCOPE 3 CAT 1] Calculated impact', {
           product: product.name,
           unitsProduced,
-          emissionsPerUnit: lca.total_ghg_emissions,
-          totalImpactKg,
+          materialsPerUnit,
+          packagingPerUnit,
+          totalPerUnit: materialsPerUnit + packagingPerUnit,
+          totalMaterialsTonnes,
+          totalPackagingTonnes,
           totalImpactTonnes,
           runningTotal: totalEmissions
         });
 
         breakdown.push({
           product_name: product.name,
-          materials_tco2e: totalImpactTonnes,
-          packaging_tco2e: 0,
+          materials_tco2e: totalMaterialsTonnes,
+          packaging_tco2e: totalPackagingTonnes,
           production_volume: unitsProduced,
         });
       }
