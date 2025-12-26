@@ -59,8 +59,8 @@ export default function FootprintBuilderPage() {
   const [overheads, setOverheads] = useState<OverheadEntry[]>([]);
   const [operationsCO2e, setOperationsCO2e] = useState(0);
   const [productsCO2e, setProductsCO2e] = useState(0);
+  const [overheadsCO2e, setOverheadsCO2e] = useState(0);
   const [fleetCO2e, setFleetCO2e] = useState(0);
-  const [scope3TotalCO2e, setScope3TotalCO2e] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -131,8 +131,8 @@ export default function FootprintBuilderPage() {
           }))
         });
 
-        // Store the overhead total separately (we'll add products emissions to it later)
-        setScope3TotalCO2e(overheadScope3Total);
+        // Store the overhead total
+        setOverheadsCO2e(overheadScope3Total);
       }
 
       // Fetch operations emissions (Scope 1 & 2)
@@ -264,17 +264,6 @@ export default function FootprintBuilderPage() {
       });
 
       setProductsCO2e(total);
-
-      // Update total Scope 3 (overheads + products)
-      setScope3TotalCO2e(prev => {
-        const newTotal = prev + total;
-        console.log('📊 [COMPANY FOOTPRINT - SCOPE 3 TOTAL]', {
-          overheadsCO2e: prev,
-          productsCO2e: total,
-          totalScope3CO2e: newTotal
-        });
-        return newTotal;
-      });
     } catch (error: any) {
       console.error("Error fetching products emissions:", error);
     }
@@ -356,6 +345,15 @@ export default function FootprintBuilderPage() {
   const capitalGoodsEntries = overheads.filter((o) => o.category === "capital_goods") as any[];
   const logisticsEntries = overheads.filter((o) => o.category === "downstream_logistics") as any[];
   const wasteEntries = overheads.filter((o) => o.category === "operational_waste") as any[];
+
+  // Calculate total Scope 3 (products + all overheads)
+  const scope3TotalCO2e = productsCO2e + overheadsCO2e;
+
+  console.log('📊 [COMPANY FOOTPRINT - SCOPE 3 TOTAL COMPUTED]', {
+    productsCO2e,
+    overheadsCO2e,
+    scope3TotalCO2e
+  });
 
   const canGenerate = true; // Always allow generation
 
