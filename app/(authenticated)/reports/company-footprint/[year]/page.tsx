@@ -349,16 +349,36 @@ export default function FootprintBuilderPage() {
   // Calculate total Scope 3 (products + all overheads)
   const scope3TotalCO2e = productsCO2e + overheadsCO2e;
 
-  console.log('📊 [COMPANY FOOTPRINT - SCOPE 3 TOTAL COMPUTED]', {
+  console.log('🔥 [DEBUG - SCOPE 3 CALCULATION]', {
     productsCO2e,
     overheadsCO2e,
-    scope3TotalCO2e
+    scope3TotalCO2e,
+    timestamp: new Date().toISOString()
   });
 
   const canGenerate = true; // Always allow generation
 
   return (
     <div className="space-y-6">
+      {/* DEBUG INFO */}
+      <div className="bg-yellow-100 dark:bg-yellow-900 border-2 border-yellow-500 p-4 rounded-lg">
+        <div className="font-bold text-yellow-900 dark:text-yellow-100 mb-2">🔍 DEBUG - Scope 3 Calculation</div>
+        <div className="grid grid-cols-3 gap-4 text-sm font-mono">
+          <div>
+            <div className="text-yellow-700 dark:text-yellow-300">Products (Cat 1):</div>
+            <div className="font-bold">{productsCO2e.toFixed(3)} kg</div>
+          </div>
+          <div>
+            <div className="text-yellow-700 dark:text-yellow-300">Overheads (Other Cats):</div>
+            <div className="font-bold">{overheadsCO2e.toFixed(3)} kg</div>
+          </div>
+          <div>
+            <div className="text-yellow-700 dark:text-yellow-300">Total Scope 3:</div>
+            <div className="font-bold">{scope3TotalCO2e.toFixed(3)} kg</div>
+          </div>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
