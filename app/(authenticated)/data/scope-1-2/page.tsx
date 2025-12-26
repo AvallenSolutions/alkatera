@@ -1124,7 +1124,7 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {scope1CO2e > 0
-                              ? `${scope1CO2e.toFixed(3)} kgCO2e`
+                              ? `${(scope1CO2e / 1000).toFixed(3)} tCO₂e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Direct emissions (fuel combustion, process, fugitive)</p>
@@ -1139,7 +1139,7 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {scope2CO2e > 0
-                              ? `${scope2CO2e.toFixed(3)} kgCO2e`
+                              ? `${(scope2CO2e / 1000).toFixed(3)} tCO₂e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Indirect emissions (purchased electricity, heat, steam)</p>
@@ -1154,7 +1154,7 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {(scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e + scope3OverheadsCO2e > 0
-                              ? `${((scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e + scope3OverheadsCO2e).toFixed(3)} kgCO2e`
+                              ? `${(((scope3Cat1CO2e * 1000) + productsCO2e + fleetCO2e + scope3OverheadsCO2e) / 1000).toFixed(3)} tCO₂e`
                               : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>
