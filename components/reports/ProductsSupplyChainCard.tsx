@@ -8,16 +8,20 @@ import Link from "next/link";
 
 interface ProductsSupplyChainCardProps {
   totalCO2e: number;
+  productsCO2e?: number;
   year: number;
   productCount?: number;
   isLoading?: boolean;
+  report?: any;
 }
 
 export function ProductsSupplyChainCard({
   totalCO2e,
+  productsCO2e,
   year,
   productCount = 0,
   isLoading,
+  report,
 }: ProductsSupplyChainCardProps) {
   const formatEmissions = (value: number) => {
     // Always display in tonnes
@@ -35,11 +39,11 @@ export function ProductsSupplyChainCard({
               <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <CardTitle className="text-lg">Products & Supply Chain</CardTitle>
-              <CardDescription>Scope 3 Product Emissions</CardDescription>
+              <CardTitle className="text-lg">Scope 3 Emissions</CardTitle>
+              <CardDescription>All Indirect Value Chain Emissions</CardDescription>
             </div>
           </div>
-          <Badge variant="secondary">Read-Only</Badge>
+          <Badge variant="secondary">Calculated</Badge>
         </div>
       </CardHeader>
 
@@ -55,28 +59,85 @@ export function ProductsSupplyChainCard({
                 {formatEmissions(totalCO2e)}
               </div>
               <div className="text-sm text-muted-foreground mt-1">
-                From {productCount} {productCount === 1 ? "product" : "products"} in {year}
+                Total Scope 3 for {year}
               </div>
             </div>
 
-            <div className="pt-4 border-t">
-              <div className="text-xs text-muted-foreground mb-2">Data Sources</div>
-              <div className="space-y-1 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Production logs</span>
-                  <span className="font-medium">Volume tracked</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Product LCAs</span>
-                  <span className="font-medium">Impact calculated</span>
+            {report?.breakdown_json?.scope3 ? (
+              <div className="pt-4 border-t">
+                <div className="text-xs text-muted-foreground mb-2">Category Breakdown</div>
+                <div className="space-y-1 text-sm">
+                  {report.breakdown_json.scope3.products > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cat 1: Purchased Goods</span>
+                      <span className="font-medium">{formatEmissions(report.breakdown_json.scope3.products)}</span>
+                    </div>
+                  )}
+                  {report.breakdown_json.scope3.capital_goods > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cat 2: Capital Goods</span>
+                      <span className="font-medium">{formatEmissions(report.breakdown_json.scope3.capital_goods)}</span>
+                    </div>
+                  )}
+                  {report.breakdown_json.scope3.operational_waste > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cat 5: Waste</span>
+                      <span className="font-medium">{formatEmissions(report.breakdown_json.scope3.operational_waste)}</span>
+                    </div>
+                  )}
+                  {report.breakdown_json.scope3.business_travel > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cat 6: Business Travel</span>
+                      <span className="font-medium">{formatEmissions(report.breakdown_json.scope3.business_travel)}</span>
+                    </div>
+                  )}
+                  {report.breakdown_json.scope3.employee_commuting > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cat 7: Commuting</span>
+                      <span className="font-medium">{formatEmissions(report.breakdown_json.scope3.employee_commuting)}</span>
+                    </div>
+                  )}
+                  {report.breakdown_json.scope3.downstream_logistics > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cat 9: Distribution</span>
+                      <span className="font-medium">{formatEmissions(report.breakdown_json.scope3.downstream_logistics)}</span>
+                    </div>
+                  )}
+                  {report.breakdown_json.scope3.purchased_services > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Services & Other</span>
+                      <span className="font-medium">{formatEmissions(report.breakdown_json.scope3.purchased_services)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            ) : productsCO2e !== undefined ? (
+              <div className="pt-4 border-t">
+                <div className="text-xs text-muted-foreground mb-2">Preliminary Breakdown</div>
+                <div className="space-y-1 text-sm">
+                  {productsCO2e > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cat 1: Purchased Goods</span>
+                      <span className="font-medium">{formatEmissions(productsCO2e)}</span>
+                    </div>
+                  )}
+                  {(totalCO2e - productsCO2e) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Other Categories</span>
+                      <span className="font-medium">{formatEmissions(totalCO2e - productsCO2e)}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-3 text-xs text-muted-foreground italic">
+                  Generate report to see full breakdown
+                </div>
+              </div>
+            ) : null}
           </>
         ) : (
           <div className="py-8 text-center">
             <div className="text-sm text-muted-foreground mb-4">
-              No production data found for {year}
+              No Scope 3 data found for {year}
             </div>
           </div>
         )}

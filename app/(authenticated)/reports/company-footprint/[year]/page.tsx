@@ -60,6 +60,7 @@ export default function FootprintBuilderPage() {
   const [operationsCO2e, setOperationsCO2e] = useState(0);
   const [productsCO2e, setProductsCO2e] = useState(0);
   const [fleetCO2e, setFleetCO2e] = useState(0);
+  const [scope3TotalCO2e, setScope3TotalCO2e] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -114,12 +115,30 @@ export default function FootprintBuilderPage() {
 
         if (overheadError) throw overheadError;
         setOverheads(overheadData || []);
+
+        // Calculate total Scope 3 from all overhead entries
+        const overheadScope3Total = (overheadData || []).reduce(
+          (sum, item) => sum + (item.computed_co2e || 0),
+          0
+        );
+
+        console.log('📊 [COMPANY FOOTPRINT - SCOPE 3 OVERHEADS]', {
+          overheadCount: overheadData?.length || 0,
+          overheadScope3Total,
+          categories: (overheadData || []).map(o => ({
+            category: o.category,
+            co2e: o.computed_co2e
+          }))
+        });
+
+        // Store the overhead total separately (we'll add products emissions to it later)
+        setScope3TotalCO2e(overheadScope3Total);
       }
 
       // Fetch operations emissions (Scope 1 & 2)
       await fetchOperationsEmissions();
 
-      // Fetch products emissions (Scope 3)
+      // Fetch products emissions (Scope 3 Category 1)
       await fetchProductsEmissions();
 
       // Fetch fleet emissions (Scope 1 & 2)
@@ -245,6 +264,17 @@ export default function FootprintBuilderPage() {
       });
 
       setProductsCO2e(total);
+
+      // Update total Scope 3 (overheads + products)
+      setScope3TotalCO2e(prev => {
+        const newTotal = prev + total;
+        console.log('📊 [COMPANY FOOTPRINT - SCOPE 3 TOTAL]', {
+          overheadsCO2e: prev,
+          productsCO2e: total,
+          totalScope3CO2e: newTotal
+        });
+        return newTotal;
+      });
     } catch (error: any) {
       console.error("Error fetching products emissions:", error);
     }
@@ -376,8 +406,8 @@ export default function FootprintBuilderPage() {
         {/* Card 1: Operations & Energy */}
         <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
 
-        {/* Card 2: Products & Supply Chain */}
-        <ProductsSupplyChainCard totalCO2e={productsCO2e} year={year} />
+        {/* Card 2: Scope 3 - All Categories */}
+        <ProductsSupplyChainCard totalCO2e={scope3TotalCO2e} productsCO2e={productsCO2e} year={year} report={report} />
 
         {/* Card 3: Company Fleet & Vehicles */}
         <CompanyFleetCard totalCO2e={fleetCO2e} year={year} />

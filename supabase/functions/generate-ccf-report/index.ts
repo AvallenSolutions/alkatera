@@ -25,6 +25,9 @@ interface ScopeBreakdown {
     business_travel: number;
     purchased_services: number;
     employee_commuting: number;
+    capital_goods: number;
+    downstream_logistics: number;
+    operational_waste: number;
     total: number;
   };
   total: number;
@@ -137,43 +140,74 @@ Deno.serve(async (req: Request) => {
 
     console.log(`Scope 3 (Products) Total: ${scope3ProductsTotal} kgCO2e`);
 
-    // ===== LOGIC BLOCK B: TOP-DOWN (GAP-FILL) =====
+    // ===== LOGIC BLOCK B: FETCH ALL OVERHEADS FROM DATABASE =====
 
+    // First check if a report exists to get its ID
+    const { data: existingReport } = await supabase
+      .from("corporate_reports")
+      .select("id")
+      .eq("organization_id", organization_id)
+      .eq("year", year)
+      .maybeSingle();
+
+    let overheadScope3Total = 0;
     let businessTravelTotal = 0;
     let purchasedServicesTotal = 0;
     let employeeCommutingTotal = 0;
+    let capitalGoodsTotal = 0;
+    let logisticsTotal = 0;
+    let wasteTotal = 0;
 
-    if (overheads) {
-      // Business Travel
-      if (overheads.business_travel) {
-        const factor = 0.25; // kgCO2e per GBP (from EEIO)
-        businessTravelTotal = overheads.business_travel * factor;
-      }
+    // Fetch all overhead entries from the database if report exists
+    if (existingReport) {
+      const { data: overheadEntries, error: overheadError } = await supabase
+        .from("corporate_overheads")
+        .select("category, computed_co2e")
+        .eq("report_id", existingReport.id);
 
-      // Purchased Services
-      if (overheads.purchased_services) {
-        const factor = 0.15; // kgCO2e per GBP (from EEIO)
-        purchasedServicesTotal = overheads.purchased_services * factor;
-      }
+      if (!overheadError && overheadEntries) {
+        console.log(`Found ${overheadEntries.length} overhead entries`);
 
-      // Employee Commuting (using FTE count)
-      if (overheads.employee_commuting_ftes) {
-        const annualCommutingPerFTE = 2500; // kgCO2e per FTE per year (UK average)
-        employeeCommutingTotal = overheads.employee_commuting_ftes * annualCommutingPerFTE;
+        // Sum by category
+        overheadEntries.forEach((entry) => {
+          const co2e = entry.computed_co2e || 0;
+          overheadScope3Total += co2e;
+
+          switch (entry.category) {
+            case "business_travel":
+              businessTravelTotal += co2e;
+              break;
+            case "purchased_services":
+              purchasedServicesTotal += co2e;
+              break;
+            case "employee_commuting":
+              employeeCommutingTotal += co2e;
+              break;
+            case "capital_goods":
+              capitalGoodsTotal += co2e;
+              break;
+            case "downstream_logistics":
+              logisticsTotal += co2e;
+              break;
+            case "operational_waste":
+              wasteTotal += co2e;
+              break;
+          }
+        });
+
+        console.log(`Overhead Scope 3 Total: ${overheadScope3Total} kgCO2e`);
+        console.log(`Business Travel: ${businessTravelTotal} kgCO2e`);
+        console.log(`Purchased Services: ${purchasedServicesTotal} kgCO2e`);
+        console.log(`Employee Commuting: ${employeeCommutingTotal} kgCO2e`);
+        console.log(`Capital Goods: ${capitalGoodsTotal} kgCO2e`);
+        console.log(`Logistics: ${logisticsTotal} kgCO2e`);
+        console.log(`Waste: ${wasteTotal} kgCO2e`);
       }
     }
 
-    console.log(`Business Travel: ${businessTravelTotal} kgCO2e`);
-    console.log(`Purchased Services: ${purchasedServicesTotal} kgCO2e`);
-    console.log(`Employee Commuting: ${employeeCommutingTotal} kgCO2e`);
-
     // ===== AGGREGATE TOTALS =====
 
-    const scope3Total =
-      scope3ProductsTotal +
-      businessTravelTotal +
-      purchasedServicesTotal +
-      employeeCommutingTotal;
+    const scope3Total = scope3ProductsTotal + overheadScope3Total;
 
     const totalEmissions = scope1Total + scope2Total + scope3Total;
 
@@ -185,6 +219,9 @@ Deno.serve(async (req: Request) => {
         business_travel: businessTravelTotal,
         purchased_services: purchasedServicesTotal,
         employee_commuting: employeeCommutingTotal,
+        capital_goods: capitalGoodsTotal,
+        downstream_logistics: logisticsTotal,
+        operational_waste: wasteTotal,
         total: scope3Total,
       },
       total: totalEmissions,
