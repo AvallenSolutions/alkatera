@@ -19,6 +19,7 @@ import { LogisticsDistributionCard } from "@/components/reports/LogisticsDistrib
 import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard";
 import { CompanyFleetCard } from "@/components/reports/CompanyFleetCard";
 import { MarketingMaterialsCard } from "@/components/reports/MarketingMaterialsCard";
+import { useScope3Emissions } from "@/hooks/data/useScope3Emissions";
 import { toast } from "sonner";
 
 interface CorporateReport {
@@ -58,11 +59,15 @@ export default function FootprintBuilderPage() {
   const [report, setReport] = useState<CorporateReport | null>(null);
   const [overheads, setOverheads] = useState<OverheadEntry[]>([]);
   const [operationsCO2e, setOperationsCO2e] = useState(0);
-  const [productsCO2e, setProductsCO2e] = useState(0);
-  const [overheadsCO2e, setOverheadsCO2e] = useState(0);
   const [fleetCO2e, setFleetCO2e] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Use the shared Scope 3 hook
+  const { scope3Emissions, isLoading: isLoadingScope3, refetch: refetchScope3 } = useScope3Emissions(
+    currentOrganization?.id,
+    year
+  );
 
   useEffect(() => {
     if (currentOrganization?.id && year) {
@@ -115,25 +120,16 @@ export default function FootprintBuilderPage() {
 
         if (overheadError) throw overheadError;
         setOverheads(overheadData || []);
-
-        // Calculate total Scope 3 from all overhead entries
-        const overheadScope3Total = (overheadData || []).reduce(
-          (sum, item) => sum + (item.computed_co2e || 0),
-          0
-        );
-
-        console.log('📊 [SCOPE 3 OVERHEADS]', { total: overheadScope3Total, count: overheadData?.length || 0 });
-        setOverheadsCO2e(overheadScope3Total);
       }
 
       // Fetch operations emissions (Scope 1 & 2)
       await fetchOperationsEmissions();
 
-      // Fetch products emissions (Scope 3 Category 1)
-      await fetchProductsEmissions();
-
       // Fetch fleet emissions (Scope 1 & 2)
       await fetchFleetEmissions();
+
+      // Refetch Scope 3 emissions
+      await refetchScope3();
     } catch (error: any) {
       console.error("Error fetching report data:", error);
       toast.error("Failed to load footprint data");
@@ -167,47 +163,6 @@ export default function FootprintBuilderPage() {
     }
   };
 
-  const fetchProductsEmissions = async () => {
-    if (!currentOrganization?.id) return;
-
-    try {
-      const supabase = getSupabaseBrowserClient();
-      const yearStart = `${year}-01-01`;
-      const yearEnd = `${year}-12-31`;
-
-      const { data: productionData, error } = await supabase
-        .from("production_logs")
-        .select("product_id, volume, unit, date")
-        .eq("organization_id", currentOrganization.id)
-        .gte("date", yearStart)
-        .lte("date", yearEnd);
-
-      if (error) throw error;
-
-      let total = 0;
-
-      if (productionData) {
-        for (const log of productionData) {
-          const { data: lca } = await supabase
-            .from("product_lcas")
-            .select("total_ghg_emissions, status")
-            .eq("product_id", log.product_id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
-            total += lca.total_ghg_emissions * log.volume;
-          }
-        }
-      }
-
-      console.log('📊 [SCOPE 3 CAT 1]', { productsCO2e: total, count: productionData?.length || 0 });
-      setProductsCO2e(total);
-    } catch (error: any) {
-      console.error("Error fetching products emissions:", error);
-    }
-  };
 
   const fetchFleetEmissions = async () => {
     if (!currentOrganization?.id) return;
@@ -286,8 +241,8 @@ export default function FootprintBuilderPage() {
   const logisticsEntries = overheads.filter((o) => o.category === "downstream_logistics") as any[];
   const wasteEntries = overheads.filter((o) => o.category === "operational_waste") as any[];
 
-  // Calculate total Scope 3 (products + all overheads)
-  const scope3TotalCO2e = productsCO2e + overheadsCO2e;
+  // Use the total from the shared hook
+  const scope3TotalCO2e = scope3Emissions.total;
 
   const canGenerate = true; // Always allow generation
 
@@ -339,7 +294,13 @@ export default function FootprintBuilderPage() {
         <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
 
         {/* Card 2: Scope 3 - All Categories */}
-        <ProductsSupplyChainCard totalCO2e={scope3TotalCO2e} productsCO2e={productsCO2e} year={year} report={report} />
+        <ProductsSupplyChainCard
+          totalCO2e={scope3TotalCO2e}
+          productsCO2e={scope3Emissions.products}
+          year={year}
+          report={report}
+          isLoading={isLoadingScope3}
+        />
 
         {/* Card 3: Company Fleet & Vehicles */}
         <CompanyFleetCard totalCO2e={fleetCO2e} year={year} />
