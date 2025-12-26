@@ -94,7 +94,7 @@ Deno.serve(async (req: Request) => {
     // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA impacts
     const { data: productionLogs, error: productionError } = await supabase
       .from("production_logs")
-      .select("product_id, volume, unit, date")
+      .select("product_id, units_produced, date")
       .eq("organization_id", organization_id)
       .gte("date", yearStart)
       .lte("date", yearEnd);
@@ -107,14 +107,11 @@ Deno.serve(async (req: Request) => {
 
     if (productionLogs) {
       for (const log of productionLogs) {
-        // Get product details
-        const { data: product } = await supabase
-          .from("products")
-          .select("unit_size_value, unit_size_unit")
-          .eq("id", log.product_id)
-          .maybeSingle();
-
-        if (!product) continue;
+        // Skip if no units produced
+        if (!log.units_produced || log.units_produced <= 0) {
+          console.warn(`Skipping production log for product ${log.product_id} - no units_produced`);
+          continue;
+        }
 
         // Get the latest LCA for this product
         const { data: lca } = await supabase
@@ -126,21 +123,14 @@ Deno.serve(async (req: Request) => {
           .limit(1)
           .maybeSingle();
 
-        if (lca && lca.total_ghg_emissions) {
-          // Convert production volume to litres
-          const volumeInLitres = log.unit === "Hectolitre" ? log.volume * 100 : log.volume;
-
-          // Convert product unit size to litres if needed
-          let productSizeInLitres = product.unit_size_value || 1;
-          if (product.unit_size_unit === "ml") {
-            productSizeInLitres = productSizeInLitres / 1000;
-          }
-
-          // Calculate total impact: (production volume / unit size) × emissions per unit
-          const numberOfUnits = volumeInLitres / productSizeInLitres;
-          const totalImpact = lca.total_ghg_emissions * numberOfUnits;
+        if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
+          // LCA emissions are per consumer unit (bottle/can)
+          // Multiply emissions per unit by units produced
+          const totalImpact = lca.total_ghg_emissions * log.units_produced;
 
           scope3ProductsTotal += totalImpact;
+
+          console.log(`Product ${log.product_id}: ${log.units_produced} units × ${lca.total_ghg_emissions} kgCO2e/unit = ${totalImpact} kgCO2e`);
         }
       }
     }
