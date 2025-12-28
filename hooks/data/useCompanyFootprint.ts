@@ -205,7 +205,7 @@ export function useCompanyFootprint(year?: number) {
         }
       }
 
-      // Calculate Scope 3 Category 1 from LCAs
+      // Calculate Scope 3 Category 1 from LCAs (same as Company Emissions page)
       const { data: productionLogs } = await supabase
         .from('production_logs')
         .select('product_id, units_produced, date')
@@ -220,15 +220,36 @@ export function useCompanyFootprint(year?: number) {
 
           const { data: lca } = await supabase
             .from('product_lcas')
-            .select('total_ghg_emissions')
+            .select('id')
             .eq('product_id', log.product_id)
             .eq('status', 'completed')
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (lca && lca.total_ghg_emissions) {
-            scope3ProductsTotal += lca.total_ghg_emissions * log.units_produced;
+          if (lca) {
+            // Fetch materials breakdown to match Company Emissions page calculation
+            const { data: materials } = await supabase
+              .from('product_lca_materials')
+              .select('material_type, impact_climate')
+              .eq('product_lca_id', lca.id);
+
+            let materialsPerUnit = 0;
+            let packagingPerUnit = 0;
+
+            if (materials) {
+              materials.forEach((m: any) => {
+                if (m.material_type === 'ingredient') {
+                  materialsPerUnit += m.impact_climate || 0;
+                } else if (m.material_type === 'packaging') {
+                  packagingPerUnit += m.impact_climate || 0;
+                }
+              });
+            }
+
+            // Calculate total emissions: emissions per unit × number of units (in kg)
+            const totalImpactKg = (materialsPerUnit + packagingPerUnit) * log.units_produced;
+            scope3ProductsTotal += totalImpactKg;
           }
         }
       }
