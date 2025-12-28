@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Cloud, Info, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useGhgHotspots } from "@/hooks/data/useGhgHotspots"
+import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 
 const scopeColors: Record<number, string> = {
   1: 'bg-red-500',
@@ -39,55 +39,66 @@ function ScopeSkeleton() {
 }
 
 export function GHGEmissionsSummaryWidget() {
-  const { data: hotspots, isLoading, error } = useGhgHotspots()
+  const currentYear = new Date().getFullYear();
+  const { footprint, previewMode, loading: isLoading, error } = useCompanyFootprint(currentYear);
 
   const formatEmissions = (value: number) => {
     return `${value.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO₂e`
   }
 
-  const aggregateByScope = () => {
-    if (!hotspots || hotspots.length === 0) {
+  const getScopeData = () => {
+    if (!footprint?.breakdown) {
       return {
         scopeTotals: { 1: 0, 2: 0, 3: 0 },
         totalEmissions: 0,
         reportingPeriod: null,
-      }
+      };
     }
 
-    const scopeTotals = hotspots.reduce((acc, hotspot) => {
-      acc[hotspot.scope] = (acc[hotspot.scope] || 0) + hotspot.total_emissions
-      return acc
-    }, {} as Record<number, number>)
+    const scopeTotals = {
+      1: footprint.breakdown.scope1 / 1000,
+      2: footprint.breakdown.scope2 / 1000,
+      3: footprint.breakdown.scope3.total / 1000,
+    };
 
-    const totalEmissions = Object.values(scopeTotals).reduce((sum, val) => sum + val, 0)
-    const reportingPeriod = hotspots[0]?.reporting_period || null
+    const totalEmissions = footprint.total_emissions / 1000;
+    const reportingPeriod = footprint.year.toString();
 
     return {
-      scopeTotals: {
-        1: scopeTotals[1] || 0,
-        2: scopeTotals[2] || 0,
-        3: scopeTotals[3] || 0,
-      },
+      scopeTotals,
       totalEmissions,
       reportingPeriod,
-    }
-  }
+    };
+  };
 
-  const { scopeTotals, totalEmissions, reportingPeriod } = aggregateByScope()
+  const { scopeTotals, totalEmissions, reportingPeriod } = getScopeData();
 
   const getScopePercentage = (scopeTotal: number) => {
     if (totalEmissions === 0) return 0
     return (scopeTotal / totalEmissions) * 100
   }
 
-  const getTopCategories = (scope: number) => {
-    if (!hotspots) return []
-    return hotspots
-      .filter(h => h.scope === scope)
-      .sort((a, b) => b.total_emissions - a.total_emissions)
-      .slice(0, 3)
-      .map(h => h.category_name)
-  }
+  const getScopeDescription = (scope: number): string => {
+    if (!footprint?.breakdown) {
+      return scopeDescriptions[scope];
+    }
+
+    if (scope === 3 && footprint.breakdown.scope3) {
+      const categories: string[] = [];
+      if (footprint.breakdown.scope3.products > 0) categories.push('Products');
+      if (footprint.breakdown.scope3.business_travel > 0) categories.push('Business Travel');
+      if (footprint.breakdown.scope3.purchased_services > 0) categories.push('Services');
+      if (footprint.breakdown.scope3.employee_commuting > 0) categories.push('Commuting');
+      if (footprint.breakdown.scope3.capital_goods > 0) categories.push('Capital Goods');
+      if (footprint.breakdown.scope3.logistics > 0) categories.push('Logistics');
+      if (footprint.breakdown.scope3.waste > 0) categories.push('Waste');
+      if (footprint.breakdown.scope3.marketing > 0) categories.push('Marketing');
+
+      return categories.length > 0 ? categories.slice(0, 3).join(', ') : scopeDescriptions[scope];
+    }
+
+    return scopeDescriptions[scope];
+  };
 
   return (
     <Card className="col-span-full lg:col-span-2">
@@ -97,8 +108,13 @@ export function GHGEmissionsSummaryWidget() {
             <CardTitle className="flex items-center gap-2">
               <Cloud className="h-5 w-5" />
               GHG Emissions Summary
+              {previewMode && (
+                <Badge variant="outline" className="ml-2">Preview</Badge>
+              )}
             </CardTitle>
-            <CardDescription>Greenhouse gas emissions by scope</CardDescription>
+            <CardDescription>
+              {previewMode ? 'Estimated from product LCAs' : 'Official company footprint'}
+            </CardDescription>
           </div>
           {reportingPeriod && (
             <Badge variant="outline" className="h-fit">
@@ -124,14 +140,13 @@ export function GHGEmissionsSummaryWidget() {
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
             <h3 className="text-lg font-semibold mb-2">Failed to Load Emissions Data</h3>
-            <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
+            <p className="text-sm text-muted-foreground mb-4">{error}</p>
           </div>
         ) : (
           <div className="space-y-6">
             {([1, 2, 3] as const).map((scope) => {
               const scopeTotal = scopeTotals[scope]
               const percentage = getScopePercentage(scopeTotal)
-              const topCategories = getTopCategories(scope)
 
               return (
                 <div key={scope} className="space-y-3">
@@ -149,9 +164,7 @@ export function GHGEmissionsSummaryWidget() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {topCategories.length > 0
-                      ? topCategories.join(', ')
-                      : scopeDescriptions[scope]}
+                    {getScopeDescription(scope)}
                   </p>
                 </div>
               )
@@ -171,7 +184,7 @@ export function GHGEmissionsSummaryWidget() {
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <Info className="h-4 w-4" />
                   <span>
-                    {hotspots?.length || 0} emission {hotspots?.length === 1 ? 'category' : 'categories'} tracked
+                    {footprint?.status === 'Finalized' ? 'Finalized' : 'Draft'} • Last updated: {footprint?.last_updated ? new Date(footprint.last_updated).toLocaleDateString('en-GB') : 'Never'}
                   </span>
                 </div>
               )}

@@ -85,10 +85,15 @@ export default function DashboardPage() {
   const { currentOrganization } = useOrganization();
   const { enabledWidgets, loading, error, refetch } = useDashboardPreferences();
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setLastUpdated(new Date());
   }, [enabledWidgets]);
+
+  useEffect(() => {
+    handleRefresh();
+  }, []);
 
   const getColSpanClass = (colSpan: number) => {
     switch (colSpan) {
@@ -107,6 +112,7 @@ export default function DashboardPage() {
 
   const handleRefresh = () => {
     refetch();
+    setRefreshKey(prev => prev + 1);
     setLastUpdated(new Date());
   };
 
@@ -168,7 +174,7 @@ export default function DashboardPage() {
 
             return (
               <div
-                key={pref.widget_id}
+                key={`${pref.widget_id}-${refreshKey}`}
                 className={getColSpanClass(pref.col_span)}
               >
                 <WidgetComponent />

@@ -1,3 +1,16 @@
+/**
+ * useCompanyMetrics Hook
+ *
+ * IMPORTANT: This hook should NEVER contain hardcoded estimates or assumptions.
+ * All data must be queried from the database.
+ *
+ * ❌ WRONG: const estimate = total * 0.3
+ * ✅ CORRECT: Query actual breakdown from database
+ *
+ * NOTE: Scope breakdown has been moved to useCompanyFootprint hook
+ * to use corporate_reports as single source of truth.
+ * See hooks/data/useCompanyFootprint.ts for emissions scope breakdown.
+ */
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
@@ -116,7 +129,6 @@ export interface FacilityEmissionsBreakdown {
 export function useCompanyMetrics() {
   const { currentOrganization } = useOrganization();
   const [metrics, setMetrics] = useState<CompanyMetrics | null>(null);
-  const [scopeBreakdown, setScopeBreakdown] = useState<ScopeBreakdown | null>(null);
   const [facilityWaterRisks, setFacilityWaterRisks] = useState<FacilityWaterRisk[]>([]);
   const [materialFlows, setMaterialFlows] = useState<MaterialFlow[]>([]);
   const [natureMetrics, setNatureMetrics] = useState<NatureMetrics | null>(null);
@@ -310,12 +322,6 @@ export function useCompanyMetrics() {
       } catch (err) {
       }
 
-      // Fetch scope breakdown (from calculated emissions) and MERGE with product LCA data
-      try {
-        await fetchScopeBreakdown();
-      } catch (err) {
-      }
-
       // Fetch facility water risks
       try {
         await fetchFacilityWaterRisks();
@@ -421,13 +427,6 @@ export function useCompanyMetrics() {
       }
     });
 
-    // Set scope breakdown from product LCAs
-    // NOTE: Corporate emissions (Scope 1 & 2 from ghg_emissions table) will be merged later
-    // in fetchScopeBreakdown() to give a complete picture
-    if (scopeTotal.scope1 > 0 || scopeTotal.scope2 > 0 || scopeTotal.scope3 > 0) {
-      setScopeBreakdown(scopeTotal);
-    }
-
     // Set material breakdown
     if (allMaterials.length > 0) {
       setMaterialBreakdown(allMaterials);
@@ -451,49 +450,6 @@ export function useCompanyMetrics() {
     // Set GHG breakdown
     if (hasGhgData) {
       setGhgBreakdown(ghgTotal);
-    }
-  }
-
-  async function fetchScopeBreakdown() {
-    try {
-      if (!currentOrganization?.id) return;
-
-      const { data: emissions, error } = await supabase
-        .from('ghg_emissions')
-        .select('category_id, total_emissions, ghg_categories(scope)')
-        .eq('organization_id', currentOrganization.id);
-
-      if (error) throw error;
-
-      const corporateBreakdown: ScopeBreakdown = {
-        scope1: 0,
-        scope2: 0,
-        scope3: 0,
-      };
-
-      emissions?.forEach((emission: any) => {
-        const scope = emission.ghg_categories?.scope;
-        const value = emission.total_emissions || 0;
-
-        if (scope === 1) corporateBreakdown.scope1 += value;
-        else if (scope === 2) corporateBreakdown.scope2 += value;
-        else if (scope === 3) corporateBreakdown.scope3 += value;
-      });
-
-      setScopeBreakdown(prevBreakdown => {
-        if (!prevBreakdown) {
-          return corporateBreakdown;
-        }
-
-        const merged = {
-          scope1: corporateBreakdown.scope1 > 0 ? corporateBreakdown.scope1 : prevBreakdown.scope1,
-          scope2: corporateBreakdown.scope2 > 0 ? corporateBreakdown.scope2 : prevBreakdown.scope2,
-          scope3: prevBreakdown.scope3 + corporateBreakdown.scope3,
-        };
-
-        return merged;
-      });
-    } catch (err) {
     }
   }
 
@@ -725,6 +681,30 @@ export function useCompanyMetrics() {
     }
   }
 
+  async function getFacilityScopeBreakdown(facilityId: string, yearStart: string, yearEnd: string) {
+    try {
+      const { data: emissions, error } = await supabase
+        .from('calculated_emissions')
+        .select('scope, total_co2e')
+        .eq('facility_id', facilityId)
+        .gte('date', yearStart)
+        .lte('date', yearEnd);
+
+      if (error) {
+        console.error('Error fetching facility scope breakdown:', error);
+        return { scope1: 0, scope2: 0 };
+      }
+
+      const scope1 = emissions?.filter(e => e.scope === 1).reduce((sum, e) => sum + (e.total_co2e || 0), 0) || 0;
+      const scope2 = emissions?.filter(e => e.scope === 2).reduce((sum, e) => sum + (e.total_co2e || 0), 0) || 0;
+
+      return { scope1, scope2 };
+    } catch (err) {
+      console.error('Error in getFacilityScopeBreakdown:', err);
+      return { scope1: 0, scope2: 0 };
+    }
+  }
+
   async function fetchFacilityEmissions() {
     try {
       if (!currentOrganization?.id) {
@@ -796,19 +776,30 @@ export function useCompanyMetrics() {
 
       const totalEmissions = Array.from(facilityMap.values()).reduce((sum, f) => sum + f.total_emissions, 0);
 
-      const facilityBreakdown: FacilityEmissionsBreakdown[] = Array.from(facilityMap.entries()).map(([facility_id, data]) => ({
-        facility_id,
-        facility_name: data.facility_name,
-        location_city: data.location_city,
-        location_country_code: data.location_country_code,
-        total_emissions: data.total_emissions,
-        percentage: totalEmissions > 0 ? (data.total_emissions / totalEmissions) * 100 : 0,
-        production_volume: data.production_volume,
-        share_of_production: 0, // Would need total production to calculate
-        facility_intensity: data.facility_intensity,
-        scope1_emissions: data.total_emissions * 0.3, // Estimate: 30% scope 1, 70% scope 2
-        scope2_emissions: data.total_emissions * 0.7,
-      })).sort((a, b) => b.total_emissions - a.total_emissions);
+      const currentYear = new Date().getFullYear();
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+
+      const facilityBreakdownPromises = Array.from(facilityMap.entries()).map(async ([facility_id, data]) => {
+        const scopeBreakdown = await getFacilityScopeBreakdown(facility_id, yearStart, yearEnd);
+
+        return {
+          facility_id,
+          facility_name: data.facility_name,
+          location_city: data.location_city,
+          location_country_code: data.location_country_code,
+          total_emissions: data.total_emissions,
+          percentage: totalEmissions > 0 ? (data.total_emissions / totalEmissions) * 100 : 0,
+          production_volume: data.production_volume,
+          share_of_production: 0,
+          facility_intensity: data.facility_intensity,
+          scope1_emissions: scopeBreakdown.scope1,
+          scope2_emissions: scopeBreakdown.scope2,
+        };
+      });
+
+      const facilityBreakdown = (await Promise.all(facilityBreakdownPromises))
+        .sort((a, b) => b.total_emissions - a.total_emissions);
 
       setFacilityEmissionsBreakdown(facilityBreakdown);
     } catch (err) {
@@ -817,7 +808,6 @@ export function useCompanyMetrics() {
 
   return {
     metrics,
-    scopeBreakdown,
     facilityWaterRisks,
     materialFlows,
     materialBreakdown,

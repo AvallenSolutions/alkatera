@@ -26,7 +26,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-import { useCompanyMetrics, CompanyMetrics, ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
+import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
+import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
+
+interface ScopeBreakdown {
+  scope1: number;
+  scope2: number;
+  scope3: number;
+}
 import { ClimateCard } from '@/components/vitality/ClimateCard';
 import { WaterCard } from '@/components/vitality/WaterCard';
 import { WasteCard } from '@/components/vitality/WasteCard';
@@ -395,11 +402,12 @@ function ComplianceOverview({ metrics }: { metrics: any }) {
 }
 
 export default function PerformancePage() {
+  const currentYear = new Date().getFullYear();
   const hookResult = useCompanyMetrics();
+  const { footprint: footprintData, loading: footprintLoading } = useCompanyFootprint(currentYear);
 
   const {
     metrics,
-    scopeBreakdown,
     facilityWaterRisks,
     materialBreakdown,
     ghgBreakdown,
@@ -410,6 +418,12 @@ export default function PerformancePage() {
     error,
     refetch,
   } = hookResult;
+
+  const scopeBreakdown: ScopeBreakdown | null = footprintData?.breakdown ? {
+    scope1: footprintData.breakdown.scope1 / 1000,
+    scope2: footprintData.breakdown.scope2 / 1000,
+    scope3: footprintData.breakdown.scope3.total / 1000,
+  } : null;
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);

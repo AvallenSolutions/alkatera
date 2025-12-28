@@ -47,20 +47,31 @@ export function ProductLCAStatusWidget() {
 
         const { data: lcas, error: lcasError } = await supabase
           .from('product_lcas')
-          .select('id, status')
+          .select('id, product_id, status')
           .eq('organization_id', currentOrganization.id);
 
         if (lcasError) throw lcasError;
 
-        const completed = lcas?.filter((l) => l.status === 'completed').length || 0;
-        const draft = lcas?.filter((l) => l.status === 'draft').length || 0;
-        const inProgress = lcas?.filter((l) => l.status === 'in_progress').length || 0;
+        const productsWithCompletedLCA = products?.filter(p => {
+          const productLca = lcas?.find(l => l.id === p.latest_lca_id);
+          return productLca?.status === 'completed';
+        }).length || 0;
+
+        const productsWithInProgressLCA = products?.filter(p => {
+          const productLca = lcas?.find(l => l.id === p.latest_lca_id);
+          return productLca?.status === 'in_progress' || (p.has_active_lca && !productLca);
+        }).length || 0;
+
+        const productsWithDraftLCA = products?.filter(p => {
+          const productLca = lcas?.find(l => l.id === p.latest_lca_id);
+          return productLca?.status === 'draft' || (!productLca && !p.has_active_lca);
+        }).length || 0;
 
         setStats({
           total: products?.length || 0,
-          completed,
-          draft,
-          inProgress,
+          completed: productsWithCompletedLCA,
+          inProgress: productsWithInProgressLCA,
+          draft: productsWithDraftLCA,
         });
 
         const productsWithStatus = (products || []).map((p) => {
@@ -123,7 +134,7 @@ export function ProductLCAStatusWidget() {
   }
 
   const completionRate =
-    stats && stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+    stats && stats.total > 0 ? Math.min(Math.round((stats.completed / stats.total) * 100), 100) : 0;
 
   return (
     <Card>
@@ -153,21 +164,21 @@ export function ProductLCAStatusWidget() {
                 <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
                   {stats.completed}
                 </span>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400">Completed</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">Complete LCA</span>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30">
                 <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mb-1" />
                 <span className="text-lg font-bold text-amber-700 dark:text-amber-300">
                   {stats.inProgress}
                 </span>
-                <span className="text-xs text-amber-600 dark:text-amber-400">In Progress</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">LCA In Progress</span>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
                 <AlertCircle className="h-5 w-5 text-slate-500 mb-1" />
                 <span className="text-lg font-bold text-slate-700 dark:text-slate-300">
                   {stats.draft}
                 </span>
-                <span className="text-xs text-slate-500">Draft</span>
+                <span className="text-xs text-slate-500">No LCA</span>
               </div>
             </div>
 

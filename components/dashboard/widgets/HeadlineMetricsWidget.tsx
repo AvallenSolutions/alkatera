@@ -3,10 +3,11 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
-import { Leaf, TrendingDown, TrendingUp, Minus, ArrowRight } from 'lucide-react';
+import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
+import { Leaf, TrendingDown, TrendingUp, Minus, ArrowRight, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useEffect } from 'react';
 
 function ScopeDonut({
   scope1,
@@ -96,7 +97,8 @@ function ScopeDonut({
 }
 
 export function HeadlineMetricsWidget() {
-  const { metrics, scopeBreakdown, loading, error } = useCompanyMetrics();
+  const currentYear = new Date().getFullYear();
+  const { footprint, previewMode, loading, error, refetch } = useCompanyFootprint(currentYear);
 
   if (loading) {
     return (
@@ -125,16 +127,50 @@ export function HeadlineMetricsWidget() {
     );
   }
 
-  const totalEmissions = metrics?.total_impacts?.climate_change_gwp100 || 0;
-  const scope1 = scopeBreakdown?.scope1 || 0;
-  const scope2 = scopeBreakdown?.scope2 || 0;
-  const scope3 = scopeBreakdown?.scope3 || 0;
-  const hasData = totalEmissions > 0 || scope1 > 0 || scope2 > 0 || scope3 > 0;
+  const totalEmissions = footprint?.total_emissions ? footprint.total_emissions / 1000 : 0;
+  const scope1 = footprint?.breakdown?.scope1 ? footprint.breakdown.scope1 / 1000 : 0;
+  const scope2 = footprint?.breakdown?.scope2 ? footprint.breakdown.scope2 / 1000 : 0;
+  const scope3 = footprint?.breakdown?.scope3?.total ? footprint.breakdown.scope3.total / 1000 : 0;
+  const hasData = footprint?.has_data || false;
+
+  useEffect(() => {
+    if (footprint) {
+      console.log('📊 [HeadlineMetricsWidget] Displaying:', {
+        total_emissions_display: totalEmissions,
+        scope1_display: scope1,
+        scope2_display: scope2,
+        scope3_display: scope3,
+        unit: 'tCO2e',
+        preview_mode: previewMode,
+        data_source: previewMode ? 'Preview (production_logs × LCAs)' : 'Official (corporate_reports)'
+      });
+    }
+  }, [footprint, totalEmissions, scope1, scope2, scope3, previewMode]);
 
   return (
     <Card className="col-span-full bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-cyan-950/30 border-0 shadow-lg overflow-hidden">
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-emerald-200/30 to-transparent dark:from-emerald-800/20 rounded-full -translate-y-32 translate-x-32" />
       <CardContent className="p-6 relative">
+        {previewMode && (
+          <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                  Preview Mode - Unofficial Data
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300">
+                  Showing estimated emissions from product LCAs only. Generate official report for complete data.
+                </p>
+              </div>
+              <Button size="sm" variant="default" asChild>
+                <Link href={`/reports/company-footprint/${currentYear}`}>
+                  Generate Report
+                </Link>
+              </Button>
+            </div>
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between">
           <div className="space-y-4 flex-1">
             <div className="flex items-center gap-3">
@@ -146,7 +182,7 @@ export function HeadlineMetricsWidget() {
                   Carbon Footprint
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  {metrics?.total_products_assessed || 0} products assessed
+                  {footprint?.year || currentYear} footprint
                 </p>
               </div>
             </div>
@@ -185,7 +221,7 @@ export function HeadlineMetricsWidget() {
                 </div>
 
                 <Button variant="outline" size="sm" asChild className="mt-2">
-                  <Link href="/reports/company-footprint">
+                  <Link href={`/reports/company-footprint/${currentYear}`}>
                     View Full Report
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
