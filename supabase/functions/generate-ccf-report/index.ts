@@ -62,17 +62,23 @@ Deno.serve(async (req: Request) => {
 
     // ===== LOGIC BLOCK A: BOTTOM-UP (HIGH ACCURACY) =====
 
-    // Step 1: Scope 1 & 2 - Query facility emissions for the year
+    // Step 1: Scope 1 & 2 - Query facility activity data for the year
     const yearStart = `${year}-01-01`;
     const yearEnd = `${year}-12-31`;
 
-    // Get Scope 1 & 2 from activity data and calculated emissions
-    const { data: facilityEmissions, error: facilityError } = await supabase
-      .from("calculated_emissions")
-      .select("total_co2e, scope")
+    // Get Scope 1 & 2 from facility_activity_data (same as Company Emissions page)
+    const { data: facilityData, error: facilityError } = await supabase
+      .from("facility_activity_data")
+      .select(`
+        quantity,
+        scope_1_2_emission_sources!inner (
+          scope,
+          emission_factor_id
+        )
+      `)
       .eq("organization_id", organization_id)
-      .gte("date", yearStart)
-      .lte("date", yearEnd);
+      .gte("reporting_period_start", yearStart)
+      .lte("reporting_period_end", yearEnd);
 
     if (facilityError) {
       console.error("Error fetching facility emissions:", facilityError);
@@ -81,18 +87,50 @@ Deno.serve(async (req: Request) => {
     let scope1Total = 0;
     let scope2Total = 0;
 
-    if (facilityEmissions) {
-      facilityEmissions.forEach((emission) => {
-        if (emission.scope === 1) {
-          scope1Total += emission.total_co2e || 0;
-        } else if (emission.scope === 2) {
-          scope2Total += emission.total_co2e || 0;
+    if (facilityData) {
+      // Calculate Scope 1
+      const scope1Items = facilityData.filter((item: any) =>
+        item.scope_1_2_emission_sources?.scope === 'Scope 1'
+      );
+
+      for (const item of scope1Items) {
+        const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
+        if (factorId) {
+          const { data: factor } = await supabase
+            .from('emissions_factors')
+            .select('value')
+            .eq('factor_id', factorId)
+            .maybeSingle();
+
+          if (factor?.value) {
+            scope1Total += item.quantity * parseFloat(factor.value);
+          }
         }
-      });
+      }
+
+      // Calculate Scope 2
+      const scope2Items = facilityData.filter((item: any) =>
+        item.scope_1_2_emission_sources?.scope === 'Scope 2'
+      );
+
+      for (const item of scope2Items) {
+        const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
+        if (factorId) {
+          const { data: factor } = await supabase
+            .from('emissions_factors')
+            .select('value')
+            .eq('factor_id', factorId)
+            .maybeSingle();
+
+          if (factor?.value) {
+            scope2Total += item.quantity * parseFloat(factor.value);
+          }
+        }
+      }
     }
 
-    console.log(`Scope 1 Total: ${scope1Total} kgCO2e`);
-    console.log(`Scope 2 Total: ${scope2Total} kgCO2e`);
+    console.log(`Scope 1 Total: ${scope1Total} kgCO2e (from facility_activity_data)`);
+    console.log(`Scope 2 Total: ${scope2Total} kgCO2e (from facility_activity_data)`);
 
     // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA impacts
     const { data: productionLogs, error: productionError } = await supabase
