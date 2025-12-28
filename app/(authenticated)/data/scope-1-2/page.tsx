@@ -1156,14 +1156,7 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {(() => {
-                              const scope3Total = report?.breakdown_json?.scope3?.total;
-
-                              // Use report breakdown if calculated (after clicking Calculate Footprint)
-                              if (scope3Total && scope3Total > 0) {
-                                return `${(scope3Total / 1000).toFixed(3)} tCO₂e`;
-                              }
-
-                              // Otherwise sum exactly what the Scope 3 tab shows
+                              // ALWAYS sum exactly what the Scope 3 tab shows
                               // scope3Cat1CO2e is in tonnes, scope3OverheadsCO2e is in kg
                               const totalTonnes = scope3Cat1CO2e + (scope3OverheadsCO2e / 1000);
 
