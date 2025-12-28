@@ -1109,26 +1109,52 @@ export default function CompanyEmissionsPage() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {report?.total_emissions && report.total_emissions > 0 ? (
-                      <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                        <div className="text-sm text-muted-foreground mb-2">Total Footprint</div>
-                        <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                          {report.total_emissions >= 1000
-                            ? `${(report.total_emissions / 1000).toFixed(3)} tCO2e`
-                            : `${report.total_emissions.toFixed(3)} kgCO2e`}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          Last calculated: {new Date(report.updated_at).toLocaleString('en-GB')}
-                        </div>
-                      </div>
-                    ) : (
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                          No emissions calculated yet for {selectedYear}. Add your Scope 1, 2, and 3 data, then click "Calculate Footprint".
-                        </AlertDescription>
-                      </Alert>
-                    )}
+                    {(() => {
+                      // Calculate total live emissions (in tonnes)
+                      const totalLiveEmissionsTonnes =
+                        (scope1CO2e / 1000) +
+                        (scope2CO2e / 1000) +
+                        scope3Cat1CO2e +
+                        (calculatedScope3OverheadsCO2e / 1000);
+
+                      const hasLiveData = totalLiveEmissionsTonnes > 0;
+                      const hasOfficialReport = report?.total_emissions && report.total_emissions > 0;
+
+                      if (hasOfficialReport) {
+                        return (
+                          <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
+                            <div className="text-sm text-muted-foreground mb-2">Total Footprint</div>
+                            <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                              {(report.total_emissions / 1000).toFixed(3)} tCO2e
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              Last calculated: {new Date(report.updated_at).toLocaleString('en-GB')}
+                            </div>
+                          </div>
+                        );
+                      } else if (hasLiveData) {
+                        return (
+                          <div className="text-center py-8 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <div className="text-sm text-amber-700 dark:text-amber-300 mb-2">Live Calculation (Unofficial)</div>
+                            <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                              {totalLiveEmissionsTonnes.toFixed(3)} tCO2e
+                            </div>
+                            <div className="text-sm text-amber-700 dark:text-amber-300">
+                              Click "Calculate Footprint" to generate official report
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <Alert>
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>
+                              No emissions calculated yet for {selectedYear}. Add your Scope 1, 2, and 3 data, then click "Calculate Footprint".
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      }
+                    })()}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <Card className="border-orange-200 dark:border-orange-900">
