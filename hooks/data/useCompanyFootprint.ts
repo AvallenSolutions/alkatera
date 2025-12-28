@@ -65,18 +65,15 @@ export function useCompanyFootprint(year?: number) {
 
       if (reportError) throw reportError;
 
-      if (report && report.breakdown_json) {
-        console.log('🔍 [Dashboard Debug] Company Footprint Data:', {
+      if (report && report.breakdown_json && report.total_emissions > 0) {
+        console.log('🔍 [Dashboard] Using official corporate report:', {
           year: targetYear,
-          organization: currentOrganization?.name,
           total_emissions_kg: report.total_emissions,
-          total_emissions_t: report.total_emissions ? report.total_emissions / 1000 : 0,
+          total_emissions_t: report.total_emissions / 1000,
           scope1_t: report.breakdown_json?.scope1 ? report.breakdown_json.scope1 / 1000 : 0,
           scope2_t: report.breakdown_json?.scope2 ? report.breakdown_json.scope2 / 1000 : 0,
           scope3_t: report.breakdown_json?.scope3?.total ? report.breakdown_json.scope3.total / 1000 : 0,
-          status: report.status,
-          last_updated: report.updated_at,
-          data_source: 'corporate_reports.breakdown_json'
+          data_source: 'corporate_reports (official)'
         });
 
         setFootprint({
@@ -92,27 +89,29 @@ export function useCompanyFootprint(year?: number) {
         return;
       }
 
-      const preview = await calculatePreviewFromLCAs(targetYear);
+      // Calculate live data from actual sources (same as Company Emissions page)
+      const liveData = await calculateLiveEmissions(targetYear, report?.id);
 
-      if (preview && preview.total > 0) {
-        console.log('🔍 [Dashboard Debug] Preview Mode Active:', {
+      if (liveData && liveData.total > 0) {
+        console.log('🔍 [Dashboard] Using live calculated data:', {
           year: targetYear,
-          organization: currentOrganization?.name,
-          total_emissions_kg: preview.total,
-          total_emissions_t: preview.total / 1000,
-          scope3_products_t: preview.breakdown.scope3.products / 1000,
-          data_source: 'production_logs × product_lcas (PREVIEW)'
+          total_emissions_kg: liveData.total,
+          total_emissions_t: liveData.total / 1000,
+          scope1_t: liveData.breakdown.scope1 / 1000,
+          scope2_t: liveData.breakdown.scope2 / 1000,
+          scope3_t: liveData.breakdown.scope3.total / 1000,
+          data_source: 'Live calculation (facility_activity_data + LCAs + overheads)'
         });
 
         setFootprint({
           year: targetYear,
-          total_emissions: preview.total,
-          breakdown: preview.breakdown,
-          status: 'Draft',
+          total_emissions: liveData.total,
+          breakdown: liveData.breakdown,
+          status: report?.status || 'Draft',
           last_updated: null,
           has_data: true,
         });
-        setPreviewMode(true);
+        setPreviewMode(false);
       } else {
         setFootprint({
           year: targetYear,
@@ -132,12 +131,81 @@ export function useCompanyFootprint(year?: number) {
     }
   }
 
-  async function calculatePreviewFromLCAs(year: number) {
+  async function calculateLiveEmissions(year: number, reportId?: string) {
     try {
       const supabase = getSupabaseBrowserClient();
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
 
+      // Calculate Scope 1 emissions from facility activity data
+      const { data: scope1Data } = await supabase
+        .from('facility_activity_data')
+        .select(`
+          quantity,
+          scope_1_2_emission_sources!inner (
+            scope,
+            emission_factor_id
+          )
+        `)
+        .eq('organization_id', currentOrganization!.id)
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      let scope1Total = 0;
+      if (scope1Data) {
+        const scope1Items = scope1Data.filter((item: any) =>
+          item.scope_1_2_emission_sources?.scope === 'Scope 1'
+        );
+        for (const item of scope1Items) {
+          const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
+          if (factorId) {
+            const { data: factor } = await supabase
+              .from('emissions_factors')
+              .select('value')
+              .eq('factor_id', factorId)
+              .maybeSingle();
+            if (factor?.value) {
+              scope1Total += item.quantity * parseFloat(factor.value);
+            }
+          }
+        }
+      }
+
+      // Calculate Scope 2 emissions from facility activity data
+      const { data: scope2Data } = await supabase
+        .from('facility_activity_data')
+        .select(`
+          quantity,
+          scope_1_2_emission_sources!inner (
+            scope,
+            emission_factor_id
+          )
+        `)
+        .eq('organization_id', currentOrganization!.id)
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      let scope2Total = 0;
+      if (scope2Data) {
+        const scope2Items = scope2Data.filter((item: any) =>
+          item.scope_1_2_emission_sources?.scope === 'Scope 2'
+        );
+        for (const item of scope2Items) {
+          const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
+          if (factorId) {
+            const { data: factor } = await supabase
+              .from('emissions_factors')
+              .select('value')
+              .eq('factor_id', factorId)
+              .maybeSingle();
+            if (factor?.value) {
+              scope2Total += item.quantity * parseFloat(factor.value);
+            }
+          }
+        }
+      }
+
+      // Calculate Scope 3 Category 1 from LCAs
       const { data: productionLogs } = await supabase
         .from('production_logs')
         .select('product_id, units_produced, date')
@@ -145,52 +213,109 @@ export function useCompanyFootprint(year?: number) {
         .gte('date', yearStart)
         .lte('date', yearEnd);
 
-      if (!productionLogs || productionLogs.length === 0) {
-        return null;
-      }
-
       let scope3ProductsTotal = 0;
+      if (productionLogs) {
+        for (const log of productionLogs) {
+          if (!log.units_produced || log.units_produced <= 0) continue;
 
-      for (const log of productionLogs) {
-        if (!log.units_produced || log.units_produced <= 0) continue;
+          const { data: lca } = await supabase
+            .from('product_lcas')
+            .select('total_ghg_emissions')
+            .eq('product_id', log.product_id)
+            .eq('status', 'completed')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
 
-        const { data: lca } = await supabase
-          .from('product_lcas')
-          .select('total_ghg_emissions')
-          .eq('product_id', log.product_id)
-          .eq('status', 'completed')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (lca && lca.total_ghg_emissions) {
-          scope3ProductsTotal += lca.total_ghg_emissions * log.units_produced;
+          if (lca && lca.total_ghg_emissions) {
+            scope3ProductsTotal += lca.total_ghg_emissions * log.units_produced;
+          }
         }
       }
 
-      if (scope3ProductsTotal === 0) return null;
+      // Calculate Scope 3 other categories from corporate overheads
+      const scope3Overheads = {
+        business_travel: 0,
+        purchased_services: 0,
+        employee_commuting: 0,
+        capital_goods: 0,
+        logistics: 0,
+        waste: 0,
+        marketing: 0,
+      };
+
+      if (reportId) {
+        const { data: overheadData } = await supabase
+          .from('corporate_overheads')
+          .select('category, computed_co2e, material_type')
+          .eq('report_id', reportId);
+
+        if (overheadData) {
+          overheadData.forEach((entry: any) => {
+            const co2e = entry.computed_co2e || 0;
+            switch (entry.category) {
+              case 'business_travel':
+                scope3Overheads.business_travel += co2e;
+                break;
+              case 'employee_commuting':
+                scope3Overheads.employee_commuting += co2e;
+                break;
+              case 'capital_goods':
+                scope3Overheads.capital_goods += co2e;
+                break;
+              case 'operational_waste':
+                scope3Overheads.waste += co2e;
+                break;
+              case 'downstream_logistics':
+                scope3Overheads.logistics += co2e;
+                break;
+              case 'purchased_services':
+                if (entry.material_type) {
+                  scope3Overheads.marketing += co2e;
+                } else {
+                  scope3Overheads.purchased_services += co2e;
+                }
+                break;
+            }
+          });
+        }
+      }
+
+      const scope3Total =
+        scope3ProductsTotal +
+        scope3Overheads.business_travel +
+        scope3Overheads.purchased_services +
+        scope3Overheads.employee_commuting +
+        scope3Overheads.capital_goods +
+        scope3Overheads.logistics +
+        scope3Overheads.waste +
+        scope3Overheads.marketing;
+
+      const totalEmissions = scope1Total + scope2Total + scope3Total;
+
+      if (totalEmissions === 0) return null;
 
       return {
-        total: scope3ProductsTotal,
+        total: totalEmissions,
         breakdown: {
-          scope1: 0,
-          scope2: 0,
+          scope1: scope1Total,
+          scope2: scope2Total,
           scope3: {
             products: scope3ProductsTotal,
-            business_travel: 0,
-            purchased_services: 0,
-            employee_commuting: 0,
-            capital_goods: 0,
-            logistics: 0,
-            waste: 0,
-            marketing: 0,
-            total: scope3ProductsTotal,
+            business_travel: scope3Overheads.business_travel,
+            purchased_services: scope3Overheads.purchased_services,
+            employee_commuting: scope3Overheads.employee_commuting,
+            capital_goods: scope3Overheads.capital_goods,
+            logistics: scope3Overheads.logistics,
+            waste: scope3Overheads.waste,
+            marketing: scope3Overheads.marketing,
+            total: scope3Total,
           },
-          total: scope3ProductsTotal,
+          total: totalEmissions,
         },
       };
     } catch (err) {
-      console.error('Error calculating preview:', err);
+      console.error('Error calculating live emissions:', err);
       return null;
     }
   }
