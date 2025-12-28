@@ -67,12 +67,17 @@ export function useScope3Emissions(
       // 1. Fetch products emissions (Category 1: Purchased Goods & Services)
       const { data: productionData, error: productionError } = await supabase
         .from("production_logs")
-        .select("product_id, volume, unit, date")
+        .select("product_id, volume, unit, units_produced, date")
         .eq("organization_id", organizationId)
         .gte("date", yearStart)
         .lte("date", yearEnd);
 
       if (productionError) throw productionError;
+
+      console.log('📦 [SCOPE 3 HOOK] Production logs fetched', {
+        count: productionData?.length || 0,
+        year,
+      });
 
       if (productionData) {
         for (const log of productionData) {
@@ -85,7 +90,27 @@ export function useScope3Emissions(
             .maybeSingle();
 
           if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
-            breakdown.products += lca.total_ghg_emissions * log.volume;
+            // CRITICAL: Use units_produced (number of bottles/cans) NOT volume (bulk hectolitres)
+            // LCA emissions are per functional unit (per bottle/can)
+            const unitsProduced = log.units_produced || 0;
+
+            if (unitsProduced > 0) {
+              const impactKg = lca.total_ghg_emissions * unitsProduced;
+              breakdown.products += impactKg;
+
+              console.log('✅ [SCOPE 3 HOOK] Product calculated', {
+                product_id: log.product_id,
+                units_produced: unitsProduced,
+                emissions_per_unit: lca.total_ghg_emissions,
+                total_impact_kg: impactKg,
+                running_total: breakdown.products,
+              });
+            } else {
+              console.warn('⚠️ [SCOPE 3 HOOK] Skipping - units_produced is 0', {
+                product_id: log.product_id,
+                log,
+              });
+            }
           }
         }
       }
