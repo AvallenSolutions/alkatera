@@ -58,6 +58,7 @@ import { CapitalGoodsCard } from '@/components/reports/CapitalGoodsCard';
 import { LogisticsDistributionCard } from '@/components/reports/LogisticsDistributionCard';
 import { OperationalWasteCard } from '@/components/reports/OperationalWasteCard';
 import { MarketingMaterialsCard } from '@/components/reports/MarketingMaterialsCard';
+import { useScope3Emissions } from '@/hooks/data/useScope3Emissions';
 
 const scope1Schema = z.object({
   facility_id: z.string().min(1, 'Facility is required'),
@@ -171,6 +172,12 @@ export default function CompanyEmissionsPage() {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [scope3OverheadsCO2e, setScope3OverheadsCO2e] = useState(0);
+
+  // Use the shared Scope 3 hook for consistent calculations
+  const { scope3Emissions, isLoading: isLoadingScope3, refetch: refetchScope3 } = useScope3Emissions(
+    currentOrganization?.id,
+    selectedYear
+  );
 
   const scope1Form = useForm<Scope1FormValues>({
     resolver: zodResolver(scope1Schema),
@@ -1163,17 +1170,16 @@ export default function CompanyEmissionsPage() {
                                 return `${(scope3Total / 1000).toFixed(3)} tCO₂e`;
                               }
 
-                              // Otherwise show frontend-calculated value (before calculation)
-                              if (scope3Cat1CO2e > 0 || scope3OverheadsCO2e > 0) {
-                                const total = scope3Cat1CO2e + (scope3OverheadsCO2e / 1000);
-                                return `${total.toFixed(3)} tCO₂e`;
+                              // Otherwise show frontend-calculated value from shared hook (before calculation)
+                              if (scope3Emissions.total > 0) {
+                                return `${(scope3Emissions.total / 1000).toFixed(3)} tCO₂e`;
                               }
 
                               return 'No data';
                             })()}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>
-                          {(scope3Cat1CO2e > 0 || (report?.breakdown_json?.scope3?.products && report.breakdown_json.scope3.products > 0)) && (
+                          {(scope3Emissions.products > 0 || (report?.breakdown_json?.scope3?.products && report.breakdown_json.scope3.products > 0)) && (
                             <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
                               <CheckCircle2 className="h-3 w-3" />
                               Includes Cat 1 from LCAs (Tier 1 data)
