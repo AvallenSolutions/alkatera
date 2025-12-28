@@ -993,6 +993,19 @@ export default function CompanyEmissionsPage() {
   const logisticsEntries = overheads.filter((o) => o.category === 'downstream_logistics') as any[];
   const wasteEntries = overheads.filter((o) => o.category === 'operational_waste') as any[];
 
+  // Calculate total Scope 3 overhead emissions (in kg) from all categories
+  const scope3OverheadCategories = [
+    'business_travel',
+    'purchased_services',
+    'employee_commuting',
+    'capital_goods',
+    'operational_waste',
+    'downstream_logistics',
+  ];
+  const calculatedScope3OverheadsCO2e = overheads
+    .filter((o) => scope3OverheadCategories.includes(o.category))
+    .reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -1156,9 +1169,10 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {(() => {
-                              // ALWAYS sum exactly what the Scope 3 tab shows
-                              // scope3Cat1CO2e is in tonnes, scope3OverheadsCO2e is in kg
-                              const totalTonnes = scope3Cat1CO2e + (scope3OverheadsCO2e / 1000);
+                              // Sum ALL Scope 3 categories:
+                              // - scope3Cat1CO2e (Category 1 from LCAs) is in tonnes
+                              // - calculatedScope3OverheadsCO2e (all other categories) is in kg
+                              const totalTonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000);
 
                               if (totalTonnes > 0) {
                                 return `${totalTonnes.toFixed(3)} tCO₂e`;
