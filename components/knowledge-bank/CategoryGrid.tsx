@@ -9,6 +9,15 @@ import {
   ShieldCheck,
   BookOpen,
   FolderOpen,
+  Shield,
+  CloudRain,
+  Heart,
+  Users,
+  Leaf,
+  RefreshCw,
+  Home,
+  Truck,
+  ShoppingBag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { KnowledgeBankCategory } from '@/hooks/data/useKnowledgeBank'
@@ -24,6 +33,16 @@ const iconMap: Record<string, any> = {
   ShieldCheck,
   BookOpen,
   FolderOpen,
+  Shield,
+  CloudRain,
+  Heart,
+  Users,
+  Leaf,
+  RefreshCw,
+  Home,
+  TruckIcon: Truck,
+  Truck,
+  ShoppingBag,
 }
 
 const colorMap: Record<string, string> = {
@@ -33,6 +52,14 @@ const colorMap: Record<string, string> = {
   red: 'bg-red-500/10 text-red-500 hover:bg-red-500/20',
   yellow: 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20',
   orange: 'bg-orange-500/10 text-orange-500 hover:bg-orange-500/20',
+  slate: 'bg-slate-500/10 text-slate-500 hover:bg-slate-500/20',
+  sky: 'bg-sky-500/10 text-sky-500 hover:bg-sky-500/20',
+  rose: 'bg-rose-500/10 text-rose-500 hover:bg-rose-500/20',
+  violet: 'bg-violet-500/10 text-violet-500 hover:bg-violet-500/20',
+  emerald: 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20',
+  teal: 'bg-teal-500/10 text-teal-500 hover:bg-teal-500/20',
+  amber: 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20',
+  indigo: 'bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20',
 }
 
 export function CategoryGrid({ categories }: CategoryGridProps) {
