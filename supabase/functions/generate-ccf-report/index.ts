@@ -129,8 +129,48 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log(`Scope 1 Total: ${scope1Total} kgCO2e (from facility_activity_data)`);
-    console.log(`Scope 2 Total: ${scope2Total} kgCO2e (from facility_activity_data)`);
+    console.log(`Scope 1 Total (facilities): ${scope1Total} kgCO2e`);
+    console.log(`Scope 2 Total (facilities): ${scope2Total} kgCO2e`);
+
+    // Add fleet emissions to Scope 1 & 2
+    const { data: fleetScope1Data } = await supabase
+      .from('fleet_activities')
+      .select('emissions_tco2e')
+      .eq('organization_id', organization_id)
+      .eq('scope', 'Scope 1')
+      .gte('reporting_period_start', yearStart)
+      .lte('reporting_period_end', yearEnd);
+
+    let fleetScope1Kg = 0;
+    if (fleetScope1Data) {
+      fleetScope1Data.forEach((item: any) => {
+        const itemKg = (item.emissions_tco2e || 0) * 1000; // Convert tCO2e to kgCO2e
+        fleetScope1Kg += itemKg;
+        scope1Total += itemKg;
+      });
+    }
+
+    const { data: fleetScope2Data } = await supabase
+      .from('fleet_activities')
+      .select('emissions_tco2e')
+      .eq('organization_id', organization_id)
+      .eq('scope', 'Scope 2')
+      .gte('reporting_period_start', yearStart)
+      .lte('reporting_period_end', yearEnd);
+
+    let fleetScope2Kg = 0;
+    if (fleetScope2Data) {
+      fleetScope2Data.forEach((item: any) => {
+        const itemKg = (item.emissions_tco2e || 0) * 1000; // Convert tCO2e to kgCO2e
+        fleetScope2Kg += itemKg;
+        scope2Total += itemKg;
+      });
+    }
+
+    console.log(`Fleet Scope 1: ${fleetScope1Kg} kgCO2e`);
+    console.log(`Fleet Scope 2: ${fleetScope2Kg} kgCO2e`);
+    console.log(`Scope 1 Total (with fleet): ${scope1Total} kgCO2e`);
+    console.log(`Scope 2 Total (with fleet): ${scope2Total} kgCO2e`);
 
     // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA impacts
     // CRITICAL: Match Company Emissions page calculation using product_lca_materials
@@ -252,7 +292,7 @@ Deno.serve(async (req: Request) => {
         });
 
         console.log(`Overhead Scope 3 Total: ${overheadScope3Total} kgCO2e`);
-        console.log(`Business Travel: ${businessTravelTotal} kgCO2e`);
+        console.log(`Business Travel (overheads): ${businessTravelTotal} kgCO2e`);
         console.log(`Purchased Services: ${purchasedServicesTotal} kgCO2e`);
         console.log(`Employee Commuting: ${employeeCommutingTotal} kgCO2e`);
         console.log(`Capital Goods: ${capitalGoodsTotal} kgCO2e`);
@@ -260,6 +300,28 @@ Deno.serve(async (req: Request) => {
         console.log(`Waste: ${wasteTotal} kgCO2e`);
       }
     }
+
+    // Add Scope 3 Cat 6 (Grey Fleet) to business travel
+    const { data: fleetScope3Data } = await supabase
+      .from('fleet_activities')
+      .select('emissions_tco2e')
+      .eq('organization_id', organization_id)
+      .eq('scope', 'Scope 3 Cat 6')
+      .gte('reporting_period_start', yearStart)
+      .lte('reporting_period_end', yearEnd);
+
+    let fleetScope3Kg = 0;
+    if (fleetScope3Data) {
+      fleetScope3Data.forEach((item: any) => {
+        const itemKg = (item.emissions_tco2e || 0) * 1000; // Convert tCO2e to kgCO2e
+        fleetScope3Kg += itemKg;
+        businessTravelTotal += itemKg;
+        overheadScope3Total += itemKg;
+      });
+    }
+
+    console.log(`Fleet Scope 3 Cat 6 (Grey Fleet): ${fleetScope3Kg} kgCO2e`);
+    console.log(`Business Travel Total (with fleet): ${businessTravelTotal} kgCO2e`);
 
     // ===== AGGREGATE TOTALS =====
 

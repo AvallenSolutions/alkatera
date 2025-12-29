@@ -172,7 +172,7 @@ export function useCompanyFootprint(year?: number) {
       }
 
       // Add Scope 1 emissions from fleet activities (company-owned combustion vehicles)
-      const { data: fleetScope1Data } = await supabase
+      const { data: fleetScope1Data, error: fleetScope1Error } = await supabase
         .from('fleet_activities')
         .select('emissions_tco2e')
         .eq('organization_id', currentOrganization!.id)
@@ -180,12 +180,29 @@ export function useCompanyFootprint(year?: number) {
         .gte('reporting_period_start', yearStart)
         .lte('reporting_period_end', yearEnd);
 
+      console.log('🚗 [Fleet Scope 1] Query result:', {
+        count: fleetScope1Data?.length || 0,
+        data: fleetScope1Data,
+        error: fleetScope1Error,
+        yearStart,
+        yearEnd
+      });
+
+      let fleetScope1Kg = 0;
       if (fleetScope1Data) {
         fleetScope1Data.forEach((item: any) => {
           // Convert from tCO2e to kgCO2e (multiply by 1000)
-          scope1Total += (item.emissions_tco2e || 0) * 1000;
+          const itemKg = (item.emissions_tco2e || 0) * 1000;
+          fleetScope1Kg += itemKg;
+          scope1Total += itemKg;
         });
       }
+
+      console.log('🚗 [Fleet Scope 1] Added to Scope 1:', {
+        fleet_kg: fleetScope1Kg,
+        scope1_before_fleet: scope1Total - fleetScope1Kg,
+        scope1_after_fleet: scope1Total
+      });
 
       // Calculate Scope 2 emissions from facility activity data
       const { data: scope2Data } = await supabase
@@ -222,7 +239,7 @@ export function useCompanyFootprint(year?: number) {
       }
 
       // Add Scope 2 emissions from fleet activities (company-owned electric vehicles)
-      const { data: fleetScope2Data } = await supabase
+      const { data: fleetScope2Data, error: fleetScope2Error } = await supabase
         .from('fleet_activities')
         .select('emissions_tco2e')
         .eq('organization_id', currentOrganization!.id)
@@ -230,11 +247,23 @@ export function useCompanyFootprint(year?: number) {
         .gte('reporting_period_start', yearStart)
         .lte('reporting_period_end', yearEnd);
 
+      console.log('🚗 [Fleet Scope 2] Query result:', {
+        count: fleetScope2Data?.length || 0,
+        error: fleetScope2Error
+      });
+
+      let fleetScope2Kg = 0;
       if (fleetScope2Data) {
         fleetScope2Data.forEach((item: any) => {
           // Convert from tCO2e to kgCO2e (multiply by 1000)
-          scope2Total += (item.emissions_tco2e || 0) * 1000;
+          const itemKg = (item.emissions_tco2e || 0) * 1000;
+          fleetScope2Kg += itemKg;
+          scope2Total += itemKg;
         });
+      }
+
+      if (fleetScope2Kg > 0) {
+        console.log('🚗 [Fleet Scope 2] Added:', fleetScope2Kg, 'kg');
       }
 
       // Calculate Scope 3 Category 1 from LCAs (same as Company Emissions page)
@@ -335,7 +364,7 @@ export function useCompanyFootprint(year?: number) {
       }
 
       // Add Scope 3 Cat 6 (Business Travel - Grey Fleet) from fleet activities
-      const { data: fleetScope3Data } = await supabase
+      const { data: fleetScope3Data, error: fleetScope3Error } = await supabase
         .from('fleet_activities')
         .select('emissions_tco2e')
         .eq('organization_id', currentOrganization!.id)
@@ -343,11 +372,23 @@ export function useCompanyFootprint(year?: number) {
         .gte('reporting_period_start', yearStart)
         .lte('reporting_period_end', yearEnd);
 
+      console.log('🚗 [Fleet Scope 3 Cat 6] Query result:', {
+        count: fleetScope3Data?.length || 0,
+        error: fleetScope3Error
+      });
+
+      let fleetScope3Kg = 0;
       if (fleetScope3Data) {
         fleetScope3Data.forEach((item: any) => {
           // Convert from tCO2e to kgCO2e (multiply by 1000) and add to business travel
-          scope3Overheads.business_travel += (item.emissions_tco2e || 0) * 1000;
+          const itemKg = (item.emissions_tco2e || 0) * 1000;
+          fleetScope3Kg += itemKg;
+          scope3Overheads.business_travel += itemKg;
         });
+      }
+
+      if (fleetScope3Kg > 0) {
+        console.log('🚗 [Fleet Scope 3 Cat 6] Added to business travel:', fleetScope3Kg, 'kg');
       }
 
       const scope3Total =
