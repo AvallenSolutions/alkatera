@@ -80,6 +80,11 @@ const navigationStructure: NavItem[] = [
         icon: Warehouse,
       },
       {
+        name: 'Fleet',
+        href: '/company/fleet/',
+        icon: Truck,
+      },
+      {
         name: 'Company Emissions',
         href: '/data/scope-1-2/',
         icon: Flame,
@@ -120,18 +125,6 @@ const navigationStructure: NavItem[] = [
         name: "LCA's & EPD's",
         href: '/reports/lcas/',
         icon: Award,
-      },
-    ],
-  },
-  {
-    name: 'How We Work',
-    href: '/how-we-work/',
-    icon: Briefcase,
-    children: [
-      {
-        name: 'Fleet',
-        href: '/company/fleet/',
-        icon: Truck,
       },
     ],
   },
