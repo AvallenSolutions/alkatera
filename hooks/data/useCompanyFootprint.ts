@@ -172,9 +172,16 @@ export function useCompanyFootprint(year?: number) {
       }
 
       // Add Scope 1 emissions from fleet activities (company-owned combustion vehicles)
+      console.log('🚗 [Fleet Scope 1] Starting query with filters:', {
+        organization_id: currentOrganization!.id,
+        yearStart,
+        yearEnd,
+        scope1_before_fleet_kg: scope1Total
+      });
+
       const { data: fleetScope1Data, error: fleetScope1Error } = await supabase
         .from('fleet_activities')
-        .select('emissions_tco2e')
+        .select('emissions_tco2e, reporting_period_start, reporting_period_end')
         .eq('organization_id', currentOrganization!.id)
         .eq('scope', 'Scope 1')
         .gte('reporting_period_start', yearStart)
@@ -189,19 +196,29 @@ export function useCompanyFootprint(year?: number) {
       });
 
       let fleetScope1Kg = 0;
-      if (fleetScope1Data) {
+      if (fleetScope1Data && fleetScope1Data.length > 0) {
+        console.log('🚗 [Fleet Scope 1] Processing fleet activities...');
         fleetScope1Data.forEach((item: any) => {
           // Convert from tCO2e to kgCO2e (multiply by 1000)
           const itemKg = (item.emissions_tco2e || 0) * 1000;
+          console.log('🚗 [Fleet Scope 1] Item:', {
+            emissions_tco2e: item.emissions_tco2e,
+            emissions_kg: itemKg,
+            reporting_period: `${item.reporting_period_start} to ${item.reporting_period_end}`
+          });
           fleetScope1Kg += itemKg;
           scope1Total += itemKg;
         });
+      } else {
+        console.warn('🚗 [Fleet Scope 1] No fleet activities found or error occurred');
       }
 
-      console.log('🚗 [Fleet Scope 1] Added to Scope 1:', {
+      console.log('🚗 [Fleet Scope 1] Final totals:', {
         fleet_kg: fleetScope1Kg,
+        fleet_tonnes: fleetScope1Kg / 1000,
         scope1_before_fleet: scope1Total - fleetScope1Kg,
-        scope1_after_fleet: scope1Total
+        scope1_after_fleet: scope1Total,
+        scope1_after_fleet_tonnes: scope1Total / 1000
       });
 
       // Calculate Scope 2 emissions from facility activity data
@@ -239,9 +256,11 @@ export function useCompanyFootprint(year?: number) {
       }
 
       // Add Scope 2 emissions from fleet activities (company-owned electric vehicles)
+      console.log('🚗 [Fleet Scope 2] Starting query, scope2_before_fleet_kg:', scope2Total);
+
       const { data: fleetScope2Data, error: fleetScope2Error } = await supabase
         .from('fleet_activities')
-        .select('emissions_tco2e')
+        .select('emissions_tco2e, reporting_period_start, reporting_period_end')
         .eq('organization_id', currentOrganization!.id)
         .eq('scope', 'Scope 2')
         .gte('reporting_period_start', yearStart)
@@ -249,22 +268,27 @@ export function useCompanyFootprint(year?: number) {
 
       console.log('🚗 [Fleet Scope 2] Query result:', {
         count: fleetScope2Data?.length || 0,
+        data: fleetScope2Data,
         error: fleetScope2Error
       });
 
       let fleetScope2Kg = 0;
-      if (fleetScope2Data) {
+      if (fleetScope2Data && fleetScope2Data.length > 0) {
         fleetScope2Data.forEach((item: any) => {
           // Convert from tCO2e to kgCO2e (multiply by 1000)
           const itemKg = (item.emissions_tco2e || 0) * 1000;
+          console.log('🚗 [Fleet Scope 2] Item:', { emissions_kg: itemKg });
           fleetScope2Kg += itemKg;
           scope2Total += itemKg;
         });
       }
 
-      if (fleetScope2Kg > 0) {
-        console.log('🚗 [Fleet Scope 2] Added:', fleetScope2Kg, 'kg');
-      }
+      console.log('🚗 [Fleet Scope 2] Final totals:', {
+        fleet_kg: fleetScope2Kg,
+        fleet_tonnes: fleetScope2Kg / 1000,
+        scope2_after_fleet_kg: scope2Total,
+        scope2_after_fleet_tonnes: scope2Total / 1000
+      });
 
       // Calculate Scope 3 Category 1 from LCAs (same as Company Emissions page)
       const { data: productionLogs } = await supabase
@@ -364,9 +388,11 @@ export function useCompanyFootprint(year?: number) {
       }
 
       // Add Scope 3 Cat 6 (Business Travel - Grey Fleet) from fleet activities
+      console.log('🚗 [Fleet Scope 3 Cat 6] Starting query, business_travel_before_fleet_kg:', scope3Overheads.business_travel);
+
       const { data: fleetScope3Data, error: fleetScope3Error } = await supabase
         .from('fleet_activities')
-        .select('emissions_tco2e')
+        .select('emissions_tco2e, reporting_period_start, reporting_period_end')
         .eq('organization_id', currentOrganization!.id)
         .eq('scope', 'Scope 3 Cat 6')
         .gte('reporting_period_start', yearStart)
@@ -374,22 +400,27 @@ export function useCompanyFootprint(year?: number) {
 
       console.log('🚗 [Fleet Scope 3 Cat 6] Query result:', {
         count: fleetScope3Data?.length || 0,
+        data: fleetScope3Data,
         error: fleetScope3Error
       });
 
       let fleetScope3Kg = 0;
-      if (fleetScope3Data) {
+      if (fleetScope3Data && fleetScope3Data.length > 0) {
         fleetScope3Data.forEach((item: any) => {
           // Convert from tCO2e to kgCO2e (multiply by 1000) and add to business travel
           const itemKg = (item.emissions_tco2e || 0) * 1000;
+          console.log('🚗 [Fleet Scope 3 Cat 6] Item:', { emissions_kg: itemKg });
           fleetScope3Kg += itemKg;
           scope3Overheads.business_travel += itemKg;
         });
       }
 
-      if (fleetScope3Kg > 0) {
-        console.log('🚗 [Fleet Scope 3 Cat 6] Added to business travel:', fleetScope3Kg, 'kg');
-      }
+      console.log('🚗 [Fleet Scope 3 Cat 6] Final totals:', {
+        fleet_kg: fleetScope3Kg,
+        fleet_tonnes: fleetScope3Kg / 1000,
+        business_travel_after_fleet_kg: scope3Overheads.business_travel,
+        business_travel_after_fleet_tonnes: scope3Overheads.business_travel / 1000
+      });
 
       const scope3Total =
         scope3ProductsTotal +
