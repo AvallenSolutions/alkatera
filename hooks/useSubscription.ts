@@ -24,7 +24,9 @@ export type FeatureCode =
   | "email_support"
   | "priority_chat"
   | "automated_verification"
-  | "verified_data";
+  | "verified_data"
+  | "vehicle_registry"
+  | "fleet_reporting";
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -363,6 +365,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "waste_circularity",
     "monthly_analytics",
     "product_comparison",
+    "vehicle_registry",
+    "fleet_reporting",
   ];
   const canopyFeatures: FeatureCode[] = [
     "custom_weighting",

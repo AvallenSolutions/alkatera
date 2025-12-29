@@ -1,151 +1,314 @@
 "use client";
 
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Car, Zap, Fuel, FileText, Code, FlaskConical, CheckCircle2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Car,
+  Zap,
+  Fuel,
+  Plus,
+  TrendingDown,
+  Truck,
+  Users,
+  BarChart3,
+  AlertCircle,
+} from "lucide-react";
+import { useOrganization } from "@/lib/organizationContext";
+import { supabase } from "@/lib/supabaseClient";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
+import { FleetOverviewCards } from "@/components/fleet/FleetOverviewCards";
+import { FleetVehicleRegistry } from "@/components/fleet/FleetVehicleRegistry";
+import { FleetActivityEntry } from "@/components/fleet/FleetActivityEntry";
+import { FleetEmissionsChart } from "@/components/fleet/FleetEmissionsChart";
+import { FleetActivityTable } from "@/components/fleet/FleetActivityTable";
+
+interface FleetSummary {
+  totalVehicles: number;
+  activeVehicles: number;
+  scope1Emissions: number;
+  scope2Emissions: number;
+  scope3Emissions: number;
+  totalEmissions: number;
+}
 
 export default function FleetPage() {
+  const { currentOrganization } = useOrganization();
+  const [summary, setSummary] = useState<FleetSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [showActivityModal, setShowActivityModal] = useState(false);
+
+  useEffect(() => {
+    if (currentOrganization?.id) {
+      fetchFleetSummary();
+    }
+  }, [currentOrganization?.id]);
+
+  const fetchFleetSummary = async () => {
+    if (!currentOrganization?.id) return;
+
+    setLoading(true);
+    try {
+      const { data: vehicleData } = await supabase
+        .from("vehicles")
+        .select("id, status")
+        .eq("organization_id", currentOrganization.id);
+
+      const currentYear = new Date().getFullYear();
+      const { data: emissionsData } = await supabase
+        .from("fleet_activities")
+        .select("scope, emissions_tco2e")
+        .eq("organization_id", currentOrganization.id)
+        .gte("activity_date", `${currentYear}-01-01`);
+
+      const totalVehicles = vehicleData?.length || 0;
+      const activeVehicles = vehicleData?.filter((v) => v.status === "active").length || 0;
+
+      let scope1 = 0;
+      let scope2 = 0;
+      let scope3 = 0;
+
+      emissionsData?.forEach((activity) => {
+        const emissions = activity.emissions_tco2e || 0;
+        if (activity.scope === "Scope 1") scope1 += emissions;
+        else if (activity.scope === "Scope 2") scope2 += emissions;
+        else if (activity.scope?.includes("Scope 3")) scope3 += emissions;
+      });
+
+      setSummary({
+        totalVehicles,
+        activeVehicles,
+        scope1Emissions: scope1,
+        scope2Emissions: scope2,
+        scope3Emissions: scope3,
+        totalEmissions: scope1 + scope2 + scope3,
+      });
+    } catch (error) {
+      console.error("Error fetching fleet summary:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleActivityAdded = () => {
+    setShowActivityModal(false);
+    fetchFleetSummary();
+  };
+
   return (
     <div className="p-8 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Fleet Management</h1>
-        <p className="text-muted-foreground mt-1">
-          Smart Fleet Management with automatic Scope 1/2 routing based on propulsion type
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Fleet Management</h1>
+          <p className="text-muted-foreground mt-1">
+            Track and manage vehicle emissions across Scope 1, 2, and 3
+          </p>
+        </div>
+        <Button onClick={() => setShowActivityModal(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Log Fleet Activity
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2 mb-2">
-              <Fuel className="h-5 w-5 text-orange-600" />
-              <Badge variant="secondary">Scope 1</Badge>
-            </div>
-            <CardTitle className="text-lg">ICE Vehicles</CardTitle>
-            <CardDescription>Internal Combustion Engine</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Emissions</CardTitle>
+            <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Diesel, petrol, and hybrid vehicles automatically route to Scope 1 (direct combustion emissions)
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {summary?.totalEmissions.toFixed(2)} tCO2e
+                </div>
+                <p className="text-xs text-muted-foreground">Current year</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-5 w-5 text-blue-600" />
-              <Badge>Scope 2</Badge>
-            </div>
-            <CardTitle className="text-lg">BEV Vehicles</CardTitle>
-            <CardDescription>Battery Electric Vehicles</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Scope 1</CardTitle>
+            <Fuel className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Electric vehicles automatically route to Scope 2 (indirect grid electricity emissions)
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {summary?.scope1Emissions.toFixed(2)} tCO2e
+                </div>
+                <p className="text-xs text-muted-foreground">Direct combustion</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2 mb-2">
-              <Car className="h-5 w-5 text-slate-600" />
-              <Badge variant="outline">DEFRA 2025</Badge>
-            </div>
-            <CardTitle className="text-lg">Official Factors</CardTitle>
-            <CardDescription>UK Government Data</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Scope 2</CardTitle>
+            <Zap className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              All calculations use official DEFRA 2025 emission factors with full traceability
-            </p>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {summary?.scope2Emissions.toFixed(2)} tCO2e
+                </div>
+                <p className="text-xs text-muted-foreground">EV charging</p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Scope 3 Cat 6</CardTitle>
+            <Users className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {summary?.scope3Emissions.toFixed(2)} tCO2e
+                </div>
+                <p className="text-xs text-muted-foreground">Grey fleet / business travel</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="h-6 w-6 text-green-600" />
-            <CardTitle>Implementation Status</CardTitle>
-          </div>
-          <CardDescription>Complete DEFRA 2025 Fleet Management System</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h3 className="font-semibold mb-2">✅ Backend Complete</h3>
-            <ul className="text-sm space-y-1 ml-4">
-              <li>• Database schema (vehicles, fleet_activities tables)</li>
-              <li>• 10 DEFRA 2025 emission factors loaded</li>
-              <li>• Smart scope routing Edge Function deployed</li>
-              <li>• Full audit trail with Glass Box compliance</li>
-              <li>• RLS policies enforced</li>
-            </ul>
-          </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="vehicles">Vehicle Registry</TabsTrigger>
+          <TabsTrigger value="activities">Activity Log</TabsTrigger>
+          <TabsTrigger value="reporting">Reporting</TabsTrigger>
+        </TabsList>
 
-          <div>
-            <h3 className="font-semibold mb-2">📋 Documentation Available</h3>
-            <div className="grid gap-2 mt-2">
-              <Link href="/dev/docs/fleet-implementation">
-                <Button variant="outline" className="w-full justify-start">
-                  <Code className="h-4 w-4 mr-2" />
-                  Fleet Implementation - Technical Overview
-                </Button>
-              </Link>
-              <Link href="/dev/docs/verification-tests">
-                <Button variant="outline" className="w-full justify-start">
-                  <FlaskConical className="h-4 w-4 mr-2" />
-                  Verification Tests - SQL & API Tests
-                </Button>
-              </Link>
-              <Link href="/dev/docs/ui-documentation">
-                <Button variant="outline" className="w-full justify-start">
-                  <FileText className="h-4 w-4 mr-2" />
-                  UI Documentation - Components & User Journeys
-                </Button>
-              </Link>
-            </div>
+        <TabsContent value="overview" className="space-y-4">
+          <FleetOverviewCards />
+          <div className="grid gap-4 md:grid-cols-2">
+            <FleetEmissionsChart organizationId={currentOrganization?.id} />
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Scope Assignment Guide</CardTitle>
+                <CardDescription>
+                  How vehicle emissions are automatically categorised
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Badge variant="secondary" className="mt-0.5">Scope 1</Badge>
+                  <div>
+                    <p className="font-medium">Company-owned ICE vehicles</p>
+                    <p className="text-sm text-muted-foreground">
+                      Diesel, petrol, LPG vehicles owned or leased by the company
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Badge className="mt-0.5">Scope 2</Badge>
+                  <div>
+                    <p className="font-medium">Company-owned EVs</p>
+                    <p className="text-sm text-muted-foreground">
+                      Electric vehicles charged using grid electricity
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Badge variant="outline" className="mt-0.5">Scope 3</Badge>
+                  <div>
+                    <p className="font-medium">Grey Fleet / Employee vehicles</p>
+                    <p className="text-sm text-muted-foreground">
+                      Employee-owned vehicles used for business purposes
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
+        </TabsContent>
 
-          <div className="bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-900">
-            <h3 className="font-semibold mb-2">🎯 How It Works</h3>
-            <p className="text-sm mb-2">
-              The Smart Fleet Protocol automatically routes vehicle emissions to the correct GHG Protocol scope:
-            </p>
-            <div className="text-sm space-y-2 ml-4">
-              <div>
-                <Badge variant="secondary" className="mr-2">ICE</Badge>
-                <span>Diesel/Petrol vehicles → Scope 1 (Direct emissions from fuel combustion)</span>
-              </div>
-              <div>
-                <Badge className="mr-2">BEV</Badge>
-                <span>Electric vehicles → Scope 2 (Indirect emissions from grid electricity)</span>
-              </div>
-            </div>
-          </div>
+        <TabsContent value="vehicles">
+          <FeatureGate
+            feature="vehicle_registry"
+            fallback={
+              <Card className="border-dashed">
+                <CardContent className="py-12 text-center">
+                  <Truck className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="font-semibold text-lg mb-2">Vehicle Registry</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Upgrade to Blossom or Canopy to access the vehicle registry feature
+                  </p>
+                  <Button variant="outline">View Plans</Button>
+                </CardContent>
+              </Card>
+            }
+          >
+            <FleetVehicleRegistry
+              organizationId={currentOrganization?.id}
+              onVehicleAdded={fetchFleetSummary}
+            />
+          </FeatureGate>
+        </TabsContent>
 
-          <div className="bg-green-50 dark:bg-green-950/20 p-4 rounded-lg border border-green-200 dark:border-green-900">
-            <h3 className="font-semibold mb-2 text-green-900 dark:text-green-100">Example Calculation</h3>
-            <div className="text-sm space-y-2">
-              <div>
-                <p className="font-semibold">Tesla Model 3 (BEV) - 150 km journey:</p>
-                <p className="ml-4">Factor: 0.04597 kgCO2e/km (DEFRA 2025)</p>
-                <p className="ml-4">Emissions: (150 × 0.04597) / 1000 = <strong>0.006896 tCO2e</strong></p>
-                <p className="ml-4">Scope: <Badge>Scope 2</Badge></p>
-              </div>
-              <div className="mt-2">
-                <p className="font-semibold">Ford Transit Diesel Van - 85 km journey:</p>
-                <p className="ml-4">Factor: 0.26385 kgCO2e/km (DEFRA 2025)</p>
-                <p className="ml-4">Emissions: (85 × 0.26385) / 1000 = <strong>0.022427 tCO2e</strong></p>
-                <p className="ml-4">Scope: <Badge variant="secondary">Scope 1</Badge></p>
-              </div>
-            </div>
+        <TabsContent value="activities">
+          <FleetActivityTable
+            organizationId={currentOrganization?.id}
+            onActivityDeleted={fetchFleetSummary}
+          />
+        </TabsContent>
+
+        <TabsContent value="reporting">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Emissions by Scope
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FleetEmissionsChart organizationId={currentOrganization?.id} type="scope" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Car className="h-5 w-5" />
+                  Emissions by Vehicle Type
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <FleetEmissionsChart organizationId={currentOrganization?.id} type="vehicle" />
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
+
+      {showActivityModal && (
+        <FleetActivityEntry
+          organizationId={currentOrganization?.id}
+          onClose={() => setShowActivityModal(false)}
+          onSuccess={handleActivityAdded}
+        />
+      )}
     </div>
   );
 }

@@ -95,6 +95,8 @@ function LockedFeatureCard({
     priority_chat: "Priority Chat Support",
     automated_verification: "Automated Verification",
     verified_data: "Verified Data",
+    vehicle_registry: "Vehicle Registry",
+    fleet_reporting: "Fleet Reporting",
   };
 
   const tierDisplayNames: Record<TierName, string> = {
