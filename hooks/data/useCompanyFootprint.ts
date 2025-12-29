@@ -171,6 +171,22 @@ export function useCompanyFootprint(year?: number) {
         }
       }
 
+      // Add Scope 1 emissions from fleet activities (company-owned combustion vehicles)
+      const { data: fleetScope1Data } = await supabase
+        .from('fleet_activities')
+        .select('emissions_tco2e')
+        .eq('organization_id', currentOrganization!.id)
+        .eq('scope', 'Scope 1')
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      if (fleetScope1Data) {
+        fleetScope1Data.forEach((item: any) => {
+          // Convert from tCO2e to kgCO2e (multiply by 1000)
+          scope1Total += (item.emissions_tco2e || 0) * 1000;
+        });
+      }
+
       // Calculate Scope 2 emissions from facility activity data
       const { data: scope2Data } = await supabase
         .from('facility_activity_data')
@@ -203,6 +219,22 @@ export function useCompanyFootprint(year?: number) {
             }
           }
         }
+      }
+
+      // Add Scope 2 emissions from fleet activities (company-owned electric vehicles)
+      const { data: fleetScope2Data } = await supabase
+        .from('fleet_activities')
+        .select('emissions_tco2e')
+        .eq('organization_id', currentOrganization!.id)
+        .eq('scope', 'Scope 2')
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      if (fleetScope2Data) {
+        fleetScope2Data.forEach((item: any) => {
+          // Convert from tCO2e to kgCO2e (multiply by 1000)
+          scope2Total += (item.emissions_tco2e || 0) * 1000;
+        });
       }
 
       // Calculate Scope 3 Category 1 from LCAs (same as Company Emissions page)
@@ -300,6 +332,22 @@ export function useCompanyFootprint(year?: number) {
             }
           });
         }
+      }
+
+      // Add Scope 3 Cat 6 (Business Travel - Grey Fleet) from fleet activities
+      const { data: fleetScope3Data } = await supabase
+        .from('fleet_activities')
+        .select('emissions_tco2e')
+        .eq('organization_id', currentOrganization!.id)
+        .eq('scope', 'Scope 3 Cat 6')
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      if (fleetScope3Data) {
+        fleetScope3Data.forEach((item: any) => {
+          // Convert from tCO2e to kgCO2e (multiply by 1000) and add to business travel
+          scope3Overheads.business_travel += (item.emissions_tco2e || 0) * 1000;
+        });
       }
 
       const scope3Total =
