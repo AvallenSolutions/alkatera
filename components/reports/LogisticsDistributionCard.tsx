@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 interface LogisticsEntry {
   id: string;
@@ -150,19 +151,15 @@ export function LogisticsDistributionCard({
 
     setIsSaving(true);
     try {
+      const supabase = getSupabaseBrowserClient();
       const emissionFactor = getEmissionFactor(transportMode);
       const weightTonnes = totalProductionWeight / 1000;
       const distance = parseFloat(distanceKm);
       const computedCO2e = weightTonnes * distance * emissionFactor;
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/corporate_overheads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-        },
-        body: JSON.stringify({
+      const { error } = await supabase
+        .from("corporate_overheads")
+        .insert({
           report_id: reportId,
           category: "downstream_logistics",
           description: `${formatTransportMode(transportMode)} - ${distance}km`,
@@ -174,10 +171,9 @@ export function LogisticsDistributionCard({
           entry_date: new Date().toISOString().split("T")[0],
           emission_factor: emissionFactor,
           computed_co2e: computedCO2e,
-        }),
-      });
+        });
 
-      if (!response.ok) throw new Error("Failed to save configuration");
+      if (error) throw error;
 
       toast.success("Distribution configured");
       setDistanceKm("");

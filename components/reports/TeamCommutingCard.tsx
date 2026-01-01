@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
 import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 interface TeamCommutingCardProps {
   reportId: string;
@@ -38,29 +39,22 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate }: TeamC
 
     setIsSaving(true);
     try {
+      const supabase = getSupabaseBrowserClient();
       const computedCO2e = parseFloat(fteCount) * COMMUTING_FACTOR * 1000;
 
       // Delete existing commuting entry for this report
-      await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/corporate_overheads?report_id=eq.${reportId}&category=eq.employee_commuting`,
-        {
-          method: "DELETE",
-          headers: {
-            apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-          },
-        }
-      );
+      const { error: deleteError } = await supabase
+        .from("corporate_overheads")
+        .delete()
+        .eq("report_id", reportId)
+        .eq("category", "employee_commuting");
+
+      if (deleteError) throw deleteError;
 
       // Insert new entry
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/corporate_overheads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-        },
-        body: JSON.stringify({
+      const { error: insertError } = await supabase
+        .from("corporate_overheads")
+        .insert({
           report_id: reportId,
           category: "employee_commuting",
           description: `${fteCount} FTEs`,
@@ -70,10 +64,9 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate }: TeamC
           emission_factor: COMMUTING_FACTOR,
           computed_co2e: computedCO2e,
           fte_count: parseInt(fteCount),
-        }),
-      });
+        });
 
-      if (!response.ok) throw new Error("Failed to save FTE count");
+      if (insertError) throw insertError;
 
       toast.success("Employee count saved");
       setIsSaved(true);

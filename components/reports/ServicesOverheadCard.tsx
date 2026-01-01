@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 interface ServiceEntry {
   id: string;
@@ -56,17 +57,13 @@ export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOv
 
     setIsSaving(true);
     try {
+      const supabase = getSupabaseBrowserClient();
       const emissionFactor = 0.15; // kgCO2e per GBP
       const computedCO2e = parseFloat(amount) * emissionFactor;
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/corporate_overheads`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          Authorization: `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!}`,
-        },
-        body: JSON.stringify({
+      const { error } = await supabase
+        .from("corporate_overheads")
+        .insert({
           report_id: reportId,
           category: "purchased_services",
           description,
@@ -75,10 +72,9 @@ export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOv
           entry_date: date,
           emission_factor: emissionFactor,
           computed_co2e: computedCO2e,
-        }),
-      });
+        });
 
-      if (!response.ok) throw new Error("Failed to save entry");
+      if (error) throw error;
 
       toast.success("Service spend logged");
       setDescription("");
