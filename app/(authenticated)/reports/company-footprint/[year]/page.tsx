@@ -60,6 +60,8 @@ export default function FootprintBuilderPage() {
   const [report, setReport] = useState<CorporateReport | null>(null);
   const [overheads, setOverheads] = useState<OverheadEntry[]>([]);
   const [operationsCO2e, setOperationsCO2e] = useState(0);
+  const [scope1CO2e, setScope1CO2e] = useState(0);
+  const [scope2CO2e, setScope2CO2e] = useState(0);
   const [fleetCO2e, setFleetCO2e] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -147,18 +149,33 @@ export default function FootprintBuilderPage() {
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
 
-      const { data, error } = await supabase
+      // Fetch Scope 1 and 2 separately to avoid mixing them
+      const { data: scope1Data, error: scope1Error } = await supabase
         .from("calculated_emissions")
         .select("total_co2e")
         .eq("organization_id", currentOrganization.id)
         .gte("date", yearStart)
         .lte("date", yearEnd)
-        .in("scope", [1, 2]);
+        .eq("scope", 1);
 
-      if (error) throw error;
+      if (scope1Error) throw scope1Error;
 
-      const total = data?.reduce((sum, item) => sum + (item.total_co2e || 0), 0) || 0;
-      setOperationsCO2e(total);
+      const { data: scope2Data, error: scope2Error } = await supabase
+        .from("calculated_emissions")
+        .select("total_co2e")
+        .eq("organization_id", currentOrganization.id)
+        .gte("date", yearStart)
+        .lte("date", yearEnd)
+        .eq("scope", 2);
+
+      if (scope2Error) throw scope2Error;
+
+      const scope1Total = scope1Data?.reduce((sum, item) => sum + (item.total_co2e || 0), 0) || 0;
+      const scope2Total = scope2Data?.reduce((sum, item) => sum + (item.total_co2e || 0), 0) || 0;
+
+      setScope1CO2e(scope1Total);
+      setScope2CO2e(scope2Total);
+      setOperationsCO2e(scope1Total + scope2Total);
     } catch (error: any) {
       console.error("Error fetching operations emissions:", error);
     }
@@ -244,6 +261,15 @@ export default function FootprintBuilderPage() {
 
   // Use the total from the shared hook
   const scope3TotalCO2e = scope3Emissions.total;
+
+  // CRITICAL: Calculate LIVE totals from real-time data to ensure accuracy
+  // Fleet emissions are Scope 1 (mobile combustion), so add to Scope 1 total
+  const liveScope1Total = scope1CO2e + fleetCO2e;
+  const liveScope2Total = scope2CO2e;
+  const liveScope3Total = scope3TotalCO2e;
+
+  // Calculate the actual live total emissions
+  const liveTotalEmissions = liveScope1Total + liveScope2Total + liveScope3Total;
 
   const canGenerate = true; // Always allow generation
 
@@ -350,11 +376,11 @@ export default function FootprintBuilderPage() {
 
       {/* Summary Dashboard */}
       <FootprintSummaryDashboard
-        totalEmissions={report.total_emissions}
-        scope1Emissions={report.breakdown_json?.scope1 || 0}
-        scope2Emissions={report.breakdown_json?.scope2 || 0}
-        scope3Emissions={report.breakdown_json?.scope3?.total || scope3TotalCO2e}
-        scope3Breakdown={report.breakdown_json?.scope3 || {
+        totalEmissions={liveTotalEmissions}
+        scope1Emissions={liveScope1Total}
+        scope2Emissions={liveScope2Total}
+        scope3Emissions={liveScope3Total}
+        scope3Breakdown={{
           products: scope3Emissions.products,
           business_travel: scope3Emissions.business_travel,
           purchased_services: scope3Emissions.purchased_services,
