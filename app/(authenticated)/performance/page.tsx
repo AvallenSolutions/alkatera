@@ -28,14 +28,103 @@ import Link from 'next/link';
 
 import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
-import { useScope3GranularData } from '@/hooks/data/useScope3GranularData';
 import { useOrganization } from '@/lib/organizationContext';
+import type {
+  Scope3CategoryData,
+  ProductEmissionDetail,
+  BusinessTravelDetail,
+  LogisticsDetail,
+  WasteDetail,
+} from '@/hooks/data/useScope3GranularData';
 
 interface ScopeBreakdown {
   scope1: number;
   scope2: number;
   scope3: number;
 }
+
+const SCOPE3_CATEGORY_DEFINITIONS = [
+  { category: 1, name: 'Purchased Goods & Services', description: 'Upstream emissions from purchased goods and services' },
+  { category: 2, name: 'Capital Goods', description: 'Upstream emissions from capital goods' },
+  { category: 3, name: 'Fuel & Energy Related Activities', description: 'Not included in Scope 1 or 2' },
+  { category: 4, name: 'Upstream Transportation', description: 'Transportation of purchased goods' },
+  { category: 5, name: 'Waste Generated in Operations', description: 'Disposal of waste generated' },
+  { category: 6, name: 'Business Travel', description: 'Employee business travel' },
+  { category: 7, name: 'Employee Commuting', description: 'Employee travel to work' },
+  { category: 8, name: 'Upstream Leased Assets', description: 'Emissions from leased assets' },
+  { category: 9, name: 'Downstream Transportation', description: 'Transportation of sold products' },
+  { category: 10, name: 'Processing of Sold Products', description: 'Processing by third parties' },
+  { category: 11, name: 'Use of Sold Products', description: 'End use of products' },
+  { category: 12, name: 'End-of-Life Treatment', description: 'Disposal of sold products' },
+  { category: 13, name: 'Downstream Leased Assets', description: 'Emissions from leased assets' },
+  { category: 14, name: 'Franchises', description: 'Emissions from franchises' },
+  { category: 15, name: 'Investments', description: 'Emissions from investments' },
+];
+
+function transformFootprintToScope3Categories(
+  footprintData: any
+): {
+  categories: Scope3CategoryData[];
+  productDetails: ProductEmissionDetail[];
+  travelDetails: BusinessTravelDetail[];
+  logisticsDetails: LogisticsDetail[];
+  wasteDetails: WasteDetail[];
+  totalScope3: number;
+} {
+  if (!footprintData?.breakdown?.scope3) {
+    return {
+      categories: [],
+      productDetails: [],
+      travelDetails: [],
+      logisticsDetails: [],
+      wasteDetails: [],
+      totalScope3: 0,
+    };
+  }
+
+  const scope3Data = footprintData.breakdown.scope3;
+
+  const categoryMapping: Record<number, { value: number; dataQuality: 'primary' | 'secondary' | 'estimated' | 'missing' }> = {
+    1: { value: scope3Data.products || 0, dataQuality: scope3Data.products > 0 ? 'primary' : 'missing' },
+    2: { value: scope3Data.capital_goods || 0, dataQuality: scope3Data.capital_goods > 0 ? 'secondary' : 'missing' },
+    3: { value: 0, dataQuality: 'missing' },
+    4: { value: 0, dataQuality: 'missing' },
+    5: { value: scope3Data.waste || 0, dataQuality: scope3Data.waste > 0 ? 'secondary' : 'missing' },
+    6: { value: scope3Data.business_travel || 0, dataQuality: scope3Data.business_travel > 0 ? 'primary' : 'missing' },
+    7: { value: scope3Data.employee_commuting || 0, dataQuality: scope3Data.employee_commuting > 0 ? 'secondary' : 'missing' },
+    8: { value: 0, dataQuality: 'missing' },
+    9: { value: scope3Data.logistics || 0, dataQuality: scope3Data.logistics > 0 ? 'secondary' : 'missing' },
+    10: { value: 0, dataQuality: 'missing' },
+    11: { value: 0, dataQuality: 'missing' },
+    12: { value: 0, dataQuality: 'missing' },
+    13: { value: 0, dataQuality: 'missing' },
+    14: { value: 0, dataQuality: 'missing' },
+    15: { value: 0, dataQuality: 'missing' },
+  };
+
+  const categories: Scope3CategoryData[] = SCOPE3_CATEGORY_DEFINITIONS.map(def => {
+    const mapping = categoryMapping[def.category];
+    return {
+      category: def.category,
+      name: def.name,
+      description: def.description,
+      totalEmissions: mapping.value,
+      entryCount: mapping.value > 0 ? 1 : 0,
+      dataQuality: mapping.dataQuality,
+      entries: [],
+    };
+  });
+
+  return {
+    categories,
+    productDetails: [],
+    travelDetails: [],
+    logisticsDetails: [],
+    wasteDetails: [],
+    totalScope3: scope3Data.total || 0,
+  };
+}
+
 import { ClimateCard } from '@/components/vitality/ClimateCard';
 import { WaterCard } from '@/components/vitality/WaterCard';
 import { WasteCard } from '@/components/vitality/WasteCard';
@@ -416,8 +505,7 @@ export default function PerformancePage() {
     logisticsDetails: scope3LogisticsDetails,
     wasteDetails: scope3WasteDetails,
     totalScope3: scope3Total,
-    isLoading: isLoadingScope3,
-  } = useScope3GranularData(currentOrganization?.id, currentYear);
+  } = transformFootprintToScope3Categories(footprintData);
 
   const {
     metrics,
@@ -720,7 +808,7 @@ export default function PerformancePage() {
                       scope3WasteDetails={scope3WasteDetails}
                       scope3Total={scope3Total}
                       year={currentYear}
-                      isLoadingScope3={isLoadingScope3}
+                      isLoadingScope3={footprintLoading}
                     />
                   )}
                 </CardContent>
@@ -846,7 +934,7 @@ export default function PerformancePage() {
         scope3WasteDetails={scope3WasteDetails}
         scope3Total={scope3Total}
         year={currentYear}
-        isLoadingScope3={isLoadingScope3}
+        isLoadingScope3={footprintLoading}
       />
 
       <WaterImpactSheet
