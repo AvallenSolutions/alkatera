@@ -19,6 +19,7 @@ import { LogisticsDistributionCard } from "@/components/reports/LogisticsDistrib
 import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard";
 import { CompanyFleetCard } from "@/components/reports/CompanyFleetCard";
 import { MarketingMaterialsCard } from "@/components/reports/MarketingMaterialsCard";
+import { FootprintSummaryDashboard } from "@/components/reports/FootprintSummaryDashboard";
 import { useScope3Emissions } from "@/hooks/data/useScope3Emissions";
 import { toast } from "sonner";
 
@@ -347,22 +348,28 @@ export default function FootprintBuilderPage() {
         )}
       </div>
 
-      {/* Summary Card */}
-      {report.total_emissions > 0 && (
-        <Card className="border-2 border-slate-200 dark:border-slate-800">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground mb-2">Total Footprint</div>
-              <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                {(report.total_emissions / 1000).toFixed(3)} tCO₂e
-              </div>
-              <div className="text-sm text-muted-foreground">
-                Last calculated: {new Date(report.updated_at).toLocaleString("en-GB")}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Summary Dashboard */}
+      <FootprintSummaryDashboard
+        totalEmissions={report.total_emissions}
+        scope1Emissions={report.breakdown_json?.scope1 || 0}
+        scope2Emissions={report.breakdown_json?.scope2 || 0}
+        scope3Emissions={report.breakdown_json?.scope3?.total || scope3TotalCO2e}
+        scope3Breakdown={report.breakdown_json?.scope3 || {
+          products: scope3Emissions.products,
+          business_travel: scope3Emissions.business_travel,
+          purchased_services: scope3Emissions.purchased_services,
+          employee_commuting: scope3Emissions.employee_commuting,
+          capital_goods: scope3Emissions.capital_goods,
+          downstream_logistics: scope3Emissions.downstream_logistics,
+          operational_waste: scope3Emissions.operational_waste,
+          marketing_materials: scope3Emissions.marketing_materials,
+        }}
+        operationsEmissions={operationsCO2e}
+        fleetEmissions={fleetCO2e}
+        year={year}
+        lastUpdated={report.updated_at}
+        status={report.status}
+      />
     </div>
   );
 }

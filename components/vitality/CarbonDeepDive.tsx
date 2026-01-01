@@ -3,10 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { BarChart3, Leaf, Package, FlaskConical, AlertCircle, CheckCircle2, Info, Globe } from 'lucide-react';
 import { ScopeBreakdown } from '@/hooks/data/useCompanyMetrics';
 import { MaterialBreakdownItem, GHGBreakdown } from './CarbonBreakdownSheet';
 import { LifecycleStageBreakdown, FacilityEmissionsBreakdown } from '@/hooks/data/useCompanyMetrics';
+import { Scope3CategoryBreakdown } from './Scope3CategoryBreakdown';
+import {
+  Scope3CategoryData,
+  ProductEmissionDetail,
+  BusinessTravelDetail,
+  LogisticsDetail,
+  WasteDetail,
+} from '@/hooks/data/useScope3GranularData';
 
 interface CarbonDeepDiveProps {
   scopeBreakdown: ScopeBreakdown | null;
@@ -15,10 +23,34 @@ interface CarbonDeepDiveProps {
   ghgBreakdown?: GHGBreakdown | null;
   lifecycleStageBreakdown?: LifecycleStageBreakdown[];
   facilityEmissionsBreakdown?: FacilityEmissionsBreakdown[];
+  scope3Categories?: Scope3CategoryData[];
+  scope3ProductDetails?: ProductEmissionDetail[];
+  scope3TravelDetails?: BusinessTravelDetail[];
+  scope3LogisticsDetails?: LogisticsDetail[];
+  scope3WasteDetails?: WasteDetail[];
+  scope3Total?: number;
+  year?: number;
+  isLoadingScope3?: boolean;
 }
 
-export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, ghgBreakdown, lifecycleStageBreakdown, facilityEmissionsBreakdown }: CarbonDeepDiveProps) {
+export function CarbonDeepDive({
+  scopeBreakdown,
+  totalCO2,
+  materialBreakdown,
+  ghgBreakdown,
+  lifecycleStageBreakdown,
+  facilityEmissionsBreakdown,
+  scope3Categories,
+  scope3ProductDetails,
+  scope3TravelDetails,
+  scope3LogisticsDetails,
+  scope3WasteDetails,
+  scope3Total,
+  year,
+  isLoadingScope3,
+}: CarbonDeepDiveProps) {
   const [sortBy, setSortBy] = useState<'impact' | 'name' | 'quantity'>('impact');
+  const hasScope3Data = scope3Categories && scope3Categories.length > 0;
 
   // Check if we have any data to display
   const hasMaterialData = materialBreakdown && materialBreakdown.length > 0;
@@ -138,9 +170,13 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
   return (
     <div className="space-y-6">
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="stages">Lifecycle Stages</TabsTrigger>
+          <TabsTrigger value="scope3" className="flex items-center gap-1">
+            <Globe className="h-3 w-3" />
+            Scope 3
+          </TabsTrigger>
+          <TabsTrigger value="stages">Lifecycle</TabsTrigger>
           <TabsTrigger value="materials">Materials</TabsTrigger>
           <TabsTrigger value="ghg">GHG Detail</TabsTrigger>
         </TabsList>
@@ -334,6 +370,34 @@ export function CarbonDeepDive({ scopeBreakdown, totalCO2, materialBreakdown, gh
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Scope 3 Deep Dive Tab */}
+        <TabsContent value="scope3" className="space-y-4 mt-6">
+          {hasScope3Data ? (
+            <Scope3CategoryBreakdown
+              categories={scope3Categories}
+              productDetails={scope3ProductDetails || []}
+              travelDetails={scope3TravelDetails || []}
+              logisticsDetails={scope3LogisticsDetails || []}
+              wasteDetails={scope3WasteDetails || []}
+              totalScope3={scope3Total || 0}
+              year={year || new Date().getFullYear()}
+              isLoading={isLoadingScope3}
+            />
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <Globe className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  No Scope 3 breakdown data available
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Add product LCAs, business travel, or overhead data to see a detailed Scope 3 breakdown by GHG Protocol category.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Lifecycle Stages Tab */}

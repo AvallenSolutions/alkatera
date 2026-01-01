@@ -9,6 +9,13 @@ import {
 import { Leaf } from 'lucide-react';
 import { CarbonDeepDive } from './CarbonDeepDive';
 import { ScopeBreakdown, LifecycleStageBreakdown, FacilityEmissionsBreakdown } from '@/hooks/data/useCompanyMetrics';
+import {
+  Scope3CategoryData,
+  ProductEmissionDetail,
+  BusinessTravelDetail,
+  LogisticsDetail,
+  WasteDetail,
+} from '@/hooks/data/useScope3GranularData';
 
 export interface MaterialBreakdownItem {
   name: string;
@@ -51,6 +58,14 @@ interface CarbonBreakdownSheetProps {
   ghgBreakdown?: GHGBreakdown | null;
   lifecycleStageBreakdown?: LifecycleStageBreakdown[];
   facilityEmissionsBreakdown?: FacilityEmissionsBreakdown[];
+  scope3Categories?: Scope3CategoryData[];
+  scope3ProductDetails?: ProductEmissionDetail[];
+  scope3TravelDetails?: BusinessTravelDetail[];
+  scope3LogisticsDetails?: LogisticsDetail[];
+  scope3WasteDetails?: WasteDetail[];
+  scope3Total?: number;
+  year?: number;
+  isLoadingScope3?: boolean;
 }
 
 export function CarbonBreakdownSheet({
@@ -62,6 +77,14 @@ export function CarbonBreakdownSheet({
   ghgBreakdown,
   lifecycleStageBreakdown,
   facilityEmissionsBreakdown,
+  scope3Categories,
+  scope3ProductDetails,
+  scope3TravelDetails,
+  scope3LogisticsDetails,
+  scope3WasteDetails,
+  scope3Total,
+  year,
+  isLoadingScope3,
 }: CarbonBreakdownSheetProps) {
   // Delay rendering to prevent Bolt auto-detection
   const [shouldRender, setShouldRender] = React.useState(false);
@@ -103,6 +126,14 @@ export function CarbonBreakdownSheet({
             ghgBreakdown={ghgBreakdown}
             lifecycleStageBreakdown={lifecycleStageBreakdown}
             facilityEmissionsBreakdown={facilityEmissionsBreakdown}
+            scope3Categories={scope3Categories}
+            scope3ProductDetails={scope3ProductDetails}
+            scope3TravelDetails={scope3TravelDetails}
+            scope3LogisticsDetails={scope3LogisticsDetails}
+            scope3WasteDetails={scope3WasteDetails}
+            scope3Total={scope3Total}
+            year={year}
+            isLoadingScope3={isLoadingScope3}
           />
         ) : (
           <div className="flex items-center justify-center p-8">

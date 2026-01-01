@@ -28,6 +28,8 @@ import Link from 'next/link';
 
 import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
+import { useScope3GranularData } from '@/hooks/data/useScope3GranularData';
+import { useOrganization } from '@/lib/organizationContext';
 
 interface ScopeBreakdown {
   scope1: number;
@@ -403,8 +405,19 @@ function ComplianceOverview({ metrics }: { metrics: any }) {
 
 export default function PerformancePage() {
   const currentYear = new Date().getFullYear();
+  const { currentOrganization } = useOrganization();
   const hookResult = useCompanyMetrics();
   const { footprint: footprintData, loading: footprintLoading } = useCompanyFootprint(currentYear);
+
+  const {
+    categories: scope3Categories,
+    productDetails: scope3ProductDetails,
+    travelDetails: scope3TravelDetails,
+    logisticsDetails: scope3LogisticsDetails,
+    wasteDetails: scope3WasteDetails,
+    totalScope3: scope3Total,
+    isLoading: isLoadingScope3,
+  } = useScope3GranularData(currentOrganization?.id, currentYear);
 
   const {
     metrics,
@@ -700,6 +713,14 @@ export default function PerformancePage() {
                       ghgBreakdown={ghgBreakdown}
                       lifecycleStageBreakdown={lifecycleStageBreakdown}
                       facilityEmissionsBreakdown={facilityEmissionsBreakdown}
+                      scope3Categories={scope3Categories}
+                      scope3ProductDetails={scope3ProductDetails}
+                      scope3TravelDetails={scope3TravelDetails}
+                      scope3LogisticsDetails={scope3LogisticsDetails}
+                      scope3WasteDetails={scope3WasteDetails}
+                      scope3Total={scope3Total}
+                      year={currentYear}
+                      isLoadingScope3={isLoadingScope3}
                     />
                   )}
                 </CardContent>
@@ -818,6 +839,14 @@ export default function PerformancePage() {
         ghgBreakdown={ghgBreakdown}
         lifecycleStageBreakdown={lifecycleStageBreakdown}
         facilityEmissionsBreakdown={facilityEmissionsBreakdown}
+        scope3Categories={scope3Categories}
+        scope3ProductDetails={scope3ProductDetails}
+        scope3TravelDetails={scope3TravelDetails}
+        scope3LogisticsDetails={scope3LogisticsDetails}
+        scope3WasteDetails={scope3WasteDetails}
+        scope3Total={scope3Total}
+        year={currentYear}
+        isLoadingScope3={isLoadingScope3}
       />
 
       <WaterImpactSheet
