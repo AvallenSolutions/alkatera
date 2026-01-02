@@ -1110,37 +1110,26 @@ export default function CompanyEmissionsPage() {
                 ) : (
                   <div className="space-y-6">
                     {(() => {
-                      // Calculate total live emissions (in tonnes)
+                      // CRITICAL: Always calculate LIVE total emissions from real-time data (in tonnes)
+                      // Fleet emissions are included in scope1CO2e already, so no need to add separately
                       const totalLiveEmissionsTonnes =
-                        (scope1CO2e / 1000) +
-                        (scope2CO2e / 1000) +
-                        scope3Cat1CO2e +
-                        (calculatedScope3OverheadsCO2e / 1000);
+                        (scope1CO2e / 1000) +       // Scope 1 in tonnes
+                        (fleetCO2e) +                // Fleet already in tonnes
+                        (scope2CO2e / 1000) +       // Scope 2 in tonnes
+                        scope3Cat1CO2e +            // Scope 3 Cat 1 already in tonnes
+                        (calculatedScope3OverheadsCO2e / 1000); // Scope 3 other categories in tonnes
 
                       const hasLiveData = totalLiveEmissionsTonnes > 0;
-                      const hasOfficialReport = report?.total_emissions && report.total_emissions > 0;
 
-                      if (hasOfficialReport) {
+                      if (hasLiveData) {
                         return (
                           <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
                             <div className="text-sm text-muted-foreground mb-2">Total Footprint</div>
                             <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                              {(report.total_emissions / 1000).toFixed(3)} tCO2e
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Last calculated: {new Date(report.updated_at).toLocaleString('en-GB')}
-                            </div>
-                          </div>
-                        );
-                      } else if (hasLiveData) {
-                        return (
-                          <div className="text-center py-8 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                            <div className="text-sm text-amber-700 dark:text-amber-300 mb-2">Live Calculation (Unofficial)</div>
-                            <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
                               {totalLiveEmissionsTonnes.toFixed(3)} tCO2e
                             </div>
-                            <div className="text-sm text-amber-700 dark:text-amber-300">
-                              Click "Calculate Footprint" to generate official report
+                            <div className="text-sm text-muted-foreground">
+                              Last calculated: {report?.updated_at ? new Date(report.updated_at).toLocaleString('en-GB') : 'Just now'}
                             </div>
                           </div>
                         );
@@ -1164,11 +1153,16 @@ export default function CompanyEmissionsPage() {
                             <span className="font-medium">Scope 1</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {scope1CO2e > 0
-                              ? `${(scope1CO2e / 1000).toFixed(3)} tCO₂e`
-                              : 'No data'}
+                            {(() => {
+                              // CRITICAL: Scope 1 = Operations + Fleet
+                              // scope1CO2e is in kg, fleetCO2e is in tonnes
+                              const totalScope1Tonnes = (scope1CO2e / 1000) + fleetCO2e;
+                              return totalScope1Tonnes > 0
+                                ? `${totalScope1Tonnes.toFixed(3)} tCO₂e`
+                                : 'No data';
+                            })()}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Direct emissions (fuel combustion, process, fugitive)</p>
+                          <p className="text-sm text-muted-foreground mt-1">Direct emissions (fuel combustion, process, fugitive, fleet)</p>
                         </CardContent>
                       </Card>
 

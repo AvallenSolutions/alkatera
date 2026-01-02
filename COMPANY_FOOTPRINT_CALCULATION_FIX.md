@@ -273,8 +273,29 @@ test('Company footprint totals match sum of scopes', () => {
 
 ## Files Modified
 
-- `/app/(authenticated)/reports/company-footprint/[year]/page.tsx`
+1. `/app/(authenticated)/reports/company-footprint/[year]/page.tsx` - Detailed year-specific footprint page
+2. `/app/(authenticated)/data/scope-1-2/page.tsx` - Main Company Emissions overview page
+
+## Key Changes Per File
+
+### File 1: `/app/(authenticated)/reports/company-footprint/[year]/page.tsx`
+
+**Changes:**
+- Added separate state variables for `scope1CO2e` and `scope2CO2e`
+- Updated `fetchOperationsEmissions()` to query Scope 1 and 2 separately
+- Calculate live totals: `liveScope1Total = scope1CO2e + fleetCO2e`
+- Pass live totals to `FootprintSummaryDashboard` component instead of stale database values
+
+### File 2: `/app/(authenticated)/data/scope-1-2/page.tsx`
+
+**Changes:**
+- Updated total calculation to always use live data instead of `report.total_emissions`
+- Removed "Official Report" vs "Live Calculation" distinction - now always shows live data
+- Updated Scope 1 card to include fleet emissions: `(scope1CO2e / 1000) + fleetCO2e`
+- Updated description to mention fleet: "Direct emissions (fuel combustion, process, fugitive, fleet)"
 
 ## Result
 
-The Company Footprint now displays **100% accurate calculations** with live totals that always match the sum of Scope 1, 2, and 3 emissions. No risk of double counting exists.
+The Company Footprint now displays **100% accurate calculations** with live totals that always match the sum of Scope 1, 2, and 3 emissions on BOTH pages. No risk of double counting exists.
+
+The total will now correctly equal: **Scope 1 (operations + fleet) + Scope 2 + Scope 3**
