@@ -19,6 +19,8 @@ import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RichTextEditor } from "@/components/blog/RichTextEditor";
+import { ImageUpload } from "@/components/blog/ImageUpload";
 
 interface BlogPost {
   id: string;
@@ -276,13 +278,11 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
 
               {/* Content */}
               <div className="space-y-2">
-                <Label htmlFor="content">Content * (Markdown/HTML supported)</Label>
-                <Textarea
-                  id="content"
-                  rows={20}
-                  className="font-mono"
-                  value={post.content}
-                  onChange={(e) => setPost(prev => prev ? { ...prev, content: e.target.value } : null)}
+                <Label htmlFor="content">Content *</Label>
+                <RichTextEditor
+                  content={post.content}
+                  onChange={(content) => setPost(prev => prev ? { ...prev, content } : null)}
+                  placeholder="Write your post content here..."
                 />
               </div>
             </CardContent>
@@ -342,15 +342,12 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
               </div>
 
               {/* Featured Image */}
-              <div className="space-y-2">
-                <Label htmlFor="featured_image">Featured Image URL</Label>
-                <Input
-                  id="featured_image"
-                  placeholder="https://..."
-                  value={post.featured_image_url || ''}
-                  onChange={(e) => setPost(prev => prev ? { ...prev, featured_image_url: e.target.value } : null)}
-                />
-              </div>
+              <ImageUpload
+                label="Featured Image"
+                description="Upload a featured image for your post"
+                currentImageUrl={post.featured_image_url}
+                onUploadComplete={(url) => setPost(prev => prev ? { ...prev, featured_image_url: url } : null)}
+              />
             </CardContent>
           </Card>
 

@@ -18,6 +18,8 @@ import { ArrowLeft, Save, Send, AlertTriangle, Loader2 } from "lucide-react";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { RichTextEditor } from "@/components/blog/RichTextEditor";
+import { ImageUpload } from "@/components/blog/ImageUpload";
 
 interface BlogPostFormData {
   title: string;
@@ -258,14 +260,11 @@ export default function NewBlogPost() {
 
               {/* Content */}
               <div className="space-y-2">
-                <Label htmlFor="content">Content * (Markdown/HTML supported)</Label>
-                <Textarea
-                  id="content"
-                  placeholder="Write your post content here... You can use Markdown formatting."
-                  rows={20}
-                  className="font-mono"
-                  value={formData.content}
-                  onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
+                <Label htmlFor="content">Content *</Label>
+                <RichTextEditor
+                  content={formData.content}
+                  onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                  placeholder="Write your post content here..."
                 />
               </div>
             </CardContent>
@@ -328,15 +327,12 @@ export default function NewBlogPost() {
               </div>
 
               {/* Featured Image */}
-              <div className="space-y-2">
-                <Label htmlFor="featured_image">Featured Image URL</Label>
-                <Input
-                  id="featured_image"
-                  placeholder="https://..."
-                  value={formData.featured_image_url}
-                  onChange={(e) => setFormData(prev => ({ ...prev, featured_image_url: e.target.value }))}
-                />
-              </div>
+              <ImageUpload
+                label="Featured Image"
+                description="Upload a featured image for your post"
+                currentImageUrl={formData.featured_image_url}
+                onUploadComplete={(url) => setFormData(prev => ({ ...prev, featured_image_url: url }))}
+              />
             </CardContent>
           </Card>
 
