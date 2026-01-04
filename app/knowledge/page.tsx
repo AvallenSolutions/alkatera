@@ -1,18 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Play, ArrowUpRight, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
-type ContentType = 'article' | 'video' | 'quote';
+type ContentType = 'article' | 'video' | 'quote' | 'tutorial';
 
 interface ContentItem {
   id: string;
   type: ContentType;
   title: string;
+  slug?: string;
   excerpt?: string;
   tags: string[];
   readTime?: string;
@@ -102,13 +104,13 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
     );
   }
 
-  return (
+  const cardContent = (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ delay: index * 0.1 }}
-      className="group relative bg-[#0a0a0a] border border-white/10 hover:border-[#ccff00]/50 transition-all duration-500 overflow-hidden cursor-pointer"
+      className="group relative bg-[#0a0a0a] border border-white/10 hover:border-[#ccff00]/50 transition-all duration-500 overflow-hidden cursor-pointer h-full"
     >
       {item.image && (
         <div className="relative h-64 overflow-hidden">
@@ -166,16 +168,61 @@ const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
       </div>
     </motion.div>
   );
+
+  // Wrap in Link if item has a slug (from database)
+  if (item.slug) {
+    return <Link href={`/blog/${item.slug}`}>{cardContent}</Link>;
+  }
+
+  return cardContent;
 };
 
 export default function KnowledgePage() {
   const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [blogPosts, setBlogPosts] = useState<ContentItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const allTags = ['all', ...Array.from(new Set(CONTENT_ITEMS.flatMap(item => item.tags)))];
+  // Fetch blog posts from API
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await fetch('/api/blog?status=published&limit=100');
+        const data = await response.json();
+
+        if (response.ok && data.posts) {
+          // Transform API posts to ContentItem format
+          const transformedPosts: ContentItem[] = data.posts.map((post: any) => ({
+            id: post.id,
+            type: post.content_type || 'article',
+            title: post.title,
+            slug: post.slug,
+            excerpt: post.excerpt,
+            tags: post.tags || [],
+            readTime: post.read_time,
+            image: post.featured_image_url,
+            author: post.author_name,
+          }));
+
+          setBlogPosts(transformedPosts);
+        }
+      } catch (error) {
+        console.error('Error fetching blog posts:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchPosts();
+  }, []);
+
+  // Combine hardcoded content with blog posts
+  const allContent = [...blogPosts, ...CONTENT_ITEMS];
+
+  const allTags = ['all', ...Array.from(new Set(allContent.flatMap(item => item.tags)))];
 
   const filteredContent = activeFilter === 'all'
-    ? CONTENT_ITEMS
-    : CONTENT_ITEMS.filter(item => item.tags.includes(activeFilter));
+    ? allContent
+    : allContent.filter(item => item.tags.includes(activeFilter));
 
   return (
     <div className="bg-[#050505] min-h-screen text-white selection:bg-[#ccff00] selection:text-black">
