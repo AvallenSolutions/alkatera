@@ -6,12 +6,12 @@ This guide will help you set up platform administrators for AlkaTera.
 
 In Supabase SQL Editor, run the migration file:
 ```
-supabase/migrations/20260104000013_platform_admin_careful_order.sql
+supabase/migrations/20260104000014_platform_admin_fixed_function.sql
 ```
 
 Or copy and paste the entire contents of that file into the SQL Editor and click **Run**.
 
-**Important**: This migration creates a platform admin organization that sits above the normal subscription system. It carefully handles the constraint update by dropping the old constraint first, then allowing NULL values for the platform admin org while keeping your existing tier values (seed, blossom, canopy) intact.
+**Important**: This migration creates a platform admin organization that sits above the normal subscription system. It fixes ambiguous column reference errors and properly handles the constraint update by dropping the old constraint first, then allowing NULL values for the platform admin org while keeping your existing tier values (seed, blossom, canopy) intact.
 
 ## Step 2: Make Yourself a Platform Admin
 
