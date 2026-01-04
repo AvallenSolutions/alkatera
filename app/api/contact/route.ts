@@ -31,18 +31,9 @@ export async function POST(request: NextRequest) {
       const lastname = nameParts.slice(1).join(' ');
 
       // Prepare payload for Sender API
-      const senderPayload: {
-        email: string;
-        firstname: string;
-        lastname?: string;
-        fields?: {
-          company?: string;
-        };
-        trigger_automation?: boolean;
-      } = {
+      const senderPayload: any = {
         email,
         firstname,
-        trigger_automation: true, // Enable automation workflows
       };
 
       // Add lastname if available
@@ -52,10 +43,15 @@ export async function POST(request: NextRequest) {
 
       // Add company as custom field if provided
       if (company) {
-        senderPayload.fields = {
-          company,
-        };
+        senderPayload.company = company;
       }
+
+      console.log('Attempting to add subscriber to Sender with payload:', {
+        email,
+        firstname,
+        lastname: lastname || 'N/A',
+        company: company || 'N/A'
+      });
 
       // Call Sender API
       const senderResponse = await fetch('https://api.sender.net/v2/subscribers', {
@@ -68,18 +64,30 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(senderPayload),
       });
 
-      if (!senderResponse.ok) {
-        const errorData = await senderResponse.json().catch(() => ({}));
-        console.error('Sender API error:', errorData);
+      const responseText = await senderResponse.text();
+      console.log('Sender API response status:', senderResponse.status);
+      console.log('Sender API response body:', responseText);
 
-        // Don't expose Sender API errors to client, but log them
+      if (!senderResponse.ok) {
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { message: responseText };
+        }
+        console.error('Sender API error - Status:', senderResponse.status, 'Data:', errorData);
+
+        // Return more detailed error for debugging
         return NextResponse.json(
-          { error: 'Failed to subscribe to mailing list' },
+          {
+            error: 'Failed to subscribe to mailing list',
+            debug: process.env.NODE_ENV === 'development' ? errorData : undefined
+          },
           { status: 500 }
         );
       }
 
-      const senderData = await senderResponse.json();
+      const senderData = JSON.parse(responseText);
       console.log('Successfully added subscriber to Sender:', senderData);
     }
 
