@@ -34,3 +34,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# temporary design exports / imports
+*-marketing-export/
+*-import/
+Alkatera Marketing/

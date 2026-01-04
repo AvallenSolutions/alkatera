@@ -38,6 +38,9 @@
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions"
+    "supabase/functions",
+    "Alkatera Marketing",
+    "**/vite.config.ts",
+    "**/*.vite.config.ts"
   ]
 }
