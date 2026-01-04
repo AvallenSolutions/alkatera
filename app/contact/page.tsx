@@ -111,17 +111,43 @@ export default function ContactPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
+  const [subscribe, setSubscribe] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // TODO: Add Supabase integration here
-    setTimeout(() => {
-      setIsLoading(false);
+    setError('');
+
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          company,
+          subscribe,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to submit form');
+      }
+
       setIsSubmitted(true);
-    }, 1500);
+    } catch (err) {
+      console.error('Form submission error:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -192,6 +218,44 @@ export default function ContactPage() {
                     onChange={(e) => setCompany(e.target.value)}
                   />
 
+                  {/* Consent Checkbox */}
+                  <div className="mt-8 mb-8">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className="relative flex items-center justify-center w-5 h-5 mt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={subscribe}
+                          onChange={(e) => setSubscribe(e.target.checked)}
+                          className="w-5 h-5 bg-transparent border-2 border-gray-600 checked:bg-[#ccff00] checked:border-[#ccff00] transition-all cursor-pointer appearance-none"
+                        />
+                        {subscribe && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                          >
+                            <CheckCircle2 size={20} className="text-black" />
+                          </motion.div>
+                        )}
+                      </div>
+                      <span className="text-gray-400 text-sm leading-relaxed group-hover:text-white transition-colors">
+                        I agree to receive updates, newsletters, and marketing communications from AlkaTera.
+                        You can unsubscribe at any time.
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Error Message */}
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-6 p-4 bg-red-500/10 border border-red-500/50 text-red-400 text-sm font-mono"
+                    >
+                      {error}
+                    </motion.div>
+                  )}
+
                   <div className="mt-12">
                     <button
                       type="submit"
@@ -223,10 +287,24 @@ export default function ContactPage() {
                 <h2 className="text-3xl font-serif text-white mb-4">Transmission Received</h2>
                 <p className="text-gray-400 font-mono text-sm uppercase tracking-widest leading-relaxed">
                   Thank you, {name.split(' ')[0]}.<br/>
-                  Our team will be in touch with {company} shortly.
+                  {company && <>Our team will be in touch with {company} shortly.</>}
+                  {!company && <>Our team will be in touch shortly.</>}
+                  {subscribe && (
+                    <>
+                      <br/><br/>
+                      You&apos;ve been added to our mailing list.
+                    </>
+                  )}
                 </p>
                 <button
-                  onClick={() => setIsSubmitted(false)}
+                  onClick={() => {
+                    setIsSubmitted(false);
+                    setName('');
+                    setEmail('');
+                    setCompany('');
+                    setSubscribe(false);
+                    setError('');
+                  }}
                   className="mt-12 font-mono text-[#ccff00] text-xs uppercase tracking-widest hover:text-white transition-colors"
                 >
                   Back to Form
