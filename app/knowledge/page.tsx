@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Play, ArrowUpRight, Clock, Tag } from 'lucide-react';
+import { FileText, Play, ArrowUpRight, ArrowRight, Clock, Tag } from 'lucide-react';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
