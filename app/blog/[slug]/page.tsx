@@ -78,7 +78,7 @@ export async function generateMetadata(
       card: 'summary_large_image',
       title: post.meta_title || post.title,
       description: post.meta_description || post.excerpt,
-      images: post.og_image_url || post.featured_image_url ? [post.og_image_url || post.featured_image_url] : [],
+      images: post.og_image_url || post.featured_image_url ? [(post.og_image_url || post.featured_image_url)!] : [],
     },
   };
 }
