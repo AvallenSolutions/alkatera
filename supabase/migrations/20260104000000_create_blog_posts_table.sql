@@ -79,13 +79,8 @@ CREATE POLICY "Public can view published blog posts"
 CREATE POLICY "Alkatera admins have full access to blog posts"
   ON public.blog_posts
   FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE profiles.id = auth.uid()
-      AND profiles.is_alkatera_admin = true
-    )
-  );
+  USING (is_alkatera_admin())
+  WITH CHECK (is_alkatera_admin());
 
 -- =====================================================
 -- FUNCTIONS
