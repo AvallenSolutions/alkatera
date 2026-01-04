@@ -6,10 +6,12 @@ This guide will help you set up platform administrators for AlkaTera.
 
 In Supabase SQL Editor, run the migration file:
 ```
-supabase/migrations/20260104000002_create_platform_admin_system.sql
+supabase/migrations/20260104000005_create_platform_admin_correct_tiers.sql
 ```
 
 Or copy and paste the entire contents of that file into the SQL Editor and click **Run**.
+
+**Important**: This migration uses the correct AlkaTera subscription tiers (Seed, Blossom, Canopy) and creates a platform admin organization that sits above the normal subscription system.
 
 ## Step 2: Make Yourself a Platform Admin
 
