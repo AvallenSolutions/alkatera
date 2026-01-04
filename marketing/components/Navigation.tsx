@@ -38,21 +38,12 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
             {item.label}
           </Link>
         ))}
-        {onOpenContact ? (
-          <button
-            onClick={onOpenContact}
-            className="border border-white px-6 py-2 rounded-full hover:bg-white hover:text-black transition-colors duration-300"
-          >
-            Get Access
-          </button>
-        ) : (
-          <Link
-            href="/login"
-            className="border border-white px-6 py-2 rounded-full hover:bg-white hover:text-black transition-colors duration-300"
-          >
-            Get Access
-          </Link>
-        )}
+        <Link
+          href="/contact"
+          className="border border-white px-6 py-2 rounded-full hover:bg-white hover:text-black transition-colors duration-300"
+        >
+          Get Access
+        </Link>
       </div>
 
       <button
@@ -84,7 +75,7 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
               </Link>
             ))}
             <Link
-              href="/login"
+              href="/contact"
               onClick={() => setIsOpen(false)}
               className="mt-8 text-[#ccff00] font-mono uppercase tracking-widest border border-[#ccff00] px-8 py-4 rounded-full"
             >
