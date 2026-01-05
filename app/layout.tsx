@@ -35,6 +35,13 @@ const playfairDisplay = Playfair_Display({
 export const metadata: Metadata = {
   title: 'AlkaTera',
   description: 'Multi-tenant SaaS application',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '32x32' },
+    ],
+    apple: '/apple-icon.png',
+  },
 };
 
 export default function RootLayout({
