@@ -107,27 +107,37 @@ export default function BlogDashboard() {
   }, [isAlkateraAdmin, isLoadingAuth]);
 
   const handleDelete = async (id: string) => {
+    console.log('[Frontend] Delete clicked for post:', id);
+
     if (deleteConfirm !== id) {
+      console.log('[Frontend] First click - setting confirmation');
       setDeleteConfirm(id);
       setTimeout(() => setDeleteConfirm(null), 3000);
       return;
     }
+
+    console.log('[Frontend] Confirmed delete - making API call to:', `/api/blog/${id}`);
 
     try {
       const response = await fetch(`/api/blog/${id}`, {
         method: 'DELETE',
       });
 
+      console.log('[Frontend] Delete response status:', response.status);
+
       if (!response.ok) {
         const data = await response.json();
+        console.error('[Frontend] Delete failed:', data);
         throw new Error(data.error || 'Failed to delete post');
       }
+
+      console.log('[Frontend] Delete successful, refreshing posts');
 
       // Refresh posts list
       fetchPosts();
       setDeleteConfirm(null);
     } catch (err) {
-      console.error('Error deleting post:', err);
+      console.error('[Frontend] Error deleting post:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete post');
     }
   };
