@@ -33,6 +33,8 @@ interface BlogPostFormData {
   meta_title: string;
   meta_description: string;
   author_name: string;
+  video_url: string;
+  video_duration: string;
 }
 
 const DRAFT_STORAGE_KEY = 'alkatera-blog-draft';
@@ -53,12 +55,15 @@ export default function NewBlogPost() {
     meta_title: '',
     meta_description: '',
     author_name: '',
+    video_url: '',
+    video_duration: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
 
   // Load saved draft on mount
   useEffect(() => {
@@ -96,6 +101,8 @@ export default function NewBlogPost() {
       meta_title: '',
       meta_description: '',
       author_name: '',
+      video_url: '',
+      video_duration: '',
     });
     setHasDraft(false);
   };
@@ -126,6 +133,36 @@ export default function NewBlogPost() {
     }));
   };
 
+  const handleVideoUpload = async (file: File) => {
+    try {
+      setIsUploadingVideo(true);
+      setError(null);
+
+      const formData = new FormData();
+      formData.append('video', file);
+
+      const response = await fetch('/api/blog/upload-video', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to upload video');
+      }
+
+      // Set the video URL from the upload
+      setFormData(prev => ({ ...prev, video_url: data.url }));
+
+    } catch (err) {
+      console.error('Error uploading video:', err);
+      setError(err instanceof Error ? err.message : 'Failed to upload video');
+    } finally {
+      setIsUploadingVideo(false);
+    }
+  };
+
   const handleSubmit = async (status: 'draft' | 'published') => {
     try {
       setIsSubmitting(true);
@@ -134,16 +171,22 @@ export default function NewBlogPost() {
 
       // Validate required fields
       const isQuote = formData.content_type === 'quote';
+      const isVideo = formData.content_type === 'video';
+
       if (!formData.title) {
         setError('Title is required');
         return;
       }
-      if (!isQuote && !formData.content) {
+      if (!isQuote && !isVideo && !formData.content) {
         setError('Content is required');
         return;
       }
       if (isQuote && !formData.author_name) {
         setError('Author name is required for quotes');
+        return;
+      }
+      if (isVideo && !formData.video_url) {
+        setError('Video URL or video upload is required for video posts');
         return;
       }
 
@@ -232,7 +275,12 @@ export default function NewBlogPost() {
           <Button
             variant="outline"
             onClick={() => handleSubmit('draft')}
-            disabled={isSubmitting || !formData.title || (formData.content_type !== 'quote' && !formData.content) || (formData.content_type === 'quote' && !formData.author_name)}
+            disabled={
+              isSubmitting ||
+              !formData.title ||
+              (formData.content_type === 'quote' && !formData.author_name) ||
+              (formData.content_type === 'video' && !formData.video_url)
+            }
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -243,7 +291,12 @@ export default function NewBlogPost() {
           </Button>
           <Button
             onClick={() => handleSubmit('published')}
-            disabled={isSubmitting || !formData.title || (formData.content_type !== 'quote' && !formData.content) || (formData.content_type === 'quote' && !formData.author_name)}
+            disabled={
+              isSubmitting ||
+              !formData.title ||
+              (formData.content_type === 'quote' && !formData.author_name) ||
+              (formData.content_type === 'video' && !formData.video_url)
+            }
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -357,14 +410,80 @@ export default function NewBlogPost() {
                 </div>
               )}
 
+              {/* Video Fields */}
+              {formData.content_type === 'video' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="video_url">Video URL *</Label>
+                    <Input
+                      id="video_url"
+                      placeholder="https://www.youtube.com/watch?v=... or upload below"
+                      value={formData.video_url}
+                      onChange={(e) => setFormData(prev => ({ ...prev, video_url: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter a YouTube URL or upload a video file below
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="video_upload">Or Upload Video</Label>
+                    <Input
+                      id="video_upload"
+                      type="file"
+                      accept="video/mp4,video/webm,video/ogg,video/quicktime"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleVideoUpload(file);
+                      }}
+                      disabled={isUploadingVideo}
+                    />
+                    {isUploadingVideo && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Uploading video...
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Supported formats: MP4, WebM, OGG, QuickTime (max 500 MB)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="video_duration">Video Duration</Label>
+                    <Input
+                      id="video_duration"
+                      placeholder="e.g., 3:24 or 1:15:30"
+                      value={formData.video_duration}
+                      onChange={(e) => setFormData(prev => ({ ...prev, video_duration: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format: MM:SS or HH:MM:SS
+                    </p>
+                  </div>
+                </>
+              )}
+
               {/* Content */}
-              {formData.content_type !== 'quote' && (
+              {formData.content_type !== 'quote' && formData.content_type !== 'video' && (
                 <div className="space-y-2">
                   <Label htmlFor="content">Content *</Label>
                   <RichTextEditor
                     content={formData.content}
                     onChange={(content) => setFormData(prev => ({ ...prev, content }))}
                     placeholder="Write your post content here..."
+                  />
+                </div>
+              )}
+
+              {/* Optional description for videos */}
+              {formData.content_type === 'video' && (
+                <div className="space-y-2">
+                  <Label htmlFor="content">Video Description (Optional)</Label>
+                  <RichTextEditor
+                    content={formData.content}
+                    onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                    placeholder="Add additional context or description for the video..."
                   />
                 </div>
               )}
@@ -399,18 +518,22 @@ export default function NewBlogPost() {
                 </Select>
               </div>
 
-              {/* Read Time */}
+              {/* Read Time / Watch Time */}
               {formData.content_type !== 'quote' && (
                 <div className="space-y-2">
-                  <Label htmlFor="read_time">Read Time</Label>
+                  <Label htmlFor="read_time">
+                    {formData.content_type === 'video' ? 'Watch Time' : 'Read Time'}
+                  </Label>
                   <Input
                     id="read_time"
-                    placeholder="e.g., 5 min read or 3:24"
+                    placeholder={formData.content_type === 'video' ? 'e.g., 3:24' : 'e.g., 5 min read'}
                     value={formData.read_time}
                     onChange={(e) => setFormData(prev => ({ ...prev, read_time: e.target.value }))}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Leave empty for auto-calculation
+                    {formData.content_type === 'video'
+                      ? 'Video duration (same as above if set)'
+                      : 'Leave empty for auto-calculation'}
                   </p>
                 </div>
               )}
