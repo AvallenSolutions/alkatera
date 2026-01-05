@@ -35,6 +35,7 @@ interface BlogPost {
   read_time?: string;
   meta_title?: string;
   meta_description?: string;
+  author_name?: string;
 }
 
 export default function EditBlogPost({ params }: { params: { id: string } }) {
@@ -91,6 +92,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
         read_time: post.read_time,
         meta_title: post.meta_title,
         meta_description: post.meta_description,
+        author_name: post.author_name,
       };
 
       if (status) {
@@ -244,13 +246,40 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
             <CardContent className="space-y-4">
               {/* Title */}
               <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  value={post.title}
-                  onChange={(e) => setPost(prev => prev ? { ...prev, title: e.target.value } : null)}
-                />
+                <Label htmlFor="title">{post.content_type === 'quote' ? 'Quote Text *' : 'Title *'}</Label>
+                {post.content_type === 'quote' ? (
+                  <Textarea
+                    id="title"
+                    placeholder="Enter the quote text..."
+                    rows={4}
+                    value={post.title}
+                    onChange={(e) => setPost(prev => prev ? { ...prev, title: e.target.value } : null)}
+                    className="font-serif text-lg italic"
+                  />
+                ) : (
+                  <Input
+                    id="title"
+                    value={post.title}
+                    onChange={(e) => setPost(prev => prev ? { ...prev, title: e.target.value } : null)}
+                  />
+                )}
               </div>
+
+              {/* Author (for quotes only) */}
+              {post.content_type === 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="author_name">Author *</Label>
+                  <Input
+                    id="author_name"
+                    placeholder="e.g., CEO, Founder, etc."
+                    value={post.author_name || ''}
+                    onChange={(e) => setPost(prev => prev ? { ...prev, author_name: e.target.value } : null)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Who said this quote? (e.g., "CEO", "Founder")
+                  </p>
+                </div>
+              )}
 
               {/* Slug */}
               <div className="space-y-2">
@@ -266,25 +295,29 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
               </div>
 
               {/* Excerpt */}
-              <div className="space-y-2">
-                <Label htmlFor="excerpt">Excerpt</Label>
-                <Textarea
-                  id="excerpt"
-                  rows={3}
-                  value={post.excerpt || ''}
-                  onChange={(e) => setPost(prev => prev ? { ...prev, excerpt: e.target.value } : null)}
-                />
-              </div>
+              {post.content_type !== 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="excerpt">Excerpt</Label>
+                  <Textarea
+                    id="excerpt"
+                    rows={3}
+                    value={post.excerpt || ''}
+                    onChange={(e) => setPost(prev => prev ? { ...prev, excerpt: e.target.value } : null)}
+                  />
+                </div>
+              )}
 
               {/* Content */}
-              <div className="space-y-2">
-                <Label htmlFor="content">Content *</Label>
-                <RichTextEditor
-                  content={post.content}
-                  onChange={(content) => setPost(prev => prev ? { ...prev, content } : null)}
-                  placeholder="Write your post content here..."
-                />
-              </div>
+              {post.content_type !== 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="content">Content *</Label>
+                  <RichTextEditor
+                    content={post.content}
+                    onChange={(content) => setPost(prev => prev ? { ...prev, content } : null)}
+                    placeholder="Write your post content here..."
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -317,15 +350,17 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
               </div>
 
               {/* Read Time */}
-              <div className="space-y-2">
-                <Label htmlFor="read_time">Read Time</Label>
-                <Input
-                  id="read_time"
-                  placeholder="e.g., 5 min read or 3:24"
-                  value={post.read_time || ''}
-                  onChange={(e) => setPost(prev => prev ? { ...prev, read_time: e.target.value } : null)}
-                />
-              </div>
+              {post.content_type !== 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="read_time">Read Time</Label>
+                  <Input
+                    id="read_time"
+                    placeholder="e.g., 5 min read or 3:24"
+                    value={post.read_time || ''}
+                    onChange={(e) => setPost(prev => prev ? { ...prev, read_time: e.target.value } : null)}
+                  />
+                </div>
+              )}
 
               {/* Tags */}
               <div className="space-y-2">
@@ -342,12 +377,14 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
               </div>
 
               {/* Featured Image */}
-              <ImageUpload
-                label="Featured Image"
-                description="Upload a featured image for your post"
-                currentImageUrl={post.featured_image_url}
-                onUploadComplete={(url) => setPost(prev => prev ? { ...prev, featured_image_url: url } : null)}
-              />
+              {post.content_type !== 'quote' && (
+                <ImageUpload
+                  label="Featured Image"
+                  description="Upload a featured image for your post"
+                  currentImageUrl={post.featured_image_url}
+                  onUploadComplete={(url) => setPost(prev => prev ? { ...prev, featured_image_url: url } : null)}
+                />
+              )}
             </CardContent>
           </Card>
 

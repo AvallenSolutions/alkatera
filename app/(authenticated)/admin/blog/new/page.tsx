@@ -32,6 +32,7 @@ interface BlogPostFormData {
   read_time: string;
   meta_title: string;
   meta_description: string;
+  author_name: string;
 }
 
 export default function NewBlogPost() {
@@ -49,6 +50,7 @@ export default function NewBlogPost() {
     read_time: '',
     meta_title: '',
     meta_description: '',
+    author_name: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -88,8 +90,17 @@ export default function NewBlogPost() {
       setSuccess(false);
 
       // Validate required fields
-      if (!formData.title || !formData.content) {
-        setError('Title and content are required');
+      const isQuote = formData.content_type === 'quote';
+      if (!formData.title) {
+        setError('Title is required');
+        return;
+      }
+      if (!isQuote && !formData.content) {
+        setError('Content is required');
+        return;
+      }
+      if (isQuote && !formData.author_name) {
+        setError('Author name is required for quotes');
         return;
       }
 
@@ -174,7 +185,7 @@ export default function NewBlogPost() {
           <Button
             variant="outline"
             onClick={() => handleSubmit('draft')}
-            disabled={isSubmitting || !formData.title || !formData.content}
+            disabled={isSubmitting || !formData.title || (formData.content_type !== 'quote' && !formData.content) || (formData.content_type === 'quote' && !formData.author_name)}
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -185,7 +196,7 @@ export default function NewBlogPost() {
           </Button>
           <Button
             onClick={() => handleSubmit('published')}
-            disabled={isSubmitting || !formData.title || !formData.content}
+            disabled={isSubmitting || !formData.title || (formData.content_type !== 'quote' && !formData.content) || (formData.content_type === 'quote' && !formData.author_name)}
           >
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -223,14 +234,41 @@ export default function NewBlogPost() {
             <CardContent className="space-y-4">
               {/* Title */}
               <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  placeholder="Enter post title..."
-                  value={formData.title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                />
+                <Label htmlFor="title">{formData.content_type === 'quote' ? 'Quote Text *' : 'Title *'}</Label>
+                {formData.content_type === 'quote' ? (
+                  <Textarea
+                    id="title"
+                    placeholder="Enter the quote text..."
+                    rows={4}
+                    value={formData.title}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                    className="font-serif text-lg italic"
+                  />
+                ) : (
+                  <Input
+                    id="title"
+                    placeholder="Enter post title..."
+                    value={formData.title}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                  />
+                )}
               </div>
+
+              {/* Author (for quotes only) */}
+              {formData.content_type === 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="author_name">Author *</Label>
+                  <Input
+                    id="author_name"
+                    placeholder="e.g., CEO, Founder, etc."
+                    value={formData.author_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, author_name: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Who said this quote? (e.g., "CEO", "Founder")
+                  </p>
+                </div>
+              )}
 
               {/* Slug */}
               <div className="space-y-2">
@@ -247,26 +285,30 @@ export default function NewBlogPost() {
               </div>
 
               {/* Excerpt */}
-              <div className="space-y-2">
-                <Label htmlFor="excerpt">Excerpt</Label>
-                <Textarea
-                  id="excerpt"
-                  placeholder="Brief description of the post..."
-                  rows={3}
-                  value={formData.excerpt}
-                  onChange={(e) => handleExcerptChange(e.target.value)}
-                />
-              </div>
+              {formData.content_type !== 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="excerpt">Excerpt</Label>
+                  <Textarea
+                    id="excerpt"
+                    placeholder="Brief description of the post..."
+                    rows={3}
+                    value={formData.excerpt}
+                    onChange={(e) => handleExcerptChange(e.target.value)}
+                  />
+                </div>
+              )}
 
               {/* Content */}
-              <div className="space-y-2">
-                <Label htmlFor="content">Content *</Label>
-                <RichTextEditor
-                  content={formData.content}
-                  onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-                  placeholder="Write your post content here..."
-                />
-              </div>
+              {formData.content_type !== 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="content">Content *</Label>
+                  <RichTextEditor
+                    content={formData.content}
+                    onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                    placeholder="Write your post content here..."
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -299,18 +341,20 @@ export default function NewBlogPost() {
               </div>
 
               {/* Read Time */}
-              <div className="space-y-2">
-                <Label htmlFor="read_time">Read Time</Label>
-                <Input
-                  id="read_time"
-                  placeholder="e.g., 5 min read or 3:24"
-                  value={formData.read_time}
-                  onChange={(e) => setFormData(prev => ({ ...prev, read_time: e.target.value }))}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Leave empty for auto-calculation
-                </p>
-              </div>
+              {formData.content_type !== 'quote' && (
+                <div className="space-y-2">
+                  <Label htmlFor="read_time">Read Time</Label>
+                  <Input
+                    id="read_time"
+                    placeholder="e.g., 5 min read or 3:24"
+                    value={formData.read_time}
+                    onChange={(e) => setFormData(prev => ({ ...prev, read_time: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty for auto-calculation
+                  </p>
+                </div>
+              )}
 
               {/* Tags */}
               <div className="space-y-2">
@@ -327,12 +371,14 @@ export default function NewBlogPost() {
               </div>
 
               {/* Featured Image */}
-              <ImageUpload
-                label="Featured Image"
-                description="Upload a featured image for your post"
-                currentImageUrl={formData.featured_image_url}
-                onUploadComplete={(url) => setFormData(prev => ({ ...prev, featured_image_url: url }))}
-              />
+              {formData.content_type !== 'quote' && (
+                <ImageUpload
+                  label="Featured Image"
+                  description="Upload a featured image for your post"
+                  currentImageUrl={formData.featured_image_url}
+                  onUploadComplete={(url) => setFormData(prev => ({ ...prev, featured_image_url: url }))}
+                />
+              )}
             </CardContent>
           </Card>
 
