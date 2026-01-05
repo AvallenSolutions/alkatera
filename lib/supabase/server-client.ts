@@ -11,10 +11,15 @@ export function getSupabaseServerClient() {
     throw new Error('Missing Supabase environment variables')
   }
 
+  // Log cookie access for debugging
+  console.log('[Server Client] Creating Supabase client');
+
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
-        return cookieStore.get(name)?.value
+        const value = cookieStore.get(name)?.value;
+        console.log('[Server Client] Getting cookie:', { name, hasValue: !!value });
+        return value;
       },
       set(name: string, value: string, options: CookieOptions) {
         try {

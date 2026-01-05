@@ -63,9 +63,22 @@ export async function POST(request: NextRequest) {
     // Check if user is authenticated and is Alkatera admin
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
+    // Detailed logging for debugging
+    console.log('[Blog API] Auth check:', {
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
+      authError: authError?.message,
+      timestamp: new Date().toISOString()
+    });
+
     if (authError || !user) {
+      console.error('[Blog API] Authentication failed:', {
+        error: authError?.message,
+        hasUser: !!user
+      });
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized', details: authError?.message },
         { status: 401 }
       );
     }
@@ -73,9 +86,19 @@ export async function POST(request: NextRequest) {
     // Check if user is Alkatera admin
     const { data: isAdmin, error: adminError } = await supabase.rpc('is_alkatera_admin');
 
+    console.log('[Blog API] Admin check:', {
+      isAdmin,
+      adminError: adminError?.message,
+      userId: user.id
+    });
+
     if (adminError || !isAdmin) {
+      console.error('[Blog API] Admin check failed:', {
+        error: adminError?.message,
+        isAdmin
+      });
       return NextResponse.json(
-        { error: 'Forbidden - Admin access required' },
+        { error: 'Forbidden - Admin access required', details: adminError?.message },
         { status: 403 }
       );
     }
