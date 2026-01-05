@@ -25,6 +25,9 @@ import {
   TrendingUp,
   AlertTriangle,
   CheckCircle2,
+  ArrowUp,
+  ArrowDown,
+  GripVertical,
 } from "lucide-react";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { formatDistanceToNow } from "date-fns";
@@ -44,6 +47,7 @@ interface BlogPost {
   tags: string[];
   view_count: number;
   content_type: string;
+  display_order: number;
 }
 
 interface BlogStats {
@@ -125,6 +129,68 @@ export default function BlogDashboard() {
     } catch (err) {
       console.error('Error deleting post:', err);
       setError(err instanceof Error ? err.message : 'Failed to delete post');
+    }
+  };
+
+  const handleMoveUp = async (index: number) => {
+    if (index === 0) return; // Already at top
+
+    const currentPost = posts[index];
+    const previousPost = posts[index - 1];
+
+    // Swap display_order values
+    const updates = [
+      { id: currentPost.id, display_order: previousPost.display_order },
+      { id: previousPost.id, display_order: currentPost.display_order },
+    ];
+
+    try {
+      const response = await fetch('/api/blog/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reorder posts');
+      }
+
+      // Refresh posts list
+      fetchPosts();
+    } catch (err) {
+      console.error('Error reordering posts:', err);
+      setError(err instanceof Error ? err.message : 'Failed to reorder posts');
+    }
+  };
+
+  const handleMoveDown = async (index: number) => {
+    if (index === posts.length - 1) return; // Already at bottom
+
+    const currentPost = posts[index];
+    const nextPost = posts[index + 1];
+
+    // Swap display_order values
+    const updates = [
+      { id: currentPost.id, display_order: nextPost.display_order },
+      { id: nextPost.id, display_order: currentPost.display_order },
+    ];
+
+    try {
+      const response = await fetch('/api/blog/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reorder posts');
+      }
+
+      // Refresh posts list
+      fetchPosts();
+    } catch (err) {
+      console.error('Error reordering posts:', err);
+      setError(err instanceof Error ? err.message : 'Failed to reorder posts');
     }
   };
 
@@ -259,6 +325,7 @@ export default function BlogDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[100px]">Order</TableHead>
                   <TableHead>Title</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Type</TableHead>
@@ -269,8 +336,33 @@ export default function BlogDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {posts.map((post) => (
+                {posts.map((post, index) => (
                   <TableRow key={post.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <GripVertical className="w-4 h-4 text-muted-foreground" />
+                        <div className="flex flex-col gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMoveUp(index)}
+                            disabled={index === 0}
+                            className="h-5 w-5 p-0"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleMoveDown(index)}
+                            disabled={index === posts.length - 1}
+                            className="h-5 w-5 p-0"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div>
                         <div className="font-medium">{post.title}</div>
