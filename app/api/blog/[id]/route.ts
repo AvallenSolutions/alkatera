@@ -92,6 +92,7 @@ export async function PUT(
       meta_title,
       meta_description,
       og_image_url,
+      author_name,
     } = body;
 
     // Build update object with only provided fields
@@ -108,6 +109,7 @@ export async function PUT(
     if (meta_title !== undefined) updates.meta_title = meta_title;
     if (meta_description !== undefined) updates.meta_description = meta_description;
     if (og_image_url !== undefined) updates.og_image_url = og_image_url;
+    if (author_name !== undefined) updates.author_name = author_name;
 
     // Handle status changes
     if (status !== undefined) {
