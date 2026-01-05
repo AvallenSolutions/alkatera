@@ -37,6 +37,7 @@ import {
   CheckSquare,
   Activity,
   CreditCard,
+  FileEdit,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -426,6 +427,25 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/supplier-verification/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Supplier Verification</span>
+                  {isDevelopment && !isAlkateraAdmin && (
+                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
+                  )}
+                </Link>
+
+                <Link
+                  href="/admin/blog/"
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                    isActive('/admin/blog/')
+                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                      : 'text-sidebar-foreground hover:bg-secondary/50'
+                  )}
+                >
+                  <FileEdit className={cn(
+                    'h-4 w-4 flex-shrink-0 transition-colors',
+                    isActive('/admin/blog/') ? 'text-neon-lime' : ''
+                  )} />
+                  <span className="truncate">Blog CMS</span>
                   {isDevelopment && !isAlkateraAdmin && (
                     <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
                   )}
