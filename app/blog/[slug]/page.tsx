@@ -4,6 +4,7 @@ import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { Clock, Calendar, User, Tag, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
 interface BlogPost {
   id: string;
@@ -25,21 +26,21 @@ interface BlogPost {
 
 async function getBlogPost(slug: string): Promise<BlogPost | null> {
   try {
-    // Fetch all published posts and find by slug
-    // Note: In production, you'd want a dedicated endpoint for fetching by slug
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/blog?status=published&limit=100`,
-      { cache: 'no-store' }
-    );
+    const supabase = getSupabaseServerClient();
 
-    if (!response.ok) {
+    const { data, error } = await supabase
+      .from('blog_posts')
+      .select('*')
+      .eq('slug', slug)
+      .eq('status', 'published')
+      .single();
+
+    if (error) {
+      console.error('Error fetching blog post:', error);
       return null;
     }
 
-    const data = await response.json();
-    const post = data.posts.find((p: BlogPost) => p.slug === slug);
-
-    return post || null;
+    return data;
   } catch (error) {
     console.error('Error fetching blog post:', error);
     return null;
