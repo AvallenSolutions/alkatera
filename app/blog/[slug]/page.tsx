@@ -22,6 +22,8 @@ interface BlogPost {
   meta_title?: string;
   meta_description?: string;
   og_image_url?: string;
+  video_url?: string;
+  video_duration?: string;
 }
 
 async function getBlogPost(slug: string): Promise<BlogPost | null> {
@@ -43,6 +45,27 @@ async function getBlogPost(slug: string): Promise<BlogPost | null> {
     return data;
   } catch (error) {
     console.error('Error fetching blog post:', error);
+    return null;
+  }
+}
+
+function getYouTubeEmbedUrl(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+
+    // Handle youtube.com/watch?v=VIDEO_ID
+    if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
+      return `https://www.youtube.com/embed/${urlObj.searchParams.get('v')}`;
+    }
+
+    // Handle youtu.be/VIDEO_ID
+    if (urlObj.hostname.includes('youtu.be')) {
+      const videoId = urlObj.pathname.slice(1);
+      return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    return null;
+  } catch (error) {
     return null;
   }
 }
@@ -164,8 +187,8 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             </div>
           </header>
 
-          {/* Featured Image */}
-          {post.featured_image_url && (
+          {/* Featured Image (only show if not a video post) */}
+          {post.featured_image_url && post.content_type !== 'video' && (
             <div className="mb-12 -mx-6 md:mx-0">
               <img
                 src={post.featured_image_url}
@@ -175,22 +198,54 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             </div>
           )}
 
+          {/* Video Player */}
+          {post.content_type === 'video' && post.video_url && (
+            <div className="mb-12 -mx-6 md:mx-0">
+              {getYouTubeEmbedUrl(post.video_url) ? (
+                // YouTube Video
+                <div className="relative w-full pb-[56.25%]">
+                  <iframe
+                    src={getYouTubeEmbedUrl(post.video_url)!}
+                    title={post.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="absolute top-0 left-0 w-full h-full rounded-none md:rounded-lg"
+                  />
+                </div>
+              ) : (
+                // Direct Video File
+                <video
+                  controls
+                  className="w-full h-auto rounded-none md:rounded-lg bg-black"
+                  poster={post.featured_image_url}
+                >
+                  <source src={post.video_url} type="video/mp4" />
+                  <source src={post.video_url} type="video/webm" />
+                  <source src={post.video_url} type="video/ogg" />
+                  Your browser does not support the video tag.
+                </video>
+              )}
+            </div>
+          )}
+
           {/* Content */}
-          <div
-            className="prose prose-invert prose-lg max-w-none
-              prose-headings:font-serif prose-headings:text-white
-              prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl
-              prose-p:text-gray-300 prose-p:leading-relaxed
-              prose-a:text-[#ccff00] prose-a:no-underline hover:prose-a:underline
-              prose-strong:text-white prose-strong:font-bold
-              prose-code:text-[#ccff00] prose-code:bg-[#ccff00]/10 prose-code:px-1 prose-code:py-0.5
-              prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10
-              prose-blockquote:border-l-[#ccff00] prose-blockquote:text-gray-400 prose-blockquote:italic
-              prose-img:rounded-lg prose-img:w-full
-              prose-ul:text-gray-300 prose-ol:text-gray-300
-              prose-li:marker:text-[#ccff00]"
-            dangerouslySetInnerHTML={{ __html: post.content }}
-          />
+          {post.content && (
+            <div
+              className="prose prose-invert prose-lg max-w-none
+                prose-headings:font-serif prose-headings:text-white
+                prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl
+                prose-p:text-gray-300 prose-p:leading-relaxed
+                prose-a:text-[#ccff00] prose-a:no-underline hover:prose-a:underline
+                prose-strong:text-white prose-strong:font-bold
+                prose-code:text-[#ccff00] prose-code:bg-[#ccff00]/10 prose-code:px-1 prose-code:py-0.5
+                prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10
+                prose-blockquote:border-l-[#ccff00] prose-blockquote:text-gray-400 prose-blockquote:italic
+                prose-img:rounded-lg prose-img:w-full
+                prose-ul:text-gray-300 prose-ol:text-gray-300
+                prose-li:marker:text-[#ccff00]"
+              dangerouslySetInnerHTML={{ __html: post.content }}
+            />
+          )}
 
           {/* Footer Tags */}
           {post.tags.length > 0 && (

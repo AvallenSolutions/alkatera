@@ -118,17 +118,21 @@ export async function POST(request: NextRequest) {
       meta_description,
       og_image_url,
       author_name,
+      video_url,
+      video_duration,
     } = body;
 
     // Validate required fields
     const isQuote = content_type === 'quote';
+    const isVideo = content_type === 'video';
+
     if (!title) {
       return NextResponse.json(
         { error: 'Title is required' },
         { status: 400 }
       );
     }
-    if (!isQuote && !content) {
+    if (!isQuote && !isVideo && !content) {
       return NextResponse.json(
         { error: 'Content is required' },
         { status: 400 }
@@ -137,6 +141,12 @@ export async function POST(request: NextRequest) {
     if (isQuote && !author_name) {
       return NextResponse.json(
         { error: 'Author name is required for quotes' },
+        { status: 400 }
+      );
+    }
+    if (isVideo && !video_url) {
+      return NextResponse.json(
+        { error: 'Video URL is required for video posts' },
         { status: 400 }
       );
     }
@@ -176,7 +186,7 @@ export async function POST(request: NextRequest) {
         title,
         slug: finalSlug,
         excerpt: excerpt || null,
-        content: content || '',
+        content: content || null,
         featured_image_url: featured_image_url || null,
         author_id: user.id,
         author_name: finalAuthorName,
@@ -188,6 +198,8 @@ export async function POST(request: NextRequest) {
         meta_title: meta_title || title,
         meta_description: meta_description || excerpt || null,
         og_image_url: og_image_url || featured_image_url || null,
+        video_url: video_url || null,
+        video_duration: video_duration || null,
       })
       .select()
       .single();
