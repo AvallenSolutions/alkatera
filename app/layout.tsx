@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import { Inter, Lora, JetBrains_Mono } from 'next/font/google';
+import { Inter, Lora, JetBrains_Mono, Playfair_Display } from 'next/font/google';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { OrganizationProvider } from '@/lib/organizationContext';
 import { Toaster } from '@/components/ui/toaster';
@@ -24,6 +24,14 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-serif',
+  display: 'swap',
+  style: ['normal', 'italic'],
+  weight: ['400', '500', '600', '700', '800', '900'],
+});
+
 export const metadata: Metadata = {
   title: 'AlkaTera',
   description: 'Multi-tenant SaaS application',
@@ -36,7 +44,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} font-body`}>
+      <body className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} font-body`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

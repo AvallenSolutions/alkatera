@@ -5,7 +5,6 @@ const nextConfig = {
   compiler: {
     removeConsole: false,
   },
-  serverExternalPackages: ['pdfjs-dist'],
   eslint: {
     ignoreDuringBuilds: true,
   },

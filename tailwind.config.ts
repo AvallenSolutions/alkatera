@@ -6,6 +6,7 @@ const config: Config = {
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './marketing/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
@@ -13,7 +14,7 @@ const config: Config = {
         heading: 'var(--font-heading)',
         body: 'var(--font-body)',
         data: 'var(--font-data)',
-        serif: ['"Playfair Display"', 'Georgia', 'serif'],
+        serif: ['var(--font-serif)', '"Playfair Display"', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['"Fira Code"', 'Consolas', 'monospace'],
       },
