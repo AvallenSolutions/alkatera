@@ -35,6 +35,8 @@ interface BlogPostFormData {
   author_name: string;
 }
 
+const DRAFT_STORAGE_KEY = 'alkatera-blog-draft';
+
 export default function NewBlogPost() {
   const router = useRouter();
   const { isAlkateraAdmin, isLoading: isLoadingAuth } = useIsAlkateraAdmin();
@@ -56,6 +58,47 @@ export default function NewBlogPost() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // Load saved draft on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        setFormData(parsed);
+        setHasDraft(true);
+      } catch (err) {
+        console.error('Error loading draft:', err);
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  // Save draft to localStorage whenever form data changes
+  useEffect(() => {
+    if (formData.title || formData.content || formData.excerpt) {
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(formData));
+    }
+  }, [formData]);
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    setFormData({
+      title: '',
+      slug: '',
+      excerpt: '',
+      content: '',
+      featured_image_url: '',
+      tags: '',
+      content_type: 'article',
+      read_time: '',
+      meta_title: '',
+      meta_description: '',
+      author_name: '',
+    });
+    setHasDraft(false);
+  };
 
   const generateSlug = (title: string) => {
     return title
@@ -132,6 +175,10 @@ export default function NewBlogPost() {
 
       setSuccess(true);
 
+      // Clear the saved draft
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+      setHasDraft(false);
+
       // Redirect to blog dashboard after a short delay
       setTimeout(() => {
         router.push('/admin/blog');
@@ -207,6 +254,18 @@ export default function NewBlogPost() {
           </Button>
         </div>
       </div>
+
+      {/* Draft Loaded Notice */}
+      {hasDraft && !success && (
+        <Alert>
+          <AlertDescription className="flex items-center justify-between">
+            <span>Draft restored from your last session</span>
+            <Button variant="ghost" size="sm" onClick={clearDraft}>
+              Clear Draft
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Success/Error Messages */}
       {success && (

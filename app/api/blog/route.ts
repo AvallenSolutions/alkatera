@@ -94,12 +94,26 @@ export async function POST(request: NextRequest) {
       meta_title,
       meta_description,
       og_image_url,
+      author_name,
     } = body;
 
     // Validate required fields
-    if (!title || !content) {
+    const isQuote = content_type === 'quote';
+    if (!title) {
       return NextResponse.json(
-        { error: 'Title and content are required' },
+        { error: 'Title is required' },
+        { status: 400 }
+      );
+    }
+    if (!isQuote && !content) {
+      return NextResponse.json(
+        { error: 'Content is required' },
+        { status: 400 }
+      );
+    }
+    if (isQuote && !author_name) {
+      return NextResponse.json(
+        { error: 'Author name is required for quotes' },
         { status: 400 }
       );
     }
@@ -119,13 +133,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Get author info
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', user.id)
-      .single();
+    // For quotes, use the provided author_name (the person being quoted)
+    // For other content types, use the logged-in user's name
+    let finalAuthorName = author_name;
+    if (!isQuote) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
 
-    const author_name = profile?.full_name || user.email?.split('@')[0] || 'AlkaTera Team';
+      finalAuthorName = profile?.full_name || user.email?.split('@')[0] || 'AlkaTera Team';
+    }
 
     // Create blog post
     const { data, error } = await supabase
@@ -133,19 +152,19 @@ export async function POST(request: NextRequest) {
       .insert({
         title,
         slug: finalSlug,
-        excerpt,
-        content,
-        featured_image_url,
+        excerpt: excerpt || null,
+        content: content || '',
+        featured_image_url: featured_image_url || null,
         author_id: user.id,
-        author_name,
+        author_name: finalAuthorName,
         tags: tags || [],
         content_type: content_type || 'article',
         status: status || 'draft',
         published_at: status === 'published' ? new Date().toISOString() : null,
-        read_time: finalReadTime,
+        read_time: finalReadTime || null,
         meta_title: meta_title || title,
-        meta_description: meta_description || excerpt,
-        og_image_url: og_image_url || featured_image_url,
+        meta_description: meta_description || excerpt || null,
+        og_image_url: og_image_url || featured_image_url || null,
       })
       .select()
       .single();
