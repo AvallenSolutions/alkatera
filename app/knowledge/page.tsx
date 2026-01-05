@@ -23,56 +23,7 @@ interface ContentItem {
 }
 
 const CONTENT_ITEMS: ContentItem[] = [
-  {
-    id: '1',
-    type: 'article',
-    title: 'The Future of Glass: Lightweighting Premium Spirits',
-    excerpt: 'Why shedding grams from your bottle might be the radical innovation the industry needs to cut carbon by 40%.',
-    tags: ['Strategy', 'Packaging'],
-    readTime: '5 min read',
-    author: 'Dr. Elena S.'
-  },
-  {
-    id: '2',
-    type: 'video',
-    title: 'Distillery Tour: Tracking Water Usage',
-    excerpt: 'A 3-minute guide to setting up your first water footprint audit in the mash house using AlkaTera sensors.',
-    tags: ['Tutorial', 'Water'],
-    readTime: '3:24',
-    image: 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=2670&auto=format&fit=crop'
-  },
-  {
-    id: '3',
-    type: 'quote',
-    title: "Sustainability isn't a department. It's the operating system.",
-    tags: ['Manifesto'],
-    author: 'AlkaTera CEO'
-  },
-  {
-    id: '4',
-    type: 'article',
-    title: 'Decarbonizing the Supply Chain: From Grain to Glass',
-    excerpt: 'How to engage farmers and glass manufacturers without losing contracts. A practical guide for procurement.',
-    tags: ['Carbon', 'Supply Chain'],
-    readTime: '8 min read'
-  },
-  {
-    id: '5',
-    type: 'video',
-    title: 'B Corp Certification: The Alkatera Advantage',
-    excerpt: 'See how our platform automates 80% of the data collection needed for your environmental impact section.',
-    tags: ['Certification', 'B Corp'],
-    readTime: '5:12',
-    image: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=2670&auto=format&fit=crop'
-  },
-  {
-    id: '6',
-    type: 'article',
-    title: 'The Economics of Regenerative Agriculture for Distillers',
-    excerpt: 'What happens when you pay farmers to sequester carbon? A case study from Scotland\'s barley fields.',
-    tags: ['Agriculture', 'Carbon'],
-    readTime: '6 min read'
-  }
+  // Placeholder content removed - only showing blog posts from CMS
 ];
 
 const ContentCard = ({ item, index }: { item: ContentItem; index: number }) => {
@@ -215,8 +166,8 @@ export default function KnowledgePage() {
     fetchPosts();
   }, []);
 
-  // Combine hardcoded content with blog posts
-  const allContent = [...blogPosts, ...CONTENT_ITEMS];
+  // Use only blog posts from CMS
+  const allContent = blogPosts;
 
   const allTags = ['all', ...Array.from(new Set(allContent.flatMap(item => item.tags)))];
 
@@ -279,11 +230,28 @@ export default function KnowledgePage() {
       {/* Content Grid */}
       <section className="px-6 md:px-20 pb-32">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredContent.map((item, index) => (
-              <ContentCard key={item.id} item={item} index={index} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="text-center py-20">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[#ccff00] border-t-transparent"></div>
+              <p className="mt-4 text-gray-400 font-mono text-sm">Loading knowledge...</p>
+            </div>
+          ) : filteredContent.length === 0 ? (
+            <div className="text-center py-20 border border-white/10 bg-white/5">
+              <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-2xl font-serif mb-2">No content yet</h3>
+              <p className="text-gray-400 font-mono text-sm">
+                {activeFilter === 'all'
+                  ? 'Blog posts will appear here once published.'
+                  : `No content found with tag "${activeFilter}".`}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredContent.map((item, index) => (
+                <ContentCard key={item.id} item={item} index={index} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
