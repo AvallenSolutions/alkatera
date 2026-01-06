@@ -179,31 +179,47 @@ export async function POST(request: NextRequest) {
       finalAuthorName = profile?.full_name || user.email?.split('@')[0] || 'AlkaTera Team';
     }
 
+    // Prepare blog post data
+    const postData = {
+      title,
+      slug: finalSlug,
+      excerpt: excerpt || null,
+      content: content || null,
+      featured_image_url: featured_image_url || null,
+      author_id: user.id,
+      author_name: finalAuthorName,
+      tags: tags || [],
+      content_type: content_type || 'article',
+      status: status || 'draft',
+      published_at: status === 'published' ? new Date().toISOString() : null,
+      read_time: finalReadTime || null,
+      meta_title: meta_title || title,
+      meta_description: meta_description || excerpt || null,
+      og_image_url: og_image_url || featured_image_url || null,
+      video_url: video_url || null,
+      video_duration: video_duration || null,
+      display_order: 0, // Default display order
+    };
+
     // Create blog post
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('blog_posts')
-      .insert({
-        title,
-        slug: finalSlug,
-        excerpt: excerpt || null,
-        content: content || null,
-        featured_image_url: featured_image_url || null,
-        author_id: user.id,
-        author_name: finalAuthorName,
-        tags: tags || [],
-        content_type: content_type || 'article',
-        status: status || 'draft',
-        published_at: status === 'published' ? new Date().toISOString() : null,
-        read_time: finalReadTime || null,
-        meta_title: meta_title || title,
-        meta_description: meta_description || excerpt || null,
-        og_image_url: og_image_url || featured_image_url || null,
-        video_url: video_url || null,
-        video_duration: video_duration || null,
-        display_order: 0, // Default display order
-      })
+      .insert(postData)
       .select()
       .single();
+
+    // If display_order column doesn't exist yet (42703 = undefined_column), retry without it
+    if (error && error.code === '42703' && error.message?.includes('display_order')) {
+      console.log('[Blog API] display_order column not found, retrying without it');
+      const { display_order, ...postDataWithoutOrder } = postData;
+      const result = await supabase
+        .from('blog_posts')
+        .insert(postDataWithoutOrder)
+        .select()
+        .single();
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('[Blog API] Database error creating post:', {
