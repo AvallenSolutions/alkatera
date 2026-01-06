@@ -200,23 +200,36 @@ export async function POST(request: NextRequest) {
         og_image_url: og_image_url || featured_image_url || null,
         video_url: video_url || null,
         video_duration: video_duration || null,
+        display_order: 0, // Default display order
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating blog post:', error);
+      console.error('[Blog API] Database error creating post:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
 
       // Handle unique constraint violation (slug already exists)
       if (error.code === '23505') {
         return NextResponse.json(
-          { error: 'A post with this slug already exists. Please use a different slug.' },
+          { error: 'A post with this slug already exists. Please use a different slug.', details: error.message },
           { status: 409 }
         );
       }
 
+      // Return detailed error for debugging
       return NextResponse.json(
-        { error: 'Failed to create blog post' },
+        {
+          error: 'Failed to create blog post',
+          details: error.message,
+          code: error.code,
+          hint: error.hint
+        },
         { status: 500 }
       );
     }
