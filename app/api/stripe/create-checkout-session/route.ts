@@ -67,11 +67,20 @@ export async function POST(request: NextRequest) {
     // Get organization details
     const { data: org, error: orgError } = await supabase
       .from('organizations')
-      .select('id, name, stripe_customer_id, billing_email')
+      .select('id, name, stripe_customer_id')
       .eq('id', organizationId)
       .single();
 
-    if (orgError || !org) {
+    if (orgError) {
+      console.error('Error fetching organization:', orgError);
+      return NextResponse.json({
+        error: 'Organization not found',
+        details: orgError.message
+      }, { status: 404 });
+    }
+
+    if (!org) {
+      console.error('Organization not found for ID:', organizationId);
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     }
 
@@ -82,7 +91,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const customerEmail = org.billing_email || profile?.email || user.email;
+    const customerEmail = profile?.email || user.email;
 
     // Get tier and billing interval from price ID
     const tier = getTierFromPriceId(priceId);
