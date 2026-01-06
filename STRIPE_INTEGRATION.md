@@ -99,9 +99,9 @@ Includes usage examples in comments.
 
 Added:
 ```bash
-STRIPE_SECRET_KEY=mk_1SACycS6ESxgnZl292m4JQN3
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=mk_1R3brxS6ESxgnZl2njSaBGWK
-STRIPE_WEBHOOK_SECRET=whsec_YUmwJkxoySFhppLlF1c0xAK1DGUurqtB
+STRIPE_SECRET_KEY=your_stripe_secret_key_here
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key_here
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 ```
 
@@ -145,10 +145,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://dfcezkyaejrxmbwunhry.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
-# Stripe
-STRIPE_SECRET_KEY=sk_test_... # or sk_live_... for production
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_... # or pk_live_... for production
-STRIPE_WEBHOOK_SECRET=whsec_... # from webhook setup
+# Stripe (use your production keys here)
+STRIPE_SECRET_KEY=sk_live_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
 
 # Other existing vars...
 ```
