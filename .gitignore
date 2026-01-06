@@ -39,3 +39,5 @@ next-env.d.ts
 *-marketing-export/
 *-import/
 Alkatera Marketing/
+STRIPE_PRODUCTION_KEYS.txt
+STRIPE_TEST_KEYS.txt
