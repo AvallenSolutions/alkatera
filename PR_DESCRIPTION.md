@@ -149,3 +149,12 @@ This implementation provides a production-ready subscription system with compreh
    - Protected server-client.ts and subscription-limits.ts with 'server-only' guard
    - Extracted client-safe utilities to subscription-utils.ts
    - Resolved Next.js build error with cookies/next/headers in client bundle
+
+10. **Update PR description with server/client boundary fix** (a1ed5aa)
+   - Enhanced PR documentation with latest changes
+
+11. **Fix TypeScript compilation errors for Netlify build** (adf50a6)
+   - Updated Stripe API version to '2025-12-15.clover' (latest)
+   - Fixed Invoice.subscription type errors in webhook handlers
+   - Added type assertions for invoice data handling
+   - All TypeScript checks now pass successfully
