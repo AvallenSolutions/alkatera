@@ -179,8 +179,8 @@ export async function POST(request: NextRequest) {
       finalAuthorName = profile?.full_name || user.email?.split('@')[0] || 'AlkaTera Team';
     }
 
-    // Prepare blog post data
-    const postData = {
+    // Prepare blog post data (with all optional new columns)
+    const postData: Record<string, any> = {
       title,
       slug: finalSlug,
       excerpt: excerpt || null,
@@ -208,13 +208,16 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    // If display_order column doesn't exist yet (42703 = undefined_column), retry without it
-    if (error && error.code === '42703' && error.message?.includes('display_order')) {
-      console.log('[Blog API] display_order column not found, retrying without it');
-      const { display_order, ...postDataWithoutOrder } = postData;
+    // If columns don't exist yet (PGRST204 or 42703), retry without the newer columns
+    if (error && (error.code === 'PGRST204' || error.code === '42703')) {
+      console.log('[Blog API] Some columns not found in schema, retrying with base columns only');
+
+      // Remove columns that might not exist yet (from newer migrations)
+      const { video_url, video_duration, display_order, ...basePostData } = postData;
+
       const result = await supabase
         .from('blog_posts')
-        .insert(postDataWithoutOrder)
+        .insert(basePostData)
         .select()
         .single();
       data = result.data;
