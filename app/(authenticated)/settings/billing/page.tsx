@@ -367,12 +367,6 @@ function TierCard({
   const savings = billingInterval === "annual" ? calculateAnnualSavings(tier.tier) : 0;
 
   const handleClick = () => {
-    if (!priceId) {
-      toast.error(
-        "Annual pricing is not yet configured. Please contact support or choose monthly billing."
-      );
-      return;
-    }
     onUpgrade(priceId, tier.displayName);
   };
 
@@ -439,7 +433,7 @@ function TierCard({
 
         <Button
           onClick={handleClick}
-          disabled={isCurrent || processing || !priceId}
+          disabled={isCurrent || processing}
           className="w-full"
           variant={isCurrent ? "outline" : "default"}
         >

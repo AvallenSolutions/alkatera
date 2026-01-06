@@ -33,7 +33,7 @@ export interface TierPricing {
   tier: SubscriptionTier;
   displayName: string;
   monthlyPriceId: string;
-  annualPriceId: string | null; // null until annual prices are created in Stripe
+  annualPriceId: string;
   monthlyPrice: number; // in GBP
   annualPrice: number; // in GBP (10 months - 2 months free)
   description: string;
@@ -53,7 +53,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     tier: 'seed',
     displayName: 'Seed',
     monthlyPriceId: 'price_1SjQkLS6ESxgnZl2F62rcpVd',
-    annualPriceId: null, // TODO: Add annual price ID when created in Stripe
+    annualPriceId: 'price_1SmfD6S6ESxgnZl2D3ELCThW',
     monthlyPrice: 149,
     annualPrice: 1490, // 10 months (2 months free)
     description: 'Perfect for startups and small businesses beginning their sustainability journey',
@@ -77,7 +77,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     tier: 'blossom',
     displayName: 'Blossom',
     monthlyPriceId: 'price_1SjQlgS6ESxgnZl2c9QYw7QI',
-    annualPriceId: null, // TODO: Add annual price ID when created in Stripe
+    annualPriceId: 'price_1SmfE0S6ESxgnZl2rW18ZxV7',
     monthlyPrice: 399,
     annualPrice: 3990, // 10 months (2 months free)
     description: 'For growing businesses ready to expand their environmental impact tracking',
@@ -102,7 +102,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     tier: 'canopy',
     displayName: 'Canopy',
     monthlyPriceId: 'price_1SjQmXS6ESxgnZl2SWd2nHga',
-    annualPriceId: null, // TODO: Add annual price ID when created in Stripe
+    annualPriceId: 'price_1SmfEqS6ESxgnZl2FugLcZSr',
     monthlyPrice: 899,
     annualPrice: 8990, // 10 months (2 months free)
     description: 'Comprehensive sustainability management for established organisations',
@@ -149,17 +149,7 @@ export function getTierFromPriceId(priceId: string): SubscriptionTier {
  */
 export function getPriceId(tier: SubscriptionTier, interval: BillingInterval): string {
   const pricing = TIER_PRICING[tier];
-
-  if (interval === 'annual') {
-    if (!pricing.annualPriceId) {
-      throw new Error(
-        `Annual pricing for ${tier} tier is not yet configured. Please create the annual price in Stripe dashboard.`
-      );
-    }
-    return pricing.annualPriceId;
-  }
-
-  return pricing.monthlyPriceId;
+  return interval === 'annual' ? pricing.annualPriceId : pricing.monthlyPriceId;
 }
 
 /**

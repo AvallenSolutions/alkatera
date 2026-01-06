@@ -107,10 +107,10 @@ BEGIN
     WHEN 'price_1SjQkLS6ESxgnZl2F62rcpVd' THEN 'seed'
     WHEN 'price_1SjQlgS6ESxgnZl2c9QYw7QI' THEN 'blossom'
     WHEN 'price_1SjQmXS6ESxgnZl2SWd2nHga' THEN 'canopy'
-    -- Annual prices (to be added when created in Stripe)
-    -- WHEN 'price_ANNUAL_SEED' THEN 'seed'
-    -- WHEN 'price_ANNUAL_BLOSSOM' THEN 'blossom'
-    -- WHEN 'price_ANNUAL_CANOPY' THEN 'canopy'
+    -- Annual prices
+    WHEN 'price_1SmfD6S6ESxgnZl2D3ELCThW' THEN 'seed'
+    WHEN 'price_1SmfE0S6ESxgnZl2rW18ZxV7' THEN 'blossom'
+    WHEN 'price_1SmfEqS6ESxgnZl2FugLcZSr' THEN 'canopy'
     ELSE 'seed' -- Default to seed if unknown
   END;
 

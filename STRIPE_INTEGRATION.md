@@ -23,7 +23,7 @@ Added fields to `organizations` table:
   - **Seed**: £149/month, £1,490/year
   - **Blossom**: £399/month, £3,990/year
   - **Canopy**: £899/month, £8,990/year
-- Price ID mappings (monthly configured, annual TODOs marked)
+- Price ID mappings (monthly and annual fully configured)
 - Helper functions for tier/price conversions
 - Limits and features for each tier
 
@@ -48,7 +48,7 @@ Functions to check and enforce limits:
 - Validates user permissions (admin/owner only)
 - Creates or retrieves Stripe customer
 - Stores metadata for webhook processing
-- Supports monthly billing (annual pending price IDs)
+- Supports both monthly and annual billing
 
 #### Webhooks Handler
 **File:** `app/api/stripe/webhooks/route.ts`
@@ -109,33 +109,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 ## 🚀 Next Steps - Required Actions
 
-### 1. Create Annual Price IDs in Stripe Dashboard
-
-Currently, only monthly prices are configured. To enable annual billing:
-
-1. Go to [Stripe Dashboard](https://dashboard.stripe.com)
-2. Navigate to Products
-3. For each tier (Seed, Blossom, Canopy), create an annual price:
-   - **Seed Annual**: £1,490/year (£149/month × 10)
-   - **Blossom Annual**: £3,990/year (£399/month × 10)
-   - **Canopy Annual**: £8,990/year (£899/month × 10)
-4. Update `lib/stripe-config.ts`:
-   ```typescript
-   seed: {
-     // ...
-     annualPriceId: 'price_YOUR_ANNUAL_SEED_PRICE_ID',
-   },
-   blossom: {
-     // ...
-     annualPriceId: 'price_YOUR_ANNUAL_BLOSSOM_PRICE_ID',
-   },
-   canopy: {
-     // ...
-     annualPriceId: 'price_YOUR_ANNUAL_CANOPY_PRICE_ID',
-   }
-   ```
-
-### 2. Run Database Migration
+### 1. Run Database Migration
 
 Apply the migration to add Stripe fields:
 
@@ -147,7 +121,7 @@ supabase db push
 # Upload: supabase/migrations/20260106000000_add_stripe_fields_to_organizations.sql
 ```
 
-### 3. Set Up Stripe Webhook
+### 2. Set Up Stripe Webhook
 
 1. Go to [Stripe Webhooks](https://dashboard.stripe.com/webhooks)
 2. Click "Add endpoint"
@@ -161,7 +135,7 @@ supabase db push
 5. Copy the webhook signing secret
 6. Update your environment variables with the webhook secret
 
-### 4. Configure Environment Variables
+### 3. Configure Environment Variables
 
 Create a `.env.local` file (NOT committed to git):
 
@@ -182,7 +156,7 @@ STRIPE_WEBHOOK_SECRET=whsec_... # from webhook setup
 **⚠️ IMPORTANT:** Get your Supabase Service Role Key from:
 Supabase Dashboard → Settings → API → Service Role Key
 
-### 5. Implement Stripe Customer Portal (Optional but Recommended)
+### 4. Implement Stripe Customer Portal (Optional but Recommended)
 
 To allow users to manage payment methods and view invoices, create a portal session endpoint:
 
@@ -206,7 +180,7 @@ export async function POST(request: NextRequest) {
 
 Then update the "Manage Payment Method" button in `billing/page.tsx`.
 
-### 6. Add Enforcement to Existing API Routes
+### 5. Add Enforcement to Existing API Routes
 
 Add limit checks to your product/LCA creation routes:
 
@@ -233,7 +207,7 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-### 7. Test the Integration
+### 6. Test the Integration
 
 1. **Test Checkout Flow:**
    - Navigate to `/settings/billing`
