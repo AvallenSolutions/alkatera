@@ -37,6 +37,8 @@ import { useCallback, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ImageUpload } from '@/components/blog/ImageUpload';
 
 interface RichTextEditorProps {
   content: string;
@@ -110,10 +112,34 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
   const addImage = useCallback(() => {
     if (!imageUrl) return;
 
-    editor?.chain().focus().setImage({ src: imageUrl }).run();
+    // Handle Dropbox URLs - convert to direct download links
+    let processedUrl = imageUrl;
+    if (imageUrl.includes('dropbox.com')) {
+      processedUrl = imageUrl.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '?raw=1');
+      if (!processedUrl.includes('?raw=1')) {
+        processedUrl = processedUrl.includes('?')
+          ? processedUrl + '&raw=1'
+          : processedUrl + '?raw=1';
+      }
+    }
+    // Handle Google Drive URLs
+    else if (imageUrl.includes('drive.google.com')) {
+      const fileIdMatch = imageUrl.match(/[-\w]{25,}/);
+      if (fileIdMatch) {
+        processedUrl = `https://drive.google.com/uc?export=view&id=${fileIdMatch[0]}`;
+      }
+    }
+
+    editor?.chain().focus().setImage({ src: processedUrl }).run();
     setImageUrl('');
     setImageDialogOpen(false);
   }, [editor, imageUrl]);
+
+  const handleImageUpload = useCallback((url: string) => {
+    if (!url) return;
+    editor?.chain().focus().setImage({ src: url }).run();
+    setImageDialogOpen(false);
+  }, [editor]);
 
   if (!editor) {
     return null;
@@ -358,27 +384,47 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
 
       {/* Image Dialog */}
       <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Insert Image</DialogTitle>
             <DialogDescription>
-              Enter the image URL
+              Upload an image or provide a URL
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Input
-              placeholder="https://example.com/image.jpg"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && addImage()}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setImageDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={addImage}>Insert Image</Button>
-          </DialogFooter>
+          <Tabs defaultValue="upload" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="upload">Upload</TabsTrigger>
+              <TabsTrigger value="url">URL</TabsTrigger>
+            </TabsList>
+            <TabsContent value="upload" className="space-y-4 py-4">
+              <ImageUpload
+                onUploadComplete={handleImageUpload}
+                label="Upload Image"
+                description="Drag and drop or click to upload (max 10MB)"
+              />
+            </TabsContent>
+            <TabsContent value="url" className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Input
+                  placeholder="https://example.com/image.jpg"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addImage()}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Supports direct image URLs, Dropbox, and Google Drive links
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setImageDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={addImage} disabled={!imageUrl}>
+                  Insert Image
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
     </div>
