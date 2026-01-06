@@ -130,6 +130,9 @@ export async function POST(request: NextRequest) {
         .eq('id', org.id);
     }
 
+    // Get the base URL for redirects (use custom domain if available)
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin;
+
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -141,8 +144,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${request.nextUrl.origin}/settings/billing?success=true&tier=${tier}`,
-      cancel_url: `${request.nextUrl.origin}/settings/billing?canceled=true`,
+      success_url: `${baseUrl}/settings/billing?success=true&tier=${tier}`,
+      cancel_url: `${baseUrl}/settings/billing?canceled=true`,
       metadata: {
         organizationId: org.id,
         tier,
