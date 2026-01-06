@@ -5,6 +5,7 @@ import { Footer } from '@/marketing/components/Footer';
 import { Clock, Calendar, User, Tag, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { SocialShare } from '@/components/blog/SocialShare';
 
 interface BlogPost {
   id: string;
@@ -125,21 +126,21 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {/* Back Link */}
           <Link
             href="/knowledge"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-[#ccff00] transition-colors mb-8 font-mono text-sm uppercase tracking-widest"
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-[#ccff00] transition-all duration-300 mb-12 font-mono text-sm uppercase tracking-widest group"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform duration-300" />
             Back to Knowledge Hub
           </Link>
 
           {/* Header */}
-          <header className="mb-12 space-y-6">
+          <header className="mb-16 space-y-8">
             {/* Tags */}
             {post.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {post.tags.map((tag, i) => (
                   <span
                     key={i}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-[#ccff00]/10 border border-[#ccff00]/30 text-[#ccff00] font-mono text-xs uppercase tracking-widest"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#ccff00]/10 border border-[#ccff00]/30 text-[#ccff00] font-mono text-xs uppercase tracking-widest rounded-md hover:bg-[#ccff00]/20 transition-colors duration-300"
                   >
                     <Tag className="w-3 h-3" />
                     {tag}
@@ -149,13 +150,13 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             )}
 
             {/* Title */}
-            <h1 className="text-5xl md:text-6xl font-serif leading-tight">
+            <h1 className="text-5xl md:text-7xl font-serif leading-[1.1] tracking-tight bg-gradient-to-br from-white via-white to-gray-400 bg-clip-text text-transparent">
               {post.title}
             </h1>
 
             {/* Excerpt */}
             {post.excerpt && (
-              <p className="text-xl text-gray-400 leading-relaxed">
+              <p className="text-xl md:text-2xl text-gray-400 leading-relaxed max-w-3xl">
                 {post.excerpt}
               </p>
             )}
@@ -185,38 +186,48 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                 </div>
               )}
             </div>
+
+            {/* Social Share */}
+            <SocialShare
+              url={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://alkatera.com'}/blog/${post.slug}`}
+              title={post.title}
+              description={post.excerpt}
+            />
           </header>
 
           {/* Featured Image (only show if not a video post) */}
           {post.featured_image_url && post.content_type !== 'video' && (
-            <div className="mb-12 -mx-6 md:mx-0">
-              <img
-                src={post.featured_image_url}
-                alt={post.title}
-                className="w-full h-auto rounded-none md:rounded-lg"
-              />
+            <div className="mb-16 -mx-6 md:mx-0 group">
+              <div className="relative overflow-hidden rounded-none md:rounded-xl">
+                <img
+                  src={post.featured_image_url}
+                  alt={post.title}
+                  className="w-full h-auto transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-transparent to-transparent opacity-50"></div>
+              </div>
             </div>
           )}
 
           {/* Video Player */}
           {post.content_type === 'video' && post.video_url && (
-            <div className="mb-12 -mx-6 md:mx-0">
+            <div className="mb-16 -mx-6 md:mx-0">
               {getYouTubeEmbedUrl(post.video_url) ? (
                 // YouTube Video
-                <div className="relative w-full pb-[56.25%]">
+                <div className="relative w-full pb-[56.25%] rounded-none md:rounded-xl overflow-hidden shadow-2xl border border-white/5">
                   <iframe
                     src={getYouTubeEmbedUrl(post.video_url)!}
                     title={post.title}
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    className="absolute top-0 left-0 w-full h-full rounded-none md:rounded-lg"
+                    className="absolute top-0 left-0 w-full h-full"
                   />
                 </div>
               ) : (
                 // Direct Video File
                 <video
                   controls
-                  className="w-full h-auto rounded-none md:rounded-lg bg-black"
+                  className="w-full h-auto rounded-none md:rounded-xl bg-black shadow-2xl border border-white/5"
                   poster={post.featured_image_url}
                 >
                   <source src={post.video_url} type="video/mp4" />
@@ -231,40 +242,55 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {/* Content */}
           {post.content && (
             <div
-              className="prose prose-invert prose-lg max-w-none
-                prose-headings:font-serif prose-headings:text-white
-                prose-h1:text-4xl prose-h2:text-3xl prose-h3:text-2xl
-                prose-p:text-gray-300 prose-p:leading-relaxed
-                prose-a:text-[#ccff00] prose-a:no-underline hover:prose-a:underline
-                prose-strong:text-white prose-strong:font-bold
-                prose-code:text-[#ccff00] prose-code:bg-[#ccff00]/10 prose-code:px-1 prose-code:py-0.5
-                prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10
-                prose-blockquote:border-l-[#ccff00] prose-blockquote:text-gray-400 prose-blockquote:italic
-                prose-img:rounded-lg prose-img:w-full
-                prose-ul:text-gray-300 prose-ol:text-gray-300
-                prose-li:marker:text-[#ccff00]"
+              className="prose prose-invert prose-lg md:prose-xl max-w-none
+                prose-headings:font-serif prose-headings:text-white prose-headings:tracking-tight
+                prose-h1:text-5xl prose-h1:leading-tight prose-h1:mb-6 prose-h1:mt-12
+                prose-h2:text-4xl prose-h2:leading-tight prose-h2:mb-4 prose-h2:mt-10
+                prose-h3:text-3xl prose-h3:leading-snug prose-h3:mb-3 prose-h3:mt-8
+                prose-p:text-gray-300 prose-p:leading-relaxed prose-p:mb-6
+                prose-a:text-[#ccff00] prose-a:no-underline prose-a:font-medium hover:prose-a:underline prose-a:transition-all
+                prose-strong:text-white prose-strong:font-semibold
+                prose-em:text-gray-200 prose-em:italic
+                prose-code:text-[#ccff00] prose-code:bg-[#ccff00]/10 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:font-mono prose-code:text-base
+                prose-pre:bg-black/50 prose-pre:border prose-pre:border-white/10 prose-pre:rounded-xl prose-pre:p-6
+                prose-blockquote:border-l-4 prose-blockquote:border-l-[#ccff00] prose-blockquote:text-gray-300 prose-blockquote:italic prose-blockquote:pl-6 prose-blockquote:py-2
+                prose-img:rounded-xl prose-img:w-full prose-img:shadow-2xl prose-img:border prose-img:border-white/5
+                prose-ul:text-gray-300 prose-ul:space-y-2 prose-ol:text-gray-300 prose-ol:space-y-2
+                prose-li:marker:text-[#ccff00] prose-li:leading-relaxed
+                prose-hr:border-white/10 prose-hr:my-12
+                first:prose-p:text-xl first:prose-p:leading-relaxed"
               dangerouslySetInnerHTML={{ __html: post.content }}
             />
           )}
 
-          {/* Footer Tags */}
-          {post.tags.length > 0 && (
-            <footer className="mt-16 pt-8 border-t border-white/10">
-              <div className="flex flex-wrap items-center gap-2">
+          {/* Footer Tags & Share */}
+          <footer className="mt-20 pt-10 border-t border-white/10 space-y-8">
+            {/* Social Share */}
+            <div className="flex justify-center">
+              <SocialShare
+                url={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://alkatera.com'}/blog/${post.slug}`}
+                title={post.title}
+                description={post.excerpt}
+              />
+            </div>
+
+            {/* Tags */}
+            {post.tags.length > 0 && (
+              <div className="flex flex-wrap items-center justify-center gap-3 pb-4">
                 <span className="text-gray-500 font-mono text-xs uppercase tracking-widest">
                   Tagged:
                 </span>
                 {post.tags.map((tag, i) => (
                   <span
                     key={i}
-                    className="px-3 py-1 bg-white/5 border border-white/10 text-gray-400 font-mono text-xs uppercase tracking-widest hover:border-[#ccff00] hover:text-[#ccff00] transition-colors"
+                    className="px-4 py-2 bg-white/5 border border-white/10 text-gray-400 font-mono text-xs uppercase tracking-widest rounded-md hover:border-[#ccff00] hover:text-[#ccff00] hover:bg-[#ccff00]/5 transition-all duration-300 cursor-pointer"
                   >
                     {tag}
                   </span>
                 ))}
               </div>
-            </footer>
-          )}
+            )}
+          </footer>
         </article>
       </main>
 
