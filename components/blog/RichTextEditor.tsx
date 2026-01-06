@@ -7,6 +7,8 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
 import {
   Bold,
   Italic,
@@ -27,18 +29,30 @@ import {
   AlignCenter,
   AlignRight,
   AlignJustify,
+  Palette,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useCallback, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
 }
+
+// Alkatera Color Palette
+const ALKATERA_COLORS = [
+  { name: 'Neon Lime', value: '#ccff00', hsl: 'hsl(84, 100%, 60%)' },
+  { name: 'Neon Cyan', value: '#00d4ff', hsl: 'hsl(190, 100%, 50%)' },
+  { name: 'Neon Purple', value: '#c000ff', hsl: 'hsl(280, 100%, 50%)' },
+  { name: 'Neon Emerald', value: '#008a4d', hsl: 'hsl(160, 84%, 39%)' },
+  { name: 'White', value: '#e6e6e6', hsl: 'hsl(0, 0%, 90%)' },
+  { name: 'Gray', value: '#666666', hsl: 'hsl(0, 0%, 40%)' },
+];
 
 export function RichTextEditor({ content, onChange, placeholder = 'Write your content here...' }: RichTextEditorProps) {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -54,6 +68,8 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
         },
       }),
       Underline,
+      TextStyle,
+      Color,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -157,6 +173,51 @@ export function RichTextEditor({ content, onChange, placeholder = 'Write your co
         >
           <Code className="h-4 w-4" />
         </MenuButton>
+
+        {/* Text Color Picker */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-8 w-8 p-0',
+                editor.isActive('textStyle') && 'bg-[#ccff00]/20 text-[#ccff00]'
+              )}
+            >
+              <Palette className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-3 bg-black/95 border-white/10">
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-mono text-gray-400 uppercase tracking-widest mb-1">
+                Alkatera Colors
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {ALKATERA_COLORS.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => editor.chain().focus().setColor(color.value).run()}
+                    className={cn(
+                      'w-10 h-10 rounded border-2 transition-all hover:scale-110',
+                      editor.isActive('textStyle', { color: color.value })
+                        ? 'border-white ring-2 ring-white/50'
+                        : 'border-white/20 hover:border-white/50'
+                    )}
+                    style={{ backgroundColor: color.value }}
+                    title={color.name}
+                  />
+                ))}
+              </div>
+              <button
+                onClick={() => editor.chain().focus().unsetColor().run()}
+                className="mt-2 px-3 py-1.5 text-xs font-mono text-gray-400 border border-white/10 rounded hover:border-[#ccff00] hover:text-[#ccff00] transition-colors"
+              >
+                Reset Color
+              </button>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         <div className="w-px h-8 bg-white/10 mx-1" />
 
