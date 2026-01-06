@@ -167,3 +167,12 @@ This implementation provides a production-ready subscription system with compreh
    - Prevents build crash when STRIPE_SECRET_KEY not set at build time
    - Maintains backward compatibility with existing code
    - Error only throws at runtime when Stripe is actually accessed
+
+14. **Update PR description with lazy initialization fix** (6cb7f94)
+   - Enhanced PR documentation with Stripe lazy loading details
+
+15. **Fix Supabase client build-time initialization in webhooks** (f8e92fe)
+   - Implemented lazy initialization for webhook secret and Supabase admin client
+   - Added proper TypeScript typing with Database type for Supabase client
+   - Prevents build crash when environment variables not available at build time
+   - All webhook handlers now use lazy-loaded instances

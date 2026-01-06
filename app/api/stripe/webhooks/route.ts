@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe-config';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/db_types';
 import Stripe from 'stripe';
 
 /**
@@ -20,23 +21,38 @@ import Stripe from 'stripe';
 // Disable body parsing, need raw body for signature verification
 export const runtime = 'nodejs';
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+// Lazy initialization to prevent build-time errors
+let _webhookSecret: string | null = null;
+let _supabaseAdmin: SupabaseClient<Database> | null = null;
 
-if (!webhookSecret) {
-  throw new Error('STRIPE_WEBHOOK_SECRET is not defined in environment variables');
+function getWebhookSecret(): string {
+  if (!_webhookSecret) {
+    if (!process.env.STRIPE_WEBHOOK_SECRET) {
+      throw new Error('STRIPE_WEBHOOK_SECRET is not defined in environment variables');
+    }
+    _webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  }
+  return _webhookSecret;
 }
 
-// Create Supabase admin client for webhook operations
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '',
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables for webhook handler');
+    }
+
+    _supabaseAdmin = createClient<Database>(supabaseUrl, supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
   }
-);
+  return _supabaseAdmin;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,7 +67,7 @@ export async function POST(request: NextRequest) {
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      event = stripe.webhooks.constructEvent(body, signature, getWebhookSecret());
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
@@ -125,7 +141,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   }
 
   // Update organization using the database function
-  const { error } = await supabaseAdmin.rpc('update_subscription_from_stripe', {
+  const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId,
     p_stripe_customer_id: customerId,
     p_stripe_subscription_id: subscriptionId,
@@ -150,7 +166,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const organizationId = subscription.metadata?.organizationId;
   if (!organizationId) {
     // Try to find organization by customer ID
-    const { data: org } = await supabaseAdmin
+    const { data: org } = await getSupabaseAdmin()
       .from('organizations')
       .select('id')
       .eq('stripe_customer_id', subscription.customer)
@@ -169,7 +185,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   // Update organization using the database function
-  const { error } = await supabaseAdmin.rpc('update_subscription_from_stripe', {
+  const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId || null,
     p_stripe_customer_id: subscription.customer as string,
     p_stripe_subscription_id: subscription.id,
@@ -192,7 +208,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log('Subscription deleted:', subscription.id);
 
   // Find organization by subscription ID
-  const { data: org, error: findError } = await supabaseAdmin
+  const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
     .select('id')
     .eq('stripe_subscription_id', subscription.id)
@@ -204,7 +220,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   }
 
   // Downgrade to seed (free) tier
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('organizations')
     .update({
       subscription_tier: 'seed',
@@ -240,7 +256,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   // Find organization by subscription ID
-  const { data: org, error: findError } = await supabaseAdmin
+  const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
     .select('id, name, billing_email')
     .eq('stripe_subscription_id', subscriptionId)
@@ -252,7 +268,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   // Update subscription status to suspended
-  const { error } = await supabaseAdmin
+  const { error } = await getSupabaseAdmin()
     .from('organizations')
     .update({
       subscription_status: 'suspended',
@@ -288,7 +304,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   }
 
   // Find organization by subscription ID
-  const { data: org, error: findError } = await supabaseAdmin
+  const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
     .select('id, subscription_status')
     .eq('stripe_subscription_id', subscriptionId)
@@ -300,7 +316,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   // If organization was suspended, reactivate it
   if (org.subscription_status === 'suspended') {
-    const { error } = await supabaseAdmin
+    const { error } = await getSupabaseAdmin()
       .from('organizations')
       .update({
         subscription_status: 'active',
