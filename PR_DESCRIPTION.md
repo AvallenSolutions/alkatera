@@ -58,9 +58,14 @@ All tiers include 2 months free when paying annually!
 - `middleware/subscription-check.ts` - Enforcement middleware
 - `supabase/migrations/20260106000000_add_stripe_fields_to_organizations.sql` - DB schema
 - `STRIPE_INTEGRATION.md` - Complete implementation guide
+- `lib/bulk-import/template-generator.ts` - CSV template utilities (build fix)
+- `lib/bulk-import/material-matcher.ts` - Material matching helpers (build fix)
+- `STRIPE_TEST_KEYS.txt` - Test mode API keys (gitignored)
+- `STRIPE_PRODUCTION_KEYS.txt` - Production API keys (gitignored)
 
 **Modified:**
 - `.env.example` - Added Stripe environment variables
+- `.gitignore` - Allow lib/bulk-import/, add Stripe key files
 - `package.json` - Added stripe package
 
 ### 🚀 Next Steps (Post-Merge)
@@ -113,3 +118,23 @@ This implementation provides a production-ready subscription system with compreh
    - Added annual price IDs for all three tiers
    - Enabled monthly/annual billing toggle
    - Updated documentation to reflect complete configuration
+
+3. **Add PR description for Stripe integration** (b32edc5)
+   - Created comprehensive PR documentation
+
+4. **Update environment configuration for production deployment** (48aa200)
+   - Separated test and production keys into gitignored files
+   - Updated .env.example with placeholders for security
+
+5. **Configure Stripe integration for test mode** (df3f9c3)
+   - Added all 6 test price IDs (monthly + annual for all tiers)
+   - Updated database migration to support both test and production price IDs
+   - Created STRIPE_TEST_KEYS.txt with test credentials and documentation
+
+6. **Add detailed PR description for Stripe integration** (fbd35a3)
+   - Enhanced PR documentation with full details
+
+7. **Fix Netlify build: Add missing bulk-import utility files** (bb3ff69)
+   - Created missing template-generator.ts and material-matcher.ts files
+   - Fixed .gitignore to allow lib/bulk-import/ directory
+   - Resolved webpack build failures on Netlify
