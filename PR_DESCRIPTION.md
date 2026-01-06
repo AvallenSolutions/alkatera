@@ -158,3 +158,12 @@ This implementation provides a production-ready subscription system with compreh
    - Fixed Invoice.subscription type errors in webhook handlers
    - Added type assertions for invoice data handling
    - All TypeScript checks now pass successfully
+
+12. **Update PR description with TypeScript fixes** (74b9bfe)
+   - Enhanced PR documentation with TypeScript fix details
+
+13. **Fix build-time Stripe initialization error** (199baa8)
+   - Changed Stripe client to lazy initialization with Proxy pattern
+   - Prevents build crash when STRIPE_SECRET_KEY not set at build time
+   - Maintains backward compatibility with existing code
+   - Error only throws at runtime when Stripe is actually accessed
