@@ -103,14 +103,22 @@ DECLARE
 BEGIN
   -- Map Stripe price IDs to tiers
   v_tier := CASE p_price_id
-    -- Monthly prices
+    -- Production Monthly prices
     WHEN 'price_1SjQkLS6ESxgnZl2F62rcpVd' THEN 'seed'
     WHEN 'price_1SjQlgS6ESxgnZl2c9QYw7QI' THEN 'blossom'
     WHEN 'price_1SjQmXS6ESxgnZl2SWd2nHga' THEN 'canopy'
-    -- Annual prices
+    -- Production Annual prices
     WHEN 'price_1SmfD6S6ESxgnZl2D3ELCThW' THEN 'seed'
     WHEN 'price_1SmfE0S6ESxgnZl2rW18ZxV7' THEN 'blossom'
     WHEN 'price_1SmfEqS6ESxgnZl2FugLcZSr' THEN 'canopy'
+    -- Test Monthly prices
+    WHEN 'price_1SmfgF28UK4Vxpt37j13gfue' THEN 'seed'
+    WHEN 'price_1SmfhK28UK4Vxpt3mAfxrggp' THEN 'blossom'
+    WHEN 'price_1Smfhv28UK4Vxpt3SU2pZVrt' THEN 'canopy'
+    -- Test Annual prices
+    WHEN 'price_1SmfiY28UK4Vxpt3uLpyVX5H' THEN 'seed'
+    WHEN 'price_1Smfj928UK4Vxpt393quRGXO' THEN 'blossom'
+    WHEN 'price_1Smfjf28UK4Vxpt3gB2qvW1b' THEN 'canopy'
     ELSE 'seed' -- Default to seed if unknown
   END;
 

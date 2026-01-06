@@ -52,8 +52,8 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
   seed: {
     tier: 'seed',
     displayName: 'Seed',
-    monthlyPriceId: 'price_1SjQkLS6ESxgnZl2F62rcpVd',
-    annualPriceId: 'price_1SmfD6S6ESxgnZl2D3ELCThW',
+    monthlyPriceId: 'price_1SmfgF28UK4Vxpt37j13gfue',
+    annualPriceId: 'price_1SmfiY28UK4Vxpt3uLpyVX5H',
     monthlyPrice: 149,
     annualPrice: 1490, // 10 months (2 months free)
     description: 'Perfect for startups and small businesses beginning their sustainability journey',
@@ -76,8 +76,8 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
   blossom: {
     tier: 'blossom',
     displayName: 'Blossom',
-    monthlyPriceId: 'price_1SjQlgS6ESxgnZl2c9QYw7QI',
-    annualPriceId: 'price_1SmfE0S6ESxgnZl2rW18ZxV7',
+    monthlyPriceId: 'price_1SmfhK28UK4Vxpt3mAfxrggp',
+    annualPriceId: 'price_1Smfj928UK4Vxpt393quRGXO',
     monthlyPrice: 399,
     annualPrice: 3990, // 10 months (2 months free)
     description: 'For growing businesses ready to expand their environmental impact tracking',
@@ -101,8 +101,8 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
   canopy: {
     tier: 'canopy',
     displayName: 'Canopy',
-    monthlyPriceId: 'price_1SjQmXS6ESxgnZl2SWd2nHga',
-    annualPriceId: 'price_1SmfEqS6ESxgnZl2FugLcZSr',
+    monthlyPriceId: 'price_1Smfhv28UK4Vxpt3SU2pZVrt',
+    annualPriceId: 'price_1Smfjf28UK4Vxpt3gB2qvW1b',
     monthlyPrice: 899,
     annualPrice: 8990, // 10 months (2 months free)
     description: 'Comprehensive sustainability management for established organisations',
