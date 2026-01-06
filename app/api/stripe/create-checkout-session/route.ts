@@ -26,12 +26,17 @@ export async function POST(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
+      console.error('[Checkout] Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    console.log('[Checkout] User authenticated:', user.id);
 
     // Parse request body
     const body = await request.json();
     const { priceId, organizationId } = body;
+
+    console.log('[Checkout] Request:', { priceId, organizationId });
 
     if (!priceId || !organizationId) {
       return NextResponse.json(
@@ -48,7 +53,10 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
+    console.log('[Checkout] Member check:', { memberData, memberError });
+
     if (memberError || !memberData) {
+      console.error('[Checkout] Member error:', memberError);
       return NextResponse.json(
         { error: 'You do not have access to this organization' },
         { status: 403 }
@@ -57,6 +65,8 @@ export async function POST(request: NextRequest) {
 
     // Check if user is admin or owner
     const roleName = (memberData as any).roles?.name;
+    console.log('[Checkout] Role name:', roleName);
+
     if (roleName !== 'admin' && roleName !== 'owner') {
       return NextResponse.json(
         { error: 'Only organization admins or owners can manage billing' },
@@ -71,8 +81,10 @@ export async function POST(request: NextRequest) {
       .eq('id', organizationId)
       .single();
 
+    console.log('[Checkout] Organization query:', { org, orgError });
+
     if (orgError) {
-      console.error('Error fetching organization:', orgError);
+      console.error('[Checkout] Error fetching organization:', orgError);
       return NextResponse.json({
         error: 'Organization not found',
         details: orgError.message
