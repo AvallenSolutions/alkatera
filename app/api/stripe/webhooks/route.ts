@@ -229,7 +229,12 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   console.log('Invoice payment failed:', invoice.id);
 
-  const subscriptionId = invoice.subscription as string;
+  // Extract subscription ID from invoice
+  // In Stripe API, subscription can be a string ID or an expanded object
+  const invoiceData = invoice as any;
+  const subscriptionId = typeof invoiceData.subscription === 'string'
+    ? invoiceData.subscription
+    : invoiceData.subscription?.id;
   if (!subscriptionId) {
     return;
   }
@@ -272,7 +277,12 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   console.log('Invoice payment succeeded:', invoice.id);
 
-  const subscriptionId = invoice.subscription as string;
+  // Extract subscription ID from invoice
+  // In Stripe API, subscription can be a string ID or an expanded object
+  const invoiceData = invoice as any;
+  const subscriptionId = typeof invoiceData.subscription === 'string'
+    ? invoiceData.subscription
+    : invoiceData.subscription?.id;
   if (!subscriptionId) {
     return;
   }
