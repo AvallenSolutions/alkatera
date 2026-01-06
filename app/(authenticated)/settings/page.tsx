@@ -34,6 +34,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="subscription" className="space-y-4">
         <TabsList>
           <TabsTrigger value="subscription">Subscription</TabsTrigger>
+          <TabsTrigger value="billing">Billing</TabsTrigger>
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
@@ -231,6 +232,25 @@ export default function SettingsPage() {
                   )
                 })}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="billing" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Billing & Payments
+              </CardTitle>
+              <CardDescription>
+                Manage your subscription, payment methods, and invoices
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link href="/settings/billing">Manage Billing</Link>
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
