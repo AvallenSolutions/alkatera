@@ -51,7 +51,8 @@ All tiers include 2 months free when paying annually!
 
 **Created:**
 - `lib/stripe-config.ts` - Stripe client and configuration
-- `lib/subscription-limits.ts` - Usage tracking and limits
+- `lib/subscription-limits.ts` - Usage tracking and limits (server-only)
+- `lib/subscription-utils.ts` - Client-safe utility functions
 - `app/api/stripe/create-checkout-session/route.ts` - Checkout API
 - `app/api/stripe/webhooks/route.ts` - Webhook handler
 - `app/(authenticated)/settings/billing/page.tsx` - Billing UI
@@ -66,7 +67,8 @@ All tiers include 2 months free when paying annually!
 **Modified:**
 - `.env.example` - Added Stripe environment variables
 - `.gitignore` - Allow lib/bulk-import/, add Stripe key files
-- `package.json` - Added stripe package
+- `package.json` - Added stripe and server-only packages
+- `lib/supabase/server-client.ts` - Added 'server-only' guard
 
 ### 🚀 Next Steps (Post-Merge)
 
@@ -138,3 +140,12 @@ This implementation provides a production-ready subscription system with compreh
    - Created missing template-generator.ts and material-matcher.ts files
    - Fixed .gitignore to allow lib/bulk-import/ directory
    - Resolved webpack build failures on Netlify
+
+8. **Update PR description with build fix details** (ab4d4b1)
+   - Enhanced PR documentation with all file changes and commit history
+
+9. **Fix server/client component boundary issue** (252b0de)
+   - Added 'server-only' package to enforce server-only imports
+   - Protected server-client.ts and subscription-limits.ts with 'server-only' guard
+   - Extracted client-safe utilities to subscription-utils.ts
+   - Resolved Next.js build error with cookies/next/headers in client bundle

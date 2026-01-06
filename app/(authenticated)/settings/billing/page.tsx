@@ -11,7 +11,7 @@ import {
   type TierPricing,
   type BillingInterval,
 } from "@/lib/stripe-config";
-import { getOrganizationUsage, calculateUsagePercentage, getUsageStatusColor } from "@/lib/subscription-limits";
+import { calculateUsagePercentage, getUsageStatusColor } from "@/lib/subscription-utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
