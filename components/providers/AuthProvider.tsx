@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
-  const [authStateCallback, setAuthStateCallback] = useState<(() => void) | null>(null)
+  const authStateCallbackRef = useRef<(() => void) | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -86,8 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(currentSession)
         setUser(currentSession.user)
         setLoading(false)
-        if (authStateCallback) {
-          authStateCallback()
+        if (authStateCallbackRef.current) {
+          authStateCallbackRef.current()
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out')
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signOut,
     refreshSession,
     onAuthStateChanged: (callback: () => void) => {
-      setAuthStateCallback(() => callback)
+      authStateCallbackRef.current = callback
     },
   }
 
