@@ -50,7 +50,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const isFetchingRef = useRef(false)
-  const { user, session, loading: authLoading } = useAuth()
+  const { user, session, loading: authLoading, onAuthStateChanged } = useAuth()
 
   const fetchOrganizations = useCallback(async () => {
     if (authLoading) {
@@ -215,6 +215,15 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       fetchOrganizations()
     }
   }, [user, authLoading, fetchOrganizations])
+
+  useEffect(() => {
+    if (onAuthStateChanged) {
+      onAuthStateChanged(() => {
+        console.log('🔄 OrganizationContext: Auth state changed, refetching organizations...')
+        fetchOrganizations()
+      })
+    }
+  }, [onAuthStateChanged, fetchOrganizations])
 
   const value = {
     currentOrganization,

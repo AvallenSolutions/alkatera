@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabaseClient'
+import { resetSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useRouter } from 'next/navigation'
 
 interface AuthContextType {
@@ -11,6 +12,7 @@ interface AuthContextType {
   loading: boolean
   signOut: () => Promise<void>
   refreshSession: () => Promise<void>
+  onAuthStateChanged?: (callback: () => void) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -20,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
+  const [authStateCallback, setAuthStateCallback] = useState<(() => void) | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -81,11 +84,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === 'SIGNED_IN' && currentSession) {
         console.log('✅ User signed in:', currentSession.user.email)
+        resetSupabaseBrowserClient()
         setSession(currentSession)
         setUser(currentSession.user)
         setLoading(false)
+        if (authStateCallback) {
+          authStateCallback()
+        }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out')
+        resetSupabaseBrowserClient()
         setSession(null)
         setUser(null)
         setLoading(false)
@@ -159,6 +167,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     signOut,
     refreshSession,
+    onAuthStateChanged: (callback: () => void) => {
+      setAuthStateCallback(() => callback)
+    },
   }
 
   if (!isMounted) {
