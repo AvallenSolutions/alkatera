@@ -331,7 +331,7 @@ export default function ImportPage() {
                                   </span>
                                 </div>
                                 <span className="text-xs">
-                                  {getConfidenceLevel(item.match_confidence || 0)}
+                                  {getConfidenceLevel(item.match_confidence || 0).label}
                                 </span>
                               </div>
                             ) : (

@@ -1,0 +1,23 @@
+
+> nextjs@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.5
+  - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Skipping linting
+   Checking validity of types ...
+Failed to compile.
+
+./app/(authenticated)/products/import/page.tsx:334:35
+Type error: Type '{ label: string; color: string; }' is not assignable to type 'ReactNode'.
+
+[0m [90m 332 |[39m                                 [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+[0m [90m 333 |[39m                                 [33m<[39m[33mspan[39m className[33m=[39m[32m"text-xs"[39m[33m>[39m[0m
+[0m[31m[1m>[22m[39m[90m 334 |[39m                                   {getConfidenceLevel(item[33m.[39mmatch_confidence [33m||[39m [35m0[39m)}[0m
+[0m [90m     |[39m                                   [31m[1m^[22m[39m[0m
+[0m [90m 335 |[39m                                 [33m<[39m[33m/[39m[33mspan[39m[33m>[39m[0m
+[0m [90m 336 |[39m                               [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m[0m
+[0m [90m 337 |[39m                             ) [33m:[39m ([0m
