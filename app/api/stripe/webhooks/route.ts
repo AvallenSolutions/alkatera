@@ -55,9 +55,19 @@ function getSupabaseAdmin() {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('========================================');
+  console.log('Stripe Webhook Request Received');
+  console.log('========================================');
+  console.log('URL:', request.url);
+  console.log('Method:', request.method);
+  console.log('Headers:', Object.fromEntries(request.headers.entries()));
+
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
+
+    console.log('Body length:', body.length);
+    console.log('Has signature:', !!signature);
 
     if (!signature) {
       console.error('Missing stripe-signature header');
@@ -67,13 +77,16 @@ export async function POST(request: NextRequest) {
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature, getWebhookSecret());
+      const webhookSecret = getWebhookSecret();
+      console.log('Using webhook secret (first 8 chars):', webhookSecret.substring(0, 8) + '...');
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+      console.log('Signature verification successful');
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
-    console.log(`Processing Stripe event: ${event.type}`);
+    console.log(`Processing Stripe event: ${event.type} (ID: ${event.id})`);
 
     // Handle the event
     switch (event.type) {
@@ -101,9 +114,14 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    console.log('Event processed successfully');
+    console.log('========================================');
     return NextResponse.json({ received: true });
   } catch (error: any) {
+    console.error('========================================');
     console.error('Error processing webhook:', error);
+    console.error('Stack:', error.stack);
+    console.error('========================================');
     return NextResponse.json(
       { error: error.message || 'Webhook processing failed' },
       { status: 500 }
@@ -120,27 +138,43 @@ export async function POST(request: NextRequest) {
  * Activate subscription when initial payment succeeds
  */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  console.log('Checkout session completed:', session.id);
+  console.log('>>> Handling checkout.session.completed');
+  console.log('Session ID:', session.id);
+  console.log('Metadata:', session.metadata);
 
   const organizationId = session.metadata?.organizationId;
   if (!organizationId) {
-    console.error('No organizationId in checkout session metadata');
+    console.error('ERROR: No organizationId in checkout session metadata');
+    console.error('Available metadata keys:', Object.keys(session.metadata || {}));
     return;
   }
 
   const customerId = session.customer as string;
   const subscriptionId = session.subscription as string;
 
+  console.log('Customer ID:', customerId);
+  console.log('Subscription ID:', subscriptionId);
+
   // Get subscription details to get the price
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const priceId = subscription.items.data[0]?.price.id;
 
+  console.log('Subscription status:', subscription.status);
+  console.log('Price ID:', priceId);
+
   if (!priceId) {
-    console.error('No price ID found in subscription');
+    console.error('ERROR: No price ID found in subscription');
     return;
   }
 
   // Update organization using the database function
+  console.log('Calling update_subscription_from_stripe with params:');
+  console.log('  p_organization_id:', organizationId);
+  console.log('  p_stripe_customer_id:', customerId);
+  console.log('  p_stripe_subscription_id:', subscriptionId);
+  console.log('  p_price_id:', priceId);
+  console.log('  p_status:', subscription.status);
+
   const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId,
     p_stripe_customer_id: customerId,
@@ -150,9 +184,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   });
 
   if (error) {
-    console.error('Error updating organization after checkout:', error);
+    console.error('ERROR updating organization after checkout:');
+    console.error('  Message:', error.message);
+    console.error('  Details:', error.details);
+    console.error('  Hint:', error.hint);
+    console.error('  Full error:', JSON.stringify(error, null, 2));
   } else {
-    console.log(`Organization ${organizationId} subscription activated`);
+    console.log(`SUCCESS: Organization ${organizationId} subscription activated`);
   }
 }
 
