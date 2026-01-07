@@ -34,8 +34,3 @@ export function getSupabaseBrowserClient() {
 
   return client
 }
-
-export function resetSupabaseBrowserClient() {
-  console.log('🔄 Supabase browser client reset requested')
-  client = null
-}

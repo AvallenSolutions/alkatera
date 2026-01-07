@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, Session, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabaseClient'
-import { resetSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import { useRouter } from 'next/navigation'
 
 interface AuthContextType {
@@ -84,7 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === 'SIGNED_IN' && currentSession) {
         console.log('✅ User signed in:', currentSession.user.email)
-        resetSupabaseBrowserClient()
         setSession(currentSession)
         setUser(currentSession.user)
         setLoading(false)
@@ -93,7 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out')
-        resetSupabaseBrowserClient()
         setSession(null)
         setUser(null)
         setLoading(false)
