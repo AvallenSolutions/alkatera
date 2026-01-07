@@ -33,14 +33,24 @@ export default function BillingPage() {
   useEffect(() => {
     // Check for success/cancel in URL
     if (searchParams.get("success") === "true") {
-      toast.success("Subscription activated successfully!");
-      router.replace("/settings/billing");
+      toast.success("Subscription activated successfully! Processing your upgrade...");
+      // Refresh billing data after a short delay to allow webhook to process
+      setTimeout(() => {
+        fetchBillingData();
+      }, 2000);
+      // Clean up URL without full page reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete("success");
+      url.searchParams.delete("tier");
+      window.history.replaceState({}, "", url.toString());
     }
     if (searchParams.get("canceled") === "true") {
       toast.info("Checkout cancelled");
-      router.replace("/settings/billing");
+      const url = new URL(window.location.href);
+      url.searchParams.delete("canceled");
+      window.history.replaceState({}, "", url.toString());
     }
-  }, [searchParams, router]);
+  }, [searchParams]);
 
   useEffect(() => {
     if (currentOrganization) {
