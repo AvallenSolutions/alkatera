@@ -1,16 +1,28 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity } from 'lucide-react'
+import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity, AlertCircle, FileText, Calendar, DollarSign } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import Link from 'next/link'
 import { useSubscription, TierName } from '@/hooks/useSubscription'
 import { TierBadge } from '@/components/subscription/TierBadge'
 import { UsageMeter } from '@/components/subscription/UsageMeter'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { supabase } from '@/lib/supabaseClient'
+import { useOrganization } from '@/lib/organizationContext'
+
+type BillingInterval = 'monthly' | 'annual'
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { currentOrganization } = useOrganization()
   const {
     usage,
     tierName,
@@ -19,6 +31,89 @@ export default function SettingsPage() {
     allTiers,
     isLoading,
   } = useSubscription()
+
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly')
+  const [processingCheckout, setProcessingCheckout] = useState(false)
+  const [organizationData, setOrganizationData] = useState<any>(null)
+  const [invoices, setInvoices] = useState<any[]>([])
+
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      toast.success('Subscription activated successfully!')
+      router.replace('/settings')
+    }
+    if (searchParams.get('canceled') === 'true') {
+      toast.info('Checkout cancelled')
+      router.replace('/settings')
+    }
+  }, [searchParams, router])
+
+  useEffect(() => {
+    if (currentOrganization) {
+      fetchOrganizationData()
+    }
+  }, [currentOrganization])
+
+  async function fetchOrganizationData() {
+    if (!currentOrganization) return
+
+    try {
+      const { data: org, error } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('id', currentOrganization.id)
+        .single()
+
+      if (error) throw error
+      setOrganizationData(org)
+    } catch (error) {
+      console.error('Error fetching organization data:', error)
+    }
+  }
+
+  async function handleUpgrade(tierName: string) {
+    if (!currentOrganization) {
+      toast.error('No organization selected')
+      return
+    }
+
+    setProcessingCheckout(true)
+
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tierName,
+          billingInterval,
+          organizationId: currentOrganization.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session')
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error)
+      toast.error(error.message || 'Failed to start checkout')
+    } finally {
+      setProcessingCheckout(false)
+    }
+  }
+
+  async function handleManageSubscription() {
+    if (!organizationData?.stripe_customer_id) {
+      toast.error('No active subscription to manage')
+      return
+    }
+    toast.info('Opening Stripe Customer Portal...')
+  }
 
   return (
     <div className="space-y-6">
@@ -46,11 +141,11 @@ export default function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
+                  <Sparkles className="h-5 w-5" />
                   Current Plan
                 </CardTitle>
                 <CardDescription>
-                  Your subscription details and billing information
+                  Your subscription details and status
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -65,10 +160,10 @@ export default function SettingsPage() {
                       <TierBadge tier={tierName} size="lg" />
                       <span className={cn(
                         "text-xs px-2 py-1 rounded-full",
-                        subscriptionStatus === 'active' && "bg-green-100 text-green-700",
-                        subscriptionStatus === 'trial' && "bg-blue-100 text-blue-700",
-                        subscriptionStatus === 'suspended' && "bg-amber-100 text-amber-700",
-                        subscriptionStatus === 'cancelled' && "bg-red-100 text-red-700"
+                        subscriptionStatus === 'active' && "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
+                        subscriptionStatus === 'trial' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                        subscriptionStatus === 'suspended' && "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
+                        subscriptionStatus === 'cancelled' && "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
                       )}>
                         {subscriptionStatus.charAt(0).toUpperCase() + subscriptionStatus.slice(1)}
                       </span>
@@ -76,10 +171,6 @@ export default function SettingsPage() {
                     <p className="text-sm text-muted-foreground">
                       {allTiers.find(t => t.tier_name === tierName)?.description || 'Manage your sustainability tracking'}
                     </p>
-                    <Button variant="outline" className="gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Upgrade Plan
-                    </Button>
                   </>
                 )}
               </CardContent>
@@ -136,10 +227,32 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Compare Plans</CardTitle>
-              <CardDescription>
-                Find the right plan for your organisation
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Available Plans</CardTitle>
+                  <CardDescription>
+                    Choose the plan that fits your organisation
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border p-1">
+                  <Button
+                    size="sm"
+                    variant={billingInterval === 'monthly' ? 'default' : 'ghost'}
+                    onClick={() => setBillingInterval('monthly')}
+                  >
+                    Monthly
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={billingInterval === 'annual' ? 'default' : 'ghost'}
+                    onClick={() => setBillingInterval('annual')}
+                    className="gap-1"
+                  >
+                    Annual
+                    <Badge variant="secondary" className="ml-1 text-xs">Save 17%</Badge>
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid gap-6 md:grid-cols-3">
@@ -152,13 +265,17 @@ export default function SettingsPage() {
                   }
                   const Icon = tierIcons[tier.tier_name]
 
+                  const monthlyPrice = tier.monthly_price_gbp || 0
+                  const annualPrice = monthlyPrice * 10
+                  const displayPrice = billingInterval === 'monthly' ? monthlyPrice : Math.round(annualPrice / 12)
+
                   return (
                     <div
                       key={tier.tier_name}
                       className={cn(
-                        "relative rounded-lg border p-6",
+                        "relative rounded-lg border p-6 transition-all hover:shadow-md",
                         isCurrent && "border-neon-lime bg-neon-lime/5",
-                        tier.tier_name === 'blossom' && !isCurrent && "border-pink-200"
+                        tier.tier_name === 'blossom' && !isCurrent && "border-pink-200 dark:border-pink-900"
                       )}
                     >
                       {isCurrent && (
@@ -186,10 +303,21 @@ export default function SettingsPage() {
                         <span className="font-semibold">{tier.display_name}</span>
                       </div>
 
-                      {tier.monthly_price_gbp && (
+                      {monthlyPrice > 0 ? (
                         <div className="mb-4">
-                          <span className="text-2xl font-bold">£{tier.monthly_price_gbp}</span>
-                          <span className="text-sm text-muted-foreground">/month</span>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-bold">£{displayPrice}</span>
+                            <span className="text-sm text-muted-foreground">/month</span>
+                          </div>
+                          {billingInterval === 'annual' && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                              £{annualPrice} billed annually
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="mb-4 h-[52px] flex items-center">
+                          <span className="text-xl font-semibold text-muted-foreground">Contact Us</span>
                         </div>
                       )}
 
@@ -220,12 +348,22 @@ export default function SettingsPage() {
                         <Button variant="outline" className="w-full" disabled>
                           Current Plan
                         </Button>
+                      ) : tier.tier_name === 'seed' ? (
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={() => window.location.href = '/contact'}
+                        >
+                          Contact Us
+                        </Button>
                       ) : (
                         <Button
                           variant={tier.tier_name === 'blossom' ? 'default' : 'outline'}
                           className="w-full"
+                          onClick={() => handleUpgrade(tier.tier_name)}
+                          disabled={processingCheckout}
                         >
-                          {tier.tier_level > (allTiers.find(t => t.tier_name === tierName)?.tier_level || 1) ? 'Upgrade' : 'Contact Us'}
+                          {processingCheckout ? 'Processing...' : 'Upgrade Now'}
                         </Button>
                       )}
                     </div>
@@ -237,20 +375,193 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="billing" className="space-y-4">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Payment Method
+                </CardTitle>
+                <CardDescription>
+                  Manage your payment details and billing information
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {organizationData?.stripe_customer_id ? (
+                  <>
+                    <div className="flex items-center gap-3 p-3 rounded-lg border">
+                      <div className="h-10 w-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded flex items-center justify-center">
+                        <CreditCard className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Payment method on file</p>
+                        <p className="text-xs text-muted-foreground">Managed via Stripe</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleManageSubscription}
+                    >
+                      Update Payment Method
+                    </Button>
+                  </>
+                ) : (
+                  <div className="text-center py-6">
+                    <CreditCard className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground mb-4">
+                      No payment method on file
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Add a payment method by upgrading your plan
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Next Billing Date
+                </CardTitle>
+                <CardDescription>
+                  When your next payment is due
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {organizationData?.subscription_started_at && subscriptionStatus === 'active' ? (
+                  <div className="space-y-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-bold">
+                        {new Date(
+                          new Date(organizationData.subscription_started_at).setMonth(
+                            new Date(organizationData.subscription_started_at).getMonth() + 1
+                          )
+                        ).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric'
+                        })}
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Estimated amount</span>
+                      <span className="font-medium">
+                        £{allTiers.find(t => t.tier_name === tierName)?.monthly_price_gbp || 0}/month
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-6">
+                    <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground">
+                      No active subscription
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Billing & Payments
+                <Building2 className="h-5 w-5" />
+                Billing Details
               </CardTitle>
               <CardDescription>
-                Manage your subscription, payment methods, and invoices
+                Organisation information for invoices
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild>
-                <Link href="/settings/billing">Manage Billing</Link>
-              </Button>
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Organisation Name</label>
+                    <p className="text-sm mt-1">{currentOrganization?.name || 'Not set'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Billing Email</label>
+                    <p className="text-sm mt-1">{organizationData?.billing_email || 'Not set'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Tax/VAT ID</label>
+                    <p className="text-sm mt-1">{organizationData?.tax_id || 'Not set'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Country</label>
+                    <p className="text-sm mt-1">{organizationData?.country || 'Not set'}</p>
+                  </div>
+                </div>
+                <Separator />
+                <Button variant="outline" asChild>
+                  <Link href="/company/overview">Update Billing Details</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Invoice History
+              </CardTitle>
+              <CardDescription>
+                View and download your past invoices
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invoices.length > 0 ? (
+                <div className="space-y-2">
+                  {invoices.map((invoice: any) => (
+                    <div
+                      key={invoice.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">
+                            {new Date(invoice.created).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric'
+                            })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Invoice #{invoice.number}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Badge variant={invoice.status === 'paid' ? 'default' : 'secondary'}>
+                          {invoice.status}
+                        </Badge>
+                        <span className="text-sm font-medium">
+                          £{(invoice.amount_paid / 100).toFixed(2)}
+                        </span>
+                        <Button size="sm" variant="ghost" asChild>
+                          <a href={invoice.invoice_pdf} target="_blank" rel="noopener noreferrer">
+                            Download
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm font-medium mb-1">No invoices yet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Invoices will appear here after your first payment
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

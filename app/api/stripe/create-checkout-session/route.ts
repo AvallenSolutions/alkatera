@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, getTierFromPriceId, getBillingIntervalFromPriceId } from '@/lib/stripe-config';
+import { stripe, getTierFromPriceId, getBillingIntervalFromPriceId, getPriceId, type SubscriptionTier, type BillingInterval } from '@/lib/stripe-config';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
 /**
@@ -7,8 +7,13 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client';
  *
  * POST /api/stripe/create-checkout-session
  *
- * Body:
+ * Body (Option 1):
  * - priceId: Stripe price ID
+ * - organizationId: Organization ID to associate the subscription with
+ *
+ * Body (Option 2):
+ * - tierName: Subscription tier name (seed, blossom, canopy)
+ * - billingInterval: Billing interval (monthly, annual)
  * - organizationId: Organization ID to associate the subscription with
  *
  * Returns:
@@ -34,13 +39,19 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { priceId, organizationId } = body;
+    const { priceId: directPriceId, tierName, billingInterval: requestedInterval, organizationId } = body;
 
-    console.log('[Checkout] Request:', { priceId, organizationId });
+    console.log('[Checkout] Request:', { directPriceId, tierName, requestedInterval, organizationId });
+
+    // Determine priceId - either directly provided or derived from tier/interval
+    let priceId = directPriceId;
+    if (!priceId && tierName && requestedInterval) {
+      priceId = getPriceId(tierName as SubscriptionTier, requestedInterval as BillingInterval);
+    }
 
     if (!priceId || !organizationId) {
       return NextResponse.json(
-        { error: 'Missing required fields: priceId and organizationId' },
+        { error: 'Missing required fields: (priceId OR tierName+billingInterval) and organizationId' },
         { status: 400 }
       );
     }
@@ -107,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Get tier and billing interval from price ID
     const tier = getTierFromPriceId(priceId);
-    const billingInterval = getBillingIntervalFromPriceId(priceId);
+    const interval = getBillingIntervalFromPriceId(priceId);
 
     // Create or retrieve Stripe customer
     let customerId = org.stripe_customer_id;
@@ -144,18 +155,18 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${baseUrl}/settings/billing?success=true&tier=${tier}`,
-      cancel_url: `${baseUrl}/settings/billing?canceled=true`,
+      success_url: `${baseUrl}/settings?success=true&tier=${tier}`,
+      cancel_url: `${baseUrl}/settings?canceled=true`,
       metadata: {
         organizationId: org.id,
         tier,
-        billingInterval,
+        billingInterval: interval,
       },
       subscription_data: {
         metadata: {
           organizationId: org.id,
           tier,
-          billingInterval,
+          billingInterval: interval,
         },
       },
       allow_promotion_codes: true,
