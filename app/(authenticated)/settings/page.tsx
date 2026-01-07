@@ -258,6 +258,10 @@ export default function SettingsPage() {
               <div className="grid gap-6 md:grid-cols-3">
                 {allTiers.map((tier) => {
                   const isCurrent = tier.tier_name === tierName
+                  const currentTierLevel = allTiers.find(t => t.tier_name === tierName)?.tier_level || 1
+                  const isUpgrade = tier.tier_level > currentTierLevel
+                  const isDowngrade = tier.tier_level < currentTierLevel
+
                   const tierIcons: Record<TierName, React.ComponentType<{ className?: string }>> = {
                     seed: Leaf,
                     blossom: Flower2,
@@ -268,12 +272,13 @@ export default function SettingsPage() {
                   const monthlyPrice = tier.monthly_price_gbp || 0
                   const annualPrice = monthlyPrice * 10
                   const displayPrice = billingInterval === 'monthly' ? monthlyPrice : Math.round(annualPrice / 12)
+                  const annualSavings = monthlyPrice * 12 - annualPrice
 
                   return (
                     <div
                       key={tier.tier_name}
                       className={cn(
-                        "relative rounded-lg border p-6 transition-all hover:shadow-md",
+                        "relative rounded-lg border p-6 transition-all hover:shadow-md flex flex-col",
                         isCurrent && "border-neon-lime bg-neon-lime/5",
                         tier.tier_name === 'blossom' && !isCurrent && "border-pink-200 dark:border-pink-900"
                       )}
@@ -309,9 +314,9 @@ export default function SettingsPage() {
                             <span className="text-3xl font-bold">£{displayPrice}</span>
                             <span className="text-sm text-muted-foreground">/month</span>
                           </div>
-                          {billingInterval === 'annual' && (
+                          {billingInterval === 'annual' && annualSavings > 0 && (
                             <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                              £{annualPrice} billed annually
+                              £{annualPrice} billed annually (save £{annualSavings})
                             </p>
                           )}
                         </div>
@@ -325,45 +330,93 @@ export default function SettingsPage() {
                         {tier.description}
                       </p>
 
-                      <ul className="space-y-2 mb-6">
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
-                          <span>{tier.max_products ?? <Infinity className="h-3 w-3 inline" />} Products</span>
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
-                          <span>{tier.max_facilities ?? <Infinity className="h-3 w-3 inline" />} Facilities</span>
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
-                          <span>{tier.max_team_members ?? <Infinity className="h-3 w-3 inline" />} Users</span>
-                        </li>
-                        <li className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
-                          <span>{tier.max_reports_per_month ?? <Infinity className="h-3 w-3 inline" />} Reports/month</span>
-                        </li>
-                      </ul>
+                      <div className="space-y-4 mb-6 flex-1">
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                            Plan Limits
+                          </p>
+                          <ul className="space-y-2">
+                            <li className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <span>
+                                {tier.max_products ? `${tier.max_products} Products` : 'Unlimited Products'}
+                              </span>
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <span>
+                                {tier.max_lcas ? `${tier.max_lcas} LCAs` : 'Unlimited LCAs'}
+                              </span>
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <span>
+                                {tier.max_team_members ? `${tier.max_team_members} Team Members` : 'Unlimited Team Members'}
+                              </span>
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <span>
+                                {tier.max_facilities ? `${tier.max_facilities} Facilities` : 'Unlimited Facilities'}
+                              </span>
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <span>
+                                {tier.max_suppliers ? `${tier.max_suppliers} Suppliers` : 'Unlimited Suppliers'}
+                              </span>
+                            </li>
+                            <li className="flex items-center gap-2 text-sm">
+                              <Check className="h-4 w-4 text-neon-lime flex-shrink-0" />
+                              <span>
+                                {tier.max_reports_per_month ? `${tier.max_reports_per_month} Reports/month` : 'Unlimited Reports'}
+                              </span>
+                            </li>
+                          </ul>
+                        </div>
+
+                        {tier.features_enabled && tier.features_enabled.length > 0 && (
+                          <div>
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                              Features Included
+                            </p>
+                            <ul className="space-y-1">
+                              {tier.features_enabled.slice(0, 6).map((feature) => (
+                                <li key={feature} className="flex items-center gap-2 text-xs">
+                                  <Check className="h-3 w-3 text-neon-lime flex-shrink-0" />
+                                  <span className="capitalize">{feature.replace(/_/g, ' ')}</span>
+                                </li>
+                              ))}
+                              {tier.features_enabled.length > 6 && (
+                                <li className="text-xs text-muted-foreground ml-5">
+                                  +{tier.features_enabled.length - 6} more features
+                                </li>
+                              )}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
 
                       {isCurrent ? (
-                        <Button variant="outline" className="w-full" disabled>
+                        <Button variant="outline" className="w-full mt-auto" disabled>
                           Current Plan
                         </Button>
-                      ) : tier.tier_name === 'seed' ? (
+                      ) : tier.tier_name === 'seed' && isDowngrade ? (
                         <Button
                           variant="outline"
-                          className="w-full"
+                          className="w-full mt-auto"
                           onClick={() => window.location.href = '/contact'}
                         >
                           Contact Us
                         </Button>
                       ) : (
                         <Button
-                          variant={tier.tier_name === 'blossom' ? 'default' : 'outline'}
-                          className="w-full"
+                          variant={isUpgrade ? 'default' : 'outline'}
+                          className="w-full mt-auto"
                           onClick={() => handleUpgrade(tier.tier_name)}
                           disabled={processingCheckout}
                         >
-                          {processingCheckout ? 'Processing...' : 'Upgrade Now'}
+                          {processingCheckout ? 'Processing...' : isUpgrade ? 'Upgrade' : 'Downgrade'}
                         </Button>
                       )}
                     </div>
