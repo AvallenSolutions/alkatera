@@ -353,7 +353,15 @@ export default function CompanyEmissionsPage() {
           continue;
         }
 
-        // Fetch materials breakdown to separate materials vs packaging
+        // CRITICAL: Use total_ghg_emissions which includes ALL lifecycle stages
+        // (materials, production, transport, end-of-life) - matches edge function
+        const emissionsPerUnit = lca.total_ghg_emissions;
+        const totalImpactKg = emissionsPerUnit * unitsProduced;
+        const totalImpactTonnes = totalImpactKg / 1000;
+
+        totalEmissions += totalImpactTonnes;
+
+        // Fetch materials breakdown for UI display purposes only
         const { data: materials } = await browserSupabase
           .from('product_lca_materials')
           .select('material_type, impact_climate')
@@ -372,23 +380,22 @@ export default function CompanyEmissionsPage() {
           });
         }
 
-        // Calculate total emissions: emissions per unit × number of units
         const totalMaterialsTonnes = (materialsPerUnit * unitsProduced) / 1000;
         const totalPackagingTonnes = (packagingPerUnit * unitsProduced) / 1000;
-        const totalImpactTonnes = totalMaterialsTonnes + totalPackagingTonnes;
 
-        totalEmissions += totalImpactTonnes;
-
-        console.log('✅ [SCOPE 3 CAT 1] Calculated impact', {
+        console.log('✅ [SCOPE 3 CAT 1] Calculated impact (FULL LCA)', {
           product: product.name,
           unitsProduced,
-          materialsPerUnit,
-          packagingPerUnit,
-          totalPerUnit: materialsPerUnit + packagingPerUnit,
-          totalMaterialsTonnes,
-          totalPackagingTonnes,
+          emissionsPerUnit_kgCO2e: emissionsPerUnit,
+          totalImpactKg,
           totalImpactTonnes,
-          runningTotal: totalEmissions
+          runningTotal: totalEmissions,
+          display_breakdown: {
+            materialsPerUnit,
+            packagingPerUnit,
+            totalMaterialsTonnes,
+            totalPackagingTonnes
+          }
         });
 
         breakdown.push({
