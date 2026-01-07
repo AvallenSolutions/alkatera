@@ -172,8 +172,8 @@ Deno.serve(async (req: Request) => {
     console.log(`Scope 1 Total (with fleet): ${scope1Total} kgCO2e`);
     console.log(`Scope 2 Total (with fleet): ${scope2Total} kgCO2e`);
 
-    // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA impacts
-    // CRITICAL: Match Company Emissions page calculation using product_lca_materials
+    // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA total impacts
+    // CRITICAL: Use total_ghg_emissions (full lifecycle) NOT just materials breakdown
     const { data: productionLogs, error: productionError } = await supabase
       .from("production_logs")
       .select("product_id, units_produced, date")
@@ -195,41 +195,23 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        // Get the latest LCA for this product
+        // Get the latest LCA for this product (use total_ghg_emissions for full lifecycle)
         const { data: lca } = await supabase
           .from("product_lcas")
-          .select("id")
+          .select("id, total_ghg_emissions")
           .eq("product_id", log.product_id)
           .eq("status", "completed")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (lca) {
-          // Fetch materials breakdown (same as Company Emissions page)
-          const { data: materials } = await supabase
-            .from("product_lca_materials")
-            .select("material_type, impact_climate")
-            .eq("product_lca_id", lca.id);
-
-          let materialsPerUnit = 0;
-          let packagingPerUnit = 0;
-
-          if (materials) {
-            materials.forEach((m: any) => {
-              if (m.material_type === "ingredient") {
-                materialsPerUnit += m.impact_climate || 0;
-              } else if (m.material_type === "packaging") {
-                packagingPerUnit += m.impact_climate || 0;
-              }
-            });
-          }
-
-          // Calculate total emissions: emissions per unit × number of units (in kg)
-          const totalImpactKg = (materialsPerUnit + packagingPerUnit) * log.units_produced;
+        if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
+          // Use the LCA total which includes ALL lifecycle stages
+          // (materials, production, transport, end-of-life)
+          const totalImpactKg = lca.total_ghg_emissions * log.units_produced;
           scope3ProductsTotal += totalImpactKg;
 
-          console.log(`Product ${log.product_id}: ${log.units_produced} units × ${(materialsPerUnit + packagingPerUnit).toFixed(4)} kgCO2e/unit = ${totalImpactKg.toFixed(2)} kgCO2e`);
+          console.log(`Product ${log.product_id}: ${log.units_produced} units × ${lca.total_ghg_emissions.toFixed(4)} kgCO2e/unit = ${totalImpactKg.toFixed(2)} kgCO2e`);
         }
       }
     }
