@@ -39,14 +39,24 @@ export interface GHGBreakdown {
     co2_fossil: number;
     co2_biogenic: number;
     methane: number;
+    methane_fossil?: number;
+    methane_biogenic?: number;
     nitrous_oxide: number;
     hfc_pfc: number;
   };
+  physical_mass?: {
+    ch4_fossil_kg: number;
+    ch4_biogenic_kg: number;
+    n2o_kg: number;
+  };
   gwp_factors: {
-    methane_gwp100: number;
+    methane_gwp100?: number;
+    ch4_fossil_gwp100?: number;
+    ch4_biogenic_gwp100?: number;
     n2o_gwp100: number;
     method: string;
   };
+  data_quality?: 'primary' | 'secondary' | 'tertiary';
 }
 
 interface CarbonBreakdownSheetProps {

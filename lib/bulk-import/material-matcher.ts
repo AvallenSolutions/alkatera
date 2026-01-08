@@ -1,13 +1,17 @@
-export function getConfidenceLevel(
-  confidence: number | null
-): { label: string; color: string } {
-  if (!confidence) return { label: 'unknown', color: 'gray' };
-  if (confidence >= 0.9) return { label: 'high', color: 'green' };
-  if (confidence >= 0.7) return { label: 'medium', color: 'yellow' };
-  return { label: 'low', color: 'red' };
+export interface ConfidenceLevel {
+  level: 'high' | 'medium' | 'low' | 'none';
+  label: string;
+  color: string;
 }
 
-export function matchMaterialToEmissionFactor(materialName: string) {
-  console.log('matchMaterialToEmissionFactor not yet implemented for', materialName);
-  return null;
+export function getConfidenceLevel(confidence: number | null): ConfidenceLevel {
+  if (confidence === null) return { level: 'none', label: 'No Match', color: 'text-gray-500' };
+  if (confidence >= 0.8) return { level: 'high', label: 'High Confidence', color: 'text-green-600' };
+  if (confidence >= 0.5) return { level: 'medium', label: 'Medium Confidence', color: 'text-amber-600' };
+  if (confidence > 0) return { level: 'low', label: 'Low Confidence', color: 'text-red-600' };
+  return { level: 'none', label: 'No Match', color: 'text-gray-500' };
+}
+
+export function matchMaterial(rawName: string): { id: string | null; confidence: number } {
+  return { id: null, confidence: 0 };
 }

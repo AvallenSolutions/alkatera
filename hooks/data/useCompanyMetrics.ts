@@ -108,14 +108,23 @@ export interface GHGBreakdown {
     co2_fossil: number;
     co2_biogenic: number;
     methane: number;
+    methane_fossil: number;
+    methane_biogenic: number;
     nitrous_oxide: number;
     hfc_pfc: number;
   };
+  physical_mass: {
+    ch4_fossil_kg: number;
+    ch4_biogenic_kg: number;
+    n2o_kg: number;
+  };
   gwp_factors: {
-    methane_gwp100: number;
+    ch4_fossil_gwp100: number;
+    ch4_biogenic_gwp100: number;
     n2o_gwp100: number;
     method: string;
   };
+  data_quality: 'primary' | 'secondary' | 'tertiary';
 }
 
 export interface LifecycleStageBreakdown {
@@ -416,8 +425,10 @@ export function useCompanyMetrics() {
     let hasGhgData = false;
     let ghgTotal: GHGBreakdown = {
       carbon_origin: { fossil: 0, biogenic: 0, land_use_change: 0 },
-      gas_inventory: { co2_fossil: 0, co2_biogenic: 0, methane: 0, nitrous_oxide: 0, hfc_pfc: 0 },
-      gwp_factors: { methane_gwp100: 27.9, n2o_gwp100: 273, method: 'IPCC AR6' }
+      gas_inventory: { co2_fossil: 0, co2_biogenic: 0, methane: 0, methane_fossil: 0, methane_biogenic: 0, nitrous_oxide: 0, hfc_pfc: 0 },
+      physical_mass: { ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0 },
+      gwp_factors: { ch4_fossil_gwp100: 29.8, ch4_biogenic_gwp100: 27.2, n2o_gwp100: 273, method: 'IPCC AR6 GWP100' },
+      data_quality: 'tertiary'
     };
 
     lcas.forEach((lca) => {
@@ -617,7 +628,7 @@ export function useCompanyMetrics() {
         return;
       }
 
-      // Fetch materials from all completed LCAs with lifecycle stage information
+      // Fetch materials from all completed LCAs with lifecycle stage information and GHG breakdown
       const { data: materials, error } = await supabase
         .from('product_lca_materials')
         .select(`
@@ -625,12 +636,27 @@ export function useCompanyMetrics() {
           quantity,
           unit,
           impact_climate,
+          impact_climate_fossil,
+          impact_climate_biogenic,
+          impact_climate_dluc,
           impact_water,
           impact_land,
           impact_waste,
           impact_source,
           packaging_category,
           lca_sub_stage_id,
+          ch4_fossil_kg,
+          ch4_biogenic_kg,
+          n2o_kg,
+          ch4_fossil_kg_co2e,
+          ch4_biogenic_kg_co2e,
+          n2o_kg_co2e,
+          hfc_pfc_kg_co2e,
+          gwp_method,
+          gwp_ch4_fossil,
+          gwp_ch4_biogenic,
+          gwp_n2o,
+          ghg_data_quality,
           lca_sub_stages (
             id,
             name,
@@ -736,70 +762,100 @@ export function useCompanyMetrics() {
 
       setLifecycleStageBreakdown(stageBreakdown);
 
-      // Calculate GHG breakdown using ACTUAL database fields (not hardcoded percentages)
+      // Calculate GHG breakdown using ACTUAL database fields (ISO 14067 compliant)
       if (totalClimate > 0) {
         let fossilCO2 = 0;
         let biogenicCO2 = 0;
         let landUseChange = 0;
-        let methaneTotal = 0;
-        let nitrousOxideTotal = 0;
-        let hfcsTotal = 0;
+        let ch4FossilKg = 0;
+        let ch4BiogenicKg = 0;
+        let n2oKg = 0;
+        let ch4FossilCO2e = 0;
+        let ch4BiogenicCO2e = 0;
+        let n2oCO2e = 0;
+        let hfcsCO2e = 0;
+        let gwpCh4Fossil = 29.8;
+        let gwpCh4Biogenic = 27.2;
+        let gwpN2o = 273;
+        let gwpMethod = 'IPCC AR6 GWP100';
+        let dataQuality: 'primary' | 'secondary' | 'tertiary' = 'tertiary';
+        let hasActualGhgData = false;
 
         materials.forEach((material: any) => {
-          // Use actual biogenic/fossil split from database
           const fossilFromDB = Number(material.impact_climate_fossil || 0);
           const biogenicFromDB = Number(material.impact_climate_biogenic || 0);
           const dlucFromDB = Number(material.impact_climate_dluc || 0);
           const totalClimateImpact = Number(material.impact_climate || 0);
 
-          // Add actual values from database
           fossilCO2 += fossilFromDB;
           biogenicCO2 += biogenicFromDB;
           landUseChange += dlucFromDB;
 
-          // Parse GHG breakdown if available
-          const ghgBreakdown = material.ghg_breakdown as any;
-          if (ghgBreakdown) {
-            methaneTotal += Number(ghgBreakdown.ch4_kg_co2e || 0);
-            nitrousOxideTotal += Number(ghgBreakdown.n2o_kg_co2e || 0);
-            hfcsTotal += Number(ghgBreakdown.hfcs_kg_co2e || 0);
+          // Use ACTUAL GHG breakdown fields from database
+          const ch4FossilKgVal = Number(material.ch4_fossil_kg || 0);
+          const ch4BiogenicKgVal = Number(material.ch4_biogenic_kg || 0);
+          const n2oKgVal = Number(material.n2o_kg || 0);
+          const ch4FossilCO2eVal = Number(material.ch4_fossil_kg_co2e || 0);
+          const ch4BiogenicCO2eVal = Number(material.ch4_biogenic_kg_co2e || 0);
+          const n2oCO2eVal = Number(material.n2o_kg_co2e || 0);
+          const hfcCO2eVal = Number(material.hfc_pfc_kg_co2e || 0);
+
+          ch4FossilKg += ch4FossilKgVal;
+          ch4BiogenicKg += ch4BiogenicKgVal;
+          n2oKg += n2oKgVal;
+          ch4FossilCO2e += ch4FossilCO2eVal;
+          ch4BiogenicCO2e += ch4BiogenicCO2eVal;
+          n2oCO2e += n2oCO2eVal;
+          hfcsCO2e += hfcCO2eVal;
+
+          if (ch4FossilKgVal > 0 || ch4BiogenicKgVal > 0 || n2oKgVal > 0) {
+            hasActualGhgData = true;
           }
 
+          // Capture GWP factors from data
+          if (material.gwp_ch4_fossil) gwpCh4Fossil = Number(material.gwp_ch4_fossil);
+          if (material.gwp_ch4_biogenic) gwpCh4Biogenic = Number(material.gwp_ch4_biogenic);
+          if (material.gwp_n2o) gwpN2o = Number(material.gwp_n2o);
+          if (material.gwp_method) gwpMethod = material.gwp_method;
+
+          // Track data quality
+          const materialQuality = material.ghg_data_quality;
+          if (materialQuality === 'primary') dataQuality = 'primary';
+          else if (materialQuality === 'secondary' && dataQuality !== 'primary') dataQuality = 'secondary';
+
           // CONSERVATIVE FALLBACK: If no biogenic/fossil split provided, assume all fossil
-          // This follows ISO 14067 precautionary principle
           if (fossilFromDB === 0 && biogenicFromDB === 0 && dlucFromDB === 0 && totalClimateImpact > 0) {
             fossilCO2 += totalClimateImpact;
           }
         });
 
-        // If no CH4/N2O data available, apply typical GHG composition ratios
-        // Based on IPCC guidelines for product life cycle assessments
-        if (methaneTotal === 0 && nitrousOxideTotal === 0 && totalClimate > 0) {
-          // Typical composition for product life cycles:
-          // ~95% CO2, ~3% CH4, ~2% N2O (in CO2eq)
-          // This is conservative estimate used when detailed gas composition unavailable
-          methaneTotal = totalClimate * 0.03; // 3% as CH4 in CO2eq
-          nitrousOxideTotal = totalClimate * 0.02; // 2% as N2O in CO2eq
-        }
-
-        const ghgData = {
+        const ghgData: GHGBreakdown = {
           carbon_origin: {
             fossil: fossilCO2,
             biogenic: biogenicCO2,
             land_use_change: landUseChange,
           },
           gas_inventory: {
-            co2_fossil: fossilCO2,
-            co2_biogenic: biogenicCO2,
-            methane: methaneTotal,
-            nitrous_oxide: nitrousOxideTotal,
-            hfc_pfc: 0,
+            co2_fossil: fossilCO2 - ch4FossilCO2e - (n2oCO2e * 0.5),
+            co2_biogenic: biogenicCO2 - ch4BiogenicCO2e - (n2oCO2e * 0.5),
+            methane: ch4FossilCO2e + ch4BiogenicCO2e,
+            methane_fossil: ch4FossilCO2e,
+            methane_biogenic: ch4BiogenicCO2e,
+            nitrous_oxide: n2oCO2e,
+            hfc_pfc: hfcsCO2e,
+          },
+          physical_mass: {
+            ch4_fossil_kg: ch4FossilKg,
+            ch4_biogenic_kg: ch4BiogenicKg,
+            n2o_kg: n2oKg,
           },
           gwp_factors: {
-            methane_gwp100: 27.9,
-            n2o_gwp100: 273,
-            method: 'IPCC AR6',
+            ch4_fossil_gwp100: gwpCh4Fossil,
+            ch4_biogenic_gwp100: gwpCh4Biogenic,
+            n2o_gwp100: gwpN2o,
+            method: gwpMethod,
           },
+          data_quality: hasActualGhgData ? dataQuality : 'tertiary',
         };
 
         setGhgBreakdown(ghgData);

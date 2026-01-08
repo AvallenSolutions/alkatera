@@ -581,7 +581,7 @@ export function CarbonDeepDive({
               {ghgBreakdown ? (
                 <>
                   {/* Summary Cards */}
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <Card className="bg-orange-50 border-orange-200">
                       <CardContent className="p-4">
                         <div className="flex items-baseline gap-2">
@@ -598,11 +598,23 @@ export function CarbonDeepDive({
                       <CardContent className="p-4">
                         <div className="flex items-baseline gap-2">
                           <span className="text-2xl font-bold text-blue-900">
-                            {ghgBreakdown.gwp_factors.methane_gwp100}
+                            {'ch4_fossil_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.ch4_fossil_gwp100 : 29.8}
                           </span>
                           <span className="text-xs text-muted-foreground">GWP</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">CH₄ Factor (100-year)</p>
+                        <p className="text-xs text-muted-foreground mt-1">CH₄ Fossil (IPCC AR6)</p>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-teal-50 border-teal-200">
+                      <CardContent className="p-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-bold text-teal-900">
+                            {'ch4_biogenic_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.ch4_biogenic_gwp100 : 27.2}
+                          </span>
+                          <span className="text-xs text-muted-foreground">GWP</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">CH₄ Biogenic (IPCC AR6)</p>
                       </CardContent>
                     </Card>
 
@@ -610,14 +622,35 @@ export function CarbonDeepDive({
                       <CardContent className="p-4">
                         <div className="flex items-baseline gap-2">
                           <span className="text-2xl font-bold text-blue-900">
-                            {ghgBreakdown.gwp_factors.n2o_gwp100}
+                            {'n2o_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.n2o_gwp100 : 273}
                           </span>
                           <span className="text-xs text-muted-foreground">GWP</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">N₂O Factor (100-year)</p>
+                        <p className="text-xs text-muted-foreground mt-1">N₂O Factor (IPCC AR6)</p>
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Data Quality Indicator */}
+                  {'data_quality' in ghgBreakdown && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Data Quality:</span>
+                      <Badge
+                        variant="outline"
+                        className={
+                          ghgBreakdown.data_quality === 'primary'
+                            ? 'bg-green-100 text-green-800 border-green-300'
+                            : ghgBreakdown.data_quality === 'secondary'
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-slate-100 text-slate-800 border-slate-300'
+                        }
+                      >
+                        {ghgBreakdown.data_quality === 'primary' ? 'Primary (EcoInvent/Measured)' :
+                         ghgBreakdown.data_quality === 'secondary' ? 'Secondary (Calculated)' :
+                         'Tertiary (Estimated)'}
+                      </Badge>
+                    </div>
+                  )}
 
                   {/* Gas Inventory Table */}
                   <div>
@@ -675,41 +708,80 @@ export function CarbonDeepDive({
                             </TableCell>
                           </TableRow>
 
+                          {/* CH4 Fossil Row */}
                           <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full bg-blue-500" />
-                                Methane (CH₄)
+                                CH₄ (Fossil)
+                                <Badge variant="outline" className="text-[10px] ml-1">Industrial</Badge>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.methane / ghgBreakdown.gwp_factors.methane_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {ghgBreakdown.physical_mass && ghgBreakdown.physical_mass.ch4_fossil_kg > 0
+                                ? (ghgBreakdown.physical_mass.ch4_fossil_kg / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })
+                                : ghgBreakdown.gas_inventory.methane_fossil !== undefined
+                                  ? ((ghgBreakdown.gas_inventory.methane_fossil / (ghgBreakdown.gwp_factors.ch4_fossil_gwp100 ?? 29.8)) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })
+                                  : '-'}
                             </TableCell>
-                            <TableCell className="text-center">{ghgBreakdown.gwp_factors.methane_gwp100}</TableCell>
+                            <TableCell className="text-center">
+                              {'ch4_fossil_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.ch4_fossil_gwp100 : 29.8}
+                            </TableCell>
                             <TableCell className="text-right font-semibold">
-                              {(ghgBreakdown.gas_inventory.methane / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {((ghgBreakdown.gas_inventory.methane_fossil ?? ghgBreakdown.gas_inventory.methane * 0.5) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.methane / totalCO2) * 100).toFixed(1)}%
+                              {(((ghgBreakdown.gas_inventory.methane_fossil ?? ghgBreakdown.gas_inventory.methane * 0.5) / totalCO2) * 100).toFixed(2)}%
                             </TableCell>
                           </TableRow>
 
+                          {/* CH4 Biogenic Row */}
                           <TableRow>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-purple-500" />
-                                Nitrous Oxide (N₂O)
+                                <div className="w-3 h-3 rounded-full bg-teal-500" />
+                                CH₄ (Biogenic)
+                                <Badge variant="outline" className="text-[10px] ml-1">Agricultural</Badge>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.nitrous_oxide / ghgBreakdown.gwp_factors.n2o_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {ghgBreakdown.physical_mass && ghgBreakdown.physical_mass.ch4_biogenic_kg > 0
+                                ? (ghgBreakdown.physical_mass.ch4_biogenic_kg / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })
+                                : ghgBreakdown.gas_inventory.methane_biogenic !== undefined
+                                  ? ((ghgBreakdown.gas_inventory.methane_biogenic / (ghgBreakdown.gwp_factors.ch4_biogenic_gwp100 ?? 27.2)) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })
+                                  : '-'}
                             </TableCell>
-                            <TableCell className="text-center">{ghgBreakdown.gwp_factors.n2o_gwp100}</TableCell>
+                            <TableCell className="text-center">
+                              {ghgBreakdown.gwp_factors.ch4_biogenic_gwp100 ?? 27.2}
+                            </TableCell>
                             <TableCell className="text-right font-semibold">
-                              {(ghgBreakdown.gas_inventory.nitrous_oxide / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {((ghgBreakdown.gas_inventory.methane_biogenic ?? ghgBreakdown.gas_inventory.methane * 0.5) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.nitrous_oxide / totalCO2) * 100).toFixed(1)}%
+                              {(((ghgBreakdown.gas_inventory.methane_biogenic ?? ghgBreakdown.gas_inventory.methane * 0.5) / totalCO2) * 100).toFixed(2)}%
+                            </TableCell>
+                          </TableRow>
+
+                          {/* N2O Row */}
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-amber-500" />
+                                Nitrous Oxide (N₂O)
+                                <Badge variant="outline" className="text-[10px] ml-1">Fertiliser</Badge>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {ghgBreakdown.physical_mass && ghgBreakdown.physical_mass.n2o_kg > 0
+                                ? (ghgBreakdown.physical_mass.n2o_kg / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })
+                                : ((ghgBreakdown.gas_inventory.nitrous_oxide / (ghgBreakdown.gwp_factors.n2o_gwp100 ?? 273)) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
+                            </TableCell>
+                            <TableCell className="text-center">{'n2o_gwp100' in ghgBreakdown.gwp_factors ? ghgBreakdown.gwp_factors.n2o_gwp100 : 273}</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {(ghgBreakdown.gas_inventory.nitrous_oxide / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {((ghgBreakdown.gas_inventory.nitrous_oxide / totalCO2) * 100).toFixed(2)}%
                             </TableCell>
                           </TableRow>
 
