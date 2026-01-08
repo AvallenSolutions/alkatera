@@ -476,6 +476,9 @@ export function useCompanyMetrics() {
           if (typeof stages === 'object' && !Array.isArray(stages)) {
             // Object format: { stage_name: emissions_per_unit, ... }
             Object.entries(stages).forEach(([stage_name, emissions_per_unit]: [string, any]) => {
+              // Filter out "use_phase" stage
+              if (stage_name === 'use_phase') return;
+
               const totalEmissions = (emissions_per_unit || 0) * productionVolume;
               const existing = allLifecycleStages.find(s => s.stage_name === formatStageName(stage_name));
               if (existing) {
@@ -494,6 +497,10 @@ export function useCompanyMetrics() {
           } else if (Array.isArray(stages)) {
             // Array format: [{ stage: "name", emissions: value }, ...]
             stages.forEach((stage: any) => {
+              // Filter out "use_phase" stage
+              const stageName = stage.stage || stage.stage_name;
+              if (stageName === 'use_phase') return;
+
               const totalEmissions = (stage.emissions || 0) * productionVolume;
               const existing = allLifecycleStages.find(s => s.stage_name === (stage.stage_name || formatStageName(stage.stage)));
               if (existing) {
@@ -545,6 +552,8 @@ export function useCompanyMetrics() {
       allLifecycleStages.forEach(stage => {
         stage.percentage = total > 0 ? (stage.total_impact / total) * 100 : 0;
       });
+      // Sort by total_impact descending (largest emissions first)
+      allLifecycleStages.sort((a, b) => b.total_impact - a.total_impact);
       setLifecycleStageBreakdown(allLifecycleStages);
     }
 
@@ -691,6 +700,9 @@ export function useCompanyMetrics() {
         const impact = Number(material.impact_climate) || 0;
         const lca_stage_id = material.lca_sub_stages?.lca_stage_id;
         const stageName = lca_stage_id ? (stageIdToName.get(lca_stage_id) || 'Unclassified') : 'Unclassified';
+
+        // Filter out "Use Phase" stage
+        if (stageName === 'Use Phase') return;
 
         if (!stageMap.has(stageName)) {
           stageMap.set(stageName, {
