@@ -477,32 +477,35 @@ export function useCompanyMetrics() {
             // Object format: { stage_name: emissions_per_unit, ... }
             Object.entries(stages).forEach(([stage_name, emissions_per_unit]: [string, any]) => {
               const totalEmissions = (emissions_per_unit || 0) * productionVolume;
-              const existing = allLifecycleStages.find(s => s.stage === stage_name);
+              const existing = allLifecycleStages.find(s => s.stage_name === formatStageName(stage_name));
               if (existing) {
-                existing.emissions += totalEmissions;
+                existing.total_impact += totalEmissions;
               } else {
                 allLifecycleStages.push({
-                  stage: stage_name,
-                  stage_display_name: formatStageName(stage_name),
-                  emissions: totalEmissions,
-                  percentage: 0
+                  stage_name: formatStageName(stage_name),
+                  sub_stage_name: null,
+                  total_impact: totalEmissions,
+                  percentage: 0,
+                  material_count: 0,
+                  top_contributors: []
                 });
               }
             });
           } else if (Array.isArray(stages)) {
             // Array format: [{ stage: "name", emissions: value }, ...]
             stages.forEach((stage: any) => {
-              const productionVolume = lca.production_volume || 0;
               const totalEmissions = (stage.emissions || 0) * productionVolume;
-              const existing = allLifecycleStages.find(s => s.stage === stage.stage);
+              const existing = allLifecycleStages.find(s => s.stage_name === (stage.stage_name || formatStageName(stage.stage)));
               if (existing) {
-                existing.emissions += totalEmissions;
+                existing.total_impact += totalEmissions;
               } else {
                 allLifecycleStages.push({
-                  stage: stage.stage,
-                  stage_display_name: formatStageName(stage.stage),
-                  emissions: totalEmissions,
-                  percentage: 0
+                  stage_name: stage.stage_name || formatStageName(stage.stage),
+                  sub_stage_name: stage.sub_stage_name || null,
+                  total_impact: totalEmissions,
+                  percentage: 0,
+                  material_count: stage.material_count || 0,
+                  top_contributors: stage.top_contributors || []
                 });
               }
             });
@@ -538,9 +541,9 @@ export function useCompanyMetrics() {
     // Set lifecycle stage breakdown
     if (allLifecycleStages.length > 0) {
       // Recalculate percentages
-      const total = allLifecycleStages.reduce((sum, stage) => sum + stage.emissions, 0);
+      const total = allLifecycleStages.reduce((sum, stage) => sum + stage.total_impact, 0);
       allLifecycleStages.forEach(stage => {
-        stage.percentage = total > 0 ? (stage.emissions / total) * 100 : 0;
+        stage.percentage = total > 0 ? (stage.total_impact / total) * 100 : 0;
       });
       setLifecycleStageBreakdown(allLifecycleStages);
     }
