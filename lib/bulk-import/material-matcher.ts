@@ -1,8 +1,3 @@
-/**
- * Material Matcher for Bulk Import
- * Matches imported materials to emission factors in the database
- */
-
 export function getConfidenceLevel(
   confidence: number | null
 ): { label: string; color: string } {

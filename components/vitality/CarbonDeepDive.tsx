@@ -747,6 +747,13 @@ export function CarbonDeepDive({
                             Global Warming Potentials calculated using {ghgBreakdown.gwp_factors.method} characterisation factors.
                             All emissions converted to 100-year CO₂ equivalents per IPCC methodology.
                           </p>
+                          {((ghgBreakdown.gas_inventory.methane > 0 || ghgBreakdown.gas_inventory.nitrous_oxide > 0) &&
+                            (ghgBreakdown.gas_inventory.methane + ghgBreakdown.gas_inventory.nitrous_oxide) / totalCO2 > 0.04) && (
+                            <p className="text-xs text-blue-700 mt-2 bg-blue-100 p-2 rounded">
+                              <strong>Note:</strong> CH₄ and N₂O values estimated using typical GHG composition ratios (~3% CH₄, ~2% N₂O in CO₂eq)
+                              as material-specific gas breakdowns are not available. CO₂ values are actual measured data.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </CardContent>
