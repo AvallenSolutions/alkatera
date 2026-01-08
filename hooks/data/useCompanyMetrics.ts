@@ -15,6 +15,21 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 
+function formatStageName(stage: string): string {
+  const stageMap: Record<string, string> = {
+    'raw_materials': 'Raw Materials',
+    'material_production': 'Material Production',
+    'processing': 'Processing',
+    'packaging_stage': 'Packaging',
+    'distribution': 'Distribution',
+    'use_phase': 'Use Phase',
+    'end_of_life': 'End of Life',
+    'transport': 'Transport',
+    'manufacturing': 'Manufacturing',
+  };
+  return stageMap[stage] || stage.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
 export interface ImpactMetrics {
   climate_change_gwp100: number;
   water_consumption: number;
@@ -454,15 +469,44 @@ export function useCompanyMetrics() {
         }
 
         // Aggregate lifecycle stage data
-        if (breakdown.by_lifecycle_stage && Array.isArray(breakdown.by_lifecycle_stage)) {
-          breakdown.by_lifecycle_stage.forEach((stage: any) => {
-            const existing = allLifecycleStages.find(s => s.stage === stage.stage);
-            if (existing) {
-              existing.emissions += stage.emissions || 0;
-            } else {
-              allLifecycleStages.push({ ...stage });
-            }
-          });
+        if (breakdown.by_lifecycle_stage) {
+          const productionVolume = lca.production_volume || 0;
+          const stages = breakdown.by_lifecycle_stage;
+
+          if (typeof stages === 'object' && !Array.isArray(stages)) {
+            // Object format: { stage_name: emissions_per_unit, ... }
+            Object.entries(stages).forEach(([stage_name, emissions_per_unit]: [string, any]) => {
+              const totalEmissions = (emissions_per_unit || 0) * productionVolume;
+              const existing = allLifecycleStages.find(s => s.stage === stage_name);
+              if (existing) {
+                existing.emissions += totalEmissions;
+              } else {
+                allLifecycleStages.push({
+                  stage: stage_name,
+                  stage_display_name: formatStageName(stage_name),
+                  emissions: totalEmissions,
+                  percentage: 0
+                });
+              }
+            });
+          } else if (Array.isArray(stages)) {
+            // Array format: [{ stage: "name", emissions: value }, ...]
+            stages.forEach((stage: any) => {
+              const productionVolume = lca.production_volume || 0;
+              const totalEmissions = (stage.emissions || 0) * productionVolume;
+              const existing = allLifecycleStages.find(s => s.stage === stage.stage);
+              if (existing) {
+                existing.emissions += totalEmissions;
+              } else {
+                allLifecycleStages.push({
+                  stage: stage.stage,
+                  stage_display_name: formatStageName(stage.stage),
+                  emissions: totalEmissions,
+                  percentage: 0
+                });
+              }
+            });
+          }
         }
       }
 
