@@ -330,8 +330,8 @@ export default function ImportPage() {
                                     {Math.round((item.match_confidence || 0) * 100)}%
                                   </span>
                                 </div>
-                                <span className="text-xs">
-                                  {getConfidenceLevel(item.match_confidence || 0).label}
+                                <span className="text-xs capitalize">
+                                  {getConfidenceLevel(item.match_confidence || 0)}
                                 </span>
                               </div>
                             ) : (

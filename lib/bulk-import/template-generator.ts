@@ -1,16 +1,20 @@
 export function downloadTemplateAsCSV() {
-  const csvContent = 'Material Name,Quantity,Unit,Type\n';
+  const csvContent = `raw_name,quantity,unit,item_type
+Sugar,1000,kg,ingredient
+Water,500,L,ingredient
+Glass Bottle,1000,units,packaging`;
+
   const blob = new Blob([csvContent], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'product-import-template.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'bom-import-template.csv';
+  link.click();
   window.URL.revokeObjectURL(url);
 }
 
 export function createGoogleSheetsTemplate() {
-  console.log('Google Sheets template creation not yet implemented');
+  // Placeholder function
+  const templateUrl = 'https://docs.google.com/spreadsheets/d/1example/edit';
+  window.open(templateUrl, '_blank');
 }

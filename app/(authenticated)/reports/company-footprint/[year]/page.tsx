@@ -19,6 +19,7 @@ import { LogisticsDistributionCard } from "@/components/reports/LogisticsDistrib
 import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard";
 import { CompanyFleetCard } from "@/components/reports/CompanyFleetCard";
 import { MarketingMaterialsCard } from "@/components/reports/MarketingMaterialsCard";
+import { SpendImportCard } from "@/components/reports/SpendImportCard";
 import { FootprintSummaryDashboard } from "@/components/reports/FootprintSummaryDashboard";
 import { useScope3Emissions } from "@/hooks/data/useScope3Emissions";
 import { toast } from "sonner";
@@ -317,6 +318,16 @@ export default function FootprintBuilderPage() {
 
       {/* Activity Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {/* AI Spend Import Card */}
+        {report && currentOrganization && (
+          <SpendImportCard
+            reportId={report.id}
+            organizationId={currentOrganization.id}
+            year={year}
+            onUpdate={fetchReportData}
+          />
+        )}
+
         {/* Card 1: Operations & Energy */}
         <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
 
