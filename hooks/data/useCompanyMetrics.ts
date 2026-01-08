@@ -534,20 +534,36 @@ export function useCompanyMetrics() {
         }
       }
 
-      // Aggregate GHG data
+      // Aggregate GHG data, scaled by production volume
       if (ghg) {
         hasGhgData = true;
+        const productionVolume = lca.production_volume || 1;
+
         if (ghg.carbon_origin) {
-          ghgTotal.carbon_origin.fossil += ghg.carbon_origin.fossil || 0;
-          ghgTotal.carbon_origin.biogenic += ghg.carbon_origin.biogenic || 0;
-          ghgTotal.carbon_origin.land_use_change += ghg.carbon_origin.land_use_change || 0;
+          ghgTotal.carbon_origin.fossil += (ghg.carbon_origin.fossil || 0) * productionVolume;
+          ghgTotal.carbon_origin.biogenic += (ghg.carbon_origin.biogenic || 0) * productionVolume;
+          ghgTotal.carbon_origin.land_use_change += (ghg.carbon_origin.land_use_change || 0) * productionVolume;
         }
         if (ghg.gas_inventory) {
-          ghgTotal.gas_inventory.co2_fossil += ghg.gas_inventory.co2_fossil || 0;
-          ghgTotal.gas_inventory.co2_biogenic += ghg.gas_inventory.co2_biogenic || 0;
-          ghgTotal.gas_inventory.methane += ghg.gas_inventory.methane || 0;
-          ghgTotal.gas_inventory.nitrous_oxide += ghg.gas_inventory.nitrous_oxide || 0;
-          ghgTotal.gas_inventory.hfc_pfc += ghg.gas_inventory.hfc_pfc || 0;
+          ghgTotal.gas_inventory.co2_fossil += (ghg.gas_inventory.co2_fossil || 0) * productionVolume;
+          ghgTotal.gas_inventory.co2_biogenic += (ghg.gas_inventory.co2_biogenic || 0) * productionVolume;
+          ghgTotal.gas_inventory.methane += (ghg.gas_inventory.methane || 0) * productionVolume;
+          ghgTotal.gas_inventory.methane_fossil += (ghg.gas_inventory.methane_fossil || 0) * productionVolume;
+          ghgTotal.gas_inventory.methane_biogenic += (ghg.gas_inventory.methane_biogenic || 0) * productionVolume;
+          ghgTotal.gas_inventory.nitrous_oxide += (ghg.gas_inventory.nitrous_oxide || 0) * productionVolume;
+          ghgTotal.gas_inventory.hfc_pfc += (ghg.gas_inventory.hfc_pfc || 0) * productionVolume;
+        }
+        if (ghg.physical_mass) {
+          ghgTotal.physical_mass.ch4_fossil_kg += (ghg.physical_mass.ch4_fossil_kg || 0) * productionVolume;
+          ghgTotal.physical_mass.ch4_biogenic_kg += (ghg.physical_mass.ch4_biogenic_kg || 0) * productionVolume;
+          ghgTotal.physical_mass.n2o_kg += (ghg.physical_mass.n2o_kg || 0) * productionVolume;
+        }
+        if (ghg.gwp_factors) {
+          ghgTotal.gwp_factors = ghg.gwp_factors;
+        }
+        if (ghg.data_quality) {
+          if (ghg.data_quality === 'primary') ghgTotal.data_quality = 'primary';
+          else if (ghg.data_quality === 'secondary' && ghgTotal.data_quality !== 'primary') ghgTotal.data_quality = 'secondary';
         }
       }
     });
@@ -660,12 +676,13 @@ export function useCompanyMetrics() {
           gwp_ch4_biogenic,
           gwp_n2o,
           ghg_data_quality,
+          product_lca_id,
           lca_sub_stages (
             id,
             name,
             lca_stage_id
           ),
-          product_lcas!inner(status, organization_id)
+          product_lcas!inner(status, organization_id, product_id)
         `)
         .eq('product_lcas.organization_id', currentOrganization.id)
         .eq('product_lcas.status', 'completed')
@@ -679,22 +696,39 @@ export function useCompanyMetrics() {
         return;
       }
 
-      // Aggregate materials by name
+      // Fetch production volumes for all products
+      const productIds = Array.from(new Set(materials.map((m: any) => m.product_lcas?.product_id).filter(Boolean)));
+      const { data: productionData } = await supabase
+        .from('production_logs')
+        .select('product_id, units_produced')
+        .in('product_id', productIds);
+
+      // Build production volume map
+      const productionMap = new Map<string, number>();
+      productionData?.forEach(prod => {
+        const current = productionMap.get(prod.product_id) || 0;
+        productionMap.set(prod.product_id, current + Number(prod.units_produced || 0));
+      });
+
+      // Aggregate materials by name, scaling by production volume
       const materialMap = new Map<string, MaterialBreakdownItem>();
 
       materials.forEach((material: any) => {
+        const productId = material.product_lcas?.product_id;
+        const productionVolume = productionMap.get(productId) || 1;
+
         const name = material.name || 'Unknown Material';
         const existing = materialMap.get(name);
 
         if (existing) {
-          existing.quantity += Number(material.quantity) || 0;
-          existing.climate += Number(material.impact_climate) || 0;
+          existing.quantity += (Number(material.quantity) || 0) * productionVolume;
+          existing.climate += (Number(material.impact_climate) || 0) * productionVolume;
         } else {
           materialMap.set(name, {
             name: name,
-            quantity: Number(material.quantity) || 0,
+            quantity: (Number(material.quantity) || 0) * productionVolume,
             unit: material.unit || 'kg',
-            climate: Number(material.impact_climate) || 0,
+            climate: (Number(material.impact_climate) || 0) * productionVolume,
             source: material.impact_source || 'secondary_modelled',
           });
         }
@@ -726,7 +760,10 @@ export function useCompanyMetrics() {
       }>();
 
       materials.forEach((material: any) => {
-        const impact = Number(material.impact_climate) || 0;
+        const productId = material.product_lcas?.product_id;
+        const productionVolume = productionMap.get(productId) || 1;
+
+        const impact = (Number(material.impact_climate) || 0) * productionVolume;
         const lca_stage_id = material.lca_sub_stages?.lca_stage_id;
         const stageName = lca_stage_id ? (stageIdToName.get(lca_stage_id) || 'Unclassified') : 'Unclassified';
 
@@ -785,23 +822,26 @@ export function useCompanyMetrics() {
         let hasActualGhgData = false;
 
         materials.forEach((material: any) => {
-          const fossilFromDB = Number(material.impact_climate_fossil || 0);
-          const biogenicFromDB = Number(material.impact_climate_biogenic || 0);
-          const dlucFromDB = Number(material.impact_climate_dluc || 0);
-          const totalClimateImpact = Number(material.impact_climate || 0);
+          const productId = material.product_lcas?.product_id;
+          const productionVolume = productionMap.get(productId) || 1;
+
+          const fossilFromDB = Number(material.impact_climate_fossil || 0) * productionVolume;
+          const biogenicFromDB = Number(material.impact_climate_biogenic || 0) * productionVolume;
+          const dlucFromDB = Number(material.impact_climate_dluc || 0) * productionVolume;
+          const totalClimateImpact = Number(material.impact_climate || 0) * productionVolume;
 
           fossilCO2 += fossilFromDB;
           biogenicCO2 += biogenicFromDB;
           landUseChange += dlucFromDB;
 
-          // Use ACTUAL GHG breakdown fields from database
-          const ch4FossilKgVal = Number(material.ch4_fossil_kg || 0);
-          const ch4BiogenicKgVal = Number(material.ch4_biogenic_kg || 0);
-          const n2oKgVal = Number(material.n2o_kg || 0);
-          const ch4FossilCO2eVal = Number(material.ch4_fossil_kg_co2e || 0);
-          const ch4BiogenicCO2eVal = Number(material.ch4_biogenic_kg_co2e || 0);
-          const n2oCO2eVal = Number(material.n2o_kg_co2e || 0);
-          const hfcCO2eVal = Number(material.hfc_pfc_kg_co2e || 0);
+          // Use ACTUAL GHG breakdown fields from database, scaled by production volume
+          const ch4FossilKgVal = Number(material.ch4_fossil_kg || 0) * productionVolume;
+          const ch4BiogenicKgVal = Number(material.ch4_biogenic_kg || 0) * productionVolume;
+          const n2oKgVal = Number(material.n2o_kg || 0) * productionVolume;
+          const ch4FossilCO2eVal = Number(material.ch4_fossil_kg_co2e || 0) * productionVolume;
+          const ch4BiogenicCO2eVal = Number(material.ch4_biogenic_kg_co2e || 0) * productionVolume;
+          const n2oCO2eVal = Number(material.n2o_kg_co2e || 0) * productionVolume;
+          const hfcCO2eVal = Number(material.hfc_pfc_kg_co2e || 0) * productionVolume;
 
           ch4FossilKg += ch4FossilKgVal;
           ch4BiogenicKg += ch4BiogenicKgVal;
@@ -815,7 +855,7 @@ export function useCompanyMetrics() {
             hasActualGhgData = true;
           }
 
-          // Capture GWP factors from data
+          // Capture GWP factors from data (same for all units)
           if (material.gwp_ch4_fossil) gwpCh4Fossil = Number(material.gwp_ch4_fossil);
           if (material.gwp_ch4_biogenic) gwpCh4Biogenic = Number(material.gwp_ch4_biogenic);
           if (material.gwp_n2o) gwpN2o = Number(material.gwp_n2o);
@@ -827,7 +867,7 @@ export function useCompanyMetrics() {
           else if (materialQuality === 'secondary' && dataQuality !== 'primary') dataQuality = 'secondary';
 
           // CONSERVATIVE FALLBACK: If no biogenic/fossil split provided, assume all fossil
-          if (fossilFromDB === 0 && biogenicFromDB === 0 && dlucFromDB === 0 && totalClimateImpact > 0) {
+          if (material.impact_climate_fossil === 0 && material.impact_climate_biogenic === 0 && material.impact_climate_dluc === 0 && Number(material.impact_climate || 0) > 0) {
             fossilCO2 += totalClimateImpact;
           }
         });
