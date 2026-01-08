@@ -141,7 +141,7 @@ Deno.serve(async (req: Request) => {
             .from('spend_import_items')
             .update({
               suggested_category: result.category,
-              ai_confidence_score: result.confidence,
+              ai_confidence_score: result.confidence / 100,
               ai_reasoning: result.reasoning,
               ai_processed_at: new Date().toISOString(),
             })
