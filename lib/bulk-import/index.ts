@@ -1,2 +1,4 @@
-export * from './template-generator';
+export * from './types';
+export * from './parser';
 export * from './material-matcher';
+export * from './template-generator';

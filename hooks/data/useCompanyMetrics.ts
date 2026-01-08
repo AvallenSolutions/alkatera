@@ -385,7 +385,10 @@ export function useCompanyMetrics() {
 
       // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
       const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
-      if (!hasMaterialBreakdown) {
+      const hasGHGBreakdown = lcas.some(lca => lca.aggregated_impacts?.ghg_breakdown);
+
+      // Always fetch GHG data from database if not in aggregated_impacts
+      if (!hasMaterialBreakdown || !hasGHGBreakdown) {
         try {
           await fetchMaterialAndGHGBreakdown();
         } catch (err) {
