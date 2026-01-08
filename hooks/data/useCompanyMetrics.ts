@@ -157,15 +157,46 @@ export function useCompanyMetrics() {
         throw new Error('No organization selected');
       }
 
-      // Fetch all product LCAs with their aggregated impacts
-      const { data: lcas, error: lcaError } = await supabase
+      // Fetch all LCAs first
+      const { data: allLcas, error: lcaError } = await supabase
         .from('product_lcas')
-        .select('id, product_name, aggregated_impacts, csrd_compliant, updated_at')
+        .select('id, product_id, product_name, aggregated_impacts, csrd_compliant, updated_at')
         .eq('organization_id', currentOrganization.id)
         .eq('status', 'completed')
-        .not('aggregated_impacts', 'is', null);
+        .not('aggregated_impacts', 'is', null)
+        .order('updated_at', { ascending: false });
 
       if (lcaError) throw lcaError;
+
+      // Deduplicate to get latest per product_id
+      const latestByProduct = new Map();
+      allLcas?.forEach(lca => {
+        if (!latestByProduct.has(lca.product_id) ||
+            new Date(lca.updated_at) > new Date(latestByProduct.get(lca.product_id).updated_at)) {
+          latestByProduct.set(lca.product_id, lca);
+        }
+      });
+
+      const lcas = Array.from(latestByProduct.values());
+
+      // Fetch production volumes for all products
+      const productIds = lcas.map(lca => lca.product_id).filter(id => id);
+      const { data: productionData } = await supabase
+        .from('production_logs')
+        .select('product_id, units_produced')
+        .in('product_id', productIds);
+
+      // Build production volume map
+      const productionMap = new Map();
+      productionData?.forEach(prod => {
+        const current = productionMap.get(prod.product_id) || 0;
+        productionMap.set(prod.product_id, current + Number(prod.units_produced || 0));
+      });
+
+      // Attach production volume to each LCA
+      lcas.forEach(lca => {
+        (lca as any).production_volume = productionMap.get(lca.product_id) || 0;
+      });
 
       if (!lcas || lcas.length === 0) {
         setMetrics({
@@ -388,24 +419,29 @@ export function useCompanyMetrics() {
 
         // Aggregate material data by name (sum across all products)
         if (breakdown.by_material && Array.isArray(breakdown.by_material)) {
+          const productionVolume = lca.production_volume || 0;
+
           breakdown.by_material.forEach((material: any) => {
             if (!material.name) return;
 
             const key = material.name.toLowerCase().trim();
             const existing = materialMap.get(key);
 
-            // Handle both 'climate' and 'emissions' field names
-            const emissionsValue = material.climate || material.emissions || 0;
+            // Handle both 'climate' and 'emissions' field names (per unit)
+            const emissionsPerUnit = material.climate || material.emissions || 0;
+            // Multiply by production volume to get total emissions
+            const totalEmissions = emissionsPerUnit * productionVolume;
+            const totalQuantity = (material.quantity || 0) * productionVolume;
 
             if (existing) {
-              existing.quantity += material.quantity || 0;
-              existing.climate += emissionsValue;
+              existing.quantity += totalQuantity;
+              existing.climate += totalEmissions;
             } else {
               materialMap.set(key, {
                 name: material.name,
-                quantity: material.quantity || 0,
+                quantity: totalQuantity,
                 unit: material.unit || '',
-                climate: emissionsValue,
+                climate: totalEmissions,
                 source: material.dataSource || material.source || 'Product LCA',
               });
             }
