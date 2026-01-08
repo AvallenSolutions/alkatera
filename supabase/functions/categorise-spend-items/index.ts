@@ -40,29 +40,30 @@ Deno.serve(async (req: Request) => {
     batchId = body.batch_id;
 
     console.log(`Starting categorisation for batch: ${batchId}`);
+    console.log(`GEMINI_API_KEY is ${GEMINI_API_KEY ? 'SET (length: ' + GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
 
     if (!batchId) {
       throw new Error('batch_id is required');
     }
 
-    if (!GEMINI_API_KEY) {
-      console.warn('GEMINI_API_KEY not configured - skipping AI categorization');
+    if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 10) {
+      console.error('GEMINI_API_KEY not configured properly');
 
       await supabase
         .from('spend_import_batches')
         .update({
-          status: 'ready_for_review',
+          status: 'failed',
+          error_message: 'AI categorization not configured - contact support',
           ai_processing_completed_at: new Date().toISOString(),
         })
         .eq('id', batchId);
 
       return new Response(
         JSON.stringify({
-          success: true,
-          message: 'AI categorization skipped - manual review required',
-          ai_disabled: true
+          error: 'AI categorization is not configured. Please contact support.',
+          needsSetup: true
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
