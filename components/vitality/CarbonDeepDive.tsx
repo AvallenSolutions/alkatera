@@ -125,10 +125,13 @@ export function CarbonDeepDive({
     return 0;
   }) : [];
 
-  // Calculate percentages
+  // Calculate total from materials only (not including scope 1 & 2)
+  const materialsTotal = sortedMaterials.reduce((sum, m) => sum + m.climate, 0);
+
+  // Calculate percentages based on materials total only
   const materialsWithPercentage = sortedMaterials.map(m => ({
     ...m,
-    percentage: totalCO2 > 0 ? (m.climate / totalCO2) * 100 : 0,
+    percentage: materialsTotal > 0 ? (m.climate / materialsTotal) * 100 : 0,
   }));
 
   // Separate ingredients from packaging
@@ -165,6 +168,17 @@ export function CarbonDeepDive({
 
     const badgeConfig = config[source || 'secondary_modelled'] || config.secondary_modelled;
     return <Badge variant="default" className={`${badgeConfig.className} text-xs`}>{badgeConfig.label}</Badge>;
+  };
+
+  // Format emissions value with appropriate unit (kg or t) and max 2 decimal places
+  const formatEmissions = (valueKg: number) => {
+    if (valueKg >= 1000) {
+      // Use tons for large values
+      return `${(valueKg / 1000).toFixed(2)} t`;
+    } else {
+      // Use kg for smaller values
+      return `${valueKg.toFixed(2)} kg`;
+    }
   };
 
   return (
@@ -811,7 +825,7 @@ export function CarbonDeepDive({
                       <span className="text-xs text-muted-foreground">total materials</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {(totalCO2 / 1000).toFixed(3)} tCO₂eq combined
+                      {((ingredientsTotal + packagingTotal) / 1000).toFixed(2)} tCO₂eq combined
                     </p>
                   </CardContent>
                 </Card>
@@ -887,13 +901,13 @@ export function CarbonDeepDive({
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit || ''}
+                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right text-xs text-muted-foreground">
-                                  {(emissionFactor / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} tCO₂eq/{material.unit || ''}
+                                  {formatEmissions(emissionFactor)} CO₂eq/{material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
-                                  {(climateValue / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} t
+                                  {formatEmissions(climateValue)} CO₂eq
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
@@ -960,13 +974,13 @@ export function CarbonDeepDive({
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit || ''}
+                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right text-xs text-muted-foreground">
-                                  {(emissionFactor / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} tCO₂eq/{material.unit || ''}
+                                  {formatEmissions(emissionFactor)} CO₂eq/{material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
-                                  {(climateValue / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} t
+                                  {formatEmissions(climateValue)} CO₂eq
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
