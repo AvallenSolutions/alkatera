@@ -317,12 +317,22 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
       console.log('AI categorization completed:', responseData);
 
+      if (responseData.needsMoreProcessing) {
+        const progress = Math.round((responseData.processed / responseData.total) * 100);
+        toast.info(`Processing... ${responseData.processed}/${responseData.total} items (${progress}%)`);
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        await triggerAICategorization(batchId);
+        return;
+      }
+
       if (responseData.hasAIError) {
         toast.warning("Items uploaded successfully. AI categorization unavailable - manual review required.");
       } else if (responseData.ai_disabled) {
         toast.info("Items uploaded successfully. AI categorization disabled - manual review required.");
       } else {
-        toast.success("AI categorisation completed. Review categorisations and approve.");
+        toast.success(`AI categorisation completed. ${responseData.processed} items processed.`);
       }
 
       fetchBatches();
@@ -343,6 +353,8 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
         return <Badge variant="secondary"><Loader2 className="h-3 w-3 mr-1 animate-spin" />Uploading</Badge>;
       case "processing":
         return <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1 animate-pulse" />AI Processing</Badge>;
+      case "partial":
+        return <Badge variant="secondary"><Sparkles className="h-3 w-3 mr-1 animate-pulse" />Processing...</Badge>;
       case "ready_for_review":
         return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"><AlertCircle className="h-3 w-3 mr-1" />Ready for Review</Badge>;
       case "partially_imported":

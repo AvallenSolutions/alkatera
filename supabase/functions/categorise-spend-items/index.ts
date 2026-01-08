@@ -96,15 +96,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const batchSize = 20;
+    const batchSize = 50;
+    const maxItemsPerRun = 1000;
+    const itemsToProcess = items.slice(0, maxItemsPerRun);
     let processedCount = 0;
     let hasAIError = false;
     let aiErrorMessage = '';
 
-    for (let i = 0; i < items.length; i += batchSize) {
-      const batch = items.slice(i, i + batchSize);
+    console.log(`Processing ${itemsToProcess.length} of ${items.length} total items`);
+
+    for (let i = 0; i < itemsToProcess.length; i += batchSize) {
+      const batch = itemsToProcess.slice(i, i + batchSize);
 
       try {
+        console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(itemsToProcess.length / batchSize)}`);
         const results = await categoriseBatch(batch);
 
         for (let j = 0; j < batch.length; j++) {
@@ -144,11 +149,14 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const remainingItems = items.length - processedCount;
+    const needsMoreProcessing = remainingItems > 0;
+
     await supabase
       .from('spend_import_batches')
       .update({
-        status: 'ready_for_review',
-        ai_processing_completed_at: new Date().toISOString(),
+        status: needsMoreProcessing ? 'partial' : 'ready_for_review',
+        ai_processing_completed_at: needsMoreProcessing ? null : new Date().toISOString(),
       })
       .eq('id', batchId);
 
@@ -157,6 +165,8 @@ Deno.serve(async (req: Request) => {
         success: true,
         processed: processedCount,
         total: items.length,
+        remaining: remainingItems,
+        needsMoreProcessing,
         hasAIError,
         aiErrorMessage: hasAIError ? 'AI categorization failed - all items require manual review' : undefined,
       }),
