@@ -29,6 +29,8 @@ Deno.serve(async (req: Request) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
+  let batchId: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -38,26 +40,25 @@ Deno.serve(async (req: Request) => {
       throw new Error('GEMINI_API_KEY environment variable is not set');
     }
 
-    const { batch_id } = await req.json();
+    const body = await req.json();
+    batchId = body.batch_id;
 
-    if (!batch_id) {
+    if (!batchId) {
       throw new Error('batch_id is required');
     }
 
-    // Update batch status to processing
     await supabase
       .from('spend_import_batches')
       .update({
         status: 'processing',
         ai_processing_started_at: new Date().toISOString(),
       })
-      .eq('id', batch_id);
+      .eq('id', batchId);
 
-    // Fetch uncategorised items
     const { data: items, error: itemsError } = await supabase
       .from('spend_import_items')
       .select('*')
-      .eq('batch_id', batch_id)
+      .eq('batch_id', batchId)
       .is('ai_processed_at', null)
       .order('row_number', { ascending: true });
 
@@ -70,7 +71,7 @@ Deno.serve(async (req: Request) => {
           status: 'ready_for_review',
           ai_processing_completed_at: new Date().toISOString(),
         })
-        .eq('id', batch_id);
+        .eq('id', batchId);
 
       return new Response(
         JSON.stringify({ success: true, message: 'No items to process' }),
@@ -78,7 +79,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Process items in batches of 20 for efficiency
     const batchSize = 20;
     let processedCount = 0;
 
@@ -86,7 +86,6 @@ Deno.serve(async (req: Request) => {
       const batch = items.slice(i, i + batchSize);
       const results = await categoriseBatch(batch);
 
-      // Update items with AI suggestions
       for (let j = 0; j < batch.length; j++) {
         const item = batch[j];
         const result = results[j];
@@ -105,14 +104,13 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Update batch status
     await supabase
       .from('spend_import_batches')
       .update({
         status: 'ready_for_review',
         ai_processing_completed_at: new Date().toISOString(),
       })
-      .eq('id', batch_id);
+      .eq('id', batchId);
 
     return new Response(
       JSON.stringify({
@@ -136,30 +134,26 @@ Deno.serve(async (req: Request) => {
       userFriendlyMessage += 'Please check your file format and try again.';
     }
 
-    try {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (batchId) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-      const { batch_id } = await req.json();
-
-      if (batch_id) {
-        console.log(`Cleaning up failed batch: ${batch_id}`);
-
-        await supabase
-          .from('spend_import_items')
-          .delete()
-          .eq('batch_id', batch_id);
+        console.log(`Marking batch as failed: ${batchId}`);
 
         await supabase
           .from('spend_import_batches')
-          .delete()
-          .eq('id', batch_id);
+          .update({
+            status: 'failed',
+            error_message: userFriendlyMessage,
+          })
+          .eq('id', batchId);
 
-        console.log(`Successfully deleted failed batch: ${batch_id}`);
+        console.log(`Successfully marked batch as failed: ${batchId}`);
+      } catch (cleanupError) {
+        console.error('Failed to update batch status:', cleanupError);
       }
-    } catch (cleanupError) {
-      console.error('Failed to clean up failed batch:', cleanupError);
     }
 
     return new Response(
@@ -221,11 +215,9 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
 
   const content = data.candidates[0].content.parts[0].text;
 
-  // Parse JSON response
   try {
     const results = JSON.parse(content);
 
-    // Validate that we have an array with the correct structure
     if (!Array.isArray(results) || results.length !== items.length) {
       console.error('Invalid results structure:', results);
       return items.map(() => ({

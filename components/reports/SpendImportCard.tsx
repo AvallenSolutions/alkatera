@@ -14,7 +14,9 @@ import {
   Loader2,
   AlertCircle,
   ChevronRight,
-  Download
+  Download,
+  Trash2,
+  RefreshCw
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
@@ -36,18 +38,62 @@ interface ImportBatch {
   rejected_rows: number;
   status: string;
   created_at: string;
+  error_message?: string | null;
 }
+
+const STUCK_THRESHOLD_MINUTES = 5;
 
 export function SpendImportCard({ reportId, organizationId, year, onUpdate }: SpendImportCardProps) {
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchBatches();
   }, [reportId]);
+
+  const isStuckBatch = (batch: ImportBatch): boolean => {
+    if (batch.status !== "uploading" && batch.status !== "processing") return false;
+    const createdAt = new Date(batch.created_at).getTime();
+    const now = Date.now();
+    const minutesElapsed = (now - createdAt) / (1000 * 60);
+    return minutesElapsed > STUCK_THRESHOLD_MINUTES;
+  };
+
+  const deleteBatch = async (batchId: string) => {
+    try {
+      setIsDeleting(true);
+      const supabase = getSupabaseBrowserClient();
+
+      const { error: itemsError } = await supabase
+        .from("spend_import_items")
+        .delete()
+        .eq("batch_id", batchId);
+
+      if (itemsError) {
+        console.error("Error deleting items:", itemsError);
+      }
+
+      const { error: batchError } = await supabase
+        .from("spend_import_batches")
+        .delete()
+        .eq("id", batchId);
+
+      if (batchError) throw batchError;
+
+      toast.success("Upload cancelled and cleaned up");
+      fetchBatches();
+      onUpdate?.();
+    } catch (error: any) {
+      console.error("Error deleting batch:", error);
+      toast.error("Failed to cancel upload");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const fetchBatches = async () => {
     try {
@@ -96,13 +142,14 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
   };
 
   const parseAndUploadFile = async (file: File) => {
+    let createdBatchId: string | null = null;
+
     try {
       setIsUploading(true);
       setUploadProgress(10);
 
       const supabase = getSupabaseBrowserClient();
 
-      // Read file
       const arrayBuffer = await file.arrayBuffer();
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -114,7 +161,6 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
       setUploadProgress(30);
 
-      // Create batch
       const { data: batch, error: batchError } = await supabase
         .from("spend_import_batches")
         .insert({
@@ -129,11 +175,10 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
       if (batchError) throw batchError;
 
+      createdBatchId = batch.id;
       setUploadProgress(50);
 
-      // Parse and insert items
       const items = jsonData.map((row: any, index: number) => {
-        // Try to detect columns flexibly
         const description =
           row.description ||
           row.Description ||
@@ -143,15 +188,22 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
           row.Vendor ||
           row.supplier ||
           row.Supplier ||
+          row.Merchant ||
+          row.merchant ||
+          row.Note ||
+          row.note ||
           "";
 
         const amount =
-          parseFloat(row.amount || row.Amount || row.spend || row.Spend || row.cost || row.Cost || "0") || 0;
+          parseFloat(
+            String(row.amount || row.Amount || row.spend || row.Spend || row.cost || row.Cost || row.Total || row.total || "0")
+              .replace(/[^0-9.-]/g, "")
+          ) || 0;
 
         const currency = row.currency || row.Currency || "GBP";
 
         let date = null;
-        const dateField = row.date || row.Date || row.transaction_date || row["Transaction Date"];
+        const dateField = row.date || row.Date || row.transaction_date || row["Transaction Date"] || row["Created (UTC)"];
         if (dateField) {
           const parsedDate = new Date(dateField);
           if (!isNaN(parsedDate.getTime())) {
@@ -162,27 +214,28 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
         return {
           batch_id: batch.id,
           row_number: index + 1,
-          raw_description: String(description).trim(),
-          raw_amount: amount,
+          raw_description: String(description).substring(0, 1000).trim(),
+          raw_amount: Math.abs(amount),
           raw_currency: currency,
           raw_date: date,
-          raw_vendor: String(row.vendor || row.Vendor || "").trim() || null,
-          raw_category: String(row.category || row.Category || "").trim() || null,
+          raw_vendor: String(row.vendor || row.Vendor || row.Merchant || row.merchant || "").substring(0, 500).trim() || null,
+          raw_category: String(row.category || row.Category || "").substring(0, 200).trim() || null,
         };
       });
 
-      // Insert in chunks of 100
       const chunkSize = 100;
       for (let i = 0; i < items.length; i += chunkSize) {
         const chunk = items.slice(i, i + chunkSize);
         const { error: itemsError } = await supabase.from("spend_import_items").insert(chunk);
 
-        if (itemsError) throw itemsError;
+        if (itemsError) {
+          console.error("Error inserting chunk:", itemsError);
+          throw new Error(`Failed to insert items: ${itemsError.message}`);
+        }
 
         setUploadProgress(50 + ((i + chunk.length) / items.length) * 30);
       }
 
-      // Update batch status
       await supabase
         .from("spend_import_batches")
         .update({ status: "processing" })
@@ -190,7 +243,6 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
       setUploadProgress(90);
 
-      // Trigger AI categorization
       await triggerAICategorization(batch.id);
 
       setUploadProgress(100);
@@ -200,7 +252,20 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
       onUpdate?.();
     } catch (error: any) {
       console.error("Error uploading file:", error);
+
+      if (createdBatchId) {
+        try {
+          const supabase = getSupabaseBrowserClient();
+          await supabase.from("spend_import_items").delete().eq("batch_id", createdBatchId);
+          await supabase.from("spend_import_batches").delete().eq("id", createdBatchId);
+          console.log("Cleaned up failed batch:", createdBatchId);
+        } catch (cleanupError) {
+          console.error("Failed to clean up batch:", cleanupError);
+        }
+      }
+
       toast.error(error.message || "Failed to upload file");
+      fetchBatches();
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -350,8 +415,70 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
               {getStatusBadge(latestBatch.status)}
             </div>
 
-            {latestBatch.status === "processing" && (
+            {latestBatch.status === "failed" && (
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    {latestBatch.error_message || "Upload failed. Please try again."}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => deleteBatch(latestBatch.id)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Clear Failed Upload
+                </Button>
+              </div>
+            )}
+
+            {(latestBatch.status === "uploading" || latestBatch.status === "processing") && isStuckBatch(latestBatch) && (
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    This upload appears to be stuck. You can cancel it and try again.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => deleteBatch(latestBatch.id)}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Cancel Upload
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={fetchBatches}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {latestBatch.status === "processing" && !isStuckBatch(latestBatch) && (
               <Progress value={(latestBatch.processed_rows / latestBatch.total_rows) * 100} className="h-2" />
+            )}
+
+            {latestBatch.status === "uploading" && !isStuckBatch(latestBatch) && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Preparing data for AI categorisation...</span>
+              </div>
             )}
 
             {latestBatch.status === "ready_for_review" && (
