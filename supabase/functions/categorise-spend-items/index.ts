@@ -36,15 +36,32 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (!GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY environment variable is not set');
-    }
-
     const body = await req.json();
     batchId = body.batch_id;
 
     if (!batchId) {
       throw new Error('batch_id is required');
+    }
+
+    if (!GEMINI_API_KEY) {
+      console.warn('GEMINI_API_KEY not configured - skipping AI categorization');
+
+      await supabase
+        .from('spend_import_batches')
+        .update({
+          status: 'ready_for_review',
+          ai_processing_completed_at: new Date().toISOString(),
+        })
+        .eq('id', batchId);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'AI categorization skipped - manual review required',
+          ai_disabled: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     await supabase
@@ -81,26 +98,49 @@ Deno.serve(async (req: Request) => {
 
     const batchSize = 20;
     let processedCount = 0;
+    let hasAIError = false;
+    let aiErrorMessage = '';
 
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
-      const results = await categoriseBatch(batch);
 
-      for (let j = 0; j < batch.length; j++) {
-        const item = batch[j];
-        const result = results[j];
+      try {
+        const results = await categoriseBatch(batch);
 
-        await supabase
-          .from('spend_import_items')
-          .update({
-            suggested_category: result.category,
-            ai_confidence_score: result.confidence,
-            ai_reasoning: result.reasoning,
-            ai_processed_at: new Date().toISOString(),
-          })
-          .eq('id', item.id);
+        for (let j = 0; j < batch.length; j++) {
+          const item = batch[j];
+          const result = results[j];
 
-        processedCount++;
+          await supabase
+            .from('spend_import_items')
+            .update({
+              suggested_category: result.category,
+              ai_confidence_score: result.confidence,
+              ai_reasoning: result.reasoning,
+              ai_processed_at: new Date().toISOString(),
+            })
+            .eq('id', item.id);
+
+          processedCount++;
+        }
+      } catch (aiError: any) {
+        console.error('AI categorization error for batch:', aiError);
+        hasAIError = true;
+        aiErrorMessage = aiError.message;
+
+        for (const item of batch) {
+          await supabase
+            .from('spend_import_items')
+            .update({
+              suggested_category: 'other',
+              ai_confidence_score: 0,
+              ai_reasoning: 'AI categorization unavailable - manual review required',
+              ai_processed_at: new Date().toISOString(),
+            })
+            .eq('id', item.id);
+
+          processedCount++;
+        }
       }
     }
 
@@ -117,6 +157,8 @@ Deno.serve(async (req: Request) => {
         success: true,
         processed: processedCount,
         total: items.length,
+        hasAIError,
+        aiErrorMessage: hasAIError ? 'AI categorization failed - all items require manual review' : undefined,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -124,14 +166,16 @@ Deno.serve(async (req: Request) => {
     console.error('Error categorising spend items:', error);
 
     const errorMessage = error instanceof Error ? error.message : String(error);
-    let userFriendlyMessage = 'Failed to categorise spend items. ';
+    let userFriendlyMessage = 'Upload processing failed. ';
 
-    if (errorMessage.includes('GEMINI_API_KEY')) {
-      userFriendlyMessage += 'AI service is not configured. Please contact support.';
+    if (errorMessage.includes('batch_id is required')) {
+      userFriendlyMessage = 'Invalid request - batch ID missing.';
     } else if (errorMessage.includes('Gemini API error')) {
-      userFriendlyMessage += 'AI service encountered an error. Please try again or contact support.';
+      const apiKeyStatus = GEMINI_API_KEY ? 'configured but may be invalid' : 'not configured';
+      console.error(`Gemini API error - API key is ${apiKeyStatus}:`, errorMessage);
+      userFriendlyMessage = 'The data has been uploaded but automatic categorization is unavailable. You can proceed with manual categorization.';
     } else {
-      userFriendlyMessage += 'Please check your file format and try again.';
+      userFriendlyMessage += 'An unexpected error occurred. Please try again.';
     }
 
     if (batchId) {
@@ -159,7 +203,8 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         error: userFriendlyMessage,
-        technicalError: errorMessage
+        technicalError: errorMessage,
+        needsSetup: !GEMINI_API_KEY
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

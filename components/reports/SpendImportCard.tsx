@@ -295,22 +295,38 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
       if (!response.ok) {
         const errorMsg = responseData.error || `AI categorisation failed with status ${response.status}`;
-        const technicalDetails = responseData.technicalError;
+        const needsSetup = responseData.needsSetup;
 
         console.error("AI categorization error:", {
           userMessage: errorMsg,
-          technicalError: technicalDetails,
-          response: responseData
+          technicalError: responseData.technicalError,
+          needsSetup
         });
 
         fetchBatches();
         onUpdate?.();
 
-        throw new Error(errorMsg);
+        if (needsSetup) {
+          toast.warning("AI categorization is not configured. Items uploaded successfully - manual categorization required.");
+        } else {
+          toast.error(errorMsg);
+        }
+
+        return;
       }
 
-      console.log('AI categorization completed successfully:', responseData);
-      toast.success("AI categorisation completed. Review categorisations and approve.");
+      console.log('AI categorization completed:', responseData);
+
+      if (responseData.hasAIError) {
+        toast.warning("Items uploaded successfully. AI categorization unavailable - manual review required.");
+      } else if (responseData.ai_disabled) {
+        toast.info("Items uploaded successfully. AI categorization disabled - manual review required.");
+      } else {
+        toast.success("AI categorisation completed. Review categorisations and approve.");
+      }
+
+      fetchBatches();
+      onUpdate?.();
     } catch (error: any) {
       const errorMessage = error instanceof Error ? error.message : "Failed to trigger AI categorization";
       console.error("Error triggering AI categorization:", error);
