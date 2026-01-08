@@ -520,10 +520,11 @@ export default function PerformancePage() {
     refetch,
   } = hookResult;
 
+  // Keep scope breakdown in kg to match totalCO2 (consistent with CarbonDeepDive display)
   const scopeBreakdown: ScopeBreakdown | null = footprintData?.breakdown ? {
-    scope1: footprintData.breakdown.scope1 / 1000,
-    scope2: footprintData.breakdown.scope2 / 1000,
-    scope3: footprintData.breakdown.scope3.total / 1000,
+    scope1: footprintData.breakdown.scope1,
+    scope2: footprintData.breakdown.scope2,
+    scope3: footprintData.breakdown.scope3.total,
   } : null;
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -532,7 +533,11 @@ export default function PerformancePage() {
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
 
-  const totalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
+  // Use corporate footprint total for Carbon Footprint card (consistent with Company Emissions page)
+  // Fall back to product LCA total if no corporate data exists
+  const corporateTotalCO2 = footprintData?.total_emissions || 0;
+  const productLcaTotalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
+  const totalCO2 = corporateTotalCO2 > 0 ? corporateTotalCO2 : productLcaTotalCO2;
   const waterConsumption = metrics?.total_impacts.water_consumption || 0;
   const waterScarcityImpact = metrics?.total_impacts.water_scarcity_aware || 0;
   const landUse = metrics?.total_impacts.land_use || 0;
