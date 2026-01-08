@@ -364,7 +364,7 @@ export function useCompanyMetrics() {
   function extractBreakdownFromAggregatedImpacts(lcas: any[]) {
     // Aggregate scope breakdown
     const scopeTotal: ScopeBreakdown = { scope1: 0, scope2: 0, scope3: 0 };
-    const allMaterials: MaterialBreakdownItem[] = [];
+    const materialMap = new Map<string, MaterialBreakdownItem>();
     const allFacilities: any[] = [];
     const allLifecycleStages: any[] = [];
     let hasGhgData = false;
@@ -386,9 +386,27 @@ export function useCompanyMetrics() {
           scopeTotal.scope3 += breakdown.by_scope.scope3 || 0;
         }
 
-        // Aggregate material data
+        // Aggregate material data by name (sum across all products)
         if (breakdown.by_material && Array.isArray(breakdown.by_material)) {
-          allMaterials.push(...breakdown.by_material);
+          breakdown.by_material.forEach((material: MaterialBreakdownItem) => {
+            if (!material.name) return;
+
+            const key = material.name.toLowerCase().trim();
+            const existing = materialMap.get(key);
+
+            if (existing) {
+              existing.quantity += material.quantity || 0;
+              existing.climate += material.climate || 0;
+            } else {
+              materialMap.set(key, {
+                name: material.name,
+                quantity: material.quantity || 0,
+                unit: material.unit || '',
+                climate: material.climate || 0,
+                source: material.source || 'Product LCA',
+              });
+            }
+          });
         }
 
         // Aggregate facility data
@@ -427,9 +445,11 @@ export function useCompanyMetrics() {
       }
     });
 
-    // Set material breakdown
-    if (allMaterials.length > 0) {
-      setMaterialBreakdown(allMaterials);
+    // Convert material map to array and sort by climate impact
+    if (materialMap.size > 0) {
+      const aggregatedMaterials = Array.from(materialMap.values())
+        .sort((a, b) => b.climate - a.climate);
+      setMaterialBreakdown(aggregatedMaterials);
     }
 
     // Set lifecycle stage breakdown

@@ -1,18 +1,6 @@
-interface ConfidenceLevel {
-  level: 'high' | 'medium' | 'low' | 'none';
-  label: string;
-  color: string;
-}
-
-export function getConfidenceLevel(confidence: number | null): ConfidenceLevel {
-  if (confidence === null || confidence === 0) {
-    return { level: 'none', label: 'No match', color: 'gray' };
-  }
-  if (confidence >= 0.8) {
-    return { level: 'high', label: 'High confidence', color: 'green' };
-  }
-  if (confidence >= 0.5) {
-    return { level: 'medium', label: 'Medium confidence', color: 'amber' };
-  }
-  return { level: 'low', label: 'Low confidence', color: 'red' };
+export function getConfidenceLevel(confidence: number | null): { label: string; color: string } {
+  if (!confidence) return { label: 'unknown', color: 'gray' };
+  if (confidence >= 0.9) return { label: 'high', color: 'green' };
+  if (confidence >= 0.7) return { label: 'medium', color: 'yellow' };
+  return { label: 'low', color: 'red' };
 }
