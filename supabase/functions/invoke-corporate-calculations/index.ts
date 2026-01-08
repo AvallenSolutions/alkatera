@@ -40,7 +40,6 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const executionEnvironment = Deno.env.get("EXECUTION_ENVIRONMENT") || "unknown";
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -250,7 +249,6 @@ Deno.serve(async (req: Request) => {
         disaggregated_summary: disaggregatedSummary,
         activity_records_processed: activityData.length,
         calculation_duration_ms: calculationDuration,
-        environment: executionEnvironment,
       }),
       {
         status: 200,
@@ -264,7 +262,6 @@ Deno.serve(async (req: Request) => {
     console.error("Error in invoke-corporate-calculations:", error);
 
     const calculationDuration = Date.now() - startTime;
-    const executionEnvironment = Deno.env.get("EXECUTION_ENVIRONMENT") || "unknown";
 
     if (logId) {
       try {
@@ -290,7 +287,6 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: false,
         error: error.message || "An unexpected error occurred",
-        environment: executionEnvironment,
       }),
       {
         status: statusCode,
