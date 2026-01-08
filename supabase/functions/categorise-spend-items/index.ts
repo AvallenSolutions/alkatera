@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 
 interface SpendItem {
   id: string;
@@ -131,37 +131,43 @@ Deno.serve(async (req: Request) => {
 async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
   const prompt = buildPrompt(items);
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content: prompt,
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+          responseMimeType: 'application/json',
         },
-      ],
-    }),
-  });
+      }),
+    }
+  );
 
   if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.statusText}`);
+    const errorText = await response.text();
+    throw new Error(`Gemini API error: ${response.statusText} - ${errorText}`);
   }
 
   const data = await response.json();
-  const content = data.content[0].text;
 
-  // Parse JSON response
-  const jsonMatch = content.match(/\[\s*\{[\s\S]*\}\s*\]/);  
-  if (!jsonMatch) {
-    console.error('Failed to parse AI response:', content);
-    // Return default categorisation for all items
+  if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+    console.error('Unexpected Gemini response:', data);
     return items.map(() => ({
       category: 'other',
       confidence: 50,
@@ -169,8 +175,31 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
     }));
   }
 
-  const results = JSON.parse(jsonMatch[0]);
-  return results;
+  const content = data.candidates[0].content.parts[0].text;
+
+  // Parse JSON response
+  try {
+    const results = JSON.parse(content);
+
+    // Validate that we have an array with the correct structure
+    if (!Array.isArray(results) || results.length !== items.length) {
+      console.error('Invalid results structure:', results);
+      return items.map(() => ({
+        category: 'other',
+        confidence: 50,
+        reasoning: 'Failed to categorise automatically',
+      }));
+    }
+
+    return results;
+  } catch (parseError) {
+    console.error('Failed to parse Gemini response:', content, parseError);
+    return items.map(() => ({
+      category: 'other',
+      confidence: 50,
+      reasoning: 'Failed to categorise automatically',
+    }));
+  }
 }
 
 function buildPrompt(items: SpendItem[]): string {

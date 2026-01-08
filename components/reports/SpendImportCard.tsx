@@ -286,14 +286,19 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            <CardTitle>AI Spend Import</CardTitle>
+            <CardTitle>Accounts Import</CardTitle>
           </div>
           <Button variant="ghost" size="sm" onClick={downloadTemplate}>
             <Download className="h-4 w-4 mr-1" />
             Template
           </Button>
         </div>
-        <CardDescription>Upload expense data and let AI categorise it automatically</CardDescription>
+        <CardDescription>
+          Upload your expense data from accounting systems, credit card statements, or procurement records.
+          Our AI automatically analyses each transaction and assigns it to the correct GHG Protocol Scope 3 category
+          (Business Travel, Purchased Services, Capital Goods, etc.) with confidence scoring to ensure accuracy.
+          Review and approve categorisations before importing to your footprint.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {isUploading ? (

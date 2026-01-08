@@ -1715,6 +1715,16 @@ export default function CompanyEmissionsPage() {
               </CardContent>
             </Card>
 
+            {/* AI Accounts Import - Full Width */}
+            {currentOrganization && report && (
+              <SpendImportCard
+                reportId={report.id}
+                organizationId={currentOrganization.id}
+                year={selectedYear}
+                onUpdate={fetchReportData}
+              />
+            )}
+
             <Card className="border-green-200 dark:border-green-900 bg-green-50/30 dark:bg-green-950/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -1822,15 +1832,6 @@ export default function CompanyEmissionsPage() {
               </div>
             ) : report ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {currentOrganization && (
-                  <SpendImportCard
-                    reportId={report.id}
-                    organizationId={currentOrganization.id}
-                    year={selectedYear}
-                    onUpdate={fetchReportData}
-                  />
-                )}
-
                 <BusinessTravelCard
                   reportId={report.id}
                   entries={travelEntries}
