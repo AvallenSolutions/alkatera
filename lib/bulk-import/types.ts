@@ -60,60 +60,7 @@ export interface MatchResult {
   source: 'exact' | 'fuzzy' | 'category';
 }
 
-export interface BulkImportSession {
-  id: string;
-  organization_id: string;
-  status: 'pending' | 'processing' | 'preview' | 'confirmed' | 'completed' | 'failed';
-  file_name: string;
-  parsed_data: ParsedImportData;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-}
-
-export const TEMPLATE_HEADERS = [
-  'Product Name*',
-  'SKU',
-  'Category',
-  'Unit Size (Value)',
-  'Unit Size (Unit)',
-  'Description',
-] as const;
-
 export const INGREDIENT_COLUMNS = 20;
 export const PACKAGING_CATEGORIES = ['Container', 'Label', 'Closure', 'Secondary'] as const;
 
 export type PackagingCategory = typeof PACKAGING_CATEGORIES[number];
-
-export const SUPPORTED_CATEGORIES = [
-  'Gin',
-  'Vodka',
-  'Whisky',
-  'Rum',
-  'Tequila',
-  'Brandy',
-  'Liqueur',
-  'Beer',
-  'Lager',
-  'Ale',
-  'Stout',
-  'Cider',
-  'Wine',
-  'Sparkling Wine',
-  'Ready-to-Drink',
-  'Non-Alcoholic',
-  'Soft Drink',
-  'Mixer',
-  'Other',
-] as const;
-
-export const SUPPORTED_UNITS = [
-  'g',
-  'kg',
-  'ml',
-  'l',
-  'oz',
-  'lb',
-  'unit',
-  'piece',
-] as const;

@@ -244,28 +244,6 @@ export function validateImportData(data: ParsedImportData): ParseError[] {
         severity: 'error',
       });
     }
-
-    for (const ingredient of product.ingredients) {
-      if (ingredient.quantity !== null && ingredient.quantity < 0) {
-        errors.push({
-          row: rowNum,
-          column: `Ingredient ${ingredient.index}`,
-          message: `Ingredient "${ingredient.name}" has invalid quantity`,
-          severity: 'warning',
-        });
-      }
-    }
-
-    for (const pkg of product.packaging) {
-      if (pkg.weight !== null && pkg.weight < 0) {
-        errors.push({
-          row: rowNum,
-          column: `Packaging (${pkg.category})`,
-          message: `Packaging "${pkg.material}" has invalid weight`,
-          severity: 'warning',
-        });
-      }
-    }
   });
 
   return errors;

@@ -215,6 +215,8 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
       const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+      console.log('Triggering AI categorization for batch:', batchId);
+
       const response = await fetch(`${supabaseUrl}/functions/v1/categorise-spend-items`, {
         method: "POST",
         headers: {
@@ -224,11 +226,20 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
         body: JSON.stringify({ batch_id: batchId }),
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        throw new Error("AI categorisation failed");
+        const errorMsg = responseData.error || `AI categorisation failed with status ${response.status}`;
+        console.error("AI categorization error response:", errorMsg);
+        throw new Error(errorMsg);
       }
+
+      console.log('AI categorization completed successfully:', responseData);
+      toast.success("AI categorisation completed. Review categorisations and approve.");
     } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to trigger AI categorization";
       console.error("Error triggering AI categorization:", error);
+      toast.error(errorMessage);
     }
   };
 

@@ -34,6 +34,10 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY environment variable is not set');
+    }
+
     const { batch_id } = await req.json();
 
     if (!batch_id) {
@@ -121,8 +125,31 @@ Deno.serve(async (req: Request) => {
   } catch (error: any) {
     console.error('Error categorising spend items:', error);
 
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const { batch_id } = await req.json();
+
+      if (batch_id) {
+        await supabase
+          .from('spend_import_batches')
+          .update({
+            status: 'failed',
+            error_message: errorMessage,
+            ai_processing_completed_at: new Date().toISOString(),
+          })
+          .eq('id', batch_id);
+      }
+    } catch (updateError) {
+      console.error('Failed to update batch error status:', updateError);
+    }
+
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

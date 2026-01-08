@@ -1,9 +1,4 @@
-import {
-  INGREDIENT_COLUMNS,
-  PACKAGING_CATEGORIES,
-  SUPPORTED_CATEGORIES,
-  SUPPORTED_UNITS,
-} from './types';
+import { INGREDIENT_COLUMNS, PACKAGING_CATEGORIES } from './types';
 
 function generateHeaders(): string[] {
   const headers: string[] = [
@@ -116,94 +111,12 @@ export function downloadTemplateAsCSV(filename = 'alkatera_product_import_templa
   URL.revokeObjectURL(url);
 }
 
-export function createGoogleSheetsTemplate(): {
-  headers: string[];
-  exampleData: string[][];
-  validationRules: ValidationRule[];
-} {
+export function createGoogleSheetsTemplate() {
   const headers = generateHeaders();
   const exampleRow = generateExampleRow();
-
-  const validationRules: ValidationRule[] = [
-    {
-      column: 'Category',
-      type: 'list',
-      values: [...SUPPORTED_CATEGORIES],
-    },
-    {
-      column: 'Unit Size (Unit)',
-      type: 'list',
-      values: [...SUPPORTED_UNITS],
-    },
-    {
-      column: 'Reusable (Yes/No)',
-      type: 'list',
-      values: ['Yes', 'No'],
-    },
-  ];
-
-  for (let i = 1; i <= INGREDIENT_COLUMNS; i++) {
-    validationRules.push({
-      column: `Ingredient Unit ${i}`,
-      type: 'list',
-      values: [...SUPPORTED_UNITS],
-    });
-  }
-
-  for (const category of PACKAGING_CATEGORIES) {
-    validationRules.push({
-      column: `Packaging Category (${category})`,
-      type: 'list',
-      values: [category],
-    });
-  }
 
   return {
     headers,
     exampleData: [exampleRow],
-    validationRules,
   };
-}
-
-interface ValidationRule {
-  column: string;
-  type: 'list' | 'number' | 'text';
-  values?: string[];
-  min?: number;
-  max?: number;
-}
-
-export function getTemplateInstructions(): string {
-  return `
-ALKATERA PRODUCT IMPORT TEMPLATE - INSTRUCTIONS
-
-REQUIRED FIELDS:
-- Product Name: The name of your product (required)
-
-OPTIONAL FIELDS:
-- SKU: Your internal product code
-- Category: Product category (${SUPPORTED_CATEGORIES.join(', ')})
-- Unit Size: The size of one consumer unit (e.g., 750 ml)
-- Description: Product description
-
-INGREDIENTS:
-- You can add up to ${INGREDIENT_COLUMNS} ingredients per product
-- For each ingredient, provide: Name, Quantity, Unit
-- Supported units: ${SUPPORTED_UNITS.join(', ')}
-- Leave blank for unused ingredient slots
-
-PACKAGING:
-- Four packaging categories are supported: ${PACKAGING_CATEGORIES.join(', ')}
-- For each, provide: Material type and Weight (in grams)
-- Leave blank for unused packaging types
-
-REUSABLE:
-- Enter "Yes" if the packaging is designed for reuse, "No" otherwise
-
-TIPS:
-- Use the example row as a guide
-- Delete the example row before uploading
-- Save as CSV or Excel format
-- Ensure all quantities are numeric values
-`.trim();
 }
