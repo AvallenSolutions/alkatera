@@ -230,7 +230,17 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
 
       if (!response.ok) {
         const errorMsg = responseData.error || `AI categorisation failed with status ${response.status}`;
-        console.error("AI categorization error response:", errorMsg);
+        const technicalDetails = responseData.technicalError;
+
+        console.error("AI categorization error:", {
+          userMessage: errorMsg,
+          technicalError: technicalDetails,
+          response: responseData
+        });
+
+        fetchBatches();
+        onUpdate?.();
+
         throw new Error(errorMsg);
       }
 
@@ -240,6 +250,9 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
       const errorMessage = error instanceof Error ? error.message : "Failed to trigger AI categorization";
       console.error("Error triggering AI categorization:", error);
       toast.error(errorMessage);
+
+      fetchBatches();
+      onUpdate?.();
     }
   };
 

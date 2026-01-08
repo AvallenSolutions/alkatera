@@ -126,6 +126,15 @@ Deno.serve(async (req: Request) => {
     console.error('Error categorising spend items:', error);
 
     const errorMessage = error instanceof Error ? error.message : String(error);
+    let userFriendlyMessage = 'Failed to categorise spend items. ';
+
+    if (errorMessage.includes('GEMINI_API_KEY')) {
+      userFriendlyMessage += 'AI service is not configured. Please contact support.';
+    } else if (errorMessage.includes('Gemini API error')) {
+      userFriendlyMessage += 'AI service encountered an error. Please try again or contact support.';
+    } else {
+      userFriendlyMessage += 'Please check your file format and try again.';
+    }
 
     try {
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -135,21 +144,29 @@ Deno.serve(async (req: Request) => {
       const { batch_id } = await req.json();
 
       if (batch_id) {
+        console.log(`Cleaning up failed batch: ${batch_id}`);
+
+        await supabase
+          .from('spend_import_items')
+          .delete()
+          .eq('batch_id', batch_id);
+
         await supabase
           .from('spend_import_batches')
-          .update({
-            status: 'failed',
-            error_message: errorMessage,
-            ai_processing_completed_at: new Date().toISOString(),
-          })
+          .delete()
           .eq('id', batch_id);
+
+        console.log(`Successfully deleted failed batch: ${batch_id}`);
       }
-    } catch (updateError) {
-      console.error('Failed to update batch error status:', updateError);
+    } catch (cleanupError) {
+      console.error('Failed to clean up failed batch:', cleanupError);
     }
 
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({
+        error: userFriendlyMessage,
+        technicalError: errorMessage
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
@@ -159,7 +176,7 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
   const prompt = buildPrompt(items);
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
     {
       method: 'POST',
       headers: {

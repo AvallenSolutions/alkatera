@@ -29,7 +29,7 @@ function generateHeaders(): string[] {
 
 function generateExampleRow(): string[] {
   const row: string[] = [
-    'Example',
+    'Example Product',
     'GIN-001',
     'Gin',
     '750',
