@@ -388,22 +388,25 @@ export function useCompanyMetrics() {
 
         // Aggregate material data by name (sum across all products)
         if (breakdown.by_material && Array.isArray(breakdown.by_material)) {
-          breakdown.by_material.forEach((material: MaterialBreakdownItem) => {
+          breakdown.by_material.forEach((material: any) => {
             if (!material.name) return;
 
             const key = material.name.toLowerCase().trim();
             const existing = materialMap.get(key);
 
+            // Handle both 'climate' and 'emissions' field names
+            const emissionsValue = material.climate || material.emissions || 0;
+
             if (existing) {
               existing.quantity += material.quantity || 0;
-              existing.climate += material.climate || 0;
+              existing.climate += emissionsValue;
             } else {
               materialMap.set(key, {
                 name: material.name,
                 quantity: material.quantity || 0,
                 unit: material.unit || '',
-                climate: material.climate || 0,
-                source: material.source || 'Product LCA',
+                climate: emissionsValue,
+                source: material.dataSource || material.source || 'Product LCA',
               });
             }
           });
