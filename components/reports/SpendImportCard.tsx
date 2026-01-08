@@ -55,6 +55,20 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
     fetchBatches();
   }, [reportId]);
 
+  useEffect(() => {
+    const hasProcessingBatch = batches.some(
+      (b) => b.status === "processing" || b.status === "partial" || b.status === "uploading"
+    );
+
+    if (!hasProcessingBatch) return;
+
+    const interval = setInterval(() => {
+      fetchBatches();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [batches]);
+
   const isStuckBatch = (batch: ImportBatch): boolean => {
     if (batch.status !== "uploading" && batch.status !== "processing" && batch.status !== "partial") return false;
     const createdAt = new Date(batch.created_at).getTime();
