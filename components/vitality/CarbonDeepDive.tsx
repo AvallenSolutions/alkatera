@@ -181,6 +181,19 @@ export function CarbonDeepDive({
     }
   };
 
+  // Format quantity value with appropriate unit (kg or t) and max 2 decimal places
+  const formatQuantity = (value: number, unit: string) => {
+    if (unit === 'kg' && value >= 1000) {
+      // Convert kg to tons for large values
+      return `${(value / 1000).toFixed(2)} t`;
+    } else if (unit === 'kg') {
+      return `${value.toFixed(2)} kg`;
+    } else {
+      // For other units, just format with 2 decimal places
+      return `${value.toFixed(2)} ${unit}`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Tabs defaultValue="overview" className="w-full">
@@ -878,7 +891,6 @@ export function CarbonDeepDive({
                           <TableRow className="bg-green-50">
                             <TableHead className="font-semibold">Material Name</TableHead>
                             <TableHead className="font-semibold text-right">Quantity</TableHead>
-                            <TableHead className="font-semibold text-right">Emission Factor</TableHead>
                             <TableHead className="font-semibold text-right">Total Impact</TableHead>
                             <TableHead className="font-semibold text-right">% of Total</TableHead>
                             <TableHead className="font-semibold text-center">Data Source</TableHead>
@@ -889,7 +901,6 @@ export function CarbonDeepDive({
                             const climateValue = material.climate ?? 0;
                             const quantityValue = material.quantity ?? 0;
                             const percentageValue = material.percentage ?? 0;
-                            const emissionFactor = quantityValue > 0 ? climateValue / quantityValue : 0;
                             return (
                               <TableRow key={idx} className={percentageValue > 5 ? 'bg-orange-50/50' : ''}>
                                 <TableCell className="font-medium">
@@ -901,10 +912,7 @@ export function CarbonDeepDive({
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {material.unit || ''}
-                                </TableCell>
-                                <TableCell className="text-right text-xs text-muted-foreground">
-                                  {formatEmissions(emissionFactor)} CO₂eq/{material.unit || ''}
+                                  {formatQuantity(quantityValue, material.unit || 'kg')}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
                                   {formatEmissions(climateValue)} CO₂eq
@@ -951,7 +959,6 @@ export function CarbonDeepDive({
                           <TableRow className="bg-blue-50">
                             <TableHead className="font-semibold">Material Name</TableHead>
                             <TableHead className="font-semibold text-right">Quantity</TableHead>
-                            <TableHead className="font-semibold text-right">Emission Factor</TableHead>
                             <TableHead className="font-semibold text-right">Total Impact</TableHead>
                             <TableHead className="font-semibold text-right">% of Total</TableHead>
                             <TableHead className="font-semibold text-center">Data Source</TableHead>
@@ -962,7 +969,6 @@ export function CarbonDeepDive({
                             const climateValue = material.climate ?? 0;
                             const quantityValue = material.quantity ?? 0;
                             const percentageValue = material.percentage ?? 0;
-                            const emissionFactor = quantityValue > 0 ? climateValue / quantityValue : 0;
                             return (
                               <TableRow key={idx} className={percentageValue > 5 ? 'bg-orange-50/50' : ''}>
                                 <TableCell className="font-medium">
@@ -974,10 +980,7 @@ export function CarbonDeepDive({
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {material.unit || ''}
-                                </TableCell>
-                                <TableCell className="text-right text-xs text-muted-foreground">
-                                  {formatEmissions(emissionFactor)} CO₂eq/{material.unit || ''}
+                                  {formatQuantity(quantityValue, material.unit || 'kg')}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
                                   {formatEmissions(climateValue)} CO₂eq
