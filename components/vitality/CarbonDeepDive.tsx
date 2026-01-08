@@ -683,14 +683,14 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {(ghgBreakdown.gas_inventory.methane / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {((ghgBreakdown.gas_inventory.methane / ghgBreakdown.gwp_factors.methane_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-center">{ghgBreakdown.gwp_factors.methane_gwp100}</TableCell>
                             <TableCell className="text-right font-semibold">
-                              {((ghgBreakdown.gas_inventory.methane * ghgBreakdown.gwp_factors.methane_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.methane / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {(((ghgBreakdown.gas_inventory.methane * ghgBreakdown.gwp_factors.methane_gwp100) / totalCO2) * 100).toFixed(1)}%
+                              {((ghgBreakdown.gas_inventory.methane / totalCO2) * 100).toFixed(1)}%
                             </TableCell>
                           </TableRow>
 
@@ -702,14 +702,14 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {(ghgBreakdown.gas_inventory.nitrous_oxide / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {((ghgBreakdown.gas_inventory.nitrous_oxide / ghgBreakdown.gwp_factors.n2o_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-center">{ghgBreakdown.gwp_factors.n2o_gwp100}</TableCell>
                             <TableCell className="text-right font-semibold">
-                              {((ghgBreakdown.gas_inventory.nitrous_oxide * ghgBreakdown.gwp_factors.n2o_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.nitrous_oxide / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {(((ghgBreakdown.gas_inventory.nitrous_oxide * ghgBreakdown.gwp_factors.n2o_gwp100) / totalCO2) * 100).toFixed(1)}%
+                              {((ghgBreakdown.gas_inventory.nitrous_oxide / totalCO2) * 100).toFixed(1)}%
                             </TableCell>
                           </TableRow>
 
