@@ -149,12 +149,11 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
           },
         ],
         generationConfig: {
-          temperature: 0.2,
-          topK: 40,
-          topP: 0.95,
+          temperature: 0.1,
+          topK: 20,
+          topP: 0.9,
           maxOutputTokens: 8192,
           responseMimeType: 'application/json',
-          thinkingLevel: 'minimal',
         },
       }),
     }
