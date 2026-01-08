@@ -265,8 +265,8 @@ function HotspotCard({
                 </Badge>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-lg font-semibold text-slate-900 dark:text-slate-50">{typeof item.value === 'number' ? item.value.toLocaleString('en-GB', { maximumFractionDigits: 2 }) : '0'}</span>
-                <span className="text-xs text-slate-600 dark:text-slate-400">kg CO₂eq</span>
+                <span className="text-lg font-semibold text-slate-900 dark:text-slate-50">{typeof item.value === 'number' ? (item.value / 1000).toLocaleString('en-GB', { maximumFractionDigits: 2 }) : '0'}</span>
+                <span className="text-xs text-slate-600 dark:text-slate-400">tCO₂eq</span>
               </div>
             </div>
           </div>
@@ -305,32 +305,32 @@ function ActionGuidanceCard({
 
     if (materialHotspots.length > 0) {
       const topMaterial = materialHotspots[0];
-      const potentialReduction = (topMaterial.value * 0.4).toFixed(0);
+      const potentialReduction = (topMaterial.value * 0.4 / 1000).toFixed(2);
       generated.push({
         priority: topMaterial.percentage > 25 ? 'high' : 'medium',
         category: 'Raw Materials',
         action: `Optimise ${topMaterial.label} sourcing`,
-        impact: `Reduce by ${potentialReduction} kg CO₂eq (${(topMaterial.percentage * 0.4).toFixed(0)}%)`,
+        impact: `Reduce by ${potentialReduction} tCO₂eq (${(topMaterial.percentage * 0.4).toFixed(0)}%)`,
         icon: Leaf,
       });
     }
 
     if (scope2Pct > 15) {
-      const potentialReduction = (scopeBreakdown.scope2 * 0.8).toFixed(0);
+      const potentialReduction = (scopeBreakdown.scope2 * 0.8 / 1000).toFixed(2);
       generated.push({
         priority: scope2Pct > 30 ? 'high' : 'medium',
         category: 'Energy',
         action: 'Switch to renewable electricity tariff',
-        impact: `Eliminate ${potentialReduction} kg CO₂eq (${(scope2Pct * 0.8).toFixed(0)}% of total)`,
+        impact: `Eliminate ${potentialReduction} tCO₂eq (${(scope2Pct * 0.8).toFixed(0)}% of total)`,
         icon: Factory,
       });
     } else if (scope1Pct > 20) {
-      const potentialReduction = (scopeBreakdown.scope1 * 0.3).toFixed(0);
+      const potentialReduction = (scopeBreakdown.scope1 * 0.3 / 1000).toFixed(2);
       generated.push({
         priority: 'high',
         category: 'Direct Emissions',
         action: 'Improve facility energy efficiency',
-        impact: `Reduce Scope 1 by ${potentialReduction} kg CO₂eq`,
+        impact: `Reduce Scope 1 by ${potentialReduction} tCO₂eq`,
         icon: Factory,
       });
     }
@@ -736,8 +736,8 @@ export default function PerformancePage() {
             <VitalityMetricCard
               icon={Leaf}
               title="Carbon Footprint"
-              value={totalCO2}
-              unit="kg CO₂eq"
+              value={totalCO2 / 1000}
+              unit="tCO₂eq"
               trend="down"
               trendValue="12% vs last quarter"
               status="good"

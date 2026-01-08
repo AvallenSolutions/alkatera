@@ -1,16 +1,16 @@
-export function getConfidenceLevel(confidence: number | null): {
-  label: string;
-  color: string;
-} {
-  if (confidence === null) {
-    return { label: 'Unmatched', color: 'gray' };
+export function getConfidenceLevel(confidence: number | null): { level: string; label: string; color: string } {
+  if (confidence === null || confidence === 0) {
+    return { level: 'none', label: 'No Match', color: 'gray' };
   }
+  if (confidence >= 0.8) {
+    return { level: 'high', label: 'High Confidence', color: 'green' };
+  }
+  if (confidence >= 0.5) {
+    return { level: 'medium', label: 'Medium Confidence', color: 'yellow' };
+  }
+  return { level: 'low', label: 'Low Confidence', color: 'red' };
+}
 
-  if (confidence >= 90) {
-    return { label: 'High', color: 'green' };
-  } else if (confidence >= 70) {
-    return { label: 'Medium', color: 'yellow' };
-  } else {
-    return { label: 'Low', color: 'red' };
-  }
+export function matchMaterial(name: string): { materialId: string | null; confidence: number } {
+  return { materialId: null, confidence: 0 };
 }

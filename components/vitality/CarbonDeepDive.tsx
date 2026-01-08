@@ -76,7 +76,7 @@ export function CarbonDeepDive({
               <>
                 <p className="text-sm font-medium">Partial carbon data available</p>
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg text-left">
-                  <p className="text-sm font-semibold text-blue-900">Summary metric: {totalCO2.toFixed(3)} kg CO₂eq</p>
+                  <p className="text-sm font-semibold text-blue-900">Summary metric: {(totalCO2 / 1000).toFixed(3)} tCO₂eq</p>
                   <p className="text-xs text-blue-700 mt-2">
                     Detailed breakdown pending. Run a full LCA calculation to see:
                   </p>
@@ -231,7 +231,7 @@ export function CarbonDeepDive({
                       <div className="space-y-1">
                         <p className="text-sm font-semibold text-amber-900">Data Quality Warning</p>
                         <p className="text-xs text-amber-700">
-                          Carbon origin sum ({fossilBiogenicLuc.toFixed(3)} kg) deviates {variancePercent.toFixed(1)}% from total ({totalCO2.toFixed(3)} kg).
+                          Carbon origin sum ({(fossilBiogenicLuc / 1000).toFixed(3)} t) deviates {variancePercent.toFixed(1)}% from total ({(totalCO2 / 1000).toFixed(3)} t).
                           ISO 14067 recommends &lt;5% variance.
                         </p>
                       </div>
@@ -272,7 +272,7 @@ export function CarbonDeepDive({
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 1 (Direct)</span>
                         <Badge variant="outline" className="bg-red-50 text-slate-900">
-                          {scopeBreakdown.scope1.toFixed(3)} kg CO₂eq
+                          {(scopeBreakdown.scope1 / 1000).toFixed(3)} tCO₂eq
                         </Badge>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -290,7 +290,7 @@ export function CarbonDeepDive({
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 2 (Energy)</span>
                         <Badge variant="outline" className="bg-orange-50 text-slate-900">
-                          {scopeBreakdown.scope2.toFixed(3)} kg CO₂eq
+                          {(scopeBreakdown.scope2 / 1000).toFixed(3)} tCO₂eq
                         </Badge>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -308,7 +308,7 @@ export function CarbonDeepDive({
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">Scope 3 (Value Chain)</span>
                         <Badge variant="outline" className="bg-yellow-50 text-slate-900">
-                          {scopeBreakdown.scope3.toFixed(3)} kg CO₂eq
+                          {(scopeBreakdown.scope3 / 1000).toFixed(3)} tCO₂eq
                         </Badge>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
@@ -336,7 +336,7 @@ export function CarbonDeepDive({
                   <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                     <span className="text-sm font-medium text-slate-900">Total Emissions</span>
                     <span className="text-lg font-bold text-orange-900">
-                      {totalCO2.toFixed(3)} kg CO₂eq
+                      {(totalCO2 / 1000).toFixed(3)} tCO₂eq
                     </span>
                   </div>
 
@@ -422,7 +422,7 @@ export function CarbonDeepDive({
                           <h3 className="font-semibold text-sm">{stage.stage_name}</h3>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline">{(stage.percentage ?? 0).toFixed(1)}%</Badge>
-                            <span className="text-sm font-bold">{(stage.total_impact ?? 0).toFixed(3)} kg CO₂eq</span>
+                            <span className="text-sm font-bold">{((stage.total_impact ?? 0) / 1000).toFixed(3)} tCO₂eq</span>
                           </div>
                         </div>
 
@@ -487,7 +487,7 @@ export function CarbonDeepDive({
                           </div>
                           <div className="text-right">
                             <Badge variant="outline">{(facility.percentage ?? 0).toFixed(1)}%</Badge>
-                            <p className="text-sm font-bold mt-1">{(facility.total_emissions ?? 0).toFixed(3)} kg CO₂eq</p>
+                            <p className="text-sm font-bold mt-1">{((facility.total_emissions ?? 0) / 1000).toFixed(3)} tCO₂eq</p>
                           </div>
                         </div>
 
@@ -501,11 +501,11 @@ export function CarbonDeepDive({
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div className="flex items-center justify-between p-2 bg-red-50 rounded">
                             <span className="text-muted-foreground">Scope 1</span>
-                            <span className="font-semibold">{(facility.scope1_emissions ?? 0).toFixed(2)} kg</span>
+                            <span className="font-semibold">{((facility.scope1_emissions ?? 0) / 1000).toFixed(3)} t</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
                             <span className="text-muted-foreground">Scope 2</span>
-                            <span className="font-semibold">{(facility.scope2_emissions ?? 0).toFixed(2)} kg</span>
+                            <span className="font-semibold">{((facility.scope2_emissions ?? 0) / 1000).toFixed(3)} t</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
                             <span className="text-muted-foreground">Production</span>
@@ -513,7 +513,7 @@ export function CarbonDeepDive({
                           </div>
                           <div className="flex items-center justify-between p-2 bg-green-50 rounded">
                             <span className="text-muted-foreground">Intensity</span>
-                            <span className="font-semibold">{(facility.facility_intensity ?? 0).toFixed(4)} kg/unit</span>
+                            <span className="font-semibold">{((facility.facility_intensity ?? 0) / 1000).toFixed(6)} t/unit</span>
                           </div>
                         </div>
                       </CardContent>
@@ -549,9 +549,9 @@ export function CarbonDeepDive({
                       <CardContent className="p-4">
                         <div className="flex items-baseline gap-2">
                           <span className="text-2xl font-bold text-orange-900">
-                            {totalCO2.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                            {(totalCO2 / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                           </span>
-                          <span className="text-xs text-muted-foreground">kg CO₂eq</span>
+                          <span className="text-xs text-muted-foreground">tCO₂eq</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Total GHG Emissions</p>
                       </CardContent>
@@ -593,9 +593,9 @@ export function CarbonDeepDive({
                         <TableHeader>
                           <TableRow className="bg-orange-50">
                             <TableHead className="font-semibold">Gas Species</TableHead>
-                            <TableHead className="font-semibold text-right">Mass (kg)</TableHead>
+                            <TableHead className="font-semibold text-right">Mass (t)</TableHead>
                             <TableHead className="font-semibold text-center">GWP100 Factor</TableHead>
-                            <TableHead className="font-semibold text-right">CO₂eq (kg)</TableHead>
+                            <TableHead className="font-semibold text-right">CO₂eq (t)</TableHead>
                             <TableHead className="font-semibold text-right">% of Total</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -608,11 +608,11 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {ghgBreakdown.gas_inventory.co2_fossil.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.co2_fossil / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-center">1</TableCell>
                             <TableCell className="text-right font-semibold">
-                              {ghgBreakdown.gas_inventory.co2_fossil.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.co2_fossil / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
                               {((ghgBreakdown.gas_inventory.co2_fossil / totalCO2) * 100).toFixed(1)}%
@@ -627,11 +627,11 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {ghgBreakdown.gas_inventory.co2_biogenic.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.co2_biogenic / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-center">1</TableCell>
                             <TableCell className="text-right font-semibold">
-                              {ghgBreakdown.gas_inventory.co2_biogenic.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.co2_biogenic / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
                               {((ghgBreakdown.gas_inventory.co2_biogenic / totalCO2) * 100).toFixed(1)}%
@@ -646,11 +646,11 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {ghgBreakdown.gas_inventory.methane.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.methane / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-center">{ghgBreakdown.gwp_factors.methane_gwp100}</TableCell>
                             <TableCell className="text-right font-semibold">
-                              {(ghgBreakdown.gas_inventory.methane * ghgBreakdown.gwp_factors.methane_gwp100).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {((ghgBreakdown.gas_inventory.methane * ghgBreakdown.gwp_factors.methane_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
                               {(((ghgBreakdown.gas_inventory.methane * ghgBreakdown.gwp_factors.methane_gwp100) / totalCO2) * 100).toFixed(1)}%
@@ -665,11 +665,11 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {ghgBreakdown.gas_inventory.nitrous_oxide.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {(ghgBreakdown.gas_inventory.nitrous_oxide / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-center">{ghgBreakdown.gwp_factors.n2o_gwp100}</TableCell>
                             <TableCell className="text-right font-semibold">
-                              {(ghgBreakdown.gas_inventory.nitrous_oxide * ghgBreakdown.gwp_factors.n2o_gwp100).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                              {((ghgBreakdown.gas_inventory.nitrous_oxide * ghgBreakdown.gwp_factors.n2o_gwp100) / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
                               {(((ghgBreakdown.gas_inventory.nitrous_oxide * ghgBreakdown.gwp_factors.n2o_gwp100) / totalCO2) * 100).toFixed(1)}%
@@ -687,7 +687,7 @@ export function CarbonDeepDive({
                               <TableCell className="text-right">-</TableCell>
                               <TableCell className="text-center">Various</TableCell>
                               <TableCell className="text-right font-semibold">
-                                {ghgBreakdown.gas_inventory.hfc_pfc.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                                {(ghgBreakdown.gas_inventory.hfc_pfc / 1000).toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                               </TableCell>
                               <TableCell className="text-right">
                                 {((ghgBreakdown.gas_inventory.hfc_pfc / totalCO2) * 100).toFixed(1)}%
@@ -773,7 +773,7 @@ export function CarbonDeepDive({
                       <span className="text-xs text-muted-foreground">ingredients</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {ingredientsTotal.toFixed(3)} kg CO₂eq total
+                      {(ingredientsTotal / 1000).toFixed(3)} tCO₂eq total
                     </p>
                   </CardContent>
                 </Card>
@@ -787,7 +787,7 @@ export function CarbonDeepDive({
                       <span className="text-xs text-muted-foreground">packaging parts</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {packagingTotal.toFixed(3)} kg CO₂eq total
+                      {(packagingTotal / 1000).toFixed(3)} tCO₂eq total
                     </p>
                   </CardContent>
                 </Card>
@@ -801,7 +801,7 @@ export function CarbonDeepDive({
                       <span className="text-xs text-muted-foreground">total materials</span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {totalCO2.toFixed(3)} kg CO₂eq combined
+                      {(totalCO2 / 1000).toFixed(3)} tCO₂eq combined
                     </p>
                   </CardContent>
                 </Card>
@@ -880,10 +880,10 @@ export function CarbonDeepDive({
                                   {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right text-xs text-muted-foreground">
-                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit || ''}
+                                  {(emissionFactor / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} tCO₂eq/{material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
-                                  {climateValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
+                                  {(climateValue / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} t
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
@@ -953,10 +953,10 @@ export function CarbonDeepDive({
                                   {quantityValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} {material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right text-xs text-muted-foreground">
-                                  {emissionFactor.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg CO₂eq/{material.unit || ''}
+                                  {(emissionFactor / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} tCO₂eq/{material.unit || ''}
                                 </TableCell>
                                 <TableCell className="text-right font-semibold">
-                                  {climateValue.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })} kg
+                                  {(climateValue / 1000).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })} t
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-2">
