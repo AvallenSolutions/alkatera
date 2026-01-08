@@ -1,7 +1,7 @@
-export function downloadTemplateAsCSV(): void {
-  throw new Error('Not implemented');
+export function downloadTemplateAsCSV() {
+  console.log('downloadTemplateAsCSV not implemented');
 }
 
-export function createGoogleSheetsTemplate(): void {
-  throw new Error('Not implemented');
+export function createGoogleSheetsTemplate() {
+  console.log('createGoogleSheetsTemplate not implemented');
 }

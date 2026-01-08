@@ -302,7 +302,7 @@ export default function ProductLcaReportPage() {
   const hasFacilityData = scope1 > 0 || scope2 > 0;
 
   // Lifecycle stage breakdowns (use real data)
-  const lifecycleStages = breakdown?.by_lifecycle_stage || {
+  const lifecycleStagesRaw = breakdown?.by_lifecycle_stage || {
     raw_materials: 0,
     processing: 0,
     packaging_stage: 0,
@@ -310,6 +310,20 @@ export default function ProductLcaReportPage() {
     use_phase: 0,
     end_of_life: 0,
   };
+
+  // Filter out Use Phase and sort by size (descending)
+  const lifecycleStages = Object.entries(lifecycleStagesRaw)
+    .filter(([key]) => key !== 'use_phase')
+    .map(([key, value]) => ({
+      key,
+      value: Number(value),
+      label: key === 'raw_materials' ? 'Raw Materials' :
+             key === 'processing' ? 'Processing' :
+             key === 'packaging_stage' ? 'Packaging' :
+             key === 'distribution' ? 'Distribution' :
+             key === 'end_of_life' ? 'End of Life' : key
+    }))
+    .sort((a, b) => b.value - a.value);
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -623,45 +637,22 @@ export default function ProductLcaReportPage() {
                         )}
 
                         <div className="grid md:grid-cols-2 gap-3">
-                          <div className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-medium">Raw Materials</span>
-                              <span className="text-sm font-bold">{lifecycleStages.raw_materials.toFixed(3)} kg</span>
-                            </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
-                              <div className="bg-green-600 h-1.5 rounded-full" style={{ width: `${(lifecycleStages.raw_materials / totalEmissions) * 100}%` }}></div>
-                            </div>
-                          </div>
+                          {lifecycleStages.map((stage, idx) => {
+                            const colors = ['bg-green-600', 'bg-blue-600', 'bg-amber-600', 'bg-orange-600', 'bg-red-600'];
+                            const colorClass = colors[idx % colors.length];
 
-                          <div className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-medium">Processing</span>
-                              <span className="text-sm font-bold">{lifecycleStages.processing.toFixed(3)} kg</span>
-                            </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
-                              <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${(lifecycleStages.processing / totalEmissions) * 100}%` }}></div>
-                            </div>
-                          </div>
-
-                          <div className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-medium">Packaging</span>
-                              <span className="text-sm font-bold">{lifecycleStages.packaging_stage.toFixed(3)} kg</span>
-                            </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
-                              <div className="bg-amber-600 h-1.5 rounded-full" style={{ width: `${(lifecycleStages.packaging_stage / totalEmissions) * 100}%` }}></div>
-                            </div>
-                          </div>
-
-                          <div className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-medium">Distribution</span>
-                              <span className="text-sm font-bold">{lifecycleStages.distribution.toFixed(3)} kg</span>
-                            </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
-                              <div className="bg-orange-600 h-1.5 rounded-full" style={{ width: `${(lifecycleStages.distribution / totalEmissions) * 100}%` }}></div>
-                            </div>
-                          </div>
+                            return (
+                              <div key={stage.key} className="p-3 rounded-lg bg-white dark:bg-slate-900/50 border">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-xs font-medium">{stage.label}</span>
+                                  <span className="text-sm font-bold">{stage.value.toFixed(3)} kg</span>
+                                </div>
+                                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
+                                  <div className={`${colorClass} h-1.5 rounded-full`} style={{ width: `${(stage.value / totalEmissions) * 100}%` }}></div>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
