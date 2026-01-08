@@ -11,6 +11,7 @@ export function downloadTemplateAsCSV(): void {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 export function createGoogleSheetsTemplate(): string {

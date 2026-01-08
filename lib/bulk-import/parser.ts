@@ -1,49 +1,17 @@
-import * as XLSX from 'xlsx';
+import { ImportedItem } from './types';
 
-export interface ParsedRow {
-  productName: string;
-  sku: string;
-  description: string;
-  category: string;
-  ingredientName?: string;
-  ingredientQuantity?: number;
-  ingredientUnit?: string;
-  packagingType?: string;
-  packagingMaterial?: string;
-  packagingWeight?: number;
-}
+export function parseCSV(csvContent: string): ImportedItem[] {
+  const lines = csvContent.split('\n').filter(line => line.trim());
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
 
-export function parseSpreadsheet(file: File): Promise<ParsedRow[]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+  return lines.slice(1).map((line, index) => {
+    const values = line.split(',').map(v => v.trim());
+    const item: any = { id: `import-${index}` };
 
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+    headers.forEach((header, i) => {
+      item[header] = values[i];
+    });
 
-        const parsed = jsonData.map((row: any) => ({
-          productName: row.product_name || row['Product Name'] || '',
-          sku: row.sku || row.SKU || '',
-          description: row.description || row.Description || '',
-          category: row.category || row.Category || '',
-          ingredientName: row.ingredient_name || row['Ingredient Name'],
-          ingredientQuantity: row.ingredient_quantity || row['Ingredient Quantity'],
-          ingredientUnit: row.ingredient_unit || row['Ingredient Unit'],
-          packagingType: row.packaging_type || row['Packaging Type'],
-          packagingMaterial: row.packaging_material || row['Packaging Material'],
-          packagingWeight: row.packaging_weight_g || row['Packaging Weight (g)'],
-        }));
-
-        resolve(parsed);
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    reader.onerror = () => reject(reader.error);
-    reader.readAsBinaryString(file);
+    return item as ImportedItem;
   });
 }

@@ -359,9 +359,19 @@ export function CarbonDeepDive({
                       <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                         <span className="text-sm font-medium text-slate-900">Contribution</span>
                         <span className="text-sm font-bold text-purple-900">
-                          {materialBreakdown[0] && totalCO2 > 0 && typeof materialBreakdown[0].climate === 'number'
-                            ? ((materialBreakdown[0].climate / totalCO2) * 100).toFixed(1)
-                            : 0}%
+                          {(() => {
+                            const climate = materialBreakdown[0]?.climate;
+                            if (
+                              climate != null &&
+                              Number.isFinite(climate) &&
+                              Number.isFinite(totalCO2) &&
+                              totalCO2 > 0
+                            ) {
+                              const percentage = (climate / totalCO2) * 100;
+                              return Number.isFinite(percentage) ? percentage.toFixed(1) : '0';
+                            }
+                            return '0';
+                          })()}%
                         </span>
                       </div>
                     </>
