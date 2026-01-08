@@ -56,7 +56,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
   }, [reportId]);
 
   const isStuckBatch = (batch: ImportBatch): boolean => {
-    if (batch.status !== "uploading" && batch.status !== "processing") return false;
+    if (batch.status !== "uploading" && batch.status !== "processing" && batch.status !== "partial") return false;
     const createdAt = new Date(batch.created_at).getTime();
     const now = Date.now();
     const minutesElapsed = (now - createdAt) / (1000 * 60);
@@ -466,7 +466,7 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
               </div>
             )}
 
-            {(latestBatch.status === "uploading" || latestBatch.status === "processing") && isStuckBatch(latestBatch) && (
+            {(latestBatch.status === "uploading" || latestBatch.status === "processing" || latestBatch.status === "partial") && isStuckBatch(latestBatch) && (
               <div className="space-y-3">
                 <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
                   <p className="text-sm text-amber-700 dark:text-amber-300">
@@ -498,8 +498,14 @@ export function SpendImportCard({ reportId, organizationId, year, onUpdate }: Sp
               </div>
             )}
 
-            {latestBatch.status === "processing" && !isStuckBatch(latestBatch) && (
-              <Progress value={(latestBatch.processed_rows / latestBatch.total_rows) * 100} className="h-2" />
+            {(latestBatch.status === "processing" || latestBatch.status === "partial") && !isStuckBatch(latestBatch) && (
+              <div className="space-y-2">
+                <Progress value={(latestBatch.processed_rows / latestBatch.total_rows) * 100} className="h-2" />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{latestBatch.processed_rows} / {latestBatch.total_rows} items</span>
+                  <span>{Math.round((latestBatch.processed_rows / latestBatch.total_rows) * 100)}%</span>
+                </div>
+              </div>
             )}
 
             {latestBatch.status === "uploading" && !isStuckBatch(latestBatch) && (

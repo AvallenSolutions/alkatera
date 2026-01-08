@@ -152,11 +152,20 @@ Deno.serve(async (req: Request) => {
     const remainingItems = items.length - processedCount;
     const needsMoreProcessing = remainingItems > 0;
 
+    const { data: batchData } = await supabase
+      .from('spend_import_batches')
+      .select('processed_rows')
+      .eq('id', batchId)
+      .single();
+
+    const totalProcessed = (batchData?.processed_rows || 0) + processedCount;
+
     await supabase
       .from('spend_import_batches')
       .update({
         status: needsMoreProcessing ? 'partial' : 'ready_for_review',
         ai_processing_completed_at: needsMoreProcessing ? null : new Date().toISOString(),
+        processed_rows: totalProcessed,
       })
       .eq('id', batchId);
 
