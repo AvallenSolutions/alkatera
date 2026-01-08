@@ -1,21 +1,18 @@
 export function downloadTemplateAsCSV(): void {
-  const template = `name,quantity,unit,item_type
-"Example Ingredient 1",100,kg,ingredient
-"Example Ingredient 2",50,L,ingredient
-"Glass Bottle",0.5,kg,packaging
-"Label",0.01,kg,packaging`;
+  const headers = ['name', 'quantity', 'unit', 'type'];
+  const sampleRow = ['Example Ingredient', '100', 'kg', 'ingredient'];
+  const csvContent = [headers.join(','), sampleRow.join(',')].join('\n');
 
-  const blob = new Blob([template], { type: 'text/csv' });
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'product-import-template.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'product_import_template.csv');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 export function createGoogleSheetsTemplate(): string {
-  return 'https://docs.google.com/spreadsheets/d/template';
+  return 'https://docs.google.com/spreadsheets/d/1example/copy';
 }

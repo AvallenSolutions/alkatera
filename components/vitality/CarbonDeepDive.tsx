@@ -359,7 +359,7 @@ export function CarbonDeepDive({
                       <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                         <span className="text-sm font-medium text-slate-900">Contribution</span>
                         <span className="text-sm font-bold text-purple-900">
-                          {materialBreakdown[0] && totalCO2 > 0
+                          {materialBreakdown[0] && totalCO2 > 0 && typeof materialBreakdown[0].climate === 'number'
                             ? ((materialBreakdown[0].climate / totalCO2) * 100).toFixed(1)
                             : 0}%
                         </span>
