@@ -14,7 +14,6 @@ Glass Bottle,1000,units,packaging`;
 }
 
 export function createGoogleSheetsTemplate() {
-  // Placeholder function
   const templateUrl = 'https://docs.google.com/spreadsheets/d/1example/edit';
   window.open(templateUrl, '_blank');
 }

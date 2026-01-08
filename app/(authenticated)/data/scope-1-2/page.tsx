@@ -58,6 +58,7 @@ import { CapitalGoodsCard } from '@/components/reports/CapitalGoodsCard';
 import { LogisticsDistributionCard } from '@/components/reports/LogisticsDistributionCard';
 import { OperationalWasteCard } from '@/components/reports/OperationalWasteCard';
 import { MarketingMaterialsCard } from '@/components/reports/MarketingMaterialsCard';
+import { SpendImportCard } from '@/components/reports/SpendImportCard';
 
 const scope1Schema = z.object({
   facility_id: z.string().min(1, 'Facility is required'),
@@ -1821,6 +1822,15 @@ export default function CompanyEmissionsPage() {
               </div>
             ) : report ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {currentOrganization && (
+                  <SpendImportCard
+                    reportId={report.id}
+                    organizationId={currentOrganization.id}
+                    year={selectedYear}
+                    onUpdate={fetchReportData}
+                  />
+                )}
+
                 <BusinessTravelCard
                   reportId={report.id}
                   entries={travelEntries}
