@@ -97,7 +97,7 @@ export default function ReportBuilderPage() {
     try {
       const result = await generateReport(config);
 
-      if (result.success) {
+      if (result.success && result.report_id && result.document_url) {
         setGeneratedReport({
           id: result.report_id,
           document_url: result.document_url,
