@@ -718,16 +718,16 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {(ghgBreakdown.gas_inventory.methane_fossil / (ghgBreakdown.gwp_factors.ch4_fossil_gwp100 ?? 29.8)).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
+                              {((ghgBreakdown.gas_inventory.methane_fossil ?? 0) / (ghgBreakdown.gwp_factors.ch4_fossil_gwp100 ?? 29.8)).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-center">
                               {ghgBreakdown.gwp_factors.ch4_fossil_gwp100 ?? 29.8}
                             </TableCell>
                             <TableCell className="text-right font-semibold">
-                              {ghgBreakdown.gas_inventory.methane_fossil.toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
+                              {(ghgBreakdown.gas_inventory.methane_fossil ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.methane_fossil / totalCO2) * 100).toFixed(2)}%
+                              {(((ghgBreakdown.gas_inventory.methane_fossil ?? 0) / totalCO2) * 100).toFixed(2)}%
                             </TableCell>
                           </TableRow>
 
@@ -741,16 +741,16 @@ export function CarbonDeepDive({
                               </div>
                             </TableCell>
                             <TableCell className="text-right">
-                              {(ghgBreakdown.gas_inventory.methane_biogenic / (ghgBreakdown.gwp_factors.ch4_biogenic_gwp100 ?? 27.2)).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
+                              {((ghgBreakdown.gas_inventory.methane_biogenic ?? 0) / (ghgBreakdown.gwp_factors.ch4_biogenic_gwp100 ?? 27.2)).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-center">
                               {ghgBreakdown.gwp_factors.ch4_biogenic_gwp100 ?? 27.2}
                             </TableCell>
                             <TableCell className="text-right font-semibold">
-                              {ghgBreakdown.gas_inventory.methane_biogenic.toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
+                              {(ghgBreakdown.gas_inventory.methane_biogenic ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.methane_biogenic / totalCO2) * 100).toFixed(2)}%
+                              {(((ghgBreakdown.gas_inventory.methane_biogenic ?? 0) / totalCO2) * 100).toFixed(2)}%
                             </TableCell>
                           </TableRow>
 

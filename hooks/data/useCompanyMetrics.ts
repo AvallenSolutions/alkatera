@@ -386,7 +386,7 @@ export function useCompanyMetrics() {
       // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
       const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
 
-      // Check if there's ACTUAL non-zero GHG data (not just an empty object)
+      // Check if there's ACTUAL non-zero GHG BREAKDOWN data (require biogenic/fossil split)
       const hasGHGBreakdown = lcas.some(lca => {
         const ghg = lca.aggregated_impacts?.ghg_breakdown;
         if (!ghg) return false;
@@ -407,16 +407,30 @@ export function useCompanyMetrics() {
           }
         });
 
-        // Check if any gas inventory values are non-zero
-        const hasData = (ghg.gas_inventory?.methane || 0) > 0 ||
-                       (ghg.gas_inventory?.methane_fossil || 0) > 0 ||
-                       (ghg.gas_inventory?.methane_biogenic || 0) > 0 ||
-                       (ghg.gas_inventory?.nitrous_oxide || 0) > 0 ||
-                       (ghg.physical_mass?.ch4_fossil_kg || 0) > 0 ||
-                       (ghg.physical_mass?.ch4_biogenic_kg || 0) > 0 ||
-                       (ghg.physical_mass?.n2o_kg || 0) > 0;
+        // STRICT CHECK: Require breakdown data (biogenic/fossil), not just totals
+        // We need either:
+        // 1. CH4 breakdown: methane_fossil > 0 OR methane_biogenic > 0 (not just total methane)
+        // 2. N2O data: n2o_kg > 0 OR nitrous_oxide > 0
+        // 3. CO2e contributions: ch4_biogenic_kg > 0 OR ch4_fossil_kg > 0
 
-        console.log('🔬 Has non-zero data:', hasData);
+        const hasCH4Breakdown =
+          (ghg.gas_inventory?.methane_fossil || 0) > 0 ||
+          (ghg.gas_inventory?.methane_biogenic || 0) > 0 ||
+          (ghg.physical_mass?.ch4_fossil_kg || 0) > 0 ||
+          (ghg.physical_mass?.ch4_biogenic_kg || 0) > 0;
+
+        const hasN2OData =
+          (ghg.gas_inventory?.nitrous_oxide || 0) > 0 ||
+          (ghg.physical_mass?.n2o_kg || 0) > 0;
+
+        const hasData = hasCH4Breakdown || hasN2OData;
+
+        console.log('🔬 GHG breakdown validation:', {
+          hasCH4Breakdown,
+          hasN2OData,
+          hasValidBreakdownData: hasData
+        });
+
         return hasData;
       });
 
