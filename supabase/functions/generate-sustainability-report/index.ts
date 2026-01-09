@@ -80,22 +80,29 @@ Deno.serve(async (req: Request) => {
     const skyworkQuery = constructSkyworkQuery(reportConfig, aggregatedData);
 
     // 7. Call Skywork API
-    const skyworkApiKey = Deno.env.get('SKYWORK_API_KEY');
+    const skyworkSecretId = Deno.env.get('SKYWORK_SECRET_ID');
+    const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY');
     const skyworkUrl = Deno.env.get('SKYWORK_API_URL') || 'https://api.skywork.ai';
 
-    if (!skyworkApiKey) {
-      throw new Error('SKYWORK_API_KEY not configured');
+    if (!skyworkSecretId || !skyworkSecretKey) {
+      throw new Error('SKYWORK_SECRET_ID or SKYWORK_SECRET_KEY not configured');
     }
+
+    // Generate MD5 sign: md5(secretId:secretKey)
+    const encoder = new TextEncoder();
+    const data = encoder.encode(`${skyworkSecretId}:${skyworkSecretKey}`);
+    const hashBuffer = await crypto.subtle.digest('MD5', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const sign = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
     const tool = SKYWORK_TOOLS[reportConfig.output_format as keyof typeof SKYWORK_TOOLS] || 'gen_ppt';
 
     console.log(`Calling Skywork API with tool: ${tool}`);
 
-    const skyworkResponse = await fetch(`${skyworkUrl}/open/sse`, {
+    const skyworkResponse = await fetch(`${skyworkUrl}/open/sse?secret_id=${skyworkSecretId}&sign=${sign}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${skyworkApiKey}`,
       },
       body: JSON.stringify({
         tool,
