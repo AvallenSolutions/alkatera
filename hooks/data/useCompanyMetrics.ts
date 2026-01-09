@@ -390,6 +390,23 @@ export function useCompanyMetrics() {
       const hasGHGBreakdown = lcas.some(lca => {
         const ghg = lca.aggregated_impacts?.ghg_breakdown;
         if (!ghg) return false;
+
+        // Log the actual values we're checking
+        console.log('🔬 Examining GHG breakdown:', {
+          ghg_breakdown: ghg,
+          gas_inventory: ghg.gas_inventory,
+          physical_mass: ghg.physical_mass,
+          checks: {
+            methane: (ghg.gas_inventory?.methane || 0),
+            methane_fossil: (ghg.gas_inventory?.methane_fossil || 0),
+            methane_biogenic: (ghg.gas_inventory?.methane_biogenic || 0),
+            nitrous_oxide: (ghg.gas_inventory?.nitrous_oxide || 0),
+            ch4_fossil_kg: (ghg.physical_mass?.ch4_fossil_kg || 0),
+            ch4_biogenic_kg: (ghg.physical_mass?.ch4_biogenic_kg || 0),
+            n2o_kg: (ghg.physical_mass?.n2o_kg || 0)
+          }
+        });
+
         // Check if any gas inventory values are non-zero
         const hasData = (ghg.gas_inventory?.methane || 0) > 0 ||
                        (ghg.gas_inventory?.methane_fossil || 0) > 0 ||
@@ -398,14 +415,15 @@ export function useCompanyMetrics() {
                        (ghg.physical_mass?.ch4_fossil_kg || 0) > 0 ||
                        (ghg.physical_mass?.ch4_biogenic_kg || 0) > 0 ||
                        (ghg.physical_mass?.n2o_kg || 0) > 0;
+
+        console.log('🔬 Has non-zero data:', hasData);
         return hasData;
       });
 
       console.log('🔍 Checking fallback conditions:', {
         lcaCount: lcas.length,
         hasMaterialBreakdown,
-        hasGHGBreakdown,
-        sampleLCA: lcas[0]?.aggregated_impacts?.ghg_breakdown
+        hasGHGBreakdown
       });
 
       // Always fetch GHG data from database if not in aggregated_impacts
