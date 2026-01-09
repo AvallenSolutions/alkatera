@@ -6,7 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { CalendarIcon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CalendarIcon, TrendingUp, Info } from 'lucide-react';
 import { format } from 'date-fns';
 import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
 
@@ -77,28 +80,88 @@ export function BasicConfigForm({ config, onChange }: BasicConfigFormProps) {
         </p>
       </div>
 
+      {/* Multi-Year Toggle */}
+      <div className="flex items-center justify-between p-4 border rounded-lg bg-accent/20">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-primary" />
+            <Label htmlFor="multi-year" className="text-base font-semibold cursor-pointer">
+              Multi-Year Trend Analysis
+            </Label>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Compare data across multiple years to show progress and trends
+          </p>
+        </div>
+        <Switch
+          id="multi-year"
+          checked={config.isMultiYear || false}
+          onCheckedChange={(checked) => {
+            onChange({
+              isMultiYear: checked,
+              reportYears: checked ? [config.reportYear, config.reportYear - 1] : [config.reportYear],
+            });
+          }}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="report-year">Reporting Year</Label>
-          <Select
-            value={config.reportYear.toString()}
-            onValueChange={(value) => onChange({ reportYear: parseInt(value) })}
-          >
-            <SelectTrigger id="report-year">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+        {!config.isMultiYear ? (
+          <div className="space-y-2">
+            <Label htmlFor="report-year">Reporting Year</Label>
+            <Select
+              value={config.reportYear.toString()}
+              onValueChange={(value) => onChange({ reportYear: parseInt(value) })}
+            >
+              <SelectTrigger id="report-year">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 5 }, (_, i) => {
+                  const year = new Date().getFullYear() - i;
+                  return (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Label>Select Years for Comparison</Label>
+            <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
               {Array.from({ length: 5 }, (_, i) => {
                 const year = new Date().getFullYear() - i;
+                const isSelected = (config.reportYears || []).includes(year);
                 return (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
-                  </SelectItem>
+                  <div key={year} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`year-${year}`}
+                      checked={isSelected}
+                      onCheckedChange={(checked) => {
+                        const currentYears = config.reportYears || [];
+                        const newYears = checked
+                          ? [...currentYears, year].sort((a, b) => b - a)
+                          : currentYears.filter((y) => y !== year);
+                        onChange({ reportYears: newYears });
+                      }}
+                    />
+                    <label htmlFor={`year-${year}`} className="text-sm cursor-pointer">
+                      {year}
+                    </label>
+                  </div>
                 );
               })}
-            </SelectContent>
-          </Select>
-        </div>
+            </div>
+            {(config.reportYears || []).length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {config.reportYears?.length} year{config.reportYears && config.reportYears.length > 1 ? 's' : ''} selected
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="output-format">Output Format</Label>
@@ -117,6 +180,15 @@ export function BasicConfigForm({ config, onChange }: BasicConfigFormProps) {
           </Select>
         </div>
       </div>
+
+      {config.isMultiYear && (config.reportYears || []).length > 1 && (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            Multi-year reports will include comparative tables, trend charts, and year-over-year % changes.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">

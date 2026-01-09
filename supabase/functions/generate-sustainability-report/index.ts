@@ -68,12 +68,14 @@ Deno.serve(async (req: Request) => {
       .update({ status: 'generating' })
       .eq('id', report_config_id);
 
-    // 5. Aggregate data (simplified for initial implementation)
+    // 5. Aggregate data with multi-year support
     const aggregatedData = await aggregateReportData(
       supabaseClient,
       reportConfig.organization_id,
       reportConfig.report_year,
-      reportConfig.sections
+      reportConfig.sections,
+      reportConfig.is_multi_year,
+      reportConfig.report_years
     );
 
     // 6. Construct Skywork query
@@ -210,16 +212,19 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-// Data aggregation function (simplified version)
+// Data aggregation function with multi-year support
 async function aggregateReportData(
   supabaseClient: any,
   organizationId: string,
   reportYear: number,
-  sections: string[]
+  sections: string[],
+  isMultiYear?: boolean,
+  reportYears?: number[]
 ): Promise<any> {
   const data: any = {
     organization: {},
     emissions: {},
+    emissionsTrends: [],
     products: [],
   };
 
@@ -248,7 +253,37 @@ async function aggregateReportData(
         scope2: corporateReport.breakdown_json?.scope2 || 0,
         scope3: corporateReport.breakdown_json?.scope3 || 0,
         total: corporateReport.total_emissions || 0,
+        year: reportYear,
       };
+    }
+
+    // Fetch multi-year data if enabled
+    if (isMultiYear && reportYears && reportYears.length > 1) {
+      const { data: historicalReports } = await supabaseClient
+        .from('corporate_reports')
+        .select('year, total_emissions, breakdown_json')
+        .eq('organization_id', organizationId)
+        .in('year', reportYears)
+        .order('year', { ascending: true });
+
+      data.emissionsTrends = historicalReports?.map((r: any) => ({
+        year: r.year,
+        scope1: r.breakdown_json?.scope1 || 0,
+        scope2: r.breakdown_json?.scope2 || 0,
+        scope3: r.breakdown_json?.scope3 || 0,
+        total: r.total_emissions || 0,
+      })) || [];
+
+      // Calculate year-over-year changes
+      if (data.emissionsTrends.length > 1) {
+        for (let i = 1; i < data.emissionsTrends.length; i++) {
+          const current = data.emissionsTrends[i];
+          const previous = data.emissionsTrends[i - 1];
+          current.yoyChange = previous.total > 0
+            ? ((current.total - previous.total) / previous.total * 100).toFixed(2)
+            : 'N/A';
+        }
+      }
     }
   }
 
@@ -271,11 +306,30 @@ async function aggregateReportData(
   return data;
 }
 
-// Construct Skywork query
+// Construct Skywork query with multi-year support
 function constructSkyworkQuery(config: any, data: any): string {
   const formatName = config.output_format === 'pptx' ? 'PowerPoint presentation' :
                     config.output_format === 'docx' ? 'Word document' :
                     'Excel workbook';
+
+  const trendSection = data.emissionsTrends && data.emissionsTrends.length > 1 ? `
+---
+# MULTI-YEAR EMISSIONS TRENDS
+
+${data.emissionsTrends.map((trend: any) => `
+## Year ${trend.year}
+- **Total Emissions:** ${trend.total.toFixed(2)} tCO2e
+- **Scope 1:** ${trend.scope1.toFixed(2)} tCO2e
+- **Scope 2:** ${trend.scope2.toFixed(2)} tCO2e
+- **Scope 3:** ${trend.scope3.toFixed(2)} tCO2e
+${trend.yoyChange ? `- **Year-over-Year Change:** ${trend.yoyChange}%` : ''}
+`).join('\n')}
+
+**Key Insights:**
+- Analyze trends showing improvement or areas requiring attention
+- Highlight progress toward reduction targets
+- Show trajectory and momentum
+` : '';
 
   return `
 Generate a professional sustainability report ${formatName} for ${data.organization.name} for the year ${config.report_year}.
@@ -286,6 +340,7 @@ Generate a professional sustainability report ${formatName} for ${data.organizat
 3. Format the report for: ${config.audience}
 4. Ensure compliance with: ${config.standards.join(', ')}
 5. Use company branding: Primary Color: ${config.primary_color}, Secondary Color: ${config.secondary_color}
+${config.is_multi_year ? '6. Include multi-year trend analysis with year-over-year comparisons' : ''}
 
 ---
 # ORGANIZATION INFORMATION
@@ -293,9 +348,10 @@ Generate a professional sustainability report ${formatName} for ${data.organizat
 - **Company Name:** ${data.organization.name || 'N/A'}
 - **Industry:** ${data.organization.industry || 'N/A'}
 - **Reporting Period:** ${config.reporting_period_start} to ${config.reporting_period_end}
+${config.is_multi_year && config.report_years ? `- **Years Covered:** ${config.report_years.join(', ')}` : ''}
 
 ---
-# GREENHOUSE GAS EMISSIONS SUMMARY
+# GREENHOUSE GAS EMISSIONS SUMMARY (${config.report_year})
 
 ${data.emissions.total ? `
 ## Total Emissions: ${data.emissions.total.toFixed(2)} tCO2e
@@ -309,6 +365,8 @@ Indirect emissions from purchased energy.
 ### Scope 3 Emissions: ${data.emissions.scope3?.toFixed(2) || '0.00'} tCO2e
 All other indirect emissions in the value chain.
 ` : 'Emissions data not available for this period.'}
+
+${trendSection}
 
 ---
 # PRODUCT CARBON FOOTPRINTS
@@ -330,6 +388,7 @@ ${config.sections.map((s: string) => `- ${s}`).join('\n')}
 - Document Type: ${formatName}
 - Audience: ${config.audience}
 - Include professional charts and visualizations where appropriate
+${config.is_multi_year ? '- Include trend charts showing multi-year progress' : ''}
 - Use executive summary format
 - Apply company branding colors
 
