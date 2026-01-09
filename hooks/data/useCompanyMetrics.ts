@@ -385,7 +385,21 @@ export function useCompanyMetrics() {
 
       // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
       const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
-      const hasGHGBreakdown = lcas.some(lca => lca.aggregated_impacts?.ghg_breakdown);
+
+      // Check if there's ACTUAL non-zero GHG data (not just an empty object)
+      const hasGHGBreakdown = lcas.some(lca => {
+        const ghg = lca.aggregated_impacts?.ghg_breakdown;
+        if (!ghg) return false;
+        // Check if any gas inventory values are non-zero
+        const hasData = (ghg.gas_inventory?.methane || 0) > 0 ||
+                       (ghg.gas_inventory?.methane_fossil || 0) > 0 ||
+                       (ghg.gas_inventory?.methane_biogenic || 0) > 0 ||
+                       (ghg.gas_inventory?.nitrous_oxide || 0) > 0 ||
+                       (ghg.physical_mass?.ch4_fossil_kg || 0) > 0 ||
+                       (ghg.physical_mass?.ch4_biogenic_kg || 0) > 0 ||
+                       (ghg.physical_mass?.n2o_kg || 0) > 0;
+        return hasData;
+      });
 
       console.log('🔍 Checking fallback conditions:', {
         lcaCount: lcas.length,
