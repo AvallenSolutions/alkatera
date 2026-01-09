@@ -387,12 +387,23 @@ export function useCompanyMetrics() {
       const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
       const hasGHGBreakdown = lcas.some(lca => lca.aggregated_impacts?.ghg_breakdown);
 
+      console.log('🔍 Checking fallback conditions:', {
+        lcaCount: lcas.length,
+        hasMaterialBreakdown,
+        hasGHGBreakdown,
+        sampleLCA: lcas[0]?.aggregated_impacts?.ghg_breakdown
+      });
+
       // Always fetch GHG data from database if not in aggregated_impacts
       if (!hasMaterialBreakdown || !hasGHGBreakdown) {
+        console.log('✅ Calling fetchMaterialAndGHGBreakdown');
         try {
           await fetchMaterialAndGHGBreakdown();
         } catch (err) {
+          console.error('❌ Error in fetchMaterialAndGHGBreakdown:', err);
         }
+      } else {
+        console.log('⛔ Skipping fetchMaterialAndGHGBreakdown - using aggregated_impacts data');
       }
 
       // Fetch facility emissions breakdown - FALLBACK
@@ -598,6 +609,8 @@ export function useCompanyMetrics() {
       setGhgBreakdown(ghgTotal);
     } else {
       console.log('⚠️ No GHG data in aggregated_impacts, will fetch from database');
+      // IMPORTANT: Don't set ghgTotal with zeros! This will overwrite real data from fetchMaterialAndGHGBreakdown
+      // setGhgBreakdown(ghgTotal); // DO NOT SET ZEROS
     }
   }
 
