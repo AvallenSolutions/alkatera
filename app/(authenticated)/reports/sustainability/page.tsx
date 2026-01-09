@@ -17,10 +17,12 @@ export default function SustainabilityReportsPage() {
             Corporate carbon footprint reports and compliance documentation
           </p>
         </div>
-        <Button className="gap-2">
-          <TrendingUp className="h-4 w-4" />
-          Generate New Report
-        </Button>
+        <Link href="/reports/builder">
+          <Button className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Generate New Report
+          </Button>
+        </Link>
       </div>
 
       <div className="grid gap-6">
