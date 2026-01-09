@@ -921,8 +921,14 @@ export function useCompanyMetrics() {
           ch4FossilKg,
           ch4BiogenicKg,
           n2oKg,
+          ch4FossilCO2e,
+          ch4BiogenicCO2e,
+          n2oCO2e,
           materialCount: materials.length,
           hasActualGhgData,
+          fossilCO2,
+          biogenicCO2,
+          totalClimate,
           ghgData
         });
 

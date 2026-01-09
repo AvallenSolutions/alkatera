@@ -11,7 +11,3 @@ export function getConfidenceLevel(confidence: number | null): ConfidenceLevel {
   if (confidence > 0) return { level: 'low', label: 'Low Confidence', color: 'text-red-600' };
   return { level: 'none', label: 'No Match', color: 'text-gray-500' };
 }
-
-export function matchMaterial(rawName: string): { id: string | null; confidence: number } {
-  return { id: null, confidence: 0 };
-}
