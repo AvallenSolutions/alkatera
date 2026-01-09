@@ -128,6 +128,9 @@ export default function ReportBuilderPage() {
     }
   };
 
+  // Extract reportId to avoid TypeScript narrowing issues
+  const reportId = generatedReport?.id;
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-6xl">
       <div className="mb-8">
@@ -237,7 +240,7 @@ export default function ReportBuilderPage() {
 
               <TabsContent value="versions" className="space-y-4 mt-6">
                 <ReportVersioning
-                  reportId={generatedReport?.id}
+                  reportId={reportId}
                   currentConfig={config}
                   onRestore={handleUpdateConfig}
                 />
