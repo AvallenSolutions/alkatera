@@ -168,8 +168,9 @@ Deno.serve(async (req: Request) => {
     const tool = SKYWORK_TOOLS[reportConfig.output_format as keyof typeof SKYWORK_TOOLS] || 'gen_ppt';
 
     console.log('🔵 [Skywork] Calling API with tool:', tool);
-    console.log('🔵 [Skywork] API URL:', skyworkApiUrl);
+    console.log('🔵 [Skywork] Full API URL:', skyworkApiUrl);
     console.log('🔵 [Skywork] Using Bearer token authentication');
+    console.log('🔵 [Skywork] API Key (first 10 chars):', skyworkApiKey.substring(0, 10) + '...');
 
     let skyworkResponse;
     try {
@@ -183,6 +184,7 @@ Deno.serve(async (req: Request) => {
       console.log('  Tool:', tool);
       console.log('  Query length:', skyworkQuery.length);
       console.log('  use_network:', false);
+      console.log('  Payload:', JSON.stringify(payload).substring(0, 300) + '...');
 
       skyworkResponse = await fetch(skyworkApiUrl, {
         method: 'POST',
@@ -210,11 +212,14 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('✅ [Skywork] API call successful, parsing SSE response...');
+    console.log('🔵 [Skywork] Content-Type:', skyworkResponse.headers.get('content-type'));
 
     // 8. Parse SSE response for download URL
     const reader = skyworkResponse.body?.getReader();
     const decoder = new TextDecoder();
     let documentUrl = '';
+    let skyworkError: any = null;
+    let allChunks = '';
 
     if (reader) {
       while (true) {
@@ -222,6 +227,8 @@ Deno.serve(async (req: Request) => {
         if (done) break;
 
         const chunk = decoder.decode(value);
+        allChunks += chunk;
+        console.log('🔵 [Skywork] Raw chunk:', chunk.substring(0, 200)); // Log first 200 chars
         const lines = chunk.split('\n');
 
         for (const line of lines) {
@@ -229,9 +236,22 @@ Deno.serve(async (req: Request) => {
             try {
               const data = JSON.parse(line.slice(6));
               console.log('🔵 [Skywork] SSE data:', data);
+
+              // Check for error in SSE stream
+              if (data.error || data.code >= 400) {
+                skyworkError = data;
+                console.error('❌ [Skywork] Error in SSE stream:', data);
+              }
+
+              // Check for download URL
               if (data.download_url) {
                 documentUrl = data.download_url;
-                console.log('✅ [Skywork] Download URL received');
+                console.log('✅ [Skywork] Download URL received:', documentUrl);
+              }
+
+              // Check for status updates
+              if (data.status) {
+                console.log('🔵 [Skywork] Status update:', data.status);
               }
             } catch (e) {
               // Ignore parse errors
@@ -242,10 +262,41 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    // If no SSE data was parsed, try parsing as regular JSON
+    if (!documentUrl && !skyworkError && allChunks) {
+      console.log('🔵 [Skywork] No SSE data found, trying to parse as JSON...');
+      try {
+        const jsonResponse = JSON.parse(allChunks);
+        console.log('🔵 [Skywork] JSON response:', jsonResponse);
+
+        if (jsonResponse.error || jsonResponse.code >= 400) {
+          skyworkError = jsonResponse;
+        } else if (jsonResponse.download_url) {
+          documentUrl = jsonResponse.download_url;
+          console.log('✅ [Skywork] Download URL from JSON:', documentUrl);
+        } else if (jsonResponse.url) {
+          documentUrl = jsonResponse.url;
+          console.log('✅ [Skywork] URL from JSON:', documentUrl);
+        }
+      } catch (e) {
+        console.error('❌ [Skywork] Failed to parse as JSON:', e.message);
+        console.log('🔵 [Skywork] Full response:', allChunks.substring(0, 500));
+      }
+    }
+
+    // Check if we got an error in the SSE stream
+    if (skyworkError) {
+      console.error('❌ [Skywork] Generation failed:', skyworkError);
+      throw new Error(`Skywork API error: ${skyworkError.code || 'Unknown'} ${skyworkError.message || skyworkError.error || 'Generation failed'}`);
+    }
+
     if (!documentUrl) {
       console.error('❌ [Skywork] No download URL received');
+      console.log('🔵 [Skywork] Full response data:', allChunks.substring(0, 1000));
       throw new Error('No download URL received from Skywork');
     }
+
+    console.log('✅ [Skywork] Final document URL:', documentUrl);
 
     // 9. Update report with success
     await supabaseClient
