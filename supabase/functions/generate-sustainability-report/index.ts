@@ -125,12 +125,16 @@ Deno.serve(async (req: Request) => {
     console.log('✅ [Skywork] Query constructed:', skyworkQuery.length, 'characters');
 
     // 7. Call Skywork API
-    const skyworkSecretId = Deno.env.get('SKYWORK_SECRET_ID');
-    const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY');
-    const skyworkUrl = Deno.env.get('SKYWORK_API_URL') || 'https://api.skywork.ai';
+    const skyworkApiKey = Deno.env.get('SKYWORK_API_KEY');
+    const skyworkApiUrl = Deno.env.get('SKYWORK_API_URL');
 
-    if (!skyworkSecretId || !skyworkSecretKey) {
+    if (!skyworkApiKey || !skyworkApiUrl) {
       console.error('❌ [Skywork] API credentials not configured');
+      console.error('  Expected: SKYWORK_API_KEY and SKYWORK_API_URL');
+      console.error('  Found:', {
+        hasApiKey: !!skyworkApiKey,
+        hasApiUrl: !!skyworkApiUrl,
+      });
 
       // For now, return mock data for testing without Skywork
       const mockDocumentUrl = 'https://example.com/mock-report.pptx';
@@ -163,33 +167,33 @@ Deno.serve(async (req: Request) => {
 
     const tool = SKYWORK_TOOLS[reportConfig.output_format as keyof typeof SKYWORK_TOOLS] || 'gen_ppt';
 
-    console.log('🔵 [Skywork] Generating authentication signature...');
-
-    // Generate MD5 sign: md5(secretId:secretKey)
-    // Note: crypto.subtle.digest doesn't support MD5, so we'll use a different approach
-    const encoder = new TextEncoder();
-    const authString = `${skyworkSecretId}:${skyworkSecretKey}`;
-
-    // For now, use a simple hash as MD5 is not available in edge runtime
-    // In production, you'd need to use a proper MD5 library
-    const sign = btoa(authString); // Simple encoding for now
-
     console.log('🔵 [Skywork] Calling API with tool:', tool);
-    console.log('🔵 [Skywork] API URL:', skyworkUrl);
+    console.log('🔵 [Skywork] API URL:', skyworkApiUrl);
+    console.log('🔵 [Skywork] Using Bearer token authentication');
 
     let skyworkResponse;
     try {
-      skyworkResponse = await fetch(`${skyworkUrl}/open/sse?secret_id=${skyworkSecretId}&sign=${sign}`, {
+      console.log('🔵 [Skywork] Sending request payload...');
+      const payload = {
+        tool,
+        query: skyworkQuery,
+        use_network: false, // CRITICAL: Prevent hallucination
+      };
+
+      console.log('  Tool:', tool);
+      console.log('  Query length:', skyworkQuery.length);
+      console.log('  use_network:', false);
+
+      skyworkResponse = await fetch(skyworkApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${skyworkApiKey}`,
         },
-        body: JSON.stringify({
-          tool,
-          query: skyworkQuery,
-          use_network: false, // CRITICAL: Prevent hallucination
-        }),
+        body: JSON.stringify(payload),
       });
+
+      console.log('✅ [Skywork] Response status:', skyworkResponse.status);
     } catch (fetchError) {
       console.error('❌ [Skywork] Network error:', fetchError);
       throw new Error(`Failed to connect to Skywork API: ${fetchError.message}`);
