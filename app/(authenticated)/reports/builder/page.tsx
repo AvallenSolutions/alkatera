@@ -11,6 +11,11 @@ import { DataSelectionPanel } from '@/components/report-builder/DataSelectionPan
 import { StandardsSelector } from '@/components/report-builder/StandardsSelector';
 import { BrandingPanel } from '@/components/report-builder/BrandingPanel';
 import { ReportPreview } from '@/components/report-builder/ReportPreview';
+import { DataPreviewPanel } from '@/components/report-builder/DataPreviewPanel';
+import { SectionRecommendations } from '@/components/report-builder/SectionRecommendations';
+import { TemplateLibrary } from '@/components/report-builder/TemplateLibrary';
+import { DataGapAlerts } from '@/components/report-builder/DataGapAlerts';
+import { ReportVersioning } from '@/components/report-builder/ReportVersioning';
 import { useReportBuilder } from '@/hooks/useReportBuilder';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,6 +33,8 @@ export interface ReportConfig {
     primaryColor: string;
     secondaryColor: string;
   };
+  isMultiYear?: boolean;
+  reportYears?: number[];
 }
 
 export default function ReportBuilderPage() {
@@ -48,6 +55,8 @@ export default function ReportBuilderPage() {
       primaryColor: '#2563eb',
       secondaryColor: '#10b981',
     },
+    isMultiYear: false,
+    reportYears: [currentYear],
   });
 
   const [activeTab, setActiveTab] = useState('basics');
@@ -177,20 +186,37 @@ export default function ReportBuilderPage() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10 gap-1">
                 <TabsTrigger value="basics">Basics</TabsTrigger>
+                <TabsTrigger value="templates">Templates</TabsTrigger>
+                <TabsTrigger value="recommendations">AI Recommendations</TabsTrigger>
                 <TabsTrigger value="data">Data Selection</TabsTrigger>
+                <TabsTrigger value="data-preview">Data Preview</TabsTrigger>
                 <TabsTrigger value="standards">Standards</TabsTrigger>
                 <TabsTrigger value="branding">Branding</TabsTrigger>
+                <TabsTrigger value="gaps">Data Gaps</TabsTrigger>
                 <TabsTrigger value="preview">Preview</TabsTrigger>
+                <TabsTrigger value="versions">Versions</TabsTrigger>
               </TabsList>
 
               <TabsContent value="basics" className="space-y-4 mt-6">
                 <BasicConfigForm config={config} onChange={handleUpdateConfig} />
               </TabsContent>
 
+              <TabsContent value="templates" className="space-y-4 mt-6">
+                <TemplateLibrary config={config} onChange={handleUpdateConfig} />
+              </TabsContent>
+
+              <TabsContent value="recommendations" className="space-y-4 mt-6">
+                <SectionRecommendations config={config} onChange={handleUpdateConfig} />
+              </TabsContent>
+
               <TabsContent value="data" className="space-y-4 mt-6">
                 <DataSelectionPanel config={config} onChange={handleUpdateConfig} />
+              </TabsContent>
+
+              <TabsContent value="data-preview" className="space-y-4 mt-6">
+                <DataPreviewPanel config={config} />
               </TabsContent>
 
               <TabsContent value="standards" className="space-y-4 mt-6">
@@ -201,8 +227,20 @@ export default function ReportBuilderPage() {
                 <BrandingPanel config={config} onChange={handleUpdateConfig} />
               </TabsContent>
 
+              <TabsContent value="gaps" className="space-y-4 mt-6">
+                <DataGapAlerts config={config} />
+              </TabsContent>
+
               <TabsContent value="preview" className="space-y-4 mt-6">
                 <ReportPreview config={config} />
+              </TabsContent>
+
+              <TabsContent value="versions" className="space-y-4 mt-6">
+                <ReportVersioning
+                  reportId={generatedReport?.id}
+                  currentConfig={config}
+                  onRestore={handleUpdateConfig}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
