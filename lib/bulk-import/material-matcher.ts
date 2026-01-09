@@ -1,9 +1,18 @@
-export function getConfidenceLevel(confidence: number): { level: 'high' | 'medium' | 'low'; label: string } {
-  if (confidence >= 0.8) {
-    return { level: 'high', label: 'high' };
-  } else if (confidence >= 0.5) {
-    return { level: 'medium', label: 'medium' };
-  } else {
-    return { level: 'low', label: 'low' };
+export function getConfidenceLevel(confidence: number | null): {
+  label: string;
+  color: string;
+} {
+  if (confidence === null) {
+    return { label: 'No Match', color: 'gray' };
   }
+
+  if (confidence >= 0.9) {
+    return { label: 'High', color: 'green' };
+  }
+
+  if (confidence >= 0.7) {
+    return { label: 'Medium', color: 'yellow' };
+  }
+
+  return { label: 'Low', color: 'red' };
 }

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts';
 
 // CORS headers for cross-origin requests
 const corsHeaders = {
@@ -13,6 +14,15 @@ const SKYWORK_TOOLS = {
   docx: 'gen_doc',
   xlsx: 'gen_excel',
 };
+
+// MD5 hash function for Skywork authentication
+async function md5(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('MD5', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -124,16 +134,16 @@ Deno.serve(async (req: Request) => {
     const skyworkQuery = constructSkyworkQuery(reportConfig, aggregatedData);
     console.log('✅ [Skywork] Query constructed:', skyworkQuery.length, 'characters');
 
-    // 7. Call Skywork API
-    const skyworkApiKey = Deno.env.get('SKYWORK_API_KEY');
-    const skyworkApiUrl = Deno.env.get('SKYWORK_API_URL');
+    // 7. Call Skywork API with MD5 signature authentication
+    const skyworkSecretId = Deno.env.get('SKYWORK_SECRET_ID');
+    const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY');
 
-    if (!skyworkApiKey || !skyworkApiUrl) {
+    if (!skyworkSecretId || !skyworkSecretKey) {
       console.error('❌ [Skywork] API credentials not configured');
-      console.error('  Expected: SKYWORK_API_KEY and SKYWORK_API_URL');
+      console.error('  Expected: SKYWORK_SECRET_ID and SKYWORK_SECRET_KEY');
       console.error('  Found:', {
-        hasApiKey: !!skyworkApiKey,
-        hasApiUrl: !!skyworkApiUrl,
+        hasSecretId: !!skyworkSecretId,
+        hasSecretKey: !!skyworkSecretKey,
       });
 
       // For now, return mock data for testing without Skywork
@@ -165,32 +175,38 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Generate MD5 signature: md5(secret_id:secret_key)
+    const signatureInput = `${skyworkSecretId}:${skyworkSecretKey}`;
+    const sign = await md5(signatureInput);
+
     const tool = SKYWORK_TOOLS[reportConfig.output_format as keyof typeof SKYWORK_TOOLS] || 'gen_ppt';
 
     console.log('🔵 [Skywork] Calling API with tool:', tool);
-    console.log('🔵 [Skywork] Full API URL:', skyworkApiUrl);
-    console.log('🔵 [Skywork] Using Bearer token authentication');
-    console.log('🔵 [Skywork] API Key (first 10 chars):', skyworkApiKey.substring(0, 10) + '...');
+    console.log('🔵 [Skywork] Using MD5 signature authentication');
+    console.log('🔵 [Skywork] Secret ID:', skyworkSecretId.substring(0, 8) + '...');
+    console.log('🔵 [Skywork] Signature:', sign.substring(0, 16) + '...');
+
+    // Construct SSE endpoint URL with authentication
+    const skyworkApiUrl = `https://api.skywork.ai/open/sse?secret_id=${skyworkSecretId}&sign=${sign}`;
 
     let skyworkResponse;
     try {
-      console.log('🔵 [Skywork] Sending request payload...');
+      console.log('🔵 [Skywork] Sending SSE request...');
+      console.log('  Tool:', tool);
+      console.log('  Query length:', skyworkQuery.length);
+      console.log('  Query preview:', skyworkQuery.substring(0, 200) + '...');
+
+      // For Skywork SSE API, we need to send the query as a POST with the tool and query
       const payload = {
         tool,
         query: skyworkQuery,
         use_network: false, // CRITICAL: Prevent hallucination
       };
 
-      console.log('  Tool:', tool);
-      console.log('  Query length:', skyworkQuery.length);
-      console.log('  use_network:', false);
-      console.log('  Payload:', JSON.stringify(payload).substring(0, 300) + '...');
-
       skyworkResponse = await fetch(skyworkApiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${skyworkApiKey}`,
         },
         body: JSON.stringify(payload),
       });

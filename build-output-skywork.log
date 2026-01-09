@@ -1,0 +1,153 @@
+
+> nextjs@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.5
+  - Environments: .env
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Skipping linting
+   Checking validity of types ...
+   Collecting page data ...
+Warning: Please use the `legacy` build in Node.js environments.
+   Generating static pages (0/81) ...
+✅ Supabase browser client initialising: {
+  url: 'https://dfcezkyaejrxmbwunhry.supabase.co',
+  hasAnonKey: true,
+  inIframe: false,
+  storage: 'cookies'
+}
+✅ Supabase browser client initialising: {
+  url: 'https://dfcezkyaejrxmbwunhry.supabase.co',
+  hasAnonKey: true,
+  inIframe: false,
+  storage: 'cookies'
+}
+✅ Supabase browser client initialising: {
+  url: 'https://dfcezkyaejrxmbwunhry.supabase.co',
+  hasAnonKey: true,
+  inIframe: false,
+  storage: 'cookies'
+}
+   Generating static pages (20/81) 
+   Generating static pages (40/81) 
+   Generating static pages (60/81) 
+ ✓ Generating static pages (81/81)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                  Size     First Load JS
+┌ ○ /                                        12 kB           150 kB
+├ ○ /_not-found                              879 B          88.2 kB
+├ ƒ /admin/allocation-review                 7.23 kB         209 kB
+├ ƒ /admin/approvals                         6.83 kB         191 kB
+├ ƒ /admin/blog                              7.1 kB          175 kB
+├ ƒ /admin/blog/[id]                         2.8 kB          334 kB
+├ ƒ /admin/blog/new                          3.42 kB         334 kB
+├ ƒ /admin/platform                          6.74 kB         168 kB
+├ ƒ /admin/supplier-verification             7.08 kB         179 kB
+├ ƒ /api/blog                                0 B                0 B
+├ ƒ /api/blog/[id]                           0 B                0 B
+├ ƒ /api/blog/notify                         0 B                0 B
+├ ƒ /api/blog/reorder                        0 B                0 B
+├ ƒ /api/blog/upload-video                   0 B                0 B
+├ ƒ /api/bom/parse                           0 B                0 B
+├ ƒ /api/contact                             0 B                0 B
+├ ƒ /api/ingredients/search                  0 B                0 B
+├ ƒ /api/places/autocomplete                 0 B                0 B
+├ ƒ /api/places/details                      0 B                0 B
+├ ƒ /api/stripe/create-checkout-session      0 B                0 B
+├ ƒ /api/stripe/webhooks                     0 B                0 B
+├ ƒ /api/supplier-products/search            0 B                0 B
+├ ○ /blog                                    6.08 kB         141 kB
+├ ƒ /blog/[slug]                             5.9 kB          141 kB
+├ ƒ /company/facilities                      2.12 kB         215 kB
+├ ƒ /company/facilities/[id]                 22.8 kB         219 kB
+├ ƒ /company/fleet                           15.4 kB         324 kB
+├ ƒ /company/overview                        9.4 kB          181 kB
+├ ○ /contact                                 5.26 kB         134 kB
+├ ○ /create-organization                     7.82 kB         161 kB
+├ ƒ /dashboard                               17.8 kB         215 kB
+├ ƒ /dashboard/data-hub/scope-1              3.88 kB         105 kB
+├ ƒ /dashboard/data-hub/scope-2              4 kB            105 kB
+├ ƒ /dashboard/data-hub/scope-3              4.73 kB         106 kB
+├ ƒ /dashboard/products                      4.88 kB         208 kB
+├ ● /dashboard/products/[id]/edit            3.9 kB          201 kB
+├ ƒ /dashboard/products/create               8.73 kB         197 kB
+├ ƒ /dashboard/reports/product-lca           11.4 kB         192 kB
+├ ƒ /dashboard/settings/profile              7.3 kB          161 kB
+├ ƒ /dashboard/settings/team                 10.7 kB         198 kB
+├ ƒ /data/ingest                             4.33 kB         214 kB
+├ ƒ /data/quality                            14.8 kB         179 kB
+├ ƒ /data/scope-1-2                          153 kB          404 kB
+├ ○ /debug-auth                              6.17 kB         160 kB
+├ ƒ /dev/calculation-verifier                17.4 kB         175 kB
+├ ƒ /dev/docs/fleet-implementation           4.5 kB         98.6 kB
+├ ƒ /dev/docs/iso-14044-compliance           13.1 kB         107 kB
+├ ƒ /dev/docs/iso-compliance-tests           8.07 kB         102 kB
+├ ƒ /dev/docs/lca-calculation-testing        5.86 kB         100 kB
+├ ƒ /dev/docs/lca-testing-summary            6.53 kB         101 kB
+├ ƒ /dev/docs/reporting-standards            14.2 kB         112 kB
+├ ƒ /dev/docs/technical-debt                 2.33 kB        96.5 kB
+├ ƒ /dev/docs/ui-documentation               5.12 kB        99.2 kB
+├ ƒ /dev/docs/verification-tests             4.32 kB        98.5 kB
+├ ƒ /dev/test-harness                        4.86 kB         158 kB
+├ ƒ /dev/tier-management                     8.4 kB          166 kB
+├ ○ /impact                                  7.06 kB         145 kB
+├ ○ /knowledge                               5.72 kB         141 kB
+├ ƒ /knowledge-bank                          5.97 kB         213 kB
+├ ƒ /knowledge-bank/categories/[categoryId]  2.88 kB         180 kB
+├ ƒ /knowledge-bank/items/[itemId]           7.27 kB         180 kB
+├ ƒ /knowledge-bank/new                      8.69 kB         203 kB
+├ ƒ /lca-report/[id]                         813 B           269 kB
+├ ○ /login                                   150 B           167 kB
+├ ○ /manifesto                               7.6 kB          146 kB
+├ ƒ /operations                              1.79 kB         215 kB
+├ ƒ /passport/[token]                        11.5 kB         313 kB
+├ ○ /passport/methodology/blossom            147 B           134 kB
+├ ○ /passport/methodology/canopy             148 B           134 kB
+├ ○ /password-reset                          5.16 kB         166 kB
+├ ƒ /performance                             32.7 kB         248 kB
+├ ○ /platform                                8.02 kB         146 kB
+├ ƒ /production                              9.07 kB         232 kB
+├ ƒ /products                                4.92 kB         208 kB
+├ ƒ /products/[id]                           85 kB           313 kB
+├ ƒ /products/[id]/calculate-lca             12.3 kB         170 kB
+├ ƒ /products/[id]/core-operations           9.96 kB         198 kB
+├ ƒ /products/[id]/distribution              1.02 kB        98.5 kB
+├ ƒ /products/[id]/end-of-life               1.01 kB        98.5 kB
+├ ƒ /products/[id]/lca-pdf                   842 B           269 kB
+├ ƒ /products/[id]/materials                 6.95 kB         198 kB
+├ ƒ /products/[id]/recipe                    24.7 kB         241 kB
+├ ƒ /products/[id]/report                    20.4 kB         202 kB
+├ ƒ /products/detail                         6.49 kB         167 kB
+├ ƒ /products/import                         11.5 kB         185 kB
+├ ƒ /products/new                            13.5 kB         221 kB
+├ ƒ /reporting/calculations                  8.09 kB         166 kB
+├ ƒ /reports                                 6.16 kB         111 kB
+├ ƒ /reports/builder                         24.9 kB         248 kB
+├ ƒ /reports/company-footprint               7.76 kB         166 kB
+├ ƒ /reports/company-footprint/[year]        10.7 kB         246 kB
+├ ƒ /reports/lcas                            5.93 kB         170 kB
+├ ƒ /reports/sustainability                  4.59 kB         106 kB
+├ ƒ /settings                                17 kB           203 kB
+├ ƒ /settings/billing                        46.7 kB         209 kB
+├ ○ /signup                                  152 B           167 kB
+├ ○ /supplier-onboarding                     6.59 kB         167 kB
+├ ƒ /suppliers                               6.55 kB         213 kB
+├ ƒ /suppliers/[id]                          16.4 kB         236 kB
+├ ƒ /suppliers/new                           5.51 kB         205 kB
+└ ○ /update-password                         5.37 kB         159 kB
++ First Load JS shared by all                87.4 kB
+  ├ chunks/7023-c6134fe60c099285.js          31.7 kB
+  ├ chunks/fd9d1056-c61bfde645e3cbc7.js      53.6 kB
+  └ other shared chunks (total)              2.03 kB
+
+
+ƒ Middleware                                 78.5 kB
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses getStaticProps)
+ƒ  (Dynamic)  server-rendered on demand
+
