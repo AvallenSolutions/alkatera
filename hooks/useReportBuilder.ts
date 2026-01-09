@@ -34,6 +34,13 @@ export function useReportBuilder() {
       const organizationId = currentOrganization.id;
 
       // 2. Create report record in database
+      console.log('🔵 Creating report record with:', {
+        organization_id: organizationId,
+        created_by: user.id,
+        report_name: config.reportName,
+        report_year: config.reportYear,
+      });
+
       const { data: reportRecord, error: insertError } = await supabase
         .from('generated_reports')
         .insert({
@@ -51,15 +58,29 @@ export function useReportBuilder() {
           logo_url: config.branding.logo,
           primary_color: config.branding.primaryColor,
           secondary_color: config.branding.secondaryColor,
+          is_multi_year: config.isMultiYear || false,
+          report_years: config.reportYears || [config.reportYear],
           status: 'pending',
         })
         .select()
         .single();
 
-      if (insertError || !reportRecord) {
-        console.error('Insert error:', insertError);
-        throw new Error('Failed to create report record');
+      if (insertError) {
+        console.error('❌ Insert error details:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code,
+        });
+        throw new Error(`Failed to create report record: ${insertError.message}`);
       }
+
+      if (!reportRecord) {
+        console.error('❌ No report record returned after insert');
+        throw new Error('Failed to create report record: No data returned');
+      }
+
+      console.log('✅ Report record created:', reportRecord.id);
 
       // 3. Call edge function to generate report
       const { data: result, error: functionError } = await supabase.functions.invoke(
