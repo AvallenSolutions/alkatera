@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { useOrganization } from '@/lib/organizationContext';
 import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
 
 interface GenerateReportResponse {
@@ -12,6 +13,7 @@ interface GenerateReportResponse {
 export function useReportBuilder() {
   const [loading, setLoading] = useState(false);
   const supabase = getSupabaseBrowserClient();
+  const { currentOrganization } = useOrganization();
 
   const generateReport = async (config: ReportConfig): Promise<GenerateReportResponse> => {
     setLoading(true);
@@ -24,21 +26,18 @@ export function useReportBuilder() {
         throw new Error('User not authenticated');
       }
 
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('active_organization_id')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profile?.active_organization_id) {
+      // Use organization from context instead of querying profiles
+      if (!currentOrganization) {
         throw new Error('No active organization found');
       }
+
+      const organizationId = currentOrganization.id;
 
       // 2. Create report record in database
       const { data: reportRecord, error: insertError } = await supabase
         .from('generated_reports')
         .insert({
-          organization_id: profile.active_organization_id,
+          organization_id: organizationId,
           created_by: user.id,
           report_name: config.reportName,
           report_year: config.reportYear,

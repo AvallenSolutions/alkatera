@@ -50,7 +50,7 @@ interface ReportVersion {
   created_by: string;
   profiles: {
     full_name: string;
-  };
+  } | null;
 }
 
 export function ReportVersioning({ reportId, currentConfig, onRestore }: ReportVersioningProps) {
@@ -86,14 +86,20 @@ export function ReportVersioning({ reportId, currentConfig, onRestore }: ReportV
           document_url,
           created_at,
           created_by,
-          profiles (
+          profiles!created_by (
             full_name
           )
         `)
         .or(`id.eq.${reportId},parent_report_id.eq.${reportId}`)
         .order('version', { ascending: false });
 
-      setVersions(versionsData || []);
+      // Transform the data to handle profiles as a single object instead of array
+      const transformedVersions = (versionsData || []).map((v: any) => ({
+        ...v,
+        profiles: Array.isArray(v.profiles) ? v.profiles[0] : v.profiles,
+      }));
+
+      setVersions(transformedVersions);
     } catch (error) {
       console.error('Error loading version history:', error);
     } finally {
