@@ -594,7 +594,10 @@ export function useCompanyMetrics() {
 
     // Set GHG breakdown
     if (hasGhgData) {
+      console.log('🔄 Setting GHG from aggregated_impacts:', ghgTotal);
       setGhgBreakdown(ghgTotal);
+    } else {
+      console.log('⚠️ No GHG data in aggregated_impacts, will fetch from database');
     }
   }
 
@@ -900,6 +903,15 @@ export function useCompanyMetrics() {
           },
           data_quality: hasActualGhgData ? dataQuality : 'tertiary',
         };
+
+        console.log('🔍 GHG Breakdown Calculated:', {
+          ch4FossilKg,
+          ch4BiogenicKg,
+          n2oKg,
+          materialCount: materials.length,
+          hasActualGhgData,
+          ghgData
+        });
 
         setGhgBreakdown(ghgData);
       }
