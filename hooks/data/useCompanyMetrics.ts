@@ -85,6 +85,10 @@ export interface FacilityWaterRisk {
   risk_level: 'high' | 'medium' | 'low';
   latitude?: number;
   longitude?: number;
+  total_water_consumption_m3: number;
+  scarcity_weighted_consumption_m3: number;
+  production_volume: number;
+  products_linked: string[];
 }
 
 export interface MaterialFlow {
@@ -687,11 +691,56 @@ export function useCompanyMetrics() {
 
       if (error) throw error;
 
-      // Calculate water scarcity risk per facility based on location
+      const { data: productionSites } = await supabase
+        .from('product_lca_production_sites')
+        .select(`
+          facility_id,
+          production_volume,
+          share_of_production,
+          product_lcas!inner(
+            id,
+            product_name,
+            aggregated_impacts,
+            status,
+            organization_id
+          )
+        `)
+        .eq('product_lcas.organization_id', currentOrganization.id)
+        .eq('product_lcas.status', 'completed');
+
+      const facilityWaterMap = new Map<string, {
+        totalWater: number;
+        totalProduction: number;
+        products: string[];
+      }>();
+
+      productionSites?.forEach((site: any) => {
+        const facilityId = site.facility_id;
+        if (!facilityId) return;
+
+        const waterPerUnit = Number(site.product_lcas?.aggregated_impacts?.water_consumption || 0);
+        const prodVolume = Number(site.production_volume || 0);
+        const sharePercent = Number(site.share_of_production || 100) / 100;
+        const productName = site.product_lcas?.product_name || 'Unknown';
+
+        const waterForFacility = waterPerUnit * prodVolume * sharePercent;
+
+        if (!facilityWaterMap.has(facilityId)) {
+          facilityWaterMap.set(facilityId, { totalWater: 0, totalProduction: 0, products: [] });
+        }
+
+        const current = facilityWaterMap.get(facilityId)!;
+        current.totalWater += waterForFacility;
+        current.totalProduction += prodVolume * sharePercent;
+        if (!current.products.includes(productName)) {
+          current.products.push(productName);
+        }
+      });
+
       const AWARE_THRESHOLDS = { high: 40, medium: 20 };
       const AWARE_FACTORS: Record<string, number> = {
         ES: 54.8, PT: 42.1, IT: 38.5, GR: 35.2, SA: 95.7, AE: 89.4,
-        GB: 8.2, IE: 5.3, NO: 3.1, SE: 4.2, FI: 3.8,
+        GB: 8.2, IE: 5.3, NO: 3.1, SE: 4.2, FI: 3.8, FR: 20.5, NZ: 12.3,
         GLOBAL: 20.5,
       };
 
@@ -703,6 +752,10 @@ export function useCompanyMetrics() {
         if (awareFactor > AWARE_THRESHOLDS.high) riskLevel = 'high';
         else if (awareFactor > AWARE_THRESHOLDS.medium) riskLevel = 'medium';
 
+        const waterData = facilityWaterMap.get(facility.id);
+        const totalWater = waterData?.totalWater || 0;
+        const scarcityWeighted = totalWater * awareFactor;
+
         return {
           facility_id: facility.id,
           facility_name: facility.name || 'Unknown Facility',
@@ -711,6 +764,10 @@ export function useCompanyMetrics() {
           risk_level: riskLevel,
           latitude: facility.address_lat ? parseFloat(facility.address_lat) : undefined,
           longitude: facility.address_lng ? parseFloat(facility.address_lng) : undefined,
+          total_water_consumption_m3: totalWater,
+          scarcity_weighted_consumption_m3: scarcityWeighted,
+          production_volume: waterData?.totalProduction || 0,
+          products_linked: waterData?.products || [],
         };
       }) || [];
 

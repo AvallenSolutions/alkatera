@@ -56,6 +56,7 @@ export interface FacilityWaterSummary {
   measured_data_points: number;
   earliest_data: string | null;
   latest_data: string | null;
+  products_linked?: string[];
 }
 
 export interface CompanyWaterOverview {

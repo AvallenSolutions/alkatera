@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,9 @@ import {
   Recycle,
   Factory,
   Waves,
+  Sparkles,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import { FacilityWaterRisk } from '@/hooks/data/useCompanyMetrics';
 import type {
@@ -79,33 +82,40 @@ export function WaterDeepDive({
     if (facilitySummaries.length > 0) {
       return facilitySummaries;
     }
-    return facilityWaterRisks.map(f => ({
-      facility_id: f.facility_id,
-      organization_id: '',
-      facility_name: f.facility_name,
-      city: null,
-      country: f.location_country_code,
-      country_code: f.location_country_code,
-      latitude: f.latitude,
-      longitude: f.longitude,
-      total_consumption_m3: 0,
-      municipal_consumption_m3: 0,
-      groundwater_consumption_m3: 0,
-      surface_water_consumption_m3: 0,
-      rainwater_consumption_m3: 0,
-      recycled_consumption_m3: 0,
-      total_discharge_m3: 0,
-      net_consumption_m3: 0,
-      aware_factor: f.water_scarcity_aware,
-      scarcity_weighted_consumption_m3: 0,
-      risk_level: f.risk_level,
-      recycling_rate_percent: 0,
-      avg_water_intensity_m3_per_unit: null,
-      data_points_count: 0,
-      measured_data_points: 0,
-      earliest_data: null,
-      latest_data: null,
-    } as FacilityWaterSummary));
+    return facilityWaterRisks.map(f => {
+      const totalConsumption = f.total_water_consumption_m3 || 0;
+      const scarcityWeighted = f.scarcity_weighted_consumption_m3 || (totalConsumption * f.water_scarcity_aware);
+      const productionVol = f.production_volume || 0;
+
+      return {
+        facility_id: f.facility_id,
+        organization_id: '',
+        facility_name: f.facility_name,
+        city: null,
+        country: f.location_country_code,
+        country_code: f.location_country_code,
+        latitude: f.latitude,
+        longitude: f.longitude,
+        total_consumption_m3: totalConsumption,
+        municipal_consumption_m3: totalConsumption,
+        groundwater_consumption_m3: 0,
+        surface_water_consumption_m3: 0,
+        rainwater_consumption_m3: 0,
+        recycled_consumption_m3: 0,
+        total_discharge_m3: 0,
+        net_consumption_m3: totalConsumption,
+        aware_factor: f.water_scarcity_aware,
+        scarcity_weighted_consumption_m3: scarcityWeighted,
+        risk_level: f.risk_level,
+        recycling_rate_percent: 0,
+        avg_water_intensity_m3_per_unit: productionVol > 0 ? totalConsumption / productionVol : null,
+        data_points_count: f.products_linked?.length || 0,
+        measured_data_points: 0,
+        earliest_data: null,
+        latest_data: null,
+        products_linked: f.products_linked || [],
+      } as FacilityWaterSummary;
+    });
   }, [facilitySummaries, facilityWaterRisks]);
 
   const filteredFacilities = useMemo((): FacilityWaterSummary[] => {
@@ -608,6 +618,12 @@ function FacilityRow({
   );
 }
 
+interface AIRecommendations {
+  recommendations: string[];
+  analysis: string;
+  priority_action: string;
+}
+
 function FacilityDetailView({
   facility,
   onBack,
@@ -615,6 +631,10 @@ function FacilityDetailView({
   facility: FacilityWaterSummary;
   onBack: () => void;
 }) {
+  const [aiRecommendations, setAiRecommendations] = useState<AIRecommendations | null>(null);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const riskConfig = {
     high: {
       bgColor: 'bg-red-50 dark:bg-red-900/20',
@@ -637,6 +657,57 @@ function FacilityDetailView({
   };
 
   const config = riskConfig[facility.risk_level];
+  const hasWaterData = facility.total_consumption_m3 > 0;
+  const hasProducts = (facility.products_linked?.length || 0) > 0;
+
+  const fetchAIRecommendations = async () => {
+    setLoadingAI(true);
+    setAiError(null);
+
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
+        throw new Error('Supabase configuration missing');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/generate-water-recommendations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          facility_name: facility.facility_name,
+          country: facility.country || facility.country_code,
+          risk_level: facility.risk_level,
+          aware_factor: facility.aware_factor,
+          total_consumption_m3: facility.total_consumption_m3,
+          scarcity_weighted_consumption_m3: facility.scarcity_weighted_consumption_m3,
+          net_consumption_m3: facility.net_consumption_m3,
+          recycling_rate_percent: facility.recycling_rate_percent,
+          products_linked: facility.products_linked || [],
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch AI recommendations');
+      }
+
+      const data = await response.json();
+      setAiRecommendations(data);
+    } catch (error) {
+      console.error('AI recommendations error:', error);
+      setAiError(error instanceof Error ? error.message : 'Failed to load AI recommendations');
+    } finally {
+      setLoadingAI(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAIRecommendations();
+  }, [facility.facility_id]);
 
   return (
     <div className="space-y-6">
@@ -664,6 +735,32 @@ function FacilityDetailView({
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {hasProducts && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              <span className="text-sm text-muted-foreground">Products:</span>
+              {facility.products_linked?.map((product, idx) => (
+                <Badge key={idx} variant="outline" className="text-xs">{product}</Badge>
+              ))}
+            </div>
+          )}
+
+          {!hasWaterData && (
+            <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">No Water Data Available</p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                      This facility has no production sites linked to completed product LCAs.
+                      To see water data, link this facility to a product's production sites.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className={`${config.bgColor} border-2 ${config.borderColor}`}>
             <CardContent className="p-6">
               <div className="grid md:grid-cols-3 gap-6">
@@ -678,18 +775,19 @@ function FacilityDetailView({
                   <h3 className="text-sm font-semibold">Total Consumption</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold">
-                      {facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                      {hasWaterData ? facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 }) : '-'}
                     </span>
-                    <span className="text-sm text-muted-foreground">m³</span>
+                    {hasWaterData && <span className="text-sm text-muted-foreground">m³</span>}
                   </div>
+                  {hasWaterData && <span className="text-xs text-muted-foreground">From Product LCAs</span>}
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold">Scarcity Impact</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold">
-                      {facility.scarcity_weighted_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                      {hasWaterData ? facility.scarcity_weighted_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 }) : '-'}
                     </span>
-                    <span className="text-sm text-muted-foreground">m³ eq</span>
+                    {hasWaterData && <span className="text-sm text-muted-foreground">m³ eq</span>}
                   </div>
                 </div>
               </div>
@@ -723,35 +821,74 @@ function FacilityDetailView({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-2 border-blue-200 dark:border-blue-800">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Recommended Actions</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-blue-600" />
+                    AI-Powered Recommendations
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchAIRecommendations}
+                    disabled={loadingAI}
+                    className="h-7 px-2"
+                  >
+                    {loadingAI ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {facility.risk_level === 'high' && (
+              <CardContent className="space-y-3">
+                {loadingAI ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-5/6" />
+                  </div>
+                ) : aiError ? (
+                  <div className="text-sm text-red-600 dark:text-red-400">
+                    <p>{aiError}</p>
+                    <Button variant="link" size="sm" onClick={fetchAIRecommendations} className="p-0 h-auto mt-1">
+                      Try again
+                    </Button>
+                  </div>
+                ) : aiRecommendations ? (
                   <>
-                    <ActionItem>Prioritise water efficiency measures</ActionItem>
-                    <ActionItem>Explore alternative water sources (recycling, rainwater)</ActionItem>
-                    <ActionItem>Consider site relocation for future expansion</ActionItem>
+                    {aiRecommendations.priority_action && (
+                      <div className="p-2 rounded-md bg-blue-100 dark:bg-blue-900/30 mb-3">
+                        <p className="text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide mb-1">Priority Action</p>
+                        <p className="text-xs text-blue-900 dark:text-blue-100">{aiRecommendations.priority_action}</p>
+                      </div>
+                    )}
+                    {aiRecommendations.recommendations.slice(0, 4).map((rec, idx) => (
+                      <ActionItem key={idx}>{rec}</ActionItem>
+                    ))}
                   </>
-                )}
-                {facility.risk_level === 'medium' && (
-                  <>
-                    <ActionItem>Implement water monitoring systems</ActionItem>
-                    <ActionItem>Set water reduction targets</ActionItem>
-                    <ActionItem>Investigate recycling opportunities</ActionItem>
-                  </>
-                )}
-                {facility.risk_level === 'low' && (
-                  <>
-                    <ActionItem>Maintain efficient operations</ActionItem>
-                    <ActionItem>Monitor for future climate changes</ActionItem>
-                    <ActionItem>Document best practices for other sites</ActionItem>
-                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Loading recommendations...</p>
                 )}
               </CardContent>
             </Card>
           </div>
+
+          {aiRecommendations?.analysis && (
+            <Card className="bg-slate-50 dark:bg-slate-900/20 border-slate-200 dark:border-slate-800">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-slate-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">AI Analysis</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{aiRecommendations.analysis}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
             <CardContent className="p-4 space-y-2">
