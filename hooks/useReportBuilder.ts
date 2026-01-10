@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
 
@@ -12,13 +12,8 @@ interface GenerateReportResponse {
 
 export function useReportBuilder() {
   const [loading, setLoading] = useState(false);
+  const supabase = getSupabaseBrowserClient();
   const { currentOrganization } = useOrganization();
-
-  // Use standard createClient for edge function support
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
 
   const generateReport = async (config: ReportConfig): Promise<GenerateReportResponse> => {
     setLoading(true);
@@ -31,7 +26,7 @@ export function useReportBuilder() {
         throw new Error('User not authenticated');
       }
 
-      // Use organization from context instead of querying profiles
+      // Use organization from context
       if (!currentOrganization) {
         throw new Error('No active organization found');
       }
@@ -71,17 +66,11 @@ export function useReportBuilder() {
         .single();
 
       if (insertError) {
-        console.error('❌ Insert error details:', {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code,
-        });
+        console.error('❌ Insert error details:', insertError);
         throw new Error(`Failed to create report record: ${insertError.message}`);
       }
 
       if (!reportRecord) {
-        console.error('❌ No report record returned after insert');
         throw new Error('Failed to create report record: No data returned');
       }
 
@@ -90,11 +79,14 @@ export function useReportBuilder() {
       // 3. Call edge function using supabase.functions.invoke()
       console.log('🔵 Calling edge function with report_config_id:', reportRecord.id);
 
-      const { data, error: functionError } = await supabase.functions.invoke('generate-sustainability-report', {
-        body: {
-          report_config_id: reportRecord.id,
-        },
-      });
+      const { data, error: functionError } = await supabase.functions.invoke(
+        'generate-sustainability-report',
+        {
+          body: {
+            report_config_id: reportRecord.id,
+          },
+        }
+      );
 
       console.log('📡 Edge function response:', { data, error: functionError });
 
