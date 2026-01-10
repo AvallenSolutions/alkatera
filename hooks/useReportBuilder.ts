@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { createClient } from '@supabase/supabase-js';
 import { useOrganization } from '@/lib/organizationContext';
 import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
 
@@ -12,8 +12,13 @@ interface GenerateReportResponse {
 
 export function useReportBuilder() {
   const [loading, setLoading] = useState(false);
-  const supabase = getSupabaseBrowserClient();
   const { currentOrganization } = useOrganization();
+
+  // Use standard createClient for edge function support
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const generateReport = async (config: ReportConfig): Promise<GenerateReportResponse> => {
     setLoading(true);
