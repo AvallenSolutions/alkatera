@@ -32,10 +32,27 @@
     - Complies with greenwashing regulation guardrails
 */
 
--- Create ENUM types for data integrity
-CREATE TYPE public.functional_unit_type_enum AS ENUM ('bottle', 'can', 'pack', 'unit');
-CREATE TYPE public.functional_unit_measure_enum AS ENUM ('ml', 'l');
-CREATE TYPE public.system_boundary_enum AS ENUM ('cradle_to_gate', 'cradle_to_grave');
+-- Create ENUM types for data integrity (with IF NOT EXISTS checks)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'functional_unit_type_enum') THEN
+    CREATE TYPE public.functional_unit_type_enum AS ENUM ('bottle', 'can', 'pack', 'unit');
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'functional_unit_measure_enum') THEN
+    CREATE TYPE public.functional_unit_measure_enum AS ENUM ('ml', 'l');
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'system_boundary_enum') THEN
+    CREATE TYPE public.system_boundary_enum AS ENUM ('cradle_to_gate', 'cradle_to_grave');
+  END IF;
+END $$;
 
 -- Create products table
 CREATE TABLE IF NOT EXISTS public.products (
