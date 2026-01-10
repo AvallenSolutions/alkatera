@@ -171,15 +171,6 @@ export function WaterDeepDive({
     low: facilities.filter(f => f.risk_level === 'low').length,
   }), [facilities]);
 
-  if (selectedFacility) {
-    return (
-      <FacilityDetailView
-        facility={selectedFacility}
-        onBack={() => setSelectedFacility(null)}
-      />
-    );
-  }
-
   const totalOperationalWater = useMemo(() => {
     return facilityWaterRisks.reduce((sum, f) => sum + (f.operational_water_intake_m3 || 0), 0);
   }, [facilityWaterRisks]);
@@ -212,6 +203,15 @@ export function WaterDeepDive({
     : (companyOverview?.net_consumption_m3 || productLcaWaterConsumption || 0);
 
   const recyclingRate = companyOverview?.avg_recycling_rate || 0;
+
+  if (selectedFacility) {
+    return (
+      <FacilityDetailView
+        facility={selectedFacility}
+        onBack={() => setSelectedFacility(null)}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
