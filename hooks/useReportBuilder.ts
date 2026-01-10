@@ -90,6 +90,7 @@ export function useReportBuilder() {
 
       // 4. Call edge function using direct fetch (bypass supabase.functions.invoke)
       const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       const functionUrl = `${supabaseUrl}/functions/v1/generate-sustainability-report`;
 
       console.log('🔵 Calling edge function at:', functionUrl);
@@ -99,6 +100,7 @@ export function useReportBuilder() {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
+          'apikey': supabaseAnonKey || '',
         },
         body: JSON.stringify({
           report_config_id: reportRecord.id,
