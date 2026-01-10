@@ -85,10 +85,14 @@ export interface FacilityWaterRisk {
   risk_level: 'high' | 'medium' | 'low';
   latitude?: number;
   longitude?: number;
-  total_water_consumption_m3: number;
+  operational_water_intake_m3: number;
+  operational_water_discharge_m3: number;
+  operational_net_consumption_m3: number;
+  product_lca_water_m3: number;
   scarcity_weighted_consumption_m3: number;
   production_volume: number;
   products_linked: string[];
+  has_operational_data: boolean;
 }
 
 export interface MaterialFlow {
@@ -691,6 +695,41 @@ export function useCompanyMetrics() {
 
       if (error) throw error;
 
+      // Fetch OPERATIONAL water data from facility_activity_entries
+      const { data: operationalWater } = await supabase
+        .from('facility_activity_entries')
+        .select('facility_id, activity_category, quantity, unit')
+        .eq('organization_id', currentOrganization.id)
+        .in('activity_category', ['water_intake', 'water_discharge', 'water_recycled']);
+
+      // Build operational water map by facility
+      const operationalWaterMap = new Map<string, {
+        intake: number;
+        discharge: number;
+        recycled: number;
+      }>();
+
+      operationalWater?.forEach((entry: any) => {
+        const facilityId = entry.facility_id;
+        if (!facilityId) return;
+
+        if (!operationalWaterMap.has(facilityId)) {
+          operationalWaterMap.set(facilityId, { intake: 0, discharge: 0, recycled: 0 });
+        }
+
+        const current = operationalWaterMap.get(facilityId)!;
+        const quantity = Number(entry.quantity || 0);
+
+        if (entry.activity_category === 'water_intake') {
+          current.intake += quantity;
+        } else if (entry.activity_category === 'water_discharge') {
+          current.discharge += quantity;
+        } else if (entry.activity_category === 'water_recycled') {
+          current.recycled += quantity;
+        }
+      });
+
+      // Fetch PRODUCT LCA water data from production sites
       const { data: productionSites } = await supabase
         .from('product_lca_production_sites')
         .select(`
@@ -708,7 +747,7 @@ export function useCompanyMetrics() {
         .eq('product_lcas.organization_id', currentOrganization.id)
         .eq('product_lcas.status', 'completed');
 
-      const facilityWaterMap = new Map<string, {
+      const productLcaWaterMap = new Map<string, {
         totalWater: number;
         totalProduction: number;
         products: string[];
@@ -725,11 +764,11 @@ export function useCompanyMetrics() {
 
         const waterForFacility = waterPerUnit * prodVolume * sharePercent;
 
-        if (!facilityWaterMap.has(facilityId)) {
-          facilityWaterMap.set(facilityId, { totalWater: 0, totalProduction: 0, products: [] });
+        if (!productLcaWaterMap.has(facilityId)) {
+          productLcaWaterMap.set(facilityId, { totalWater: 0, totalProduction: 0, products: [] });
         }
 
-        const current = facilityWaterMap.get(facilityId)!;
+        const current = productLcaWaterMap.get(facilityId)!;
         current.totalWater += waterForFacility;
         current.totalProduction += prodVolume * sharePercent;
         if (!current.products.includes(productName)) {
@@ -752,9 +791,20 @@ export function useCompanyMetrics() {
         if (awareFactor > AWARE_THRESHOLDS.high) riskLevel = 'high';
         else if (awareFactor > AWARE_THRESHOLDS.medium) riskLevel = 'medium';
 
-        const waterData = facilityWaterMap.get(facility.id);
-        const totalWater = waterData?.totalWater || 0;
-        const scarcityWeighted = totalWater * awareFactor;
+        // Get operational water (direct facility data)
+        const opWater = operationalWaterMap.get(facility.id);
+        const operationalIntake = opWater?.intake || 0;
+        const operationalDischarge = opWater?.discharge || 0;
+        const operationalNet = operationalIntake - operationalDischarge;
+        const hasOperationalData = operationalIntake > 0 || operationalDischarge > 0;
+
+        // Get product LCA water (embedded supply chain water)
+        const lcaWater = productLcaWaterMap.get(facility.id);
+        const productLcaWater = lcaWater?.totalWater || 0;
+
+        // Calculate scarcity-weighted impact based on OPERATIONAL water (actual facility consumption)
+        // Product LCA water is supply chain water, not local consumption
+        const scarcityWeighted = operationalNet * awareFactor;
 
         return {
           facility_id: facility.id,
@@ -764,10 +814,14 @@ export function useCompanyMetrics() {
           risk_level: riskLevel,
           latitude: facility.address_lat ? parseFloat(facility.address_lat) : undefined,
           longitude: facility.address_lng ? parseFloat(facility.address_lng) : undefined,
-          total_water_consumption_m3: totalWater,
+          operational_water_intake_m3: operationalIntake,
+          operational_water_discharge_m3: operationalDischarge,
+          operational_net_consumption_m3: operationalNet,
+          product_lca_water_m3: productLcaWater,
           scarcity_weighted_consumption_m3: scarcityWeighted,
-          production_volume: waterData?.totalProduction || 0,
-          products_linked: waterData?.products || [],
+          production_volume: lcaWater?.totalProduction || 0,
+          products_linked: lcaWater?.products || [],
+          has_operational_data: hasOperationalData,
         };
       }) || [];
 

@@ -1,31 +1,48 @@
-export function downloadTemplateAsCSV(templateType: string = 'materials'): void {
-  const templates: Record<string, string[][]> = {
-    materials: [
-      ['Material Name', 'Quantity', 'Unit', 'Origin Country', 'Transport Mode'],
-      ['Example Material', '100', 'kg', 'GB', 'road'],
-    ],
-    products: [
-      ['Product Name', 'SKU', 'Functional Unit', 'Description'],
-      ['Example Product', 'SKU-001', '1 unit', 'Product description'],
-    ],
-  };
+export function downloadTemplateAsCSV(type: 'ingredients' | 'packaging' = 'ingredients'): void {
+  const headers = type === 'ingredients'
+    ? ['Name', 'Quantity', 'Unit', 'Origin Country', 'Supplier']
+    : ['Name', 'Material Type', 'Weight (g)', 'Recyclable', 'Supplier'];
 
-  const data = templates[templateType] || templates.materials;
-  const csvContent = data.map(row => row.join(',')).join('\n');
+  const sampleData = type === 'ingredients'
+    ? [
+        ['Organic Sugar', '100', 'kg', 'Brazil', 'Example Supplier'],
+        ['Wheat Flour', '50', 'kg', 'UK', 'Example Supplier'],
+      ]
+    : [
+        ['Glass Bottle 750ml', 'Glass', '350', 'Yes', 'Example Supplier'],
+        ['Aluminium Cap', 'Aluminium', '5', 'Yes', 'Example Supplier'],
+      ];
+
+  const csvContent = [
+    headers.join(','),
+    ...sampleData.map(row => row.join(','))
+  ].join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-
-  link.setAttribute('href', url);
-  link.setAttribute('download', `${templateType}_template.csv`);
-  link.style.visibility = 'hidden';
-
-  document.body.appendChild(link);
+  link.href = URL.createObjectURL(blob);
+  link.download = `${type}_import_template.csv`;
   link.click();
-  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
 }
 
-export function createGoogleSheetsTemplate(templateType: string): string {
-  return `https://docs.google.com/spreadsheets/create?title=${encodeURIComponent(templateType + '_import')}`;
+export function createGoogleSheetsTemplate(type: 'ingredients' | 'packaging' = 'ingredients'): string {
+  const baseUrl = 'https://docs.google.com/spreadsheets/d/create';
+  return baseUrl;
+}
+
+export function parseCSV(csvContent: string): Record<string, string>[] {
+  const lines = csvContent.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
+
+  return lines.slice(1).map(line => {
+    const values = line.split(',').map(v => v.trim());
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] || '';
+    });
+    return row;
+  });
 }

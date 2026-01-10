@@ -57,6 +57,11 @@ export interface FacilityWaterSummary {
   earliest_data: string | null;
   latest_data: string | null;
   products_linked?: string[];
+  operational_water_intake_m3?: number;
+  operational_water_discharge_m3?: number;
+  operational_net_consumption_m3?: number;
+  product_lca_water_m3?: number;
+  has_operational_data?: boolean;
 }
 
 export interface CompanyWaterOverview {

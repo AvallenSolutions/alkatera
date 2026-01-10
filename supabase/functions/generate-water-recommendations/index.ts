@@ -14,6 +14,10 @@ interface FacilityData {
   net_consumption_m3: number;
   recycling_rate_percent: number;
   products_linked: string[];
+  operational_water_intake_m3?: number;
+  operational_water_discharge_m3?: number;
+  product_lca_water_m3?: number;
+  has_operational_data?: boolean;
 }
 
 interface RecommendationResponse {
@@ -100,8 +104,14 @@ Deno.serve(async (req: Request) => {
 });
 
 function buildPrompt(facility: FacilityData): string {
-  const hasWaterData = facility.total_consumption_m3 > 0;
+  const hasOperationalData = facility.has_operational_data || (facility.operational_water_intake_m3 || 0) > 0;
+  const hasProductLcaData = (facility.product_lca_water_m3 || 0) > 0;
   const hasProducts = facility.products_linked.length > 0;
+
+  const operationalIntake = facility.operational_water_intake_m3 || 0;
+  const operationalDischarge = facility.operational_water_discharge_m3 || 0;
+  const operationalNet = operationalIntake - operationalDischarge;
+  const productLcaWater = facility.product_lca_water_m3 || 0;
   
   return `You are a water sustainability expert. Analyse this facility's water data and provide actionable recommendations.
 
@@ -110,29 +120,42 @@ FACILITY DATA:
 - Location: ${facility.country}
 - Water Scarcity Risk: ${facility.risk_level.toUpperCase()}
 - AWARE Factor: ${facility.aware_factor.toFixed(2)} (higher = more water-stressed region)
-${hasWaterData ? `- Total Water Consumption: ${facility.total_consumption_m3.toLocaleString()} m³
-- Scarcity-Weighted Impact: ${facility.scarcity_weighted_consumption_m3.toLocaleString()} m³ eq
-- Net Consumption: ${facility.net_consumption_m3.toLocaleString()} m³
-- Recycling Rate: ${facility.recycling_rate_percent.toFixed(1)}%` : '- No detailed water consumption data available'}
-${hasProducts ? `- Products Manufactured: ${facility.products_linked.join(', ')}` : '- No products linked'}
+
+OPERATIONAL WATER DATA (direct facility consumption):
+${hasOperationalData ? `- Water Intake: ${operationalIntake.toLocaleString()} m³
+- Wastewater Discharge: ${operationalDischarge.toLocaleString()} m³
+- Net Consumption: ${operationalNet.toLocaleString()} m³
+- Scarcity-Weighted Impact: ${(operationalNet * facility.aware_factor).toLocaleString()} m³ eq` : '- No operational water data logged for this facility'}
+
+PRODUCT LCA EMBEDDED WATER (supply chain water footprint):
+${hasProductLcaData ? `- Embedded Water from Products: ${productLcaWater.toLocaleString()} m³
+- This represents water consumed across the upstream supply chain for products manufactured here` : '- No products with completed LCAs linked to this facility'}
+
+${hasProducts ? `PRODUCTS MANUFACTURED: ${facility.products_linked.join(', ')}` : ''}
+
+IMPORTANT DISTINCTIONS:
+- Operational water = actual water consumed AT the facility (metered/measured)
+- Product LCA water = embedded water in the supply chain (calculated from product LCAs)
+- These are DIFFERENT types of water impact and should NOT be added together for local impact
+- Operational water affects LOCAL water stress; LCA water is distributed across supply chain locations
 
 CONTEXT:
 - AWARE factors > 10 indicate extreme water stress
-- AWARE factors 1-10 indicate moderate water stress
+- AWARE factors 1-10 indicate moderate water stress  
 - AWARE factors < 1 indicate low water stress
 - The beverage/food industry typically uses 2-5 m³ water per m³ product
 
 Provide your response in this exact format:
-ANALYSIS: [One paragraph analysing the facility's water situation based on the data]
+ANALYSIS: [One paragraph analysing the facility's water situation based on BOTH operational and LCA data where available. Be specific about what data is available and what insights can be drawn.]
 
-PRIORITY_ACTION: [Single most important action to take]
+PRIORITY_ACTION: [Single most important action based on the available data]
 
 RECOMMENDATION_1: [Specific, actionable recommendation]
 RECOMMENDATION_2: [Specific, actionable recommendation]
 RECOMMENDATION_3: [Specific, actionable recommendation]
 RECOMMENDATION_4: [Specific, actionable recommendation]
 
-Base your recommendations on the actual data provided. If data is limited, recommend data collection as a first step. Focus on practical, implementable actions appropriate for a ${facility.risk_level} risk facility.`;
+Base your recommendations on the actual data provided. ${!hasOperationalData ? 'Since no operational data is available, recommend logging water intake and discharge data as a first step.' : ''} Focus on practical, implementable actions appropriate for a ${facility.risk_level} risk facility.`;
 }
 
 function parseGeminiResponse(text: string, fallbackRiskLevel: string): RecommendationResponse {

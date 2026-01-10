@@ -83,8 +83,15 @@ export function WaterDeepDive({
       return facilitySummaries;
     }
     return facilityWaterRisks.map(f => {
-      const totalConsumption = f.total_water_consumption_m3 || 0;
-      const scarcityWeighted = f.scarcity_weighted_consumption_m3 || (totalConsumption * f.water_scarcity_aware);
+      const operationalIntake = f.operational_water_intake_m3 || 0;
+      const operationalDischarge = f.operational_water_discharge_m3 || 0;
+      const operationalNet = f.operational_net_consumption_m3 || 0;
+      const productLcaWater = f.product_lca_water_m3 || 0;
+      const hasOperational = f.has_operational_data || false;
+
+      const totalConsumption = hasOperational ? operationalIntake : productLcaWater;
+      const netConsumption = hasOperational ? operationalNet : productLcaWater;
+      const scarcityWeighted = f.scarcity_weighted_consumption_m3 || (netConsumption * f.water_scarcity_aware);
       const productionVol = f.production_volume || 0;
 
       return {
@@ -97,23 +104,28 @@ export function WaterDeepDive({
         latitude: f.latitude,
         longitude: f.longitude,
         total_consumption_m3: totalConsumption,
-        municipal_consumption_m3: totalConsumption,
+        municipal_consumption_m3: operationalIntake,
         groundwater_consumption_m3: 0,
         surface_water_consumption_m3: 0,
         rainwater_consumption_m3: 0,
         recycled_consumption_m3: 0,
-        total_discharge_m3: 0,
-        net_consumption_m3: totalConsumption,
+        total_discharge_m3: operationalDischarge,
+        net_consumption_m3: netConsumption,
         aware_factor: f.water_scarcity_aware,
         scarcity_weighted_consumption_m3: scarcityWeighted,
         risk_level: f.risk_level,
         recycling_rate_percent: 0,
-        avg_water_intensity_m3_per_unit: productionVol > 0 ? totalConsumption / productionVol : null,
+        avg_water_intensity_m3_per_unit: productionVol > 0 ? netConsumption / productionVol : null,
         data_points_count: f.products_linked?.length || 0,
-        measured_data_points: 0,
+        measured_data_points: hasOperational ? 1 : 0,
         earliest_data: null,
         latest_data: null,
         products_linked: f.products_linked || [],
+        operational_water_intake_m3: operationalIntake,
+        operational_water_discharge_m3: operationalDischarge,
+        operational_net_consumption_m3: operationalNet,
+        product_lca_water_m3: productLcaWater,
+        has_operational_data: hasOperational,
       } as FacilityWaterSummary;
     });
   }, [facilitySummaries, facilityWaterRisks]);
@@ -168,39 +180,65 @@ export function WaterDeepDive({
     );
   }
 
-  const totalConsumption = companyOverview?.total_consumption_m3 || productLcaWaterConsumption || 0;
-  const scarcityImpact = companyOverview?.scarcity_weighted_consumption_m3 || productLcaWaterScarcity || 0;
-  const netConsumption = companyOverview?.net_consumption_m3 || totalConsumption;
-  const recyclingRate = companyOverview?.avg_recycling_rate || 0;
-  const hasOperationalData = (companyOverview?.total_consumption_m3 || 0) > 0;
+  const totalOperationalWater = useMemo(() => {
+    return facilityWaterRisks.reduce((sum, f) => sum + (f.operational_water_intake_m3 || 0), 0);
+  }, [facilityWaterRisks]);
+
+  const totalOperationalNet = useMemo(() => {
+    return facilityWaterRisks.reduce((sum, f) => sum + (f.operational_net_consumption_m3 || 0), 0);
+  }, [facilityWaterRisks]);
+
+  const totalOperationalDischarge = useMemo(() => {
+    return facilityWaterRisks.reduce((sum, f) => sum + (f.operational_water_discharge_m3 || 0), 0);
+  }, [facilityWaterRisks]);
+
+  const totalScarcityWeighted = useMemo(() => {
+    return facilityWaterRisks.reduce((sum, f) => sum + (f.scarcity_weighted_consumption_m3 || 0), 0);
+  }, [facilityWaterRisks]);
+
+  const hasOperationalWaterData = totalOperationalWater > 0;
   const hasProductLcaData = productLcaWaterConsumption > 0 || productLcaWaterScarcity > 0;
+
+  const displayTotalConsumption = hasOperationalWaterData
+    ? totalOperationalWater
+    : (companyOverview?.total_consumption_m3 || productLcaWaterConsumption || 0);
+
+  const displayScarcityImpact = hasOperationalWaterData
+    ? totalScarcityWeighted
+    : (companyOverview?.scarcity_weighted_consumption_m3 || productLcaWaterScarcity || 0);
+
+  const displayNetConsumption = hasOperationalWaterData
+    ? totalOperationalNet
+    : (companyOverview?.net_consumption_m3 || productLcaWaterConsumption || 0);
+
+  const recyclingRate = companyOverview?.avg_recycling_rate || 0;
 
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-4 gap-4">
         <MetricCard
-          title="Total Consumption"
-          value={totalConsumption}
+          title="Facility Water Intake"
+          value={displayTotalConsumption}
           unit="m³"
           icon={Droplets}
           color="blue"
-          subtitle={hasOperationalData ? 'Facility data' : hasProductLcaData ? 'From Product LCAs' : undefined}
+          subtitle={hasOperationalWaterData ? 'Direct facility data' : hasProductLcaData ? 'From Product LCAs' : undefined}
         />
         <MetricCard
           title="Scarcity Impact"
-          value={scarcityImpact}
+          value={displayScarcityImpact}
           unit="m³ eq"
           icon={Waves}
           color="amber"
-          subtitle={hasOperationalData ? 'AWARE weighted' : hasProductLcaData ? 'From Product LCAs' : undefined}
+          subtitle={hasOperationalWaterData ? 'AWARE weighted' : hasProductLcaData ? 'From Product LCAs' : undefined}
         />
         <MetricCard
           title="Net Consumption"
-          value={netConsumption}
+          value={displayNetConsumption}
           unit="m³"
           icon={TrendingDown}
           color="cyan"
-          subtitle={hasOperationalData ? 'After discharge' : hasProductLcaData ? 'Estimated' : undefined}
+          subtitle={hasOperationalWaterData ? 'After discharge' : hasProductLcaData ? 'Estimated' : undefined}
         />
         <MetricCard
           title="Recycling Rate"
@@ -208,7 +246,7 @@ export function WaterDeepDive({
           unit="%"
           icon={Recycle}
           color="green"
-          subtitle={!hasOperationalData ? 'No facility data' : undefined}
+          subtitle={!hasOperationalWaterData ? 'No facility data' : undefined}
         />
       </div>
 
@@ -657,7 +695,14 @@ function FacilityDetailView({
   };
 
   const config = riskConfig[facility.risk_level];
-  const hasWaterData = facility.total_consumption_m3 > 0;
+
+  const operationalIntake = facility.operational_water_intake_m3 || 0;
+  const operationalDischarge = facility.operational_water_discharge_m3 || 0;
+  const operationalNet = facility.operational_net_consumption_m3 || 0;
+  const productLcaWater = facility.product_lca_water_m3 || 0;
+  const hasOperationalData = facility.has_operational_data || operationalIntake > 0;
+  const hasProductLcaData = productLcaWater > 0;
+  const hasAnyWaterData = hasOperationalData || hasProductLcaData;
   const hasProducts = (facility.products_linked?.length || 0) > 0;
 
   const fetchAIRecommendations = async () => {
@@ -683,11 +728,15 @@ function FacilityDetailView({
           country: facility.country || facility.country_code,
           risk_level: facility.risk_level,
           aware_factor: facility.aware_factor,
-          total_consumption_m3: facility.total_consumption_m3,
+          total_consumption_m3: operationalIntake || productLcaWater,
           scarcity_weighted_consumption_m3: facility.scarcity_weighted_consumption_m3,
-          net_consumption_m3: facility.net_consumption_m3,
+          net_consumption_m3: operationalNet || productLcaWater,
           recycling_rate_percent: facility.recycling_rate_percent,
           products_linked: facility.products_linked || [],
+          operational_water_intake_m3: operationalIntake,
+          operational_water_discharge_m3: operationalDischarge,
+          product_lca_water_m3: productLcaWater,
+          has_operational_data: hasOperationalData,
         }),
       });
 
@@ -744,7 +793,7 @@ function FacilityDetailView({
             </div>
           )}
 
-          {!hasWaterData && (
+          {!hasAnyWaterData && (
             <Card className="bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
@@ -752,8 +801,7 @@ function FacilityDetailView({
                   <div>
                     <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">No Water Data Available</p>
                     <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                      This facility has no production sites linked to completed product LCAs.
-                      To see water data, link this facility to a product's production sites.
+                      This facility has no water activity data logged and no production sites linked to completed product LCAs.
                     </p>
                   </div>
                 </div>
@@ -772,22 +820,22 @@ function FacilityDetailView({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-sm font-semibold">Total Consumption</h3>
+                  <h3 className="text-sm font-semibold">Operational Net</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold">
-                      {hasWaterData ? facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 }) : '-'}
+                      {hasOperationalData ? operationalNet.toLocaleString('en-GB', { maximumFractionDigits: 0 }) : '-'}
                     </span>
-                    {hasWaterData && <span className="text-sm text-muted-foreground">m³</span>}
+                    {hasOperationalData && <span className="text-sm text-muted-foreground">m³</span>}
                   </div>
-                  {hasWaterData && <span className="text-xs text-muted-foreground">From Product LCAs</span>}
+                  <span className="text-xs text-muted-foreground">{hasOperationalData ? 'Direct facility data' : 'No data logged'}</span>
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold">Scarcity Impact</h3>
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold">
-                      {hasWaterData ? facility.scarcity_weighted_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 }) : '-'}
+                      {hasOperationalData ? (operationalNet * facility.aware_factor).toLocaleString('en-GB', { maximumFractionDigits: 0 }) : '-'}
                     </span>
-                    {hasWaterData && <span className="text-sm text-muted-foreground">m³ eq</span>}
+                    {hasOperationalData && <span className="text-sm text-muted-foreground">m³ eq</span>}
                   </div>
                 </div>
               </div>
@@ -797,29 +845,84 @@ function FacilityDetailView({
           <div className="grid md:grid-cols-2 gap-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Water Balance</CardTitle>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Factory className="h-4 w-4" />
+                  Facility Operational Water
+                </CardTitle>
+                <CardDescription className="text-xs">Direct water use at this facility</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Intake</span>
-                  <span className="font-medium">{facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Discharge</span>
-                  <span className="font-medium">{facility.total_discharge_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
-                </div>
-                <div className="flex justify-between text-sm border-t pt-2">
-                  <span className="text-muted-foreground">Net Consumption</span>
-                  <span className="font-bold">{facility.net_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
-                </div>
-                {facility.recycling_rate_percent > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>Recycling Rate</span>
-                    <span className="font-medium">{facility.recycling_rate_percent.toFixed(1)}%</span>
+                {hasOperationalData ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Water Intake</span>
+                      <span className="font-medium">{operationalIntake.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Wastewater Discharge</span>
+                      <span className="font-medium">{operationalDischarge.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t pt-2">
+                      <span className="text-muted-foreground">Net Consumption</span>
+                      <span className="font-bold text-blue-600">{operationalNet.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-amber-600">
+                      <span>Scarcity-Weighted</span>
+                      <span className="font-medium">{(operationalNet * facility.aware_factor).toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³ eq</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Droplets className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-xs">No operational water data logged for this facility</p>
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Waves className="h-4 w-4" />
+                  Product LCA Embedded Water
+                </CardTitle>
+                <CardDescription className="text-xs">Supply chain water from linked products</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {hasProductLcaData ? (
+                  <>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Embedded Water</span>
+                      <span className="font-medium">{productLcaWater.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Water footprint from upstream supply chain and processing for products manufactured at this facility.
+                    </div>
+                    {hasProducts && (
+                      <div className="pt-2 border-t">
+                        <span className="text-xs text-muted-foreground">Products:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {facility.products_linked?.slice(0, 3).map((p, i) => (
+                            <Badge key={i} variant="outline" className="text-xs">{p}</Badge>
+                          ))}
+                          {(facility.products_linked?.length || 0) > 3 && (
+                            <Badge variant="outline" className="text-xs">+{(facility.products_linked?.length || 0) - 3} more</Badge>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <Waves className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-xs">No products with LCAs linked to this facility</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
 
             <Card className="border-2 border-blue-200 dark:border-blue-800">
               <CardHeader className="pb-3">
