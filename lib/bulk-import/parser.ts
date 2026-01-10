@@ -1,75 +1,46 @@
-import type { BulkImportRow, BulkImportResult } from './types';
+import type { BulkImportRow } from './types';
 
-export async function parseCSV(file: File): Promise<BulkImportResult> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+export function parseCSV(csvContent: string): Record<string, string>[] {
+  const lines = csvContent.trim().split('\n');
+  if (lines.length < 2) return [];
 
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/\s+/g, '_'));
 
-        if (lines.length < 2) {
-          resolve({
-            success: false,
-            totalRows: 0,
-            validRows: 0,
-            errorRows: 0,
-            rows: [],
-          });
-          return;
-        }
-
-        const headers = lines[0].split(',').map(h => h.trim());
-        const rows: BulkImportRow[] = [];
-
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(',').map(v => v.trim());
-          const data: Record<string, string> = {};
-
-          headers.forEach((header, idx) => {
-            data[header] = values[idx] || '';
-          });
-
-          rows.push({
-            rowNumber: i,
-            data,
-            errors: [],
-            warnings: [],
-          });
-        }
-
-        resolve({
-          success: true,
-          totalRows: rows.length,
-          validRows: rows.filter(r => r.errors.length === 0).length,
-          errorRows: rows.filter(r => r.errors.length > 0).length,
-          rows,
-        });
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsText(file);
+  return lines.slice(1).map(line => {
+    const values = line.split(',').map(v => v.trim());
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] || '';
+    });
+    return row;
   });
 }
 
-export function validateRow(
-  row: BulkImportRow,
-  requiredColumns: string[]
-): BulkImportRow {
+export function validateImportRow(row: Record<string, string>, rowIndex: number): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
-  requiredColumns.forEach(col => {
-    if (!row.data[col] || row.data[col].trim() === '') {
-      errors.push(`Missing required field: ${col}`);
-    }
-  });
+  if (!row.name || row.name.trim() === '') {
+    errors.push(`Row ${rowIndex}: Name is required`);
+  }
+
+  if (row.quantity && isNaN(Number(row.quantity))) {
+    errors.push(`Row ${rowIndex}: Quantity must be a number`);
+  }
 
   return {
-    ...row,
-    errors: [...row.errors, ...errors],
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+export function mapRowToBulkImport(row: Record<string, string>): BulkImportRow {
+  return {
+    name: row.name || '',
+    quantity: row.quantity ? Number(row.quantity) : null,
+    unit: row.unit || null,
+    origin_country: row.origin_country || row.country,
+    supplier: row.supplier,
+    material_type: row.material_type,
+    recyclable: row.recyclable?.toLowerCase() === 'yes' || row.recyclable?.toLowerCase() === 'true',
   };
 }

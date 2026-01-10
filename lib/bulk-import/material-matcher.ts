@@ -50,7 +50,7 @@ export function getConfidenceBadgeVariant(level: ConfidenceLevel | ConfidenceLev
 }
 
 export async function matchMaterial(
-  name: string,
+  _name: string,
   _type: 'ingredient' | 'packaging'
 ): Promise<MatchResult> {
   return {

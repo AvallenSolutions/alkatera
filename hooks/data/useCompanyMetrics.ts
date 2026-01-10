@@ -747,6 +747,22 @@ export function useCompanyMetrics() {
         .eq('product_lcas.organization_id', currentOrganization.id)
         .eq('product_lcas.status', 'completed');
 
+      // Fetch water data from contract manufacturer allocations
+      const { data: cmAllocations } = await supabase
+        .from('contract_manufacturer_allocations')
+        .select(`
+          facility_id,
+          product_id,
+          client_production_volume,
+          allocated_water_litres,
+          products!inner(
+            id,
+            name,
+            organization_id
+          )
+        `)
+        .eq('products.organization_id', currentOrganization.id);
+
       const productLcaWaterMap = new Map<string, {
         totalWater: number;
         totalProduction: number;
@@ -771,6 +787,28 @@ export function useCompanyMetrics() {
         const current = productLcaWaterMap.get(facilityId)!;
         current.totalWater += waterForFacility;
         current.totalProduction += prodVolume * sharePercent;
+        if (!current.products.includes(productName)) {
+          current.products.push(productName);
+        }
+      });
+
+      // Add contract manufacturer allocation water data
+      cmAllocations?.forEach((allocation: any) => {
+        const facilityId = allocation.facility_id;
+        if (!facilityId) return;
+
+        const waterLitres = Number(allocation.allocated_water_litres || 0);
+        const waterM3 = waterLitres / 1000;
+        const prodVolume = Number(allocation.client_production_volume || 0);
+        const productName = allocation.products?.name || 'Unknown';
+
+        if (!productLcaWaterMap.has(facilityId)) {
+          productLcaWaterMap.set(facilityId, { totalWater: 0, totalProduction: 0, products: [] });
+        }
+
+        const current = productLcaWaterMap.get(facilityId)!;
+        current.totalWater += waterM3;
+        current.totalProduction += prodVolume;
         if (!current.products.includes(productName)) {
           current.products.push(productName);
         }
