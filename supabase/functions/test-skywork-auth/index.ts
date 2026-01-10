@@ -172,6 +172,18 @@ Deno.serve(async (req: Request) => {
     const skyworkSecretId = Deno.env.get('SKYWORK_SECRET_ID') || Deno.env.get('SKYWORK_API_KEY');
     const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY') || Deno.env.get('SKYWORK_API_SECRET');
 
+    // TEMPORARY: Log actual secret prefixes and lengths to verify correct values
+    console.log('🔑 SKYWORK_SECRET_ID  prefix/suffix/len:',
+      skyworkSecretId?.slice(0, 8) ?? 'NULL',
+      skyworkSecretId?.slice(-4) ?? 'NULL',
+      skyworkSecretId?.length ?? 0
+    );
+    console.log('🔑 SKYWORK_SECRET_KEY prefix/suffix/len:',
+      skyworkSecretKey?.slice(0, 8) ?? 'NULL',
+      skyworkSecretKey?.slice(-4) ?? 'NULL',
+      skyworkSecretKey?.length ?? 0
+    );
+
     console.log('[Skywork Test] Checking credentials:', {
       hasSecretId: !!skyworkSecretId,
       hasSecretKey: !!skyworkSecretKey,
