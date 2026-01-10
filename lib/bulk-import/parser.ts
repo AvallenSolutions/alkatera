@@ -1,36 +1,75 @@
-import { ParsedBulkImport } from './types';
+import type { BulkImportRow, BulkImportResult } from './types';
 
-export function parseCSV(csvText: string): ParsedBulkImport {
-  const rows: any[] = [];
+export async function parseCSV(file: File): Promise<BulkImportResult> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+
+        if (lines.length < 2) {
+          resolve({
+            success: false,
+            totalRows: 0,
+            validRows: 0,
+            errorRows: 0,
+            rows: [],
+          });
+          return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim());
+        const rows: BulkImportRow[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const values = lines[i].split(',').map(v => v.trim());
+          const data: Record<string, string> = {};
+
+          headers.forEach((header, idx) => {
+            data[header] = values[idx] || '';
+          });
+
+          rows.push({
+            rowNumber: i,
+            data,
+            errors: [],
+            warnings: [],
+          });
+        }
+
+        resolve({
+          success: true,
+          totalRows: rows.length,
+          validRows: rows.filter(r => r.errors.length === 0).length,
+          errorRows: rows.filter(r => r.errors.length > 0).length,
+          rows,
+        });
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsText(file);
+  });
+}
+
+export function validateRow(
+  row: BulkImportRow,
+  requiredColumns: string[]
+): BulkImportRow {
   const errors: string[] = [];
 
-  try {
-    const lines = csvText.trim().split('\n');
-    if (lines.length < 2) {
-      errors.push('CSV file must contain header row and at least one data row');
-      return { rows, errors };
+  requiredColumns.forEach(col => {
+    if (!row.data[col] || row.data[col].trim() === '') {
+      errors.push(`Missing required field: ${col}`);
     }
+  });
 
-    const headers = lines[0].split(',').map((h: string) => h.trim());
-
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map((v: string) => v.trim());
-
-      if (values.length !== headers.length) {
-        errors.push(`Row ${i + 1}: Column count mismatch`);
-        continue;
-      }
-
-      const row: any = {};
-      headers.forEach((header: string, index: number) => {
-        row[header] = values[index];
-      });
-
-      rows.push(row);
-    }
-  } catch (error) {
-    errors.push(`CSV parsing error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-
-  return { rows, errors };
+  return {
+    ...row,
+    errors: [...row.errors, ...errors],
+  };
 }

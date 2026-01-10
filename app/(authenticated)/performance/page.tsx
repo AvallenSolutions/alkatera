@@ -840,7 +840,11 @@ export default function PerformancePage() {
                   {loading ? (
                     <Skeleton className="h-64 w-full" />
                   ) : (
-                    <WaterDeepDive facilityWaterRisks={facilityWaterRisks} />
+                    <WaterDeepDive
+                    facilityWaterRisks={facilityWaterRisks}
+                    productLcaWaterConsumption={waterConsumption}
+                    productLcaWaterScarcity={waterScarcityImpact}
+                  />
                   )}
                 </CardContent>
               </Card>

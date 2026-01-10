@@ -52,6 +52,8 @@ interface WaterDeepDiveProps {
   sourceBreakdown?: WaterSourceBreakdown[];
   waterTimeSeries?: WaterTimeSeries[];
   loading?: boolean;
+  productLcaWaterConsumption?: number;
+  productLcaWaterScarcity?: number;
 }
 
 type RiskFilter = 'all' | 'high' | 'medium' | 'low';
@@ -64,6 +66,8 @@ export function WaterDeepDive({
   sourceBreakdown = [],
   waterTimeSeries = [],
   loading = false,
+  productLcaWaterConsumption = 0,
+  productLcaWaterScarcity = 0,
 }: WaterDeepDiveProps) {
   const [selectedFacility, setSelectedFacility] = useState<FacilityWaterSummary | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -154,36 +158,47 @@ export function WaterDeepDive({
     );
   }
 
+  const totalConsumption = companyOverview?.total_consumption_m3 || productLcaWaterConsumption || 0;
+  const scarcityImpact = companyOverview?.scarcity_weighted_consumption_m3 || productLcaWaterScarcity || 0;
+  const netConsumption = companyOverview?.net_consumption_m3 || totalConsumption;
+  const recyclingRate = companyOverview?.avg_recycling_rate || 0;
+  const hasOperationalData = (companyOverview?.total_consumption_m3 || 0) > 0;
+  const hasProductLcaData = productLcaWaterConsumption > 0 || productLcaWaterScarcity > 0;
+
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-4 gap-4">
         <MetricCard
           title="Total Consumption"
-          value={companyOverview?.total_consumption_m3 || 0}
+          value={totalConsumption}
           unit="m³"
           icon={Droplets}
           color="blue"
+          subtitle={hasOperationalData ? 'Facility data' : hasProductLcaData ? 'From Product LCAs' : undefined}
         />
         <MetricCard
           title="Scarcity Impact"
-          value={companyOverview?.scarcity_weighted_consumption_m3 || 0}
+          value={scarcityImpact}
           unit="m³ eq"
           icon={Waves}
           color="amber"
+          subtitle={hasOperationalData ? 'AWARE weighted' : hasProductLcaData ? 'From Product LCAs' : undefined}
         />
         <MetricCard
           title="Net Consumption"
-          value={companyOverview?.net_consumption_m3 || 0}
+          value={netConsumption}
           unit="m³"
           icon={TrendingDown}
           color="cyan"
+          subtitle={hasOperationalData ? 'After discharge' : hasProductLcaData ? 'Estimated' : undefined}
         />
         <MetricCard
           title="Recycling Rate"
-          value={companyOverview?.avg_recycling_rate || 0}
+          value={recyclingRate}
           unit="%"
           icon={Recycle}
           color="green"
+          subtitle={!hasOperationalData ? 'No facility data' : undefined}
         />
       </div>
 
@@ -485,12 +500,14 @@ function MetricCard({
   unit,
   icon: Icon,
   color,
+  subtitle,
 }: {
   title: string;
   value: number;
   unit: string;
   icon: any;
   color: 'blue' | 'amber' | 'cyan' | 'green';
+  subtitle?: string;
 }) {
   const colorClasses = {
     blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600',
@@ -516,6 +533,11 @@ function MetricCard({
           <span className="text-2xl font-bold">{formatValue(value)}</span>
           <span className="text-xs opacity-70">{unit}</span>
         </div>
+        {subtitle && (
+          <div className="mt-1">
+            <span className="text-[10px] opacity-60">{subtitle}</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

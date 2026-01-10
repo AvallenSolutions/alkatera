@@ -1,12 +1,27 @@
 export interface BulkImportRow {
-  materialName: string;
-  quantity: number;
-  unit: string;
-  originCountry?: string;
-  supplier?: string;
+  rowNumber: number;
+  data: Record<string, string>;
+  errors: string[];
+  warnings: string[];
+  matchedMaterial?: {
+    id: string;
+    name: string;
+    confidence: number;
+  };
 }
 
-export interface ParsedBulkImport {
+export interface BulkImportResult {
+  success: boolean;
+  totalRows: number;
+  validRows: number;
+  errorRows: number;
   rows: BulkImportRow[];
-  errors: string[];
+}
+
+export interface ImportTemplate {
+  id: string;
+  name: string;
+  columns: string[];
+  requiredColumns: string[];
+  description: string;
 }
