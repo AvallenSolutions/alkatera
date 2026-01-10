@@ -247,10 +247,15 @@ async function callSkyworkAPI(tool: string, query: string, timeoutMs = 180000): 
 
     try {
       let buffer = '';
+      let eventCount = 0;
+      let lastEventTime = Date.now();
 
       while (!isComplete) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('[Skywork] SSE stream ended. Total events:', eventCount);
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
@@ -259,6 +264,13 @@ async function callSkyworkAPI(tool: string, query: string, timeoutMs = 180000): 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             const data = line.substring(6).trim();
+            eventCount++;
+            lastEventTime = Date.now();
+
+            // Log raw data for debugging (first 200 chars)
+            if (eventCount <= 10 || eventCount % 50 === 0) {
+              console.log(`[Skywork] Event ${eventCount}:`, data.substring(0, 200));
+            }
 
             if (data.startsWith('/open/message')) {
               const url = new URL(data, 'https://api.skywork.ai');
@@ -270,36 +282,65 @@ async function callSkyworkAPI(tool: string, query: string, timeoutMs = 180000): 
             try {
               const jsonData = JSON.parse(data);
 
+              // Skip ping events silently
               if (jsonData.method === 'ping') continue;
 
-              if (jsonData.result?.download_url) {
-                documentUrl = jsonData.result.download_url;
+              // Log any other method/event type
+              if (jsonData.method) {
+                console.log('[Skywork] Method:', jsonData.method);
+              }
+
+              // Check for download URL in various possible locations
+              const downloadUrl = jsonData.result?.download_url ||
+                                  jsonData.download_url ||
+                                  jsonData.data?.download_url ||
+                                  jsonData.result?.data?.download_url;
+
+              if (downloadUrl) {
+                documentUrl = downloadUrl;
                 console.log('[Skywork] Document ready:', documentUrl);
                 isComplete = true;
                 break;
               }
 
+              // Check for completion status
+              if (jsonData.result?.status === 'completed' || jsonData.status === 'completed') {
+                console.log('[Skywork] Generation completed, checking for URL in result:', JSON.stringify(jsonData.result || jsonData).substring(0, 500));
+              }
+
+              // Check for errors
               if (jsonData.error) {
+                console.error('[Skywork] API error:', JSON.stringify(jsonData.error));
                 clearTimeout(timeoutHandle);
                 return {
                   success: false,
                   error: `Skywork API error: ${JSON.stringify(jsonData.error)}`,
                 };
               }
+
+              // Log any result that isn't ping/session
+              if (jsonData.result && !jsonData.method) {
+                console.log('[Skywork] Result received:', JSON.stringify(jsonData.result).substring(0, 300));
+              }
+
             } catch {
-              // Ignore non-JSON data
+              // Log non-JSON data if it's not empty
+              if (data.trim() && data !== '[DONE]') {
+                console.log('[Skywork] Non-JSON data:', data.substring(0, 100));
+              }
             }
           }
         }
       }
 
       clearTimeout(timeoutHandle);
+      console.log('[Skywork] Processing complete. Events received:', eventCount, 'Document URL:', documentUrl ? 'yes' : 'no');
 
       if (documentUrl) {
         return { success: true, downloadUrl: documentUrl };
       }
 
-      return { success: false, error: 'No download URL received' };
+      return { success: false, error: `No download URL received after ${eventCount} events` };
 
     } finally {
       reader.releaseLock();
