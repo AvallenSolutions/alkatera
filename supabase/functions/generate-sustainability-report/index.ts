@@ -13,15 +13,140 @@ const SKYWORK_TOOLS = {
   pptx: 'gen_ppt',
   docx: 'gen_doc',
   xlsx: 'gen_excel',
-};
+} as const;
 
-// MD5 hash function for Skywork authentication
+// Skywork Client (inlined for deployment)
 async function md5(text: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
   const hashBuffer = await crypto.subtle.digest('MD5', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+interface SkyworkResult {
+  success: boolean;
+  downloadUrl?: string;
+  error?: string;
+}
+
+async function callSkyworkAPI(tool: string, query: string, timeoutMs = 180000): Promise<SkyworkResult> {
+  const secretId = Deno.env.get('SKYWORK_SECRET_ID');
+  const secretKey = Deno.env.get('SKYWORK_SECRET_KEY');
+
+  if (!secretId || !secretKey) {
+    return { success: false, error: 'Credentials not configured' };
+  }
+
+  const signatureInput = `${secretId}:${secretKey}`;
+  const sign = await md5(signatureInput);
+
+  const queryParams = new URLSearchParams({
+    secret_id: secretId,
+    sign: sign,
+    tool,
+    query,
+    use_network: 'false',
+  });
+
+  const sseUrl = `https://api.skywork.ai/open/sse?${queryParams.toString()}`;
+
+  console.log('[Skywork] Establishing SSE connection...');
+
+  try {
+    const response = await fetch(sseUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        success: false,
+        error: `SSE connection failed: ${response.status} ${errorText}`,
+      };
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return { success: false, error: 'Failed to get response reader' };
+    }
+
+    const decoder = new TextDecoder();
+    let documentUrl: string | null = null;
+    let isComplete = false;
+
+    const timeoutHandle = setTimeout(() => {
+      reader.cancel();
+    }, timeoutMs);
+
+    try {
+      let buffer = '';
+
+      while (!isComplete) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.substring(6).trim();
+
+            if (data.startsWith('/open/message')) {
+              const url = new URL(data, 'https://api.skywork.ai');
+              const sessionId = url.searchParams.get('sessionId');
+              console.log('[Skywork] Session established:', sessionId);
+              continue;
+            }
+
+            try {
+              const jsonData = JSON.parse(data);
+
+              if (jsonData.method === 'ping') continue;
+
+              if (jsonData.result?.download_url) {
+                documentUrl = jsonData.result.download_url;
+                console.log('[Skywork] Document ready:', documentUrl);
+                isComplete = true;
+                break;
+              }
+
+              if (jsonData.error) {
+                clearTimeout(timeoutHandle);
+                return {
+                  success: false,
+                  error: `Skywork API error: ${JSON.stringify(jsonData.error)}`,
+                };
+              }
+            } catch {
+              // Ignore non-JSON data
+            }
+          }
+        }
+      }
+
+      clearTimeout(timeoutHandle);
+
+      if (documentUrl) {
+        return { success: true, downloadUrl: documentUrl };
+      }
+
+      return { success: false, error: 'No download URL received' };
+
+    } finally {
+      reader.releaseLock();
+    }
+
+  } catch (error) {
+    console.error('[Skywork] Error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -134,181 +259,54 @@ Deno.serve(async (req: Request) => {
     const skyworkQuery = constructSkyworkQuery(reportConfig, aggregatedData);
     console.log('✅ [Skywork] Query constructed:', skyworkQuery.length, 'characters');
 
-    // 7. Call Skywork API with MD5 signature authentication
-    const skyworkSecretId = Deno.env.get('SKYWORK_SECRET_ID');
-    const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY');
-
-    if (!skyworkSecretId || !skyworkSecretKey) {
-      console.error('❌ [Skywork] API credentials not configured');
-      console.error('  Expected: SKYWORK_SECRET_ID and SKYWORK_SECRET_KEY');
-      console.error('  Found:', {
-        hasSecretId: !!skyworkSecretId,
-        hasSecretKey: !!skyworkSecretKey,
-      });
-
-      // For now, return mock data for testing without Skywork
-      const mockDocumentUrl = 'https://example.com/mock-report.pptx';
-
-      console.log('⚠️ [Skywork] Using mock data for testing');
-
-      await supabaseClient
-        .from('generated_reports')
-        .update({
-          status: 'completed',
-          skywork_query: skyworkQuery,
-          document_url: mockDocumentUrl,
-          data_snapshot: aggregatedData,
-          generated_at: new Date().toISOString(),
-        })
-        .eq('id', report_config_id);
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          report_id: report_config_id,
-          document_url: mockDocumentUrl,
-          note: 'Using mock data - Skywork API credentials not configured',
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-
-    // Generate MD5 signature: md5(secret_id:secret_key)
-    const signatureInput = `${skyworkSecretId}:${skyworkSecretKey}`;
-    const sign = await md5(signatureInput);
-
+    // 7. Call Skywork API
     const tool = SKYWORK_TOOLS[reportConfig.output_format as keyof typeof SKYWORK_TOOLS] || 'gen_ppt';
 
     console.log('🔵 [Skywork] Calling API with tool:', tool);
-    console.log('🔵 [Skywork] Using MD5 signature authentication');
-    console.log('🔵 [Skywork] Secret ID:', skyworkSecretId.substring(0, 8) + '...');
-    console.log('🔵 [Skywork] Signature:', sign.substring(0, 16) + '...');
+    console.log('🔵 [Skywork] Query length:', skyworkQuery.length);
+    console.log('🔵 [Skywork] Query preview:', skyworkQuery.substring(0, 200) + '...');
 
-    // Construct SSE endpoint URL with authentication
-    const skyworkApiUrl = `https://api.skywork.ai/open/sse?secret_id=${skyworkSecretId}&sign=${sign}`;
+    // 8. Generate document using Skywork
+    const skyworkResult = await callSkyworkAPI(tool, skyworkQuery, 180000);
 
-    let skyworkResponse;
-    try {
-      console.log('🔵 [Skywork] Sending SSE request...');
-      console.log('  Tool:', tool);
-      console.log('  Query length:', skyworkQuery.length);
-      console.log('  Query preview:', skyworkQuery.substring(0, 200) + '...');
+    if (!skyworkResult.success) {
+      if (skyworkResult.error === 'Credentials not configured') {
+        console.error('❌ [Skywork] API credentials not configured');
 
-      // For Skywork SSE API, we need to send the query as a POST with the tool and query
-      const payload = {
-        tool,
-        query: skyworkQuery,
-        use_network: false, // CRITICAL: Prevent hallucination
-      };
+        // Return mock data for testing without Skywork
+        const mockDocumentUrl = 'https://example.com/mock-report.pptx';
 
-      skyworkResponse = await fetch(skyworkApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
+        await supabaseClient
+          .from('generated_reports')
+          .update({
+            status: 'completed',
+            skywork_query: skyworkQuery,
+            document_url: mockDocumentUrl,
+            data_snapshot: aggregatedData,
+            generated_at: new Date().toISOString(),
+          })
+          .eq('id', report_config_id);
 
-      console.log('✅ [Skywork] Response status:', skyworkResponse.status);
-    } catch (fetchError) {
-      console.error('❌ [Skywork] Network error:', fetchError);
-      throw new Error(`Failed to connect to Skywork API: ${fetchError.message}`);
-    }
-
-    if (!skyworkResponse.ok) {
-      const errorText = await skyworkResponse.text();
-      console.error('❌ [Skywork] API error:', {
-        status: skyworkResponse.status,
-        statusText: skyworkResponse.statusText,
-        body: errorText,
-      });
-      throw new Error(`Skywork API error: ${skyworkResponse.status} ${skyworkResponse.statusText}`);
-    }
-
-    console.log('✅ [Skywork] API call successful, parsing SSE response...');
-    console.log('🔵 [Skywork] Content-Type:', skyworkResponse.headers.get('content-type'));
-
-    // 8. Parse SSE response for download URL
-    const reader = skyworkResponse.body?.getReader();
-    const decoder = new TextDecoder();
-    let documentUrl = '';
-    let skyworkError: any = null;
-    let allChunks = '';
-
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        allChunks += chunk;
-        console.log('🔵 [Skywork] Raw chunk:', chunk.substring(0, 200)); // Log first 200 chars
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              console.log('🔵 [Skywork] SSE data:', data);
-
-              // Check for error in SSE stream
-              if (data.error || data.code >= 400) {
-                skyworkError = data;
-                console.error('❌ [Skywork] Error in SSE stream:', data);
-              }
-
-              // Check for download URL
-              if (data.download_url) {
-                documentUrl = data.download_url;
-                console.log('✅ [Skywork] Download URL received:', documentUrl);
-              }
-
-              // Check for status updates
-              if (data.status) {
-                console.log('🔵 [Skywork] Status update:', data.status);
-              }
-            } catch (e) {
-              // Ignore parse errors
-              console.log('⚠️ [Skywork] SSE parse error:', e.message);
-            }
+        return new Response(
+          JSON.stringify({
+            success: true,
+            report_id: report_config_id,
+            document_url: mockDocumentUrl,
+            note: 'Using mock data - Skywork API credentials not configured',
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           }
-        }
+        );
       }
+
+      console.error('❌ [Skywork] Generation failed:', skyworkResult.error);
+      throw new Error(`Skywork API error: ${skyworkResult.error}`);
     }
 
-    // If no SSE data was parsed, try parsing as regular JSON
-    if (!documentUrl && !skyworkError && allChunks) {
-      console.log('🔵 [Skywork] No SSE data found, trying to parse as JSON...');
-      try {
-        const jsonResponse = JSON.parse(allChunks);
-        console.log('🔵 [Skywork] JSON response:', jsonResponse);
-
-        if (jsonResponse.error || jsonResponse.code >= 400) {
-          skyworkError = jsonResponse;
-        } else if (jsonResponse.download_url) {
-          documentUrl = jsonResponse.download_url;
-          console.log('✅ [Skywork] Download URL from JSON:', documentUrl);
-        } else if (jsonResponse.url) {
-          documentUrl = jsonResponse.url;
-          console.log('✅ [Skywork] URL from JSON:', documentUrl);
-        }
-      } catch (e) {
-        console.error('❌ [Skywork] Failed to parse as JSON:', e.message);
-        console.log('🔵 [Skywork] Full response:', allChunks.substring(0, 500));
-      }
-    }
-
-    // Check if we got an error in the SSE stream
-    if (skyworkError) {
-      console.error('❌ [Skywork] Generation failed:', skyworkError);
-      throw new Error(`Skywork API error: ${skyworkError.code || 'Unknown'} ${skyworkError.message || skyworkError.error || 'Generation failed'}`);
-    }
-
+    const documentUrl = skyworkResult.downloadUrl;
     if (!documentUrl) {
       console.error('❌ [Skywork] No download URL received');
-      console.log('🔵 [Skywork] Full response data:', allChunks.substring(0, 1000));
       throw new Error('No download URL received from Skywork');
     }
 

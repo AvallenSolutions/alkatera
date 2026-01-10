@@ -1,18 +1,18 @@
-export function getConfidenceLevel(confidence: number | null): {
+export interface ConfidenceLevel {
+  level: 'high' | 'medium' | 'low' | 'none';
   label: string;
-  color: string;
-} {
-  if (confidence === null) {
-    return { label: 'No Match', color: 'gray' };
-  }
+  score: number;
+}
 
-  if (confidence >= 0.9) {
-    return { label: 'High', color: 'green' };
+export function getConfidenceLevel(score: number): ConfidenceLevel {
+  if (score >= 0.8) {
+    return { level: 'high', label: 'High', score };
   }
-
-  if (confidence >= 0.7) {
-    return { label: 'Medium', color: 'yellow' };
+  if (score >= 0.6) {
+    return { level: 'medium', label: 'Medium', score };
   }
-
-  return { label: 'Low', color: 'red' };
+  if (score >= 0.4) {
+    return { level: 'low', label: 'Low', score };
+  }
+  return { level: 'none', label: 'None', score };
 }
