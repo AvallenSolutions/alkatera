@@ -1,356 +1,805 @@
-import React, { useState } from 'react';
+'use client';
+
+import React, { useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MapPin, Droplets, AlertTriangle, ChevronRight, ArrowLeft, TrendingDown } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  MapPin,
+  Droplets,
+  AlertTriangle,
+  ChevronRight,
+  ArrowLeft,
+  TrendingDown,
+  Search,
+  Filter,
+  Download,
+  BarChart3,
+  Map,
+  Clock,
+  Recycle,
+  Factory,
+  Waves,
+} from 'lucide-react';
 import { FacilityWaterRisk } from '@/hooks/data/useCompanyMetrics';
+import type {
+  FacilityWaterSummary,
+  CompanyWaterOverview,
+  WaterSourceBreakdown,
+  WaterTimeSeries,
+} from '@/hooks/data/useFacilityWaterData';
+import { WaterConsumptionChart } from '@/components/water/WaterConsumptionChart';
+import { WaterSourceBreakdownChart } from '@/components/water/WaterSourceBreakdownChart';
+import { WaterIntensityComparisonChart } from '@/components/water/WaterIntensityComparisonChart';
+
+const FacilityWaterRiskMap = dynamic(
+  () => import('@/components/water/FacilityWaterRiskMap').then(mod => mod.FacilityWaterRiskMap),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="w-full h-[400px] rounded-lg" />,
+  }
+);
 
 interface WaterDeepDiveProps {
   facilityWaterRisks: FacilityWaterRisk[];
+  facilitySummaries?: FacilityWaterSummary[];
+  companyOverview?: CompanyWaterOverview | null;
+  sourceBreakdown?: WaterSourceBreakdown[];
+  waterTimeSeries?: WaterTimeSeries[];
+  loading?: boolean;
 }
 
-export function WaterDeepDive({ facilityWaterRisks }: WaterDeepDiveProps) {
-  const [selectedFacility, setSelectedFacility] = useState<FacilityWaterRisk | null>(null);
+type RiskFilter = 'all' | 'high' | 'medium' | 'low';
+type SortOption = 'consumption' | 'risk' | 'name' | 'intensity';
 
-  const highRiskFacilities = facilityWaterRisks.filter(f => f.risk_level === 'high');
-  const mediumRiskFacilities = facilityWaterRisks.filter(f => f.risk_level === 'medium');
-  const lowRiskFacilities = facilityWaterRisks.filter(f => f.risk_level === 'low');
+export function WaterDeepDive({
+  facilityWaterRisks,
+  facilitySummaries = [],
+  companyOverview,
+  sourceBreakdown = [],
+  waterTimeSeries = [],
+  loading = false,
+}: WaterDeepDiveProps) {
+  const [selectedFacility, setSelectedFacility] = useState<FacilityWaterSummary | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('consumption');
+  const [activeTab, setActiveTab] = useState('overview');
 
-  // If a facility is selected, show detailed view
+  const facilities = useMemo((): FacilityWaterSummary[] => {
+    if (facilitySummaries.length > 0) {
+      return facilitySummaries;
+    }
+    return facilityWaterRisks.map(f => ({
+      facility_id: f.facility_id,
+      organization_id: '',
+      facility_name: f.facility_name,
+      city: null,
+      country: f.location_country_code,
+      country_code: f.location_country_code,
+      latitude: f.latitude,
+      longitude: f.longitude,
+      total_consumption_m3: 0,
+      municipal_consumption_m3: 0,
+      groundwater_consumption_m3: 0,
+      surface_water_consumption_m3: 0,
+      rainwater_consumption_m3: 0,
+      recycled_consumption_m3: 0,
+      total_discharge_m3: 0,
+      net_consumption_m3: 0,
+      aware_factor: f.water_scarcity_aware,
+      scarcity_weighted_consumption_m3: 0,
+      risk_level: f.risk_level,
+      recycling_rate_percent: 0,
+      avg_water_intensity_m3_per_unit: null,
+      data_points_count: 0,
+      measured_data_points: 0,
+      earliest_data: null,
+      latest_data: null,
+    } as FacilityWaterSummary));
+  }, [facilitySummaries, facilityWaterRisks]);
+
+  const filteredFacilities = useMemo((): FacilityWaterSummary[] => {
+    let result = [...facilities];
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(f =>
+        f.facility_name.toLowerCase().includes(query) ||
+        f.city?.toLowerCase().includes(query) ||
+        f.country?.toLowerCase().includes(query)
+      );
+    }
+
+    if (riskFilter !== 'all') {
+      result = result.filter(f => f.risk_level === riskFilter);
+    }
+
+    switch (sortBy) {
+      case 'consumption':
+        result.sort((a, b) => b.total_consumption_m3 - a.total_consumption_m3);
+        break;
+      case 'risk':
+        const riskOrder = { high: 0, medium: 1, low: 2 };
+        result.sort((a, b) => riskOrder[a.risk_level] - riskOrder[b.risk_level]);
+        break;
+      case 'name':
+        result.sort((a, b) => a.facility_name.localeCompare(b.facility_name));
+        break;
+      case 'intensity':
+        result.sort((a, b) => (b.avg_water_intensity_m3_per_unit || 0) - (a.avg_water_intensity_m3_per_unit || 0));
+        break;
+    }
+
+    return result;
+  }, [facilities, searchQuery, riskFilter, sortBy]);
+
+  const riskCounts = useMemo(() => ({
+    high: facilities.filter(f => f.risk_level === 'high').length,
+    medium: facilities.filter(f => f.risk_level === 'medium').length,
+    low: facilities.filter(f => f.risk_level === 'low').length,
+  }), [facilities]);
+
   if (selectedFacility) {
-    const riskConfig = {
-      high: {
-        bgColor: 'bg-red-50',
-        borderColor: 'border-red-200',
-        textColor: 'text-red-700',
-        badgeClass: 'bg-red-600',
-      },
-      medium: {
-        bgColor: 'bg-amber-50',
-        borderColor: 'border-amber-200',
-        textColor: 'text-amber-700',
-        badgeClass: 'bg-amber-600',
-      },
-      low: {
-        bgColor: 'bg-green-50',
-        borderColor: 'border-green-200',
-        textColor: 'text-green-700',
-        badgeClass: 'bg-green-600',
-      },
-    };
-
-    const config = riskConfig[selectedFacility.risk_level];
-
     return (
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedFacility(null)}
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Overview
-              </Button>
-            </div>
-            <div className="flex items-center justify-between mt-4">
-              <div className="space-y-1">
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  {selectedFacility.facility_name}
-                </CardTitle>
-                <CardDescription>Detailed water scarcity risk assessment</CardDescription>
-              </div>
-              <Badge variant="default" className={config.badgeClass}>
-                {selectedFacility.risk_level.toUpperCase()} RISK
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <Card className={`${config.bgColor} border-2 ${config.borderColor}`}>
-              <CardContent className="p-6 space-y-4">
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold">Location</h3>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{selectedFacility.location_country_code}</span>
-                      </div>
-                      {selectedFacility.latitude && selectedFacility.longitude && (
-                        <p className="text-xs text-muted-foreground">
-                          Coordinates: {selectedFacility.latitude.toFixed(4)}°N, {selectedFacility.longitude.toFixed(4)}°E
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold">AWARE Water Scarcity</h3>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-bold">
-                        {selectedFacility.water_scarcity_aware.toFixed(1)}
-                      </span>
-                      <span className="text-sm text-muted-foreground">m³ world eq/m³</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Characterisation factor for water consumption
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Risk Interpretation</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium text-muted-foreground">What this means:</p>
-                    <p className="text-sm">
-                      {selectedFacility.risk_level === 'high' &&
-                        'This location experiences severe water stress. Water consumption here has significant impact on local water availability.'}
-                      {selectedFacility.risk_level === 'medium' &&
-                        'This location has moderate water stress. Monitor water consumption and consider efficiency improvements.'}
-                      {selectedFacility.risk_level === 'low' &&
-                        'This location has abundant water resources. Water consumption has minimal impact on local scarcity.'}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Recommended Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="space-y-2">
-                    {selectedFacility.risk_level === 'high' && (
-                      <>
-                        <div className="flex items-start gap-2">
-                          <TrendingDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs">Prioritise water efficiency measures</p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <TrendingDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs">Explore alternative water sources (recycling, rainwater)</p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <TrendingDown className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs">Consider site relocation for future expansion</p>
-                        </div>
-                      </>
-                    )}
-                    {selectedFacility.risk_level === 'medium' && (
-                      <>
-                        <div className="flex items-start gap-2">
-                          <TrendingDown className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs">Implement water monitoring systems</p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <TrendingDown className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs">Set water reduction targets</p>
-                        </div>
-                      </>
-                    )}
-                    {selectedFacility.risk_level === 'low' && (
-                      <>
-                        <div className="flex items-start gap-2">
-                          <TrendingDown className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs">Maintain efficient operations</p>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <TrendingDown className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                          <p className="text-xs">Monitor for future climate changes</p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="bg-blue-50 border-blue-200">
-              <CardContent className="p-4 space-y-2">
-                <p className="text-sm font-semibold text-blue-900">About AWARE Characterisation</p>
-                <p className="text-xs text-muted-foreground">
-                  The AWARE method quantifies relative available water remaining per area in a watershed, after human and aquatic ecosystem demands have been met. A higher factor indicates greater water scarcity.
-                </p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant="outline" className="text-xs">Low: &lt;20</Badge>
-                  <Badge variant="outline" className="text-xs">Medium: 20-40</Badge>
-                  <Badge variant="outline" className="text-xs">High: &gt;40</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </CardContent>
-        </Card>
-      </div>
+      <FacilityDetailView
+        facility={selectedFacility}
+        onBack={() => setSelectedFacility(null)}
+      />
     );
   }
 
   return (
     <div className="space-y-6">
+      <div className="grid md:grid-cols-4 gap-4">
+        <MetricCard
+          title="Total Consumption"
+          value={companyOverview?.total_consumption_m3 || 0}
+          unit="m³"
+          icon={Droplets}
+          color="blue"
+        />
+        <MetricCard
+          title="Scarcity Impact"
+          value={companyOverview?.scarcity_weighted_consumption_m3 || 0}
+          unit="m³ eq"
+          icon={Waves}
+          color="amber"
+        />
+        <MetricCard
+          title="Net Consumption"
+          value={companyOverview?.net_consumption_m3 || 0}
+          unit="m³"
+          icon={TrendingDown}
+          color="cyan"
+        />
+        <MetricCard
+          title="Recycling Rate"
+          value={companyOverview?.avg_recycling_rate || 0}
+          unit="%"
+          icon={Recycle}
+          color="green"
+        />
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview" className="gap-2">
+            <Map className="h-4 w-4" />
+            <span className="hidden sm:inline">Risk Overview</span>
+          </TabsTrigger>
+          <TabsTrigger value="consumption" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Consumption</span>
+          </TabsTrigger>
+          <TabsTrigger value="sources" className="gap-2">
+            <Droplets className="h-4 w-4" />
+            <span className="hidden sm:inline">Sources</span>
+          </TabsTrigger>
+          <TabsTrigger value="trends" className="gap-2">
+            <Clock className="h-4 w-4" />
+            <span className="hidden sm:inline">Trends</span>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <FacilityWaterRiskMap
+            facilities={filteredFacilities}
+            loading={loading}
+            onFacilityClick={setSelectedFacility}
+          />
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base">Facility Risk Details</CardTitle>
+                  <CardDescription>
+                    {filteredFacilities.length} facilities
+                    {riskFilter !== 'all' && ` (${riskFilter} risk)`}
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search facilities..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-8 w-[180px] h-9"
+                    />
+                  </div>
+                  <Select value={riskFilter} onValueChange={(v) => setRiskFilter(v as RiskFilter)}>
+                    <SelectTrigger className="w-[120px] h-9">
+                      <Filter className="h-4 w-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Risks</SelectItem>
+                      <SelectItem value="high">High Risk</SelectItem>
+                      <SelectItem value="medium">Medium Risk</SelectItem>
+                      <SelectItem value="low">Low Risk</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                    <SelectTrigger className="w-[140px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="consumption">By Consumption</SelectItem>
+                      <SelectItem value="risk">By Risk Level</SelectItem>
+                      <SelectItem value="name">By Name</SelectItem>
+                      <SelectItem value="intensity">By Intensity</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {loading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))
+                ) : filteredFacilities.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Factory className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                    <p>No facilities match your filters</p>
+                  </div>
+                ) : (
+                  filteredFacilities.map((facility) => (
+                    <FacilityRow
+                      key={facility.facility_id}
+                      facility={facility}
+                      onClick={() => setSelectedFacility(facility)}
+                    />
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="consumption" className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <WaterConsumptionChart
+              data={waterTimeSeries}
+              loading={loading}
+              title="Monthly Water Consumption"
+              showDischarge={true}
+              showScarcityWeighted={true}
+            />
+            <WaterIntensityComparisonChart
+              facilities={filteredFacilities}
+              loading={loading}
+              title="Water Intensity by Facility"
+              maxFacilities={8}
+              onFacilityClick={setSelectedFacility}
+            />
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Consumption Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Intake</p>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                    {(companyOverview?.total_consumption_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">cubic metres</p>
+                </div>
+                <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Discharge</p>
+                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                    {(companyOverview?.total_discharge_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">cubic metres</p>
+                </div>
+                <div className="p-4 rounded-lg bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Net Consumption</p>
+                  <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
+                    {(companyOverview?.net_consumption_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">cubic metres</p>
+                </div>
+                <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Scarcity Weighted</p>
+                  <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+                    {(companyOverview?.scarcity_weighted_consumption_m3 || 0).toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-xs text-muted-foreground">m³ world equivalent</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="sources" className="space-y-6">
+          <div className="grid lg:grid-cols-2 gap-6">
+            <WaterSourceBreakdownChart
+              data={sourceBreakdown}
+              loading={loading}
+              title="Water Sources Breakdown"
+              height={320}
+            />
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Source Distribution</CardTitle>
+                <CardDescription>Percentage of water from each source type</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {sourceBreakdown.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Droplets className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                    <p>No source data available</p>
+                  </div>
+                ) : (
+                  sourceBreakdown.map((source, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: source.color }}
+                          />
+                          <span>{source.source}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{source.percentage.toFixed(1)}%</span>
+                          <span className="text-muted-foreground text-xs">
+                            ({source.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${source.percentage}%`,
+                            backgroundColor: source.color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {companyOverview && companyOverview.recycled_consumption_m3 > 0 && (
+                  <div className="mt-6 p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Recycle className="h-4 w-4 text-green-600" />
+                      <span className="font-medium text-green-900 dark:text-green-100">Water Recycling</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {companyOverview.recycled_percent.toFixed(1)}% of water consumed comes from recycled/reused sources,
+                      totalling {companyOverview.recycled_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="trends" className="space-y-6">
+          <WaterConsumptionChart
+            data={waterTimeSeries}
+            loading={loading}
+            title="Water Consumption Over Time"
+            height={350}
+            showDischarge={true}
+            showScarcityWeighted={true}
+          />
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Period Analysis</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {waterTimeSeries.length < 2 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Clock className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                    <p>Not enough data for trend analysis</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <TrendMetric
+                      label="Consumption Trend"
+                      data={waterTimeSeries}
+                      metric="consumption"
+                    />
+                    <TrendMetric
+                      label="Net Consumption Trend"
+                      data={waterTimeSeries}
+                      metric="netConsumption"
+                    />
+                    <TrendMetric
+                      label="Scarcity Impact Trend"
+                      data={waterTimeSeries}
+                      metric="scarcityWeighted"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+              <CardHeader>
+                <CardTitle className="text-base text-blue-900 dark:text-blue-100">About AWARE Methodology</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  The AWARE (Available WAter REmaining) method quantifies relative water availability
+                  per area in a watershed, after human and aquatic ecosystem demands have been met.
+                </p>
+                <p className="text-muted-foreground">
+                  Higher factors indicate greater water scarcity. Net impact multiplies consumption
+                  by the location-specific AWARE factor to provide m³ world equivalent.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Badge variant="outline" className="text-xs">ISO 14046</Badge>
+                  <Badge variant="outline" className="text-xs">CSRD E3</Badge>
+                  <Badge variant="outline" className="text-xs">AWARE v1.3</Badge>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function MetricCard({
+  title,
+  value,
+  unit,
+  icon: Icon,
+  color,
+}: {
+  title: string;
+  value: number;
+  unit: string;
+  icon: any;
+  color: 'blue' | 'amber' | 'cyan' | 'green';
+}) {
+  const colorClasses = {
+    blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600',
+    amber: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-600',
+    cyan: 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800 text-cyan-600',
+    green: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600',
+  };
+
+  const formatValue = (val: number) => {
+    if (val >= 1000000) return `${(val / 1000000).toFixed(1)}M`;
+    if (val >= 1000) return `${(val / 1000).toFixed(1)}k`;
+    return val.toFixed(1);
+  };
+
+  return (
+    <Card className={`${colorClasses[color]} border`}>
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium uppercase tracking-wide opacity-80">{title}</span>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="flex items-baseline gap-1">
+          <span className="text-2xl font-bold">{formatValue(value)}</span>
+          <span className="text-xs opacity-70">{unit}</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FacilityRow({
+  facility,
+  onClick,
+}: {
+  facility: FacilityWaterSummary;
+  onClick: () => void;
+}) {
+  const riskConfig = {
+    high: {
+      bgColor: 'bg-red-50 dark:bg-red-900/20',
+      borderColor: 'border-red-200 dark:border-red-800',
+      textColor: 'text-red-700 dark:text-red-300',
+      badgeClass: 'bg-red-600',
+    },
+    medium: {
+      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
+      borderColor: 'border-amber-200 dark:border-amber-800',
+      textColor: 'text-amber-700 dark:text-amber-300',
+      badgeClass: 'bg-amber-600',
+    },
+    low: {
+      bgColor: 'bg-green-50 dark:bg-green-900/20',
+      borderColor: 'border-green-200 dark:border-green-800',
+      textColor: 'text-green-700 dark:text-green-300',
+      badgeClass: 'bg-green-600',
+    },
+  };
+
+  const config = riskConfig[facility.risk_level];
+
+  return (
+    <Card
+      className={`${config.bgColor} ${config.borderColor} border cursor-pointer hover:shadow-md transition-all`}
+      onClick={onClick}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1.5 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <MapPin className={`h-4 w-4 ${config.textColor} flex-shrink-0`} />
+              <span className="font-semibold truncate">{facility.facility_name}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <span>{facility.city || facility.country || facility.country_code}</span>
+              <span>AWARE: {facility.aware_factor.toFixed(2)}</span>
+              {facility.total_consumption_m3 > 0 && (
+                <span>{facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+              )}
+              {facility.recycling_rate_percent > 0 && (
+                <span className="text-green-600">{facility.recycling_rate_percent.toFixed(1)}% recycled</span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Badge variant="default" className={config.badgeClass}>
+              {facility.risk_level.toUpperCase()}
+            </Badge>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FacilityDetailView({
+  facility,
+  onBack,
+}: {
+  facility: FacilityWaterSummary;
+  onBack: () => void;
+}) {
+  const riskConfig = {
+    high: {
+      bgColor: 'bg-red-50 dark:bg-red-900/20',
+      borderColor: 'border-red-200 dark:border-red-800',
+      textColor: 'text-red-700 dark:text-red-300',
+      badgeClass: 'bg-red-600',
+    },
+    medium: {
+      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
+      borderColor: 'border-amber-200 dark:border-amber-800',
+      textColor: 'text-amber-700 dark:text-amber-300',
+      badgeClass: 'bg-amber-600',
+    },
+    low: {
+      bgColor: 'bg-green-50 dark:bg-green-900/20',
+      borderColor: 'border-green-200 dark:border-green-800',
+      textColor: 'text-green-700 dark:text-green-300',
+      badgeClass: 'bg-green-600',
+    },
+  };
+
+  const config = riskConfig[facility.risk_level];
+
+  return (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={onBack} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Overview
+            </Button>
+          </div>
+          <div className="flex items-center justify-between mt-4">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                Facility Water Risk Map
+                {facility.facility_name}
               </CardTitle>
               <CardDescription>
-                Geographic water scarcity analysis using AWARE method
+                {facility.city && `${facility.city}, `}{facility.country || facility.country_code}
               </CardDescription>
             </div>
-            <Badge variant="outline" className="text-xs">
-              AWARE
+            <Badge variant="default" className={config.badgeClass}>
+              {facility.risk_level.toUpperCase()} RISK
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-4">
-            <Card className="border-2 border-red-200 bg-red-50">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-red-900 uppercase tracking-wide">
-                    High Risk
-                  </span>
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
+          <Card className={`${config.bgColor} border-2 ${config.borderColor}`}>
+            <CardContent className="p-6">
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">AWARE Factor</h3>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold">{facility.aware_factor.toFixed(2)}</span>
+                    <span className="text-sm text-muted-foreground">m³ eq/m³</span>
+                  </div>
                 </div>
-                <div className="text-3xl font-bold text-red-900">
-                  {highRiskFacilities.length}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Total Consumption</h3>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold">
+                      {facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="text-sm text-muted-foreground">m³</span>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-900">
-                  Facilities in water-stressed regions
-                </p>
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Scarcity Impact</h3>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold">
+                      {facility.scarcity_weighted_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="text-sm text-muted-foreground">m³ eq</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Water Balance</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Intake</span>
+                  <span className="font-medium">{facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Discharge</span>
+                  <span className="font-medium">{facility.total_discharge_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                </div>
+                <div className="flex justify-between text-sm border-t pt-2">
+                  <span className="text-muted-foreground">Net Consumption</span>
+                  <span className="font-bold">{facility.net_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³</span>
+                </div>
+                {facility.recycling_rate_percent > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Recycling Rate</span>
+                    <span className="font-medium">{facility.recycling_rate_percent.toFixed(1)}%</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-amber-200 bg-amber-50">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-amber-900 uppercase tracking-wide">
-                    Medium Risk
-                  </span>
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                </div>
-                <div className="text-3xl font-bold text-amber-900">
-                  {mediumRiskFacilities.length}
-                </div>
-                <p className="text-xs text-slate-900">
-                  Moderate water scarcity concern
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-2 border-green-200 bg-green-50">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-green-900 uppercase tracking-wide">
-                    Low Risk
-                  </span>
-                  <Droplets className="h-4 w-4 text-green-600" />
-                </div>
-                <div className="text-3xl font-bold text-green-900">
-                  {lowRiskFacilities.length}
-                </div>
-                <p className="text-xs text-slate-900">
-                  Abundant water resources
-                </p>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Recommended Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {facility.risk_level === 'high' && (
+                  <>
+                    <ActionItem>Prioritise water efficiency measures</ActionItem>
+                    <ActionItem>Explore alternative water sources (recycling, rainwater)</ActionItem>
+                    <ActionItem>Consider site relocation for future expansion</ActionItem>
+                  </>
+                )}
+                {facility.risk_level === 'medium' && (
+                  <>
+                    <ActionItem>Implement water monitoring systems</ActionItem>
+                    <ActionItem>Set water reduction targets</ActionItem>
+                    <ActionItem>Investigate recycling opportunities</ActionItem>
+                  </>
+                )}
+                {facility.risk_level === 'low' && (
+                  <>
+                    <ActionItem>Maintain efficient operations</ActionItem>
+                    <ActionItem>Monitor for future climate changes</ActionItem>
+                    <ActionItem>Document best practices for other sites</ActionItem>
+                  </>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold">Facility Risk Details</h3>
-            <div className="space-y-2">
-              {facilityWaterRisks.length === 0 ? (
-                <Card>
-                  <CardContent className="p-8 text-center text-muted-foreground">
-                    No facility water risk data available. Add facilities with location data to see risk analysis.
-                  </CardContent>
-                </Card>
-              ) : (
-                facilityWaterRisks.map((facility) => {
-                  const riskConfig = {
-                    high: {
-                      bgColor: 'bg-red-50',
-                      borderColor: 'border-red-200',
-                      textColor: 'text-red-700',
-                      badgeClass: 'bg-red-600',
-                    },
-                    medium: {
-                      bgColor: 'bg-amber-50',
-                      borderColor: 'border-amber-200',
-                      textColor: 'text-amber-700',
-                      badgeClass: 'bg-amber-600',
-                    },
-                    low: {
-                      bgColor: 'bg-green-50',
-                      borderColor: 'border-green-200',
-                      textColor: 'text-green-700',
-                      badgeClass: 'bg-green-600',
-                    },
-                  };
-
-                  const config = riskConfig[facility.risk_level];
-
-                  return (
-                    <Card
-                      key={facility.facility_id}
-                      className={`${config.bgColor} ${config.borderColor} border-2 cursor-pointer hover:shadow-lg transition-shadow`}
-                      onClick={() => setSelectedFacility(facility)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="space-y-2 flex-1">
-                            <div className="flex items-center gap-2">
-                              <MapPin className={`h-4 w-4 ${config.textColor}`} />
-                              <span className="font-semibold text-slate-900">{facility.facility_name}</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-slate-900">
-                              <span>Location: {facility.location_country_code}</span>
-                              <span>AWARE Factor: {facility.water_scarcity_aware.toFixed(1)} m³ world eq/m³</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="default" className={config.badgeClass}>
-                              {facility.risk_level.toUpperCase()}
-                            </Badge>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              )}
-            </div>
-          </div>
-
-          <Card className="bg-blue-50 border-blue-200">
+          <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
             <CardContent className="p-4 space-y-2">
-              <p className="text-sm font-semibold text-blue-900">
-                About AWARE Water Scarcity
-              </p>
+              <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">About AWARE</p>
               <p className="text-xs text-muted-foreground">
-                AWARE (Available WAter REmaining) is a spatially-explicit characterisation factor that measures water scarcity at country/regional level. Higher factors indicate greater water stress. This method is required for CSRD E3 reporting.
+                The AWARE method quantifies relative available water remaining per area in a watershed,
+                after human and aquatic ecosystem demands have been met. A higher factor indicates greater water scarcity.
               </p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <Badge variant="outline" className="text-xs text-slate-900">UNEP SETAC</Badge>
-                <Badge variant="outline" className="text-xs text-slate-900">ISO 14046</Badge>
-                <Badge variant="outline" className="text-xs text-slate-900">CSRD E3 Compliant</Badge>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Badge variant="outline" className="text-xs">Low: &lt;1</Badge>
+                <Badge variant="outline" className="text-xs">Medium: 1-10</Badge>
+                <Badge variant="outline" className="text-xs">High: &gt;10</Badge>
               </div>
             </CardContent>
           </Card>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function ActionItem({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2">
+      <TrendingDown className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+      <p className="text-xs">{children}</p>
+    </div>
+  );
+}
+
+function TrendMetric({
+  label,
+  data,
+  metric,
+}: {
+  label: string;
+  data: WaterTimeSeries[];
+  metric: 'consumption' | 'netConsumption' | 'scarcityWeighted';
+}) {
+  const trend = useMemo(() => {
+    if (data.length < 4) return { direction: 'stable' as const, percentage: 0 };
+
+    const recent = data.slice(-2);
+    const previous = data.slice(-4, -2);
+
+    const recentAvg = recent.reduce((sum, d) => sum + d[metric], 0) / recent.length;
+    const previousAvg = previous.reduce((sum, d) => sum + d[metric], 0) / previous.length;
+
+    if (previousAvg === 0) return { direction: 'stable' as const, percentage: 0 };
+
+    const change = ((recentAvg - previousAvg) / previousAvg) * 100;
+
+    return {
+      direction: change > 5 ? 'up' as const : change < -5 ? 'down' as const : 'stable' as const,
+      percentage: Math.abs(change),
+    };
+  }, [data, metric]);
+
+  const TrendIcon = trend.direction === 'up' ? TrendingDown : trend.direction === 'down' ? TrendingDown : Clock;
+  const trendColor = trend.direction === 'down' ? 'text-green-600' : trend.direction === 'up' ? 'text-amber-600' : 'text-slate-500';
+
+  return (
+    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+      <span className="text-sm font-medium">{label}</span>
+      <div className={`flex items-center gap-1.5 ${trendColor}`}>
+        <TrendIcon className="h-4 w-4" />
+        <span className="text-sm font-medium">
+          {trend.direction === 'stable' ? 'Stable' : `${trend.percentage.toFixed(1)}% ${trend.direction === 'down' ? 'decrease' : 'increase'}`}
+        </span>
+      </div>
     </div>
   );
 }
