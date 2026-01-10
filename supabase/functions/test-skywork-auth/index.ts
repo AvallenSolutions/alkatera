@@ -1,4 +1,5 @@
-import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts';
+// Use Deno std crypto which supports MD5 (unlike Web Crypto API)
+import { crypto as stdCrypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,7 +10,8 @@ const corsHeaders = {
 async function md5(text: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest('MD5', data);
+  // Use Deno std crypto which supports MD5
+  const hashBuffer = await stdCrypto.subtle.digest('MD5', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -20,8 +22,16 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const skyworkSecretId = Deno.env.get('SKYWORK_SECRET_ID');
-    const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY');
+    // Support both credential naming conventions for flexibility
+    const skyworkSecretId = Deno.env.get('SKYWORK_SECRET_ID') || Deno.env.get('SKYWORK_API_KEY');
+    const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY') || Deno.env.get('SKYWORK_API_SECRET');
+
+    console.log('[Skywork Test] Checking credentials:', {
+      hasSecretId: !!skyworkSecretId,
+      hasSecretKey: !!skyworkSecretKey,
+      secretIdSource: Deno.env.get('SKYWORK_SECRET_ID') ? 'SKYWORK_SECRET_ID' : (Deno.env.get('SKYWORK_API_KEY') ? 'SKYWORK_API_KEY' : 'NONE'),
+      secretKeySource: Deno.env.get('SKYWORK_SECRET_KEY') ? 'SKYWORK_SECRET_KEY' : (Deno.env.get('SKYWORK_API_SECRET') ? 'SKYWORK_API_SECRET' : 'NONE'),
+    });
 
     if (!skyworkSecretId || !skyworkSecretKey) {
       return new Response(
@@ -29,6 +39,7 @@ Deno.serve(async (req: Request) => {
           error: 'Skywork credentials not configured in Supabase secrets',
           hasSecretId: !!skyworkSecretId,
           hasSecretKey: !!skyworkSecretKey,
+          hint: 'Please set either SKYWORK_SECRET_ID + SKYWORK_SECRET_KEY or SKYWORK_API_KEY + SKYWORK_API_SECRET',
         }),
         {
           status: 500,
