@@ -1,6 +1,16 @@
-export function getConfidenceLevel(confidence: number | null): { label: string; color: string } {
-  if (!confidence) return { label: 'unknown', color: 'gray' };
-  if (confidence >= 0.9) return { label: 'high', color: 'green' };
-  if (confidence >= 0.7) return { label: 'medium', color: 'yellow' };
-  return { label: 'low', color: 'red' };
+export interface ConfidenceLevelResult {
+  level: 'high' | 'medium' | 'low' | 'unknown';
+  label: string;
+  color: string;
+}
+
+export function getConfidenceLevel(score: number): ConfidenceLevelResult {
+  if (score >= 0.8) return { level: 'high', label: 'High Confidence', color: 'text-green-500' };
+  if (score >= 0.5) return { level: 'medium', label: 'Medium Confidence', color: 'text-yellow-500' };
+  if (score >= 0.2) return { level: 'low', label: 'Low Confidence', color: 'text-orange-500' };
+  return { level: 'unknown', label: 'Unknown', color: 'text-gray-500' };
+}
+
+export function matchMaterial(name: string): { match: string | null; confidence: number } {
+  return { match: null, confidence: 0 };
 }
