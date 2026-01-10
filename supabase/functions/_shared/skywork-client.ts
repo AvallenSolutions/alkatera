@@ -1,4 +1,5 @@
-import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts';
+// Use Deno std crypto which supports MD5 (unlike Web Crypto API)
+import { crypto as stdCrypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
 
 export interface SkyworkConfig {
   secretId: string;
@@ -23,7 +24,8 @@ export interface SkyworkResult {
 async function md5(text: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest('MD5', data);
+  // Use Deno std crypto which supports MD5
+  const hashBuffer = await stdCrypto.subtle.digest('MD5', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -211,11 +213,19 @@ export class SkyworkClient {
 }
 
 export function createSkyworkClient(): SkyworkClient | null {
-  const secretId = Deno.env.get('SKYWORK_SECRET_ID');
-  const secretKey = Deno.env.get('SKYWORK_SECRET_KEY');
+  // Support both credential naming conventions for flexibility
+  const secretId = Deno.env.get('SKYWORK_SECRET_ID') || Deno.env.get('SKYWORK_API_KEY');
+  const secretKey = Deno.env.get('SKYWORK_SECRET_KEY') || Deno.env.get('SKYWORK_API_SECRET');
+
+  console.log('[Skywork] Checking credentials:', {
+    hasSecretId: !!secretId,
+    hasSecretKey: !!secretKey,
+  });
 
   if (!secretId || !secretKey) {
-    console.warn('[Skywork] Credentials not configured');
+    console.warn('[Skywork] ❌ Credentials not configured. Please set either:');
+    console.warn('  - SKYWORK_SECRET_ID and SKYWORK_SECRET_KEY, or');
+    console.warn('  - SKYWORK_API_KEY and SKYWORK_API_SECRET');
     return null;
   }
 

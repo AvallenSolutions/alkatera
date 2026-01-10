@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.58.0';
-import { crypto } from 'https://deno.land/std@0.177.0/crypto/mod.ts';
+import { crypto as stdCrypto } from 'https://deno.land/std@0.208.0/crypto/mod.ts';
 
 // CORS headers for cross-origin requests
 const corsHeaders = {
@@ -18,11 +18,12 @@ const SKYWORK_TOOLS = {
   xlsx: 'gen_excel',
 } as const;
 
-// Skywork Client (inlined for deployment)
+// MD5 implementation using Deno's extended crypto module
 async function md5(text: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(text);
-  const hashBuffer = await crypto.subtle.digest('MD5', data);
+  // Use Deno std crypto which supports MD5
+  const hashBuffer = await stdCrypto.subtle.digest('MD5', data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
@@ -34,10 +35,21 @@ interface SkyworkResult {
 }
 
 async function callSkyworkAPI(tool: string, query: string, timeoutMs = 180000): Promise<SkyworkResult> {
-  const secretId = Deno.env.get('SKYWORK_SECRET_ID');
-  const secretKey = Deno.env.get('SKYWORK_SECRET_KEY');
+  // Support both credential naming conventions for flexibility
+  const secretId = Deno.env.get('SKYWORK_SECRET_ID') || Deno.env.get('SKYWORK_API_KEY');
+  const secretKey = Deno.env.get('SKYWORK_SECRET_KEY') || Deno.env.get('SKYWORK_API_SECRET');
+
+  console.log('[Skywork] Checking credentials:', {
+    hasSecretId: !!secretId,
+    hasSecretKey: !!secretKey,
+    secretIdVar: Deno.env.get('SKYWORK_SECRET_ID') ? 'SKYWORK_SECRET_ID' : (Deno.env.get('SKYWORK_API_KEY') ? 'SKYWORK_API_KEY' : 'NONE'),
+    secretKeyVar: Deno.env.get('SKYWORK_SECRET_KEY') ? 'SKYWORK_SECRET_KEY' : (Deno.env.get('SKYWORK_API_SECRET') ? 'SKYWORK_API_SECRET' : 'NONE'),
+  });
 
   if (!secretId || !secretKey) {
+    console.error('[Skywork] ❌ API credentials not configured. Please set either:');
+    console.error('  - SKYWORK_SECRET_ID and SKYWORK_SECRET_KEY, or');
+    console.error('  - SKYWORK_API_KEY and SKYWORK_API_SECRET');
     return { success: false, error: 'Credentials not configured' };
   }
 
