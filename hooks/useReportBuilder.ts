@@ -82,51 +82,33 @@ export function useReportBuilder() {
 
       console.log('✅ Report record created:', reportRecord.id);
 
-      // 3. Get session for auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
+      // 3. Call edge function using supabase.functions.invoke()
+      console.log('🔵 Calling edge function with report_config_id:', reportRecord.id);
 
-      // 4. Call edge function using direct fetch (bypass supabase.functions.invoke)
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-      const functionUrl = `${supabaseUrl}/functions/v1/generate-sustainability-report`;
-
-      console.log('🔵 Calling edge function at:', functionUrl);
-
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': supabaseAnonKey || '',
-        },
-        body: JSON.stringify({
+      const { data, error: functionError } = await supabase.functions.invoke('generate-sustainability-report', {
+        body: {
           report_config_id: reportRecord.id,
-        }),
+        },
       });
 
-      console.log('📡 Edge function response status:', response.status);
+      console.log('📡 Edge function response:', { data, error: functionError });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Edge function error response:', errorText);
+      if (functionError) {
+        console.error('❌ Edge function error:', functionError);
 
         // Update report status to failed
         await supabase
           .from('generated_reports')
           .update({
             status: 'failed',
-            error_message: `HTTP ${response.status}: ${errorText}`,
+            error_message: functionError.message || 'Unknown error',
           })
           .eq('id', reportRecord.id);
 
-        throw new Error(`Edge function failed: ${response.status}`);
+        throw new Error(`Edge function failed: ${functionError.message}`);
       }
 
-      const result = await response.json();
-      console.log('✅ Edge function result:', result);
+      const result = data;
 
       if (!result.success) {
         throw new Error(result.error || 'Report generation failed');
