@@ -10,6 +10,18 @@
  * NOTE: Scope breakdown has been moved to useCompanyFootprint hook
  * to use corporate_reports as single source of truth.
  * See hooks/data/useCompanyFootprint.ts for emissions scope breakdown.
+ *
+ * WATER CALCULATION METHODOLOGY:
+ * - Product LCA water = embedded water footprint (upstream supply chain + processing)
+ * - Facility water (facility_water_data) = operational water at owned facilities
+ * - TOTAL COMPANY WATER = Product LCA water (scaled by production volume)
+ *
+ * DOUBLE-COUNTING PREVENTION:
+ * - Product LCA "processing" water represents embedded water in materials/processes
+ * - Facility operational water is actual metered consumption at owned sites
+ * - These are complementary, not overlapping, when properly categorised
+ * - If both data sources exist, facility water should be used for Scope 1/2 operations
+ *   and Product LCA water for Scope 3 supply chain water
  */
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
@@ -263,19 +275,21 @@ export function useCompanyMetrics() {
 
       lcas.forEach((lca) => {
         const impacts = lca.aggregated_impacts as ImpactMetrics;
+        const productionVolume = (lca as any).production_volume || 0;
+
         if (impacts) {
-          totalImpacts.climate_change_gwp100 += impacts.climate_change_gwp100 || 0;
-          totalImpacts.water_consumption += impacts.water_consumption || 0;
-          totalImpacts.water_scarcity_aware += impacts.water_scarcity_aware || 0;
-          totalImpacts.land_use += impacts.land_use || 0;
-          totalImpacts.terrestrial_ecotoxicity += impacts.terrestrial_ecotoxicity || 0;
-          totalImpacts.freshwater_eutrophication += impacts.freshwater_eutrophication || 0;
-          totalImpacts.terrestrial_acidification += impacts.terrestrial_acidification || 0;
-          totalImpacts.fossil_resource_scarcity += impacts.fossil_resource_scarcity || 0;
+          totalImpacts.climate_change_gwp100 += (impacts.climate_change_gwp100 || 0) * productionVolume;
+          totalImpacts.water_consumption += (impacts.water_consumption || 0) * productionVolume;
+          totalImpacts.water_scarcity_aware += (impacts.water_scarcity_aware || 0) * productionVolume;
+          totalImpacts.land_use += (impacts.land_use || 0) * productionVolume;
+          totalImpacts.terrestrial_ecotoxicity += (impacts.terrestrial_ecotoxicity || 0) * productionVolume;
+          totalImpacts.freshwater_eutrophication += (impacts.freshwater_eutrophication || 0) * productionVolume;
+          totalImpacts.terrestrial_acidification += (impacts.terrestrial_acidification || 0) * productionVolume;
+          totalImpacts.fossil_resource_scarcity += (impacts.fossil_resource_scarcity || 0) * productionVolume;
 
           productContributions.push({
             name: lca.product_name || 'Unknown Product',
-            value: impacts.climate_change_gwp100 || 0,
+            value: (impacts.climate_change_gwp100 || 0) * productionVolume,
           });
         }
 
@@ -314,13 +328,15 @@ export function useCompanyMetrics() {
       let circularityPercentage = 0;
       const totalWasteGenerated = lcas.reduce((sum, lca) => {
         const eolWaste = lca.aggregated_impacts?.end_of_life_waste_kg || 0;
-        return sum + eolWaste;
+        const prodVol = (lca as any).production_volume || 0;
+        return sum + (eolWaste * prodVol);
       }, 0);
 
       const recyclableWaste = lcas.reduce((sum, lca) => {
         const recyclability = lca.aggregated_impacts?.recyclability_percentage || 0;
         const eolWaste = lca.aggregated_impacts?.end_of_life_waste_kg || 0;
-        return sum + (eolWaste * recyclability / 100);
+        const prodVol = (lca as any).production_volume || 0;
+        return sum + (eolWaste * recyclability / 100 * prodVol);
       }, 0);
 
       if (totalWasteGenerated > 0) {
