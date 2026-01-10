@@ -1,0 +1,38 @@
+# Alkatera
+
+> Sustainability, Distilled. The first ecological intelligence engine for the global drinks industry.
+
+Alkatera is a specialized sustainability SaaS platform designed for breweries, distilleries, wineries, and soft drink producers. It moves beyond basic carbon accounting to provide a full-spectrum environmental stewardship tool that quantifies the "impact per litre" of beverages.
+
+## Core Platform Stages
+- **Analyse:** Dissects the "liquid journey" by standardising raw inputs against global frameworks (GHG Protocol, ISO 14064/14067) to reveal the true composition of a brand's footprint.
+- **Calculate:** Executes complex, audit-ready calculations for carbon equivalents in packaging (glass, aluminium, kegs) and location-specific water scarcity indices.
+- **Strategise:** Enables brands to move from reporting to action by building resilient supply chains and setting Science-Based Targets (SBTi) to regenerate terroir.
+
+## Key Features & Specialisms
+- **Ecological Intelligence:** Deep-tier mapping of agricultural dependencies including soil health and climate stability for key ingredients (Barley, Agave, Grapes, Cane).
+- **Water Stewardship (AWARE Protocol):** Uses the AWARE protocol to provide location-specific water impact scores, validating true stewardship in high-volume production.
+- **Greenwashing Protection:** Real-time asset scanning against the Digital Markets, Competition and Consumers (DMCC) Act and the EU Green Claims Directive to ensure marketing claims are legally defensible.
+- **Full Spectrum Traceability:** Tracks performance beyond carbon, including waste stream management and biodiversity impact mapping.
+- **B-Corp Framework Integration:** Automated data mapping to the B Impact Assessment (Environment section) to streamline certification and maintenance.
+- **Terroir Regeneration:** Tools specifically designed to track and drive value back into the agricultural "terroir" that beverage products depend on.
+
+## Technical Standards
+- **Reporting Frameworks:** TCFD, CSRD, SECR, and GRI.
+- **Compliance:** Audit-ready outputs for global regulatory bodies.
+- **Target Metrics:** Quantified impact per litre of finished product.
+
+## Product Roadmap
+- **Status:** Pre-Launch / Early Access.
+- **Availability:** Full launch scheduled for Q1 2026.
+
+## Target Audience
+- Founders and CEOs of drinks brands.
+- Sustainability and ESG Managers in the beverage sector.
+- Operations Leads in breweries and distilleries.
+- Supply chain auditors and beverage consultants.
+
+## Links
+- Homepage: [https://alkatera.com](https://alkatera.com)
+- LinkedIn: [https://www.linkedin.com/company/alkatera](https://www.linkedin.com/company/alkatera)
+- Contact: hello@alkatera.com
