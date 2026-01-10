@@ -52,6 +52,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="alternate" type="text/plain" title="LLM-friendly content" href="/llms.txt" />
+      </head>
       <GoogleAnalytics />
       <body className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} font-body`}>
         <ThemeProvider

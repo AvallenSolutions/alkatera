@@ -1,0 +1,46 @@
+# Alkatera: Full Technical Specification & Feature Deep-Dive
+
+## 1. Vision: Sustainability, Distilled
+Alkatera is the first "Ecological Intelligence Engine" built exclusively for the global drinks industry. Unlike generic carbon calculators, Alkatera treats the beverage as a product of its environment—integrating data from soil, water, and sky to create a full-spectrum impact profile.
+
+## 2. Core Methodologies & Compliance
+Alkatera operates to the highest global standards for environmental accounting and legal protection:
+- **Carbon Accounting:** Built on GHG Protocol Corporate Standard and ISO 14064. Product-level carbon footprints (PCF) follow ISO 14067.
+- **Water Footprinting:** Utilises the **AWARE (Available WAter REmaining)** protocol for location-specific midpoint impact assessment.
+- **Greenwashing Protection:** Automated scanning against the **UK DMCC Act** (Digital Markets, Competition and Consumers) and the **EU Green Claims Directive**.
+- **Reporting Standards:** Native support for CSRD (ESRS), SECR, TCFD, and GRI (Beverage Sector Supplement).
+
+## 3. The "Liquid Journey" Analysis
+Alkatera standardises and calculates impact across the entire value chain of a drink:
+
+### Tier 1: Terroir & Agriculture
+- **Soil Intelligence:** Mapping agricultural dependencies for Barley, Agave, Grapes, Sugarcane, and Botanicals.
+- **Biogenic Emissions:** Specialized tracking of CO2 released during fermentation and its sequestration potential.
+- **Regenerative Metrics:** Tracking biodiversity gains and soil organic matter (SOM) within the supply chain.
+
+### Tier 2: Production & Processing
+- **Energy Intensity:** Benchmarking for brewhouse efficiency, still-run energy consumption, and refrigeration loads.
+- **Water-to-Product Ratio:** Calculating total litres of water used per litre of finished product (Blue, Green, and Grey water footprints).
+- **Waste Streams:** Circularity tracking for spent grain (draff), pomace, and wastewater treatment.
+
+### Tier 3: Packaging & Logistics
+- **Vessel LCA:** Comparative life-cycle analysis for glass (virgin vs. recycled), aluminium, PET, and kegging systems.
+- **Closure Impact:** Footprinting for corks, crowns, and capsules.
+- **Distribution:** Real-time logistics emissions tracking across road, sea, and air.
+
+## 4. Strategic Stewardship Tools
+- **Science-Based Targets (SBTi):** Tools to help brands set and track pathways to 1.5°C alignment.
+- **B-Corp Navigator:** Automated data mapping to the B Impact Assessment (BIA) Environment pillar.
+- **Risk Mapping:** Visualising supply chain vulnerability to climate-driven droughts or crop failures.
+
+## 5. Implementation for Partners
+Alkatera is designed for seamless integration:
+- **ERP Connections:** Direct API hooks for SAP, Oracle, and brewery-specific software like Ekos.
+- **Audit Logs:** Every calculation is traceable to the source data, providing "investor-grade" assurance.
+- **Output formats:** High-resolution JSON data, CSV exports, and pre-formatted PDF Sustainability Reports.
+
+## 6. Development Status
+- **Current Version:** Pre-Launch Beta.
+- **Public Launch:** Scheduled Q1 2026.
+- **Contact:** [hello@alkatera.com](mailto:hello@alkatera.com)
+- **Web:** [https://alkatera.com](https://alkatera.com)
