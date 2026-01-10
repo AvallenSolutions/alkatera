@@ -158,6 +158,9 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // Store report_config_id in outer scope for error handling
+  let report_config_id: string | undefined;
+
   try {
     console.log('🔵 [Sustainability Report] Starting report generation...');
 
@@ -188,8 +191,9 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ [Auth] User authenticated:', user.id);
 
-    // 2. Parse request
-    const { report_config_id } = await req.json();
+    // 2. Parse request (only read body once!)
+    const body = await req.json();
+    report_config_id = body.report_config_id;
 
     if (!report_config_id) {
       console.error('❌ [Request] Missing report_config_id');
@@ -340,19 +344,17 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('❌ [Error] Report generation error:', error);
 
-    // Try to update report status to failed
-    try {
-      const authHeader = req.headers.get('Authorization');
-      if (authHeader) {
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-          { global: { headers: { Authorization: authHeader } } }
-        );
+    // Try to update report status to failed (without re-reading body)
+    if (report_config_id) {
+      try {
+        const authHeader = req.headers.get('Authorization');
+        if (authHeader) {
+          const supabaseClient = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            { global: { headers: { Authorization: authHeader } } }
+          );
 
-        const body = await req.json();
-        const report_config_id = body.report_config_id;
-        if (report_config_id) {
           await supabaseClient
             .from('generated_reports')
             .update({
@@ -361,9 +363,9 @@ Deno.serve(async (req: Request) => {
             })
             .eq('id', report_config_id);
         }
+      } catch (updateError) {
+        console.error('❌ [Error] Failed to update report status:', updateError);
       }
-    } catch (updateError) {
-      console.error('❌ [Error] Failed to update report status:', updateError);
     }
 
     return new Response(
