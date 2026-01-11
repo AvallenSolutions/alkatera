@@ -70,6 +70,6 @@ export const config = {
      * - public files (public folder)
      * - api/stripe/webhooks (Stripe webhook endpoint)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/stripe/webhooks|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/stripe/webhooks|.*\\.(?:svg|png|jpg|jpeg|gif|webp|txt)$).*)',
   ],
 }
