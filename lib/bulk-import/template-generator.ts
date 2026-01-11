@@ -1,14 +1,69 @@
-export function downloadTemplateAsCSV(type: 'ingredients' | 'packaging' = 'ingredients'): void {
-  const headers = type === 'ingredients' ? ['Name', 'Quantity', 'Unit', 'Origin Country', 'Supplier'] : ['Name', 'Material Type', 'Weight (g)', 'Recyclable', 'Supplier'];
-  const sampleData = type === 'ingredients' ? [['Organic Sugar', '100', 'kg', 'Brazil', 'Example Supplier'], ['Wheat Flour', '50', 'kg', 'UK', 'Example Supplier']] : [['Glass Bottle 750ml', 'Glass', '350', 'Yes', 'Example Supplier'], ['Aluminium Cap', 'Aluminium', '5', 'Yes', 'Example Supplier']];
-  const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
+/**
+ * Template Generator for Bulk Import
+ *
+ * Generates CSV templates for bulk importing product data
+ */
+
+export function downloadTemplateAsCSV() {
+  const headers = [
+    'Product Name',
+    'SKU',
+    'Category',
+    'Ingredient Name',
+    'Ingredient Quantity',
+    'Ingredient Unit',
+    'Packaging Type',
+    'Packaging Material',
+    'Packaging Quantity',
+    'Packaging Unit'
+  ];
+
+  const exampleRows = [
+    [
+      'Example Product',
+      'PROD-001',
+      'Beverage',
+      'Water',
+      '100',
+      'L',
+      'Bottle',
+      'Glass',
+      '1',
+      'unit'
+    ],
+    [
+      '',
+      '',
+      '',
+      'Sugar',
+      '5',
+      'kg',
+      'Label',
+      'Paper',
+      '1',
+      'unit'
+    ]
+  ];
+
+  const csvContent = [
+    headers.join(','),
+    ...exampleRows.map(row => row.join(','))
+  ].join('\n');
+
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = `${type}_import_template.csv`;
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute('href', url);
+  link.setAttribute('download', 'product_import_template.csv');
+  link.style.visibility = 'hidden';
+
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(link.href);
+  document.body.removeChild(link);
 }
-export function createGoogleSheetsTemplate(_type: 'ingredients' | 'packaging' = 'ingredients'): string {
-  return 'https://docs.google.com/spreadsheets/d/create';
+
+export function createGoogleSheetsTemplate() {
+  // Placeholder for Google Sheets template creation
+  console.log('Google Sheets template creation not implemented yet');
 }
