@@ -269,6 +269,14 @@ function TargetProgressCard({ targets, currentMetrics }: { targets: CircularityT
 }
 
 export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
+  // Debug logging
+  console.log('[WasteDeepDive] Received:', {
+    loading,
+    hasMetrics: !!wasteMetrics,
+    totalWasteKg: wasteMetrics?.total_waste_kg,
+    metricsKeys: wasteMetrics ? Object.keys(wasteMetrics) : []
+  });
+
   if (loading) {
     return (
       <div className="space-y-4">
