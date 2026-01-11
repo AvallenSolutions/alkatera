@@ -1,9 +1,3 @@
-/**
- * Template Generator for Bulk Import
- *
- * Generates CSV templates for bulk importing product data
- */
-
 export function downloadTemplateAsCSV() {
   const headers = [
     'Product Name',
@@ -64,6 +58,5 @@ export function downloadTemplateAsCSV() {
 }
 
 export function createGoogleSheetsTemplate() {
-  // Placeholder for Google Sheets template creation
   console.log('Google Sheets template creation not implemented yet');
 }

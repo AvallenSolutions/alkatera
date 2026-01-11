@@ -1,21 +1,20 @@
-export interface BulkImportRow {
-  name: string;
+export interface ExtractedItem {
+  id: string;
+  raw_name: string;
+  clean_name: string | null;
   quantity: number | null;
   unit: string | null;
-  origin_country?: string;
-  supplier?: string;
-  material_type?: string;
-  recyclable?: boolean;
+  item_type: 'ingredient' | 'packaging';
+  matched_material_id: string | null;
+  match_confidence: number | null;
+  is_reviewed: boolean;
+  is_imported: boolean;
 }
 
-export interface ImportValidationError {
-  row: number;
-  field: string;
-  message: string;
-}
-
-export interface ImportResult {
-  success: boolean;
-  imported: number;
-  errors: ImportValidationError[];
+export interface ImportSession {
+  id: string;
+  organization_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  total_items: number;
+  created_at: string;
 }

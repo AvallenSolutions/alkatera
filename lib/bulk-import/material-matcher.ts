@@ -1,9 +1,3 @@
-/**
- * Material Matcher for Bulk Import
- *
- * Matches imported materials to existing database materials
- */
-
 export interface MatchResult {
   materialId: string | null;
   confidence: number;
@@ -23,7 +17,6 @@ export function getConfidenceLevel(confidence: number): { label: string; color: 
 }
 
 export function matchMaterial(materialName: string, existingMaterials: any[]): MatchResult {
-  // Simple fuzzy matching placeholder
   const normalizedName = materialName.toLowerCase().trim();
 
   for (const material of existingMaterials) {
