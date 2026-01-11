@@ -1,7 +1,8 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Mountain, Leaf, Droplets, Wind } from 'lucide-react';
+import { Mountain, Leaf, Droplets, Wind, TrendingUp, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
 
 interface NatureDeepDiveProps {
@@ -9,58 +10,91 @@ interface NatureDeepDiveProps {
 }
 
 export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
+  if (!natureMetrics) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Nature Impact Assessment</CardTitle>
+          <CardDescription>No data available</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  const perUnit = natureMetrics.per_unit;
+  const total = natureMetrics;
+  const production = natureMetrics.total_production_volume;
+
+  const getPerformance = (value: number, goodThreshold: number, fairThreshold: number) => {
+    if (value < goodThreshold) {
+      return { level: 'Excellent', color: 'text-green-600', bgColor: 'bg-green-100', barColor: 'bg-green-500' };
+    }
+    if (value < fairThreshold) {
+      return { level: 'Good', color: 'text-emerald-600', bgColor: 'bg-emerald-100', barColor: 'bg-emerald-500' };
+    }
+    return { level: 'Needs Improvement', color: 'text-amber-600', bgColor: 'bg-amber-100', barColor: 'bg-amber-500' };
+  };
+
   const metrics = [
     {
       name: 'Land Use',
-      value: natureMetrics?.land_use || 0,
+      perUnit: perUnit.land_use,
+      total: total.land_use,
       unit: 'm²a crop eq',
+      unitShort: 'm²a',
       icon: Mountain,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
       description: 'Land occupation and transformation impact',
-      maxValue: 10000,
       interpretation: 'Lower is better - less land transformed',
-      targetGuidance: 'Good: <500 | Fair: 500-2000 | High: >2000',
+      benchmark: { good: 500, fair: 2000 },
+      targetGuidance: 'Excellent: <500 | Good: 500-2,000 | Needs Work: >2,000',
     },
     {
       name: 'Terrestrial Ecotoxicity',
-      value: natureMetrics?.terrestrial_ecotoxicity || 0,
-      unit: 'kg 1,4-DCB',
+      perUnit: perUnit.terrestrial_ecotoxicity,
+      total: total.terrestrial_ecotoxicity,
+      unit: 'kg 1,4-DCB eq',
+      unitShort: 'kg DCB',
       icon: Leaf,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100',
       description: 'Toxic impact on terrestrial ecosystems',
-      maxValue: 100,
       interpretation: 'Lower is better - less toxic impact',
-      targetGuidance: 'Good: <5 | Fair: 5-15 | High: >15',
+      benchmark: { good: 5, fair: 15 },
+      targetGuidance: 'Excellent: <5 | Good: 5-15 | Needs Work: >15',
     },
     {
       name: 'Freshwater Eutrophication',
-      value: natureMetrics?.freshwater_eutrophication || 0,
+      perUnit: perUnit.freshwater_eutrophication,
+      total: total.freshwater_eutrophication,
       unit: 'kg P eq',
+      unitShort: 'kg P eq',
       icon: Droplets,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
       description: 'Nutrient loading in freshwater bodies',
-      maxValue: 10,
       interpretation: 'Lower is better - less water pollution',
-      targetGuidance: 'Good: <0.3 | Fair: 0.3-0.7 | High: >0.7',
+      benchmark: { good: 0.3, fair: 0.7 },
+      targetGuidance: 'Excellent: <0.3 | Good: 0.3-0.7 | Needs Work: >0.7',
     },
     {
       name: 'Terrestrial Acidification',
-      value: natureMetrics?.terrestrial_acidification || 0,
+      perUnit: perUnit.terrestrial_acidification,
+      total: total.terrestrial_acidification,
       unit: 'kg SO₂ eq',
+      unitShort: 'kg SO₂',
       icon: Wind,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
       description: 'Acidifying emissions affecting soil and plants',
-      maxValue: 50,
       interpretation: 'Lower is better - less soil acidification',
-      targetGuidance: 'Good: <1.5 | Fair: 1.5-3.0 | High: >3.0',
+      benchmark: { good: 1.5, fair: 3.0 },
+      targetGuidance: 'Excellent: <1.5 | Good: 1.5-3.0 | Needs Work: >3.0',
     },
   ];
 
-  const maxMetricValue = Math.max(...metrics.map(m => (m.value / m.maxValue) * 100));
+  const maxPerUnitValue = Math.max(...metrics.map(m => (m.perUnit / m.benchmark.fair) * 100));
 
   return (
     <div className="space-y-6">
@@ -70,10 +104,10 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2">
                 <Mountain className="h-5 w-5" />
-                Nature Impact Radar
+                Nature Impact Assessment
               </CardTitle>
               <CardDescription>
-                Multi-dimensional biodiversity & ecosystem assessment
+                Per-unit biodiversity metrics • {production.toLocaleString()} units produced
               </CardDescription>
             </div>
             <div className="flex gap-1">
@@ -86,8 +120,9 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
           <div className="grid md:grid-cols-2 gap-4">
             {metrics.map((metric) => {
               const IconComponent = metric.icon;
-              const percentageOfMax = metric.maxValue > 0 ? (metric.value / metric.maxValue) * 100 : 0;
-              const relativeIntensity = maxMetricValue > 0 ? (percentageOfMax / maxMetricValue) * 100 : 0;
+              const performance = getPerformance(metric.perUnit, metric.benchmark.good, metric.benchmark.fair);
+              const percentageOfFair = metric.benchmark.fair > 0 ? (metric.perUnit / metric.benchmark.fair) * 100 : 0;
+              const relativeIntensity = maxPerUnitValue > 0 ? (percentageOfFair / maxPerUnitValue) * 100 : 0;
 
               const getTitleClass = () => {
                 if (metric.name === 'Land Use') return 'text-green-900';
@@ -100,39 +135,73 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
               return (
                 <Card key={metric.name} className={`border-2 ${metric.bgColor} border-opacity-30`}>
                   <CardHeader className="pb-3">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-lg ${metric.bgColor}`}>
-                        <IconComponent className={`h-4 w-4 ${metric.color}`} />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-2 rounded-lg ${metric.bgColor}`}>
+                          <IconComponent className={`h-4 w-4 ${metric.color}`} />
+                        </div>
+                        <CardTitle className={`text-sm ${getTitleClass()}`}>{metric.name}</CardTitle>
                       </div>
-                      <CardTitle className={`text-sm ${getTitleClass()}`}>{metric.name}</CardTitle>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="text-sm max-w-xs">{metric.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="flex items-baseline gap-2">
-                      <span className={`text-2xl font-bold ${getTitleClass()}`}>
-                        {metric.value.toLocaleString('en-GB', { maximumFractionDigits: 2 })}
-                      </span>
-                      <span className={`text-xs ${getTitleClass()}`}>{metric.unit}</span>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Per Unit</span>
+                        <Badge className={`${performance.bgColor} ${performance.color} border-0 text-xs`}>
+                          {performance.level}
+                        </Badge>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-3xl font-bold ${getTitleClass()}`}>
+                          {metric.perUnit >= 1 ? metric.perUnit.toFixed(2) : metric.perUnit.toFixed(4)}
+                        </span>
+                        <span className={`text-sm ${getTitleClass()}`}>{metric.unitShort}</span>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span className={`font-medium ${getTitleClass()}`}>{metric.interpretation}</span>
-                        <Badge variant="outline" className="text-xs text-slate-900">Impact Level</Badge>
+                        <span className="text-muted-foreground">vs benchmark</span>
                       </div>
                       <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
                         <div
-                          className={`h-full ${metric.color.replace('text-', 'bg-')} transition-all duration-500`}
+                          className={`h-full ${performance.barColor} transition-all duration-500`}
                           style={{ width: `${Math.min(relativeIntensity, 100)}%` }}
                         />
                       </div>
-                      <p className={`text-xs ${getTitleClass()}`}>
-                        {metric.description}
-                      </p>
-                      <div className="pt-2 border-t">
-                        <p className={`text-xs font-medium ${getTitleClass()}`}>Benchmark:</p>
-                        <p className={`text-xs mt-1 ${getTitleClass()}`}>{metric.targetGuidance}</p>
+                    </div>
+
+                    <div className="pt-2 border-t space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-medium ${getTitleClass()}`}>Total Company Impact</span>
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{production.toLocaleString()} units</span>
+                        </div>
                       </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-xl font-bold ${getTitleClass()}`}>
+                          {metric.total.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </span>
+                        <span className={`text-xs ${getTitleClass()}`}>{metric.unitShort}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t">
+                      <p className={`text-xs font-medium ${getTitleClass()} mb-1`}>Benchmark:</p>
+                      <p className={`text-xs ${getTitleClass()}`}>{metric.targetGuidance}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -182,6 +251,17 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-blue-50 border-blue-200">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-sm font-semibold text-blue-900">
+                Understanding These Metrics
+              </p>
+              <p className="text-xs text-blue-700">
+                These metrics show average per-unit impacts across your product portfolio. Per-unit values allow fair comparison against industry benchmarks regardless of production volume. Total company impacts help you understand your overall nature footprint and prioritise reduction initiatives.
+              </p>
             </CardContent>
           </Card>
 

@@ -1,47 +1,61 @@
-export interface MatchResult {
-  materialId: string | null;
-  confidence: number;
-  label: string;
-}
+import { ConfidenceLevel } from './types';
 
-export function getConfidenceLevel(confidence: number): { label: string; color: string } {
+export function getConfidenceLevel(confidence: number): ConfidenceLevel {
   if (confidence >= 0.9) {
-    return { label: 'high', color: 'green' };
-  } else if (confidence >= 0.7) {
-    return { label: 'medium', color: 'amber' };
-  } else if (confidence >= 0.5) {
-    return { label: 'low', color: 'orange' };
-  } else {
-    return { label: 'no match', color: 'red' };
+    return {
+      level: 'high',
+      label: 'High',
+      color: 'text-green-600',
+    };
   }
-}
 
-export function matchMaterial(materialName: string, existingMaterials: any[]): MatchResult {
-  const normalizedName = materialName.toLowerCase().trim();
+  if (confidence >= 0.7) {
+    return {
+      level: 'medium',
+      label: 'Medium',
+      color: 'text-amber-600',
+    };
+  }
 
-  for (const material of existingMaterials) {
-    const normalizedMaterialName = material.name.toLowerCase().trim();
-
-    if (normalizedMaterialName === normalizedName) {
-      return {
-        materialId: material.id,
-        confidence: 1.0,
-        label: 'exact'
-      };
-    }
-
-    if (normalizedMaterialName.includes(normalizedName) || normalizedName.includes(normalizedMaterialName)) {
-      return {
-        materialId: material.id,
-        confidence: 0.8,
-        label: 'partial'
-      };
-    }
+  if (confidence >= 0.4) {
+    return {
+      level: 'low',
+      label: 'Low',
+      color: 'text-orange-600',
+    };
   }
 
   return {
-    materialId: null,
-    confidence: 0,
-    label: 'no match'
+    level: 'none',
+    label: 'No Match',
+    color: 'text-gray-600',
   };
+}
+
+export function calculateMatchConfidence(
+  searchTerm: string,
+  materialName: string
+): number {
+  const search = searchTerm.toLowerCase().trim();
+  const material = materialName.toLowerCase().trim();
+
+  if (search === material) {
+    return 1.0;
+  }
+
+  if (material.includes(search) || search.includes(material)) {
+    return 0.85;
+  }
+
+  const searchWords = search.split(/\s+/);
+  const materialWords = material.split(/\s+/);
+  const matchingWords = searchWords.filter(word =>
+    materialWords.some(mWord => mWord.includes(word) || word.includes(mWord))
+  );
+
+  if (matchingWords.length > 0) {
+    return 0.6 * (matchingWords.length / searchWords.length);
+  }
+
+  return 0;
 }

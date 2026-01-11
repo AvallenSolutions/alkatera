@@ -122,6 +122,13 @@ export interface NatureMetrics {
   terrestrial_ecotoxicity: number;
   freshwater_eutrophication: number;
   terrestrial_acidification: number;
+  per_unit: {
+    land_use: number;
+    terrestrial_ecotoxicity: number;
+    freshwater_eutrophication: number;
+    terrestrial_acidification: number;
+  };
+  total_production_volume: number;
 }
 
 export interface MaterialBreakdownItem {
@@ -499,12 +506,32 @@ export function useCompanyMetrics() {
         }
       }
 
-      // Set nature metrics
+      // Calculate total production volume across all products
+      const totalProductionVolume = lcas.reduce((sum, lca) => {
+        return sum + ((lca as any).production_volume || 0);
+      }, 0);
+
+      // Calculate weighted average per-unit impacts
+      const perUnitImpacts = totalProductionVolume > 0 ? {
+        land_use: totalImpacts.land_use / totalProductionVolume,
+        terrestrial_ecotoxicity: totalImpacts.terrestrial_ecotoxicity / totalProductionVolume,
+        freshwater_eutrophication: totalImpacts.freshwater_eutrophication / totalProductionVolume,
+        terrestrial_acidification: totalImpacts.terrestrial_acidification / totalProductionVolume,
+      } : {
+        land_use: 0,
+        terrestrial_ecotoxicity: 0,
+        freshwater_eutrophication: 0,
+        terrestrial_acidification: 0,
+      };
+
+      // Set nature metrics with both total and per-unit values
       setNatureMetrics({
         land_use: totalImpacts.land_use,
         terrestrial_ecotoxicity: totalImpacts.terrestrial_ecotoxicity,
         freshwater_eutrophication: totalImpacts.freshwater_eutrophication,
         terrestrial_acidification: totalImpacts.terrestrial_acidification,
+        per_unit: perUnitImpacts,
+        total_production_volume: totalProductionVolume,
       });
 
       setLoading(false);

@@ -1,47 +1,50 @@
-export function downloadTemplateAsCSV() {
+export function downloadTemplateAsCSV(): void {
   const headers = [
     'Product Name',
     'SKU',
     'Category',
+    'Description',
     'Ingredient Name',
-    'Ingredient Quantity',
-    'Ingredient Unit',
+    'Quantity',
+    'Unit',
+    'Origin',
     'Packaging Type',
     'Packaging Material',
-    'Packaging Quantity',
-    'Packaging Unit'
+    'Packaging Weight',
   ];
 
   const exampleRows = [
     [
       'Example Product',
-      'PROD-001',
+      'SKU001',
       'Beverage',
+      'An example product',
       'Water',
-      '100',
-      'L',
+      '500',
+      'ml',
+      'UK',
       'Bottle',
       'Glass',
-      '1',
-      'unit'
+      '250g',
     ],
     [
       '',
       '',
       '',
+      '',
       'Sugar',
-      '5',
-      'kg',
-      'Label',
-      'Paper',
-      '1',
-      'unit'
-    ]
+      '50',
+      'g',
+      'Brazil',
+      '',
+      '',
+      '',
+    ],
   ];
 
   const csvContent = [
     headers.join(','),
-    ...exampleRows.map(row => row.join(','))
+    ...exampleRows.map(row => row.join(',')),
   ].join('\n');
 
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -49,14 +52,13 @@ export function downloadTemplateAsCSV() {
   const url = URL.createObjectURL(blob);
 
   link.setAttribute('href', url);
-  link.setAttribute('download', 'product_import_template.csv');
+  link.setAttribute('download', 'product-import-template.csv');
   link.style.visibility = 'hidden';
-
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 }
 
-export function createGoogleSheetsTemplate() {
-  console.log('Google Sheets template creation not implemented yet');
+export function createGoogleSheetsTemplate(): string {
+  return 'https://docs.google.com/spreadsheets/d/example-template-id/edit';
 }
