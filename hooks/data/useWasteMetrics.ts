@@ -171,7 +171,7 @@ export function useWasteMetrics(year?: number) {
             data_provenance,
             confidence_score,
             activity_date,
-            facilities!inner(id, name, operational_control)
+            facilities(id, name, operational_control)
           `)
           .eq('organization_id', currentOrganization.id)
           .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
@@ -180,9 +180,8 @@ export function useWasteMetrics(year?: number) {
 
         if (result.error) throw result.error;
         wasteData = result.data;
-        console.log('[useWasteMetrics] ✅ Waste data fetched:', wasteData?.length || 0, 'rows');
       } catch (err) {
-        console.error('[useWasteMetrics] ❌ Waste data query failed:', err);
+        console.error('[useWasteMetrics] Waste data query failed:', err);
         throw err;
       }
 
@@ -196,9 +195,8 @@ export function useWasteMetrics(year?: number) {
 
         if (result.error) throw result.error;
         circularityData = result.data;
-        console.log('[useWasteMetrics] ✅ Circularity data fetched');
       } catch (err) {
-        console.error('[useWasteMetrics] ❌ Circularity query failed:', err);
+        console.error('[useWasteMetrics] Circularity query failed:', err);
         throw err;
       }
 
@@ -215,9 +213,8 @@ export function useWasteMetrics(year?: number) {
 
         if (result.error) throw result.error;
         eolData = result.data;
-        console.log('[useWasteMetrics] ✅ End-of-life data fetched:', eolData?.length || 0, 'rows');
       } catch (err) {
-        console.error('[useWasteMetrics] ❌ End-of-life query failed:', err);
+        console.error('[useWasteMetrics] End-of-life query failed:', err);
         throw err;
       }
 
@@ -232,9 +229,8 @@ export function useWasteMetrics(year?: number) {
 
         if (result.error) throw result.error;
         targetsData = result.data;
-        console.log('[useWasteMetrics] ✅ Targets data fetched');
       } catch (err) {
-        console.error('[useWasteMetrics] ❌ Targets query failed:', err);
+        console.error('[useWasteMetrics] Targets query failed:', err);
         throw err;
       }
 
@@ -248,9 +244,8 @@ export function useWasteMetrics(year?: number) {
           .lte('production_date', `${currentYear}-12-31`);
 
         productionData = result.data;
-        console.log('[useWasteMetrics] ✅ Production data fetched:', productionData?.length || 0, 'rows');
       } catch (err) {
-        console.warn('[useWasteMetrics] ⚠️ Production query failed (non-critical):', err);
+        console.warn('[useWasteMetrics] Production query failed (non-critical):', err);
         productionData = [];
       }
 
@@ -360,16 +355,6 @@ export function useWasteMetrics(year?: number) {
         .sort((a, b) => b.total_kg - a.total_kg);
 
       const diversionRate = totalWasteKg > 0 ? (circularWasteKg / totalWasteKg) * 100 : 0;
-
-      // Debug logging
-      console.log('[useWasteMetrics] Calculation results:', {
-        entriesCount: wasteEntries.length,
-        totalWasteKg,
-        totalEmissions,
-        hazardousWasteKg,
-        circularWasteKg,
-        diversionRate,
-      });
 
       const wasteStreams: WasteStreamItem[] = wasteEntries.map((entry) => ({
         id: entry.id,
