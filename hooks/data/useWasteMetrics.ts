@@ -155,9 +155,9 @@ export function useWasteMetrics(year?: number) {
       let targetsData: any | null;
       let productionData: any[] | null;
 
-      // Query 1: Waste data
+      // Query 1: Waste data (without facilities join to avoid RLS issues)
       try {
-        const result = await supabase
+        const wasteResult = await supabase
           .from('facility_activity_entries')
           .select(`
             id,
@@ -170,17 +170,39 @@ export function useWasteMetrics(year?: number) {
             calculated_emissions_kg_co2e,
             data_provenance,
             confidence_score,
-            activity_date,
-            facilities(id, name, operational_control)
+            activity_date
           `)
           .eq('organization_id', currentOrganization.id)
           .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
           .gte('activity_date', `${currentYear}-01-01`)
           .lte('activity_date', `${currentYear}-12-31`);
 
-        if (result.error) throw result.error;
-        wasteData = result.data;
-      } catch (err) {
+        if (wasteResult.error) throw wasteResult.error;
+
+        // Fetch facilities separately to avoid RLS join issues
+        const facilityIds = Array.from(new Set(wasteResult.data?.map(w => w.facility_id).filter(Boolean) || []));
+
+        let facilitiesMap: Record<string, any> = {};
+        if (facilityIds.length > 0) {
+          const facilitiesResult = await supabase
+            .from('facilities')
+            .select('id, name, operational_control')
+            .in('id', facilityIds);
+
+          if (!facilitiesResult.error && facilitiesResult.data) {
+            facilitiesMap = facilitiesResult.data.reduce((acc, f) => {
+              acc[f.id] = f;
+              return acc;
+            }, {} as Record<string, any>);
+          }
+        }
+
+        // Merge facility data into waste data
+        wasteData = wasteResult.data?.map(entry => ({
+          ...entry,
+          facilities: entry.facility_id ? facilitiesMap[entry.facility_id] : null
+        })) || [];
+      } catch (err: any) {
         console.error('[useWasteMetrics] Waste data query failed:', err);
         throw err;
       }
