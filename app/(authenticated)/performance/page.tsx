@@ -28,6 +28,7 @@ import Link from 'next/link';
 
 import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
+import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
 import { useOrganization } from '@/lib/organizationContext';
 import type {
   Scope3CategoryData,
@@ -497,6 +498,7 @@ export default function PerformancePage() {
   const { currentOrganization } = useOrganization();
   const hookResult = useCompanyMetrics();
   const { footprint: footprintData, loading: footprintLoading } = useCompanyFootprint(currentYear);
+  const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(currentYear);
 
   const {
     categories: scope3Categories,
@@ -596,17 +598,13 @@ export default function PerformancePage() {
     },
   ];
 
-  const estimatedTotalWaste = 5650;
-  const linearWasteMass = estimatedTotalWaste * (100 - circularityRate) / 100;
-  const circularWasteMass = estimatedTotalWaste * circularityRate / 100;
-
-  const wasteStreams = [
-    { id: '1', stream: 'Glass Bottles', disposition: 'recycling' as const, mass: Math.round(circularWasteMass * 0.45), circularityScore: 100 },
-    { id: '2', stream: 'Cardboard Packaging', disposition: 'recycling' as const, mass: Math.round(circularWasteMass * 0.33), circularityScore: 100 },
-    { id: '3', stream: 'Mixed Office Waste', disposition: 'landfill' as const, mass: Math.round(linearWasteMass * 0.6), circularityScore: 0 },
-    { id: '4', stream: 'Organic Waste', disposition: 'composting' as const, mass: Math.round(circularWasteMass * 0.22), circularityScore: 100 },
-    { id: '5', stream: 'Plastic Film', disposition: 'landfill' as const, mass: Math.round(linearWasteMass * 0.4), circularityScore: 0 },
-  ];
+  const wasteStreams = (wasteMetrics?.waste_by_treatment || []).map((t, idx) => ({
+    id: String(idx + 1),
+    stream: t.treatment_display,
+    disposition: t.treatment_method as 'recycling' | 'landfill' | 'composting' | 'incineration_with_recovery' | 'reuse' | 'other',
+    mass: Math.round(t.total_kg),
+    circularityScore: t.circularity_score,
+  }));
 
   const totalLandUseFromMetrics = landUse || 6250;
 
@@ -620,9 +618,12 @@ export default function PerformancePage() {
 
   const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);
   const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0);
-  const totalWaste = wasteStreams.reduce((sum, item) => sum + item.mass, 0);
-  const circularWaste = wasteStreams.reduce((sum, item) => sum + (item.mass * item.circularityScore / 100), 0);
+  const totalWaste = wasteMetrics?.total_waste_kg || wasteStreams.reduce((sum, item) => sum + item.mass, 0);
+  const circularWaste = wasteMetrics?.circularity_rate
+    ? totalWaste * wasteMetrics.circularity_rate / 100
+    : wasteStreams.reduce((sum, item) => sum + (item.mass * item.circularityScore / 100), 0);
   const totalLandUse = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0);
+  const wasteDiversionRate = wasteMetrics?.waste_diversion_rate || (totalWaste > 0 ? (circularWaste / totalWaste) * 100 : 0);
 
   const getWaterRiskStatus = () => {
     if (metrics?.water_risk_level === 'high') return 'critical';
@@ -849,6 +850,27 @@ export default function PerformancePage() {
                 </CardContent>
               </Card>
 
+              {/* Waste & Circularity Deep Dive */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Trash2 className="h-5 w-5 text-amber-600" />
+                    Waste & Circularity Analysis
+                  </CardTitle>
+                  <CardDescription>Operational waste streams and circular economy metrics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {wasteLoading ? (
+                    <Skeleton className="h-64 w-full" />
+                  ) : (
+                    <WasteDeepDive
+                      wasteMetrics={wasteMetrics}
+                      loading={wasteLoading}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Nature Impact Radar */}
               <Card>
                 <CardHeader>
@@ -957,9 +979,9 @@ export default function PerformancePage() {
       <CircularitySheet
         open={circularitySheetOpen}
         onOpenChange={setCircularitySheetOpen}
-        totalWaste={totalWaste}
-        circularityRate={(circularWaste / totalWaste) * 100}
-        wasteStreams={wasteStreams}
+        metrics={wasteMetrics}
+        loading={wasteLoading}
+        year={currentYear}
       />
 
       <NatureImpactSheet

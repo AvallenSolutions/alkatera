@@ -1,61 +1,33 @@
-import { ConfidenceLevel } from './types';
+export type ConfidenceLevelName = 'high' | 'medium' | 'low' | 'none';
 
-export function getConfidenceLevel(confidence: number): ConfidenceLevel {
-  if (confidence >= 0.9) {
-    return {
-      level: 'high',
-      label: 'High',
-      color: 'text-green-600',
-    };
-  }
-
-  if (confidence >= 0.7) {
-    return {
-      level: 'medium',
-      label: 'Medium',
-      color: 'text-amber-600',
-    };
-  }
-
-  if (confidence >= 0.4) {
-    return {
-      level: 'low',
-      label: 'Low',
-      color: 'text-orange-600',
-    };
-  }
-
-  return {
-    level: 'none',
-    label: 'No Match',
-    color: 'text-gray-600',
-  };
+export interface ConfidenceLevel {
+  name: ConfidenceLevelName;
+  label: string;
+  color: string;
 }
 
-export function calculateMatchConfidence(
-  searchTerm: string,
-  materialName: string
-): number {
-  const search = searchTerm.toLowerCase().trim();
-  const material = materialName.toLowerCase().trim();
-
-  if (search === material) {
-    return 1.0;
+export function getConfidenceLevel(confidence: number | null): ConfidenceLevel {
+  if (confidence === null || confidence === 0) {
+    return { name: 'none', label: 'No Match', color: 'text-slate-400' };
   }
-
-  if (material.includes(search) || search.includes(material)) {
-    return 0.85;
+  if (confidence >= 0.8) {
+    return { name: 'high', label: 'High', color: 'text-green-600' };
   }
-
-  const searchWords = search.split(/\s+/);
-  const materialWords = material.split(/\s+/);
-  const matchingWords = searchWords.filter(word =>
-    materialWords.some(mWord => mWord.includes(word) || word.includes(mWord))
-  );
-
-  if (matchingWords.length > 0) {
-    return 0.6 * (matchingWords.length / searchWords.length);
+  if (confidence >= 0.5) {
+    return { name: 'medium', label: 'Medium', color: 'text-amber-600' };
   }
+  return { name: 'low', label: 'Low', color: 'text-red-600' };
+}
 
-  return 0;
+export function getConfidenceColor(level: ConfidenceLevelName): string {
+  switch (level) {
+    case 'high':
+      return 'text-green-600';
+    case 'medium':
+      return 'text-amber-600';
+    case 'low':
+      return 'text-red-600';
+    default:
+      return 'text-slate-400';
+  }
 }
