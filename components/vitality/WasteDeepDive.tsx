@@ -693,10 +693,35 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
         </TabsContent>
 
         <TabsContent value="facilities" className="space-y-4">
+          <Card className="bg-gradient-to-r from-blue-50 to-slate-50 dark:from-blue-950/30 dark:to-slate-950/30 border-blue-200 dark:border-blue-800">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                    Reporting Boundary: Owned vs Contract Facilities
+                  </h4>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>
+                      <strong className="text-blue-800 dark:text-blue-200">Owned/Operated (In Scope):</strong> Facilities under your operational control. Waste is reported as Scope 3 Category 5 per GHG Protocol.
+                    </p>
+                    <p>
+                      <strong className="text-blue-800 dark:text-blue-200">Third Party/Contract (Flagged):</strong> Contract manufacturers report their own waste. Data shown here is for transparency but may be counted in their Scope 3 Category 5, not yours.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300">Owned = In Scope</Badge>
+                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">Third Party = Flagged</Badge>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm">Waste by Facility</CardTitle>
-              <CardDescription>Performance breakdown across sites</CardDescription>
+              <CardDescription>Performance breakdown across sites with ownership status</CardDescription>
             </CardHeader>
             <CardContent>
               {wasteMetrics.waste_by_facility.length === 0 ? (
@@ -707,10 +732,45 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
               ) : (
                 <div className="space-y-4">
                   {wasteMetrics.waste_by_facility.map((facility) => (
-                    <div key={facility.facility_id} className="p-4 rounded-lg border">
+                    <div
+                      key={facility.facility_id}
+                      className={`p-4 rounded-lg border ${
+                        facility.is_in_scope
+                          ? 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20'
+                          : 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20'
+                      }`}
+                    >
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h4 className="font-medium text-sm">{facility.facility_name}</h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium text-sm">{facility.facility_name}</h4>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${
+                                facility.is_in_scope
+                                  ? 'bg-green-100 text-green-800 border-green-300'
+                                  : 'bg-amber-100 text-amber-800 border-amber-300'
+                              }`}
+                            >
+                              {facility.operational_control === 'owned' ? 'Owned' :
+                               facility.operational_control === 'third_party' ? 'Contract' :
+                               facility.operational_control === 'joint_venture' ? 'JV' : 'Unknown'}
+                            </Badge>
+                            {!facility.is_in_scope && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="text-xs max-w-48">
+                                      Third-party facility waste may be counted in the contractor&apos;s own Scope 3 reporting. Shown here for transparency.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             {facility.percentage.toFixed(1)}% of total waste
                           </p>
@@ -749,6 +809,18 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-50 dark:bg-slate-950/30">
+            <CardContent className="p-4 space-y-2">
+              <h4 className="text-sm font-semibold">Standards Reference: Facility Scope</h4>
+              <p className="text-xs text-muted-foreground">
+                <strong>GHG Protocol:</strong> Scope 3 Category 5 covers waste from operations under your operational control. Contract manufacturer waste falls under their own reporting boundary.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                <strong>CSRD ESRS E5:</strong> Resource use and circular economy metrics should cover own operations. Upstream value chain waste is reported separately.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

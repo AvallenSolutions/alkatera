@@ -41,6 +41,8 @@ export interface WasteByFacilityItem {
   percentage: number;
   diversion_rate: number;
   hazardous_kg: number;
+  operational_control: 'owned' | 'third_party' | 'joint_venture' | null;
+  is_in_scope: boolean;
 }
 
 export interface CircularityMetrics {
@@ -161,7 +163,7 @@ export function useWasteMetrics(year?: number) {
           data_provenance,
           confidence_score,
           activity_date,
-          facilities!inner(id, name)
+          facilities!inner(id, name, operational_control)
         `)
         .eq('organization_id', currentOrganization.id)
         .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
@@ -218,6 +220,7 @@ export function useWasteMetrics(year?: number) {
         total_kg: number;
         hazardous_kg: number;
         circular_kg: number;
+        operational_control: 'owned' | 'third_party' | 'joint_venture' | null;
       }> = {};
 
       let hazardousWasteKg = 0;
@@ -227,7 +230,9 @@ export function useWasteMetrics(year?: number) {
         const category = entry.waste_category || 'other';
         const treatment = entry.waste_treatment_method || 'other';
         const facilityId = entry.facility_id;
-        const facilityName = (entry.facilities as any)?.name || 'Unknown Facility';
+        const facilityData = entry.facilities as any;
+        const facilityName = facilityData?.name || 'Unknown Facility';
+        const operationalControl = facilityData?.operational_control || null;
         const quantity = entry.quantity || 0;
         const emissions = entry.calculated_emissions_kg_co2e || 0;
         const recovery = entry.waste_recovery_percentage || 0;
@@ -253,6 +258,7 @@ export function useWasteMetrics(year?: number) {
             total_kg: 0,
             hazardous_kg: 0,
             circular_kg: 0,
+            operational_control: operationalControl,
           };
         }
         wasteByFacility[facilityId].total_kg += quantity;
@@ -295,6 +301,8 @@ export function useWasteMetrics(year?: number) {
           percentage: totalWasteKg > 0 ? (data.total_kg / totalWasteKg) * 100 : 0,
           diversion_rate: data.total_kg > 0 ? (data.circular_kg / data.total_kg) * 100 : 0,
           hazardous_kg: data.hazardous_kg,
+          operational_control: data.operational_control,
+          is_in_scope: data.operational_control === 'owned' || data.operational_control === 'joint_venture',
         }))
         .sort((a, b) => b.total_kg - a.total_kg);
 
