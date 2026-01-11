@@ -210,8 +210,8 @@ export function useWasteMetrics(year?: number) {
       const totalProduction = productionData?.reduce((sum, p) => sum + (p.quantity || 0), 0) || 1;
 
       const wasteEntries = wasteData || [];
-      const totalWasteKg = wasteEntries.reduce((sum, w) => sum + (w.quantity || 0), 0);
-      const totalEmissions = wasteEntries.reduce((sum, w) => sum + (w.calculated_emissions_kg_co2e || 0), 0);
+      const totalWasteKg = wasteEntries.reduce((sum, w) => sum + Number(w.quantity || 0), 0);
+      const totalEmissions = wasteEntries.reduce((sum, w) => sum + Number(w.calculated_emissions_kg_co2e || 0), 0);
 
       const wasteByCategory: Record<string, { total_kg: number; emissions: number }> = {};
       const wasteByTreatment: Record<string, { total_kg: number; recovery_sum: number; count: number }> = {};
@@ -233,9 +233,9 @@ export function useWasteMetrics(year?: number) {
         const facilityData = entry.facilities as any;
         const facilityName = facilityData?.name || 'Unknown Facility';
         const operationalControl = facilityData?.operational_control || null;
-        const quantity = entry.quantity || 0;
-        const emissions = entry.calculated_emissions_kg_co2e || 0;
-        const recovery = entry.waste_recovery_percentage || 0;
+        const quantity = Number(entry.quantity || 0);
+        const emissions = Number(entry.calculated_emissions_kg_co2e || 0);
+        const recovery = Number(entry.waste_recovery_percentage || 0);
         const isHazardous = entry.hazard_classification === 'hazardous';
         const circularityScore = TREATMENT_CIRCULARITY_SCORES[treatment] || 0;
 
@@ -315,45 +315,45 @@ export function useWasteMetrics(year?: number) {
         waste_category: entry.waste_category || 'other',
         waste_treatment_method: entry.waste_treatment_method || 'other',
         hazard_classification: entry.hazard_classification || 'non_hazardous',
-        total_quantity_kg: entry.quantity || 0,
-        avg_recovery_percentage: entry.waste_recovery_percentage || 0,
-        total_emissions_kg_co2e: entry.calculated_emissions_kg_co2e || 0,
+        total_quantity_kg: Number(entry.quantity || 0),
+        avg_recovery_percentage: Number(entry.waste_recovery_percentage || 0),
+        total_emissions_kg_co2e: Number(entry.calculated_emissions_kg_co2e || 0),
         entry_count: 1,
         data_provenance: entry.data_provenance || 'unknown',
-        confidence_score: entry.confidence_score || 0,
+        confidence_score: Number(entry.confidence_score || 0),
       }));
 
       const endOfLifeScenarios: EndOfLifeScenario[] = (eolData || []).map((scenario: any) => ({
         product_id: scenario.product_id,
         product_name: scenario.products?.name || 'Unknown Product',
         material_name: scenario.scenario_name || 'All Materials',
-        recycling_percentage: scenario.recycling_percentage || 0,
-        landfill_percentage: scenario.landfill_percentage || 0,
-        incineration_percentage: scenario.incineration_percentage || 0,
-        composting_percentage: scenario.composting_percentage || 0,
-        reuse_percentage: scenario.reuse_percentage || 0,
-        total_emissions_kg_co2e: scenario.total_emissions_kg_co2e || 0,
-        avoided_emissions_kg_co2e: scenario.avoided_emissions_kg_co2e || 0,
+        recycling_percentage: Number(scenario.recycling_percentage || 0),
+        landfill_percentage: Number(scenario.landfill_percentage || 0),
+        incineration_percentage: Number(scenario.incineration_percentage || 0),
+        composting_percentage: Number(scenario.composting_percentage || 0),
+        reuse_percentage: Number(scenario.reuse_percentage || 0),
+        total_emissions_kg_co2e: Number(scenario.total_emissions_kg_co2e || 0),
+        avoided_emissions_kg_co2e: Number(scenario.avoided_emissions_kg_co2e || 0),
       }));
 
       const circularityMetrics: CircularityMetrics | null = circularityData ? {
-        total_products: circularityData.total_products || 0,
-        avg_packaging_circularity: circularityData.avg_packaging_circularity || 0,
-        avg_mci: circularityData.avg_mci || 0,
-        avg_recycled_content: circularityData.avg_recycled_content || 0,
-        avg_recyclability: circularityData.avg_recyclability || 0,
-        reusable_materials_percentage: circularityData.reusable_materials_percentage || 0,
-        compostable_materials_percentage: circularityData.compostable_materials_percentage || 0,
-        total_materials_assessed: circularityData.total_materials_assessed || 0,
+        total_products: Number(circularityData.total_products || 0),
+        avg_packaging_circularity: Number(circularityData.avg_packaging_circularity || 0),
+        avg_mci: Number(circularityData.avg_mci || 0),
+        avg_recycled_content: Number(circularityData.avg_recycled_content || 0),
+        avg_recyclability: Number(circularityData.avg_recyclability || 0),
+        reusable_materials_percentage: Number(circularityData.reusable_materials_percentage || 0),
+        compostable_materials_percentage: Number(circularityData.compostable_materials_percentage || 0),
+        total_materials_assessed: Number(circularityData.total_materials_assessed || 0),
       } : null;
 
       const targets: CircularityTarget | null = targetsData ? {
         id: targetsData.id,
-        target_year: targetsData.target_year,
-        waste_diversion_target: targetsData.waste_diversion_target || 0,
-        recycled_content_target: targetsData.recycled_content_target || 0,
-        circularity_score_target: targetsData.circularity_score_target || 0,
-        packaging_recyclability_target: targetsData.packaging_recyclability_target || 0,
+        target_year: Number(targetsData.target_year),
+        waste_diversion_target: Number(targetsData.waste_diversion_target || 0),
+        recycled_content_target: Number(targetsData.recycled_content_target || 0),
+        circularity_score_target: Number(targetsData.circularity_score_target || 0),
+        packaging_recyclability_target: Number(targetsData.packaging_recyclability_target || 0),
         zero_waste_to_landfill_target: targetsData.zero_waste_to_landfill_target || false,
       } : null;
 
