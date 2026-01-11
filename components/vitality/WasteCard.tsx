@@ -65,11 +65,16 @@ export function WasteCard({ metrics, loading, onClick }: WasteCardProps) {
             </div>
             <CardTitle className="text-lg">Waste & Circularity</CardTitle>
           </div>
-          <Badge variant="default" className="bg-amber-600">
-            E5
-          </Badge>
+          <div className="flex gap-1">
+            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
+              Gate
+            </Badge>
+            <Badge variant="default" className="bg-amber-600">
+              E5
+            </Badge>
+          </div>
         </div>
-        <CardDescription>Resource use & circular economy (CSRD E5)</CardDescription>
+        <CardDescription>Operational waste (cradle-to-gate) per CSRD E5</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">

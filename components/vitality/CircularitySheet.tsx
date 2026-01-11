@@ -348,6 +348,44 @@ export function CircularitySheet({
           </div>
         </SheetHeader>
 
+        <Card className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                <Info className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                  Cradle-to-Gate Analysis: Operational Circularity
+                </h4>
+                <div className="grid md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+                  <div>
+                    <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">Measured (Cradle-to-Gate):</p>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
+                      <li>Production waste treatment pathways</li>
+                      <li>Material recovery and recycling rates</li>
+                      <li>Packaging recyclability at point of sale</li>
+                      <li>Recycled content in input materials</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-amber-800 dark:text-amber-200 mb-1">Not Measured (Post-Consumer):</p>
+                    <ul className="list-disc list-inside space-y-0.5 ml-1">
+                      <li>Consumer disposal behaviour</li>
+                      <li>Actual end-of-life recycling rates</li>
+                      <li>Regional recycling infrastructure</li>
+                      <li>Product lifespan/durability in use</li>
+                    </ul>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground pt-1">
+                  <strong>Methodology:</strong> Circularity scores follow the Ellen MacArthur Foundation Material Circularity Indicator (MCI) framework, measuring how restorative material flows are within your operational boundary.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="overview" className="mt-4">
           <TabsList className="grid w-full grid-cols-4 mb-4">
             <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>

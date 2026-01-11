@@ -1,33 +1,50 @@
-export type ConfidenceLevelName = 'high' | 'medium' | 'low' | 'none';
-
 export interface ConfidenceLevel {
-  name: ConfidenceLevelName;
+  name: 'high' | 'medium' | 'low' | 'none';
   label: string;
   color: string;
+  minScore: number;
 }
 
-export function getConfidenceLevel(confidence: number | null): ConfidenceLevel {
-  if (confidence === null || confidence === 0) {
-    return { name: 'none', label: 'No Match', color: 'text-slate-400' };
+const confidenceLevels: ConfidenceLevel[] = [
+  { name: 'high', label: 'High Confidence', color: 'green', minScore: 0.8 },
+  { name: 'medium', label: 'Medium Confidence', color: 'amber', minScore: 0.5 },
+  { name: 'low', label: 'Low Confidence', color: 'orange', minScore: 0.2 },
+  { name: 'none', label: 'No Match', color: 'red', minScore: 0 },
+];
+
+export function getConfidenceLevel(score: number): ConfidenceLevel {
+  if (score >= 0.8) {
+    return confidenceLevels[0];
+  } else if (score >= 0.5) {
+    return confidenceLevels[1];
+  } else if (score >= 0.2) {
+    return confidenceLevels[2];
   }
-  if (confidence >= 0.8) {
-    return { name: 'high', label: 'High', color: 'text-green-600' };
-  }
-  if (confidence >= 0.5) {
-    return { name: 'medium', label: 'Medium', color: 'text-amber-600' };
-  }
-  return { name: 'low', label: 'Low', color: 'text-red-600' };
+  return confidenceLevels[3];
 }
 
-export function getConfidenceColor(level: ConfidenceLevelName): string {
-  switch (level) {
-    case 'high':
-      return 'text-green-600';
-    case 'medium':
-      return 'text-amber-600';
-    case 'low':
-      return 'text-red-600';
-    default:
-      return 'text-slate-400';
-  }
+export function getConfidenceColor(score: number): string {
+  return getConfidenceLevel(score).color;
+}
+
+export interface MaterialMatch {
+  materialId: string;
+  materialName: string;
+  confidence: number;
+  matchType: 'exact' | 'fuzzy' | 'category';
+}
+
+export async function findMaterialMatches(
+  rawName: string,
+  _itemType: 'ingredient' | 'packaging'
+): Promise<MaterialMatch[]> {
+  const cleanName = rawName.toLowerCase().trim();
+  return [
+    {
+      materialId: 'placeholder-id',
+      materialName: cleanName,
+      confidence: 0.5,
+      matchType: 'fuzzy',
+    },
+  ];
 }

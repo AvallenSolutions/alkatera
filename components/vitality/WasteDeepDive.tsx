@@ -315,6 +315,43 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
 
   return (
     <div className="space-y-6">
+      <Card className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/50">
+              <Info className="h-5 w-5 text-amber-700 dark:text-amber-400" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                  Cradle-to-Gate Scope: Operational Waste Only
+                </h4>
+                <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                  GHG Protocol Scope 3.5
+                </Badge>
+              </div>
+              <div className="text-xs text-muted-foreground space-y-1.5">
+                <p>
+                  <strong className="text-amber-800 dark:text-amber-200">What is measured:</strong> All waste generated during production operations at your facilities - including raw material processing residues, damaged packaging, process waste, and hazardous operational materials.
+                </p>
+                <p>
+                  <strong className="text-amber-800 dark:text-amber-200">What is NOT included:</strong> Consumer end-of-life waste (packaging disposed by customers after product use). This would require cradle-to-grave analysis extending beyond the factory gate.
+                </p>
+                <p>
+                  <strong className="text-amber-800 dark:text-amber-200">Data sources:</strong> Primary measured data from facility waste manifests, weighbridge records, and third-party waste contractor reports.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">ISO 14064-1</Badge>
+                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">CSRD ESRS E5</Badge>
+                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">EU Waste Framework</Badge>
+                <Badge variant="outline" className="text-xs border-amber-300 text-amber-700 dark:text-amber-300">Ellen MacArthur MCI</Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-4 mb-4">
           <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
@@ -445,12 +482,15 @@ export function WasteDeepDive({ wasteMetrics, loading }: WasteDeepDiveProps) {
           <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
             <CardContent className="p-4 flex items-start gap-3">
               <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                  GHG Emissions from Waste
+                  GHG Emissions from Operational Waste (Scope 3 Category 5)
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Total waste-related emissions: <strong>{(wasteMetrics.total_waste_emissions_kg_co2e / 1000).toFixed(2)} tCO₂eq</strong> (Scope 3 Category 5)
+                  Total waste-related emissions: <strong>{(wasteMetrics.total_waste_emissions_kg_co2e / 1000).toFixed(2)} tCO₂eq</strong>
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Calculated using DEFRA 2024 emission factors for waste treatment methods. Emissions vary by treatment pathway: landfill generates methane, incineration produces CO₂, while recycling/composting avoid virgin material production emissions.
                 </p>
               </div>
             </CardContent>
