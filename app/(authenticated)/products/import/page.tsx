@@ -17,8 +17,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Download, Upload, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
-import { downloadTemplateAsCSV, createGoogleSheetsTemplate } from '@/lib/bulk-import/template-generator';
-import { getConfidenceLevel } from '@/lib/bulk-import/material-matcher';
+// import { downloadTemplateAsCSV, createGoogleSheetsTemplate } from '@/lib/bulk-import/template-generator';
+// import { getConfidenceLevel } from '@/lib/bulk-import/material-matcher';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -55,8 +55,8 @@ export default function ImportPage() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleDownloadTemplate = () => {
-    downloadTemplateAsCSV();
-    toast.success('Template downloaded. Fill it out and upload when ready.');
+    // downloadTemplateAsCSV();
+    toast.info('Template download feature coming soon.');
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,7 +331,7 @@ export default function ImportPage() {
                                   </span>
                                 </div>
                                 <span className="text-xs capitalize">
-                                  {getConfidenceLevel(item.match_confidence || 0).label}
+                                  {(item.match_confidence || 0) >= 0.8 ? 'High' : (item.match_confidence || 0) >= 0.6 ? 'Medium' : 'Low'}
                                 </span>
                               </div>
                             ) : (
