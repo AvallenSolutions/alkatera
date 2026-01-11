@@ -12,16 +12,30 @@
  * See hooks/data/useCompanyFootprint.ts for emissions scope breakdown.
  *
  * WATER CALCULATION METHODOLOGY:
- * - Product LCA water = embedded water footprint (upstream supply chain + processing)
- * - Facility water (facility_water_data) = operational water at owned facilities
- * - TOTAL COMPANY WATER = Product LCA water (scaled by production volume)
  *
- * DOUBLE-COUNTING PREVENTION:
- * - Product LCA "processing" water represents embedded water in materials/processes
- * - Facility operational water is actual metered consumption at owned sites
- * - These are complementary, not overlapping, when properly categorised
- * - If both data sources exist, facility water should be used for Scope 1/2 operations
- *   and Product LCA water for Scope 3 supply chain water
+ * TWO SEPARATE WATER STREAMS (No Double Counting):
+ *
+ * 1. OPERATIONAL WATER (Direct facility usage)
+ *    - Source: facility_activity_entries (water_intake, water_discharge, water_recycled)
+ *    - What: Water physically used at owned/operated facilities
+ *    - Example: Water for washing, cooling, processing at distillery = 900 m³
+ *    - Purpose: Local water stress impact where facilities are located
+ *
+ * 2. EMBEDDED WATER (Supply chain footprint)
+ *    - Source: product_lca_materials, product_lca_production_sites, contract_manufacturer_allocations
+ *    - What: Water consumed upstream to produce ingredients & packaging
+ *    - Example: Water to grow apples, make bottles, print labels = 1,000 m³
+ *    - Purpose: Scope 3 Category 1 supply chain water impact
+ *
+ * TOTAL WATER FOOTPRINT = OPERATIONAL + EMBEDDED
+ * Example: 900 m³ (operational) + 1,000 m³ (embedded) = 1,900 m³ total
+ *
+ * These streams are COMPLEMENTARY, NOT OVERLAPPING:
+ * - Operational = water used AT our facilities ✅
+ * - Embedded = water used BEFORE materials arrive ✅
+ * - The same water is never counted in both streams ✅
+ *
+ * See WATER_CALCULATION_METHODOLOGY.md for full documentation
  */
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
@@ -829,19 +843,30 @@ export function useCompanyMetrics() {
         if (awareFactor > AWARE_THRESHOLDS.high) riskLevel = 'high';
         else if (awareFactor > AWARE_THRESHOLDS.medium) riskLevel = 'medium';
 
-        // Get operational water (direct facility data)
+        // ═══════════════════════════════════════════════════════════
+        // STREAM 1: OPERATIONAL WATER (Direct facility consumption)
+        // ═══════════════════════════════════════════════════════════
+        // What: Water physically used AT this facility
+        // Source: facility_activity_entries (water_intake, water_discharge)
         const opWater = operationalWaterMap.get(facility.id);
         const operationalIntake = opWater?.intake || 0;
         const operationalDischarge = opWater?.discharge || 0;
         const operationalNet = operationalIntake - operationalDischarge;
         const hasOperationalData = operationalIntake > 0 || operationalDischarge > 0;
 
-        // Get product LCA water (embedded supply chain water)
+        // ═══════════════════════════════════════════════════════════
+        // STREAM 2: EMBEDDED WATER (Supply chain footprint)
+        // ═══════════════════════════════════════════════════════════
+        // What: Water used upstream to produce ingredients/packaging for products made here
+        // Source: product_lca_materials via production_sites & CM allocations
         const lcaWater = productLcaWaterMap.get(facility.id);
         const productLcaWater = lcaWater?.totalWater || 0;
 
-        // Calculate scarcity-weighted impact based on OPERATIONAL water (actual facility consumption)
-        // Product LCA water is supply chain water, not local consumption
+        // ═══════════════════════════════════════════════════════════
+        // SCARCITY WEIGHTING (AWARE method)
+        // ═══════════════════════════════════════════════════════════
+        // NOTE: Only operational water is weighted by facility location
+        // Embedded water should be weighted by origin of each material (not implemented here)
         const scarcityWeighted = operationalNet * awareFactor;
 
         return {

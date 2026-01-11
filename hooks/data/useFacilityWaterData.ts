@@ -66,6 +66,18 @@ export interface FacilityWaterSummary {
 
 export interface CompanyWaterOverview {
   organization_id: string;
+  // OPERATIONAL WATER (Direct facility consumption)
+  operational_intake_m3: number;
+  operational_discharge_m3: number;
+  operational_net_m3: number;
+  operational_scarcity_weighted_m3: number;
+  // EMBEDDED WATER (Supply chain water from products)
+  embedded_water_m3: number;
+  embedded_scarcity_weighted_m3: number;
+  // TOTAL WATER FOOTPRINT (Operational + Embedded)
+  total_water_footprint_m3: number;
+  total_scarcity_weighted_m3: number;
+  // Legacy fields (for backwards compatibility - derived from operational)
   total_consumption_m3: number;
   net_consumption_m3: number;
   scarcity_weighted_consumption_m3: number;

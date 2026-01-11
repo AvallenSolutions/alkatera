@@ -42,9 +42,16 @@ export function WaterCard({
     );
   }
 
-  const waterConsumption = waterOverview?.total_consumption_m3 || metrics?.total_impacts.water_consumption || 0;
-  const waterScarcity = waterOverview?.scarcity_weighted_consumption_m3 || metrics?.total_impacts.water_scarcity_aware || 0;
-  const netConsumption = waterOverview?.net_consumption_m3 || waterConsumption;
+  // Calculate water streams
+  const operationalWater = waterOverview?.operational_net_m3 || 0;
+  const embeddedWater = waterOverview?.embedded_water_m3 || 0;
+  const totalWaterFootprint = waterOverview?.total_water_footprint_m3 || operationalWater + embeddedWater || metrics?.total_impacts.water_consumption || 0;
+
+  // Scarcity-weighted metrics
+  const operationalScarcity = waterOverview?.operational_scarcity_weighted_m3 || 0;
+  const embeddedScarcity = waterOverview?.embedded_scarcity_weighted_m3 || 0;
+  const totalScarcity = waterOverview?.total_scarcity_weighted_m3 || operationalScarcity + embeddedScarcity || metrics?.total_impacts.water_scarcity_aware || 0;
+
   const recyclingRate = waterOverview?.avg_recycling_rate || 0;
 
   const highRiskCount = waterOverview?.high_risk_facilities || 0;
@@ -115,13 +122,18 @@ export function WaterCard({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground uppercase tracking-wide">
-              Total Consumption
+              Total Water Footprint
             </p>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {formatVolume(waterConsumption)}
+                {formatVolume(totalWaterFootprint)}
               </span>
               <span className="text-sm text-muted-foreground">m³</span>
+            </div>
+            <div className="flex gap-2 text-xs text-muted-foreground">
+              <span title="Direct facility water use">Operational: {formatVolume(operationalWater)}</span>
+              <span>•</span>
+              <span title="Supply chain water footprint">Embedded: {formatVolume(embeddedWater)}</span>
             </div>
             {trend.direction !== 'stable' && (
               <div className={`flex items-center gap-1 text-xs ${trend.direction === 'down' ? 'text-green-600' : 'text-amber-600'}`}>
@@ -137,7 +149,7 @@ export function WaterCard({
             </p>
             <div className="flex items-baseline gap-1">
               <span className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                {formatVolume(waterScarcity)}
+                {formatVolume(totalScarcity)}
               </span>
               <span className="text-xs text-muted-foreground">m³ eq</span>
             </div>
