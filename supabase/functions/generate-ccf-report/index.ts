@@ -195,23 +195,28 @@ Deno.serve(async (req: Request) => {
           continue;
         }
 
-        // Get the latest LCA for this product (use total_ghg_emissions for full lifecycle)
+        // CRITICAL: Use aggregated_impacts.breakdown.by_scope.scope3 instead of total_ghg_emissions
+        // total_ghg_emissions includes owned facility Scope 1 & 2 which would cause double counting
+        // breakdown.by_scope.scope3 contains only: materials + transport + contract mfg + end-of-life
         const { data: lca } = await supabase
           .from("product_lcas")
-          .select("id, total_ghg_emissions")
+          .select("id, aggregated_impacts")
           .eq("product_id", log.product_id)
           .eq("status", "completed")
-          .order("created_at", { ascending: false })
+          .order("updated_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
-          // Use the LCA total which includes ALL lifecycle stages
-          // (materials, production, transport, end-of-life)
-          const totalImpactKg = lca.total_ghg_emissions * log.units_produced;
+        // Extract Scope 3 emissions from the breakdown (excludes owned facility S1+S2)
+        const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+
+        if (lca && scope3PerUnit > 0) {
+          // Use the Scope 3 portion only - excludes owned facility emissions
+          // (materials, transport, contract mfg, end-of-life)
+          const totalImpactKg = scope3PerUnit * log.units_produced;
           scope3ProductsTotal += totalImpactKg;
 
-          console.log(`Product ${log.product_id}: ${log.units_produced} units × ${lca.total_ghg_emissions.toFixed(4)} kgCO2e/unit = ${totalImpactKg.toFixed(2)} kgCO2e`);
+          console.log(`Product ${log.product_id}: ${log.units_produced} units × ${scope3PerUnit.toFixed(4)} kgCO2e/unit (Scope 3 only) = ${totalImpactKg.toFixed(2)} kgCO2e`);
         }
       }
     }

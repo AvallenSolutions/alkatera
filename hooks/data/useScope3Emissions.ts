@@ -81,27 +81,34 @@ export function useScope3Emissions(
 
       if (productionData) {
         for (const log of productionData) {
+          // CRITICAL: Use aggregated_impacts.breakdown.by_scope.scope3 instead of total_ghg_emissions
+          // total_ghg_emissions includes owned facility Scope 1 & 2 which would cause double counting
+          // breakdown.by_scope.scope3 contains only: materials + transport + contract mfg + end-of-life
           const { data: lca } = await supabase
             .from("product_lcas")
-            .select("total_ghg_emissions, status")
+            .select("aggregated_impacts, status")
             .eq("product_id", log.product_id)
-            .order("created_at", { ascending: false })
+            .eq("status", "completed")
+            .order("updated_at", { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (lca && lca.total_ghg_emissions && lca.total_ghg_emissions > 0) {
+          // Extract Scope 3 emissions from the breakdown (excludes owned facility S1+S2)
+          const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+
+          if (lca && scope3PerUnit > 0) {
             // CRITICAL: Use units_produced (number of bottles/cans) NOT volume (bulk hectolitres)
             // LCA emissions are per functional unit (per bottle/can)
             const unitsProduced = log.units_produced || 0;
 
             if (unitsProduced > 0) {
-              const impactKg = lca.total_ghg_emissions * unitsProduced;
+              const impactKg = scope3PerUnit * unitsProduced;
               breakdown.products += impactKg;
 
-              console.log('✅ [SCOPE 3 HOOK] Product calculated', {
+              console.log('✅ [SCOPE 3 HOOK] Product calculated (using scope3 breakdown)', {
                 product_id: log.product_id,
                 units_produced: unitsProduced,
-                emissions_per_unit: lca.total_ghg_emissions,
+                scope3_per_unit: scope3PerUnit,
                 total_impact_kg: impactKg,
                 running_total: breakdown.products,
               });
