@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import {
+  TREATMENT_CIRCULARITY_SCORES,
+  WASTE_CATEGORY_LABELS,
+  TREATMENT_METHOD_LABELS,
+  getTreatmentCircularityScore,
+  isCircularTreatment,
+} from '@/lib/calculations/waste-circularity';
 
 export interface WasteStreamItem {
   id: string;
@@ -99,37 +106,7 @@ export interface WasteMetrics {
   waste_streams: WasteStreamItem[];
 }
 
-const WASTE_CATEGORY_LABELS: Record<string, string> = {
-  food_waste: 'Food Waste',
-  packaging_waste: 'Packaging Waste',
-  process_waste: 'Process Waste',
-  hazardous: 'Hazardous Waste',
-  construction: 'Construction Waste',
-  electronic: 'Electronic Waste',
-  other: 'Other Waste',
-};
-
-const TREATMENT_METHOD_LABELS: Record<string, string> = {
-  landfill: 'Landfill',
-  recycling: 'Recycling',
-  composting: 'Composting',
-  incineration_with_recovery: 'Incineration (Energy Recovery)',
-  incineration_without_recovery: 'Incineration (No Recovery)',
-  anaerobic_digestion: 'Anaerobic Digestion',
-  reuse: 'Reuse',
-  other: 'Other',
-};
-
-const TREATMENT_CIRCULARITY_SCORES: Record<string, number> = {
-  reuse: 100,
-  recycling: 100,
-  composting: 100,
-  anaerobic_digestion: 100,
-  incineration_with_recovery: 50,
-  incineration_without_recovery: 0,
-  landfill: 0,
-  other: 0,
-};
+// Constants imported from @/lib/calculations/waste-circularity for consistency
 
 export function useWasteMetrics(year?: number) {
   const { currentOrganization } = useOrganization();
@@ -307,7 +284,7 @@ export function useWasteMetrics(year?: number) {
         const emissions = Number(entry.calculated_emissions_kg_co2e || 0) || 0;
         const recovery = Number(entry.waste_recovery_percentage || 0) || 0;
         const isHazardous = entry.hazard_classification === 'hazardous';
-        const circularityScore = TREATMENT_CIRCULARITY_SCORES[treatment] || 0;
+        const circularityScore = getTreatmentCircularityScore(treatment);
 
         if (!wasteByCategory[category]) {
           wasteByCategory[category] = { total_kg: 0, emissions: 0 };
@@ -358,8 +335,8 @@ export function useWasteMetrics(year?: number) {
           treatment_display: TREATMENT_METHOD_LABELS[treatment] || treatment,
           total_kg: data.total_kg,
           percentage: totalWasteKg > 0 ? (data.total_kg / totalWasteKg) * 100 : 0,
-          is_circular: TREATMENT_CIRCULARITY_SCORES[treatment] >= 50,
-          circularity_score: TREATMENT_CIRCULARITY_SCORES[treatment] || 0,
+          is_circular: isCircularTreatment(treatment),
+          circularity_score: getTreatmentCircularityScore(treatment),
         }))
         .sort((a, b) => b.total_kg - a.total_kg);
 

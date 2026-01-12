@@ -4,6 +4,14 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Recycle, Trash2, AlertTriangle, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { WasteMetrics } from '@/hooks/data/useWasteMetrics';
+import {
+  getDiversionLevel,
+  getHazardLevel,
+  getDiversionColorClass,
+  getDiversionBgColorClass,
+  getHazardColorClass,
+  formatWeight as formatWeightShared,
+} from '@/lib/calculations/waste-circularity';
 
 interface WasteCardProps {
   metrics: WasteMetrics | null;
@@ -11,14 +19,8 @@ interface WasteCardProps {
   onClick?: () => void;
 }
 
-function formatWeight(kg: number): { value: string; unit: string } {
-  if (kg >= 1000000) {
-    return { value: (kg / 1000000).toFixed(1), unit: 'kt' };
-  } else if (kg >= 1000) {
-    return { value: (kg / 1000).toFixed(1), unit: 't' };
-  }
-  return { value: kg.toFixed(0), unit: 'kg' };
-}
+// Use shared formatWeight from waste-circularity service
+const formatWeight = formatWeightShared;
 
 export function WasteCard({ metrics, loading, onClick }: WasteCardProps) {
   if (loading) {
@@ -43,12 +45,13 @@ export function WasteCard({ metrics, loading, onClick }: WasteCardProps) {
   const circularityRate = metrics?.circularity_rate || 0;
   const wasteIntensity = metrics?.waste_intensity_per_unit || 0;
 
-  const diversionLevel = diversionRate >= 70 ? 'high' : diversionRate >= 40 ? 'medium' : 'low';
-  const diversionColor = diversionLevel === 'high' ? 'text-green-600' : diversionLevel === 'medium' ? 'text-amber-600' : 'text-red-600';
-  const diversionBarColor = diversionLevel === 'high' ? 'bg-green-500' : diversionLevel === 'medium' ? 'bg-amber-500' : 'bg-red-500';
+  // Use shared threshold functions for consistency across all surfaces
+  const diversionLevel = getDiversionLevel(diversionRate);
+  const diversionColor = getDiversionColorClass(diversionLevel);
+  const diversionBarColor = getDiversionBgColorClass(diversionLevel);
 
-  const hazardLevel = hazardousPercentage > 10 ? 'high' : hazardousPercentage > 5 ? 'medium' : 'low';
-  const hazardColor = hazardLevel === 'low' ? 'text-green-600' : hazardLevel === 'medium' ? 'text-amber-600' : 'text-red-600';
+  const hazardLevel = getHazardLevel(hazardousPercentage);
+  const hazardColor = getHazardColorClass(hazardLevel);
 
   const formatted = formatWeight(totalWaste);
 
