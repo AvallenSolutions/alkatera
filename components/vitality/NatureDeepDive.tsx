@@ -4,6 +4,19 @@ import { Badge } from '@/components/ui/badge';
 import { Mountain, Leaf, Droplets, Wind, TrendingUp, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
+import {
+  NATURE_PERFORMANCE_THRESHOLDS,
+  RECIPE_2016_CATEGORIES,
+  getPerformanceLevel,
+  getPerformanceLabel,
+  getPerformanceColorClass,
+  getPerformanceBgColorClass,
+  getPerformanceBarColorClass,
+  getTargetGuidanceText,
+  formatImpactValue,
+  type PerformanceLevel,
+  type NatureImpactCategory,
+} from '@/lib/calculations/nature-biodiversity';
 
 interface NatureDeepDiveProps {
   natureMetrics: NatureMetrics | null;
@@ -25,72 +38,90 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
   const total = natureMetrics;
   const production = natureMetrics.total_production_volume;
 
-  const getPerformance = (value: number, goodThreshold: number, fairThreshold: number) => {
-    if (value < goodThreshold) {
-      return { level: 'Excellent', color: 'text-green-600', bgColor: 'bg-green-100', barColor: 'bg-green-500' };
-    }
-    if (value < fairThreshold) {
-      return { level: 'Good', color: 'text-emerald-600', bgColor: 'bg-emerald-100', barColor: 'bg-emerald-500' };
-    }
-    return { level: 'Needs Improvement', color: 'text-amber-600', bgColor: 'bg-amber-100', barColor: 'bg-amber-500' };
+  // Use shared service for consistent performance evaluation
+  const getPerformance = (category: NatureImpactCategory, value: number) => {
+    const level = getPerformanceLevel(category, value);
+    return {
+      level: getPerformanceLabel(level),
+      color: getPerformanceColorClass(level),
+      bgColor: getPerformanceBgColorClass(level),
+      barColor: getPerformanceBarColorClass(level),
+    };
   };
 
+  // Build metrics array using shared constants
   const metrics = [
     {
-      name: 'Land Use',
+      name: RECIPE_2016_CATEGORIES.LAND_USE.name,
+      category: 'land_use' as NatureImpactCategory,
       perUnit: perUnit.land_use,
       total: total.land_use,
-      unit: 'm²a crop eq',
-      unitShort: 'm²a',
+      unit: RECIPE_2016_CATEGORIES.LAND_USE.unit,
+      unitShort: RECIPE_2016_CATEGORIES.LAND_USE.unitShort,
       icon: Mountain,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      description: 'Land occupation and transformation impact',
+      description: RECIPE_2016_CATEGORIES.LAND_USE.description,
       interpretation: 'Lower is better - less land transformed',
-      benchmark: { good: 500, fair: 2000 },
-      targetGuidance: 'Excellent: <500 | Good: 500-2,000 | Needs Work: >2,000',
+      benchmark: {
+        good: NATURE_PERFORMANCE_THRESHOLDS.LAND_USE.EXCELLENT,
+        fair: NATURE_PERFORMANCE_THRESHOLDS.LAND_USE.GOOD,
+      },
+      targetGuidance: getTargetGuidanceText('land_use'),
     },
     {
-      name: 'Terrestrial Ecotoxicity',
+      name: RECIPE_2016_CATEGORIES.TERRESTRIAL_ECOTOXICITY.name,
+      category: 'terrestrial_ecotoxicity' as NatureImpactCategory,
       perUnit: perUnit.terrestrial_ecotoxicity,
       total: total.terrestrial_ecotoxicity,
-      unit: 'kg 1,4-DCB eq',
-      unitShort: 'kg DCB',
+      unit: RECIPE_2016_CATEGORIES.TERRESTRIAL_ECOTOXICITY.unit,
+      unitShort: RECIPE_2016_CATEGORIES.TERRESTRIAL_ECOTOXICITY.unitShort,
       icon: Leaf,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100',
-      description: 'Toxic impact on terrestrial ecosystems',
+      description: RECIPE_2016_CATEGORIES.TERRESTRIAL_ECOTOXICITY.description,
       interpretation: 'Lower is better - less toxic impact',
-      benchmark: { good: 5, fair: 15 },
-      targetGuidance: 'Excellent: <5 | Good: 5-15 | Needs Work: >15',
+      benchmark: {
+        good: NATURE_PERFORMANCE_THRESHOLDS.TERRESTRIAL_ECOTOXICITY.EXCELLENT,
+        fair: NATURE_PERFORMANCE_THRESHOLDS.TERRESTRIAL_ECOTOXICITY.GOOD,
+      },
+      targetGuidance: getTargetGuidanceText('terrestrial_ecotoxicity'),
     },
     {
-      name: 'Freshwater Eutrophication',
+      name: RECIPE_2016_CATEGORIES.FRESHWATER_EUTROPHICATION.name,
+      category: 'freshwater_eutrophication' as NatureImpactCategory,
       perUnit: perUnit.freshwater_eutrophication,
       total: total.freshwater_eutrophication,
-      unit: 'kg P eq',
-      unitShort: 'kg P eq',
+      unit: RECIPE_2016_CATEGORIES.FRESHWATER_EUTROPHICATION.unit,
+      unitShort: RECIPE_2016_CATEGORIES.FRESHWATER_EUTROPHICATION.unitShort,
       icon: Droplets,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
-      description: 'Nutrient loading in freshwater bodies',
+      description: RECIPE_2016_CATEGORIES.FRESHWATER_EUTROPHICATION.description,
       interpretation: 'Lower is better - less water pollution',
-      benchmark: { good: 0.3, fair: 0.7 },
-      targetGuidance: 'Excellent: <0.3 | Good: 0.3-0.7 | Needs Work: >0.7',
+      benchmark: {
+        good: NATURE_PERFORMANCE_THRESHOLDS.FRESHWATER_EUTROPHICATION.EXCELLENT,
+        fair: NATURE_PERFORMANCE_THRESHOLDS.FRESHWATER_EUTROPHICATION.GOOD,
+      },
+      targetGuidance: getTargetGuidanceText('freshwater_eutrophication'),
     },
     {
-      name: 'Terrestrial Acidification',
+      name: RECIPE_2016_CATEGORIES.TERRESTRIAL_ACIDIFICATION.name,
+      category: 'terrestrial_acidification' as NatureImpactCategory,
       perUnit: perUnit.terrestrial_acidification,
       total: total.terrestrial_acidification,
-      unit: 'kg SO₂ eq',
-      unitShort: 'kg SO₂',
+      unit: RECIPE_2016_CATEGORIES.TERRESTRIAL_ACIDIFICATION.unit,
+      unitShort: RECIPE_2016_CATEGORIES.TERRESTRIAL_ACIDIFICATION.unitShort,
       icon: Wind,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
-      description: 'Acidifying emissions affecting soil and plants',
+      description: RECIPE_2016_CATEGORIES.TERRESTRIAL_ACIDIFICATION.description,
       interpretation: 'Lower is better - less soil acidification',
-      benchmark: { good: 1.5, fair: 3.0 },
-      targetGuidance: 'Excellent: <1.5 | Good: 1.5-3.0 | Needs Work: >3.0',
+      benchmark: {
+        good: NATURE_PERFORMANCE_THRESHOLDS.TERRESTRIAL_ACIDIFICATION.EXCELLENT,
+        fair: NATURE_PERFORMANCE_THRESHOLDS.TERRESTRIAL_ACIDIFICATION.GOOD,
+      },
+      targetGuidance: getTargetGuidanceText('terrestrial_acidification'),
     },
   ];
 
@@ -120,7 +151,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
           <div className="grid md:grid-cols-2 gap-4">
             {metrics.map((metric) => {
               const IconComponent = metric.icon;
-              const performance = getPerformance(metric.perUnit, metric.benchmark.good, metric.benchmark.fair);
+              const performance = getPerformance(metric.category, metric.perUnit);
               const percentageOfFair = metric.benchmark.fair > 0 ? (metric.perUnit / metric.benchmark.fair) * 100 : 0;
               const relativeIntensity = maxPerUnitValue > 0 ? (percentageOfFair / maxPerUnitValue) * 100 : 0;
 
