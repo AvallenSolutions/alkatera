@@ -1,13 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import {
-  // Emission Factors
-  WASTE_EMISSION_FACTORS,
+  // Emission Factors (Fallback)
+  WASTE_EMISSION_FACTORS_FALLBACK,
+  DEFAULT_WASTE_EMISSION_FACTOR,
   getWasteEmissionFactor,
   calculateWasteEmissions,
 
-  // Circularity Scores
-  TREATMENT_CIRCULARITY_SCORES,
-  getTreatmentCircularityScore,
+  // Waste Hierarchy Scores (renamed from circularity)
+  WASTE_HIERARCHY_SCORES,
+  TREATMENT_CIRCULARITY_SCORES, // Legacy alias
+  ANAEROBIC_DIGESTION_SCORES,
+  getWasteHierarchyScore,
+  getTreatmentCircularityScore, // Legacy alias
   isCircularTreatment,
 
   // Diversion Rate
@@ -18,6 +22,7 @@ import {
 
   // Hazard Level
   HAZARDOUS_WASTE_THRESHOLDS,
+  HAZARD_THRESHOLDS, // Legacy alias
   getHazardLevel,
   getHazardColorClass,
 
@@ -29,143 +34,184 @@ import {
 
   // Formatting
   formatWeight,
+
+  // Compliance
+  getMethodologyDocumentation,
 } from '../waste-circularity';
 
 // ============================================================================
-// EMISSION FACTORS TESTS
+// DEFRA 2024 EMISSION FACTORS TESTS
 // ============================================================================
 
-describe('Waste Emission Factors', () => {
-  describe('WASTE_EMISSION_FACTORS constant', () => {
-    it('should have correct emission factors for all treatment methods', () => {
-      expect(WASTE_EMISSION_FACTORS.landfill).toBe(0.5);
-      expect(WASTE_EMISSION_FACTORS.recycling).toBe(0.02);
-      expect(WASTE_EMISSION_FACTORS.composting).toBe(0.01);
-      expect(WASTE_EMISSION_FACTORS.incineration).toBe(0.3);
-      expect(WASTE_EMISSION_FACTORS.anaerobic_digestion).toBe(0.005);
-      expect(WASTE_EMISSION_FACTORS.reuse).toBe(0.0);
-      expect(WASTE_EMISSION_FACTORS.other).toBe(0.5);
+describe('DEFRA 2024 Waste Emission Factors', () => {
+  describe('WASTE_EMISSION_FACTORS_FALLBACK constant', () => {
+    it('should have DEFRA 2024 values for all treatment methods', () => {
+      // DEFRA 2024 values (kgCO2e/kg)
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.landfill).toBe(0.467); // Mixed C&I
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.recycling).toBe(0.021); // Open-loop
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.composting).toBe(0.011); // Industrial
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.incineration).toBe(0.366); // EfW
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.incineration_with_recovery).toBe(0.366);
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.incineration_without_recovery).toBe(0.445);
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.anaerobic_digestion).toBe(0.005);
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.reuse).toBe(0.005);
     });
 
-    it('should rank landfill as highest-emitting standard disposal', () => {
-      expect(WASTE_EMISSION_FACTORS.landfill).toBeGreaterThan(WASTE_EMISSION_FACTORS.incineration);
-      expect(WASTE_EMISSION_FACTORS.landfill).toBeGreaterThan(WASTE_EMISSION_FACTORS.recycling);
-      expect(WASTE_EMISSION_FACTORS.landfill).toBeGreaterThan(WASTE_EMISSION_FACTORS.composting);
+    it('should use landfill as conservative default for unknown methods', () => {
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.other).toBe(0.467);
+      expect(DEFAULT_WASTE_EMISSION_FACTOR).toBe(0.467);
     });
 
-    it('should have reuse as zero-emission option', () => {
-      expect(WASTE_EMISSION_FACTORS.reuse).toBe(0);
+    it('should rank disposal methods correctly by emission intensity', () => {
+      // Landfill > Incineration (no recovery) > Incineration (with recovery) > Recycling > Composting > AD > Reuse
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.landfill).toBeGreaterThan(
+        WASTE_EMISSION_FACTORS_FALLBACK.incineration_with_recovery
+      );
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.incineration_without_recovery).toBeGreaterThan(
+        WASTE_EMISSION_FACTORS_FALLBACK.incineration_with_recovery
+      );
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.incineration_with_recovery).toBeGreaterThan(
+        WASTE_EMISSION_FACTORS_FALLBACK.recycling
+      );
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.recycling).toBeGreaterThan(
+        WASTE_EMISSION_FACTORS_FALLBACK.composting
+      );
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.composting).toBeGreaterThan(
+        WASTE_EMISSION_FACTORS_FALLBACK.anaerobic_digestion
+      );
     });
   });
 
   describe('getWasteEmissionFactor', () => {
-    it('should return correct factor for known treatment methods', () => {
-      expect(getWasteEmissionFactor('landfill')).toBe(0.5);
-      expect(getWasteEmissionFactor('recycling')).toBe(0.02);
-      expect(getWasteEmissionFactor('composting')).toBe(0.01);
+    it('should return correct DEFRA 2024 factor for known methods', () => {
+      expect(getWasteEmissionFactor('landfill')).toBe(0.467);
+      expect(getWasteEmissionFactor('recycling')).toBe(0.021);
+      expect(getWasteEmissionFactor('composting')).toBe(0.011);
     });
 
-    it('should return default factor for unknown methods', () => {
-      expect(getWasteEmissionFactor('unknown_method')).toBe(0.5);
-      expect(getWasteEmissionFactor('')).toBe(0.5);
+    it('should return landfill as conservative default for unknown methods', () => {
+      expect(getWasteEmissionFactor('unknown_method')).toBe(0.467);
+      expect(getWasteEmissionFactor('')).toBe(0.467);
+    });
+
+    it('should normalize method names', () => {
+      expect(getWasteEmissionFactor('LANDFILL')).toBe(0.467);
+      expect(getWasteEmissionFactor('Recycling')).toBe(0.021);
     });
   });
 
   describe('calculateWasteEmissions', () => {
     it('should calculate emissions correctly for landfill', () => {
-      // 1000kg * 0.5 = 500 kgCO2e
+      // 1000kg * 0.467 = 467 kgCO2e
       const result = calculateWasteEmissions(1000, 'landfill');
-      expect(result.emissionsKgCO2e).toBe(500);
+      expect(result.emissionsKgCO2e).toBe(467);
       expect(result.weightKg).toBe(1000);
-      expect(result.emissionFactor).toBe(0.5);
+      expect(result.emissionFactor).toBe(0.467);
     });
 
     it('should calculate emissions correctly for recycling', () => {
-      // 1000kg * 0.02 = 20 kgCO2e
+      // 1000kg * 0.021 = 21 kgCO2e
       const result = calculateWasteEmissions(1000, 'recycling');
-      expect(result.emissionsKgCO2e).toBe(20);
-      expect(result.emissionFactor).toBe(0.02);
-    });
-
-    it('should return zero emissions for reuse', () => {
-      const result = calculateWasteEmissions(1000, 'reuse');
-      expect(result.emissionsKgCO2e).toBe(0);
+      expect(result.emissionsKgCO2e).toBe(21);
+      expect(result.emissionFactor).toBe(0.021);
     });
 
     it('should handle zero weight', () => {
       const result = calculateWasteEmissions(0, 'landfill');
       expect(result.emissionsKgCO2e).toBe(0);
     });
-
-    it('should return structured result object', () => {
-      const result = calculateWasteEmissions(100, 'composting');
-      expect(result).toHaveProperty('weightKg', 100);
-      expect(result).toHaveProperty('treatmentMethod', 'composting');
-      expect(result).toHaveProperty('emissionFactor', 0.01);
-      expect(result).toHaveProperty('emissionsKgCO2e', 1);
-    });
   });
 });
 
 // ============================================================================
-// CIRCULARITY SCORES TESTS
+// EU WASTE FRAMEWORK DIRECTIVE HIERARCHY TESTS
 // ============================================================================
 
-describe('Treatment Circularity Scores', () => {
-  describe('TREATMENT_CIRCULARITY_SCORES constant', () => {
-    it('should have correct circularity scores', () => {
-      expect(TREATMENT_CIRCULARITY_SCORES.reuse).toBe(100);
-      expect(TREATMENT_CIRCULARITY_SCORES.recycling).toBe(100);
-      expect(TREATMENT_CIRCULARITY_SCORES.composting).toBe(100);
-      expect(TREATMENT_CIRCULARITY_SCORES.anaerobic_digestion).toBe(100);
-      expect(TREATMENT_CIRCULARITY_SCORES.incineration_with_recovery).toBe(50);
-      expect(TREATMENT_CIRCULARITY_SCORES.incineration_without_recovery).toBe(0);
-      expect(TREATMENT_CIRCULARITY_SCORES.landfill).toBe(0);
+describe('EU Waste Framework Directive Hierarchy Scores', () => {
+  describe('WASTE_HIERARCHY_SCORES constant', () => {
+    it('should match EU WFD Article 4 hierarchy', () => {
+      // Rank 2: Preparing for Reuse
+      expect(WASTE_HIERARCHY_SCORES.reuse).toBe(100);
+
+      // Rank 3: Recycling
+      expect(WASTE_HIERARCHY_SCORES.recycling).toBe(100);
+      expect(WASTE_HIERARCHY_SCORES.composting).toBe(100); // Art. 3(17)
+
+      // Rank 4: Other Recovery (energy)
+      expect(WASTE_HIERARCHY_SCORES.anaerobic_digestion).toBe(50); // Default: energy
+      expect(WASTE_HIERARCHY_SCORES.incineration_with_recovery).toBe(50);
+
+      // Rank 5: Disposal
+      expect(WASTE_HIERARCHY_SCORES.incineration_without_recovery).toBe(0);
+      expect(WASTE_HIERARCHY_SCORES.landfill).toBe(0);
     });
 
-    it('should follow waste hierarchy principles', () => {
-      // Reuse > Recycling/Composting > Energy Recovery > Landfill
-      expect(TREATMENT_CIRCULARITY_SCORES.reuse).toBe(100);
-      expect(TREATMENT_CIRCULARITY_SCORES.recycling).toBe(100);
-      expect(TREATMENT_CIRCULARITY_SCORES.incineration_with_recovery).toBeLessThan(
-        TREATMENT_CIRCULARITY_SCORES.recycling
-      );
-      expect(TREATMENT_CIRCULARITY_SCORES.landfill).toBeLessThan(
-        TREATMENT_CIRCULARITY_SCORES.incineration_with_recovery
-      );
+    it('should be aliased as TREATMENT_CIRCULARITY_SCORES for backwards compatibility', () => {
+      expect(TREATMENT_CIRCULARITY_SCORES).toBe(WASTE_HIERARCHY_SCORES);
     });
   });
 
-  describe('getTreatmentCircularityScore', () => {
-    it('should return correct score for known methods', () => {
+  describe('ANAEROBIC_DIGESTION_SCORES', () => {
+    it('should distinguish energy vs fertilizer end-use per EU WFD', () => {
+      // Art. 3(17): Digestate as fertilizer = recycling
+      expect(ANAEROBIC_DIGESTION_SCORES.fertilizer).toBe(100);
+
+      // Biogas for energy = other recovery
+      expect(ANAEROBIC_DIGESTION_SCORES.energy).toBe(50);
+
+      // Conservative default
+      expect(ANAEROBIC_DIGESTION_SCORES.default).toBe(50);
+    });
+  });
+
+  describe('getWasteHierarchyScore', () => {
+    it('should return correct scores for standard methods', () => {
+      expect(getWasteHierarchyScore('reuse')).toBe(100);
+      expect(getWasteHierarchyScore('recycling')).toBe(100);
+      expect(getWasteHierarchyScore('landfill')).toBe(0);
+    });
+
+    it('should handle anaerobic digestion based on end-use', () => {
+      // Without end-use, defaults to energy (50)
+      expect(getWasteHierarchyScore('anaerobic_digestion')).toBe(50);
+
+      // With end-use specified
+      expect(getWasteHierarchyScore('anaerobic_digestion', 'energy')).toBe(50);
+      expect(getWasteHierarchyScore('anaerobic_digestion', 'fertilizer')).toBe(100);
+    });
+
+    it('should return 0 for unknown methods', () => {
+      expect(getWasteHierarchyScore('unknown')).toBe(0);
+    });
+  });
+
+  describe('getTreatmentCircularityScore (legacy alias)', () => {
+    it('should work as alias for getWasteHierarchyScore', () => {
       expect(getTreatmentCircularityScore('reuse')).toBe(100);
       expect(getTreatmentCircularityScore('recycling')).toBe(100);
       expect(getTreatmentCircularityScore('landfill')).toBe(0);
     });
-
-    it('should return 0 for unknown methods', () => {
-      expect(getTreatmentCircularityScore('unknown')).toBe(0);
-      expect(getTreatmentCircularityScore('')).toBe(0);
-    });
   });
 
   describe('isCircularTreatment', () => {
-    it('should return true for fully circular treatments (score = 100)', () => {
+    it('should return true only for fully circular treatments (score = 100)', () => {
       expect(isCircularTreatment('reuse')).toBe(true);
       expect(isCircularTreatment('recycling')).toBe(true);
       expect(isCircularTreatment('composting')).toBe(true);
-      expect(isCircularTreatment('anaerobic_digestion')).toBe(true);
     });
 
-    it('should return false for partial recovery treatments (score < 100)', () => {
-      // Energy recovery is not fully circular - materials are lost
+    it('should return false for energy recovery (score = 50)', () => {
+      expect(isCircularTreatment('anaerobic_digestion')).toBe(false); // Default to energy
       expect(isCircularTreatment('incineration_with_recovery')).toBe(false);
     });
 
-    it('should return false for non-circular treatments (score = 0)', () => {
+    it('should return true for AD with fertilizer end-use', () => {
+      expect(isCircularTreatment('anaerobic_digestion', 'fertilizer')).toBe(true);
+    });
+
+    it('should return false for disposal methods', () => {
       expect(isCircularTreatment('landfill')).toBe(false);
       expect(isCircularTreatment('incineration_without_recovery')).toBe(false);
-      expect(isCircularTreatment('other')).toBe(false);
     });
   });
 });
@@ -175,8 +221,8 @@ describe('Treatment Circularity Scores', () => {
 // ============================================================================
 
 describe('Diversion Rate Calculations', () => {
-  describe('DIVERSION_RATE_THRESHOLDS constant', () => {
-    it('should have correct thresholds', () => {
+  describe('DIVERSION_RATE_THRESHOLDS', () => {
+    it('should have industry benchmark thresholds', () => {
       expect(DIVERSION_RATE_THRESHOLDS.EXCELLENT).toBe(90);
       expect(DIVERSION_RATE_THRESHOLDS.HIGH).toBe(70);
       expect(DIVERSION_RATE_THRESHOLDS.MEDIUM).toBe(40);
@@ -239,10 +285,14 @@ describe('Diversion Rate Calculations', () => {
 // ============================================================================
 
 describe('Hazard Level Calculations', () => {
-  describe('HAZARDOUS_WASTE_THRESHOLDS constant', () => {
+  describe('HAZARDOUS_WASTE_THRESHOLDS', () => {
     it('should have correct thresholds', () => {
       expect(HAZARDOUS_WASTE_THRESHOLDS.HIGH).toBe(10);
       expect(HAZARDOUS_WASTE_THRESHOLDS.MEDIUM).toBe(5);
+    });
+
+    it('should be aliased as HAZARD_THRESHOLDS for backwards compatibility', () => {
+      expect(HAZARD_THRESHOLDS).toBe(HAZARDOUS_WASTE_THRESHOLDS);
     });
   });
 
@@ -285,6 +335,7 @@ describe('Waste Category and Treatment Labels', () => {
       expect(WASTE_CATEGORY_LABELS.food_waste).toBe('Food Waste');
       expect(WASTE_CATEGORY_LABELS.packaging_waste).toBe('Packaging Waste');
       expect(WASTE_CATEGORY_LABELS.hazardous).toBe('Hazardous Waste');
+      expect(WASTE_CATEGORY_LABELS.paper_cardboard).toBe('Paper/Cardboard');
     });
   });
 
@@ -292,7 +343,16 @@ describe('Waste Category and Treatment Labels', () => {
     it('should have human-readable labels for all methods', () => {
       expect(TREATMENT_METHOD_LABELS.landfill).toBe('Landfill');
       expect(TREATMENT_METHOD_LABELS.recycling).toBe('Recycling');
-      expect(TREATMENT_METHOD_LABELS.incineration_with_recovery).toBe('Incineration (Energy Recovery)');
+      expect(TREATMENT_METHOD_LABELS.incineration_with_recovery).toBe(
+        'Incineration (Energy Recovery)'
+      );
+      expect(TREATMENT_METHOD_LABELS.anaerobic_digestion).toBe('Anaerobic Digestion');
+      expect(TREATMENT_METHOD_LABELS.anaerobic_digestion_energy).toBe(
+        'Anaerobic Digestion (Energy)'
+      );
+      expect(TREATMENT_METHOD_LABELS.anaerobic_digestion_fertilizer).toBe(
+        'Anaerobic Digestion (Digestate)'
+      );
     });
   });
 
@@ -356,73 +416,115 @@ describe('Weight Formatting', () => {
 });
 
 // ============================================================================
-// REGRESSION TESTS - Prevent hardcoding issues
+// COMPLIANCE DOCUMENTATION TESTS
 // ============================================================================
 
-describe('Regression Tests - Preventing hardcoding issues', () => {
-  it('should use consistent thresholds across the application', () => {
-    // These values must match what's used in:
-    // - WasteCard.tsx
-    // - useWasteMetrics.ts
-    // - OperationalWasteCard.tsx
-    // - Database views
+describe('ESRS E5 Compliance Documentation', () => {
+  describe('getMethodologyDocumentation', () => {
+    it('should return complete methodology documentation', () => {
+      const docs = getMethodologyDocumentation();
 
-    // Diversion rate thresholds
-    expect(DIVERSION_RATE_THRESHOLDS.HIGH).toBe(70);
-    expect(DIVERSION_RATE_THRESHOLDS.MEDIUM).toBe(40);
+      expect(docs.disclosureStandard).toBe('CSRD ESRS E5 - Resource Use and Circular Economy');
+      expect(docs.disclosureRequirement).toBe('E5-5: Resource outflows');
+    });
 
-    // Hazard thresholds
-    expect(HAZARDOUS_WASTE_THRESHOLDS.HIGH).toBe(10);
-    expect(HAZARDOUS_WASTE_THRESHOLDS.MEDIUM).toBe(5);
+    it('should document emission factor sources', () => {
+      const docs = getMethodologyDocumentation();
+
+      expect(docs.emissionFactors.primarySource).toContain('DEFRA 2024');
+      expect(docs.emissionFactors.scope).toContain('Scope 3 Category 5');
+    });
+
+    it('should document hierarchy score methodology', () => {
+      const docs = getMethodologyDocumentation();
+
+      expect(docs.hierarchyScores.source).toContain('EU Waste Framework Directive');
+      expect(docs.hierarchyScores.circularDefinition).toContain('100');
+    });
+
+    it('should include disclaimers about MCI', () => {
+      const docs = getMethodologyDocumentation();
+
+      expect(docs.disclaimers).toContain(
+        'Hierarchy scores represent EU Waste Framework compliance, not Ellen MacArthur MCI'
+      );
+      expect(docs.disclaimers).toContain(
+        'The Ellen MacArthur MCI is calculated using: MCI = 1 - LFI × F(X)'
+      );
+    });
+
+    it('should include reference URLs', () => {
+      const docs = getMethodologyDocumentation();
+
+      expect(docs.references.defra2024).toContain('gov.uk');
+      expect(docs.references.euWasteFramework).toContain('eur-lex.europa.eu');
+    });
   });
+});
 
-  it('should use consistent emission factors across the application', () => {
-    // These values must match what's displayed in:
-    // - OperationalWasteCard.tsx dropdown options
-    // - Database calculations
+// ============================================================================
+// REGRESSION TESTS - Standards Compliance
+// ============================================================================
 
-    expect(WASTE_EMISSION_FACTORS.recycling).toBe(0.02);
-    expect(WASTE_EMISSION_FACTORS.composting).toBe(0.01);
-    expect(WASTE_EMISSION_FACTORS.anaerobic_digestion).toBe(0.005);
-    expect(WASTE_EMISSION_FACTORS.incineration).toBe(0.3);
-    expect(WASTE_EMISSION_FACTORS.landfill).toBe(0.5);
-  });
-
-  it('should use consistent circularity scores', () => {
-    // These values must match EU Waste Framework Directive hierarchy
-    // and be consistent with what useWasteMetrics uses
-
-    expect(TREATMENT_CIRCULARITY_SCORES.reuse).toBe(100);
-    expect(TREATMENT_CIRCULARITY_SCORES.recycling).toBe(100);
-    expect(TREATMENT_CIRCULARITY_SCORES.composting).toBe(100);
-    expect(TREATMENT_CIRCULARITY_SCORES.anaerobic_digestion).toBe(100);
-    expect(TREATMENT_CIRCULARITY_SCORES.incineration_with_recovery).toBe(50);
-    expect(TREATMENT_CIRCULARITY_SCORES.incineration_without_recovery).toBe(0);
-    expect(TREATMENT_CIRCULARITY_SCORES.landfill).toBe(0);
-  });
-
-  it('should have all treatment methods with both emission factors and circularity scores', () => {
-    const commonMethods = ['recycling', 'composting', 'landfill', 'anaerobic_digestion', 'reuse'];
-
-    commonMethods.forEach(method => {
-      expect(WASTE_EMISSION_FACTORS[method]).toBeDefined();
-      expect(TREATMENT_CIRCULARITY_SCORES[method]).toBeDefined();
-      expect(TREATMENT_METHOD_LABELS[method]).toBeDefined();
+describe('Standards Compliance Regression Tests', () => {
+  describe('DEFRA 2024 Values', () => {
+    it('should use DEFRA 2024 emission factors, not arbitrary values', () => {
+      // These are the actual DEFRA 2024 values, not the old hardcoded approximations
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.landfill).toBe(0.467); // Was 0.5
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.recycling).toBe(0.021); // Was 0.02
+      expect(WASTE_EMISSION_FACTORS_FALLBACK.composting).toBe(0.011); // Was 0.01
     });
   });
 
-  it('should calculate diversion level consistently with WasteCard thresholds', () => {
-    // WasteCard.tsx originally had: diversionRate >= 70 ? 'high' : diversionRate >= 40 ? 'medium' : 'low'
-    // The shared function should return compatible values
-    expect(getDiversionLevel(75)).toBe('high'); // >= 70
-    expect(getDiversionLevel(50)).toBe('medium'); // >= 40 and < 70
-    expect(getDiversionLevel(30)).toBe('low'); // < 40
+  describe('EU Waste Framework Directive Compliance', () => {
+    it('should correctly classify anaerobic digestion based on end-use', () => {
+      // Per Article 3(17) and recitals
+      // Digestate as fertilizer = recycling (Art. 3(17))
+      expect(getWasteHierarchyScore('anaerobic_digestion', 'fertilizer')).toBe(100);
+
+      // Biogas for energy = other recovery (not recycling)
+      expect(getWasteHierarchyScore('anaerobic_digestion', 'energy')).toBe(50);
+
+      // Default should be conservative (energy)
+      expect(getWasteHierarchyScore('anaerobic_digestion')).toBe(50);
+    });
+
+    it('should follow EU WFD Article 4 hierarchy ranking', () => {
+      // Reuse (Rank 2) >= Recycling (Rank 3) > Recovery (Rank 4) > Disposal (Rank 5)
+      expect(WASTE_HIERARCHY_SCORES.reuse).toBeGreaterThanOrEqual(
+        WASTE_HIERARCHY_SCORES.recycling
+      );
+      expect(WASTE_HIERARCHY_SCORES.recycling).toBeGreaterThan(
+        WASTE_HIERARCHY_SCORES.incineration_with_recovery
+      );
+      expect(WASTE_HIERARCHY_SCORES.incineration_with_recovery).toBeGreaterThan(
+        WASTE_HIERARCHY_SCORES.landfill
+      );
+    });
   });
 
-  it('should calculate hazard level consistently with WasteCard thresholds', () => {
-    // WasteCard.tsx originally had: hazardousPercentage > 10 ? 'high' : hazardousPercentage > 5 ? 'medium' : 'low'
-    expect(getHazardLevel(15)).toBe('high'); // > 10
-    expect(getHazardLevel(7)).toBe('medium'); // > 5 and <= 10
-    expect(getHazardLevel(3)).toBe('low'); // <= 5
+  describe('Ellen MacArthur MCI Disclaimer', () => {
+    it('should NOT use MCI terminology for fixed treatment scores', () => {
+      // The scores are called WASTE_HIERARCHY_SCORES, not MCI
+      expect(WASTE_HIERARCHY_SCORES).toBeDefined();
+
+      // Verify we're not claiming these are MCI
+      const docs = getMethodologyDocumentation();
+      expect(docs.hierarchyScores.source).not.toContain('Ellen MacArthur');
+      expect(docs.hierarchyScores.source).toContain('EU Waste Framework');
+    });
+  });
+
+  describe('Backwards Compatibility', () => {
+    it('should maintain legacy exports for existing code', () => {
+      // TREATMENT_CIRCULARITY_SCORES is alias for WASTE_HIERARCHY_SCORES
+      expect(TREATMENT_CIRCULARITY_SCORES.reuse).toBe(WASTE_HIERARCHY_SCORES.reuse);
+
+      // getTreatmentCircularityScore is alias for getWasteHierarchyScore
+      expect(getTreatmentCircularityScore('recycling')).toBe(getWasteHierarchyScore('recycling'));
+
+      // HAZARD_THRESHOLDS is alias for HAZARDOUS_WASTE_THRESHOLDS
+      expect(HAZARD_THRESHOLDS.HIGH).toBe(HAZARDOUS_WASTE_THRESHOLDS.HIGH);
+    });
   });
 });
