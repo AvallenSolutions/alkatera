@@ -228,3 +228,86 @@
 .passport-template .font-mono {
   font-family: 'Fira Code', Consolas, monospace;
 }
+
+/* ============================================
+   Blog Content Styling
+   Fixes paragraph spacing from Tiptap editor
+   ============================================ */
+
+/* Blog prose content - ensure proper paragraph spacing */
+.prose p {
+  margin-top: 0;
+  margin-bottom: 1.5em;
+}
+
+/* Ensure empty paragraphs (from Enter key in editor) maintain spacing */
+.prose p:empty,
+.prose p:has(br:only-child) {
+  min-height: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+/* Handle paragraphs that only contain a <br> tag */
+.prose p > br:only-child {
+  display: block;
+  content: "";
+  margin-top: 0;
+}
+
+/* Prevent margin collapse between adjacent paragraphs */
+.prose p + p {
+  margin-top: 0;
+}
+
+/* First paragraph after heading should have no top margin */
+.prose h1 + p,
+.prose h2 + p,
+.prose h3 + p,
+.prose h4 + p {
+  margin-top: 0;
+}
+
+/* Ensure headings have proper spacing */
+.prose h1,
+.prose h2,
+.prose h3 {
+  margin-top: 2em;
+  margin-bottom: 0.75em;
+}
+
+/* First heading shouldn't have top margin */
+.prose > h1:first-child,
+.prose > h2:first-child,
+.prose > h3:first-child {
+  margin-top: 0;
+}
+
+/* List items spacing */
+.prose ul,
+.prose ol {
+  margin-top: 1em;
+  margin-bottom: 1.5em;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* Blockquote spacing */
+.prose blockquote {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+/* Images spacing */
+.prose img {
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+
+/* Code blocks spacing */
+.prose pre {
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
