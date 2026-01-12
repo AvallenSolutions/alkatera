@@ -1,4 +1,4 @@
-Readme.md
+﻿Readme.md
 
 # AlkaTera Product LCA Report (PDF Template)
 
