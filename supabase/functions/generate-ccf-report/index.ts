@@ -31,6 +31,10 @@ interface ScopeBreakdown {
     downstream_logistics: number;
     operational_waste: number;
     marketing_materials: number;
+    // UI-friendly aliases (for backward compatibility with existing components)
+    logistics: number;
+    waste: number;
+    marketing: number;
     total: number;
   };
   total: number;
@@ -343,6 +347,10 @@ Deno.serve(async (req: Request) => {
         downstream_logistics: logisticsTotal,
         operational_waste: wasteTotal,
         marketing_materials: marketingMaterialsTotal,
+        // UI-friendly aliases for backward compatibility
+        logistics: logisticsTotal,
+        waste: wasteTotal,
+        marketing: marketingMaterialsTotal,
         total: scope3Total,
       },
       total: totalEmissions,

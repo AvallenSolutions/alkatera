@@ -27,6 +27,10 @@ export interface Scope3Breakdown {
   operational_waste: number;
   downstream_logistics: number;
   marketing_materials: number;
+  // UI-friendly aliases (for backward compatibility with existing components)
+  logistics: number;      // alias for downstream_logistics
+  waste: number;          // alias for operational_waste
+  marketing: number;      // alias for marketing_materials
   total: number;
 }
 
@@ -225,6 +229,10 @@ export async function calculateScope3(
     operational_waste: 0,
     downstream_logistics: 0,
     marketing_materials: 0,
+    // UI aliases (populated at the end)
+    logistics: 0,
+    waste: 0,
+    marketing: 0,
     total: 0,
   };
 
@@ -348,6 +356,11 @@ export async function calculateScope3(
     breakdown.operational_waste +
     breakdown.downstream_logistics +
     breakdown.marketing_materials;
+
+  // Populate UI-friendly aliases for backward compatibility
+  breakdown.logistics = breakdown.downstream_logistics;
+  breakdown.waste = breakdown.operational_waste;
+  breakdown.marketing = breakdown.marketing_materials;
 
   return breakdown;
 }

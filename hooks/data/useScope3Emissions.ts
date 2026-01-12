@@ -28,6 +28,10 @@ export function useScope3Emissions(
     operational_waste: 0,
     downstream_logistics: 0,
     marketing_materials: 0,
+    // UI-friendly aliases
+    logistics: 0,
+    waste: 0,
+    marketing: 0,
     total: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
