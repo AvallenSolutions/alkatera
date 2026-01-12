@@ -40,6 +40,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import {
+  calculateFacilityWaterRisks,
+  FacilityWaterRisk as SharedFacilityWaterRisk,
+} from '@/lib/calculations/water-risk';
 
 function formatStageName(stage: string): string {
   const stageMap: Record<string, string> = {
@@ -729,194 +733,16 @@ export function useCompanyMetrics() {
     try {
       if (!currentOrganization?.id) return;
 
-      const { data: facilities, error } = await supabase
-        .from('facilities')
-        .select('id, name, location_country_code, address_lat, address_lng')
-        .eq('organization_id', currentOrganization.id);
-
-      if (error) throw error;
-
-      // Fetch OPERATIONAL water data from facility_activity_entries
-      const { data: operationalWater } = await supabase
-        .from('facility_activity_entries')
-        .select('facility_id, activity_category, quantity, unit')
-        .eq('organization_id', currentOrganization.id)
-        .in('activity_category', ['water_intake', 'water_discharge', 'water_recycled']);
-
-      // Build operational water map by facility
-      const operationalWaterMap = new Map<string, {
-        intake: number;
-        discharge: number;
-        recycled: number;
-      }>();
-
-      operationalWater?.forEach((entry: any) => {
-        const facilityId = entry.facility_id;
-        if (!facilityId) return;
-
-        if (!operationalWaterMap.has(facilityId)) {
-          operationalWaterMap.set(facilityId, { intake: 0, discharge: 0, recycled: 0 });
-        }
-
-        const current = operationalWaterMap.get(facilityId)!;
-        const quantity = Number(entry.quantity || 0);
-
-        if (entry.activity_category === 'water_intake') {
-          current.intake += quantity;
-        } else if (entry.activity_category === 'water_discharge') {
-          current.discharge += quantity;
-        } else if (entry.activity_category === 'water_recycled') {
-          current.recycled += quantity;
-        }
-      });
-
-      // Fetch PRODUCT LCA water data from production sites
-      const { data: productionSites } = await supabase
-        .from('product_lca_production_sites')
-        .select(`
-          facility_id,
-          production_volume,
-          share_of_production,
-          product_lcas!inner(
-            id,
-            product_name,
-            aggregated_impacts,
-            status,
-            organization_id
-          )
-        `)
-        .eq('product_lcas.organization_id', currentOrganization.id)
-        .eq('product_lcas.status', 'completed');
-
-      // Fetch water data from contract manufacturer allocations
-      const { data: cmAllocations } = await supabase
-        .from('contract_manufacturer_allocations')
-        .select(`
-          facility_id,
-          product_id,
-          client_production_volume,
-          allocated_water_litres,
-          products!inner(
-            id,
-            name,
-            organization_id
-          )
-        `)
-        .eq('products.organization_id', currentOrganization.id);
-
-      const productLcaWaterMap = new Map<string, {
-        totalWater: number;
-        totalProduction: number;
-        products: string[];
-      }>();
-
-      productionSites?.forEach((site: any) => {
-        const facilityId = site.facility_id;
-        if (!facilityId) return;
-
-        const waterPerUnit = Number(site.product_lcas?.aggregated_impacts?.water_consumption || 0);
-        const prodVolume = Number(site.production_volume || 0);
-        const sharePercent = Number(site.share_of_production || 100) / 100;
-        const productName = site.product_lcas?.product_name || 'Unknown';
-
-        const waterForFacility = waterPerUnit * prodVolume * sharePercent;
-
-        if (!productLcaWaterMap.has(facilityId)) {
-          productLcaWaterMap.set(facilityId, { totalWater: 0, totalProduction: 0, products: [] });
-        }
-
-        const current = productLcaWaterMap.get(facilityId)!;
-        current.totalWater += waterForFacility;
-        current.totalProduction += prodVolume * sharePercent;
-        if (!current.products.includes(productName)) {
-          current.products.push(productName);
-        }
-      });
-
-      // Add contract manufacturer allocation water data
-      cmAllocations?.forEach((allocation: any) => {
-        const facilityId = allocation.facility_id;
-        if (!facilityId) return;
-
-        const waterLitres = Number(allocation.allocated_water_litres || 0);
-        const waterM3 = waterLitres / 1000;
-        const prodVolume = Number(allocation.client_production_volume || 0);
-        const productName = allocation.products?.name || 'Unknown';
-
-        if (!productLcaWaterMap.has(facilityId)) {
-          productLcaWaterMap.set(facilityId, { totalWater: 0, totalProduction: 0, products: [] });
-        }
-
-        const current = productLcaWaterMap.get(facilityId)!;
-        current.totalWater += waterM3;
-        current.totalProduction += prodVolume;
-        if (!current.products.includes(productName)) {
-          current.products.push(productName);
-        }
-      });
-
-      const AWARE_THRESHOLDS = { high: 40, medium: 20 };
-      const AWARE_FACTORS: Record<string, number> = {
-        ES: 54.8, PT: 42.1, IT: 38.5, GR: 35.2, SA: 95.7, AE: 89.4,
-        GB: 8.2, IE: 5.3, NO: 3.1, SE: 4.2, FI: 3.8, FR: 20.5, NZ: 12.3,
-        GLOBAL: 20.5,
-      };
-
-      const risks: FacilityWaterRisk[] = facilities?.map((facility) => {
-        const countryCode = facility.location_country_code?.toUpperCase();
-        const awareFactor = AWARE_FACTORS[countryCode || 'GLOBAL'] || AWARE_FACTORS.GLOBAL;
-
-        let riskLevel: 'high' | 'medium' | 'low' = 'low';
-        if (awareFactor > AWARE_THRESHOLDS.high) riskLevel = 'high';
-        else if (awareFactor > AWARE_THRESHOLDS.medium) riskLevel = 'medium';
-
-        // ═══════════════════════════════════════════════════════════
-        // STREAM 1: OPERATIONAL WATER (Direct facility consumption)
-        // ═══════════════════════════════════════════════════════════
-        // What: Water physically used AT this facility
-        // Source: facility_activity_entries (water_intake, water_discharge)
-        const opWater = operationalWaterMap.get(facility.id);
-        const operationalIntake = opWater?.intake || 0;
-        const operationalDischarge = opWater?.discharge || 0;
-        const operationalNet = operationalIntake - operationalDischarge;
-        const hasOperationalData = operationalIntake > 0 || operationalDischarge > 0;
-
-        // ═══════════════════════════════════════════════════════════
-        // STREAM 2: EMBEDDED WATER (Supply chain footprint)
-        // ═══════════════════════════════════════════════════════════
-        // What: Water used upstream to produce ingredients/packaging for products made here
-        // Source: product_lca_materials via production_sites & CM allocations
-        const lcaWater = productLcaWaterMap.get(facility.id);
-        const productLcaWater = lcaWater?.totalWater || 0;
-
-        // ═══════════════════════════════════════════════════════════
-        // SCARCITY WEIGHTING (AWARE method)
-        // ═══════════════════════════════════════════════════════════
-        // NOTE: Only operational water is weighted by facility location
-        // Embedded water should be weighted by origin of each material (not implemented here)
-        const scarcityWeighted = operationalNet * awareFactor;
-
-        return {
-          facility_id: facility.id,
-          facility_name: facility.name || 'Unknown Facility',
-          location_country_code: countryCode || 'GLOBAL',
-          water_scarcity_aware: awareFactor,
-          risk_level: riskLevel,
-          latitude: facility.address_lat ? parseFloat(facility.address_lat) : undefined,
-          longitude: facility.address_lng ? parseFloat(facility.address_lng) : undefined,
-          operational_water_intake_m3: operationalIntake,
-          operational_water_discharge_m3: operationalDischarge,
-          operational_net_consumption_m3: operationalNet,
-          product_lca_water_m3: productLcaWater,
-          scarcity_weighted_consumption_m3: scarcityWeighted,
-          production_volume: lcaWater?.totalProduction || 0,
-          products_linked: lcaWater?.products || [],
-          has_operational_data: hasOperationalData,
-        };
-      }) || [];
+      // Use shared water-risk calculation service for consistency
+      // This ensures AWARE factors are fetched from the database (not hardcoded)
+      // and risk level thresholds match the database calculations
+      const risks = await calculateFacilityWaterRisks(supabase, currentOrganization.id);
 
       setFacilityWaterRisks(risks);
     } catch (err) {
+      console.error('Error fetching facility water risks:', err);
+      // Set empty array on error so UI can handle appropriately
+      setFacilityWaterRisks([]);
     }
   }
 

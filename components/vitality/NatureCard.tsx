@@ -5,6 +5,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Mountain, TrendingUp, ArrowRight, Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
+import {
+  NATURE_PERFORMANCE_THRESHOLDS,
+  getPerformanceLevel,
+  getPerformanceLabel,
+  getPerformanceColorClass,
+  getPerformanceBgColorClass,
+  formatImpactValue,
+  type PerformanceLevel,
+} from '@/lib/calculations/nature-biodiversity';
 
 interface NatureCardProps {
   natureMetrics: NatureMetrics | null;
@@ -47,16 +56,23 @@ export function NatureCard({ natureMetrics, loading, onClick }: NatureCardProps)
   const perUnit = natureMetrics.per_unit;
   const totalProduction = natureMetrics.total_production_volume;
 
-  const getPerformance = (value: number, goodThreshold: number, fairThreshold: number) => {
-    if (value < goodThreshold) return { label: 'Excellent', color: 'text-green-600', bgColor: 'bg-green-100' };
-    if (value < fairThreshold) return { label: 'Good', color: 'text-emerald-600', bgColor: 'bg-emerald-100' };
-    return { label: 'Needs Work', color: 'text-amber-600', bgColor: 'bg-amber-100' };
-  };
+  // Use shared service for consistent performance evaluation
+  const getPerformance = (level: PerformanceLevel) => ({
+    label: getPerformanceLabel(level),
+    color: getPerformanceColorClass(level),
+    bgColor: getPerformanceBgColorClass(level),
+  });
 
-  const ecotoxPerf = getPerformance(perUnit.terrestrial_ecotoxicity, 5, 15);
-  const eutroPerf = getPerformance(perUnit.freshwater_eutrophication, 0.3, 0.7);
-  const acidPerf = getPerformance(perUnit.terrestrial_acidification, 1.5, 3.0);
-  const landPerf = getPerformance(perUnit.land_use, 500, 2000);
+  // Calculate performance levels using shared thresholds
+  const ecotoxLevel = getPerformanceLevel('terrestrial_ecotoxicity', perUnit.terrestrial_ecotoxicity);
+  const eutroLevel = getPerformanceLevel('freshwater_eutrophication', perUnit.freshwater_eutrophication);
+  const acidLevel = getPerformanceLevel('terrestrial_acidification', perUnit.terrestrial_acidification);
+  const landLevel = getPerformanceLevel('land_use', perUnit.land_use);
+
+  const ecotoxPerf = getPerformance(ecotoxLevel);
+  const eutroPerf = getPerformance(eutroLevel);
+  const acidPerf = getPerformance(acidLevel);
+  const landPerf = getPerformance(landLevel);
 
   return (
     <Card

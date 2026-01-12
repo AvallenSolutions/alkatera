@@ -1,4 +1,5 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
+import { DEFAULT_AWARE_FACTOR, getAwareFactorValue } from './calculations/water-risk';
 
 export type MaterialCategoryType =
   | 'SCOPE_1_2_ENERGY'
@@ -158,8 +159,12 @@ export async function resolveImpactFactors(
   const supabase = getSupabaseBrowserClient();
   const category = detectMaterialCategory(material);
 
+  // Get location-specific AWARE factor for water scarcity weighting
+  // Uses AWARE methodology (Available Water Remaining) v1.3
+  const awareFactor = await getAwareFactorValue(supabase, material.origin_country);
+
   console.log(
-    `[Waterfall] Resolving ${material.material_name} | Category: ${category} | Quantity: ${quantity_kg} kg`
+    `[Waterfall] Resolving ${material.material_name} | Category: ${category} | Quantity: ${quantity_kg} kg | AWARE: ${awareFactor}`
   );
 
   // ===========================================================
@@ -195,7 +200,7 @@ export async function resolveImpactFactors(
             impact_climate_biogenic: (impacts.climate_biogenic || impacts.climate_change_gwp100 * 0.15 || 0) * quantity_kg,
             impact_climate_dluc: (impacts.climate_dluc || 0) * quantity_kg,
             impact_water: (impacts.water_consumption || 0) * quantity_kg,
-            impact_water_scarcity: (impacts.water_scarcity_aware || impacts.water_consumption * 20 || 0) * quantity_kg,
+            impact_water_scarcity: (impacts.water_scarcity_aware || impacts.water_consumption * awareFactor || 0) * quantity_kg,
             impact_land: (impacts.land_use || 0) * quantity_kg,
             impact_waste: (impacts.waste || 0) * quantity_kg,
             impact_ozone_depletion: (impacts.ozone_depletion || 0) * quantity_kg,
@@ -285,7 +290,7 @@ export async function resolveImpactFactors(
 
           // All other impacts from Ecoinvent
           impact_water: Number(ecoinventProxy.impact_water || 0) * quantity_kg,
-          impact_water_scarcity: Number(ecoinventProxy.impact_water || 0) * quantity_kg * 20,
+          impact_water_scarcity: Number(ecoinventProxy.impact_water || 0) * quantity_kg * awareFactor,
           impact_land: Number(ecoinventProxy.impact_land_use || ecoinventProxy.impact_land || 0) * quantity_kg,
           impact_waste: Number(ecoinventProxy.impact_waste || 0) * quantity_kg,
           impact_ozone_depletion: Number(ecoinventProxy.impact_ozone_depletion || 0) * quantity_kg,
@@ -352,7 +357,7 @@ export async function resolveImpactFactors(
       impact_climate_biogenic: co2Total * 0.15,
       impact_climate_dluc: 0,
       impact_water: waterTotal,
-      impact_water_scarcity: waterTotal * 20,
+      impact_water_scarcity: waterTotal * awareFactor,
       impact_land: landTotal,
       impact_waste: wasteTotal,
       impact_ozone_depletion: 0,
@@ -400,7 +405,7 @@ export async function resolveImpactFactors(
       impact_climate_biogenic: Number(ecoinventProxy.impact_climate || 0) * quantity_kg * 0.15,
       impact_climate_dluc: 0,
       impact_water: Number(ecoinventProxy.impact_water || 0) * quantity_kg,
-      impact_water_scarcity: Number(ecoinventProxy.impact_water || 0) * quantity_kg * 20,
+      impact_water_scarcity: Number(ecoinventProxy.impact_water || 0) * quantity_kg * awareFactor,
       impact_land: Number(ecoinventProxy.impact_land_use || ecoinventProxy.impact_land || 0) * quantity_kg,
       impact_waste: Number(ecoinventProxy.impact_waste || 0) * quantity_kg,
       impact_ozone_depletion: Number(ecoinventProxy.impact_ozone_depletion || 0) * quantity_kg,

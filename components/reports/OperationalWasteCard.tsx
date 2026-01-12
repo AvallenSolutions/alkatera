@@ -23,6 +23,11 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import {
+  getWasteEmissionFactor,
+  getTreatmentMethodLabel,
+  WASTE_EMISSION_FACTORS,
+} from "@/lib/calculations/waste-circularity";
 
 interface WasteEntry {
   id: string;
@@ -56,34 +61,11 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
     return `${(value / 1000).toFixed(3)} tCO₂e`;
   };
 
-  const formatDisposalMethod = (method: string) => {
-    const mapping: Record<string, string> = {
-      landfill: "Landfill",
-      recycling: "Recycling",
-      composting: "Composting",
-      incineration: "Incineration",
-      anaerobic_digestion: "Anaerobic Digestion",
-    };
-    return mapping[method] || method;
-  };
-
   const getDisposalIcon = (method: string) => {
     if (method === "recycling" || method === "composting" || method === "anaerobic_digestion") {
       return <Recycle className="h-3 w-3 text-green-600" />;
     }
     return <Trash2 className="h-3 w-3 text-slate-600" />;
-  };
-
-  const getEmissionFactor = (method: string): number => {
-    // kgCO2e per kg of waste
-    const factors: Record<string, number> = {
-      landfill: 0.5,
-      recycling: 0.02,
-      composting: 0.01,
-      incineration: 0.3,
-      anaerobic_digestion: 0.005,
-    };
-    return factors[method] || 0.5;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,7 +79,7 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
     setIsSaving(true);
     try {
       const supabase = getSupabaseBrowserClient();
-      const emissionFactor = getEmissionFactor(disposalMethod);
+      const emissionFactor = getWasteEmissionFactor(disposalMethod);
       const weight = parseFloat(weightKg);
       const computedCO2e = weight * emissionFactor;
 
@@ -180,7 +162,7 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
                       <div className="flex items-center gap-2 mb-1">
                         <Badge variant="outline" className="text-xs flex items-center gap-1">
                           {getDisposalIcon(entry.disposal_method)}
-                          {formatDisposalMethod(entry.disposal_method)}
+                          {getTreatmentMethodLabel(entry.disposal_method)}
                         </Badge>
                       </div>
                       <div className="font-medium text-sm truncate">{entry.material_type}</div>
@@ -295,7 +277,7 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
               <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900">
                 <div className="text-xs text-muted-foreground mb-1">Estimated Emissions</div>
                 <div className="text-lg font-semibold">
-                  {formatEmissions(parseFloat(weightKg) * getEmissionFactor(disposalMethod))}
+                  {formatEmissions(parseFloat(weightKg) * getWasteEmissionFactor(disposalMethod))}
                 </div>
               </div>
             )}
