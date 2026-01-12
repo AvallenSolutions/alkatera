@@ -17,6 +17,8 @@ interface CCFReques {
   };
 }
 
+// NOTE: This interface must match /lib/calculations/corporate-emissions.ts
+// to ensure consistency across Dashboard, Company Vitality, and CCF Reports
 interface ScopeBreakdown {
   scope1: number;
   scope2: number;
@@ -28,6 +30,7 @@ interface ScopeBreakdown {
     capital_goods: number;
     downstream_logistics: number;
     operational_waste: number;
+    marketing_materials: number;
     total: number;
   };
   total: number;
@@ -240,19 +243,21 @@ Deno.serve(async (req: Request) => {
     let capitalGoodsTotal = 0;
     let logisticsTotal = 0;
     let wasteTotal = 0;
+    let marketingMaterialsTotal = 0;
 
     // Fetch all overhead entries from the database if report exists
+    // NOTE: Logic must match /lib/calculations/corporate-emissions.ts
     if (existingReport) {
       const { data: overheadEntries, error: overheadError } = await supabase
         .from("corporate_overheads")
-        .select("category, computed_co2e")
+        .select("category, computed_co2e, material_type")
         .eq("report_id", existingReport.id);
 
       if (!overheadError && overheadEntries) {
         console.log(`Found ${overheadEntries.length} overhead entries`);
 
-        // Sum by category
-        overheadEntries.forEach((entry) => {
+        // Sum by category - matches shared corporate-emissions.ts logic
+        overheadEntries.forEach((entry: any) => {
           const co2e = entry.computed_co2e || 0;
           overheadScope3Total += co2e;
 
@@ -260,20 +265,29 @@ Deno.serve(async (req: Request) => {
             case "business_travel":
               businessTravelTotal += co2e;
               break;
-            case "purchased_services":
-              purchasedServicesTotal += co2e;
-              break;
             case "employee_commuting":
               employeeCommutingTotal += co2e;
               break;
             case "capital_goods":
               capitalGoodsTotal += co2e;
               break;
+            case "operational_waste":
+              wasteTotal += co2e;
+              break;
             case "downstream_logistics":
               logisticsTotal += co2e;
               break;
-            case "operational_waste":
-              wasteTotal += co2e;
+            case "purchased_services":
+              // Marketing materials have material_type field set
+              if (entry.material_type) {
+                marketingMaterialsTotal += co2e;
+              } else {
+                purchasedServicesTotal += co2e;
+              }
+              break;
+            default:
+              // Fallback to purchased_services
+              purchasedServicesTotal += co2e;
               break;
           }
         });
@@ -281,6 +295,7 @@ Deno.serve(async (req: Request) => {
         console.log(`Overhead Scope 3 Total: ${overheadScope3Total} kgCO2e`);
         console.log(`Business Travel (overheads): ${businessTravelTotal} kgCO2e`);
         console.log(`Purchased Services: ${purchasedServicesTotal} kgCO2e`);
+        console.log(`Marketing Materials: ${marketingMaterialsTotal} kgCO2e`);
         console.log(`Employee Commuting: ${employeeCommutingTotal} kgCO2e`);
         console.log(`Capital Goods: ${capitalGoodsTotal} kgCO2e`);
         console.log(`Logistics: ${logisticsTotal} kgCO2e`);
@@ -327,6 +342,7 @@ Deno.serve(async (req: Request) => {
         capital_goods: capitalGoodsTotal,
         downstream_logistics: logisticsTotal,
         operational_waste: wasteTotal,
+        marketing_materials: marketingMaterialsTotal,
         total: scope3Total,
       },
       total: totalEmissions,
