@@ -351,6 +351,14 @@ export async function resolveImpactFactors(
     const landTotal = Number(stagingFactor.land_factor || 0) * quantity_kg;
     const wasteTotal = Number(stagingFactor.waste_factor || 0) * quantity_kg;
 
+    // Nature impact factors from ReCiPe 2016 columns
+    const terrestrialEcotoxicity = Number(stagingFactor.terrestrial_ecotoxicity_factor || 0) * quantity_kg;
+    const freshwaterEutrophication = Number(stagingFactor.freshwater_eutrophication_factor || 0) * quantity_kg;
+    const terrestrialAcidification = Number(stagingFactor.terrestrial_acidification_factor || 0) * quantity_kg;
+    const freshwaterEcotoxicity = Number(stagingFactor.freshwater_ecotoxicity_factor || 0) * quantity_kg;
+    const marineEcotoxicity = Number(stagingFactor.marine_ecotoxicity_factor || 0) * quantity_kg;
+    const marineEutrophication = Number(stagingFactor.marine_eutrophication_factor || 0) * quantity_kg;
+
     return {
       impact_climate: co2Total,
       impact_climate_fossil: co2Total * 0.85,
@@ -366,12 +374,12 @@ export async function resolveImpactFactors(
       impact_particulate_matter: 0,
       impact_human_toxicity_carcinogenic: 0,
       impact_human_toxicity_non_carcinogenic: 0,
-      impact_terrestrial_ecotoxicity: 0,
-      impact_freshwater_ecotoxicity: 0,
-      impact_marine_ecotoxicity: 0,
-      impact_freshwater_eutrophication: 0,
-      impact_marine_eutrophication: 0,
-      impact_terrestrial_acidification: 0,
+      impact_terrestrial_ecotoxicity: terrestrialEcotoxicity,
+      impact_freshwater_ecotoxicity: freshwaterEcotoxicity,
+      impact_marine_ecotoxicity: marineEcotoxicity,
+      impact_freshwater_eutrophication: freshwaterEutrophication,
+      impact_marine_eutrophication: marineEutrophication,
+      impact_terrestrial_acidification: terrestrialAcidification,
       impact_mineral_resource_scarcity: 0,
       impact_fossil_resource_scarcity: 0,
       data_priority: 3,
