@@ -41,6 +41,11 @@
     "supabase/functions",
     "Alkatera Marketing",
     "**/vite.config.ts",
-    "**/*.vite.config.ts"
+    "**/*.vite.config.ts",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "vitest.config.ts",
+    "vitest.setup.ts"
   ]
 }

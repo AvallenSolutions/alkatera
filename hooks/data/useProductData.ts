@@ -39,6 +39,7 @@ export interface ProductPackaging {
 export interface ProductLCA {
   id: string;
   created_at: string;
+  updated_at?: string;
   system_boundary: string;
   aggregated_impacts: {
     climate_change_gwp100: number;
@@ -161,12 +162,14 @@ export function useProductData(productId: string | undefined) {
         });
       }
 
-      // Fetch LCA reports
+      // Fetch LCA reports - filter by completed status and order by updated_at
+      // to match passport fetch behavior and ensure consistency
       const { data: lcaData, error: lcaError } = await supabase
         .from("product_lcas")
-        .select("id, created_at, system_boundary, aggregated_impacts, status")
+        .select("id, created_at, updated_at, system_boundary, aggregated_impacts, status")
         .eq("product_id", productId)
-        .order("created_at", { ascending: false });
+        .eq("status", "completed")
+        .order("updated_at", { ascending: false });
 
       // LCA error is non-critical, just log it
       if (lcaError) {

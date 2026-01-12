@@ -47,6 +47,14 @@ interface PassportViewProps {
             transport?: number;
             production?: number;
           };
+          by_lifecycle_stage?: {
+            raw_materials?: number;
+            processing?: number;
+            packaging_stage?: number;
+            distribution?: number;
+            use_phase?: number;
+            end_of_life?: number;
+          };
         };
       };
       methodology?: string;

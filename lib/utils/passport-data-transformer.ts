@@ -35,6 +35,14 @@ interface TransformInput {
           transport?: number;
           production?: number;
         };
+        by_lifecycle_stage?: {
+          raw_materials?: number;
+          processing?: number;
+          packaging_stage?: number;
+          distribution?: number;
+          use_phase?: number;
+          end_of_life?: number;
+        };
         water?: {
           agricultural?: number;
           industrial?: number;
@@ -171,46 +179,105 @@ function generateKeyHighlight(
 }
 
 function buildCarbonBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[] {
-  const breakdown = lca?.aggregated_impacts?.breakdown?.by_category;
-  if (!breakdown) return [];
+  // Support both legacy by_category and current by_lifecycle_stage structures
+  const byCategory = lca?.aggregated_impacts?.breakdown?.by_category;
+  const byLifecycle = lca?.aggregated_impacts?.breakdown?.by_lifecycle_stage;
 
   const items: LCADataBreakdownItem[] = [];
+
+  // Use by_lifecycle_stage (current structure) if available, fallback to by_category (legacy)
+  if (byLifecycle) {
+    const rawMaterials = Number(byLifecycle.raw_materials || 0);
+    const packaging = Number(byLifecycle.packaging_stage || 0);
+    const processing = Number(byLifecycle.processing || 0);
+    const distribution = Number(byLifecycle.distribution || 0);
+    const endOfLife = Number(byLifecycle.end_of_life || 0);
+
+    const total = rawMaterials + packaging + processing + distribution + endOfLife;
+    if (total === 0) return [];
+
+    if (rawMaterials > 0) {
+      items.push({
+        name: 'Raw Materials',
+        value: Math.round((rawMaterials / total) * 100),
+        color: CARBON_BREAKDOWN_COLORS['Raw Materials'],
+      });
+    }
+
+    if (packaging > 0) {
+      items.push({
+        name: 'Packaging',
+        value: Math.round((packaging / total) * 100),
+        color: CARBON_BREAKDOWN_COLORS['Packaging'],
+      });
+    }
+
+    if (processing > 0) {
+      items.push({
+        name: 'Processing',
+        value: Math.round((processing / total) * 100),
+        color: CARBON_BREAKDOWN_COLORS['Processing'],
+      });
+    }
+
+    if (distribution > 0) {
+      items.push({
+        name: 'Distribution',
+        value: Math.round((distribution / total) * 100),
+        color: CARBON_BREAKDOWN_COLORS['Distribution'],
+      });
+    }
+
+    if (endOfLife > 0) {
+      items.push({
+        name: 'End of Life',
+        value: Math.round((endOfLife / total) * 100),
+        color: CARBON_BREAKDOWN_COLORS['End of Life'],
+      });
+    }
+
+    return items;
+  }
+
+  // Fallback to legacy by_category structure
+  if (!byCategory) return [];
+
   const total =
-    (breakdown.materials || 0) +
-    (breakdown.packaging || 0) +
-    (breakdown.production || 0) +
-    (breakdown.transport || 0);
+    (byCategory.materials || 0) +
+    (byCategory.packaging || 0) +
+    (byCategory.production || 0) +
+    (byCategory.transport || 0);
 
   if (total === 0) return [];
 
-  if (breakdown.materials && breakdown.materials > 0) {
+  if (byCategory.materials && byCategory.materials > 0) {
     items.push({
       name: 'Raw Materials',
-      value: Math.round((breakdown.materials / total) * 100),
+      value: Math.round((byCategory.materials / total) * 100),
       color: CARBON_BREAKDOWN_COLORS['Raw Materials'],
     });
   }
 
-  if (breakdown.packaging && breakdown.packaging > 0) {
+  if (byCategory.packaging && byCategory.packaging > 0) {
     items.push({
       name: 'Packaging',
-      value: Math.round((breakdown.packaging / total) * 100),
+      value: Math.round((byCategory.packaging / total) * 100),
       color: CARBON_BREAKDOWN_COLORS['Packaging'],
     });
   }
 
-  if (breakdown.production && breakdown.production > 0) {
+  if (byCategory.production && byCategory.production > 0) {
     items.push({
       name: 'Processing',
-      value: Math.round((breakdown.production / total) * 100),
+      value: Math.round((byCategory.production / total) * 100),
       color: CARBON_BREAKDOWN_COLORS['Processing'],
     });
   }
 
-  if (breakdown.transport && breakdown.transport > 0) {
+  if (byCategory.transport && byCategory.transport > 0) {
     items.push({
       name: 'Distribution',
-      value: Math.round((breakdown.transport / total) * 100),
+      value: Math.round((byCategory.transport / total) * 100),
       color: CARBON_BREAKDOWN_COLORS['Distribution'],
     });
   }
