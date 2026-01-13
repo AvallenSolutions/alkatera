@@ -195,8 +195,6 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         totalCarbonFootprint={totalCarbon}
         functionalUnit={product.functional_unit || 'unit'}
         carbonBreakdown={breakdown}
-        benchmark={totalCarbon * 1.15}
-        benchmarkLabel="category average"
         containerType="bottle"
         lcaReportUrl={`/products/${product.id}/report`}
       />

@@ -289,49 +289,44 @@ export default function PerformancePage() {
       severity: (m.climate / totalCO2) * 100 > 20 ? 'high' : (m.climate / totalCO2) * 100 > 10 ? 'medium' : 'low' as any,
     }));
 
-  const waterSourceItems = [
-    {
-      id: '1',
-      source: 'London Production Site',
-      location: 'London, UK',
-      consumption: waterConsumption * 0.41,
-      riskFactor: 8.2,
-      riskLevel: 'low' as const,
-      netImpact: waterScarcityImpact * 0.09
-    },
-    {
-      id: '2',
-      source: 'Barcelona Bottling Plant',
-      location: 'Andalusia, Spain',
-      consumption: waterConsumption * 0.35,
-      riskFactor: 54.8,
-      riskLevel: 'high' as const,
-      netImpact: waterScarcityImpact * 0.81
-    },
-    {
-      id: '3',
-      source: 'Dublin Distribution Centre',
-      location: 'Dublin, Ireland',
-      consumption: waterConsumption * 0.24,
-      riskFactor: 5.3,
-      riskLevel: 'low' as const,
-      netImpact: waterScarcityImpact * 0.10
-    },
-  ];
+  const waterSourceItems = useMemo(() => {
+    if (!facilityWaterRisks || facilityWaterRisks.length === 0) {
+      return [];
+    }
+    return facilityWaterRisks.map((facility, idx) => ({
+      id: facility.facility_id || String(idx),
+      source: facility.facility_name || `Facility ${idx + 1}`,
+      location: facility.location_country_code || 'Unknown',
+      consumption: facility.operational_water_intake_m3 || 0,
+      riskFactor: facility.water_scarcity_aware || 0,
+      riskLevel: facility.risk_level as 'high' | 'medium' | 'low',
+      netImpact: facility.scarcity_weighted_consumption_m3 || 0,
+    }));
+  }, [facilityWaterRisks]);
 
-  const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);
-  const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0);
+  const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0) || waterConsumption;
+  const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0) || waterScarcityImpact;
   const totalWaste = wasteMetrics?.total_waste_kg || 0;
 
-  const totalLandUseFromMetrics = landUse || 6250;
-  const landUseItems = [
-    { id: '1', ingredient: 'Winter Wheat', origin: 'France', mass: 5000, landIntensity: 2.3, totalFootprint: Math.round(totalLandUseFromMetrics * 0.14) },
-    { id: '2', ingredient: 'Sugarcane', origin: 'Brazil', mass: 3200, landIntensity: 18.5, totalFootprint: Math.round(totalLandUseFromMetrics * 0.74) },
-    { id: '3', ingredient: 'Apples', origin: 'UK', mass: 1500, landIntensity: 4.2, totalFootprint: Math.round(totalLandUseFromMetrics * 0.08) },
-    { id: '4', ingredient: 'Lemons', origin: 'Spain', mass: 800, landIntensity: 3.8, totalFootprint: Math.round(totalLandUseFromMetrics * 0.03) },
-    { id: '5', ingredient: 'Elderflower', origin: 'Austria', mass: 120, landIntensity: 1.5, totalFootprint: Math.round(totalLandUseFromMetrics * 0.01) },
-  ];
-  const totalLandUse = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0);
+  const landUseItems = useMemo(() => {
+    if (!materialBreakdown || materialBreakdown.length === 0) {
+      return [];
+    }
+    const totalLandFromMaterials = landUse || 1;
+    return materialBreakdown.slice(0, 5).map((material, idx) => {
+      const proportion = material.climate / (materialBreakdown.reduce((sum, m) => sum + m.climate, 0) || 1);
+      return {
+        id: String(idx + 1),
+        ingredient: material.name,
+        origin: material.source || 'Unknown',
+        mass: material.quantity,
+        landIntensity: landUse > 0 ? (proportion * totalLandFromMaterials) / (material.quantity || 1) : 0,
+        totalFootprint: Math.round(proportion * totalLandFromMaterials),
+      };
+    });
+  }, [materialBreakdown, landUse]);
+
+  const totalLandUse = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0) || landUse;
 
   const formatValue = (value: number): string => {
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
@@ -367,14 +362,10 @@ export default function PerformancePage() {
         waterScore={vitalityScores.water}
         circularityScore={vitalityScores.circularity}
         natureScore={vitalityScores.nature}
-        trend={8}
-        trendDirection="up"
-        trendData={[45, 52, 58, 62, 65, vitalityScores.overall]}
         lastUpdated={metrics?.last_updated
           ? new Date(metrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
           : undefined
         }
-        benchmark={65}
         onRefresh={refetch}
         loading={loading}
       />
@@ -429,10 +420,8 @@ export default function PerformancePage() {
         <PillarCard
           pillar="climate"
           score={vitalityScores.climate}
-          value={formatValue(totalCO2 / 1000)}
+          value={totalCO2 > 0 ? formatValue(totalCO2 / 1000) : '--'}
           unit="tCO2eq"
-          trend={12}
-          trendDirection="down"
           expanded={expandedPillar === 'climate'}
           onToggle={() => togglePillar('climate')}
         >
@@ -466,10 +455,8 @@ export default function PerformancePage() {
         <PillarCard
           pillar="water"
           score={vitalityScores.water}
-          value={formatValue(waterScarcityImpact)}
+          value={waterScarcityImpact > 0 ? formatValue(waterScarcityImpact) : '--'}
           unit="m3 world eq"
-          trend={8}
-          trendDirection="up"
           expanded={expandedPillar === 'water'}
           onToggle={() => togglePillar('water')}
         >
@@ -492,10 +479,8 @@ export default function PerformancePage() {
         <PillarCard
           pillar="circularity"
           score={vitalityScores.circularity}
-          value={circularityRate.toFixed(0)}
+          value={circularityRate > 0 ? circularityRate.toFixed(0) : '--'}
           unit="%"
-          trend={5}
-          trendDirection="up"
           expanded={expandedPillar === 'circularity'}
           onToggle={() => togglePillar('circularity')}
         >
@@ -517,10 +502,8 @@ export default function PerformancePage() {
         <PillarCard
           pillar="nature"
           score={vitalityScores.nature}
-          value={formatValue(landUse)}
+          value={landUse > 0 ? formatValue(landUse) : '--'}
           unit="m2a crop eq"
-          trend={0}
-          trendDirection="stable"
           expanded={expandedPillar === 'nature'}
           onToggle={() => togglePillar('nature')}
         >

@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOrganization } from '@/lib/organizationContext';
 import { useDashboardPreferences } from '@/hooks/data/useDashboardPreferences';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
 import { useSupplierEngagement } from '@/hooks/data/useSupplierEngagement';
+import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { DashboardCustomiseModal } from '@/components/dashboard/DashboardCustomiseModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -23,7 +25,6 @@ import Link from 'next/link';
 import { VitalityRing } from '@/components/vitality/VitalityRing';
 import { RAGStatusCard, RAGStatusCardGrid } from '@/components/dashboard/RAGStatusCard';
 import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
-import { Sparkline } from '@/components/shared/TrendIndicator';
 
 import {
   QuickActionsWidget,
@@ -108,14 +109,21 @@ export default function DashboardPage() {
   const { enabledWidgets, loading: prefsLoading, error: prefsError, refetch } = useDashboardPreferences();
   const currentYear = new Date().getFullYear();
   const { footprint, loading: footprintLoading } = useCompanyFootprint(currentYear);
+  const { footprint: previousYearFootprint } = useCompanyFootprint(currentYear - 1);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(currentYear);
   const { data: supplierData, isLoading: supplierLoading } = useSupplierEngagement();
+  const { metrics: companyMetrics, loading: metricsLoading } = useCompanyMetrics();
 
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
   const [showLegacyWidgets, setShowLegacyWidgets] = useState(false);
+  const [historicalScores, setHistoricalScores] = useState<number[]>([]);
 
-  const isLoading = prefsLoading || footprintLoading || wasteLoading || supplierLoading;
+  const isLoading = prefsLoading || footprintLoading || wasteLoading || supplierLoading || metricsLoading;
+
+  const waterConsumption = useMemo(() => {
+    return companyMetrics?.total_impacts?.water_consumption || 0;
+  }, [companyMetrics]);
 
   const scores = useMemo(() => {
     let climateScore = 50;
@@ -127,7 +135,17 @@ export default function DashboardPage() {
       else climateScore = 35;
     }
 
-    let waterScore = 60;
+    let waterScore = 50;
+    if (companyMetrics?.water_risk_level) {
+      if (companyMetrics.water_risk_level === 'low') waterScore = 85;
+      else if (companyMetrics.water_risk_level === 'medium') waterScore = 60;
+      else waterScore = 35;
+    } else if (waterConsumption > 0) {
+      if (waterConsumption < 1000) waterScore = 80;
+      else if (waterConsumption < 5000) waterScore = 65;
+      else if (waterConsumption < 10000) waterScore = 50;
+      else waterScore = 35;
+    }
 
     let circularityScore = 50;
     if (wasteMetrics?.waste_diversion_rate !== undefined) {
@@ -151,7 +169,7 @@ export default function DashboardPage() {
     }
 
     return { climateScore, waterScore, circularityScore, supplierScore };
-  }, [footprint, wasteMetrics, supplierData]);
+  }, [footprint, wasteMetrics, supplierData, companyMetrics, waterConsumption]);
 
   const vitalityScore = getVitalityScore(scores);
 
@@ -182,9 +200,23 @@ export default function DashboardPage() {
     });
   }, [scopeBreakdown, wasteMetrics, supplierData]);
 
-  const trendData = useMemo(() => {
-    return [65, 68, 64, 70, 72, vitalityScore];
-  }, [vitalityScore]);
+  const carbonTrend = useMemo(() => {
+    if (!footprint?.total_emissions || !previousYearFootprint?.total_emissions) {
+      return { value: undefined, direction: 'stable' as const };
+    }
+    const currentEmissions = footprint.total_emissions;
+    const previousEmissions = previousYearFootprint.total_emissions;
+    if (previousEmissions === 0) return { value: undefined, direction: 'stable' as const };
+    const percentChange = ((currentEmissions - previousEmissions) / previousEmissions) * 100;
+    return {
+      value: Math.abs(Math.round(percentChange)),
+      direction: percentChange < 0 ? 'down' as const : percentChange > 0 ? 'up' as const : 'stable' as const,
+    };
+  }, [footprint, previousYearFootprint]);
+
+  const hasTrendData = useMemo(() => {
+    return previousYearFootprint?.has_data === true;
+  }, [previousYearFootprint]);
 
   const supplierEngagementPct = useMemo(() => {
     if (!supplierData || supplierData.length === 0) return 0;
@@ -273,8 +305,24 @@ export default function DashboardPage() {
                   className="text-white"
                 />
                 <div className="mt-4 flex flex-col items-center">
-                  <span className="text-xs text-white/50 mb-1">6-month trend</span>
-                  <Sparkline data={trendData} width={100} height={28} />
+                  {hasTrendData ? (
+                    <>
+                      <span className="text-xs text-white/50 mb-1">vs. last year</span>
+                      <div className="flex items-center gap-1 text-sm">
+                        {carbonTrend.direction === 'down' ? (
+                          <span className="text-green-400">↓ {carbonTrend.value}%</span>
+                        ) : carbonTrend.direction === 'up' ? (
+                          <span className="text-red-400">↑ {carbonTrend.value}%</span>
+                        ) : (
+                          <span className="text-white/60">No change</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-xs text-white/40 text-center">
+                      Add more data to track trends
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -313,17 +361,17 @@ export default function DashboardPage() {
         <RAGStatusCard
           title="Carbon Emissions"
           status={getStatusFromScore(scores.climateScore)}
-          value={footprint?.total_emissions ? (footprint.total_emissions / 1000).toFixed(1) : '0'}
+          value={footprint?.total_emissions ? (footprint.total_emissions / 1000).toFixed(1) : '--'}
           unit="tCO₂e"
-          trend={8}
-          trendDirection="down"
+          trend={carbonTrend.value}
+          trendDirection={carbonTrend.direction}
           category="climate"
           href="/reports/company-footprint"
         />
         <RAGStatusCard
           title="Water Impact"
           status={getStatusFromScore(scores.waterScore)}
-          value="--"
+          value={waterConsumption > 0 ? waterConsumption.toFixed(0) : '--'}
           unit="m³"
           category="water"
           href="/performance"
