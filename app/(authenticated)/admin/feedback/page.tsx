@@ -35,6 +35,8 @@ import {
   Mail,
   Building2,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { fetchAllTickets, getTicketStats } from "@/lib/feedback";
@@ -106,10 +108,13 @@ function PriorityBadge({ priority }: { priority: string }) {
   );
 }
 
+const ITEMS_PER_PAGE = 20;
+
 export default function AdminFeedbackPage() {
   const { isAlkateraAdmin, isLoading: isAdminLoading } = useIsAlkateraAdmin();
   const [tickets, setTickets] = useState<FeedbackTicketWithUser[]>([]);
   const [filteredTickets, setFilteredTickets] = useState<FeedbackTicketWithUser[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [stats, setStats] = useState({
     total: 0,
     open: 0,
@@ -124,6 +129,13 @@ export default function AdminFeedbackPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredTickets.length / ITEMS_PER_PAGE);
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   useEffect(() => {
     if (isAlkateraAdmin) {
       loadData();
@@ -134,6 +146,7 @@ export default function AdminFeedbackPage() {
 
   useEffect(() => {
     filterTickets();
+    setCurrentPage(1); // Reset to page 1 when filters change
   }, [tickets, activeTab, searchQuery, categoryFilter]);
 
   function setupRealtimeSubscription() {
@@ -373,7 +386,7 @@ export default function AdminFeedbackPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTickets.map((ticket) => {
+                  {paginatedTickets.map((ticket) => {
                     const Icon = categoryIcons[ticket.category];
                     return (
                       <TableRow key={ticket.id}>
@@ -440,6 +453,62 @@ export default function AdminFeedbackPage() {
                   })}
                 </TableBody>
               </Table>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to{" "}
+                    {Math.min(currentPage * ITEMS_PER_PAGE, filteredTickets.length)} of{" "}
+                    {filteredTickets.length} tickets
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                        let pageNum: number;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            className="w-8 h-8 p-0"
+                            onClick={() => setCurrentPage(pageNum)}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
         </TabsContent>

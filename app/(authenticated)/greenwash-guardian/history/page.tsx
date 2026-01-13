@@ -23,7 +23,10 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
-  Trash2
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import { fetchAssessments, deleteAssessment, getRiskLevelColor, getRiskLevelLabel } from "@/lib/greenwash";
 import type { GreenwashAssessment } from "@/lib/types/greenwash";
@@ -51,6 +54,95 @@ function RiskIndicator({ level }: { level: string | null }) {
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${color.bg} ${color.text} border ${color.border}`}>
       <Icon className="h-4 w-4" />
       <span className="text-sm font-medium capitalize">{getRiskLevelLabel(level || "low")}</span>
+    </div>
+  );
+}
+
+function TrendVisualization({ assessments }: { assessments: GreenwashAssessment[] }) {
+  // Sort by date ascending
+  const sorted = [...assessments]
+    .filter((a) => a.status === "completed" && a.overall_risk_score !== null)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+  if (sorted.length < 2) {
+    return (
+      <p className="text-slate-400 text-sm">Need at least 2 completed assessments to show trends.</p>
+    );
+  }
+
+  // Calculate average risk score
+  const avgRiskScore = sorted.reduce((sum, a) => sum + (a.overall_risk_score || 0), 0) / sorted.length;
+
+  // Calculate trend (comparing first half to second half)
+  const midpoint = Math.floor(sorted.length / 2);
+  const firstHalf = sorted.slice(0, midpoint);
+  const secondHalf = sorted.slice(midpoint);
+
+  const firstHalfAvg = firstHalf.reduce((sum, a) => sum + (a.overall_risk_score || 0), 0) / firstHalf.length;
+  const secondHalfAvg = secondHalf.reduce((sum, a) => sum + (a.overall_risk_score || 0), 0) / secondHalf.length;
+
+  const trendDirection = secondHalfAvg < firstHalfAvg ? "improving" : secondHalfAvg > firstHalfAvg ? "worsening" : "stable";
+  const trendPercent = Math.abs(((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100).toFixed(1);
+
+  // Get recent assessments for the timeline
+  const recentAssessments = sorted.slice(-10);
+  const maxScore = 100;
+
+  return (
+    <div className="space-y-6">
+      {/* Trend Summary */}
+      <div className="flex items-center gap-4">
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+          trendDirection === "improving" ? "bg-green-500/20 text-green-400" :
+          trendDirection === "worsening" ? "bg-red-500/20 text-red-400" :
+          "bg-slate-500/20 text-slate-400"
+        }`}>
+          {trendDirection === "improving" ? (
+            <TrendingDown className="h-5 w-5" />
+          ) : trendDirection === "worsening" ? (
+            <TrendingUp className="h-5 w-5" />
+          ) : (
+            <Minus className="h-5 w-5" />
+          )}
+          <span className="font-medium">
+            {trendDirection === "improving" ? "Risk Improving" :
+             trendDirection === "worsening" ? "Risk Increasing" : "Risk Stable"}
+          </span>
+          {trendDirection !== "stable" && (
+            <span className="text-sm">({trendPercent}%)</span>
+          )}
+        </div>
+        <div className="text-slate-400 text-sm">
+          Average Risk Score: <span className="text-white font-medium">{avgRiskScore.toFixed(0)}/100</span>
+        </div>
+      </div>
+
+      {/* Simple Visual Timeline */}
+      <div className="space-y-2">
+        <p className="text-sm text-slate-400">Recent Assessment Risk Scores</p>
+        <div className="flex items-end gap-1 h-32">
+          {recentAssessments.map((assessment, idx) => {
+            const score = assessment.overall_risk_score || 0;
+            const height = (score / maxScore) * 100;
+            const color = assessment.overall_risk_level === "high" ? "bg-red-500" :
+                          assessment.overall_risk_level === "medium" ? "bg-amber-500" :
+                          "bg-green-500";
+
+            return (
+              <div key={assessment.id} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className={`w-full ${color} rounded-t transition-all hover:opacity-80`}
+                  style={{ height: `${Math.max(height, 5)}%` }}
+                  title={`${assessment.title}: ${score}/100`}
+                />
+                <span className="text-[10px] text-slate-500 truncate max-w-full">
+                  {format(new Date(assessment.created_at), "MMM d")}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -313,38 +405,55 @@ export default function GreenwashHistoryPage() {
 
         {/* Summary Stats */}
         {assessments.length > 0 && (
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-white">{assessments.length}</div>
-                <div className="text-sm text-slate-400">Total Assessments</div>
-              </CardContent>
-            </Card>
-            <Card className="backdrop-blur-xl bg-red-500/10 border border-red-500/20">
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-red-400">
-                  {assessments.filter((a) => a.overall_risk_level === "high").length}
-                </div>
-                <div className="text-sm text-slate-400">High Risk</div>
-              </CardContent>
-            </Card>
-            <Card className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/20">
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-amber-400">
-                  {assessments.filter((a) => a.overall_risk_level === "medium").length}
-                </div>
-                <div className="text-sm text-slate-400">Medium Risk</div>
-              </CardContent>
-            </Card>
-            <Card className="backdrop-blur-xl bg-green-500/10 border border-green-500/20">
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-green-400">
-                  {assessments.filter((a) => a.overall_risk_level === "low").length}
-                </div>
-                <div className="text-sm text-slate-400">Low Risk</div>
-              </CardContent>
-            </Card>
-          </div>
+          <>
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-white">{assessments.length}</div>
+                  <div className="text-sm text-slate-400">Total Assessments</div>
+                </CardContent>
+              </Card>
+              <Card className="backdrop-blur-xl bg-red-500/10 border border-red-500/20">
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-red-400">
+                    {assessments.filter((a) => a.overall_risk_level === "high").length}
+                  </div>
+                  <div className="text-sm text-slate-400">High Risk</div>
+                </CardContent>
+              </Card>
+              <Card className="backdrop-blur-xl bg-amber-500/10 border border-amber-500/20">
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-amber-400">
+                    {assessments.filter((a) => a.overall_risk_level === "medium").length}
+                  </div>
+                  <div className="text-sm text-slate-400">Medium Risk</div>
+                </CardContent>
+              </Card>
+              <Card className="backdrop-blur-xl bg-green-500/10 border border-green-500/20">
+                <CardContent className="p-4 text-center">
+                  <div className="text-2xl font-bold text-green-400">
+                    {assessments.filter((a) => a.overall_risk_level === "low").length}
+                  </div>
+                  <div className="text-sm text-slate-400">Low Risk</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Risk Trend Analysis */}
+            {assessments.length >= 2 && (
+              <Card className="mt-6 backdrop-blur-xl bg-white/5 border border-white/10">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white text-lg">Risk Trend Analysis</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    How your risk profile has changed over time
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TrendVisualization assessments={assessments} />
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
       </div>
     </div>

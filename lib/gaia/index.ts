@@ -18,7 +18,7 @@ import type {
 
 // Re-export types
 export * from '@/lib/types/gaia';
-export { GAIA_PERSONA, GAIA_SUGGESTED_QUESTIONS } from './system-prompt';
+export { GAIA_PERSONA, GAIA_SUGGESTED_QUESTIONS, getContextualFollowUps } from './system-prompt';
 
 // ============================================================================
 // Conversation Operations
@@ -118,6 +118,75 @@ export async function deleteConversation(conversationId: string): Promise<void> 
   if (error) throw error;
 }
 
+/**
+ * Export a conversation as markdown
+ */
+export async function exportConversationAsMarkdown(
+  conversationId: string
+): Promise<string> {
+  const conversation = await getConversationWithMessages(conversationId);
+  if (!conversation) throw new Error('Conversation not found');
+
+  const lines: string[] = [];
+  lines.push(`# Gaia Conversation Export`);
+  lines.push(`**Title:** ${conversation.title || 'Untitled conversation'}`);
+  lines.push(`**Date:** ${new Date(conversation.created_at).toLocaleDateString()}`);
+  lines.push(`**Messages:** ${conversation.messages.length}`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  for (const msg of conversation.messages) {
+    const timestamp = new Date(msg.created_at).toLocaleString();
+    if (msg.role === 'user') {
+      lines.push(`## User (${timestamp})`);
+    } else {
+      lines.push(`## Gaia (${timestamp})`);
+    }
+    lines.push('');
+    lines.push(msg.content);
+    lines.push('');
+
+    if (msg.data_sources && msg.data_sources.length > 0) {
+      lines.push('**Data Sources:** ' + msg.data_sources.map(s => s.description).join(', '));
+      lines.push('');
+    }
+  }
+
+  lines.push('---');
+  lines.push(`*Exported from AlkaTera on ${new Date().toLocaleString()}*`);
+
+  return lines.join('\n');
+}
+
+/**
+ * Export a conversation as JSON
+ */
+export async function exportConversationAsJson(
+  conversationId: string
+): Promise<object> {
+  const conversation = await getConversationWithMessages(conversationId);
+  if (!conversation) throw new Error('Conversation not found');
+
+  return {
+    exportedAt: new Date().toISOString(),
+    conversation: {
+      id: conversation.id,
+      title: conversation.title,
+      createdAt: conversation.created_at,
+      updatedAt: conversation.updated_at,
+      messageCount: conversation.messages.length,
+    },
+    messages: conversation.messages.map(msg => ({
+      role: msg.role,
+      content: msg.content,
+      timestamp: msg.created_at,
+      chartData: msg.chart_data,
+      dataSources: msg.data_sources,
+    })),
+  };
+}
+
 // ============================================================================
 // Message Operations
 // ============================================================================
@@ -177,7 +246,7 @@ export async function sendGaiaQuery(
 // ============================================================================
 
 /**
- * Submit feedback on a Gaia response
+ * Submit feedback on a Gaia response (with duplicate prevention)
  */
 export async function submitFeedback(
   messageId: string,
@@ -187,6 +256,18 @@ export async function submitFeedback(
 ): Promise<GaiaFeedback> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
+
+  // Check for existing feedback (duplicate prevention)
+  const { data: existing } = await supabase
+    .from('gaia_feedback')
+    .select('id')
+    .eq('message_id', messageId)
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (existing) {
+    throw new Error('Feedback already submitted for this message');
+  }
 
   const { data, error } = await supabase
     .from('gaia_feedback')

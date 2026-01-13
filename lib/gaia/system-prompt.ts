@@ -188,6 +188,71 @@ export const GAIA_SUGGESTED_QUESTIONS = [
   },
 ];
 
+// Dynamic follow-up questions based on topics detected in the response
+export const GAIA_FOLLOWUP_QUESTIONS: Record<string, string[]> = {
+  emissions: [
+    'What are the main sources of these emissions?',
+    'How does this compare to industry benchmarks?',
+    'What actions can reduce these emissions?',
+  ],
+  water: [
+    'What is the water intensity per unit of production?',
+    'Which processes consume the most water?',
+    'Are there any water stress risks at these locations?',
+  ],
+  products: [
+    'Which materials contribute most to the impact?',
+    'Which products need LCA calculations?',
+    'How can I reduce product footprints?',
+  ],
+  facilities: [
+    'What is the energy consumption at these facilities?',
+    'Are there renewable energy opportunities?',
+    'What are the waste streams from these sites?',
+  ],
+  suppliers: [
+    'Which suppliers have the highest emissions?',
+    'What is the average supplier engagement level?',
+    'How can I improve supplier data quality?',
+  ],
+  vitality: [
+    'Which pillar has the most room for improvement?',
+    'What are the quick wins for improving scores?',
+    'How do my scores compare to benchmarks?',
+  ],
+};
+
+/**
+ * Get contextual follow-up questions based on message content
+ */
+export function getContextualFollowUps(messageContent: string): string[] {
+  const content = messageContent.toLowerCase();
+  const suggestions: string[] = [];
+
+  // Detect topics in the message
+  if (content.includes('emission') || content.includes('co2') || content.includes('carbon')) {
+    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.emissions);
+  }
+  if (content.includes('water') || content.includes('m³') || content.includes('consumption')) {
+    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.water);
+  }
+  if (content.includes('product') || content.includes('lca') || content.includes('lifecycle')) {
+    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.products);
+  }
+  if (content.includes('facility') || content.includes('site') || content.includes('location')) {
+    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.facilities);
+  }
+  if (content.includes('supplier') || content.includes('vendor') || content.includes('engagement')) {
+    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.suppliers);
+  }
+  if (content.includes('vitality') || content.includes('score') || content.includes('benchmark')) {
+    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.vitality);
+  }
+
+  // Return unique suggestions, limited to 3
+  return [...new Set(suggestions)].slice(0, 3);
+}
+
 export default {
   GAIA_PERSONA,
   GAIA_SYSTEM_PROMPT,

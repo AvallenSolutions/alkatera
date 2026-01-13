@@ -8,6 +8,28 @@ const corsHeaders = {
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
 
+// Rate limiting configuration
+const RATE_LIMIT_QUERIES_PER_HOUR = 50;
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetIn: number } {
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000; // 1 hour
+  const record = rateLimitMap.get(userId);
+
+  if (!record || now > record.resetTime) {
+    rateLimitMap.set(userId, { count: 1, resetTime: now + windowMs });
+    return { allowed: true, remaining: RATE_LIMIT_QUERIES_PER_HOUR - 1, resetIn: windowMs };
+  }
+
+  if (record.count >= RATE_LIMIT_QUERIES_PER_HOUR) {
+    return { allowed: false, remaining: 0, resetIn: record.resetTime - now };
+  }
+
+  record.count++;
+  return { allowed: true, remaining: RATE_LIMIT_QUERIES_PER_HOUR - record.count, resetIn: record.resetTime - now };
+}
+
 interface GaiaQueryRequest {
   message: string;
   conversation_id?: string;
@@ -109,6 +131,20 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: userError } = await userSupabase.auth.getUser();
     if (userError || !user) {
       throw new Error('Unauthorized - invalid session');
+    }
+
+    // Check rate limit
+    const rateLimit = checkRateLimit(user.id);
+    if (!rateLimit.allowed) {
+      const resetMinutes = Math.ceil(rateLimit.resetIn / 60000);
+      return new Response(
+        JSON.stringify({
+          error: `Rate limit exceeded. You can make ${RATE_LIMIT_QUERIES_PER_HOUR} queries per hour. Try again in ${resetMinutes} minutes.`,
+          rateLimited: true,
+          resetIn: rateLimit.resetIn,
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const body: GaiaQueryRequest = await req.json();

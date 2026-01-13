@@ -29,6 +29,9 @@ import {
   Table,
   PieChart,
   LineChart,
+  Download,
+  FileJson,
+  FileText,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,7 +43,10 @@ import {
   sendGaiaQuery,
   submitFeedback,
   hasSubmittedFeedback,
+  exportConversationAsMarkdown,
+  exportConversationAsJson,
   GAIA_SUGGESTED_QUESTIONS,
+  getContextualFollowUps,
 } from '@/lib/gaia';
 import type {
   GaiaConversation,
@@ -213,6 +219,38 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
     inputRef.current?.focus();
   }
 
+  async function handleExportMarkdown() {
+    if (!activeConversation) return;
+    try {
+      const content = await exportConversationAsMarkdown(activeConversation.id);
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gaia-conversation-${activeConversation.id.substring(0, 8)}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting conversation:', err);
+    }
+  }
+
+  async function handleExportJson() {
+    if (!activeConversation) return;
+    try {
+      const content = await exportConversationAsJson(activeConversation.id);
+      const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gaia-conversation-${activeConversation.id.substring(0, 8)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting conversation:', err);
+    }
+  }
+
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('en-GB', {
       hour: '2-digit',
@@ -319,10 +357,42 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
             </p>
           </div>
 
-          <Badge variant="outline" className="ml-auto text-xs">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-            Online
-          </Badge>
+          <div className="ml-auto flex items-center gap-2">
+            {activeConversation && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handleExportMarkdown}
+                    >
+                      <FileText className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export as Markdown</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handleExportJson}
+                    >
+                      <FileJson className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export as JSON</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <Badge variant="outline" className="text-xs">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+              Online
+            </Badge>
+          </div>
         </div>
 
         {/* Messages */}
@@ -470,6 +540,29 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                 )}
               </div>
             ))}
+
+            {/* Contextual Follow-up Suggestions */}
+            {activeConversation && activeConversation.messages.length > 0 && !isSending && (() => {
+              const lastMessage = activeConversation.messages[activeConversation.messages.length - 1];
+              if (lastMessage.role !== 'assistant') return null;
+              const followUps = getContextualFollowUps(lastMessage.content);
+              if (followUps.length === 0) return null;
+              return (
+                <div className="flex flex-wrap justify-center gap-2 pt-2">
+                  {followUps.map((question, i) => (
+                    <Button
+                      key={i}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10"
+                      onClick={() => handleSuggestionClick(question)}
+                    >
+                      {question}
+                    </Button>
+                  ))}
+                </div>
+              );
+            })()}
 
             {/* Loading indicator */}
             {isSending && (
