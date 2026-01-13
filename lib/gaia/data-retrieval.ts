@@ -212,10 +212,12 @@ async function fetchFacilitiesSummary(supabase: SupabaseClient, organizationId: 
  * Fetch products summary
  */
 async function fetchProductsSummary(supabase: SupabaseClient, organizationId: string) {
-  const { data: products, count } = await supabase
+  const { data: productsData, count } = await supabase
     .from('products')
     .select('id, name, sku, has_lca', { count: 'exact' })
     .eq('organization_id', organizationId);
+
+  const products = productsData as { id: string; name: string; sku: string | null; has_lca: boolean }[] | null;
 
   if (!products || products.length === 0) {
     return null;
