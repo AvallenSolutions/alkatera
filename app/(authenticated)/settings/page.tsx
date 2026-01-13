@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity, AlertCircle, FileText, Calendar, DollarSign } from 'lucide-react'
+import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity, AlertCircle, FileText, Calendar, DollarSign, MessageSquare } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -134,6 +134,7 @@ export default function SettingsPage() {
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
           <TabsTrigger value="organisation">Organisation</TabsTrigger>
+          <TabsTrigger value="support">Support</TabsTrigger>
         </TabsList>
 
         <TabsContent value="subscription" className="space-y-6">
@@ -699,6 +700,31 @@ export default function SettingsPage() {
               <Button asChild>
                 <Link href="/company/overview">View Organisation</Link>
               </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="support" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Feedback & Support
+              </CardTitle>
+              <CardDescription>
+                Report bugs, suggest features, and view your support tickets
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Have a bug to report or a feature suggestion? We'd love to hear from you.
+                Your feedback helps us improve the platform.
+              </p>
+              <div className="flex gap-3">
+                <Button asChild>
+                  <Link href="/settings/feedback">View My Tickets</Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
