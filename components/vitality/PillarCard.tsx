@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MiniVitalityRing } from './VitalityRing';
 import { TrendIndicator } from '@/components/shared/TrendIndicator';
+import { ScoreExplainer } from './ScoreExplainer';
 import {
   ChevronDown,
   ChevronUp,
@@ -26,6 +27,12 @@ interface PillarCardProps {
   trend?: number;
   trendDirection?: 'up' | 'down' | 'stable';
   status?: 'good' | 'warning' | 'critical';
+  benchmark?: {
+    platform_average?: number;
+    category_average?: number;
+    category_name?: string;
+    top_performer?: number;
+  };
   expanded?: boolean;
   onToggle?: () => void;
   children?: React.ReactNode;
@@ -92,6 +99,7 @@ export function PillarCard({
   trend,
   trendDirection,
   status,
+  benchmark,
   expanded = false,
   onToggle,
   children,
@@ -129,6 +137,12 @@ export function PillarCard({
               <div className="flex items-center gap-2">
                 <span className="text-xl">{config.emoji}</span>
                 <h3 className="font-semibold text-lg">{config.name}</h3>
+                <ScoreExplainer
+                  scoreType={pillar}
+                  currentScore={score}
+                  benchmark={benchmark}
+                  className="hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                />
               </div>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {config.description}

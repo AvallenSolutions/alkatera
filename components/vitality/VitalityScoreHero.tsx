@@ -12,6 +12,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { ScoreExplainer } from './ScoreExplainer';
 
 interface VitalityScoreHeroProps {
   overallScore: number;
@@ -24,6 +25,12 @@ interface VitalityScoreHeroProps {
   trendData?: number[];
   lastUpdated?: string;
   benchmark?: number;
+  benchmarkData?: {
+    platform_average?: number;
+    category_average?: number;
+    category_name?: string;
+    top_performer?: number;
+  };
   onRefresh?: () => void;
   loading?: boolean;
   className?: string;
@@ -63,6 +70,7 @@ export function VitalityScoreHero({
   trendData,
   lastUpdated,
   benchmark,
+  benchmarkData,
   onRefresh,
   loading,
   className,
@@ -85,9 +93,16 @@ export function VitalityScoreHero({
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-lg font-semibold text-white/90">
-              Company Vitality Score
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-white/90">
+                Company Vitality Score
+              </h2>
+              <ScoreExplainer
+                scoreType="overall"
+                currentScore={overallScore}
+                benchmark={benchmarkData}
+              />
+            </div>
             <p className="text-sm text-white/60 mt-1">
               Multi-dimensional sustainability performance
             </p>

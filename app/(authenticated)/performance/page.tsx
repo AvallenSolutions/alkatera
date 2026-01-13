@@ -31,6 +31,7 @@ import Link from 'next/link';
 import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
+import { useVitalityBenchmarks } from '@/hooks/data/useVitalityBenchmarks';
 import { useOrganization } from '@/lib/organizationContext';
 import type {
   Scope3CategoryData,
@@ -208,6 +209,7 @@ export default function PerformancePage() {
   const hookResult = useCompanyMetrics();
   const { footprint: footprintData, loading: footprintLoading } = useCompanyFootprint(currentYear);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(currentYear);
+  const { getBenchmarkForPillar } = useVitalityBenchmarks();
 
   const {
     categories: scope3Categories,
@@ -362,6 +364,7 @@ export default function PerformancePage() {
         waterScore={vitalityScores.water}
         circularityScore={vitalityScores.circularity}
         natureScore={vitalityScores.nature}
+        benchmarkData={getBenchmarkForPillar('overall')}
         lastUpdated={metrics?.last_updated
           ? new Date(metrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
           : undefined
@@ -422,6 +425,7 @@ export default function PerformancePage() {
           score={vitalityScores.climate}
           value={totalCO2 > 0 ? formatValue(totalCO2 / 1000) : '--'}
           unit="tCO2eq"
+          benchmark={getBenchmarkForPillar('climate')}
           expanded={expandedPillar === 'climate'}
           onToggle={() => togglePillar('climate')}
         >
@@ -457,6 +461,7 @@ export default function PerformancePage() {
           score={vitalityScores.water}
           value={waterScarcityImpact > 0 ? formatValue(waterScarcityImpact) : '--'}
           unit="m3 world eq"
+          benchmark={getBenchmarkForPillar('water')}
           expanded={expandedPillar === 'water'}
           onToggle={() => togglePillar('water')}
         >
@@ -481,6 +486,7 @@ export default function PerformancePage() {
           score={vitalityScores.circularity}
           value={circularityRate > 0 ? circularityRate.toFixed(0) : '--'}
           unit="%"
+          benchmark={getBenchmarkForPillar('circularity')}
           expanded={expandedPillar === 'circularity'}
           onToggle={() => togglePillar('circularity')}
         >
@@ -504,6 +510,7 @@ export default function PerformancePage() {
           score={vitalityScores.nature}
           value={landUse > 0 ? formatValue(landUse) : '--'}
           unit="m2a crop eq"
+          benchmark={getBenchmarkForPillar('nature')}
           expanded={expandedPillar === 'nature'}
           onToggle={() => togglePillar('nature')}
         >
