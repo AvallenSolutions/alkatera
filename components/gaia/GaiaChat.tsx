@@ -38,9 +38,7 @@ import { useAuth } from '@/hooks/useAuth';
 import {
   getConversations,
   getConversationWithMessages,
-  createConversation,
   deleteConversation,
-  sendGaiaQuery,
   sendGaiaQueryStream,
   submitFeedback,
   hasSubmittedFeedback,

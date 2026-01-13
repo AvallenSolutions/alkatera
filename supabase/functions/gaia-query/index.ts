@@ -417,30 +417,48 @@ async function handleStreamingResponse(
     let chartData: ChartData | null = null;
 
     try {
+      // Set up timeout for streaming request (60 seconds)
+      const streamController = new AbortController();
+      const streamTimeout = setTimeout(() => streamController.abort(), 60000);
+
       // Call Gemini streaming API
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: {
-              parts: [{ text: GAIA_SYSTEM_PROMPT }],
-            },
-            contents: [
-              {
-                parts: [{ text: contextPrompt }],
+      let response: Response;
+      try {
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: streamController.signal,
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: GAIA_SYSTEM_PROMPT }],
               },
-            ],
-            generationConfig: {
-              temperature: 0.3,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 4096,
-            },
-          }),
+              contents: [
+                {
+                  parts: [{ text: contextPrompt }],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.3,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 4096,
+              },
+            }),
+          }
+        );
+      } catch (fetchErr: unknown) {
+        clearTimeout(streamTimeout);
+        if (fetchErr instanceof Error && fetchErr.name === 'AbortError') {
+          await sendEvent({ type: 'error', error: 'Request timed out - please try again' });
+          await writer.close();
+          return;
         }
-      );
+        throw fetchErr;
+      }
+
+      clearTimeout(streamTimeout);
 
       if (!response.ok) {
         const errorText = await response.text();

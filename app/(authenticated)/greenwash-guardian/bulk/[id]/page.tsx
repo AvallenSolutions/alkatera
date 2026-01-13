@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,28 +76,38 @@ export default function BulkJobPage() {
     }
   }, [job?.status, isProcessing, loadJob]);
 
+  // Use ref to track cancellation to avoid stale closure issues
+  const cancelledRef = useRef(false);
+
   async function handleStart() {
     if (!job) return;
 
     try {
+      cancelledRef.current = false;
       setIsProcessing(true);
       await startBulkJob(job.id);
       await loadJob();
 
-      // Process URLs one by one
+      // Process URLs one by one with small delay to avoid rate limiting
       let nextUrl = await getNextPendingUrl(job.id);
-      while (nextUrl && isProcessing) {
+      while (nextUrl && !cancelledRef.current) {
         setCurrentUrl(nextUrl.url);
         await processBulkJobUrl(nextUrl, job.organization_id);
         await loadJob();
+
+        // Small delay between requests to be respectful to target servers
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         nextUrl = await getNextPendingUrl(job.id);
       }
 
-      setCurrentUrl(null);
-      toast.success("Bulk job completed");
-    } catch (error: any) {
+      if (!cancelledRef.current) {
+        toast.success("Bulk job completed");
+      }
+    } catch (error: unknown) {
       console.error("Error processing bulk job:", error);
-      toast.error(error.message || "Error processing bulk job");
+      const message = error instanceof Error ? error.message : "Error processing bulk job";
+      toast.error(message);
     } finally {
       setIsProcessing(false);
       setCurrentUrl(null);
@@ -108,6 +118,7 @@ export default function BulkJobPage() {
   async function handleCancel() {
     if (!job) return;
     try {
+      cancelledRef.current = true;
       setIsProcessing(false);
       await cancelBulkJob(job.id);
       await loadJob();

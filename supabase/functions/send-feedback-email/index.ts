@@ -149,6 +149,17 @@ function checkShouldSendEmail(eventType: string, prefs: any): boolean {
   }
 }
 
+// Simple HTML escape to prevent XSS
+function escapeHtml(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function buildEmailContent(
   ticket: TicketData,
   eventType: string,
@@ -162,6 +173,12 @@ function buildEmailContent(
     improvement: "Improvement",
     other: "Other",
   };
+
+  // Escape user-provided content to prevent XSS
+  const safeTitle = escapeHtml(ticket.title);
+  const safeDescription = escapeHtml(ticket.description);
+  const safeCategory = escapeHtml(ticket.category);
+  const safeMessageContent = message?.message ? escapeHtml(message.message) : '';
 
   const baseStyles = `
     <style>
@@ -182,7 +199,7 @@ function buildEmailContent(
   switch (eventType) {
     case "ticket_created":
       return {
-        subject: `Ticket Created: ${ticket.title}`,
+        subject: `Ticket Created: ${safeTitle}`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -190,9 +207,9 @@ function buildEmailContent(
               <h2 style="margin: 0;">Your ticket has been created</h2>
             </div>
             <div class="content">
-              <h3>${ticket.title}</h3>
-              <p><span class="badge badge-blue">${categoryLabels[ticket.category] || ticket.category}</span></p>
-              <p>${ticket.description}</p>
+              <h3>${safeTitle}</h3>
+              <p><span class="badge badge-blue">${categoryLabels[ticket.category] || safeCategory}</span></p>
+              <p>${safeDescription}</p>
               <p>We'll review your ticket and get back to you as soon as possible.</p>
               <a href="${ticketUrl}" class="button">View Ticket</a>
             </div>
@@ -205,7 +222,7 @@ function buildEmailContent(
 
     case "ticket_updated":
       return {
-        subject: `Ticket Updated: ${ticket.title}`,
+        subject: `Ticket Updated: ${safeTitle}`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -213,7 +230,7 @@ function buildEmailContent(
               <h2 style="margin: 0;">Your ticket has been updated</h2>
             </div>
             <div class="content">
-              <h3>${ticket.title}</h3>
+              <h3>${safeTitle}</h3>
               <p>
                 <span class="badge badge-${ticket.status === 'resolved' ? 'green' : 'amber'}">
                   Status: ${ticket.status.replace('_', ' ').toUpperCase()}
@@ -231,7 +248,7 @@ function buildEmailContent(
 
     case "admin_reply":
       return {
-        subject: `New Reply: ${ticket.title}`,
+        subject: `New Reply: ${safeTitle}`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -239,9 +256,9 @@ function buildEmailContent(
               <h2 style="margin: 0;">You have a new reply</h2>
             </div>
             <div class="content">
-              <h3>${ticket.title}</h3>
+              <h3>${safeTitle}</h3>
               <p>The AlkaTera support team has replied to your ticket:</p>
-              ${message ? `<blockquote>${message.message}</blockquote>` : ''}
+              ${safeMessageContent ? `<blockquote>${safeMessageContent}</blockquote>` : ''}
               <a href="${ticketUrl}" class="button">View Conversation</a>
             </div>
             <div class="footer">
@@ -253,7 +270,7 @@ function buildEmailContent(
 
     case "escalated":
       return {
-        subject: `Ticket Escalated: ${ticket.title}`,
+        subject: `Ticket Escalated: ${safeTitle}`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -261,7 +278,7 @@ function buildEmailContent(
               <h2 style="margin: 0;">Ticket Priority Escalated</h2>
             </div>
             <div class="content">
-              <h3>${ticket.title}</h3>
+              <h3>${safeTitle}</h3>
               <p>
                 <span class="badge badge-amber">Priority: ${ticket.priority.toUpperCase()}</span>
               </p>
@@ -277,7 +294,7 @@ function buildEmailContent(
 
     default:
       return {
-        subject: `Ticket Updated: ${ticket.title}`,
+        subject: `Ticket Updated: ${safeTitle}`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -285,7 +302,7 @@ function buildEmailContent(
               <h2 style="margin: 0;">Ticket Update</h2>
             </div>
             <div class="content">
-              <h3>${ticket.title}</h3>
+              <h3>${safeTitle}</h3>
               <p>There's an update on your ticket.</p>
               <a href="${ticketUrl}" class="button">View Ticket</a>
             </div>
