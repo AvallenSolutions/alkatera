@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as pdfParse from 'pdf-parse';
-import * as mammoth from 'mammoth';
+import pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
 
 // Rate limiting map (in production, use Redis or similar)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
