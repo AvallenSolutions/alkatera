@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     } else if (file.type === 'application/pdf') {
       // PDF extraction
       try {
-        const pdfData = await pdfParse.default(buffer);
+        const pdfData = await pdfParse(buffer);
         content = pdfData.text;
       } catch (pdfError) {
         console.error('PDF parsing error:', pdfError);
