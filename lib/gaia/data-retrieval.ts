@@ -79,7 +79,15 @@ export async function fetchOrganizationContext(
   // Fetch vitality scores
   const vitalityResult = await fetchVitalityScores(supabase, organizationId);
   if (vitalityResult) {
-    context.vitality_scores = vitalityResult.summary;
+    // Convert null to undefined to match GaiaOrganizationContext type
+    const { summary } = vitalityResult;
+    context.vitality_scores = {
+      overall_score: summary.overall_score ?? undefined,
+      climate_score: summary.climate_score ?? undefined,
+      water_score: summary.water_score ?? undefined,
+      circularity_score: summary.circularity_score ?? undefined,
+      nature_score: summary.nature_score ?? undefined,
+    };
     dataSources.push(...vitalityResult.sources);
     rawData.vitality = vitalityResult.data;
   }
