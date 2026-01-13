@@ -333,3 +333,253 @@ export function getJurisdictionLabel(jurisdiction: string): string {
       return jurisdiction.toUpperCase();
   }
 }
+
+// ============================================================================
+// Bulk Job Functions
+// ============================================================================
+
+import type {
+  GreenwashBulkJob,
+  GreenwashBulkJobUrl,
+  GreenwashBulkJobWithUrls,
+  CreateBulkJobInput,
+} from '../types/greenwash';
+
+/**
+ * Create a new bulk job with multiple URLs
+ */
+export async function createBulkJob(
+  input: CreateBulkJobInput
+): Promise<GreenwashBulkJob> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  // Validate URLs
+  const validUrls = input.urls
+    .map(url => url.trim())
+    .filter(url => {
+      try {
+        new URL(url);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+  if (validUrls.length === 0) {
+    throw new Error('No valid URLs provided');
+  }
+
+  // Create the bulk job
+  const { data: job, error: jobError } = await supabase
+    .from('greenwash_bulk_jobs')
+    .insert({
+      organization_id: input.organization_id,
+      created_by: user.id,
+      title: input.title || `Bulk Scan - ${new Date().toLocaleDateString()}`,
+      total_urls: validUrls.length,
+      status: 'pending',
+    })
+    .select()
+    .single();
+
+  if (jobError) throw jobError;
+
+  // Insert all URLs
+  const urlInserts = validUrls.map(url => ({
+    bulk_job_id: job.id,
+    url,
+    status: 'pending',
+  }));
+
+  const { error: urlsError } = await supabase
+    .from('greenwash_bulk_job_urls')
+    .insert(urlInserts);
+
+  if (urlsError) throw urlsError;
+
+  return job;
+}
+
+/**
+ * Get a bulk job by ID
+ */
+export async function getBulkJob(jobId: string): Promise<GreenwashBulkJob | null> {
+  const { data, error } = await supabase
+    .from('greenwash_bulk_jobs')
+    .select('*')
+    .eq('id', jobId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Get a bulk job with all its URLs
+ */
+export async function getBulkJobWithUrls(jobId: string): Promise<GreenwashBulkJobWithUrls | null> {
+  const { data: job, error: jobError } = await supabase
+    .from('greenwash_bulk_jobs')
+    .select('*')
+    .eq('id', jobId)
+    .single();
+
+  if (jobError) throw jobError;
+  if (!job) return null;
+
+  const { data: urls, error: urlsError } = await supabase
+    .from('greenwash_bulk_job_urls')
+    .select('*')
+    .eq('bulk_job_id', jobId)
+    .order('created_at', { ascending: true });
+
+  if (urlsError) throw urlsError;
+
+  return {
+    ...job,
+    urls: urls || [],
+  };
+}
+
+/**
+ * Get all bulk jobs for an organization
+ */
+export async function fetchBulkJobs(organizationId: string): Promise<GreenwashBulkJob[]> {
+  const { data, error } = await supabase
+    .from('greenwash_bulk_jobs')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Start processing a bulk job
+ */
+export async function startBulkJob(jobId: string): Promise<void> {
+  const { error } = await supabase
+    .from('greenwash_bulk_jobs')
+    .update({
+      status: 'processing',
+      started_at: new Date().toISOString(),
+    })
+    .eq('id', jobId);
+
+  if (error) throw error;
+}
+
+/**
+ * Process the next pending URL in a bulk job
+ * Returns the URL to process, or null if all done
+ */
+export async function getNextPendingUrl(jobId: string): Promise<GreenwashBulkJobUrl | null> {
+  const { data, error } = await supabase
+    .from('greenwash_bulk_job_urls')
+    .select('*')
+    .eq('bulk_job_id', jobId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+  return data || null;
+}
+
+/**
+ * Update a bulk job URL status
+ */
+export async function updateBulkJobUrl(
+  urlId: string,
+  status: 'processing' | 'completed' | 'failed' | 'skipped',
+  assessmentId?: string,
+  errorMessage?: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('greenwash_bulk_job_urls')
+    .update({
+      status,
+      assessment_id: assessmentId || null,
+      error_message: errorMessage || null,
+      processed_at: new Date().toISOString(),
+    })
+    .eq('id', urlId);
+
+  if (error) throw error;
+}
+
+/**
+ * Cancel a bulk job
+ */
+export async function cancelBulkJob(jobId: string): Promise<void> {
+  const { error } = await supabase
+    .from('greenwash_bulk_jobs')
+    .update({
+      status: 'cancelled',
+      completed_at: new Date().toISOString(),
+    })
+    .eq('id', jobId);
+
+  if (error) throw error;
+}
+
+/**
+ * Delete a bulk job and all its URLs
+ */
+export async function deleteBulkJob(jobId: string): Promise<void> {
+  const { error } = await supabase
+    .from('greenwash_bulk_jobs')
+    .delete()
+    .eq('id', jobId);
+
+  if (error) throw error;
+}
+
+/**
+ * Process a single URL in a bulk job
+ * Creates an assessment and triggers analysis
+ */
+export async function processBulkJobUrl(
+  url: GreenwashBulkJobUrl,
+  organizationId: string
+): Promise<{ assessmentId: string } | { error: string }> {
+  try {
+    // Mark as processing
+    await updateBulkJobUrl(url.id, 'processing');
+
+    // Fetch URL content
+    const content = await fetchUrlContent(url.url);
+
+    // Create assessment
+    const assessment = await createAssessment({
+      title: new URL(url.url).hostname,
+      input_type: 'url',
+      input_source: url.url,
+      content,
+      organization_id: organizationId,
+    });
+
+    // Trigger analysis
+    const result = await triggerAnalysis(
+      assessment.id,
+      content,
+      'url',
+      url.url
+    );
+
+    if (!result.success) {
+      await updateBulkJobUrl(url.id, 'failed', undefined, result.error);
+      return { error: result.error || 'Analysis failed' };
+    }
+
+    // Mark as completed
+    await updateBulkJobUrl(url.id, 'completed', assessment.id);
+    return { assessmentId: assessment.id };
+  } catch (err: any) {
+    await updateBulkJobUrl(url.id, 'failed', undefined, err.message);
+    return { error: err.message };
+  }
+}

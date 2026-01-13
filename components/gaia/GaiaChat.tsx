@@ -41,6 +41,7 @@ import {
   createConversation,
   deleteConversation,
   sendGaiaQuery,
+  sendGaiaQueryStream,
   submitFeedback,
   hasSubmittedFeedback,
   exportConversationAsMarkdown,
@@ -48,6 +49,7 @@ import {
   GAIA_SUGGESTED_QUESTIONS,
   getContextualFollowUps,
 } from '@/lib/gaia';
+import type { GaiaStreamEvent } from '@/lib/gaia';
 import type {
   GaiaConversation,
   GaiaConversationWithMessages,
@@ -69,6 +71,9 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingContent, setStreamingContent] = useState('');
+  const [streamingChartData, setStreamingChartData] = useState<GaiaChartData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, boolean>>({});
@@ -82,10 +87,10 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
     }
   }, [currentOrganization?.id]);
 
-  // Scroll to bottom on new messages
+  // Scroll to bottom on new messages or streaming content
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeConversation?.messages]);
+  }, [activeConversation?.messages, streamingContent]);
 
   async function loadConversations() {
     if (!currentOrganization?.id) return;
@@ -145,12 +150,14 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
   }
 
   async function handleSend() {
-    if (!input.trim() || isSending || !currentOrganization?.id) return;
+    if (!input.trim() || isSending || isStreaming || !currentOrganization?.id) return;
 
     const userMessage = input.trim();
     setInput('');
     setIsSending(true);
     setError(null);
+    setStreamingContent('');
+    setStreamingChartData(null);
 
     // Optimistically add user message
     const tempUserMessage: GaiaMessage = {
@@ -173,19 +180,46 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
     }
 
     try {
-      const response = await sendGaiaQuery({
+      // Use streaming API
+      let conversationId = activeConversation?.id;
+      let isNewConversation = false;
+
+      setIsStreaming(true);
+      setIsSending(false);
+
+      for await (const event of sendGaiaQueryStream({
         message: userMessage,
         conversation_id: activeConversation?.id,
         organization_id: currentOrganization.id,
-      });
-
-      if (response.is_new_conversation) {
-        // Reload conversations to get the new one
-        await loadConversations();
+      })) {
+        switch (event.type) {
+          case 'start':
+            conversationId = event.conversation_id;
+            isNewConversation = event.is_new_conversation || false;
+            break;
+          case 'text':
+            if (event.content) {
+              setStreamingContent(prev => prev + event.content);
+            }
+            break;
+          case 'chart':
+            if (event.chart_data) {
+              setStreamingChartData(event.chart_data as GaiaChartData);
+            }
+            break;
+          case 'error':
+            throw new Error(event.error || 'Stream error');
+          case 'done':
+            // Stream complete - reload conversation to get persisted message
+            if (isNewConversation) {
+              await loadConversations();
+            }
+            if (conversationId) {
+              await loadConversation(conversationId);
+            }
+            break;
+        }
       }
-
-      // Load the full conversation to get proper message IDs
-      await loadConversation(response.conversation_id);
     } catch (err: unknown) {
       console.error('Error sending message:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
@@ -200,6 +234,9 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
       }
     } finally {
       setIsSending(false);
+      setIsStreaming(false);
+      setStreamingContent('');
+      setStreamingChartData(null);
     }
   }
 
@@ -542,7 +579,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
             ))}
 
             {/* Contextual Follow-up Suggestions */}
-            {activeConversation && activeConversation.messages.length > 0 && !isSending && (() => {
+            {activeConversation && activeConversation.messages.length > 0 && !isSending && !isStreaming && (() => {
               const lastMessage = activeConversation.messages[activeConversation.messages.length - 1];
               if (lastMessage.role !== 'assistant') return null;
               const followUps = getContextualFollowUps(lastMessage.content);
@@ -564,8 +601,42 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
               );
             })()}
 
-            {/* Loading indicator */}
-            {isSending && (
+            {/* Streaming response */}
+            {isStreaming && (
+              <div className="flex gap-3">
+                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                  <Leaf className="h-4 w-4 text-white" />
+                </div>
+                <div className="max-w-[80%] space-y-2">
+                  <Card className="bg-card border-border">
+                    <CardContent className="p-3">
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <p className="whitespace-pre-wrap text-sm">
+                          {streamingContent || (
+                            <span className="flex items-center gap-2 text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
+                              Gaia is thinking...
+                            </span>
+                          )}
+                          {streamingContent && (
+                            <span className="inline-block w-2 h-4 ml-0.5 bg-emerald-500 animate-pulse" />
+                          )}
+                        </p>
+                      </div>
+                      {/* Show chart while streaming if available */}
+                      {streamingChartData && (
+                        <div className="mt-4">
+                          <GaiaChartRenderer chartData={streamingChartData} />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* Loading indicator (before streaming starts) */}
+            {isSending && !isStreaming && (
               <div className="flex gap-3">
                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
                   <Leaf className="h-4 w-4 text-white" />
@@ -621,15 +692,15 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                 }
               }}
               placeholder="Ask Gaia about your sustainability data..."
-              disabled={isSending}
+              disabled={isSending || isStreaming}
               className="flex-1"
             />
             <Button
               onClick={handleSend}
-              disabled={!input.trim() || isSending}
+              disabled={!input.trim() || isSending || isStreaming}
               className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
             >
-              {isSending ? (
+              {isSending || isStreaming ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />

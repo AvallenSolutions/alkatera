@@ -114,3 +114,46 @@ export const ISSUE_TYPES = {
 } as const;
 
 export type IssueType = keyof typeof ISSUE_TYPES;
+
+// ============================================================================
+// Bulk Job Types
+// ============================================================================
+
+export type BulkJobStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+export type BulkJobUrlStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
+
+export interface GreenwashBulkJob {
+  id: string;
+  organization_id: string;
+  created_by: string;
+  title: string;
+  status: BulkJobStatus;
+  total_urls: number;
+  completed_count: number;
+  failed_count: number;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  error_message: string | null;
+}
+
+export interface GreenwashBulkJobUrl {
+  id: string;
+  bulk_job_id: string;
+  url: string;
+  assessment_id: string | null;
+  status: BulkJobUrlStatus;
+  error_message: string | null;
+  created_at: string;
+  processed_at: string | null;
+}
+
+export interface GreenwashBulkJobWithUrls extends GreenwashBulkJob {
+  urls: GreenwashBulkJobUrl[];
+}
+
+export interface CreateBulkJobInput {
+  urls: string[];
+  organization_id: string;
+  title?: string;
+}

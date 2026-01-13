@@ -34,6 +34,7 @@ interface GaiaQueryRequest {
   message: string;
   conversation_id?: string;
   organization_id: string;
+  stream?: boolean;
 }
 
 interface ChartData {
@@ -148,7 +149,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: GaiaQueryRequest = await req.json();
-    const { message, conversation_id, organization_id } = body;
+    const { message, conversation_id, organization_id, stream = false } = body;
 
     if (!message || !organization_id) {
       throw new Error('message and organization_id are required');
@@ -261,7 +262,19 @@ Deno.serve(async (req: Request) => {
 
     console.log('Calling Gemini API...');
 
-    // Call Gemini API
+    // Handle streaming response
+    if (stream) {
+      return handleStreamingResponse(
+        supabase,
+        contextPrompt,
+        conversationId,
+        isNewConversation,
+        orgContext,
+        startTime
+      );
+    }
+
+    // Call Gemini API (non-streaming)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
@@ -377,6 +390,194 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+// Handle streaming response using Server-Sent Events
+async function handleStreamingResponse(
+  supabase: ReturnType<typeof createClient>,
+  contextPrompt: string,
+  conversationId: string,
+  isNewConversation: boolean,
+  orgContext: { context: string; dataSources: DataSource[] },
+  startTime: number
+): Promise<Response> {
+  const encoder = new TextEncoder();
+
+  // Create a TransformStream for SSE
+  const stream = new TransformStream();
+  const writer = stream.writable.getWriter();
+
+  // Helper to send SSE events
+  const sendEvent = async (data: unknown) => {
+    await writer.write(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+  };
+
+  // Start processing in the background
+  (async () => {
+    let fullContent = '';
+    let chartData: ChartData | null = null;
+
+    try {
+      // Call Gemini streaming API
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${GEMINI_API_KEY}&alt=sse`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: GAIA_SYSTEM_PROMPT }],
+            },
+            contents: [
+              {
+                parts: [{ text: contextPrompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: 0.3,
+              topK: 40,
+              topP: 0.95,
+              maxOutputTokens: 4096,
+            },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Gemini streaming error ${response.status}:`, errorText);
+        await sendEvent({ type: 'error', error: `AI service error: ${response.status}` });
+        await writer.close();
+        return;
+      }
+
+      // Send initial metadata
+      await sendEvent({
+        type: 'start',
+        conversation_id: conversationId,
+        is_new_conversation: isNewConversation,
+      });
+
+      // Parse the streaming response
+      const reader = response.body?.getReader();
+      if (!reader) {
+        await sendEvent({ type: 'error', error: 'Failed to read response stream' });
+        await writer.close();
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE events
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6);
+            if (jsonStr === '[DONE]') continue;
+
+            try {
+              const chunk = JSON.parse(jsonStr);
+              const text = chunk?.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                fullContent += text;
+                await sendEvent({ type: 'text', content: text });
+              }
+            } catch {
+              // Skip invalid JSON chunks
+            }
+          }
+        }
+      }
+
+      // Process any remaining buffer
+      if (buffer.startsWith('data: ')) {
+        const jsonStr = buffer.slice(6);
+        if (jsonStr && jsonStr !== '[DONE]') {
+          try {
+            const chunk = JSON.parse(jsonStr);
+            const text = chunk?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              fullContent += text;
+              await sendEvent({ type: 'text', content: text });
+            }
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+      }
+
+      // Extract chart data if present
+      const chartMatch = fullContent.match(/```json\s*([\s\S]*?)\s*```/);
+      if (chartMatch) {
+        try {
+          const chartJson = JSON.parse(chartMatch[1]);
+          if (chartJson.type && chartJson.data) {
+            chartData = chartJson;
+            fullContent = fullContent.replace(/```json[\s\S]*?```/, '').trim();
+            await sendEvent({ type: 'chart', chart_data: chartData });
+          }
+        } catch {
+          // Not valid chart JSON
+        }
+      }
+
+      // Send data sources
+      await sendEvent({ type: 'sources', data_sources: orgContext.dataSources });
+
+      const processingTime = Date.now() - startTime;
+
+      // Save the complete message to database
+      const { data: savedMessage, error: msgError } = await supabase
+        .from('gaia_messages')
+        .insert({
+          conversation_id: conversationId,
+          role: 'assistant',
+          content: fullContent,
+          chart_data: chartData,
+          data_sources: orgContext.dataSources,
+          processing_time_ms: processingTime,
+        })
+        .select()
+        .single();
+
+      if (msgError) {
+        console.error('Error saving streamed message:', msgError);
+      }
+
+      // Send completion event
+      await sendEvent({
+        type: 'done',
+        message_id: savedMessage?.id,
+        processing_time_ms: processingTime,
+      });
+
+      console.log(`Gaia streaming response completed in ${processingTime}ms`);
+    } catch (err) {
+      console.error('Streaming error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      await sendEvent({ type: 'error', error: errorMessage });
+    } finally {
+      await writer.close();
+    }
+  })();
+
+  return new Response(stream.readable, {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
+}
 
 // Fetch organization data context
 async function fetchOrganizationContext(

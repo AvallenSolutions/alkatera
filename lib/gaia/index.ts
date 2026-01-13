@@ -241,6 +241,101 @@ export async function sendGaiaQuery(
   return data;
 }
 
+/**
+ * Stream chunk type for Gaia streaming responses
+ */
+export interface GaiaStreamEvent {
+  type: 'start' | 'text' | 'chart' | 'sources' | 'done' | 'error';
+  content?: string;
+  conversation_id?: string;
+  is_new_conversation?: boolean;
+  chart_data?: unknown;
+  data_sources?: unknown[];
+  message_id?: string;
+  processing_time_ms?: number;
+  error?: string;
+}
+
+/**
+ * Send a streaming query to Gaia
+ * Returns an async generator that yields stream events
+ */
+export async function* sendGaiaQueryStream(
+  request: GaiaQueryRequest
+): AsyncGenerator<GaiaStreamEvent> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token;
+
+  if (!accessToken) {
+    throw new Error('Not authenticated');
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) {
+    throw new Error('Supabase URL not configured');
+  }
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/gaia-query`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ ...request, stream: true }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Request failed: ${response.status}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('No response body');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete SSE events
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
+
+      for (const eventBlock of lines) {
+        if (eventBlock.startsWith('data: ')) {
+          const jsonStr = eventBlock.slice(6);
+          try {
+            const event: GaiaStreamEvent = JSON.parse(jsonStr);
+            yield event;
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+      }
+    }
+
+    // Process any remaining buffer
+    if (buffer.startsWith('data: ')) {
+      const jsonStr = buffer.slice(6);
+      try {
+        const event: GaiaStreamEvent = JSON.parse(jsonStr);
+        yield event;
+      } catch {
+        // Skip invalid JSON
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 // ============================================================================
 // Feedback Operations
 // ============================================================================

@@ -21,6 +21,7 @@ import {
   History,
   ArrowRight,
   Info,
+  List,
 } from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
@@ -30,14 +31,17 @@ import {
   triggerAnalysis,
   fetchUrlContent,
   fetchSocialMediaContent,
+  createBulkJob,
 } from "@/lib/greenwash";
 import type { InputType } from "@/lib/types/greenwash";
+
+type TabType = InputType | "bulk";
 
 export default function GreenwashGuardianPage() {
   const router = useRouter();
   const { currentOrganization } = useOrganization();
 
-  const [activeTab, setActiveTab] = useState<InputType>("url");
+  const [activeTab, setActiveTab] = useState<TabType>("url");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +52,7 @@ export default function GreenwashGuardianPage() {
   const [socialMediaUrl, setSocialMediaUrl] = useState("");
   const [socialMediaText, setSocialMediaText] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [bulkUrls, setBulkUrls] = useState("");
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,6 +83,45 @@ export default function GreenwashGuardianPage() {
     // Validate input based on tab
     let content = "";
     let inputSource = "";
+
+    // Handle bulk URLs separately
+    if (activeTab === "bulk") {
+      const urls = bulkUrls
+        .split("\n")
+        .map(u => u.trim())
+        .filter(u => u.length > 0);
+
+      if (urls.length === 0) {
+        toast.error("Please enter at least one URL");
+        return;
+      }
+
+      if (urls.length > 50) {
+        toast.error("Maximum 50 URLs allowed per batch");
+        return;
+      }
+
+      setIsSubmitting(true);
+      setError(null);
+
+      try {
+        toast.info("Creating bulk job...");
+        const job = await createBulkJob({
+          urls,
+          organization_id: currentOrganization.id,
+          title: title.trim() || undefined,
+        });
+        toast.success(`Bulk job created with ${urls.length} URLs`);
+        router.push(`/greenwash-guardian/bulk/${job.id}`);
+      } catch (err: any) {
+        console.error("Error:", err);
+        setError(err.message || "An error occurred");
+        toast.error(err.message || "An error occurred");
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     switch (activeTab) {
       case "url":
@@ -262,14 +306,21 @@ export default function GreenwashGuardianPage() {
             </div>
 
             {/* Input Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as InputType)}>
-              <TabsList className="grid w-full grid-cols-4 bg-white/5 border border-white/10">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+              <TabsList className="grid w-full grid-cols-5 bg-white/5 border border-white/10">
                 <TabsTrigger
                   value="url"
                   className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
                 >
                   <Globe className="h-4 w-4 mr-2" />
                   URL
+                </TabsTrigger>
+                <TabsTrigger
+                  value="bulk"
+                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
+                >
+                  <List className="h-4 w-4 mr-2" />
+                  Bulk URLs
                 </TabsTrigger>
                 <TabsTrigger
                   value="document"
@@ -290,7 +341,7 @@ export default function GreenwashGuardianPage() {
                   className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
                 >
                   <Share2 className="h-4 w-4 mr-2" />
-                  Social Media
+                  Social
                 </TabsTrigger>
               </TabsList>
 
@@ -309,6 +360,29 @@ export default function GreenwashGuardianPage() {
                   <p className="text-xs text-slate-500">
                     We'll analyze the page and its subpages (up to 10 pages)
                   </p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="bulk" className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-urls" className="text-slate-300">URLs (one per line)</Label>
+                  <Textarea
+                    id="bulk-urls"
+                    placeholder={"https://example.com/sustainability\nhttps://competitor.com/green-claims\nhttps://supplier.com/environment"}
+                    value={bulkUrls}
+                    onChange={(e) => setBulkUrls(e.target.value)}
+                    disabled={isSubmitting}
+                    rows={8}
+                    className="bg-white/5 border-white/10 text-white placeholder:text-slate-500 font-mono text-sm"
+                  />
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-500">
+                      Enter up to 50 URLs to scan in batch. Each URL will be analyzed separately.
+                    </p>
+                    <span className="text-xs text-slate-400">
+                      {bulkUrls.split("\n").filter(u => u.trim()).length} / 50 URLs
+                    </span>
+                  </div>
                 </div>
               </TabsContent>
 

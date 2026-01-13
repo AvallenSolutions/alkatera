@@ -37,6 +37,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Flame,
+  AlertOctagon,
 } from "lucide-react";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { fetchAllTickets, getTicketStats } from "@/lib/feedback";
@@ -433,11 +435,44 @@ export default function AdminFeedbackPage() {
                           <PriorityBadge priority={ticket.priority} />
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm text-muted-foreground">
-                            {format(new Date(ticket.created_at), "MMM d")}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {format(new Date(ticket.created_at), "h:mm a")}
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                {format(new Date(ticket.created_at), "MMM d")}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {format(new Date(ticket.created_at), "h:mm a")}
+                              </div>
+                            </div>
+                            {/* Days open indicator for old tickets */}
+                            {ticket.status !== "resolved" && ticket.status !== "closed" && (() => {
+                              const daysOpen = Math.floor(
+                                (Date.now() - new Date(ticket.created_at).getTime()) / (1000 * 60 * 60 * 24)
+                              );
+                              if (daysOpen >= 21) {
+                                return (
+                                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                                    <Flame className="h-3 w-3 mr-1" />
+                                    {daysOpen}d
+                                  </Badge>
+                                );
+                              } else if (daysOpen >= 14) {
+                                return (
+                                  <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">
+                                    <AlertOctagon className="h-3 w-3 mr-1" />
+                                    {daysOpen}d
+                                  </Badge>
+                                );
+                              } else if (daysOpen >= 7) {
+                                return (
+                                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {daysOpen}d
+                                  </Badge>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
