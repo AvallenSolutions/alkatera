@@ -167,20 +167,24 @@ async function fetchEmissionsSummary(supabase: SupabaseClient, organizationId: s
  * Fetch facilities summary
  */
 async function fetchFacilitiesSummary(supabase: SupabaseClient, organizationId: string) {
-  const { data: facilities, count } = await supabase
+  const { data: facilitiesData, count } = await supabase
     .from('facilities')
     .select('id, name, type', { count: 'exact' })
     .eq('organization_id', organizationId);
+
+  const facilities = facilitiesData as { id: string; name: string; type: string | null }[] | null;
 
   if (!facilities || facilities.length === 0) {
     return null;
   }
 
   // Fetch water data
-  const { data: waterData } = await supabase
+  const { data: waterResult } = await supabase
     .from('facility_water_data')
     .select('consumption_m3, facility_id')
     .in('facility_id', facilities.map((f) => f.id));
+
+  const waterData = waterResult as { consumption_m3: number | null; facility_id: string }[] | null;
 
   const totalWater = waterData?.reduce((sum, w) => sum + (w.consumption_m3 || 0), 0) || 0;
 
