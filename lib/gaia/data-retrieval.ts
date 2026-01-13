@@ -307,13 +307,21 @@ async function fetchFleetSummary(supabase: SupabaseClient, organizationId: strin
  * Fetch vitality scores
  */
 async function fetchVitalityScores(supabase: SupabaseClient, organizationId: string) {
-  const { data: scores } = await supabase
+  const { data: scoresData } = await supabase
     .from('organization_vitality_scores')
     .select('*')
     .eq('organization_id', organizationId)
     .order('calculated_at', { ascending: false })
     .limit(1)
     .single();
+
+  const scores = scoresData as {
+    overall_score: number | null;
+    climate_score: number | null;
+    water_score: number | null;
+    circularity_score: number | null;
+    nature_score: number | null;
+  } | null;
 
   if (!scores) {
     return null;
