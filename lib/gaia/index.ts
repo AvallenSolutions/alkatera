@@ -576,11 +576,11 @@ export async function getAllFeedback(): Promise<GaiaFeedbackWithMessage[]> {
   }
 
   // Get unique conversation IDs from messages
-  const conversationIds = [...new Set(
+  const conversationIds = Array.from(new Set(
     feedbackData
       .filter(f => f.message?.conversation_id)
       .map(f => f.message.conversation_id)
-  )];
+  ));
 
   // Fetch conversations separately if we have any
   let conversationsMap: Record<string, unknown> = {};

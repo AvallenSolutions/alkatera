@@ -250,7 +250,7 @@ export function getContextualFollowUps(messageContent: string): string[] {
   }
 
   // Return unique suggestions, limited to 3
-  return [...new Set(suggestions)].slice(0, 3);
+  return Array.from(new Set(suggestions)).slice(0, 3);
 }
 
 export default {
