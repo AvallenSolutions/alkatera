@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Package, Droplets, Zap, Wind, MapPin, AlertTriangle, FileText, CheckCircle2, ArrowRight, Map, Factory, ShieldAlert, Clock } from "lucide-react";
+import { Package, Droplets, Zap, Wind, MapPin, AlertTriangle, FileText, CheckCircle2, ArrowRight, Map, Factory, ShieldAlert, Clock, Layers } from "lucide-react";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
 import { useFacilityLocation } from "@/hooks/data/useFacilityLocation";
 import { useAllocationStatus } from "@/hooks/data/useAllocationStatus";
@@ -11,6 +11,7 @@ import { SupplyChainMap } from "./SupplyChainMap";
 import { ProductHeroImpact, ContainerType } from "./ProductHeroImpact";
 import { QuickImpactBar, ImpactCategory, ImpactSummaryCard } from "./QuickImpactBar";
 import { ImpactAccordion, ImpactAccordionGroup, SimpleBreakdownTable } from "./ImpactAccordion";
+import { MultipackContentsCard } from "./MultipackContentsCard";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
@@ -117,6 +118,14 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
   if (!hasLCAData || !breakdown) {
     return (
       <div className="space-y-6">
+        {/* Multipack Contents Card - shown at the top for multipacks */}
+        {product.is_multipack && (
+          <MultipackContentsCard
+            productId={String(product.id)}
+            productName={product.name}
+          />
+        )}
+
         <Card className="backdrop-blur-xl bg-white/5 border border-white/10 shadow-2xl overflow-hidden">
           <CardContent className="p-8">
             <div className="flex flex-col items-center justify-center py-12 space-y-6">
@@ -198,6 +207,14 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         containerType="bottle"
         lcaReportUrl={`/products/${product.id}/report`}
       />
+
+      {/* Multipack Contents Card - only shown for multipacks */}
+      {product.is_multipack && (
+        <MultipackContentsCard
+          productId={String(product.id)}
+          productName={product.name}
+        />
+      )}
 
       {/* Quick Impact Summary Bar */}
       <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-xl p-4">

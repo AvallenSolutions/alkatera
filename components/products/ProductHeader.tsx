@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Edit, CheckCircle2, AlertCircle } from "lucide-react";
+import { Edit, CheckCircle2, AlertCircle, Layers } from "lucide-react";
 import Image from "next/image";
 
 interface ProductHeaderProps {
@@ -11,6 +11,7 @@ interface ProductHeaderProps {
     sku: string;
     image_url?: string;
     product_category?: string;
+    is_multipack?: boolean;
   };
   isHealthy: boolean;
   onEdit: () => void;
@@ -50,6 +51,12 @@ export function ProductHeader({ product, isHealthy, onEdit }: ProductHeaderProps
                   <h1 className="text-2xl font-bold text-white truncate">
                     {product.name}
                   </h1>
+                  {product.is_multipack && (
+                    <Badge className="backdrop-blur-xl bg-indigo-500/20 text-indigo-400 border-indigo-500/30">
+                      <Layers className="h-3 w-3 mr-1" />
+                      Multipack
+                    </Badge>
+                  )}
                   {isHealthy ? (
                     <Badge className="backdrop-blur-xl bg-green-500/20 text-green-400 border-green-500/30">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
