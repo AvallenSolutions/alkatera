@@ -261,15 +261,19 @@ async function fetchProductsSummary(supabase: SupabaseClient, organizationId: st
  * Fetch fleet summary
  */
 async function fetchFleetSummary(supabase: SupabaseClient, organizationId: string) {
-  const { data: vehicles, count: vehicleCount } = await supabase
+  const { data: vehiclesData, count: vehicleCount } = await supabase
     .from('fleet_vehicles')
     .select('id, registration, vehicle_type', { count: 'exact' })
     .eq('organization_id', organizationId);
 
-  const { data: activities, count: activityCount } = await supabase
+  const vehicles = vehiclesData as { id: string; registration: string; vehicle_type: string | null }[] | null;
+
+  const { data: activitiesData, count: activityCount } = await supabase
     .from('fleet_activities')
     .select('distance_km, total_emissions_kg')
     .eq('organization_id', organizationId);
+
+  const activities = activitiesData as { distance_km: number | null; total_emissions_kg: number | null }[] | null;
 
   if (!vehicles || vehicles.length === 0) {
     return null;
