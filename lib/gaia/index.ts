@@ -384,22 +384,51 @@ export async function getAdminStats(): Promise<GaiaAdminStats> {
  * Get all feedback for admin review
  */
 export async function getAllFeedback(): Promise<GaiaFeedbackWithMessage[]> {
-  const { data, error } = await supabase
+  // First fetch feedback with messages
+  const { data: feedbackData, error: feedbackError } = await supabase
     .from('gaia_feedback')
     .select(`
       *,
-      message:gaia_messages(*),
-      conversation:gaia_messages(conversation:gaia_conversations(*))
+      message:gaia_messages(*)
     `)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
+  if (feedbackError) throw feedbackError;
+
+  if (!feedbackData || feedbackData.length === 0) {
+    return [];
+  }
+
+  // Get unique conversation IDs from messages
+  const conversationIds = [...new Set(
+    feedbackData
+      .filter(f => f.message?.conversation_id)
+      .map(f => f.message.conversation_id)
+  )];
+
+  // Fetch conversations separately if we have any
+  let conversationsMap: Record<string, unknown> = {};
+  if (conversationIds.length > 0) {
+    const { data: conversations } = await supabase
+      .from('gaia_conversations')
+      .select('*')
+      .in('id', conversationIds);
+
+    if (conversations) {
+      conversationsMap = conversations.reduce((acc, conv) => {
+        acc[conv.id] = conv;
+        return acc;
+      }, {} as Record<string, unknown>);
+    }
+  }
 
   // Transform the data
-  return (data || []).map((item) => ({
+  return feedbackData.map((item) => ({
     ...item,
     message: item.message,
-    conversation: item.conversation?.conversation || {},
+    conversation: item.message?.conversation_id
+      ? conversationsMap[item.message.conversation_id] || {}
+      : {},
   }));
 }
 

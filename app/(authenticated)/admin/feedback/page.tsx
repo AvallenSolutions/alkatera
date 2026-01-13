@@ -127,7 +127,8 @@ export default function AdminFeedbackPage() {
   useEffect(() => {
     if (isAlkateraAdmin) {
       loadData();
-      setupRealtimeSubscription();
+      const cleanup = setupRealtimeSubscription();
+      return cleanup;
     }
   }, [isAlkateraAdmin]);
 

@@ -118,7 +118,18 @@ Deno.serve(async (req: Request) => {
       throw new Error('message and organization_id are required');
     }
 
-    console.log(`Gaia query from user ${user.id}: "${message.substring(0, 50)}..."`);
+    // Validate message length to prevent token overflow
+    if (message.length > 5000) {
+      throw new Error('Message too long. Please limit to 5000 characters.');
+    }
+
+    // Basic input sanitization - remove potential prompt injection markers
+    const sanitizedMessage = message
+      .replace(/```/g, "'''")
+      .replace(/\{\{/g, '{ {')
+      .replace(/\}\}/g, '} }');
+
+    console.log(`Gaia query from user ${user.id}: "${sanitizedMessage.substring(0, 50)}..."`);
 
     // Verify user has access to this organization
     const { data: membership } = await supabase
@@ -161,6 +172,25 @@ Deno.serve(async (req: Request) => {
       if (convError) throw convError;
       conversationId = newConv.id;
       isNewConversation = true;
+    } else {
+      // Verify conversation ownership - user must own the conversation
+      const { data: existingConv, error: convCheckError } = await supabase
+        .from('gaia_conversations')
+        .select('id, user_id, organization_id')
+        .eq('id', conversationId)
+        .single();
+
+      if (convCheckError || !existingConv) {
+        throw new Error('Conversation not found');
+      }
+
+      if (existingConv.user_id !== user.id) {
+        throw new Error('You do not have access to this conversation');
+      }
+
+      if (existingConv.organization_id !== organization_id) {
+        throw new Error('Conversation does not belong to this organization');
+      }
     }
 
     // Store user message
@@ -169,7 +199,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         conversation_id: conversationId,
         role: 'user',
-        content: message,
+        content: sanitizedMessage,
       });
 
     // Fetch conversation history

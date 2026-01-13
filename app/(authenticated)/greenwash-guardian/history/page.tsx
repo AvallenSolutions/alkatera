@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useOrganization } from "@/lib/organizationContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,7 @@ function RiskIndicator({ level }: { level: string | null }) {
 
 export default function GreenwashHistoryPage() {
   const router = useRouter();
+  const { currentOrganization } = useOrganization();
   const [assessments, setAssessments] = useState<GreenwashAssessment[]>([]);
   const [filteredAssessments, setFilteredAssessments] = useState<GreenwashAssessment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,17 +67,20 @@ export default function GreenwashHistoryPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    loadAssessments();
-  }, []);
+    if (currentOrganization?.id) {
+      loadAssessments();
+    }
+  }, [currentOrganization?.id]);
 
   useEffect(() => {
     filterAssessments();
   }, [assessments, searchQuery, riskFilter, typeFilter]);
 
   async function loadAssessments() {
+    if (!currentOrganization?.id) return;
     setIsLoading(true);
     try {
-      const data = await fetchAssessments();
+      const data = await fetchAssessments(currentOrganization.id);
       setAssessments(data);
     } catch (error) {
       console.error("Error loading assessments:", error);

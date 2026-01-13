@@ -303,16 +303,22 @@ export async function uploadAttachment(
     throw uploadError;
   }
 
-  const { data: urlData } = supabase.storage
+  // Use signed URL since the bucket is private
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
     .from('feedback-attachments')
-    .getPublicUrl(filePath);
+    .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+  if (signedUrlError) {
+    console.error('Error creating signed URL:', signedUrlError);
+    // Fall back to path - components will generate signed URLs when displaying
+  }
 
   return {
     path: filePath,
     name: file.name,
     size: file.size,
     type: file.type,
-    url: urlData.publicUrl,
+    url: signedUrlData?.signedUrl || filePath,
   };
 }
 

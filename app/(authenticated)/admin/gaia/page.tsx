@@ -95,14 +95,46 @@ export default function AdminGaiaPage() {
   async function loadAllData() {
     setIsLoading(true);
     try {
-      const [statsData, knowledgeData, feedbackData] = await Promise.all([
+      // Use Promise.allSettled to handle partial failures gracefully
+      const results = await Promise.allSettled([
         getAdminStats(),
         getKnowledgeBase(),
         getAllFeedback(),
       ]);
-      setStats(statsData);
-      setKnowledgeEntries(knowledgeData);
-      setFeedback(feedbackData);
+
+      // Extract results, using defaults for failed promises
+      const [statsResult, knowledgeResult, feedbackResult] = results;
+
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value);
+      } else {
+        console.error('Error loading stats:', statsResult.reason);
+        // Set default stats to show the page
+        setStats({
+          total_conversations: 0,
+          total_messages: 0,
+          active_users: 0,
+          positive_feedback_rate: 0,
+          avg_response_time_ms: 0,
+          top_questions: [],
+          feedback_pending_review: 0,
+          knowledge_entries: 0,
+        });
+      }
+
+      if (knowledgeResult.status === 'fulfilled') {
+        setKnowledgeEntries(knowledgeResult.value);
+      } else {
+        console.error('Error loading knowledge base:', knowledgeResult.reason);
+        setKnowledgeEntries([]);
+      }
+
+      if (feedbackResult.status === 'fulfilled') {
+        setFeedback(feedbackResult.value);
+      } else {
+        console.error('Error loading feedback:', feedbackResult.reason);
+        setFeedback([]);
+      }
     } catch (err) {
       console.error('Error loading admin data:', err);
     } finally {
