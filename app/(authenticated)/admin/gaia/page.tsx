@@ -175,7 +175,7 @@ export default function AdminGaiaPage() {
       setFeedback(items =>
         items.map(f =>
           f.id === feedbackId
-            ? { ...f, reviewed_at: new Date().toISOString(), admin_notes: notes }
+            ? { ...f, reviewed_at: new Date().toISOString(), admin_notes: notes ?? null }
             : f
         )
       );
