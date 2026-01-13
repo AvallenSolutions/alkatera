@@ -47,8 +47,18 @@ const inputTypeLabels: Record<string, string> = {
 };
 
 function RiskIndicator({ level }: { level: string | null }) {
-  const color = getRiskLevelColor(level || "low");
+  const colorName = getRiskLevelColor(level || "low");
   const Icon = level === "high" ? AlertTriangle : level === "medium" ? AlertCircle : CheckCircle;
+
+  // Map color names to Tailwind classes
+  const colorClasses: Record<string, { bg: string; text: string; border: string }> = {
+    red: { bg: "bg-red-500/20", text: "text-red-400", border: "border-red-500/30" },
+    amber: { bg: "bg-amber-500/20", text: "text-amber-400", border: "border-amber-500/30" },
+    green: { bg: "bg-green-500/20", text: "text-green-400", border: "border-green-500/30" },
+    gray: { bg: "bg-gray-500/20", text: "text-gray-400", border: "border-gray-500/30" },
+  };
+
+  const color = colorClasses[colorName] || colorClasses.gray;
 
   return (
     <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${color.bg} ${color.text} border ${color.border}`}>
