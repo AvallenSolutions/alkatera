@@ -174,7 +174,7 @@ async function fetchPageContent(url: string): Promise<{ text: string; links: str
 
     return {
       text: cleanText,
-      links: [...new Set(links)], // Deduplicate
+      links: Array.from(new Set(links)), // Deduplicate
     };
   } catch (error) {
     console.error(`Error fetching page ${url}:`, error);
