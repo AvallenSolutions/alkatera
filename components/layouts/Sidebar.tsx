@@ -38,6 +38,7 @@ import {
   Activity,
   CreditCard,
   FileEdit,
+  Leaf,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -106,6 +107,11 @@ const navigationStructure: NavItem[] = [
     name: 'Knowledge Bank',
     href: '/knowledge-bank/',
     icon: GraduationCap,
+  },
+  {
+    name: 'Greenwash Guardian',
+    href: '/greenwash-guardian/',
+    icon: Leaf,
   },
   {
     name: 'Production',
