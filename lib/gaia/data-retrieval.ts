@@ -24,11 +24,13 @@ export async function fetchOrganizationContext(
   const rawData: Record<string, unknown> = {};
 
   // Fetch organization basic info
-  const { data: org } = await supabase
+  const { data: orgData } = await supabase
     .from('organizations')
     .select('id, name, industry')
     .eq('id', organizationId)
     .single();
+
+  const org = orgData as { id: string; name: string; industry?: string } | null;
 
   if (!org) {
     throw new Error('Organization not found');
