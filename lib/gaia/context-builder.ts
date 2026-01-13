@@ -1,0 +1,259 @@
+// Gaia Context Builder
+// Assembles context for Gemini API calls
+
+import { GAIA_SYSTEM_PROMPT, GAIA_CONTEXT_TEMPLATE } from './system-prompt';
+import { formatContextForPrompt, type DataRetrievalResult } from './data-retrieval';
+import type { GaiaMessage, GaiaKnowledgeEntry } from '@/lib/types/gaia';
+
+export interface GaiaPromptContext {
+  systemPrompt: string;
+  userPrompt: string;
+  conversationHistory: string;
+}
+
+/**
+ * Build the complete context for a Gaia query
+ */
+export function buildGaiaContext(params: {
+  organizationContext: DataRetrievalResult;
+  knowledgeBase: GaiaKnowledgeEntry[];
+  conversationHistory: GaiaMessage[];
+  userQuery: string;
+}): GaiaPromptContext {
+  const { organizationContext, knowledgeBase, conversationHistory, userQuery } = params;
+
+  // Format organization context
+  const orgContextStr = formatContextForPrompt(organizationContext);
+
+  // Format knowledge base entries
+  const knowledgeStr = formatKnowledgeBase(knowledgeBase);
+
+  // Format conversation history
+  const historyStr = formatConversationHistory(conversationHistory);
+
+  // Build the user prompt from template
+  const userPrompt = GAIA_CONTEXT_TEMPLATE
+    .replace('{organization_context}', orgContextStr)
+    .replace('{knowledge_base}', knowledgeStr)
+    .replace('{conversation_history}', historyStr)
+    .replace('{user_query}', userQuery);
+
+  return {
+    systemPrompt: GAIA_SYSTEM_PROMPT,
+    userPrompt,
+    conversationHistory: historyStr,
+  };
+}
+
+/**
+ * Format knowledge base entries for context
+ */
+function formatKnowledgeBase(entries: GaiaKnowledgeEntry[]): string {
+  if (!entries || entries.length === 0) {
+    return 'No additional knowledge base entries.';
+  }
+
+  // Sort by priority (higher first)
+  const sorted = [...entries].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+
+  const sections: Record<string, string[]> = {
+    guideline: [],
+    instruction: [],
+    definition: [],
+    example_qa: [],
+  };
+
+  sorted.forEach((entry) => {
+    if (entry.entry_type === 'example_qa' && entry.example_question && entry.example_answer) {
+      sections.example_qa.push(
+        `Q: ${entry.example_question}\nA: ${entry.example_answer}`
+      );
+    } else if (entry.entry_type === 'definition') {
+      sections.definition.push(`**${entry.title}**: ${entry.content}`);
+    } else {
+      const section = entry.entry_type === 'guideline' ? 'guideline' : 'instruction';
+      sections[section].push(`- ${entry.title}: ${entry.content}`);
+    }
+  });
+
+  const lines: string[] = [];
+
+  if (sections.guideline.length > 0) {
+    lines.push('### Guidelines');
+    lines.push(sections.guideline.join('\n'));
+    lines.push('');
+  }
+
+  if (sections.instruction.length > 0) {
+    lines.push('### Instructions');
+    lines.push(sections.instruction.join('\n'));
+    lines.push('');
+  }
+
+  if (sections.definition.length > 0) {
+    lines.push('### Key Definitions');
+    lines.push(sections.definition.join('\n'));
+    lines.push('');
+  }
+
+  if (sections.example_qa.length > 0) {
+    lines.push('### Example Q&A (use these as guidance for similar questions)');
+    lines.push(sections.example_qa.join('\n\n'));
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Format conversation history for context
+ */
+function formatConversationHistory(messages: GaiaMessage[]): string {
+  if (!messages || messages.length === 0) {
+    return 'No previous messages in this conversation.';
+  }
+
+  // Limit to last 10 messages to avoid context overflow
+  const recentMessages = messages.slice(-10);
+
+  return recentMessages
+    .map((msg) => {
+      const role = msg.role === 'user' ? 'User' : 'Gaia';
+      return `${role}: ${msg.content}`;
+    })
+    .join('\n\n');
+}
+
+/**
+ * Extract potential query intent from user message
+ * Used to fetch more detailed data if needed
+ */
+export function detectQueryIntent(query: string): string[] {
+  const intents: string[] = [];
+  const queryLower = query.toLowerCase();
+
+  // Emissions-related
+  if (
+    queryLower.includes('emission') ||
+    queryLower.includes('carbon') ||
+    queryLower.includes('co2') ||
+    queryLower.includes('footprint') ||
+    queryLower.includes('scope')
+  ) {
+    intents.push('emissions');
+  }
+
+  // Product-related
+  if (
+    queryLower.includes('product') ||
+    queryLower.includes('lca') ||
+    queryLower.includes('life cycle') ||
+    queryLower.includes('impact')
+  ) {
+    intents.push('product');
+  }
+
+  // Facility-related
+  if (
+    queryLower.includes('facility') ||
+    queryLower.includes('facilities') ||
+    queryLower.includes('site') ||
+    queryLower.includes('location') ||
+    queryLower.includes('building')
+  ) {
+    intents.push('facility');
+  }
+
+  // Water-related
+  if (
+    queryLower.includes('water') ||
+    queryLower.includes('consumption') ||
+    queryLower.includes('h2o')
+  ) {
+    intents.push('water');
+  }
+
+  // Energy-related
+  if (
+    queryLower.includes('energy') ||
+    queryLower.includes('electricity') ||
+    queryLower.includes('power') ||
+    queryLower.includes('fuel')
+  ) {
+    intents.push('energy');
+  }
+
+  // Fleet-related
+  if (
+    queryLower.includes('fleet') ||
+    queryLower.includes('vehicle') ||
+    queryLower.includes('travel') ||
+    queryLower.includes('transport') ||
+    queryLower.includes('mileage') ||
+    queryLower.includes('distance')
+  ) {
+    intents.push('fleet');
+  }
+
+  // Supplier-related
+  if (
+    queryLower.includes('supplier') ||
+    queryLower.includes('vendor') ||
+    queryLower.includes('value chain') ||
+    queryLower.includes('upstream') ||
+    queryLower.includes('downstream')
+  ) {
+    intents.push('supplier');
+  }
+
+  // Vitality score
+  if (
+    queryLower.includes('vitality') ||
+    queryLower.includes('score') ||
+    queryLower.includes('rating') ||
+    queryLower.includes('performance')
+  ) {
+    intents.push('vitality');
+  }
+
+  // Comparison/trend
+  if (
+    queryLower.includes('compare') ||
+    queryLower.includes('trend') ||
+    queryLower.includes('last year') ||
+    queryLower.includes('previous') ||
+    queryLower.includes('change') ||
+    queryLower.includes('improve')
+  ) {
+    intents.push('trend');
+  }
+
+  return intents;
+}
+
+/**
+ * Generate chart configuration based on data and query
+ */
+export function suggestChartType(
+  intents: string[],
+  data: unknown
+): { type: string; suggestion: string } | null {
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return null;
+  }
+
+  // Trend queries - line chart
+  if (intents.includes('trend')) {
+    return { type: 'line', suggestion: 'A line chart would show the trend over time' };
+  }
+
+  // Breakdown/comparison queries - bar or pie
+  if (data.length <= 6) {
+    return { type: 'pie', suggestion: 'A pie chart would show the breakdown effectively' };
+  } else if (data.length <= 20) {
+    return { type: 'bar', suggestion: 'A bar chart would allow comparison across items' };
+  }
+
+  // Many items - table
+  return { type: 'table', suggestion: 'A table would be best for displaying this many items' };
+}

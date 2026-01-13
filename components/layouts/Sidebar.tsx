@@ -40,6 +40,7 @@ import {
   FileEdit,
   Leaf,
   MessageSquare,
+  Bot,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -113,6 +114,11 @@ const navigationStructure: NavItem[] = [
     name: 'Greenwash Guardian',
     href: '/greenwash-guardian/',
     icon: Leaf,
+  },
+  {
+    name: 'Gaia',
+    href: '/gaia/',
+    icon: Bot,
   },
   {
     name: 'Production',
@@ -472,6 +478,25 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/feedback/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">User Feedback</span>
+                  {isDevelopment && !isAlkateraAdmin && (
+                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
+                  )}
+                </Link>
+
+                <Link
+                  href="/admin/gaia/"
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                    isActive('/admin/gaia/')
+                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                      : 'text-sidebar-foreground hover:bg-secondary/50'
+                  )}
+                >
+                  <Bot className={cn(
+                    'h-4 w-4 flex-shrink-0 transition-colors',
+                    isActive('/admin/gaia/') ? 'text-neon-lime' : ''
+                  )} />
+                  <span className="truncate">Gaia AI Admin</span>
                   {isDevelopment && !isAlkateraAdmin && (
                     <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
                   )}
