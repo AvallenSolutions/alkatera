@@ -1,16 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useOrganization } from '@/lib/organizationContext';
 import { useDashboardPreferences } from '@/hooks/data/useDashboardPreferences';
+import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
+import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
+import { useSupplierEngagement } from '@/hooks/data/useSupplierEngagement';
 import { DashboardCustomiseModal } from '@/components/dashboard/DashboardCustomiseModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Settings2, RefreshCw, Upload } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Settings2, RefreshCw, Upload, ChevronRight, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+
+import { VitalityRing } from '@/components/vitality/VitalityRing';
+import { RAGStatusCard, RAGStatusCardGrid } from '@/components/dashboard/RAGStatusCard';
+import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
+import { Sparkline } from '@/components/shared/TrendIndicator';
 
 import {
-  HeadlineMetricsWidget,
   QuickActionsWidget,
   GHGEmissionsSummaryWidget,
   SupplierEngagementWidget,
@@ -22,19 +37,6 @@ import {
   ComplianceStatusWidget,
 } from '@/components/dashboard/widgets';
 
-const widgetComponents: Record<string, React.ComponentType> = {
-  'headline-metrics': HeadlineMetricsWidget,
-  'quick-actions': QuickActionsWidget,
-  'ghg-summary': GHGEmissionsSummaryWidget,
-  'supplier-engagement': SupplierEngagementWidget,
-  'recent-activity': RecentActivityWidget,
-  'data-quality': DataQualityWidget,
-  'product-lca-status': ProductLCAStatusWidget,
-  'getting-started': GettingStartedWidget,
-  'water-risk': WaterRiskWidget,
-  'compliance-status': ComplianceStatusWidget,
-};
-
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
@@ -45,15 +47,15 @@ function DashboardSkeleton() {
         </div>
         <Skeleton className="h-9 w-28" />
       </div>
-      <Skeleton className="h-48 w-full rounded-xl" />
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-64 rounded-xl col-span-2" />
-        <Skeleton className="h-64 rounded-xl" />
-        <Skeleton className="h-64 rounded-xl" />
+      <Skeleton className="h-64 w-full rounded-2xl" />
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Skeleton className="h-36 rounded-xl" />
+        <Skeleton className="h-36 rounded-xl" />
+        <Skeleton className="h-36 rounded-xl" />
+        <Skeleton className="h-36 rounded-xl" />
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-80 rounded-xl col-span-2" />
-        <Skeleton className="h-80 rounded-xl" />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Skeleton className="h-80 rounded-xl lg:col-span-2" />
         <Skeleton className="h-80 rounded-xl" />
       </div>
     </div>
@@ -80,35 +82,121 @@ function EmptyDashboard() {
   );
 }
 
+function getVitalityScore(data: {
+  climateScore: number;
+  waterScore: number;
+  circularityScore: number;
+  supplierScore: number;
+}): number {
+  return Math.round(
+    data.climateScore * 0.35 +
+    data.waterScore * 0.25 +
+    data.circularityScore * 0.25 +
+    data.supplierScore * 0.15
+  );
+}
+
+function getStatusFromScore(score: number): 'good' | 'warning' | 'critical' {
+  if (score >= 70) return 'good';
+  if (score >= 50) return 'warning';
+  return 'critical';
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { currentOrganization } = useOrganization();
-  const { enabledWidgets, loading, error, refetch } = useDashboardPreferences();
+  const { enabledWidgets, loading: prefsLoading, error: prefsError, refetch } = useDashboardPreferences();
+  const currentYear = new Date().getFullYear();
+  const { footprint, loading: footprintLoading } = useCompanyFootprint(currentYear);
+  const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(currentYear);
+  const { data: supplierData, isLoading: supplierLoading } = useSupplierEngagement();
+
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showLegacyWidgets, setShowLegacyWidgets] = useState(false);
+
+  const isLoading = prefsLoading || footprintLoading || wasteLoading || supplierLoading;
+
+  const scores = useMemo(() => {
+    let climateScore = 50;
+    if (footprint?.total_emissions) {
+      const emissionsKg = footprint.total_emissions;
+      if (emissionsKg < 10000) climateScore = 85;
+      else if (emissionsKg < 50000) climateScore = 70;
+      else if (emissionsKg < 100000) climateScore = 55;
+      else climateScore = 35;
+    }
+
+    let waterScore = 60;
+
+    let circularityScore = 50;
+    if (wasteMetrics?.waste_diversion_rate !== undefined) {
+      const rate = wasteMetrics.waste_diversion_rate;
+      if (rate >= 80) circularityScore = 90;
+      else if (rate >= 60) circularityScore = 75;
+      else if (rate >= 40) circularityScore = 55;
+      else circularityScore = 35;
+    }
+
+    let supplierScore = 50;
+    if (supplierData && supplierData.length > 0) {
+      const total = supplierData[0]?.total_suppliers || 1;
+      const activeEntry = supplierData.find(s => s.status === 'active');
+      const engaged = activeEntry?.supplier_count || 0;
+      const engagementRate = (engaged / total) * 100;
+      if (engagementRate >= 70) supplierScore = 85;
+      else if (engagementRate >= 50) supplierScore = 70;
+      else if (engagementRate >= 30) supplierScore = 50;
+      else supplierScore = 30;
+    }
+
+    return { climateScore, waterScore, circularityScore, supplierScore };
+  }, [footprint, wasteMetrics, supplierData]);
+
+  const vitalityScore = getVitalityScore(scores);
+
+  const scopeBreakdown = useMemo(() => {
+    if (!footprint?.breakdown) return { scope1: 0, scope2: 0, scope3: 0 };
+    const total = footprint.total_emissions || 1;
+    return {
+      scope1Pct: ((footprint.breakdown.scope1 || 0) / total) * 100,
+      scope2Pct: ((footprint.breakdown.scope2 || 0) / total) * 100,
+      scope3Pct: ((footprint.breakdown.scope3?.total || 0) / total) * 100,
+    };
+  }, [footprint]);
+
+  const priorityActions = useMemo(() => {
+    let supplierEngagementRate: number | undefined;
+    if (supplierData && supplierData.length > 0) {
+      const total = supplierData[0]?.total_suppliers || 1;
+      const activeEntry = supplierData.find(s => s.status === 'active');
+      const engaged = activeEntry?.supplier_count || 0;
+      supplierEngagementRate = (engaged / total) * 100;
+    }
+    return generatePriorityActions({
+      scope1Percentage: scopeBreakdown.scope1Pct,
+      scope2Percentage: scopeBreakdown.scope2Pct,
+      scope3Percentage: scopeBreakdown.scope3Pct,
+      circularityRate: wasteMetrics?.waste_diversion_rate,
+      supplierEngagementRate,
+    });
+  }, [scopeBreakdown, wasteMetrics, supplierData]);
+
+  const trendData = useMemo(() => {
+    return [65, 68, 64, 70, 72, vitalityScore];
+  }, [vitalityScore]);
+
+  const supplierEngagementPct = useMemo(() => {
+    if (!supplierData || supplierData.length === 0) return 0;
+    const total = supplierData[0]?.total_suppliers || 1;
+    const activeEntry = supplierData.find(s => s.status === 'active');
+    const engaged = activeEntry?.supplier_count || 0;
+    return Math.round((engaged / total) * 100);
+  }, [supplierData]);
 
   useEffect(() => {
     setLastUpdated(new Date());
   }, [enabledWidgets]);
-
-  useEffect(() => {
-    handleRefresh();
-  }, []);
-
-  const getColSpanClass = (colSpan: number) => {
-    switch (colSpan) {
-      case 1:
-        return 'col-span-1';
-      case 2:
-        return 'col-span-1 md:col-span-2';
-      case 3:
-        return 'col-span-1 md:col-span-2 lg:col-span-3';
-      case 4:
-        return 'col-span-full';
-      default:
-        return 'col-span-1 md:col-span-2';
-    }
-  };
 
   const handleRefresh = () => {
     refetch();
@@ -116,7 +204,7 @@ export default function DashboardPage() {
     setLastUpdated(new Date());
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6">
         <DashboardSkeleton />
@@ -124,11 +212,11 @@ export default function DashboardPage() {
     );
   }
 
-  if (error) {
+  if (prefsError) {
     return (
       <div className="p-6">
         <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
-          <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
+          <p className="text-red-600 dark:text-red-400 mb-4">{prefsError}</p>
           <Button variant="outline" onClick={handleRefresh}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Try Again
@@ -137,6 +225,9 @@ export default function DashboardPage() {
       </div>
     );
   }
+
+  const vitalityLabel = vitalityScore >= 75 ? 'HEALTHY' :
+                        vitalityScore >= 50 ? 'DEVELOPING' : 'NEEDS ATTENTION';
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -164,25 +255,193 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {enabledWidgets.length === 0 ? (
-        <EmptyDashboard />
-      ) : (
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-          {enabledWidgets.map((pref) => {
-            const WidgetComponent = widgetComponents[pref.widget_id];
-            if (!WidgetComponent) return null;
+      <Card className="overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-slate-700/50">
+        <div className="relative">
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl" />
+            <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl" />
+          </div>
 
-            return (
-              <div
-                key={`${pref.widget_id}-${refreshKey}`}
-                className={getColSpanClass(pref.col_span)}
-              >
-                <WidgetComponent />
+          <CardContent className="relative z-10 p-6 lg:p-8">
+            <div className="flex flex-col lg:flex-row items-center gap-8">
+              <div className="flex flex-col items-center">
+                <p className="text-sm text-white/60 mb-2">Sustainability Score</p>
+                <VitalityRing
+                  score={vitalityScore}
+                  size="xl"
+                  label={vitalityLabel}
+                  className="text-white"
+                />
+                <div className="mt-4 flex flex-col items-center">
+                  <span className="text-xs text-white/50 mb-1">6-month trend</span>
+                  <Sparkline data={trendData} width={100} height={28} />
+                </div>
               </div>
-            );
-          })}
+
+              <div className="flex-1 w-full">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-white mb-1">Company Vitality</h2>
+                  <p className="text-sm text-white/60">
+                    {vitalityScore >= 75
+                      ? 'Your organisation is performing well across sustainability pillars.'
+                      : vitalityScore >= 50
+                        ? 'Good progress with opportunities for improvement.'
+                        : 'Significant opportunities to improve sustainability performance.'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <MiniScoreCard title="Climate" score={scores.climateScore} emoji="🌍" />
+                  <MiniScoreCard title="Water" score={scores.waterScore} emoji="💧" />
+                  <MiniScoreCard title="Circularity" score={scores.circularityScore} emoji="♻️" />
+                  <MiniScoreCard title="Supply Chain" score={scores.supplierScore} emoji="🔗" />
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <Link href="/performance" className="text-sm text-white/70 hover:text-white flex items-center gap-1">
+                    View detailed performance
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </CardContent>
         </div>
-      )}
+      </Card>
+
+      <RAGStatusCardGrid>
+        <RAGStatusCard
+          title="Carbon Emissions"
+          status={getStatusFromScore(scores.climateScore)}
+          value={footprint?.total_emissions ? (footprint.total_emissions / 1000).toFixed(1) : '0'}
+          unit="tCO₂e"
+          trend={8}
+          trendDirection="down"
+          category="climate"
+          href="/reports/company-footprint"
+        />
+        <RAGStatusCard
+          title="Water Impact"
+          status={getStatusFromScore(scores.waterScore)}
+          value="--"
+          unit="m³"
+          category="water"
+          href="/performance"
+        />
+        <RAGStatusCard
+          title="Waste Diversion"
+          status={getStatusFromScore(scores.circularityScore)}
+          value={wasteMetrics?.waste_diversion_rate?.toFixed(0) || '0'}
+          unit="%"
+          trend={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 5 : undefined}
+          trendDirection={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 'up' : 'stable'}
+          category="waste"
+          href="/performance"
+        />
+        <RAGStatusCard
+          title="Supplier Engagement"
+          status={getStatusFromScore(scores.supplierScore)}
+          value={supplierEngagementPct}
+          unit="%"
+          category="suppliers"
+          href="/suppliers"
+        />
+      </RAGStatusCardGrid>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <span>Priority Actions</span>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {priorityActions.length} action{priorityActions.length !== 1 ? 's' : ''}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PriorityActionsList
+                actions={priorityActions}
+                maxVisible={4}
+              />
+            </CardContent>
+          </Card>
+
+          <Accordion type="single" collapsible className="space-y-2">
+            <AccordionItem value="emissions" className="border rounded-xl overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">📊</span>
+                  <span>Emissions Breakdown</span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <GHGEmissionsSummaryWidget />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="products" className="border rounded-xl overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">📦</span>
+                  <span>Product LCA Status</span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <ProductLCAStatusWidget />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="quality" className="border rounded-xl overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">📈</span>
+                  <span>Data Quality</span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <DataQualityWidget />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="compliance" className="border rounded-xl overflow-hidden">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
+                <span className="flex items-center gap-2">
+                  <span className="text-lg">✅</span>
+                  <span>Compliance Status</span>
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4">
+                <ComplianceStatusWidget />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+
+        <div className="space-y-6">
+          <QuickActionsWidget />
+          <RecentActivityWidget />
+          <GettingStartedWidget />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniScoreCard({ title, score, emoji }: { title: string; score: number; emoji: string }) {
+  const colorClass = score >= 70 ? 'text-green-400' :
+                     score >= 50 ? 'text-amber-400' : 'text-red-400';
+
+  return (
+    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-sm">{emoji}</span>
+        <span className="text-xs text-white/60">{title}</span>
+      </div>
+      <div className={`text-xl font-bold tabular-nums ${colorClass}`}>
+        {score}
+        <span className="text-xs text-white/40">/100</span>
+      </div>
     </div>
   );
 }

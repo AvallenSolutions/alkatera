@@ -22,7 +22,9 @@ import {
   Target,
   Award,
   Activity,
-  Truck
+  Truck,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -37,6 +39,34 @@ import type {
   LogisticsDetail,
   WasteDetail,
 } from '@/hooks/data/useScope3GranularData';
+
+import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
+import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
+import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
+import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
+import { WasteDeepDive } from '@/components/vitality/WasteDeepDive';
+import { NatureDeepDive } from '@/components/vitality/NatureDeepDive';
+import { AICopilotModal } from '@/components/vitality/AICopilotModal';
+import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
+import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
+import { CircularitySheet } from '@/components/vitality/CircularitySheet';
+import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import type { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
+
+function deriveBiodiversityRisk(natureMetrics: NatureMetrics | null): 'high' | 'medium' | 'low' | undefined {
+  if (!natureMetrics) return undefined;
+  const landUse = natureMetrics.land_use || 0;
+  const ecotoxicity = natureMetrics.terrestrial_ecotoxicity || 0;
+  const impactScore = landUse + ecotoxicity;
+  if (impactScore > 1000) return 'high';
+  if (impactScore > 100) return 'medium';
+  return 'low';
+}
 
 interface ScopeBreakdown {
   scope1: number;
@@ -126,371 +156,50 @@ function transformFootprintToScope3Categories(
   };
 }
 
-import { ClimateCard } from '@/components/vitality/ClimateCard';
-import { WaterCard } from '@/components/vitality/WaterCard';
-import { WasteCard } from '@/components/vitality/WasteCard';
-import { NatureCard } from '@/components/vitality/NatureCard';
-import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
-import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
-import { WasteDeepDive } from '@/components/vitality/WasteDeepDive';
-import { NatureDeepDive } from '@/components/vitality/NatureDeepDive';
-import { AICopilotModal } from '@/components/vitality/AICopilotModal';
-import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
-import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
-import { CircularitySheet } from '@/components/vitality/CircularitySheet';
-import { NatureImpactSheet } from '@/components/vitality/NatureImpactSheet';
+function generateStrengthsAndImprovements(
+  metrics: CompanyMetrics | null,
+  scopeBreakdown: ScopeBreakdown | null,
+  circularityRate: number,
+  waterRiskLevel: string | undefined
+) {
+  const strengths: Array<{ text: string }> = [];
+  const improvements: Array<{ text: string; priority?: 'high' | 'medium' }> = [];
 
-function VitalityMetricCard({
-  icon: Icon,
-  title,
-  value,
-  unit,
-  trend,
-  trendValue,
-  status,
-  onClick,
-  gradient
-}: {
-  icon: any;
-  title: string;
-  value: number | string;
-  unit: string;
-  trend?: 'up' | 'down' | 'stable';
-  trendValue?: string;
-  status?: 'good' | 'warning' | 'critical';
-  onClick?: () => void;
-  gradient: string;
-}) {
-  const statusColors = {
-    good: 'border-green-200 bg-green-50 dark:bg-green-950/20',
-    warning: 'border-amber-200 bg-amber-50 dark:bg-amber-950/20',
-    critical: 'border-red-200 bg-red-50 dark:bg-red-950/20',
-  };
+  if (metrics?.total_products_assessed && metrics.total_products_assessed > 0) {
+    strengths.push({ text: `${metrics.total_products_assessed} products with complete LCA assessments` });
+  }
 
-  return (
-    <Card
-      className={`border-2 ${status ? statusColors[status] : 'border-slate-200'} hover:shadow-lg transition-all cursor-pointer group`}
-      onClick={onClick}
-    >
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className={`h-12 w-12 rounded-xl ${gradient} flex items-center justify-center`}>
-            <Icon className="h-6 w-6 text-white" />
-          </div>
-          {status && (
-            <Badge
-              variant="outline"
-              className={
-                status === 'good' ? 'border-green-500 text-green-700' :
-                status === 'warning' ? 'border-amber-500 text-amber-700' :
-                'border-red-500 text-red-700'
-              }
-            >
-              {status === 'good' ? 'On Track' : status === 'warning' ? 'Monitor' : 'Action Needed'}
-            </Badge>
-          )}
-        </div>
+  if (circularityRate >= 60) {
+    strengths.push({ text: `Strong circularity rate at ${circularityRate.toFixed(0)}%` });
+  } else if (circularityRate < 40) {
+    improvements.push({ text: `Circularity rate at ${circularityRate.toFixed(0)}% - target 60%+`, priority: 'high' });
+  }
 
-        <h3 className="text-sm font-medium text-muted-foreground mb-2">{title}</h3>
+  if (waterRiskLevel === 'low') {
+    strengths.push({ text: 'Low water scarcity risk across operations' });
+  } else if (waterRiskLevel === 'high') {
+    improvements.push({ text: 'High water scarcity risk in some facilities', priority: 'high' });
+  }
 
-        <div className="flex items-baseline gap-2 mb-2">
-          <span className="text-3xl font-bold">
-            {typeof value === 'number' ? value.toLocaleString('en-GB', { maximumFractionDigits: 1 }) : value}
-          </span>
-          <span className="text-sm text-green-700 dark:text-green-500">{unit}</span>
-        </div>
-
-        {trend && trendValue && (
-          <div className="flex items-center gap-1 text-sm">
-            <TrendingUp className={`h-4 w-4 ${
-              trend === 'down' ? 'text-green-600 rotate-180' :
-              trend === 'up' ? 'text-red-600' :
-              'text-slate-600 rotate-90'
-            }`} />
-            <span className={
-              trend === 'down' ? 'text-green-600' :
-              trend === 'up' ? 'text-red-600' :
-              'text-slate-600'
-            }>
-              {trendValue}
-            </span>
-          </div>
-        )}
-
-      </CardContent>
-    </Card>
-  );
-}
-
-function HotspotCard({
-  title,
-  items,
-  icon: Icon,
-  color
-}: {
-  title: string;
-  items: { label: string; value: number; percentage: number; severity: 'high' | 'medium' | 'low' }[];
-  icon: any;
-  color: string;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <Icon className={`h-5 w-5 ${color}`} />
-          {title}
-        </CardTitle>
-        <CardDescription>Highest impact contributors requiring attention</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {items.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <Icon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-sm font-medium">No material hotspots identified yet</p>
-            <p className="text-xs mt-2">Complete product LCAs to see top contributing materials</p>
-          </div>
-        ) : items.map((item, idx) => (
-          <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-medium text-slate-900 dark:text-slate-50">{item.label}</span>
-                <Badge
-                  variant="outline"
-                  className={
-                    item.severity === 'high' ? 'border-red-500 text-red-700' :
-                    item.severity === 'medium' ? 'border-amber-500 text-amber-700' :
-                    'border-green-500 text-green-700'
-                  }
-                >
-                  {(item.percentage || 0).toFixed(0)}%
-                </Badge>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-semibold text-slate-900 dark:text-slate-50">{typeof item.value === 'number' ? (item.value / 1000).toLocaleString('en-GB', { maximumFractionDigits: 2 }) : '0'}</span>
-                <span className="text-xs text-slate-600 dark:text-slate-400">tCO₂eq</span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ActionGuidanceCard({
-  metrics,
-  scopeBreakdown,
-  materialHotspots,
-}: {
-  metrics: CompanyMetrics | null;
-  scopeBreakdown: ScopeBreakdown | null;
-  materialHotspots: { label: string; value: number; percentage: number; severity: 'high' | 'medium' | 'low' }[];
-}) {
-  const actions = useMemo(() => {
-    if (!metrics || !scopeBreakdown) {
-      return [{
-        priority: 'high' as const,
-        category: 'Data Quality',
-        action: 'Complete product LCAs to enable insights',
-        impact: 'Unlock personalised reduction strategies',
-        icon: Leaf,
-      }];
+  if (scopeBreakdown) {
+    const total = scopeBreakdown.scope1 + scopeBreakdown.scope2 + scopeBreakdown.scope3;
+    const scope2Pct = total > 0 ? (scopeBreakdown.scope2 / total) * 100 : 0;
+    if (scope2Pct < 10) {
+      strengths.push({ text: 'Low Scope 2 emissions - efficient energy use' });
+    } else if (scope2Pct > 30) {
+      improvements.push({ text: 'Switch to renewable electricity to reduce Scope 2', priority: 'medium' });
     }
+  }
 
-    const totalScopes = scopeBreakdown.scope1 + scopeBreakdown.scope2 + scopeBreakdown.scope3;
-    const scope1Pct = totalScopes > 0 ? (scopeBreakdown.scope1 / totalScopes) * 100 : 0;
-    const scope2Pct = totalScopes > 0 ? (scopeBreakdown.scope2 / totalScopes) * 100 : 0;
-    const scope3Pct = totalScopes > 0 ? (scopeBreakdown.scope3 / totalScopes) * 100 : 0;
+  if (metrics?.csrd_compliant_percentage && metrics.csrd_compliant_percentage >= 80) {
+    strengths.push({ text: `${metrics.csrd_compliant_percentage}% CSRD reporting readiness` });
+  }
 
-    const generated: { priority: 'high' | 'medium'; category: string; action: string; impact: string; icon: any }[] = [];
+  if (improvements.length === 0) {
+    improvements.push({ text: 'Continue monitoring and improving data quality' });
+  }
 
-    if (materialHotspots.length > 0) {
-      const topMaterial = materialHotspots[0];
-      const potentialReduction = (topMaterial.value * 0.4 / 1000).toFixed(2);
-      generated.push({
-        priority: topMaterial.percentage > 25 ? 'high' : 'medium',
-        category: 'Raw Materials',
-        action: `Optimise ${topMaterial.label} sourcing`,
-        impact: `Reduce by ${potentialReduction} tCO₂eq (${(topMaterial.percentage * 0.4).toFixed(0)}%)`,
-        icon: Leaf,
-      });
-    }
-
-    if (scope2Pct > 15) {
-      const potentialReduction = (scopeBreakdown.scope2 * 0.8 / 1000).toFixed(2);
-      generated.push({
-        priority: scope2Pct > 30 ? 'high' : 'medium',
-        category: 'Energy',
-        action: 'Switch to renewable electricity tariff',
-        impact: `Eliminate ${potentialReduction} tCO₂eq (${(scope2Pct * 0.8).toFixed(0)}% of total)`,
-        icon: Factory,
-      });
-    } else if (scope1Pct > 20) {
-      const potentialReduction = (scopeBreakdown.scope1 * 0.3 / 1000).toFixed(2);
-      generated.push({
-        priority: 'high',
-        category: 'Direct Emissions',
-        action: 'Improve facility energy efficiency',
-        impact: `Reduce Scope 1 by ${potentialReduction} tCO₂eq`,
-        icon: Factory,
-      });
-    }
-
-    if (metrics.water_risk_level === 'high') {
-      generated.push({
-        priority: 'high',
-        category: 'Water Risk',
-        action: 'Address high water scarcity facilities',
-        impact: 'Reduce water scarcity impact by 30%',
-        icon: Droplets,
-      });
-    } else if (metrics.total_impacts.water_scarcity_aware > 100) {
-      generated.push({
-        priority: 'medium',
-        category: 'Water',
-        action: 'Implement water efficiency measures',
-        impact: `Lower water impact from ${metrics.total_impacts.water_scarcity_aware.toFixed(0)} m³ world eq`,
-        icon: Droplets,
-      });
-    }
-
-    if (metrics.circularity_percentage < 50) {
-      generated.push({
-        priority: metrics.circularity_percentage < 25 ? 'high' : 'medium',
-        category: 'Circularity',
-        action: 'Increase recyclable packaging content',
-        impact: `Raise circularity from ${metrics.circularity_percentage}% to 60%+`,
-        icon: Trash2,
-      });
-    }
-
-    if (scope3Pct > 70 && materialHotspots.length > 1) {
-      const secondMaterial = materialHotspots[1];
-      generated.push({
-        priority: 'medium',
-        category: 'Supply Chain',
-        action: `Engage suppliers for ${secondMaterial.label}`,
-        impact: `Address ${secondMaterial.percentage.toFixed(0)}% of emissions`,
-        icon: Truck,
-      });
-    }
-
-    while (generated.length < 4) {
-      const defaults = [
-        { priority: 'medium' as const, category: 'Transport', action: 'Optimise logistics routes', impact: 'Reduce transport emissions by 15%', icon: Truck },
-        { priority: 'medium' as const, category: 'Packaging', action: 'Lightweight packaging design', impact: 'Lower material footprint by 10%', icon: Leaf },
-        { priority: 'medium' as const, category: 'Operations', action: 'Implement ISO 14001 practices', impact: 'Systematic environmental improvement', icon: Factory },
-      ];
-      const next = defaults[generated.length - 1];
-      if (next && !generated.some(g => g.category === next.category)) {
-        generated.push(next);
-      } else {
-        break;
-      }
-    }
-
-    return generated.slice(0, 4);
-  }, [metrics, scopeBreakdown, materialHotspots]);
-
-  return (
-    <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
-          <Target className="h-5 w-5 text-blue-600" />
-          Priority Actions
-          <Badge variant="outline" className="ml-auto text-xs">Data-Driven</Badge>
-        </CardTitle>
-        <CardDescription>Personalised recommendations based on your impact profile</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {actions.map((action, idx) => (
-          <div
-            key={idx}
-            className="flex items-start gap-3 p-4 rounded-lg bg-white dark:bg-slate-900 border border-blue-100 dark:border-blue-900"
-          >
-            <div className={`p-2 rounded-lg ${
-              action.priority === 'high' ? 'bg-red-100 dark:bg-red-950/30' : 'bg-amber-100 dark:bg-amber-950/30'
-            }`}>
-              <action.icon className={`h-4 w-4 ${
-                action.priority === 'high' ? 'text-red-600' : 'text-amber-600'
-              }`} />
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold text-slate-900 dark:text-slate-50">{action.category}</span>
-                <Badge variant={action.priority === 'high' ? 'destructive' : 'default'} className="text-xs">
-                  {action.priority === 'high' ? 'High Priority' : 'Medium Priority'}
-                </Badge>
-              </div>
-              <p className="text-sm mb-1 text-slate-700 dark:text-slate-300">{action.action}</p>
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Activity className="h-3 w-3" />
-                {action.impact}
-              </p>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ComplianceOverview({ metrics }: { metrics: any }) {
-  return (
-    <Card className="border-2 border-green-200">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50">
-          <Award className="h-5 w-5 text-green-600" />
-          Compliance & Standards
-        </CardTitle>
-        <CardDescription>Alignment with global sustainability frameworks</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-950/20">
-            <div className="flex items-center justify-center mb-2">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-50">{metrics?.csrd_compliant_percentage || 0}%</div>
-            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">CSRD Ready</div>
-          </div>
-          <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20">
-            <div className="flex items-center justify-center mb-2">
-              <CheckCircle2 className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-50">{metrics?.total_products_assessed || 0}</div>
-            <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">Products Assessed</div>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">ISO 14044:2006</span>
-            <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">GHG Protocol</span>
-            <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">ReCiPe 2016 (H)</span>
-            <Badge variant="outline" className="border-green-500 text-green-700">Active</Badge>
-          </div>
-          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-100 dark:bg-slate-800">
-            <span className="text-sm font-medium text-slate-900 dark:text-slate-50">TNFD LEAP</span>
-            <Badge variant="outline" className="border-blue-500 text-blue-700">In Progress</Badge>
-          </div>
-        </div>
-
-        <Button asChild className="w-full mt-4">
-          <Link href="/reports/sustainability">
-            Generate Sustainability Report
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
-      </CardContent>
-    </Card>
-  );
+  return { strengths, improvements };
 }
 
 export default function PerformancePage() {
@@ -522,7 +231,6 @@ export default function PerformancePage() {
     refetch,
   } = hookResult;
 
-  // Keep scope breakdown in kg to match totalCO2 (consistent with CarbonDeepDive display)
   const scopeBreakdown: ScopeBreakdown | null = footprintData?.breakdown ? {
     scope1: footprintData.breakdown.scope1,
     scope2: footprintData.breakdown.scope2,
@@ -535,8 +243,10 @@ export default function PerformancePage() {
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
 
-  // Use corporate footprint total for Carbon Footprint card (consistent with Company Emissions page)
-  // Fall back to product LCA total if no corporate data exists
+  const [expandedPillar, setExpandedPillar] = useState<string | null>(null);
+  const [showHotspots, setShowHotspots] = useState(false);
+  const [showCompliance, setShowCompliance] = useState(false);
+
   const corporateTotalCO2 = footprintData?.total_emissions || 0;
   const productLcaTotalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
   const totalCO2 = corporateTotalCO2 > 0 ? corporateTotalCO2 : productLcaTotalCO2;
@@ -545,7 +255,30 @@ export default function PerformancePage() {
   const landUse = metrics?.total_impacts.land_use || 0;
   const circularityRate = metrics?.circularity_percentage || 0;
 
-  // Calculate hotspots from material breakdown
+  const vitalityScores = useMemo(() => {
+    const industryBenchmark = 50000;
+    return calculateVitalityScores({
+      totalEmissions: totalCO2,
+      emissionsIntensity: totalCO2 / (metrics?.total_products_assessed || 1),
+      industryBenchmark: industryBenchmark / (metrics?.total_products_assessed || 1),
+      waterConsumption,
+      waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
+      recyclingRate: wasteMetrics?.circularity_rate,
+      circularityRate: circularityRate,
+      landUseIntensity: landUse,
+      biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
+    });
+  }, [totalCO2, waterConsumption, metrics, wasteMetrics, circularityRate, landUse, natureMetrics]);
+
+  const { strengths, improvements } = useMemo(() => {
+    return generateStrengthsAndImprovements(
+      metrics,
+      scopeBreakdown,
+      circularityRate,
+      metrics?.water_risk_level
+    );
+  }, [metrics, scopeBreakdown, circularityRate]);
+
   const topMaterialHotspots = (materialBreakdown || [])
     .sort((a, b) => b.climate - a.climate)
     .slice(0, 5)
@@ -556,18 +289,6 @@ export default function PerformancePage() {
       severity: (m.climate / totalCO2) * 100 > 20 ? 'high' : (m.climate / totalCO2) * 100 > 10 ? 'medium' : 'low' as any,
     }));
 
-  // Calculate facility hotspots
-  const topFacilityHotspots = (facilityEmissionsBreakdown || [])
-    .sort((a, b) => b.total_emissions - a.total_emissions)
-    .slice(0, 3)
-    .map(f => ({
-      label: f.facility_name,
-      value: f.total_emissions,
-      percentage: f.percentage,
-      severity: f.percentage > 40 ? 'high' : f.percentage > 20 ? 'medium' : 'low' as any,
-    }));
-
-  // Mock water source items
   const waterSourceItems = [
     {
       id: '1',
@@ -598,16 +319,11 @@ export default function PerformancePage() {
     },
   ];
 
-  const wasteStreams = (wasteMetrics?.waste_by_treatment || []).map((t, idx) => ({
-    id: String(idx + 1),
-    stream: t.treatment_display,
-    disposition: t.treatment_method as 'recycling' | 'landfill' | 'composting' | 'incineration_with_recovery' | 'reuse' | 'other',
-    mass: Math.round(t.total_kg),
-    circularityScore: t.circularity_score,
-  }));
+  const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);
+  const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0);
+  const totalWaste = wasteMetrics?.total_waste_kg || 0;
 
   const totalLandUseFromMetrics = landUse || 6250;
-
   const landUseItems = [
     { id: '1', ingredient: 'Winter Wheat', origin: 'France', mass: 5000, landIntensity: 2.3, totalFootprint: Math.round(totalLandUseFromMetrics * 0.14) },
     { id: '2', ingredient: 'Sugarcane', origin: 'Brazil', mass: 3200, landIntensity: 18.5, totalFootprint: Math.round(totalLandUseFromMetrics * 0.74) },
@@ -615,71 +331,73 @@ export default function PerformancePage() {
     { id: '4', ingredient: 'Lemons', origin: 'Spain', mass: 800, landIntensity: 3.8, totalFootprint: Math.round(totalLandUseFromMetrics * 0.03) },
     { id: '5', ingredient: 'Elderflower', origin: 'Austria', mass: 120, landIntensity: 1.5, totalFootprint: Math.round(totalLandUseFromMetrics * 0.01) },
   ];
-
-  const totalWaterConsumption = waterSourceItems.reduce((sum, item) => sum + item.consumption, 0);
-  const totalWaterImpact = waterSourceItems.reduce((sum, item) => sum + item.netImpact, 0);
-  const totalWaste = wasteMetrics?.total_waste_kg || wasteStreams.reduce((sum, item) => sum + item.mass, 0);
-  const circularWaste = wasteMetrics?.circularity_rate
-    ? totalWaste * wasteMetrics.circularity_rate / 100
-    : wasteStreams.reduce((sum, item) => sum + (item.mass * item.circularityScore / 100), 0);
   const totalLandUse = landUseItems.reduce((sum, item) => sum + item.totalFootprint, 0);
-  const wasteDiversionRate = wasteMetrics?.waste_diversion_rate || (totalWaste > 0 ? (circularWaste / totalWaste) * 100 : 0);
 
-  const getWaterRiskStatus = () => {
-    if (metrics?.water_risk_level === 'high') return 'critical';
-    if (metrics?.water_risk_level === 'medium') return 'warning';
-    return 'good';
+  const formatValue = (value: number): string => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+    if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+    if (value < 0.1 && value > 0) return value.toExponential(1);
+    return value.toFixed(value < 10 ? 1 : 0);
   };
 
-  const getCircularityStatus = () => {
-    if (circularityRate >= 60) return 'good';
-    if (circularityRate >= 40) return 'warning';
-    return 'critical';
+  const togglePillar = (pillar: string) => {
+    setExpandedPillar(expandedPillar === pillar ? null : pillar);
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in-up">
+        <Skeleton className="h-64 rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+          <Skeleton className="h-48 rounded-xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Company Vitality</h1>
-          <p className="text-lg text-muted-foreground">
-            Comprehensive environmental health powered by ReCiPe 2016
-          </p>
-          {metrics?.last_updated && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-              <span>
-                Last updated: {new Date(metrics.last_updated).toLocaleString('en-GB', {
-                  day: 'numeric',
-                  month: 'short',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-            </div>
+      {/* Hero Section - Vitality Score */}
+      <VitalityScoreHero
+        overallScore={vitalityScores.overall}
+        climateScore={vitalityScores.climate}
+        waterScore={vitalityScores.water}
+        circularityScore={vitalityScores.circularity}
+        natureScore={vitalityScores.nature}
+        trend={8}
+        trendDirection="up"
+        trendData={[45, 52, 58, 62, 65, vitalityScores.overall]}
+        lastUpdated={metrics?.last_updated
+          ? new Date(metrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+          : undefined
+        }
+        benchmark={65}
+        onRefresh={refetch}
+        loading={loading}
+      />
+
+      {/* Action Bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Badge variant="outline" className="border-emerald-500 text-emerald-700">
+            {currentYear} Data
+          </Badge>
+          {metrics?.total_products_assessed && metrics.total_products_assessed > 0 && (
+            <span className="text-sm text-muted-foreground">
+              Based on {metrics.total_products_assessed} assessed product{metrics.total_products_assessed !== 1 ? 's' : ''}
+            </span>
           )}
         </div>
-
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={refetch}
-            disabled={loading}
-            className="gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button
-            onClick={() => setAiModalOpen(true)}
-            className="gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            <Sparkles className="h-4 w-4" />
-            Ask the Data (AI)
-          </Button>
-        </div>
+        <Button
+          onClick={() => setAiModalOpen(true)}
+          className="gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
+        >
+          <Sparkles className="h-4 w-4" />
+          Ask the Data (AI)
+        </Button>
       </div>
 
       {error && (
@@ -692,258 +410,281 @@ export default function PerformancePage() {
       {!loading && metrics && metrics.total_products_assessed === 0 && (
         <Alert>
           <TrendingUp className="h-4 w-4" />
-          <AlertTitle>No Data Yet</AlertTitle>
+          <AlertTitle>Get Started</AlertTitle>
           <AlertDescription>
-            Complete product LCAs with the new multi-capital calculation engine to see your Company Vitality metrics.
+            Complete product LCAs to see your Company Vitality metrics.
             The platform will automatically aggregate impacts across all products.
           </AlertDescription>
         </Alert>
       )}
 
+      {/* Performance Summary - Strengths & Improvements */}
+      <PerformanceSummary
+        strengths={strengths}
+        improvements={improvements}
+      />
+
+      {/* Four Pillars - Expandable Cards */}
+      <PillarGrid>
+        <PillarCard
+          pillar="climate"
+          score={vitalityScores.climate}
+          value={formatValue(totalCO2 / 1000)}
+          unit="tCO2eq"
+          trend={12}
+          trendDirection="down"
+          expanded={expandedPillar === 'climate'}
+          onToggle={() => togglePillar('climate')}
+        >
+          <CarbonDeepDive
+            scopeBreakdown={scopeBreakdown}
+            totalCO2={totalCO2}
+            materialBreakdown={materialBreakdown}
+            ghgBreakdown={ghgBreakdown}
+            lifecycleStageBreakdown={lifecycleStageBreakdown}
+            facilityEmissionsBreakdown={facilityEmissionsBreakdown}
+            scope3Categories={scope3Categories}
+            scope3ProductDetails={scope3ProductDetails}
+            scope3TravelDetails={scope3TravelDetails}
+            scope3LogisticsDetails={scope3LogisticsDetails}
+            scope3WasteDetails={scope3WasteDetails}
+            scope3Total={scope3Total}
+            year={currentYear}
+            isLoadingScope3={footprintLoading}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCarbonSheetOpen(true)}
+            className="mt-4 w-full"
+          >
+            View Full Analysis
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </PillarCard>
+
+        <PillarCard
+          pillar="water"
+          score={vitalityScores.water}
+          value={formatValue(waterScarcityImpact)}
+          unit="m3 world eq"
+          trend={8}
+          trendDirection="up"
+          expanded={expandedPillar === 'water'}
+          onToggle={() => togglePillar('water')}
+        >
+          <WaterDeepDive
+            facilityWaterRisks={facilityWaterRisks}
+            productLcaWaterConsumption={waterConsumption}
+            productLcaWaterScarcity={waterScarcityImpact}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setWaterSheetOpen(true)}
+            className="mt-4 w-full"
+          >
+            View Full Analysis
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </PillarCard>
+
+        <PillarCard
+          pillar="circularity"
+          score={vitalityScores.circularity}
+          value={circularityRate.toFixed(0)}
+          unit="%"
+          trend={5}
+          trendDirection="up"
+          expanded={expandedPillar === 'circularity'}
+          onToggle={() => togglePillar('circularity')}
+        >
+          <WasteDeepDive
+            wasteMetrics={wasteMetrics}
+            loading={wasteLoading}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setCircularitySheetOpen(true)}
+            className="mt-4 w-full"
+          >
+            View Full Analysis
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </PillarCard>
+
+        <PillarCard
+          pillar="nature"
+          score={vitalityScores.nature}
+          value={formatValue(landUse)}
+          unit="m2a crop eq"
+          trend={0}
+          trendDirection="stable"
+          expanded={expandedPillar === 'nature'}
+          onToggle={() => togglePillar('nature')}
+        >
+          <NatureDeepDive natureMetrics={natureMetrics} />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setNatureSheetOpen(true)}
+            className="mt-4 w-full"
+          >
+            View Full Analysis
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </PillarCard>
+      </PillarGrid>
+
+      {/* Collapsible: Material Hotspots */}
+      <Collapsible open={showHotspots} onOpenChange={setShowHotspots}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Impact Hotspots</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {topMaterialHotspots.length} materials contributing to {
+                      topMaterialHotspots.reduce((sum, m) => sum + m.percentage, 0).toFixed(0)
+                    }% of emissions
+                  </p>
+                </div>
+              </div>
+              {showHotspots ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              {topMaterialHotspots.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm font-medium">No material hotspots identified yet</p>
+                  <p className="text-xs mt-2">Complete product LCAs to see top contributing materials</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {topMaterialHotspots.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-bold text-muted-foreground w-6">#{idx + 1}</span>
+                        <div>
+                          <span className="font-medium">{item.label}</span>
+                          <p className="text-xs text-muted-foreground">
+                            {(item.value / 1000).toFixed(2)} tCO2eq
+                          </p>
+                        </div>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          item.severity === 'high' ? 'border-red-500 text-red-700' :
+                          item.severity === 'medium' ? 'border-amber-500 text-amber-700' :
+                          'border-green-500 text-green-700'
+                        }
+                      >
+                        {item.percentage.toFixed(0)}%
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      {/* Collapsible: Compliance & Standards */}
+      <Collapsible open={showCompliance} onOpenChange={setShowCompliance}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <button className="w-full p-4 flex items-center justify-between hover:bg-muted/50 transition-colors rounded-t-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                  <Award className="h-5 w-5 text-green-600" />
+                </div>
+                <div className="text-left">
+                  <h3 className="font-semibold">Compliance & Standards</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {metrics?.csrd_compliant_percentage || 0}% CSRD ready
+                  </p>
+                </div>
+              </div>
+              {showCompliance ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="text-center p-4 rounded-lg bg-green-50 dark:bg-green-950/20">
+                  <div className="flex items-center justify-center mb-2">
+                    <CheckCircle2 className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="text-2xl font-bold">{metrics?.csrd_compliant_percentage || 0}%</div>
+                  <div className="text-xs text-muted-foreground mt-1">CSRD Ready</div>
+                </div>
+                <div className="text-center p-4 rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                  <div className="flex items-center justify-center mb-2">
+                    <CheckCircle2 className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div className="text-2xl font-bold">{metrics?.total_products_assessed || 0}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Products Assessed</div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <span className="text-sm font-medium">ISO 14044:2006</span>
+                  <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <span className="text-sm font-medium">GHG Protocol</span>
+                  <Badge variant="outline" className="border-green-500 text-green-700">Compliant</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <span className="text-sm font-medium">ReCiPe 2016 (H)</span>
+                  <Badge variant="outline" className="border-green-500 text-green-700">Active</Badge>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <span className="text-sm font-medium">TNFD LEAP</span>
+                  <Badge variant="outline" className="border-blue-500 text-blue-700">In Progress</Badge>
+                </div>
+              </div>
+
+              <Button asChild className="w-full mt-4">
+                <Link href="/reports/sustainability">
+                  Generate Sustainability Report
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      {/* Methodology Note */}
       {!loading && metrics && metrics.total_products_assessed > 0 && (
-        <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800">
-          <CheckCircle2 className="h-4 w-4 text-blue-600" />
-          <AlertTitle className="text-blue-900 dark:text-blue-100">
-            Calculation Methodology
-          </AlertTitle>
-          <AlertDescription className="text-blue-800 dark:text-blue-200">
-            <p className="text-sm mb-3">
-              Company Vitality aggregates impacts following <strong>GHG Protocol Corporate Standard</strong> and <strong>ISO 14064-1</strong>:
-            </p>
-            <ul className="text-sm space-y-1.5 list-disc list-inside">
-              <li><strong>Scope 1 & 2:</strong> Direct measurement from owned/controlled facilities (from Company Emissions data)</li>
-              <li><strong>Scope 3:</strong> Value chain emissions including materials, transport, waste (from Product LCAs + Company Emissions)</li>
-              <li><strong>No double-counting:</strong> Owned facility emissions counted once in Scope 1/2, not duplicated from Product LCAs</li>
-              <li><strong>Water, Waste, Land:</strong> Aggregated from Product LCAs and operational data</li>
-            </ul>
-            <p className="text-xs mt-3 text-blue-700 dark:text-blue-300">
-              Standards compliance: ISO 14064-1, GHG Protocol Corporate Standard, ISO 14067
-            </p>
+        <Alert className="border-slate-200 bg-slate-50 dark:bg-slate-900/20 dark:border-slate-800">
+          <Activity className="h-4 w-4" />
+          <AlertTitle>Calculation Methodology</AlertTitle>
+          <AlertDescription className="text-sm">
+            Company Vitality aggregates impacts following GHG Protocol Corporate Standard and ISO 14064-1.
+            Scope 1 & 2 from facilities, Scope 3 from product LCAs and corporate emissions data.
+            No double-counting between facility and product data.
           </AlertDescription>
         </Alert>
-      )}
-
-      {loading ? (
-        <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-          <Skeleton className="h-48 rounded-xl" />
-        </div>
-      ) : (
-        <>
-          {/* Key Metrics Grid - Bento Box Style */}
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-            <VitalityMetricCard
-              icon={Leaf}
-              title="Carbon Footprint"
-              value={totalCO2 / 1000}
-              unit="tCO₂eq"
-              trend="down"
-              trendValue="12% vs last quarter"
-              status="good"
-              onClick={() => setCarbonSheetOpen(true)}
-              gradient="bg-gradient-to-br from-green-500 to-emerald-600"
-            />
-
-            <VitalityMetricCard
-              icon={Droplets}
-              title="Water Scarcity Impact"
-              value={waterScarcityImpact}
-              unit="m³ world eq."
-              trend="up"
-              trendValue="8% vs last quarter"
-              status={getWaterRiskStatus()}
-              onClick={() => setWaterSheetOpen(true)}
-              gradient="bg-gradient-to-br from-blue-500 to-cyan-600"
-            />
-
-            <VitalityMetricCard
-              icon={Trash2}
-              title="Circularity Rate"
-              value={circularityRate}
-              unit="%"
-              trend="up"
-              trendValue="5% vs last quarter"
-              status={getCircularityStatus()}
-              onClick={() => setCircularitySheetOpen(true)}
-              gradient="bg-gradient-to-br from-purple-500 to-pink-600"
-            />
-
-            <VitalityMetricCard
-              icon={Mountain}
-              title="Land Use"
-              value={landUse}
-              unit="m²a crop eq"
-              trend="stable"
-              trendValue="No change"
-              status="warning"
-              onClick={() => setNatureSheetOpen(true)}
-              gradient="bg-gradient-to-br from-amber-500 to-orange-600"
-            />
-          </div>
-
-          {/* Main Content Grid */}
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-            {/* Left Column - Detailed Breakdowns */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* GHG Emissions Deep Dive */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Leaf className="h-5 w-5 text-green-600" />
-                    GHG Emissions Breakdown
-                  </CardTitle>
-                  <CardDescription>Detailed carbon footprint analysis by scope and lifecycle stage</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <Skeleton className="h-64 w-full" />
-                  ) : (
-                    <CarbonDeepDive
-                      scopeBreakdown={scopeBreakdown}
-                      totalCO2={totalCO2}
-                      materialBreakdown={materialBreakdown}
-                      ghgBreakdown={ghgBreakdown}
-                      lifecycleStageBreakdown={lifecycleStageBreakdown}
-                      facilityEmissionsBreakdown={facilityEmissionsBreakdown}
-                      scope3Categories={scope3Categories}
-                      scope3ProductDetails={scope3ProductDetails}
-                      scope3TravelDetails={scope3TravelDetails}
-                      scope3LogisticsDetails={scope3LogisticsDetails}
-                      scope3WasteDetails={scope3WasteDetails}
-                      scope3Total={scope3Total}
-                      year={currentYear}
-                      isLoadingScope3={footprintLoading}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Material Flow Hotspots */}
-              <HotspotCard
-                title="Material Impact Hotspots"
-                items={topMaterialHotspots}
-                icon={AlertTriangle}
-                color="text-amber-600"
-              />
-
-              {/* Water Risk Analysis */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Droplets className="h-5 w-5 text-blue-600" />
-                    Water Risk Analysis
-                  </CardTitle>
-                  <CardDescription>Facility-level water scarcity assessment</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <Skeleton className="h-64 w-full" />
-                  ) : (
-                    <WaterDeepDive
-                    facilityWaterRisks={facilityWaterRisks}
-                    productLcaWaterConsumption={waterConsumption}
-                    productLcaWaterScarcity={waterScarcityImpact}
-                  />
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Waste & Circularity Deep Dive */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Trash2 className="h-5 w-5 text-amber-600" />
-                    Waste & Circularity Analysis
-                  </CardTitle>
-                  <CardDescription>Operational waste streams and circular economy metrics</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {wasteLoading ? (
-                    <Skeleton className="h-64 w-full" />
-                  ) : (
-                    <WasteDeepDive
-                      wasteMetrics={wasteMetrics}
-                      loading={wasteLoading}
-                    />
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Nature Impact Radar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Mountain className="h-5 w-5 text-green-600" />
-                    Nature Impact Assessment
-                  </CardTitle>
-                  <CardDescription>Multi-dimensional biodiversity and ecosystem health</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <Skeleton className="h-64 w-full" />
-                  ) : (
-                    <NatureDeepDive natureMetrics={natureMetrics} />
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column - Actions & Compliance */}
-            <div className="space-y-6">
-              {/* Priority Actions */}
-              <ActionGuidanceCard
-                metrics={metrics}
-                scopeBreakdown={scopeBreakdown}
-                materialHotspots={topMaterialHotspots}
-              />
-
-              {/* Facility Hotspots */}
-              {topFacilityHotspots.length > 0 && (
-                <HotspotCard
-                  title="Facility Hotspots"
-                  items={topFacilityHotspots}
-                  icon={Factory}
-                  color="text-orange-600"
-                />
-              )}
-
-              {/* Compliance Overview */}
-              <ComplianceOverview metrics={metrics} />
-
-              {/* Data Quality Indicator */}
-              <Card className="border-2 border-slate-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Activity className="h-4 w-4" />
-                    Data Quality
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Primary Data</span>
-                    <Badge variant="outline" className="border-green-500 text-green-700">
-                      {metrics?.csrd_compliant_percentage || 0}%
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Products Assessed</span>
-                    <span className="text-sm font-semibold">{metrics?.total_products_assessed || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Last Update</span>
-                    <span className="text-xs text-muted-foreground">
-                      {metrics?.last_updated
-                        ? new Date(metrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                        : 'N/A'}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </>
       )}
 
       {/* Modals and Sheets */}
