@@ -253,7 +253,7 @@ export default function PerformancePage() {
   const waterConsumption = metrics?.total_impacts.water_consumption || 0;
   const waterScarcityImpact = metrics?.total_impacts.water_scarcity_aware || 0;
   const landUse = metrics?.total_impacts.land_use || 0;
-  const circularityRate = metrics?.circularity_percentage || 0;
+  const circularityRate = wasteMetrics?.waste_diversion_rate || metrics?.circularity_percentage || 0;
 
   const vitalityScores = useMemo(() => {
     const industryBenchmark = 50000;
