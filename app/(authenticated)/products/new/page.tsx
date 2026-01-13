@@ -16,7 +16,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
@@ -24,6 +25,9 @@ import Link from "next/link";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from "@/lib/product-categories";
 import { useProductLimit } from "@/hooks/useSubscription";
 import { LimitReachedBanner, UpgradePromptModal } from "@/components/subscription";
+import { MultipackProductSelector, SelectedComponent } from "@/components/products/MultipackProductSelector";
+import { MultipackSecondaryPackagingForm, SecondaryPackagingItem } from "@/components/products/MultipackSecondaryPackagingForm";
+import { createCompleteMultipack } from "@/lib/multipacks";
 
 interface ProductFormData {
   name: string;
@@ -65,6 +69,13 @@ export default function NewProductLCAPage() {
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Product type toggle (single or multipack)
+  const [productType, setProductType] = useState<"single" | "multipack">("single");
+
+  // Multipack-specific state
+  const [selectedComponents, setSelectedComponents] = useState<SelectedComponent[]>([]);
+  const [secondaryPackaging, setSecondaryPackaging] = useState<SecondaryPackagingItem[]>([]);
 
   const {
     currentCount,
@@ -154,7 +165,16 @@ export default function NewProductLCAPage() {
       return false;
     }
 
-    if (!isDraft) {
+    // For multipacks, validate components are selected
+    if (productType === "multipack" && !isDraft) {
+      if (selectedComponents.length === 0) {
+        toast.error("Please add at least one product to the multipack");
+        return false;
+      }
+    }
+
+    // For single products, validate unit size and category
+    if (productType === "single" && !isDraft) {
       if (!formData.product_category) {
         toast.error("Product category is required");
         return false;
@@ -178,6 +198,70 @@ export default function NewProductLCAPage() {
     }
 
     return true;
+  };
+
+  const saveMultipack = async () => {
+    if (!currentOrganization?.id) {
+      toast.error("No organization selected");
+      return;
+    }
+
+    if (!validateForm(false)) {
+      return;
+    }
+
+    const limitCheck = await checkLimit();
+    if (!limitCheck.allowed) {
+      setShowUpgradeModal(true);
+      toast.error(limitCheck.reason || "Product limit reached");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      let imageUrl = formData.product_image_url;
+
+      // Upload image if one was selected
+      if (imageFile) {
+        const uploadedUrl = await uploadImage();
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          toast.warning("Multipack will be created without image");
+        }
+      }
+
+      const result = await createCompleteMultipack({
+        organizationId: currentOrganization.id,
+        name: formData.name,
+        sku: formData.sku || undefined,
+        product_description: formData.product_description || undefined,
+        product_category: formData.product_category || undefined,
+        product_image_url: imageUrl || undefined,
+        system_boundary: formData.system_boundary,
+        components: selectedComponents.map((c) => ({
+          component_product_id: c.product.id,
+          quantity: c.quantity,
+        })),
+        secondaryPackaging: secondaryPackaging.map((p) => ({
+          material_name: p.material_name,
+          material_type: p.material_type,
+          weight_grams: p.weight_grams,
+          is_recyclable: p.is_recyclable,
+          recycled_content_percentage: p.recycled_content_percentage,
+          notes: p.notes || undefined,
+        })),
+      });
+
+      toast.success("Multipack created successfully");
+      router.push(`/products/${result.product.id}`);
+    } catch (error: any) {
+      console.error("Error creating multipack:", error);
+      toast.error(error.message || "Failed to create multipack");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const saveProduct = async (isDraft: boolean = false) => {
@@ -274,7 +358,11 @@ export default function NewProductLCAPage() {
   };
 
   const handleSubmit = async () => {
-    await saveProduct(false);
+    if (productType === "multipack") {
+      await saveMultipack();
+    } else {
+      await saveProduct(false);
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -325,9 +413,51 @@ export default function NewProductLCAPage() {
         />
       )}
 
+      {/* Product Type Toggle */}
       <Card>
         <CardHeader>
-          <CardTitle>Product Information</CardTitle>
+          <CardTitle>Product Type</CardTitle>
+          <CardDescription>
+            Choose whether to create a single product or a multipack containing multiple products
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ToggleGroup
+            type="single"
+            value={productType}
+            onValueChange={(value) => {
+              if (value) setProductType(value as "single" | "multipack");
+            }}
+            className="justify-start"
+          >
+            <ToggleGroupItem
+              value="single"
+              aria-label="Single Product"
+              className="flex items-center gap-2 px-6 py-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            >
+              <Package className="h-4 w-4" />
+              Single Product
+            </ToggleGroupItem>
+            <ToggleGroupItem
+              value="multipack"
+              aria-label="Multipack"
+              className="flex items-center gap-2 px-6 py-3 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+            >
+              <Layers className="h-4 w-4" />
+              Multipack
+            </ToggleGroupItem>
+          </ToggleGroup>
+          {productType === "multipack" && (
+            <p className="text-sm text-muted-foreground mt-3">
+              A multipack combines multiple existing products (e.g., a case of 24 beers, a gift pack with assorted items).
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{productType === "multipack" ? "Multipack" : "Product"} Information</CardTitle>
           <CardDescription>
             Basic details about the product you're assessing
           </CardDescription>
@@ -468,55 +598,76 @@ export default function NewProductLCAPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Unit Size</CardTitle>
-          <CardDescription>
-            Define the size and unit of measurement for your product
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="unit_size_value">Size *</Label>
-              <Input
-                id="unit_size_value"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="500"
-                value={formData.unit_size_value}
-                onChange={(e) => handleInputChange("unit_size_value", e.target.value)}
-                disabled={isSubmitting || isSavingDraft}
-              />
+      {/* Unit Size - Only for single products */}
+      {productType === "single" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Unit Size</CardTitle>
+            <CardDescription>
+              Define the size and unit of measurement for your product
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="unit_size_value">Size *</Label>
+                <Input
+                  id="unit_size_value"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="500"
+                  value={formData.unit_size_value}
+                  onChange={(e) => handleInputChange("unit_size_value", e.target.value)}
+                  disabled={isSubmitting || isSavingDraft}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unit_size_unit">Unit *</Label>
+                <Select
+                  value={formData.unit_size_unit}
+                  onValueChange={(value) => handleInputChange("unit_size_unit", value)}
+                  disabled={isSubmitting || isSavingDraft}
+                >
+                  <SelectTrigger id="unit_size_unit">
+                    <SelectValue placeholder="Select unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map((unit) => (
+                      <SelectItem key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="unit_size_unit">Unit *</Label>
-              <Select
-                value={formData.unit_size_unit}
-                onValueChange={(value) => handleInputChange("unit_size_unit", value)}
-                disabled={isSubmitting || isSavingDraft}
-              >
-                <SelectTrigger id="unit_size_unit">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNIT_OPTIONS.map((unit) => (
-                    <SelectItem key={unit.value} value={unit.value}>
-                      {unit.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+            <p className="text-xs text-muted-foreground">
+              Example: 500 ml for a beverage bottle, 250 g for a snack pack
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-          <p className="text-xs text-muted-foreground">
-            Example: 500 ml for a beverage bottle, 250 g for a snack pack
-          </p>
-        </CardContent>
-      </Card>
+      {/* Multipack Components - Only for multipacks */}
+      {productType === "multipack" && currentOrganization && (
+        <>
+          <MultipackProductSelector
+            organizationId={currentOrganization.id}
+            selectedComponents={selectedComponents}
+            onComponentsChange={setSelectedComponents}
+            disabled={isSubmitting}
+          />
+
+          <MultipackSecondaryPackagingForm
+            packagingItems={secondaryPackaging}
+            onPackagingChange={setSecondaryPackaging}
+            disabled={isSubmitting}
+          />
+        </>
+      )}
 
       <Card>
         <CardHeader>
@@ -570,23 +721,26 @@ export default function NewProductLCAPage() {
           </Button>
         </Link>
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={handleSaveDraft}
-            disabled={isSubmitting || isSavingDraft || isUploading}
-          >
-            {isSavingDraft ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving Draft...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Save Draft
-              </>
-            )}
-          </Button>
+          {/* Save Draft - only for single products */}
+          {productType === "single" && (
+            <Button
+              variant="outline"
+              onClick={handleSaveDraft}
+              disabled={isSubmitting || isSavingDraft || isUploading}
+            >
+              {isSavingDraft ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving Draft...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Draft
+                </>
+              )}
+            </Button>
+          )}
           <Button onClick={handleSubmit} size="lg" disabled={isSubmitting || isSavingDraft || isUploading}>
             {isSubmitting ? (
               <>
@@ -595,8 +749,17 @@ export default function NewProductLCAPage() {
               </>
             ) : (
               <>
-                <Save className="mr-2 h-5 w-5" />
-                Create Product
+                {productType === "multipack" ? (
+                  <>
+                    <Layers className="mr-2 h-5 w-5" />
+                    Create Multipack
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-5 w-5" />
+                    Create Product
+                  </>
+                )}
               </>
             )}
           </Button>

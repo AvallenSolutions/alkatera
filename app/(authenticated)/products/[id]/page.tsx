@@ -138,6 +138,7 @@ export default function ProductDashboardPage() {
             sku: product.sku || "",
             image_url: product.product_image_url,
             product_category: product.product_category,
+            is_multipack: product.is_multipack,
           }}
           isHealthy={isHealthy}
           onEdit={() => setShowEditDialog(true)}

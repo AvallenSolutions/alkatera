@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Plus, Search } from 'lucide-react'
+import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Plus, Search, MessageSquare } from 'lucide-react'
 import { CommandPalette } from '@/components/dashboard/CommandPalette'
 import {
   Command,
@@ -32,6 +32,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { FeedbackDialog } from '@/components/feedback/FeedbackDialog'
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -157,6 +158,14 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
             </kbd>
           </button>
           <CommandPalette />
+          <FeedbackDialog
+            trigger={
+              <Button variant="ghost" size="icon" className="hidden sm:flex">
+                <MessageSquare className="h-4 w-4" />
+                <span className="sr-only">Send Feedback</span>
+              </Button>
+            }
+          />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
