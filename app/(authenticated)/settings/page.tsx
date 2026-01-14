@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity, AlertCircle, FileText, Calendar, DollarSign, MessageSquare } from 'lucide-react'
+import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity, AlertCircle, FileText, Calendar, DollarSign, MessageSquare, History, Loader2 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -12,12 +12,35 @@ import Link from 'next/link'
 import { useSubscription, TierName } from '@/hooks/useSubscription'
 import { TierBadge } from '@/components/subscription/TierBadge'
 import { UsageMeter } from '@/components/subscription/UsageMeter'
+import { GracePeriodBanner } from '@/components/subscription/GracePeriodBanner'
+import { DowngradeConfirmationModal } from '@/components/subscription/DowngradeConfirmationModal'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 
 type BillingInterval = 'monthly' | 'annual'
+
+interface PaymentMethod {
+  id: string;
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+  type: string;
+}
+
+interface SubscriptionHistoryEntry {
+  id: string;
+  eventType: string;
+  previousTier: string | null;
+  newTier: string | null;
+  amountCharged: number | null;
+  amountCredited: number | null;
+  currency: string;
+  createdAt: string;
+  eventTypeLabel: string;
+}
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -36,6 +59,13 @@ export default function SettingsPage() {
   const [processingCheckout, setProcessingCheckout] = useState(false)
   const [organizationData, setOrganizationData] = useState<any>(null)
   const [invoices, setInvoices] = useState<any[]>([])
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null)
+  const [loadingPaymentMethod, setLoadingPaymentMethod] = useState(false)
+  const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(false)
+  const [subscriptionHistory, setSubscriptionHistory] = useState<SubscriptionHistoryEntry[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+  const [downgradeModalOpen, setDowngradeModalOpen] = useState(false)
+  const [selectedDowngradeTier, setSelectedDowngradeTier] = useState<string | null>(null)
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
@@ -51,6 +81,8 @@ export default function SettingsPage() {
   useEffect(() => {
     if (currentOrganization) {
       fetchOrganizationData()
+      fetchPaymentMethod()
+      fetchSubscriptionHistory()
     }
   }, [currentOrganization])
 
@@ -68,6 +100,40 @@ export default function SettingsPage() {
       setOrganizationData(org)
     } catch (error) {
       console.error('Error fetching organization data:', error)
+    }
+  }
+
+  async function fetchPaymentMethod() {
+    if (!currentOrganization) return
+
+    setLoadingPaymentMethod(true)
+    try {
+      const response = await fetch(`/api/stripe/payment-method?organizationId=${currentOrganization.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setPaymentMethod(data.paymentMethod)
+      }
+    } catch (error) {
+      console.error('Error fetching payment method:', error)
+    } finally {
+      setLoadingPaymentMethod(false)
+    }
+  }
+
+  async function fetchSubscriptionHistory() {
+    if (!currentOrganization) return
+
+    setLoadingHistory(true)
+    try {
+      const response = await fetch(`/api/stripe/subscription-history?organizationId=${currentOrganization.id}&limit=10`)
+      if (response.ok) {
+        const data = await response.json()
+        setSubscriptionHistory(data.history || [])
+      }
+    } catch (error) {
+      console.error('Error fetching subscription history:', error)
+    } finally {
+      setLoadingHistory(false)
     }
   }
 
@@ -112,11 +178,120 @@ export default function SettingsPage() {
       toast.error('No active subscription to manage')
       return
     }
-    toast.info('Opening Stripe Customer Portal...')
+
+    setUpdatingPaymentMethod(true)
+    try {
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: currentOrganization?.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to open billing portal')
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error: any) {
+      console.error('Error opening portal:', error)
+      toast.error(error.message || 'Failed to open billing portal')
+    } finally {
+      setUpdatingPaymentMethod(false)
+    }
+  }
+
+  function handleDowngrade(tierName: string) {
+    setSelectedDowngradeTier(tierName)
+    setDowngradeModalOpen(true)
+  }
+
+  async function handleConfirmDowngrade() {
+    if (!selectedDowngradeTier || !currentOrganization) return
+
+    setProcessingCheckout(true)
+    try {
+      const response = await fetch('/api/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tierName: selectedDowngradeTier,
+          billingInterval,
+          organizationId: currentOrganization.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create checkout session')
+      }
+
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (error: any) {
+      console.error('Error creating checkout session:', error)
+      toast.error(error.message || 'Failed to start checkout')
+    } finally {
+      setProcessingCheckout(false)
+      setDowngradeModalOpen(false)
+    }
+  }
+
+  function getCardBrandIcon(brand: string) {
+    const brandLower = brand.toLowerCase()
+    if (brandLower === 'visa') return '💳 Visa'
+    if (brandLower === 'mastercard') return '💳 Mastercard'
+    if (brandLower === 'amex') return '💳 Amex'
+    return `💳 ${brand.charAt(0).toUpperCase() + brand.slice(1)}`
+  }
+
+  function getPriceIdForTier(tierName: string) {
+    const tier = allTiers.find(t => t.tier_name === tierName)
+    if (!tier) return ''
+    const monthlyPrice = tier.monthly_price_gbp || 0
+    // This is a simplified version - in production, you'd map to actual Stripe price IDs
+    // For now, we'll use the tier name and interval to construct the checkout session
+    return `${tierName}_${billingInterval}`
   }
 
   return (
     <div className="space-y-6">
+      {/* Grace Period Banner */}
+      {organizationData?.grace_period_end && (
+        <GracePeriodBanner
+          gracePeriodEnd={organizationData.grace_period_end}
+          resourceType={organizationData.grace_period_resource_type || 'items'}
+          currentUsage={usage?.usage?.[organizationData.grace_period_resource_type]?.current || 0}
+          limit={usage?.usage?.[organizationData.grace_period_resource_type]?.max || 0}
+        />
+      )}
+
+      {/* Downgrade Confirmation Modal */}
+      {selectedDowngradeTier && currentOrganization && (
+        <DowngradeConfirmationModal
+          isOpen={downgradeModalOpen}
+          onClose={() => {
+            setDowngradeModalOpen(false)
+            setSelectedDowngradeTier(null)
+          }}
+          onConfirm={handleConfirmDowngrade}
+          currentTier={tierName}
+          newTier={selectedDowngradeTier}
+          currentTierDisplayName={tierDisplayName}
+          newTierDisplayName={allTiers.find(t => t.tier_name === selectedDowngradeTier)?.display_name || selectedDowngradeTier}
+          organizationId={currentOrganization.id}
+          priceId={getPriceIdForTier(selectedDowngradeTier)}
+          isProcessing={processingCheckout}
+        />
+      )}
+
       <div>
         <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
           Settings
@@ -402,19 +577,11 @@ export default function SettingsPage() {
                         <Button variant="outline" className="w-full mt-auto" disabled>
                           Current Plan
                         </Button>
-                      ) : tier.tier_name === 'seed' && isDowngrade ? (
-                        <Button
-                          variant="outline"
-                          className="w-full mt-auto"
-                          onClick={() => window.location.href = '/contact'}
-                        >
-                          Contact Us
-                        </Button>
                       ) : (
                         <Button
                           variant={isUpgrade ? 'default' : 'outline'}
                           className="w-full mt-auto"
-                          onClick={() => handleUpgrade(tier.tier_name)}
+                          onClick={() => isDowngrade ? handleDowngrade(tier.tier_name) : handleUpgrade(tier.tier_name)}
                           disabled={processingCheckout}
                         >
                           {processingCheckout ? 'Processing...' : isUpgrade ? 'Upgrade' : 'Downgrade'}
@@ -441,7 +608,43 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {organizationData?.stripe_customer_id ? (
+                {loadingPaymentMethod ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : paymentMethod ? (
+                  <>
+                    <div className="flex items-center gap-3 p-3 rounded-lg border">
+                      <div className="h-10 w-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded flex items-center justify-center">
+                        <CreditCard className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{getCardBrandIcon(paymentMethod.brand)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          •••• •••• •••• {paymentMethod.last4}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Expires {paymentMethod.expMonth?.toString().padStart(2, '0')}/{paymentMethod.expYear}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleManageSubscription}
+                      disabled={updatingPaymentMethod}
+                    >
+                      {updatingPaymentMethod ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Opening Portal...
+                        </>
+                      ) : (
+                        'Update Payment Method'
+                      )}
+                    </Button>
+                  </>
+                ) : organizationData?.stripe_customer_id ? (
                   <>
                     <div className="flex items-center gap-3 p-3 rounded-lg border">
                       <div className="h-10 w-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded flex items-center justify-center">
@@ -456,8 +659,16 @@ export default function SettingsPage() {
                       variant="outline"
                       className="w-full"
                       onClick={handleManageSubscription}
+                      disabled={updatingPaymentMethod}
                     >
-                      Update Payment Method
+                      {updatingPaymentMethod ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Opening Portal...
+                        </>
+                      ) : (
+                        'Update Payment Method'
+                      )}
                     </Button>
                   </>
                 ) : (
@@ -613,6 +824,88 @@ export default function SettingsPage() {
                   <p className="text-sm font-medium mb-1">No invoices yet</p>
                   <p className="text-xs text-muted-foreground">
                     Invoices will appear here after your first payment
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                Subscription History
+              </CardTitle>
+              <CardDescription>
+                Track all changes to your subscription
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingHistory ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : subscriptionHistory.length > 0 ? (
+                <div className="space-y-2">
+                  {subscriptionHistory.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "h-2 w-2 rounded-full",
+                          entry.eventType === 'upgrade' && "bg-green-500",
+                          entry.eventType === 'downgrade' && "bg-amber-500",
+                          entry.eventType === 'payment_failed' && "bg-red-500",
+                          entry.eventType === 'payment_succeeded' && "bg-green-500",
+                          entry.eventType === 'grace_period_started' && "bg-amber-500",
+                          entry.eventType === 'grace_period_auto_deletion' && "bg-red-500",
+                          !['upgrade', 'downgrade', 'payment_failed', 'payment_succeeded', 'grace_period_started', 'grace_period_auto_deletion'].includes(entry.eventType) && "bg-blue-500"
+                        )} />
+                        <div>
+                          <p className="text-sm font-medium">{entry.eventTypeLabel}</p>
+                          {(entry.previousTier || entry.newTier) && (
+                            <p className="text-xs text-muted-foreground">
+                              {entry.previousTier && entry.newTier ? (
+                                <>
+                                  {entry.previousTier.charAt(0).toUpperCase() + entry.previousTier.slice(1)} → {entry.newTier.charAt(0).toUpperCase() + entry.newTier.slice(1)}
+                                </>
+                              ) : entry.newTier ? (
+                                `New plan: ${entry.newTier.charAt(0).toUpperCase() + entry.newTier.slice(1)}`
+                              ) : null}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {entry.amountCharged && entry.amountCharged > 0 && (
+                          <span className="text-sm font-medium">
+                            £{entry.amountCharged.toFixed(2)}
+                          </span>
+                        )}
+                        {entry.amountCredited && entry.amountCredited > 0 && (
+                          <span className="text-sm font-medium text-green-600">
+                            +£{entry.amountCredited.toFixed(2)}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(entry.createdAt).toLocaleDateString('en-GB', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <History className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm font-medium mb-1">No subscription changes yet</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your subscription activity will appear here
                   </p>
                 </div>
               )}
