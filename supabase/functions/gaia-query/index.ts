@@ -77,6 +77,35 @@ const GAIA_SYSTEM_PROMPT = `You are Gaia, the AI sustainability assistant for Al
 
 6. **BE HELPFUL**: After answering, suggest relevant follow-up questions, related insights, or actions users can take to improve their sustainability metrics.
 
+## CORPORATE EMISSIONS DATA (CRITICAL)
+
+When reporting corporate carbon footprint, total emissions, or scope breakdowns:
+- **ALWAYS use the pre-calculated figures from the "Corporate Carbon Footprint" section** in the organization data
+- **NEVER manually sum product LCAs or raw activity data** - this causes double-counting errors
+- The platform's calculation engine handles scope attribution and avoids double-counting
+- Product emissions contribute ONLY their Scope 3 portion to the corporate total (upstream supply chain)
+- Facility Scope 1 and 2 are tracked separately from product footprints
+- If no authoritative data is available, clearly state this and direct users to the Company Vitality page
+
+## SCOPE BREAKDOWN
+
+When discussing emissions by scope:
+- **Scope 1**: Direct emissions from owned/controlled sources (facilities, company vehicles)
+- **Scope 2**: Indirect emissions from purchased energy (electricity, heat, steam)
+- **Scope 3**: All other indirect emissions in the value chain, including:
+  - Cat 1: Purchased goods (products) - uses only Scope 3 portion of LCAs
+  - Cat 2: Capital goods
+  - Cat 4: Upstream transportation
+  - Cat 5: Waste generated in operations
+  - Cat 6: Business travel (including grey fleet)
+  - Cat 7: Employee commuting
+  - Cat 8: Purchased services
+
+When citing carbon footprint figures:
+- Always mention the data source (e.g., "Source: GHG Protocol calculation" or "Source: Corporate Carbon Footprint Report 2024")
+- Include the reporting year
+- Note if the figure is draft/preliminary or finalised
+
 ## PERSONALITY
 
 - **Tone**: Professional, clear, and supportive. Not robotic, but not overly casual.
@@ -876,36 +905,55 @@ async function fetchOrganizationContext(
       }
     }
 
-    // Calculate and add total carbon footprint summary
+    // Fetch authoritative corporate emissions using the RPC function
+    const currentYear = new Date().getFullYear();
+    const { data: corporateEmissions, error: emissionsError } = await supabase
+      .rpc('calculate_gaia_corporate_emissions', {
+        p_organization_id: organizationId,
+        p_year: currentYear
+      });
+
+    if (emissionsError) {
+      console.error('[Gaia] Error fetching corporate emissions:', emissionsError);
+    }
+
+    if (corporateEmissions && corporateEmissions.has_data) {
+      const breakdown = corporateEmissions.breakdown;
+      const scope3 = breakdown.scope3;
+
+      contextParts.push(`\n### Corporate Carbon Footprint (${currentYear})`);
+      contextParts.push(`**AUTHORITATIVE DATA - Use these figures for all emissions queries**`);
+      contextParts.push(`- **Total Emissions: ${(breakdown.total / 1000).toFixed(2)} tCO2e**`);
+      contextParts.push(`- Scope 1 (Direct): ${(breakdown.scope1 / 1000).toFixed(2)} tCO2e`);
+      contextParts.push(`- Scope 2 (Energy): ${(breakdown.scope2 / 1000).toFixed(2)} tCO2e`);
+      contextParts.push(`- Scope 3 (Value Chain): ${(scope3.total / 1000).toFixed(2)} tCO2e`);
+
+      if (scope3.total > 0) {
+        contextParts.push(`\n**Scope 3 Breakdown:**`);
+        if (scope3.products > 0) contextParts.push(`  - Products (Cat 1): ${(scope3.products / 1000).toFixed(2)} tCO2e`);
+        if (scope3.business_travel > 0) contextParts.push(`  - Business Travel (Cat 6): ${(scope3.business_travel / 1000).toFixed(2)} tCO2e`);
+        if (scope3.employee_commuting > 0) contextParts.push(`  - Employee Commuting (Cat 7): ${(scope3.employee_commuting / 1000).toFixed(2)} tCO2e`);
+        if (scope3.capital_goods > 0) contextParts.push(`  - Capital Goods (Cat 2): ${(scope3.capital_goods / 1000).toFixed(2)} tCO2e`);
+        if (scope3.purchased_services > 0) contextParts.push(`  - Purchased Services: ${(scope3.purchased_services / 1000).toFixed(2)} tCO2e`);
+        if (scope3.operational_waste > 0) contextParts.push(`  - Operational Waste (Cat 5): ${(scope3.operational_waste / 1000).toFixed(2)} tCO2e`);
+        if (scope3.downstream_logistics > 0) contextParts.push(`  - Downstream Logistics (Cat 4): ${(scope3.downstream_logistics / 1000).toFixed(2)} tCO2e`);
+        if (scope3.marketing_materials > 0) contextParts.push(`  - Marketing Materials: ${(scope3.marketing_materials / 1000).toFixed(2)} tCO2e`);
+      }
+
+      contextParts.push(`\n*Source: GHG Protocol calculation (${corporateEmissions.methodology})*`);
+      contextParts.push(`*Calculated: ${new Date(corporateEmissions.calculation_date).toLocaleDateString()}*`);
+
+      dataSources.push({
+        table: 'calculate_gaia_corporate_emissions',
+        description: 'Authoritative corporate emissions (GHG Protocol)',
+        recordCount: 1
+      });
+    }
+
+    // Add summary section
     if (dataSources.length > 0) {
-      contextParts.push(`\n### Summary`);
+      contextParts.push(`\n### Data Sources Summary`);
       contextParts.push(`Data retrieved from ${dataSources.length} sources: ${dataSources.map(d => d.table).join(', ')}`);
-
-      // Try to calculate a total carbon footprint estimate
-      let totalEstimate = 0;
-      const sources: string[] = [];
-
-      if (fleetData && fleetData.length > 0) {
-        const fleetTotal = fleetData.reduce((sum, f) => sum + (f.emissions_tco2e || 0), 0);
-        totalEstimate += fleetTotal;
-        if (fleetTotal > 0) sources.push(`Fleet: ${fleetTotal.toFixed(2)} tCO2e`);
-      }
-
-      if (lcaData && lcaData.length > 0) {
-        const lcaTotal = lcaData.reduce((sum, l) => {
-          const impacts = l.aggregated_impacts as Record<string, unknown> | null;
-          return sum + (impacts?.total_carbon_footprint as number || Number(l.total_ghg_emissions) || 0);
-        }, 0) / 1000; // Convert to tonnes
-        totalEstimate += lcaTotal;
-        if (lcaTotal > 0) sources.push(`Products: ${lcaTotal.toFixed(4)} tCO2e`);
-      }
-
-      if (totalEstimate > 0) {
-        contextParts.push(`\n### Estimated Total Carbon Footprint`);
-        contextParts.push(`- Total: ${totalEstimate.toFixed(2)} tCO2e`);
-        contextParts.push(`- Breakdown: ${sources.join(', ')}`);
-        contextParts.push(`- Note: This is a partial estimate based on available data`);
-      }
     } else {
       contextParts.push(`\n### Data Availability`);
       contextParts.push(`No sustainability data has been recorded yet for this organization.`);
