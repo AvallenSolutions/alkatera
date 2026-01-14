@@ -41,6 +41,16 @@ import {
   Leaf,
   MessageSquare,
   Bot,
+  Heart,
+  UserCheck,
+  Scale,
+  Eye,
+  Handshake,
+  Gift,
+  MapPin,
+  HandHelping,
+  FileHeart,
+  Target,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -104,6 +114,107 @@ const navigationStructure: NavItem[] = [
     name: 'Suppliers',
     href: '/suppliers/',
     icon: Users,
+  },
+  {
+    name: 'People & Culture',
+    href: '/people-culture/',
+    icon: UserCheck,
+    children: [
+      {
+        name: 'Overview',
+        href: '/people-culture/',
+        icon: UserCheck,
+      },
+      {
+        name: 'Fair Work',
+        href: '/people-culture/fair-work/',
+        icon: Briefcase,
+      },
+      {
+        name: 'Diversity & Inclusion',
+        href: '/people-culture/diversity-inclusion/',
+        icon: Users,
+      },
+      {
+        name: 'Wellbeing',
+        href: '/people-culture/wellbeing/',
+        icon: Heart,
+      },
+      {
+        name: 'Training',
+        href: '/people-culture/training/',
+        icon: GraduationCap,
+      },
+    ],
+  },
+  {
+    name: 'Governance',
+    href: '/governance/',
+    icon: Scale,
+    children: [
+      {
+        name: 'Overview',
+        href: '/governance/',
+        icon: Scale,
+      },
+      {
+        name: 'Policies',
+        href: '/governance/policies/',
+        icon: FileText,
+      },
+      {
+        name: 'Stakeholders',
+        href: '/governance/stakeholders/',
+        icon: Handshake,
+      },
+      {
+        name: 'Board',
+        href: '/governance/board/',
+        icon: Users,
+      },
+      {
+        name: 'Transparency',
+        href: '/governance/transparency/',
+        icon: Eye,
+      },
+    ],
+  },
+  {
+    name: 'Community Impact',
+    href: '/community-impact/',
+    icon: Heart,
+    children: [
+      {
+        name: 'Overview',
+        href: '/community-impact/',
+        icon: Heart,
+      },
+      {
+        name: 'Charitable Giving',
+        href: '/community-impact/charitable-giving/',
+        icon: Gift,
+      },
+      {
+        name: 'Local Impact',
+        href: '/community-impact/local-impact/',
+        icon: MapPin,
+      },
+      {
+        name: 'Volunteering',
+        href: '/community-impact/volunteering/',
+        icon: HandHelping,
+      },
+      {
+        name: 'Impact Stories',
+        href: '/community-impact/stories/',
+        icon: FileHeart,
+      },
+    ],
+  },
+  {
+    name: 'Certifications',
+    href: '/certifications/',
+    icon: Award,
   },
   {
     name: 'Knowledge Bank',
