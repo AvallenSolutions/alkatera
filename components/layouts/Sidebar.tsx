@@ -65,48 +65,60 @@ interface NavItem {
   icon: any
   children?: NavItem[]
   badge?: number
+  minTier?: number // Minimum tier level required (1=Seed, 2=Blossom, 3=Canopy)
+  featureCode?: string // Optional feature code requirement
 }
 
+// Navigation configuration with tier requirements
 const navigationStructure: NavItem[] = [
   {
     name: 'Dashboard',
     href: '/dashboard/',
     icon: LayoutDashboard,
+    minTier: 1, // Available to all tiers
   },
   {
     name: 'Company Vitality',
     href: '/performance/',
     icon: Sparkles,
+    minTier: 2, // Blossom and above
   },
   {
     name: 'Company',
     href: '/company/',
     icon: Building2,
+    minTier: 1, // Available to all tiers
     children: [
       {
         name: 'Overview',
         href: '/company/overview/',
         icon: Building2,
+        minTier: 1,
       },
       {
         name: 'Facilities',
         href: '/company/facilities/',
         icon: Warehouse,
+        minTier: 1,
       },
       {
         name: 'Fleet',
         href: '/company/fleet/',
         icon: Truck,
+        minTier: 2, // Blossom and above
+        featureCode: 'vehicle_registry',
       },
       {
         name: 'Production Allocation',
         href: '/company/production-allocation/',
         icon: Target,
+        minTier: 2, // Blossom and above
       },
       {
         name: 'Company Emissions',
         href: '/data/scope-1-2/',
         icon: Flame,
+        minTier: 1, // Available to all tiers (includes Scope 1, 2, and 3)
       },
     ],
   },
@@ -114,142 +126,55 @@ const navigationStructure: NavItem[] = [
     name: 'Products',
     href: '/products/',
     icon: Package,
+    minTier: 1, // Available to all tiers
   },
   {
     name: 'Suppliers',
     href: '/suppliers/',
     icon: Users,
-  },
-  {
-    name: 'People & Culture',
-    href: '/people-culture/',
-    icon: UserCheck,
-    children: [
-      {
-        name: 'Overview',
-        href: '/people-culture/',
-        icon: UserCheck,
-      },
-      {
-        name: 'Fair Work',
-        href: '/people-culture/fair-work/',
-        icon: Briefcase,
-      },
-      {
-        name: 'Diversity & Inclusion',
-        href: '/people-culture/diversity-inclusion/',
-        icon: Users,
-      },
-      {
-        name: 'Wellbeing',
-        href: '/people-culture/wellbeing/',
-        icon: Heart,
-      },
-      {
-        name: 'Training',
-        href: '/people-culture/training/',
-        icon: GraduationCap,
-      },
-    ],
-  },
-  {
-    name: 'Governance',
-    href: '/governance/',
-    icon: Scale,
-    children: [
-      {
-        name: 'Overview',
-        href: '/governance/',
-        icon: Scale,
-      },
-      {
-        name: 'Policies',
-        href: '/governance/policies/',
-        icon: FileText,
-      },
-      {
-        name: 'Stakeholders',
-        href: '/governance/stakeholders/',
-        icon: Handshake,
-      },
-      {
-        name: 'Board',
-        href: '/governance/board/',
-        icon: Users,
-      },
-      {
-        name: 'Transparency',
-        href: '/governance/transparency/',
-        icon: Eye,
-      },
-    ],
-  },
-  {
-    name: 'Community Impact',
-    href: '/community-impact/',
-    icon: Heart,
-    children: [
-      {
-        name: 'Overview',
-        href: '/community-impact/',
-        icon: Heart,
-      },
-      {
-        name: 'Charitable Giving',
-        href: '/community-impact/charitable-giving/',
-        icon: Gift,
-      },
-      {
-        name: 'Local Impact',
-        href: '/community-impact/local-impact/',
-        icon: MapPin,
-      },
-      {
-        name: 'Volunteering',
-        href: '/community-impact/volunteering/',
-        icon: HandHelping,
-      },
-      {
-        name: 'Impact Stories',
-        href: '/community-impact/stories/',
-        icon: FileHeart,
-      },
-    ],
-  },
-  {
-    name: 'Certifications',
-    href: '/certifications/',
-    icon: Award,
+    minTier: 1, // Available to all tiers
   },
   {
     name: 'Knowledge Bank',
     href: '/knowledge-bank/',
     icon: GraduationCap,
+    minTier: 1, // Available to all tiers
   },
   {
     name: 'Greenwash Guardian',
     href: '/greenwash-guardian/',
     icon: Leaf,
+    minTier: 2, // Blossom and above
   },
   {
     name: 'Gaia',
     href: '/gaia/',
     icon: Bot,
+    minTier: 2, // Blossom and above
+  },
+  {
+    name: 'Certifications',
+    href: '/certifications/',
+    icon: Award,
+    minTier: 3, // Canopy only
   },
   {
     name: 'Reports',
     href: '/reports/',
     icon: FileText,
+    minTier: 1, // Available to all tiers
     children: [
       {
         name: 'Sustainability Reports',
         href: '/reports/sustainability/',
         icon: TrendingUp,
+        minTier: 1,
       },
       {
         name: "LCA's & EPD's",
         href: '/reports/lcas/',
         icon: Award,
+        minTier: 2, // Blossom and above
       },
     ],
   },
@@ -257,8 +182,127 @@ const navigationStructure: NavItem[] = [
     name: 'Settings',
     href: '/settings/',
     icon: Settings,
+    minTier: 1, // Available to all tiers
   },
 ]
+
+// Social Impact sections configuration
+const peopleAndCultureSection: NavItem = {
+  name: 'People & Culture',
+  href: '/people-culture/',
+  icon: UserCheck,
+  minTier: 2, // Blossom and above
+  children: [
+    {
+      name: 'Overview',
+      href: '/people-culture/',
+      icon: UserCheck,
+      minTier: 2,
+    },
+    {
+      name: 'Fair Work',
+      href: '/people-culture/fair-work/',
+      icon: Briefcase,
+      minTier: 2,
+    },
+    {
+      name: 'Diversity & Inclusion',
+      href: '/people-culture/diversity-inclusion/',
+      icon: Users,
+      minTier: 2,
+    },
+    {
+      name: 'Wellbeing',
+      href: '/people-culture/wellbeing/',
+      icon: Heart,
+      minTier: 2,
+    },
+    {
+      name: 'Training',
+      href: '/people-culture/training/',
+      icon: GraduationCap,
+      minTier: 2,
+    },
+  ],
+}
+
+const governanceSection: NavItem = {
+  name: 'Governance',
+  href: '/governance/',
+  icon: Scale,
+  minTier: 3, // Canopy only
+  children: [
+    {
+      name: 'Overview',
+      href: '/governance/',
+      icon: Scale,
+      minTier: 3,
+    },
+    {
+      name: 'Policies',
+      href: '/governance/policies/',
+      icon: FileText,
+      minTier: 3,
+    },
+    {
+      name: 'Stakeholders',
+      href: '/governance/stakeholders/',
+      icon: Handshake,
+      minTier: 3,
+    },
+    {
+      name: 'Board',
+      href: '/governance/board/',
+      icon: Users,
+      minTier: 3,
+    },
+    {
+      name: 'Transparency',
+      href: '/governance/transparency/',
+      icon: Eye,
+      minTier: 3,
+    },
+  ],
+}
+
+const communityImpactSection: NavItem = {
+  name: 'Community Impact',
+  href: '/community-impact/',
+  icon: Heart,
+  minTier: 3, // Canopy only
+  children: [
+    {
+      name: 'Overview',
+      href: '/community-impact/',
+      icon: Heart,
+      minTier: 3,
+    },
+    {
+      name: 'Charitable Giving',
+      href: '/community-impact/charitable-giving/',
+      icon: Gift,
+      minTier: 3,
+    },
+    {
+      name: 'Local Impact',
+      href: '/community-impact/local-impact/',
+      icon: MapPin,
+      minTier: 3,
+    },
+    {
+      name: 'Volunteering',
+      href: '/community-impact/volunteering/',
+      icon: HandHelping,
+      minTier: 3,
+    },
+    {
+      name: 'Impact Stories',
+      href: '/community-impact/stories/',
+      icon: FileHeart,
+      minTier: 3,
+    },
+  ],
+}
 
 const developmentStructure: NavItem[] = [
   {
@@ -323,10 +367,91 @@ export function Sidebar({ className }: SidebarProps) {
   const { userRole, currentOrganization } = useOrganization()
   const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
-  const { usage, tierName, isLoading: subscriptionLoading } = useSubscription()
+  const { usage, tierName, tierLevel, hasFeature, isLoading: subscriptionLoading } = useSubscription()
 
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
   const isDevelopment = process.env.NODE_ENV === 'development'
+
+  // Build Social Impact parent menu dynamically based on tier
+  const buildSocialImpactMenu = (): NavItem | null => {
+    if (tierLevel < 2) return null // Not available to Seed tier
+
+    const socialImpactChildren: NavItem[] = []
+
+    // Add People & Culture (Blossom and above)
+    if (tierLevel >= 2) {
+      socialImpactChildren.push(peopleAndCultureSection)
+    }
+
+    // Add Governance (Canopy only)
+    if (tierLevel >= 3) {
+      socialImpactChildren.push(governanceSection)
+    }
+
+    // Add Community Impact (Canopy only)
+    if (tierLevel >= 3) {
+      socialImpactChildren.push(communityImpactSection)
+    }
+
+    if (socialImpactChildren.length === 0) return null
+
+    return {
+      name: 'Social Impact',
+      href: tierLevel >= 3 ? '/people-culture/' : '/people-culture/',
+      icon: UserCheck,
+      minTier: 2,
+      children: socialImpactChildren,
+    }
+  }
+
+  // Filter navigation items based on tier level and feature access
+  const filterNavItems = (items: NavItem[]): NavItem[] => {
+    return items
+      .filter((item) => {
+        // Check tier requirement
+        if (item.minTier && tierLevel < item.minTier) {
+          return false
+        }
+
+        // Check feature requirement
+        if (item.featureCode && !hasFeature(item.featureCode as any)) {
+          return false
+        }
+
+        return true
+      })
+      .map((item) => ({
+        ...item,
+        // Recursively filter children
+        children: item.children ? filterNavItems(item.children) : undefined,
+      }))
+      .filter((item) => {
+        // Remove parent items that have no visible children
+        if (item.children && item.children.length === 0) {
+          return false
+        }
+        return true
+      })
+  }
+
+  // Build final navigation structure
+  const getFilteredNavigation = (): NavItem[] => {
+    // Start with base navigation
+    let filteredNav = filterNavItems(navigationStructure)
+
+    // Insert Social Impact menu after Suppliers, before Knowledge Bank
+    const socialImpactMenu = buildSocialImpactMenu()
+    if (socialImpactMenu) {
+      const suppliersIndex = filteredNav.findIndex(item => item.href === '/suppliers/')
+      if (suppliersIndex !== -1) {
+        filteredNav.splice(suppliersIndex + 1, 0, socialImpactMenu)
+      }
+    }
+
+    return filteredNav
+  }
+
+  const filteredNavigation = getFilteredNavigation()
 
   useEffect(() => {
     async function checkAlkateraAdmin() {
@@ -401,7 +526,7 @@ export function Sidebar({ className }: SidebarProps) {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto">
-        {navigationStructure.map((item) => {
+        {filteredNavigation.map((item) => {
           const IconComponent = item.icon
           const active = isActive(item.href)
           const hasChildren = item.children && item.children.length > 0
@@ -436,7 +561,66 @@ export function Sidebar({ className }: SidebarProps) {
                     {item.children?.map((child) => {
                       const ChildIcon = child.icon
                       const childActive = isActive(child.href)
+                      const childHasChildren = child.children && child.children.length > 0
+                      const childExpanded = isExpanded(child.name) || shouldAutoExpand(child)
 
+                      // If child has its own children (e.g., Social Impact subsections)
+                      if (childHasChildren) {
+                        return (
+                          <div key={child.href} className="mt-1">
+                            <button
+                              onClick={() => toggleMenu(child.name)}
+                              className={cn(
+                                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
+                                childActive || shouldAutoExpand(child)
+                                  ? 'bg-secondary/50 text-foreground font-medium'
+                                  : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                              )}
+                            >
+                              <ChildIcon className={cn(
+                                'h-3.5 w-3.5 flex-shrink-0',
+                                childActive || shouldAutoExpand(child) ? 'text-neon-lime' : ''
+                              )} />
+                              <span className="truncate flex-1 text-left">{child.name}</span>
+                              {childExpanded ? (
+                                <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                              )}
+                            </button>
+
+                            {childExpanded && (
+                              <div className="ml-6 mt-1 space-y-1">
+                                {child.children?.map((grandchild) => {
+                                  const GrandchildIcon = grandchild.icon
+                                  const grandchildActive = isActive(grandchild.href)
+
+                                  return (
+                                    <Link
+                                      key={grandchild.href}
+                                      href={grandchild.href}
+                                      className={cn(
+                                        'flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-xs transition-all',
+                                        grandchildActive
+                                          ? 'bg-secondary text-foreground font-medium'
+                                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                                      )}
+                                    >
+                                      <GrandchildIcon className={cn(
+                                        'h-3 w-3 flex-shrink-0',
+                                        grandchildActive ? 'text-neon-lime' : ''
+                                      )} />
+                                      <span className="truncate">{grandchild.name}</span>
+                                    </Link>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      }
+
+                      // Regular child without nested children
                       return (
                         <Link
                           key={child.href}
