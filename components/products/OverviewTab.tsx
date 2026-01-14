@@ -12,6 +12,7 @@ import { ProductHeroImpact, ContainerType } from "./ProductHeroImpact";
 import { QuickImpactBar, ImpactCategory, ImpactSummaryCard } from "./QuickImpactBar";
 import { ImpactAccordion, ImpactAccordionGroup, SimpleBreakdownTable } from "./ImpactAccordion";
 import { MultipackContentsCard } from "./MultipackContentsCard";
+import { ProductionFacilitiesCard } from "./ProductionFacilitiesCard";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
@@ -515,6 +516,12 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </CardContent>
         </Card>
       </div>
+
+      {/* Production Facilities */}
+      <ProductionFacilitiesCard
+        productId={product.id}
+        organizationId={product.organization_id}
+      />
 
       {/* Collapsible Data Completeness */}
       <Collapsible open={showDataCompleteness} onOpenChange={setShowDataCompleteness}>
