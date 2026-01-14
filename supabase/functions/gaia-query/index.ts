@@ -617,6 +617,8 @@ async function fetchOrganizationContext(
 
     if (orgError) {
       console.error('[Gaia] Error fetching organization:', orgError);
+    } else {
+      console.log('[Gaia] Organization fetched:', org?.name);
     }
 
     if (org) {
@@ -624,18 +626,20 @@ async function fetchOrganizationContext(
       if (org.industry) contextParts.push(`Industry: ${org.industry}`);
     }
 
-    // Fetch emissions summary from fleet activities
+    // Fetch emissions summary from fleet activities (correct column: emissions_tco2e)
     const { data: fleetData, count: fleetCount, error: fleetError } = await supabase
       .from('fleet_activities')
-      .select('total_emissions_kg, distance_km', { count: 'exact' })
+      .select('emissions_tco2e, distance_km', { count: 'exact' })
       .eq('organization_id', organizationId);
 
     if (fleetError) {
       console.error('[Gaia] Error fetching fleet:', fleetError);
+    } else {
+      console.log('[Gaia] Fleet data fetched:', fleetData?.length, 'records');
     }
 
     if (fleetData && fleetData.length > 0) {
-      const totalFleetEmissions = fleetData.reduce((sum, f) => sum + (f.total_emissions_kg || 0), 0) / 1000;
+      const totalFleetEmissions = fleetData.reduce((sum, f) => sum + (f.emissions_tco2e || 0), 0);
       const totalDistance = fleetData.reduce((sum, f) => sum + (f.distance_km || 0), 0);
       contextParts.push(`\n### Fleet Data`);
       contextParts.push(`- Total Fleet Emissions: ${totalFleetEmissions.toFixed(2)} tCO2e`);
@@ -647,26 +651,66 @@ async function fetchOrganizationContext(
     // Fetch facility data
     const { data: facilities, count: facilityCount, error: facilityError } = await supabase
       .from('facilities')
-      .select('id, name, type', { count: 'exact' })
+      .select('id, name, facility_type', { count: 'exact' })
       .eq('organization_id', organizationId);
 
     if (facilityError) {
       console.error('[Gaia] Error fetching facilities:', facilityError);
+    } else {
+      console.log('[Gaia] Facilities fetched:', facilities?.length, 'records');
     }
 
     if (facilities && facilities.length > 0) {
       contextParts.push(`\n### Facilities`);
       contextParts.push(`- Number of Facilities: ${facilities.length}`);
 
-      // List facility names
       const facilityNames = facilities.slice(0, 5).map(f => f.name).join(', ');
       contextParts.push(`- Facilities: ${facilityNames}${facilities.length > 5 ? '...' : ''}`);
       dataSources.push({ table: 'facilities', description: 'Organization facilities', recordCount: facilityCount || 0 });
 
-      // Fetch water data
+      // Fetch facility activity entries (correct columns: activity_category, calculated_emissions_kg_co2e)
+      const { data: activityData, count: activityCount, error: activityError } = await supabase
+        .from('facility_activity_entries')
+        .select('activity_category, calculated_emissions_kg_co2e, quantity, unit')
+        .eq('organization_id', organizationId);
+
+      if (activityError) {
+        console.error('[Gaia] Error fetching activity data:', activityError);
+      } else {
+        console.log('[Gaia] Activity entries fetched:', activityData?.length, 'records');
+      }
+
+      if (activityData && activityData.length > 0) {
+        const totalEmissions = activityData.reduce((sum, a) => sum + (Number(a.calculated_emissions_kg_co2e) || 0), 0);
+
+        // Group by category
+        const byCategory = activityData.reduce((acc, a) => {
+          const cat = a.activity_category || 'other';
+          if (!acc[cat]) acc[cat] = { count: 0, quantity: 0 };
+          acc[cat].count++;
+          acc[cat].quantity += Number(a.quantity) || 0;
+          return acc;
+        }, {} as Record<string, { count: number; quantity: number }>);
+
+        contextParts.push(`\n### Facility Activity Data`);
+        if (totalEmissions > 0) {
+          contextParts.push(`- Total Calculated Emissions: ${(totalEmissions / 1000).toFixed(2)} tCO2e`);
+        }
+        contextParts.push(`- Activity Records: ${activityData.length}`);
+
+        // Show breakdown by category
+        const categories = Object.entries(byCategory).slice(0, 5);
+        if (categories.length > 0) {
+          contextParts.push(`- Categories: ${categories.map(([cat, data]) => `${cat} (${data.count} records)`).join(', ')}`);
+        }
+
+        dataSources.push({ table: 'facility_activity_entries', description: 'Facility activity records', recordCount: activityCount || 0 });
+      }
+
+      // Fetch water data from facility_water_data
       const { data: waterData, count: waterCount, error: waterError } = await supabase
         .from('facility_water_data')
-        .select('consumption_m3')
+        .select('consumption_m3, facility_id')
         .in('facility_id', facilities.map(f => f.id));
 
       if (waterError) {
@@ -674,27 +718,9 @@ async function fetchOrganizationContext(
       }
 
       if (waterData && waterData.length > 0) {
-        const totalWater = waterData.reduce((sum, w) => sum + (w.consumption_m3 || 0), 0);
+        const totalWater = waterData.reduce((sum, w) => sum + (Number(w.consumption_m3) || 0), 0);
         contextParts.push(`- Total Water Consumption: ${totalWater.toLocaleString()} m³`);
         dataSources.push({ table: 'facility_water_data', description: 'Water consumption records', recordCount: waterCount || 0 });
-      }
-
-      // Fetch facility activity entries (emissions data)
-      const { data: activityData, count: activityCount, error: activityError } = await supabase
-        .from('facility_activity_entries')
-        .select('emissions_kg_co2e, scope, activity_type')
-        .in('facility_id', facilities.map(f => f.id));
-
-      if (activityError) {
-        console.error('[Gaia] Error fetching activity data:', activityError);
-      }
-
-      if (activityData && activityData.length > 0) {
-        const scope1 = activityData.filter(a => a.scope === 1).reduce((sum, a) => sum + (a.emissions_kg_co2e || 0), 0);
-        const scope2 = activityData.filter(a => a.scope === 2).reduce((sum, a) => sum + (a.emissions_kg_co2e || 0), 0);
-        contextParts.push(`- Facility Scope 1 Emissions: ${(scope1 / 1000).toFixed(2)} tCO2e`);
-        contextParts.push(`- Facility Scope 2 Emissions: ${(scope2 / 1000).toFixed(2)} tCO2e`);
-        dataSources.push({ table: 'facility_activity_entries', description: 'Facility activity records', recordCount: activityCount || 0 });
       }
     }
 
@@ -706,6 +732,8 @@ async function fetchOrganizationContext(
 
     if (productError) {
       console.error('[Gaia] Error fetching products:', productError);
+    } else {
+      console.log('[Gaia] Products fetched:', products?.length, 'records');
     }
 
     if (products && products.length > 0) {
@@ -714,30 +742,62 @@ async function fetchOrganizationContext(
       contextParts.push(`- Total Products: ${products.length}`);
       contextParts.push(`- Products with LCA: ${lcaCount} (${Math.round((lcaCount / products.length) * 100)}%)`);
 
-      // List some product names
       const productNames = products.slice(0, 5).map(p => p.name).join(', ');
       contextParts.push(`- Products: ${productNames}${products.length > 5 ? '...' : ''}`);
       dataSources.push({ table: 'products', description: 'Product catalog', recordCount: productCount || 0 });
+    }
 
-      // Fetch product LCA data for products with LCA
-      const productsWithLca = products.filter(p => p.has_lca).map(p => p.id);
-      if (productsWithLca.length > 0) {
-        const { data: lcaData, error: lcaError } = await supabase
-          .from('product_lcas')
-          .select('product_id, total_gwp_kg_co2e, functional_unit, status')
-          .in('product_id', productsWithLca)
-          .eq('status', 'completed');
+    // Fetch product LCA data directly by organization (correct column: total_ghg_emissions)
+    const { data: lcaData, count: lcaCount, error: lcaError } = await supabase
+      .from('product_lcas')
+      .select('id, product_name, total_ghg_emissions, functional_unit, status, aggregated_impacts', { count: 'exact' })
+      .eq('organization_id', organizationId)
+      .eq('status', 'completed');
 
-        if (lcaError) {
-          console.error('[Gaia] Error fetching LCA data:', lcaError);
-        }
+    if (lcaError) {
+      console.error('[Gaia] Error fetching LCA data:', lcaError);
+    } else {
+      console.log('[Gaia] LCA data fetched:', lcaData?.length, 'records');
+    }
 
-        if (lcaData && lcaData.length > 0) {
-          const avgGwp = lcaData.reduce((sum, l) => sum + (l.total_gwp_kg_co2e || 0), 0) / lcaData.length;
-          contextParts.push(`- Average Product Carbon Footprint: ${avgGwp.toFixed(3)} kg CO2e`);
-          dataSources.push({ table: 'product_lcas', description: 'Product LCA calculations', recordCount: lcaData.length });
+    if (lcaData && lcaData.length > 0) {
+      contextParts.push(`\n### Product Carbon Footprints (LCA)`);
+      contextParts.push(`- Completed LCAs: ${lcaData.length}`);
+
+      // Calculate totals from aggregated_impacts
+      let totalCarbonFootprint = 0;
+      let totalWaterFootprint = 0;
+      const productFootprints: string[] = [];
+
+      for (const lca of lcaData.slice(0, 5)) {
+        const impacts = lca.aggregated_impacts as Record<string, unknown> | null;
+        const carbonFootprint = impacts?.total_carbon_footprint as number || Number(lca.total_ghg_emissions) || 0;
+        const waterFootprint = impacts?.total_water as number || 0;
+
+        totalCarbonFootprint += carbonFootprint;
+        totalWaterFootprint += waterFootprint;
+
+        if (carbonFootprint > 0) {
+          productFootprints.push(`${lca.product_name}: ${carbonFootprint.toFixed(3)} kg CO2e`);
         }
       }
+
+      if (productFootprints.length > 0) {
+        contextParts.push(`- Product Carbon Footprints:`);
+        productFootprints.forEach(pf => contextParts.push(`  - ${pf}`));
+      }
+
+      if (totalCarbonFootprint > 0) {
+        const avgCarbonFootprint = totalCarbonFootprint / lcaData.length;
+        contextParts.push(`- Average Product Carbon Footprint: ${avgCarbonFootprint.toFixed(3)} kg CO2e`);
+        contextParts.push(`- Total Carbon Footprint (all products): ${totalCarbonFootprint.toFixed(3)} kg CO2e`);
+      }
+
+      if (totalWaterFootprint > 0) {
+        contextParts.push(`- Total Water Footprint: ${totalWaterFootprint.toFixed(2)} L`);
+      }
+
+      dataSources.push({ table: 'product_lcas', description: 'Product LCA calculations', recordCount: lcaCount || 0 });
     }
 
     // Fetch vitality scores
@@ -779,34 +839,74 @@ async function fetchOrganizationContext(
       contextParts.push(`- Total Suppliers: ${suppliers.length}`);
       contextParts.push(`- Engaged Suppliers: ${engaged} (${Math.round((engaged / suppliers.length) * 100)}%)`);
 
-      // List some supplier names
       const supplierNames = suppliers.slice(0, 5).map(s => s.name).join(', ');
       contextParts.push(`- Suppliers: ${supplierNames}${suppliers.length > 5 ? '...' : ''}`);
       dataSources.push({ table: 'suppliers', description: 'Supplier records', recordCount: supplierCount || 0 });
     }
 
-    // Fetch corporate overheads (Scope 3 spend data)
-    const { data: overheads, count: overheadCount, error: overheadError } = await supabase
-      .from('corporate_overheads')
-      .select('category, total_emissions_kg, spend_gbp')
+    // Fetch corporate reports and overheads (correct table structure)
+    const { data: reports, error: reportsError } = await supabase
+      .from('corporate_reports')
+      .select('id, reporting_year, status')
       .eq('organization_id', organizationId);
 
-    if (overheadError) {
-      console.error('[Gaia] Error fetching overheads:', overheadError);
+    if (reportsError) {
+      console.error('[Gaia] Error fetching corporate reports:', reportsError);
     }
 
-    if (overheads && overheads.length > 0) {
-      const totalScope3 = overheads.reduce((sum, o) => sum + (o.total_emissions_kg || 0), 0) / 1000;
-      const totalSpend = overheads.reduce((sum, o) => sum + (o.spend_gbp || 0), 0);
-      contextParts.push(`\n### Scope 3 Overheads`);
-      contextParts.push(`- Total Scope 3 from Overheads: ${totalScope3.toFixed(2)} tCO2e`);
-      contextParts.push(`- Total Tracked Spend: £${totalSpend.toLocaleString()}`);
-      contextParts.push(`- Categories Tracked: ${overheads.length}`);
-      dataSources.push({ table: 'corporate_overheads', description: 'Corporate overhead emissions', recordCount: overheadCount || 0 });
+    if (reports && reports.length > 0) {
+      // Fetch overheads for these reports (correct columns: computed_co2e, spend_amount)
+      const { data: overheads, count: overheadCount, error: overheadError } = await supabase
+        .from('corporate_overheads')
+        .select('category, computed_co2e, spend_amount, currency')
+        .in('report_id', reports.map(r => r.id));
+
+      if (overheadError) {
+        console.error('[Gaia] Error fetching overheads:', overheadError);
+      }
+
+      if (overheads && overheads.length > 0) {
+        const totalScope3 = overheads.reduce((sum, o) => sum + (Number(o.computed_co2e) || 0), 0) / 1000;
+        const totalSpend = overheads.reduce((sum, o) => sum + (Number(o.spend_amount) || 0), 0);
+        contextParts.push(`\n### Scope 3 Corporate Emissions`);
+        contextParts.push(`- Total Scope 3 from Overheads: ${totalScope3.toFixed(2)} tCO2e`);
+        contextParts.push(`- Total Tracked Spend: £${totalSpend.toLocaleString()}`);
+        contextParts.push(`- Categories Tracked: ${new Set(overheads.map(o => o.category)).size}`);
+        dataSources.push({ table: 'corporate_overheads', description: 'Corporate overhead emissions', recordCount: overheadCount || 0 });
+      }
     }
 
-    // Add a summary of what data is available
-    if (dataSources.length === 0) {
+    // Calculate and add total carbon footprint summary
+    if (dataSources.length > 0) {
+      contextParts.push(`\n### Summary`);
+      contextParts.push(`Data retrieved from ${dataSources.length} sources: ${dataSources.map(d => d.table).join(', ')}`);
+
+      // Try to calculate a total carbon footprint estimate
+      let totalEstimate = 0;
+      const sources: string[] = [];
+
+      if (fleetData && fleetData.length > 0) {
+        const fleetTotal = fleetData.reduce((sum, f) => sum + (f.emissions_tco2e || 0), 0);
+        totalEstimate += fleetTotal;
+        if (fleetTotal > 0) sources.push(`Fleet: ${fleetTotal.toFixed(2)} tCO2e`);
+      }
+
+      if (lcaData && lcaData.length > 0) {
+        const lcaTotal = lcaData.reduce((sum, l) => {
+          const impacts = l.aggregated_impacts as Record<string, unknown> | null;
+          return sum + (impacts?.total_carbon_footprint as number || Number(l.total_ghg_emissions) || 0);
+        }, 0) / 1000; // Convert to tonnes
+        totalEstimate += lcaTotal;
+        if (lcaTotal > 0) sources.push(`Products: ${lcaTotal.toFixed(4)} tCO2e`);
+      }
+
+      if (totalEstimate > 0) {
+        contextParts.push(`\n### Estimated Total Carbon Footprint`);
+        contextParts.push(`- Total: ${totalEstimate.toFixed(2)} tCO2e`);
+        contextParts.push(`- Breakdown: ${sources.join(', ')}`);
+        contextParts.push(`- Note: This is a partial estimate based on available data`);
+      }
+    } else {
       contextParts.push(`\n### Data Availability`);
       contextParts.push(`No sustainability data has been recorded yet for this organization.`);
       contextParts.push(`To get started, users can:`);
@@ -814,9 +914,6 @@ async function fetchOrganizationContext(
       contextParts.push(`- Create products in Products`);
       contextParts.push(`- Log fleet activities in Company > Fleet`);
       contextParts.push(`- Add suppliers in Suppliers`);
-    } else {
-      contextParts.push(`\n### Data Sources Summary`);
-      contextParts.push(`Data retrieved from ${dataSources.length} sources: ${dataSources.map(d => d.table).join(', ')}`);
     }
 
     console.log(`[Gaia] Context built with ${dataSources.length} data sources, context length: ${contextParts.join('\n').length} chars`);
