@@ -876,7 +876,7 @@ async function fetchOrganizationContext(
     // Fetch corporate reports and overheads (correct table structure)
     const { data: reports, error: reportsError } = await supabase
       .from('corporate_reports')
-      .select('id, reporting_year, status')
+      .select('id, year, status')
       .eq('organization_id', organizationId);
 
     if (reportsError) {
