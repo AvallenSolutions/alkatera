@@ -89,6 +89,9 @@ const OWNERSHIP_TYPES = [
   { value: "rental", label: "Rental / Hired" },
 ];
 
+// Get current year for validation - don't allow future years
+const CURRENT_YEAR = new Date().getFullYear();
+
 export function FleetVehicleRegistry({
   organizationId,
   onVehicleAdded,
@@ -105,7 +108,7 @@ export function FleetVehicleRegistry({
     vehicle_class: "car",
     propulsion_type: "ice",
     fuel_type: "petrol",
-    year_of_manufacture: new Date().getFullYear(),
+    year_of_manufacture: CURRENT_YEAR,
     ownership_type: "company_owned",
     driver_name: "",
     department: "",
@@ -169,10 +172,18 @@ export function FleetVehicleRegistry({
       fetchVehicles();
       onVehicleAdded?.();
     } catch (error: any) {
-      console.error("Error adding vehicle:", error);
+      // Properly extract error message from Supabase error object
+      const errorMessage =
+        error?.message ||
+        error?.error?.message ||
+        (typeof error === 'object' ? JSON.stringify(error) : String(error)) ||
+        "Failed to add vehicle. Please try again.";
+
+      console.error("Error adding vehicle:", errorMessage, error);
+
       toast({
-        title: "Error",
-        description: error.message || "Failed to add vehicle",
+        title: "Error Adding Vehicle",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -216,7 +227,7 @@ export function FleetVehicleRegistry({
       vehicle_class: "car",
       propulsion_type: "ice",
       fuel_type: "petrol",
-      year_of_manufacture: new Date().getFullYear(),
+      year_of_manufacture: CURRENT_YEAR,
       ownership_type: "company_owned",
       driver_name: "",
       department: "",
@@ -356,14 +367,18 @@ export function FleetVehicleRegistry({
                   <Input
                     type="number"
                     min={1990}
-                    max={new Date().getFullYear() + 1}
+                    max={CURRENT_YEAR}
                     value={formData.year_of_manufacture}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        year_of_manufacture: parseInt(e.target.value),
-                      })
-                    }
+                    onChange={(e) => {
+                      const year = parseInt(e.target.value);
+                      // Validate year is not in the future
+                      if (year <= CURRENT_YEAR) {
+                        setFormData({
+                          ...formData,
+                          year_of_manufacture: year,
+                        });
+                      }
+                    }}
                   />
                 </div>
 

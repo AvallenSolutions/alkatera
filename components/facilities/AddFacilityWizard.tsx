@@ -27,7 +27,7 @@ import { Building2, Users, FileCheck, ArrowRight, ArrowLeft, Check } from "lucid
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { COUNTRIES } from "@/lib/countries";
-import { GoogleAddressInput } from "@/components/ui/google-address-input";
+import { LocationPicker, type LocationData } from "@/components/shared/LocationPicker";
 
 interface AddFacilityWizardProps {
   open: boolean;
@@ -159,19 +159,13 @@ export function AddFacilityWizard({
     }
   };
 
-  const handleAddressSelect = (address: {
-    formatted_address: string;
-    lat: number;
-    lng: number;
-    country_code: string;
-    city?: string;
-  }) => {
-    setLocationSearchValue(address.formatted_address);
-    setAddressLine1(address.formatted_address);
-    setAddressCity(address.city || '');
-    setAddressCountry(address.country_code);
-    setAddressLat(address.lat);
-    setAddressLng(address.lng);
+  const handleLocationSelect = (location: LocationData) => {
+    setLocationSearchValue(location.address);
+    setAddressLine1(location.address);
+    setAddressCity(location.city || '');
+    setAddressCountry(location.countryCode || location.country || '');
+    setAddressLat(location.lat);
+    setAddressLng(location.lng);
   };
 
   const handleSubmit = async () => {
@@ -320,9 +314,9 @@ export function AddFacilityWizard({
                 <p className="text-xs text-muted-foreground mb-2">
                   Search for the city or factory address
                 </p>
-                <GoogleAddressInput
+                <LocationPicker
                   value={locationSearchValue}
-                  onAddressSelect={handleAddressSelect}
+                  onLocationSelect={handleLocationSelect}
                   placeholder="Search for city or factory location..."
                   required
                 />

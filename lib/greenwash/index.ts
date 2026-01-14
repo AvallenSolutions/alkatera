@@ -99,6 +99,7 @@ export async function createAssessment(
       title: input.title,
       input_type: input.input_type,
       input_source: input.input_source || null,
+      input_content: input.content || null,
       status: 'pending',
     })
     .select()

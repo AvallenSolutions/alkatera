@@ -41,14 +41,20 @@ export function PasswordResetRequestForm() {
         redirectTo: `${window.location.origin}/update-password`,
       })
 
+      // For security, always show success message regardless of whether email exists
+      // This prevents email enumeration attacks
       if (resetError) {
-        throw resetError
+        // Log the actual error for debugging but don't expose it to users
+        console.error('Password reset error:', resetError.message)
       }
 
+      // Always show success to prevent revealing if email exists in system
       setSuccess(true)
       setEmail("")
     } catch (err: any) {
-      setError(err.message || "Failed to send reset email. Please try again.")
+      // Even on network errors, don't reveal specifics
+      console.error('Password reset error:', err)
+      setError("Unable to process request. Please try again later.")
     } finally {
       setLoading(false)
     }
@@ -67,7 +73,7 @@ export function PasswordResetRequestForm() {
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
           <AlertDescription>
-            Password reset email sent! Please check your inbox.
+            If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and spam folder.
           </AlertDescription>
         </Alert>
       )}
