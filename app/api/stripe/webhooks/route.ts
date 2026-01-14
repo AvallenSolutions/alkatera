@@ -130,6 +130,52 @@ export async function POST(request: NextRequest) {
 }
 
 // ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Send subscription-related email notification
+ */
+async function sendSubscriptionEmail(
+  organizationId: string,
+  eventType: string,
+  metadata: Record<string, any> = {}
+): Promise<void> {
+  try {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.log('Skipping email - missing Supabase config');
+      return;
+    }
+
+    // Call the edge function
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-subscription-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        organizationId,
+        eventType,
+        metadata,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error sending subscription email:', error);
+    } else {
+      console.log(`Subscription email sent: ${eventType} for org ${organizationId}`);
+    }
+  } catch (error) {
+    console.error('Failed to send subscription email:', error);
+  }
+}
+
+// ============================================================================
 // Event Handlers
 // ============================================================================
 
@@ -201,12 +247,13 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('Subscription updated:', subscription.id);
 
-  const organizationId = subscription.metadata?.organizationId;
+  let organizationId = subscription.metadata?.organizationId;
+
+  // Try to find organization by customer ID if not in metadata
   if (!organizationId) {
-    // Try to find organization by customer ID
     const { data: org } = await getSupabaseAdmin()
       .from('organizations')
-      .select('id')
+      .select('id, subscription_tier')
       .eq('stripe_customer_id', subscription.customer)
       .single();
 
@@ -214,6 +261,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       console.error('No organization found for subscription:', subscription.id);
       return;
     }
+    organizationId = org.id;
   }
 
   const priceId = subscription.items.data[0]?.price.id;
@@ -222,9 +270,19 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     return;
   }
 
+  // Get the current tier before updating
+  const { data: currentOrg } = await getSupabaseAdmin()
+    .from('organizations')
+    .select('subscription_tier, subscription_status')
+    .eq('id', organizationId)
+    .single();
+
+  const previousTier = currentOrg?.subscription_tier;
+  const previousStatus = currentOrg?.subscription_status;
+
   // Update organization using the database function
   const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
-    p_organization_id: organizationId || null,
+    p_organization_id: organizationId,
     p_stripe_customer_id: subscription.customer as string,
     p_stripe_subscription_id: subscription.id,
     p_price_id: priceId,
@@ -233,8 +291,69 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 
   if (error) {
     console.error('Error updating organization subscription:', error);
-  } else {
-    console.log(`Organization ${organizationId} subscription updated`);
+    return;
+  }
+
+  console.log(`Organization ${organizationId} subscription updated`);
+
+  // Get the new tier after update
+  const { data: updatedOrg } = await getSupabaseAdmin()
+    .from('organizations')
+    .select('subscription_tier')
+    .eq('id', organizationId)
+    .single();
+
+  const newTier = updatedOrg?.subscription_tier;
+
+  // Log the subscription change if tier changed
+  if (previousTier && newTier && previousTier !== newTier) {
+    const tierLevels: Record<string, number> = { seed: 1, blossom: 2, canopy: 3 };
+    const isUpgrade = tierLevels[newTier] > tierLevels[previousTier];
+    const eventType = isUpgrade ? 'upgrade' : 'downgrade';
+
+    // Log the change
+    await getSupabaseAdmin().rpc('log_subscription_change', {
+      p_organization_id: organizationId,
+      p_event_type: eventType,
+      p_previous_tier: previousTier,
+      p_new_tier: newTier,
+      p_previous_status: previousStatus,
+      p_new_status: subscription.status,
+    });
+
+    // Check if downgrade exceeds limits and start grace period
+    if (!isUpgrade) {
+      const { data: limitCheck } = await getSupabaseAdmin().rpc('check_downgrade_limits', {
+        p_organization_id: organizationId,
+        p_new_tier: newTier,
+      });
+
+      const overLimitResources = limitCheck?.filter((l: any) => l.over_limit) || [];
+
+      if (overLimitResources.length > 0) {
+        // Start grace period for the first over-limit resource
+        const primaryResource = overLimitResources[0];
+        await getSupabaseAdmin().rpc('start_grace_period', {
+          p_organization_id: organizationId,
+          p_resource_type: primaryResource.resource_type,
+          p_previous_tier: previousTier,
+        });
+
+        // Send grace period email
+        await sendSubscriptionEmail(organizationId, 'grace_period_started', {
+          currentUsage: primaryResource.current_usage,
+          newLimit: primaryResource.new_limit,
+          excessCount: primaryResource.excess_count,
+        });
+      }
+    }
+
+    // Send email notification
+    await sendSubscriptionEmail(organizationId, isUpgrade ? 'plan_upgraded' : 'plan_downgraded', {
+      previousTier,
+      newTier,
+      gracePeriod: !isUpgrade,
+    });
   }
 }
 
@@ -248,7 +367,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   // Find organization by subscription ID
   const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
-    .select('id')
+    .select('id, subscription_tier, subscription_status')
     .eq('stripe_subscription_id', subscription.id)
     .single();
 
@@ -256,6 +375,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     console.error('No organization found for cancelled subscription:', subscription.id);
     return;
   }
+
+  const previousTier = org.subscription_tier;
+  const previousStatus = org.subscription_status;
 
   // Downgrade to seed (free) tier
   const { error } = await getSupabaseAdmin()
@@ -272,7 +394,21 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     console.error('Error downgrading organization:', error);
   } else {
     console.log(`Organization ${org.id} downgraded to seed tier`);
-    // TODO: Send email notification about cancellation
+
+    // Log the cancellation
+    await getSupabaseAdmin().rpc('log_subscription_change', {
+      p_organization_id: org.id,
+      p_event_type: 'cancellation',
+      p_previous_tier: previousTier,
+      p_new_tier: 'seed',
+      p_previous_status: previousStatus,
+      p_new_status: 'cancelled',
+    });
+
+    // Send email notification about cancellation
+    await sendSubscriptionEmail(org.id, 'subscription_cancelled', {
+      previousTier,
+    });
   }
 }
 
@@ -296,7 +432,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   // Find organization by subscription ID
   const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
-    .select('id, name, billing_email')
+    .select('id, name, billing_email, subscription_tier, subscription_status')
     .eq('stripe_subscription_id', subscriptionId)
     .single();
 
@@ -304,6 +440,8 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     console.error('No organization found for failed invoice:', invoice.id);
     return;
   }
+
+  const previousStatus = org.subscription_status;
 
   // Update subscription status to suspended
   const { error } = await getSupabaseAdmin()
@@ -318,9 +456,21 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     console.error('Error suspending organization:', error);
   } else {
     console.log(`Organization ${org.id} suspended due to payment failure`);
-    // TODO: Send email notification about payment failure
-    // You can implement email sending here using your preferred service
-    // Example: sendPaymentFailedEmail(org.billing_email, org.name, invoice.amount_due);
+
+    // Log the payment failure
+    await getSupabaseAdmin().rpc('log_subscription_change', {
+      p_organization_id: org.id,
+      p_event_type: 'payment_failed',
+      p_previous_status: previousStatus,
+      p_new_status: 'suspended',
+      p_stripe_invoice_id: invoice.id,
+      p_metadata: JSON.stringify({ amount_due: invoice.amount_due }),
+    });
+
+    // Send email notification about payment failure
+    await sendSubscriptionEmail(org.id, 'payment_failed', {
+      amount: invoice.amount_due,
+    });
   }
 }
 
@@ -344,7 +494,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
   // Find organization by subscription ID
   const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
-    .select('id, subscription_status')
+    .select('id, subscription_status, subscription_tier')
     .eq('stripe_subscription_id', subscriptionId)
     .single();
 
@@ -352,8 +502,10 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     return;
   }
 
+  const wasSuspended = org.subscription_status === 'suspended';
+
   // If organization was suspended, reactivate it
-  if (org.subscription_status === 'suspended') {
+  if (wasSuspended) {
     const { error } = await getSupabaseAdmin()
       .from('organizations')
       .update({
@@ -366,7 +518,36 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       console.error('Error reactivating organization:', error);
     } else {
       console.log(`Organization ${org.id} reactivated after successful payment`);
-      // TODO: Send email notification about reactivation
+
+      // Log the reactivation
+      await getSupabaseAdmin().rpc('log_subscription_change', {
+        p_organization_id: org.id,
+        p_event_type: 'reactivation',
+        p_previous_status: 'suspended',
+        p_new_status: 'active',
+        p_stripe_invoice_id: invoice.id,
+        p_amount_charged: invoice.amount_paid ? invoice.amount_paid / 100 : null,
+      });
+
+      // Send email notification about reactivation
+      await sendSubscriptionEmail(org.id, 'subscription_reactivated', {
+        amount: invoice.amount_paid,
+        wasReactivated: true,
+      });
     }
+  } else {
+    // Log successful payment for non-suspended orgs
+    await getSupabaseAdmin().rpc('log_subscription_change', {
+      p_organization_id: org.id,
+      p_event_type: 'payment_succeeded',
+      p_stripe_invoice_id: invoice.id,
+      p_amount_charged: invoice.amount_paid ? invoice.amount_paid / 100 : null,
+    });
+
+    // Send payment receipt email
+    await sendSubscriptionEmail(org.id, 'payment_succeeded', {
+      amount: invoice.amount_paid,
+      wasReactivated: false,
+    });
   }
 }

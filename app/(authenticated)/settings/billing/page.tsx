@@ -116,9 +116,28 @@ export default function BillingPage() {
       return;
     }
 
-    toast.info("Opening Stripe Customer Portal...");
-    // TODO: Implement Stripe Customer Portal session creation
-    // This requires another API endpoint to create a portal session
+    try {
+      const response = await fetch('/api/stripe/create-portal-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: currentOrganization?.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to open billing portal');
+      }
+
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      console.error('Error opening portal:', error);
+      toast.error(error.message || 'Failed to open billing portal');
+    }
   }
 
   if (loading) {
