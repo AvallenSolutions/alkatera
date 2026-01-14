@@ -99,6 +99,11 @@ const navigationStructure: NavItem[] = [
         icon: Truck,
       },
       {
+        name: 'Production Allocation',
+        href: '/company/production-allocation/',
+        icon: Target,
+      },
+      {
         name: 'Company Emissions',
         href: '/data/scope-1-2/',
         icon: Flame,
@@ -230,11 +235,6 @@ const navigationStructure: NavItem[] = [
     name: 'Gaia',
     href: '/gaia/',
     icon: Bot,
-  },
-  {
-    name: 'Production',
-    href: '/production/',
-    icon: ClipboardList,
   },
   {
     name: 'Reports',
