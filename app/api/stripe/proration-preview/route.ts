@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { stripe, getTierFromPriceId, TIER_PRICING } from '@/lib/stripe-config';
 import type { Database } from '@/types/db_types';
+import type Stripe from 'stripe';
 
 /**
  * Proration Preview
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the current subscription
-    const subscription = await stripe.subscriptions.retrieve(org.stripe_subscription_id);
+    const subscription = await stripe.subscriptions.retrieve(org.stripe_subscription_id) as Stripe.Subscription;
     const currentPriceId = subscription.items.data[0]?.price.id;
 
     if (!currentPriceId) {
@@ -96,17 +97,20 @@ export async function POST(request: NextRequest) {
     const isUpgrade = newTierLevel > currentTierLevel;
 
     // Create an invoice preview with proration
+    // Using type assertion due to Stripe SDK type definitions lagging behind the API
     const invoicePreview = await stripe.invoices.createPreview({
       customer: org.stripe_customer_id!,
       subscription: org.stripe_subscription_id,
-      subscription_items: [
-        {
-          id: subscription.items.data[0].id,
-          price: newPriceId,
-        },
-      ],
-      subscription_proration_behavior: 'create_prorations',
-    });
+      subscription_details: {
+        items: [
+          {
+            id: subscription.items.data[0].id,
+            price: newPriceId,
+          },
+        ],
+        proration_behavior: 'create_prorations',
+      },
+    } as Parameters<typeof stripe.invoices.createPreview>[0]);
 
     // Calculate the proration amounts
     let currentPlanCredit = 0;
@@ -131,7 +135,7 @@ export async function POST(request: NextRequest) {
         isUpgrade,
         immediateCharge: netAmount > 0 ? netAmount : 0,
         credit: netAmount < 0 ? Math.abs(netAmount) : 0,
-        periodEnd: subscription.current_period_end,
+        periodEnd: subscription.items.data[0]?.current_period_end,
         currentTier,
         newTier,
       },

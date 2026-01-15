@@ -88,7 +88,7 @@ export default function TransparencyPage() {
 
       try {
         const response = await fetch(
-          `/api/governance/mission?organization_id=${organization.id}`
+          `/api/governance/mission?organization_id=${currentOrganization.id}`
         );
         if (response.ok) {
           const data = await response.json();

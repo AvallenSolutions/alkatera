@@ -398,8 +398,8 @@ export default function CommunityImpactPage() {
 
     try {
       const [donationsRes, volunteeringRes] = await Promise.all([
-        fetch(`/api/community-impact/donations?organization_id=${organization.id}`),
-        fetch(`/api/community-impact/volunteering?organization_id=${organization.id}`),
+        fetch(`/api/community-impact/donations?organization_id=${currentOrganization.id}`),
+        fetch(`/api/community-impact/volunteering?organization_id=${currentOrganization.id}`),
       ]);
 
       if (donationsRes.ok) {
@@ -476,7 +476,7 @@ export default function CommunityImpactPage() {
             <div className="flex-1 text-center lg:text-left">
               <h2 className="text-2xl font-bold">Community Impact Score</h2>
               <p className="text-muted-foreground mt-1">
-                {score?.overall_score !== null && score?.overall_score >= 60
+                {score?.overall_score != null && score.overall_score >= 60
                   ? 'Strong community presence - keep up the great work!'
                   : 'Track your charitable activities and community engagement'}
               </p>

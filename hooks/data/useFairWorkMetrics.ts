@@ -265,7 +265,7 @@ export function useFairWorkMetrics(year?: number) {
       }
 
       // Calculate department breakdown
-      const departments = [...new Set(records.map(r => r.department).filter(Boolean))] as string[];
+      const departments = Array.from(new Set(records.map(r => r.department).filter(Boolean))) as string[];
       const byDepartment: Record<string, { count: number; avg_salary: number; gender_breakdown: Record<string, number> }> = {};
 
       departments.forEach(dept => {

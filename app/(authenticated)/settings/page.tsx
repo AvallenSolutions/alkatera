@@ -268,8 +268,8 @@ export default function SettingsPage() {
         <GracePeriodBanner
           gracePeriodEnd={organizationData.grace_period_end}
           resourceType={organizationData.grace_period_resource_type || 'items'}
-          currentUsage={usage?.usage?.[organizationData.grace_period_resource_type]?.current || 0}
-          limit={usage?.usage?.[organizationData.grace_period_resource_type]?.max || 0}
+          currentUsage={usage?.usage?.[organizationData.grace_period_resource_type as keyof typeof usage.usage]?.current || 0}
+          limit={usage?.usage?.[organizationData.grace_period_resource_type as keyof typeof usage.usage]?.max || 0}
         />
       )}
 
