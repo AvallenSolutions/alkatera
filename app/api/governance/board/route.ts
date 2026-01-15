@@ -63,21 +63,34 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
 
-    if (!body.organization_id || !body.member_name || !body.role || !body.member_type) {
+    if (!body.member_name || !body.role || !body.member_type) {
       return NextResponse.json(
-        { error: 'organization_id, member_name, role, and member_type are required' },
+        { error: 'member_name, role, and member_type are required' },
         { status: 400 }
       );
     }
@@ -85,7 +98,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('governance_board_members')
       .insert({
-        organization_id: body.organization_id,
+        organization_id: body.organization_id || organizationId,
         member_name: body.member_name,
         role: body.role,
         member_type: body.member_type,
@@ -120,13 +133,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

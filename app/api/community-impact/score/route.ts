@@ -50,22 +50,31 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const organizationId = body.organization_id;
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
     if (!organizationId) {
-      return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
+
+    const body = await request.json();
+    const targetOrgId = body.organization_id || organizationId;
 
     // Fetch all community impact data for scoring
     const currentYear = new Date().getFullYear();
@@ -76,11 +85,11 @@ export async function POST(request: NextRequest) {
       { data: engagements },
       { data: stories },
     ] = await Promise.all([
-      supabase.from('community_donations').select('*').eq('organization_id', organizationId),
-      supabase.from('community_volunteer_activities').select('*').eq('organization_id', organizationId),
-      supabase.from('community_local_impact').select('*').eq('organization_id', organizationId).eq('reporting_year', currentYear),
-      supabase.from('community_engagements').select('*').eq('organization_id', organizationId),
-      supabase.from('community_impact_stories').select('*').eq('organization_id', organizationId),
+      supabase.from('community_donations').select('*').eq('organization_id', targetOrgId),
+      supabase.from('community_volunteer_activities').select('*').eq('organization_id', targetOrgId),
+      supabase.from('community_local_impact').select('*').eq('organization_id', targetOrgId).eq('reporting_year', currentYear),
+      supabase.from('community_engagements').select('*').eq('organization_id', targetOrgId),
+      supabase.from('community_impact_stories').select('*').eq('organization_id', targetOrgId),
     ]);
 
     // Calculate scores
@@ -96,7 +105,7 @@ export async function POST(request: NextRequest) {
     const { data: savedScore, error } = await supabase
       .from('community_impact_scores')
       .insert({
-        organization_id: organizationId,
+        organization_id: targetOrgId,
         overall_score: scores.overall_score,
         giving_score: scores.giving_score,
         local_impact_score: scores.local_impact_score,

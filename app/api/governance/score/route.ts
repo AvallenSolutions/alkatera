@@ -50,22 +50,31 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const organizationId = body.organization_id;
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
     if (!organizationId) {
-      return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
+
+    const body = await request.json();
+    const targetOrgId = body.organization_id || organizationId;
 
     // Fetch all governance data for scoring
     const [
@@ -77,13 +86,13 @@ export async function POST(request: NextRequest) {
       { data: lobbying },
       { data: ethics },
     ] = await Promise.all([
-      supabase.from('governance_policies').select('*').eq('organization_id', organizationId),
-      supabase.from('governance_stakeholders').select('*').eq('organization_id', organizationId),
-      supabase.from('governance_stakeholder_engagements').select('*').eq('organization_id', organizationId),
-      supabase.from('governance_board_members').select('*').eq('organization_id', organizationId).eq('is_current', true),
-      supabase.from('governance_mission').select('*').eq('organization_id', organizationId).maybeSingle(),
-      supabase.from('governance_lobbying').select('*').eq('organization_id', organizationId),
-      supabase.from('governance_ethics_records').select('*').eq('organization_id', organizationId),
+      supabase.from('governance_policies').select('*').eq('organization_id', targetOrgId),
+      supabase.from('governance_stakeholders').select('*').eq('organization_id', targetOrgId),
+      supabase.from('governance_stakeholder_engagements').select('*').eq('organization_id', targetOrgId),
+      supabase.from('governance_board_members').select('*').eq('organization_id', targetOrgId).eq('is_current', true),
+      supabase.from('governance_mission').select('*').eq('organization_id', targetOrgId).maybeSingle(),
+      supabase.from('governance_lobbying').select('*').eq('organization_id', targetOrgId),
+      supabase.from('governance_ethics_records').select('*').eq('organization_id', targetOrgId),
     ]);
 
     // Calculate scores
@@ -101,7 +110,7 @@ export async function POST(request: NextRequest) {
     const { data: savedScore, error } = await supabase
       .from('governance_scores')
       .insert({
-        organization_id: organizationId,
+        organization_id: targetOrgId,
         overall_score: scores.overall_score,
         policy_score: scores.policy_score,
         stakeholder_score: scores.stakeholder_score,

@@ -79,21 +79,35 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (!body.organization_id || !body.framework_id) {
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
+    }
+
+    const body = await request.json();
+    const targetOrgId = body.organization_id || organizationId;
+
+    if (!body.framework_id) {
       return NextResponse.json(
-        { error: 'organization_id and framework_id are required' },
+        { error: 'framework_id is required' },
         { status: 400 }
       );
     }
@@ -105,7 +119,7 @@ export async function POST(request: NextRequest) {
         *,
         requirement:certification_framework_requirements(points_available, category)
       `)
-      .eq('organization_id', body.organization_id)
+      .eq('organization_id', targetOrgId)
       .eq('framework_id', body.framework_id);
 
     if (gapError) {
@@ -129,7 +143,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('certification_score_history')
       .insert({
-        organization_id: body.organization_id,
+        organization_id: targetOrgId,
         framework_id: body.framework_id,
         calculation_date: new Date().toISOString().split('T')[0],
         total_score: scoreBreakdown.totalScore,
@@ -151,7 +165,7 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('organization_certifications')
       .upsert({
-        organization_id: body.organization_id,
+        organization_id: targetOrgId,
         framework_id: body.framework_id,
         current_score: scoreBreakdown.totalScore,
         status: scoreBreakdown.totalScore >= passingScore ? 'ready' : 'in_progress',
