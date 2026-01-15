@@ -40,10 +40,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Building2, Globe, Mail, MapPin, MoveVertical as MoreVertical, CreditCard as Edit, Trash2, CircleCheck as CheckCircle, Circle as XCircle, RefreshCw } from 'lucide-react';
+import { Plus, Search, Building2, Globe, Mail, MapPin, MoveVertical as MoreVertical, CreditCard as Edit, Trash2, CircleCheck as CheckCircle, Circle as XCircle, RefreshCw, Package, ChevronDown, ChevronUp, Shield } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { COUNTRIES } from '@/lib/countries';
 import { toast } from 'sonner';
+import { AddPlatformSupplierProductModal } from '@/components/suppliers/AddPlatformSupplierProductModal';
+import { usePlatformSupplierProducts, PlatformSupplierProduct } from '@/hooks/data/usePlatformSupplierProducts';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { SupplierProductsList } from '@/components/suppliers/SupplierProductsList';
 
 interface PlatformSupplier {
   id: string;
@@ -107,6 +111,10 @@ export default function AdminSuppliersPage() {
   const [formData, setFormData] = useState<SupplierFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [expandedSuppliers, setExpandedSuppliers] = useState<Set<string>>(new Set());
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [selectedSupplierForProducts, setSelectedSupplierForProducts] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<PlatformSupplierProduct | null>(null);
 
   useEffect(() => {
     fetchSuppliers();
@@ -248,6 +256,36 @@ export default function AdminSuppliersPage() {
     }
   };
 
+  const toggleSupplierExpansion = (supplierId: string) => {
+    setExpandedSuppliers((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(supplierId)) {
+        newSet.delete(supplierId);
+      } else {
+        newSet.add(supplierId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleAddProduct = (supplierId: string) => {
+    setSelectedSupplierForProducts(supplierId);
+    setEditingProduct(null);
+    setProductModalOpen(true);
+  };
+
+  const handleEditProduct = (supplierId: string, product: PlatformSupplierProduct) => {
+    setSelectedSupplierForProducts(supplierId);
+    setEditingProduct(product);
+    setProductModalOpen(true);
+  };
+
+  const handleCloseProductModal = () => {
+    setProductModalOpen(false);
+    setSelectedSupplierForProducts(null);
+    setEditingProduct(null);
+  };
+
   const filteredSuppliers = suppliers.filter((supplier) =>
     supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     supplier.industry_sector?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -342,101 +380,127 @@ export default function AdminSuppliersPage() {
       ) : (
         <div className="grid gap-4">
           {filteredSuppliers.map((supplier) => (
-            <Card key={supplier.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg">{supplier.name}</CardTitle>
-                      {supplier.is_verified && (
-                        <Badge variant="default" className="bg-emerald-600">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Verified
-                        </Badge>
-                      )}
-                    </div>
-                    <CardDescription className="mt-1">
-                      {supplier.industry_sector && (
-                        <span className="inline-flex items-center mr-3">
-                          {supplier.industry_sector}
-                        </span>
-                      )}
-                      {supplier.country && (
-                        <span className="inline-flex items-center">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          {supplier.country}
-                        </span>
-                      )}
-                    </CardDescription>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleOpenDialog(supplier)}>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => toggleVerification(supplier)}>
-                        {supplier.is_verified ? (
-                          <>
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Unverify
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle className="h-4 w-4 mr-2" />
-                            Verify
-                          </>
+            <Collapsible
+              key={supplier.id}
+              open={expandedSuppliers.has(supplier.id)}
+              onOpenChange={() => toggleSupplierExpansion(supplier.id)}
+            >
+              <Card>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-lg">{supplier.name}</CardTitle>
+                        {supplier.is_verified && (
+                          <Badge variant="default" className="bg-emerald-600">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Verified
+                          </Badge>
                         )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSupplierToDelete(supplier);
-                          setDeleteDialogOpen(true);
-                        }}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              {(supplier.description || supplier.website || supplier.contact_name) && (
-                <CardContent className="pt-0">
-                  <div className="space-y-2 text-sm">
-                    {supplier.description && (
-                      <p className="text-muted-foreground">{supplier.description}</p>
-                    )}
-                    <div className="flex flex-wrap gap-4 text-muted-foreground">
-                      {supplier.website && (
-                        <a
-                          href={supplier.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center hover:text-foreground"
-                        >
-                          <Globe className="h-3 w-3 mr-1" />
-                          Website
-                        </a>
-                      )}
-                      {supplier.contact_name && (
-                        <span className="inline-flex items-center">
-                          <Mail className="h-3 w-3 mr-1" />
-                          {supplier.contact_name}
-                          {supplier.contact_email && ` (${supplier.contact_email})`}
-                        </span>
-                      )}
+                      </div>
+                      <CardDescription className="mt-1">
+                        {supplier.industry_sector && (
+                          <span className="inline-flex items-center mr-3">
+                            {supplier.industry_sector}
+                          </span>
+                        )}
+                        {supplier.country && (
+                          <span className="inline-flex items-center">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {supplier.country}
+                          </span>
+                        )}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <Package className="h-4 w-4 mr-2" />
+                          Products
+                          {expandedSuppliers.has(supplier.id) ? (
+                            <ChevronUp className="h-4 w-4 ml-2" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 ml-2" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenDialog(supplier)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => toggleVerification(supplier)}>
+                            {supplier.is_verified ? (
+                              <>
+                                <XCircle className="h-4 w-4 mr-2" />
+                                Unverify
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Verify
+                              </>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSupplierToDelete(supplier);
+                              setDeleteDialogOpen(true);
+                            }}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
-                </CardContent>
-              )}
-            </Card>
+                </CardHeader>
+                {(supplier.description || supplier.website || supplier.contact_name) && (
+                  <CardContent className="pt-0">
+                    <div className="space-y-2 text-sm">
+                      {supplier.description && (
+                        <p className="text-muted-foreground">{supplier.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-4 text-muted-foreground">
+                        {supplier.website && (
+                          <a
+                            href={supplier.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center hover:text-foreground"
+                          >
+                            <Globe className="h-3 w-3 mr-1" />
+                            Website
+                          </a>
+                        )}
+                        {supplier.contact_name && (
+                          <span className="inline-flex items-center">
+                            <Mail className="h-3 w-3 mr-1" />
+                            {supplier.contact_name}
+                            {supplier.contact_email && ` (${supplier.contact_email})`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+                <CollapsibleContent>
+                  <SupplierProductsList
+                    supplierId={supplier.id}
+                    onAddProduct={() => handleAddProduct(supplier.id)}
+                    onEditProduct={(product) => handleEditProduct(supplier.id, product)}
+                  />
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           ))}
         </div>
       )}
@@ -600,6 +664,16 @@ export default function AdminSuppliersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Product Modal */}
+      {selectedSupplierForProducts && (
+        <AddPlatformSupplierProductModal
+          platformSupplierId={selectedSupplierForProducts}
+          open={productModalOpen}
+          onOpenChange={handleCloseProductModal}
+          product={editingProduct || undefined}
+        />
+      )}
     </div>
   );
 }
