@@ -513,8 +513,8 @@ export default function AdminSuppliersPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {COUNTRIES.map((country) => (
-                      <SelectItem key={country.code} value={country.name}>
-                        {country.name}
+                      <SelectItem key={country.value} value={country.label}>
+                        {country.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
