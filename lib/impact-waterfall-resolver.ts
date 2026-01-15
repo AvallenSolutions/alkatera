@@ -70,6 +70,140 @@ export interface WaterfallResult {
   category_type: MaterialCategoryType;
 }
 
+/**
+ * Type for supplier product impact data (from supplier_products or platform_supplier_products tables)
+ */
+interface SupplierProductImpacts {
+  id: string;
+  product_name: string;
+  impact_climate?: number | null;
+  impact_water?: number | null;
+  impact_waste?: number | null;
+  impact_land?: number | null;
+  ghg_fossil?: number | null;
+  ghg_biogenic?: number | null;
+  ghg_land_use_change?: number | null;
+  water_blue?: number | null;
+  water_green?: number | null;
+  water_grey?: number | null;
+  water_scarcity_factor?: number | null;
+  terrestrial_ecotoxicity?: number | null;
+  freshwater_eutrophication?: number | null;
+  terrestrial_acidification?: number | null;
+  data_quality_score?: number | null;
+  data_confidence_pct?: number | null;
+  data_source_type?: string | null;
+  methodology_standard?: string | null;
+  functional_unit?: string | null;
+  system_boundary?: string | null;
+  is_externally_verified?: boolean | null;
+  verifier_name?: string | null;
+}
+
+/**
+ * Checks if a supplier product has any impact data available
+ */
+function hasSupplierProductImpactData(product: SupplierProductImpacts | null): boolean {
+  if (!product) return false;
+  return !!(
+    product.impact_climate ||
+    product.impact_water ||
+    product.impact_waste ||
+    product.impact_land
+  );
+}
+
+/**
+ * Builds a WaterfallResult from supplier product impact data
+ */
+function buildSupplierProductResult(
+  product: SupplierProductImpacts,
+  quantity_kg: number,
+  awareFactor: number,
+  category: MaterialCategoryType,
+  isPlatformProduct: boolean = false
+): WaterfallResult {
+  // Calculate water scarcity - use product's scarcity factor if available, else use AWARE factor
+  const waterScarcityFactor = product.water_scarcity_factor ?? awareFactor;
+
+  // Calculate GHG breakdown - use product-specific values or estimate from total
+  const climateTotal = Number(product.impact_climate || 0);
+  const ghgFossil = product.ghg_fossil !== null && product.ghg_fossil !== undefined
+    ? Number(product.ghg_fossil)
+    : climateTotal * 0.85;
+  const ghgBiogenic = product.ghg_biogenic !== null && product.ghg_biogenic !== undefined
+    ? Number(product.ghg_biogenic)
+    : climateTotal * 0.15;
+  const ghgDluc = Number(product.ghg_land_use_change || 0);
+
+  // Calculate water breakdown - use product-specific values or use total
+  const waterTotal = Number(product.impact_water || 0);
+  const waterBlue = Number(product.water_blue || waterTotal);
+
+  // Map data quality score (1-5) to confidence percentage
+  const dataQuality = product.data_quality_score ?? 3;
+  const confidenceFromQuality = [0, 50, 65, 75, 85, 95][dataQuality] || 75;
+  const confidenceScore = product.data_confidence_pct ?? confidenceFromQuality;
+
+  // Determine data quality tag based on source type and verification
+  let dataQualityTag: 'Primary_Verified' | 'Regional_Standard' | 'Secondary_Modelled' = 'Secondary_Modelled';
+  let dataQualityGrade: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
+
+  if (product.data_source_type === 'primary_verified' || product.is_externally_verified) {
+    dataQualityTag = 'Primary_Verified';
+    dataQualityGrade = 'HIGH';
+  } else if (product.data_source_type === 'hybrid_proxy') {
+    dataQualityTag = 'Regional_Standard';
+    dataQualityGrade = 'MEDIUM';
+  }
+
+  const sourceType = isPlatformProduct ? 'Platform Supplier' : 'Supplier';
+  const methodology = product.methodology_standard || 'ISO 14067';
+  const verifierInfo = product.is_externally_verified && product.verifier_name
+    ? ` (Verified by ${product.verifier_name})`
+    : '';
+
+  return {
+    impact_climate: climateTotal * quantity_kg,
+    impact_climate_fossil: ghgFossil * quantity_kg,
+    impact_climate_biogenic: ghgBiogenic * quantity_kg,
+    impact_climate_dluc: ghgDluc * quantity_kg,
+    impact_water: waterTotal * quantity_kg,
+    impact_water_scarcity: waterBlue * quantity_kg * waterScarcityFactor,
+    impact_land: Number(product.impact_land || 0) * quantity_kg,
+    impact_waste: Number(product.impact_waste || 0) * quantity_kg,
+    // Extended impacts - use product values if available
+    impact_ozone_depletion: 0,
+    impact_photochemical_ozone_formation: 0,
+    impact_ionising_radiation: 0,
+    impact_particulate_matter: 0,
+    impact_human_toxicity_carcinogenic: 0,
+    impact_human_toxicity_non_carcinogenic: 0,
+    impact_terrestrial_ecotoxicity: Number(product.terrestrial_ecotoxicity || 0) * quantity_kg,
+    impact_freshwater_ecotoxicity: 0,
+    impact_marine_ecotoxicity: 0,
+    impact_freshwater_eutrophication: Number(product.freshwater_eutrophication || 0) * quantity_kg,
+    impact_marine_eutrophication: 0,
+    impact_terrestrial_acidification: Number(product.terrestrial_acidification || 0) * quantity_kg,
+    impact_mineral_resource_scarcity: 0,
+    impact_fossil_resource_scarcity: 0,
+    // Provenance tracking
+    data_priority: 1,
+    data_quality_tag: dataQualityTag,
+    data_quality_grade: dataQualityGrade,
+    source_reference: `${sourceType} Product: ${product.product_name}${verifierInfo}`,
+    confidence_score: confidenceScore,
+    methodology: methodology,
+    gwp_data_source: `${sourceType} Product`,
+    non_gwp_data_source: `${sourceType} Product`,
+    gwp_reference_id: product.id,
+    non_gwp_reference_id: product.id,
+    is_hybrid_source: false,
+    supplier_lca_id: product.id,
+    category_type: category,
+  };
+}
+
 export function normalizeToKg(quantity: string | number, unit: string): number {
   let qty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
   const unitLower = unit?.toLowerCase() || 'kg';
@@ -169,22 +303,48 @@ export async function resolveImpactFactors(
 
   // ===========================================================
   // PRIORITY 1: SUPPLIER VERIFIED DATA (All Categories)
+  // Checks in order: supplier_products -> platform_supplier_products -> product_lcas
   // ===========================================================
   if (material.data_source === 'supplier' && material.supplier_product_id) {
     console.log(`[Waterfall] Checking Priority 1 (Supplier) for: ${material.material_name}`);
 
     try {
+      // Priority 1a: Check supplier_products table (organization-specific suppliers)
       const { data: supplierProduct } = await supabase
+        .from('supplier_products')
+        .select('*')
+        .eq('id', material.supplier_product_id)
+        .maybeSingle();
+
+      if (supplierProduct && hasSupplierProductImpactData(supplierProduct)) {
+        console.log(`[Waterfall] ✓ Priority 1a SUCCESS: Using supplier product ${supplierProduct.id}`);
+        return buildSupplierProductResult(supplierProduct, quantity_kg, awareFactor, category);
+      }
+
+      // Priority 1b: Check platform_supplier_products table (platform-wide shared suppliers)
+      const { data: platformProduct } = await supabase
+        .from('platform_supplier_products')
+        .select('*')
+        .eq('id', material.supplier_product_id)
+        .maybeSingle();
+
+      if (platformProduct && hasSupplierProductImpactData(platformProduct)) {
+        console.log(`[Waterfall] ✓ Priority 1b SUCCESS: Using platform supplier product ${platformProduct.id}`);
+        return buildSupplierProductResult(platformProduct, quantity_kg, awareFactor, category, true);
+      }
+
+      // Priority 1c: Fallback to product LCA (existing approach)
+      const { data: productRecord } = await supabase
         .from('products')
         .select('id, organization_id')
         .eq('id', material.supplier_product_id)
         .maybeSingle();
 
-      if (supplierProduct) {
+      if (productRecord) {
         const { data: supplierLca } = await supabase
           .from('product_lcas')
           .select('id, aggregated_impacts')
-          .eq('product_id', supplierProduct.id)
+          .eq('product_id', productRecord.id)
           .eq('status', 'completed')
           .order('created_at', { ascending: false })
           .limit(1)
@@ -192,7 +352,7 @@ export async function resolveImpactFactors(
 
         if (supplierLca?.aggregated_impacts) {
           const impacts = supplierLca.aggregated_impacts;
-          console.log(`[Waterfall] ✓ Priority 1 SUCCESS: Using supplier LCA ${supplierLca.id}`);
+          console.log(`[Waterfall] ✓ Priority 1c SUCCESS: Using supplier LCA ${supplierLca.id}`);
 
           return {
             impact_climate: (impacts.climate_change_gwp100 || 0) * quantity_kg,
