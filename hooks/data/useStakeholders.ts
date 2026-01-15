@@ -107,7 +107,7 @@ export function useStakeholders(): UseStakeholdersResult {
       setError(null);
 
       const response = await fetch(
-        `/api/governance/stakeholders?organization_id=${organization.id}&include_engagements=true`
+        `/api/governance/stakeholders?organization_id=${currentOrganization.id}&include_engagements=true`
       );
 
       if (!response.ok) {

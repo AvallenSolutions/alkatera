@@ -277,7 +277,7 @@ export function PeopleCultureScoreHero({
                 <span className="text-sm font-medium">Overall Score</span>
                 <TrendIndicator current={overallScore} previous={previousScore ?? null} />
               </div>
-              {dataCompleteness !== null && dataCompleteness < 100 && (
+              {dataCompleteness != null && dataCompleteness < 100 && (
                 <Badge variant="outline" className="mt-2 text-xs">
                   {dataCompleteness.toFixed(0)}% data completeness
                 </Badge>

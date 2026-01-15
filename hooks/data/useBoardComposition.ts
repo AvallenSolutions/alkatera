@@ -81,7 +81,7 @@ export function useBoardComposition(): UseBoardCompositionResult {
       setError(null);
 
       const response = await fetch(
-        `/api/governance/board?organization_id=${organization.id}`
+        `/api/governance/board?organization_id=${currentOrganization.id}`
       );
 
       if (!response.ok) {

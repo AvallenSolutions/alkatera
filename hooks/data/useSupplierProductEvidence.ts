@@ -67,7 +67,7 @@ export function useSupplierProductEvidence(options: UseSupplierProductEvidenceOp
           water_covered: verifiedDocs.some((d) => d.covers_water),
           waste_covered: verifiedDocs.some((d) => d.covers_waste),
           land_covered: verifiedDocs.some((d) => d.covers_land),
-          evidence_types: [...new Set(verifiedDocs.map((d) => d.evidence_type))],
+          evidence_types: Array.from(new Set(verifiedDocs.map((d) => d.evidence_type))),
           earliest_expiry: verifiedDocs
             .filter((d) => d.document_expiry)
             .sort((a, b) => new Date(a.document_expiry!).getTime() - new Date(b.document_expiry!).getTime())[0]
