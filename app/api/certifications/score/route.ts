@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       .from('certification_frameworks')
       .select('passing_score')
       .eq('id', body.framework_id)
-      .single();
+      .maybeSingle();
 
     const passingScore = framework?.passing_score || 80;
 

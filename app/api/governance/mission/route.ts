@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       .from('governance_mission')
       .select('*')
       .eq('organization_id', organizationId)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
       console.error('Error fetching mission:', error);

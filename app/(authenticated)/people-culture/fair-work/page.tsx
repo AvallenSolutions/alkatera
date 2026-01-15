@@ -300,7 +300,7 @@ export default function FairWorkPage() {
       <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
         <CardContent className="p-4">
           <p className="text-sm text-blue-800 dark:text-blue-200">
-            <strong>About Fair Work:</strong> Track compensation data to analyze living wage compliance,
+            <strong>About Fair Work:</strong> Track compensation data to analyse living wage compliance,
             gender pay gaps, and pay ratios. Data is anonymized and supports UK Gender Pay Gap Reporting
             and B Corp Fair Work requirements.
           </p>

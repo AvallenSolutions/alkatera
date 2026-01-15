@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       .eq('organization_id', organizationId)
       .order('calculated_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching community impact score:', error);

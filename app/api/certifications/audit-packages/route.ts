@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         `)
         .eq('id', packageId)
         .eq('organization_id', organizationId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching audit package:', error);
@@ -198,7 +198,7 @@ export async function DELETE(request: NextRequest) {
       .from('certification_audit_packages')
       .select('status')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (existing?.status !== 'draft') {
       return NextResponse.json(

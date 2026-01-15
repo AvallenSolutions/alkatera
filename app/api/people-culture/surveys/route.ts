@@ -15,15 +15,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organization
+    // Get user's organisation
     const { data: membership, error: memberError } = await supabase
       .from('organization_members')
       .select('organization_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     // Parse query params
@@ -77,15 +77,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organization
+    // Get user's organisation
     const { data: membership, error: memberError } = await supabase
       .from('organization_members')
       .select('organization_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -155,15 +155,15 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organization
+    // Get user's organisation
     const { data: membership, error: memberError } = await supabase
       .from('organization_members')
       .select('organization_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
     if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();

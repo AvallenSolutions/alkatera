@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       .eq('organization_id', organizationId)
       .order('calculated_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching governance score:', error);
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       supabase.from('governance_stakeholders').select('*').eq('organization_id', organizationId),
       supabase.from('governance_stakeholder_engagements').select('*').eq('organization_id', organizationId),
       supabase.from('governance_board_members').select('*').eq('organization_id', organizationId).eq('is_current', true),
-      supabase.from('governance_mission').select('*').eq('organization_id', organizationId).single(),
+      supabase.from('governance_mission').select('*').eq('organization_id', organizationId).maybeSingle(),
       supabase.from('governance_lobbying').select('*').eq('organization_id', organizationId),
       supabase.from('governance_ethics_records').select('*').eq('organization_id', organizationId),
     ]);
