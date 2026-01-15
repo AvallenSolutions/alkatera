@@ -51,6 +51,7 @@ import {
   HandHelping,
   FileHeart,
   Target,
+  Library,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -76,12 +77,6 @@ const navigationStructure: NavItem[] = [
     href: '/dashboard/',
     icon: LayoutDashboard,
     minTier: 1, // Available to all tiers
-  },
-  {
-    name: 'Company Vitality',
-    href: '/performance/',
-    icon: Sparkles,
-    minTier: 2, // Blossom and above
   },
   {
     name: 'Company',
@@ -120,6 +115,12 @@ const navigationStructure: NavItem[] = [
         icon: Flame,
         minTier: 1, // Available to all tiers (includes Scope 1, 2, and 3)
       },
+      {
+        name: 'Company Vitality',
+        href: '/performance/',
+        icon: Sparkles,
+        minTier: 2, // Blossom and above
+      },
     ],
   },
   {
@@ -135,16 +136,44 @@ const navigationStructure: NavItem[] = [
     minTier: 1, // Available to all tiers
   },
   {
-    name: 'Knowledge Bank',
+    name: 'Resources',
     href: '/knowledge-bank/',
-    icon: GraduationCap,
+    icon: Library,
     minTier: 1, // Available to all tiers
-  },
-  {
-    name: 'Greenwash Guardian',
-    href: '/greenwash-guardian/',
-    icon: Leaf,
-    minTier: 2, // Blossom and above
+    children: [
+      {
+        name: 'Knowledge Bank',
+        href: '/knowledge-bank/',
+        icon: GraduationCap,
+        minTier: 1,
+      },
+      {
+        name: 'Reports',
+        href: '/reports/',
+        icon: FileText,
+        minTier: 1,
+        children: [
+          {
+            name: 'Sustainability Reports',
+            href: '/reports/sustainability/',
+            icon: TrendingUp,
+            minTier: 1,
+          },
+          {
+            name: "LCA's & EPD's",
+            href: '/reports/lcas/',
+            icon: Award,
+            minTier: 2, // Blossom and above
+          },
+        ],
+      },
+      {
+        name: 'Greenwash Guardian',
+        href: '/greenwash-guardian/',
+        icon: Leaf,
+        minTier: 2, // Blossom and above
+      },
+    ],
   },
   {
     name: 'Gaia',
@@ -157,26 +186,6 @@ const navigationStructure: NavItem[] = [
     href: '/certifications/',
     icon: Award,
     minTier: 3, // Canopy only
-  },
-  {
-    name: 'Reports',
-    href: '/reports/',
-    icon: FileText,
-    minTier: 1, // Available to all tiers
-    children: [
-      {
-        name: 'Sustainability Reports',
-        href: '/reports/sustainability/',
-        icon: TrendingUp,
-        minTier: 1,
-      },
-      {
-        name: "LCA's & EPD's",
-        href: '/reports/lcas/',
-        icon: Award,
-        minTier: 2, // Blossom and above
-      },
-    ],
   },
   {
     name: 'Settings',
@@ -372,38 +381,6 @@ export function Sidebar({ className }: SidebarProps) {
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
   const isDevelopment = process.env.NODE_ENV === 'development'
 
-  // Build Social Impact parent menu dynamically based on tier
-  const buildSocialImpactMenu = (): NavItem | null => {
-    if (tierLevel < 2) return null // Not available to Seed tier
-
-    const socialImpactChildren: NavItem[] = []
-
-    // Add People & Culture (Blossom and above)
-    if (tierLevel >= 2) {
-      socialImpactChildren.push(peopleAndCultureSection)
-    }
-
-    // Add Governance (Canopy only)
-    if (tierLevel >= 3) {
-      socialImpactChildren.push(governanceSection)
-    }
-
-    // Add Community Impact (Canopy only)
-    if (tierLevel >= 3) {
-      socialImpactChildren.push(communityImpactSection)
-    }
-
-    if (socialImpactChildren.length === 0) return null
-
-    return {
-      name: 'Social Impact',
-      href: tierLevel >= 3 ? '/people-culture/' : '/people-culture/',
-      icon: UserCheck,
-      minTier: 2,
-      children: socialImpactChildren,
-    }
-  }
-
   // Filter navigation items based on tier level and feature access
   const filterNavItems = (items: NavItem[]): NavItem[] => {
     return items
@@ -439,12 +416,27 @@ export function Sidebar({ className }: SidebarProps) {
     // Start with base navigation
     let filteredNav = filterNavItems(navigationStructure)
 
-    // Insert Social Impact menu after Suppliers, before Knowledge Bank
-    const socialImpactMenu = buildSocialImpactMenu()
-    if (socialImpactMenu) {
+    // Insert People & Culture after Suppliers
+    if (tierLevel >= 2) {
       const suppliersIndex = filteredNav.findIndex(item => item.href === '/suppliers/')
       if (suppliersIndex !== -1) {
-        filteredNav.splice(suppliersIndex + 1, 0, socialImpactMenu)
+        filteredNav.splice(suppliersIndex + 1, 0, peopleAndCultureSection)
+      }
+    }
+
+    // Insert Governance after People & Culture (Canopy only)
+    if (tierLevel >= 3) {
+      const peopleCultureIndex = filteredNav.findIndex(item => item.href === '/people-culture/')
+      if (peopleCultureIndex !== -1) {
+        filteredNav.splice(peopleCultureIndex + 1, 0, governanceSection)
+      }
+    }
+
+    // Insert Community Impact after Governance (Canopy only)
+    if (tierLevel >= 3) {
+      const governanceIndex = filteredNav.findIndex(item => item.href === '/governance/')
+      if (governanceIndex !== -1) {
+        filteredNav.splice(governanceIndex + 1, 0, communityImpactSection)
       }
     }
 
