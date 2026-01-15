@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 interface Framework {
   id: string;
@@ -42,14 +42,14 @@ interface OrganizationCertification {
 }
 
 export function useCertificationFrameworks(activeOnly = true) {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [certifications, setCertifications] = useState<OrganizationCertification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchFrameworks = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -57,7 +57,7 @@ export function useCertificationFrameworks(activeOnly = true) {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        organization_id: organization.id,
+        organization_id: currentOrganization.id,
         ...(activeOnly && { active_only: 'true' }),
       });
 
@@ -76,21 +76,21 @@ export function useCertificationFrameworks(activeOnly = true) {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id, activeOnly]);
+  }, [currentOrganization?.id, activeOnly]);
 
   useEffect(() => {
     fetchFrameworks();
   }, [fetchFrameworks]);
 
   const startCertification = async (frameworkId: string, targetDate?: string) => {
-    if (!organization?.id) return null;
+    if (!currentOrganization?.id) return null;
 
     try {
       const response = await fetch('/api/certifications/frameworks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_id: organization.id,
+          organization_id: currentOrganization.id,
           framework_id: frameworkId,
           status: 'in_progress',
           target_date: targetDate,
@@ -115,14 +115,14 @@ export function useCertificationFrameworks(activeOnly = true) {
     status: OrganizationCertification['status'],
     additionalData?: Partial<OrganizationCertification>
   ) => {
-    if (!organization?.id) return null;
+    if (!currentOrganization?.id) return null;
 
     try {
       const response = await fetch('/api/certifications/frameworks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_id: organization.id,
+          organization_id: currentOrganization.id,
           framework_id: frameworkId,
           status,
           ...additionalData,

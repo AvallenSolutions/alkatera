@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 export interface BoardMember {
   id: string;
@@ -54,7 +54,7 @@ export interface UseBoardCompositionResult {
 }
 
 export function useBoardComposition(): UseBoardCompositionResult {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [members, setMembers] = useState<BoardMember[]>([]);
   const [metrics, setMetrics] = useState<BoardMetrics>({
     total_members: 0,
@@ -71,7 +71,7 @@ export function useBoardComposition(): UseBoardCompositionResult {
   const [error, setError] = useState<string | null>(null);
 
   const fetchBoard = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -126,10 +126,10 @@ export function useBoardComposition(): UseBoardCompositionResult {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [currentOrganization?.id]);
 
   const addMember = useCallback(async (member: Partial<BoardMember>): Promise<BoardMember> => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       throw new Error('No organization selected');
     }
 
@@ -138,7 +138,7 @@ export function useBoardComposition(): UseBoardCompositionResult {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...member,
-        organization_id: organization.id,
+        organization_id: currentOrganization.id,
       }),
     });
 
@@ -150,7 +150,7 @@ export function useBoardComposition(): UseBoardCompositionResult {
     const newMember = await response.json();
     await fetchBoard();
     return newMember;
-  }, [organization?.id, fetchBoard]);
+  }, [currentOrganization?.id, fetchBoard]);
 
   const updateMember = useCallback(async (member: Partial<BoardMember> & { id: string }): Promise<BoardMember> => {
     const response = await fetch('/api/governance/board', {

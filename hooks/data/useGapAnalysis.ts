@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 interface GapAnalysis {
   id: string;
@@ -41,14 +41,14 @@ interface GapSummary {
 }
 
 export function useGapAnalysis(frameworkId?: string) {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [analyses, setAnalyses] = useState<GapAnalysis[]>([]);
   const [summary, setSummary] = useState<GapSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAnalyses = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -56,7 +56,7 @@ export function useGapAnalysis(frameworkId?: string) {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        organization_id: organization.id,
+        organization_id: currentOrganization.id,
         ...(frameworkId && { framework_id: frameworkId }),
       });
 
@@ -75,7 +75,7 @@ export function useGapAnalysis(frameworkId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id, frameworkId]);
+  }, [currentOrganization?.id, frameworkId]);
 
   useEffect(() => {
     fetchAnalyses();
@@ -85,14 +85,14 @@ export function useGapAnalysis(frameworkId?: string) {
     requirementId: string,
     data: Partial<GapAnalysis>
   ) => {
-    if (!organization?.id || !frameworkId) return null;
+    if (!currentOrganization?.id || !frameworkId) return null;
 
     try {
       const response = await fetch('/api/certifications/gap-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_id: organization.id,
+          organization_id: currentOrganization.id,
           framework_id: frameworkId,
           requirement_id: requirementId,
           ...data,
@@ -116,7 +116,7 @@ export function useGapAnalysis(frameworkId?: string) {
     requirementIds: string[],
     status: GapAnalysis['compliance_status']
   ) => {
-    if (!organization?.id || !frameworkId) return;
+    if (!currentOrganization?.id || !frameworkId) return;
 
     try {
       const updates = requirementIds.map(reqId =>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 export interface PolicyVersion {
   id: string;
@@ -58,7 +58,7 @@ export interface UsePoliciesResult {
 }
 
 export function usePolicies(): UsePoliciesResult {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +85,7 @@ export function usePolicies(): UsePoliciesResult {
   };
 
   const fetchPolicies = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -110,10 +110,10 @@ export function usePolicies(): UsePoliciesResult {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [currentOrganization?.id]);
 
   const createPolicy = useCallback(async (policy: Partial<Policy>): Promise<Policy> => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       throw new Error('No organization selected');
     }
 
@@ -122,7 +122,7 @@ export function usePolicies(): UsePoliciesResult {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...policy,
-        organization_id: organization.id,
+        organization_id: currentOrganization.id,
       }),
     });
 
@@ -134,7 +134,7 @@ export function usePolicies(): UsePoliciesResult {
     const newPolicy = await response.json();
     await fetchPolicies();
     return newPolicy;
-  }, [organization?.id, fetchPolicies]);
+  }, [currentOrganization?.id, fetchPolicies]);
 
   const updatePolicy = useCallback(async (policy: Partial<Policy> & { id: string }): Promise<Policy> => {
     const response = await fetch('/api/governance/policies', {

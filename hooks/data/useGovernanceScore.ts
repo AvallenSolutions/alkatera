@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 export interface GovernanceScore {
   id: string;
@@ -32,14 +32,14 @@ export interface UseGovernanceScoreResult {
 }
 
 export function useGovernanceScore(): UseGovernanceScoreResult {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [score, setScore] = useState<GovernanceScore | null>(null);
   const [history, setHistory] = useState<GovernanceScoreHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchScore = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -49,7 +49,7 @@ export function useGovernanceScore(): UseGovernanceScoreResult {
       setError(null);
 
       const response = await fetch(
-        `/api/governance/score?organization_id=${organization.id}`
+        `/api/governance/score?organization_id=${currentOrganization.id}`
       );
 
       if (!response.ok) {
@@ -65,10 +65,10 @@ export function useGovernanceScore(): UseGovernanceScoreResult {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [currentOrganization?.id]);
 
   const recalculate = useCallback(async () => {
-    if (!organization?.id) return;
+    if (!currentOrganization?.id) return;
 
     try {
       setLoading(true);
@@ -77,7 +77,7 @@ export function useGovernanceScore(): UseGovernanceScoreResult {
       const response = await fetch('/api/governance/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organization_id: organization.id }),
+        body: JSON.stringify({ organization_id: currentOrganization.id }),
       });
 
       if (!response.ok) {
@@ -91,7 +91,7 @@ export function useGovernanceScore(): UseGovernanceScoreResult {
       setError(err instanceof Error ? err.message : 'Failed to recalculate');
       throw err;
     }
-  }, [organization?.id, fetchScore]);
+  }, [currentOrganization?.id, fetchScore]);
 
   useEffect(() => {
     fetchScore();

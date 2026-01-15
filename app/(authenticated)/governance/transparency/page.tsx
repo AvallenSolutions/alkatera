@@ -21,7 +21,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 interface MissionData {
   id?: string;
@@ -59,7 +59,7 @@ const SDG_LIST = [
 ];
 
 export default function TransparencyPage() {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -81,7 +81,7 @@ export default function TransparencyPage() {
 
   useEffect(() => {
     async function fetchMission() {
-      if (!organization?.id) {
+      if (!currentOrganization?.id) {
         setLoading(false);
         return;
       }
@@ -109,10 +109,10 @@ export default function TransparencyPage() {
     }
 
     fetchMission();
-  }, [organization?.id]);
+  }, [currentOrganization?.id]);
 
   const handleSave = async () => {
-    if (!organization?.id) return;
+    if (!currentOrganization?.id) return;
 
     setSaving(true);
     setSaved(false);
@@ -123,7 +123,7 @@ export default function TransparencyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          organization_id: organization.id,
+          organization_id: currentOrganization.id,
         }),
       });
 

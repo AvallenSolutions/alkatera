@@ -25,7 +25,7 @@ import {
   Building2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 import { useCommunityImpactScore } from '@/hooks/data/useCommunityImpactScore';
 
 function PageSkeleton() {
@@ -110,7 +110,7 @@ function ScoreRing({
 }
 
 function AddDonationDialog({ onSuccess }: { onSuccess: () => void }) {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -129,7 +129,7 @@ function AddDonationDialog({ onSuccess }: { onSuccess: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!organization?.id) return;
+    if (!currentOrganization?.id) return;
     setIsSubmitting(true);
 
     try {
@@ -138,7 +138,7 @@ function AddDonationDialog({ onSuccess }: { onSuccess: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          organization_id: organization.id,
+          organization_id: currentOrganization.id,
           donation_amount: formData.donation_amount ? parseFloat(formData.donation_amount) : null,
           estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
           hours_donated: formData.hours_donated ? parseFloat(formData.hours_donated) : null,
@@ -379,7 +379,7 @@ function QuickActionCard({
 }
 
 export default function CommunityImpactPage() {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [activeTab, setActiveTab] = useState('overview');
   const [isRecalculating, setIsRecalculating] = useState(false);
 
@@ -391,7 +391,7 @@ export default function CommunityImpactPage() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -416,7 +416,7 @@ export default function CommunityImpactPage() {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [currentOrganization?.id]);
 
   useEffect(() => {
     fetchData();

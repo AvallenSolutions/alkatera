@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 interface EvidenceLink {
   id: string;
@@ -36,14 +36,14 @@ interface CreateEvidenceInput {
 }
 
 export function useCertificationEvidence(frameworkId?: string, requirementId?: string) {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [evidence, setEvidence] = useState<EvidenceLink[]>([]);
   const [byRequirement, setByRequirement] = useState<Record<string, EvidenceLink[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchEvidence = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -51,7 +51,7 @@ export function useCertificationEvidence(frameworkId?: string, requirementId?: s
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        organization_id: organization.id,
+        organization_id: currentOrganization.id,
         ...(frameworkId && { framework_id: frameworkId }),
         ...(requirementId && { requirement_id: requirementId }),
       });
@@ -71,21 +71,21 @@ export function useCertificationEvidence(frameworkId?: string, requirementId?: s
     } finally {
       setLoading(false);
     }
-  }, [organization?.id, frameworkId, requirementId]);
+  }, [currentOrganization?.id, frameworkId, requirementId]);
 
   useEffect(() => {
     fetchEvidence();
   }, [fetchEvidence]);
 
   const createEvidence = async (input: CreateEvidenceInput) => {
-    if (!organization?.id) return null;
+    if (!currentOrganization?.id) return null;
 
     try {
       const response = await fetch('/api/certifications/evidence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_id: organization.id,
+          organization_id: currentOrganization.id,
           ...input,
         }),
       });

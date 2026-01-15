@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 interface ScoreRecord {
   id: string;
@@ -45,7 +45,7 @@ interface ReadinessSummary {
 }
 
 export function useCertificationScore(frameworkId?: string) {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [scoreHistory, setScoreHistory] = useState<ScoreRecord[]>([]);
   const [latestScores, setLatestScores] = useState<ScoreRecord[]>([]);
   const [certifications, setCertifications] = useState<OrganizationCertification[]>([]);
@@ -54,7 +54,7 @@ export function useCertificationScore(frameworkId?: string) {
   const [error, setError] = useState<string | null>(null);
 
   const fetchScores = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -62,7 +62,7 @@ export function useCertificationScore(frameworkId?: string) {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        organization_id: organization.id,
+        organization_id: currentOrganization.id,
         ...(frameworkId && { framework_id: frameworkId }),
       });
 
@@ -83,21 +83,21 @@ export function useCertificationScore(frameworkId?: string) {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id, frameworkId]);
+  }, [currentOrganization?.id, frameworkId]);
 
   useEffect(() => {
     fetchScores();
   }, [fetchScores]);
 
   const calculateScore = async (targetFrameworkId: string, notes?: string) => {
-    if (!organization?.id) return null;
+    if (!currentOrganization?.id) return null;
 
     try {
       const response = await fetch('/api/certifications/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          organization_id: organization.id,
+          organization_id: currentOrganization.id,
           framework_id: targetFrameworkId,
           notes,
         }),

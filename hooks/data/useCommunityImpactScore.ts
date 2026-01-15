@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 export interface CommunityImpactScore {
   id: string;
@@ -24,14 +24,14 @@ export interface UseCommunityImpactScoreResult {
 }
 
 export function useCommunityImpactScore(): UseCommunityImpactScoreResult {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [score, setScore] = useState<CommunityImpactScore | null>(null);
   const [history, setHistory] = useState<Array<{ overall_score: number; calculated_at: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchScore = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -41,7 +41,7 @@ export function useCommunityImpactScore(): UseCommunityImpactScoreResult {
       setError(null);
 
       const response = await fetch(
-        `/api/community-impact/score?organization_id=${organization.id}`
+        `/api/community-impact/score?organization_id=${currentOrganization.id}`
       );
 
       if (!response.ok) {
@@ -57,10 +57,10 @@ export function useCommunityImpactScore(): UseCommunityImpactScoreResult {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [currentOrganization?.id]);
 
   const recalculate = useCallback(async () => {
-    if (!organization?.id) return;
+    if (!currentOrganization?.id) return;
 
     try {
       setLoading(true);
@@ -69,7 +69,7 @@ export function useCommunityImpactScore(): UseCommunityImpactScoreResult {
       const response = await fetch('/api/community-impact/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organization_id: organization.id }),
+        body: JSON.stringify({ organization_id: currentOrganization.id }),
       });
 
       if (!response.ok) {
@@ -82,7 +82,7 @@ export function useCommunityImpactScore(): UseCommunityImpactScoreResult {
       setError(err instanceof Error ? err.message : 'Failed to recalculate');
       throw err;
     }
-  }, [organization?.id, fetchScore]);
+  }, [currentOrganization?.id, fetchScore]);
 
   useEffect(() => {
     fetchScore();

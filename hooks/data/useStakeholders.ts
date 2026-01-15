@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useOrganization } from '@/hooks/useOrganization';
+import { useOrganization } from '@/lib/organizationContext';
 
 export interface StakeholderEngagement {
   id: string;
@@ -61,7 +61,7 @@ export interface UseStakeholdersResult {
 }
 
 export function useStakeholders(): UseStakeholdersResult {
-  const { organization } = useOrganization();
+  const { currentOrganization } = useOrganization();
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +97,7 @@ export function useStakeholders(): UseStakeholdersResult {
   };
 
   const fetchStakeholders = useCallback(async () => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       setLoading(false);
       return;
     }
@@ -122,10 +122,10 @@ export function useStakeholders(): UseStakeholdersResult {
     } finally {
       setLoading(false);
     }
-  }, [organization?.id]);
+  }, [currentOrganization?.id]);
 
   const createStakeholder = useCallback(async (stakeholder: Partial<Stakeholder>): Promise<Stakeholder> => {
-    if (!organization?.id) {
+    if (!currentOrganization?.id) {
       throw new Error('No organization selected');
     }
 
@@ -134,7 +134,7 @@ export function useStakeholders(): UseStakeholdersResult {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...stakeholder,
-        organization_id: organization.id,
+        organization_id: currentOrganization.id,
       }),
     });
 
@@ -146,7 +146,7 @@ export function useStakeholders(): UseStakeholdersResult {
     const newStakeholder = await response.json();
     await fetchStakeholders();
     return newStakeholder;
-  }, [organization?.id, fetchStakeholders]);
+  }, [currentOrganization?.id, fetchStakeholders]);
 
   const updateStakeholder = useCallback(async (stakeholder: Partial<Stakeholder> & { id: string }): Promise<Stakeholder> => {
     const response = await fetch('/api/governance/stakeholders', {
