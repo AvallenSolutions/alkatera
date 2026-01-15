@@ -44,6 +44,18 @@ function AddDemographicsDialog({ onSuccess }: { onSuccess: () => void }) {
     setIsSubmitting(true);
 
     try {
+      // Get the current session to pass to API
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const genderData = {
         male: parseInt(formData.male) || 0,
         female: parseInt(formData.female) || 0,
@@ -53,7 +65,8 @@ function AddDemographicsDialog({ onSuccess }: { onSuccess: () => void }) {
 
       const response = await fetch('/api/people-culture/demographics', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify({
           reporting_period: formData.reporting_period,
           total_employees: parseInt(formData.total_employees) || 0,
@@ -248,9 +261,22 @@ function AddDEIActionDialog({ onSuccess }: { onSuccess: () => void }) {
     setIsSubmitting(true);
 
     try {
+      // Get the current session to pass to API
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       const response = await fetch('/api/people-culture/dei-actions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
+        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
