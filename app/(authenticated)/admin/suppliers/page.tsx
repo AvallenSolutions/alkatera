@@ -40,20 +40,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Plus,
-  Search,
-  Building2,
-  Globe,
-  Mail,
-  MapPin,
-  MoreVertical,
-  Edit,
-  Trash2,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-} from 'lucide-react';
+import { Plus, Search, Building2, Globe, Mail, MapPin, MoveVertical as MoreVertical, CreditCard as Edit, Trash2, CircleCheck as CheckCircle, Circle as XCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { COUNTRIES } from '@/lib/countries';
 import { toast } from 'sonner';
