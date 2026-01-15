@@ -66,7 +66,14 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to add compensation record');
+        console.error('API Error:', error);
+        const errorMessage = [
+          error.error || 'Failed to add compensation record',
+          error.details && `Details: ${error.details}`,
+          error.hint && `Hint: ${error.hint}`,
+          error.code && `Code: ${error.code}`,
+        ].filter(Boolean).join('\n');
+        throw new Error(errorMessage);
       }
 
       setOpen(false);

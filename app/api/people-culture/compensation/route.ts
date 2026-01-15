@@ -167,8 +167,19 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('[Compensation API] Error creating compensation record:', error);
-      return NextResponse.json({ error: 'Failed to create compensation record', details: error.message }, { status: 500 });
+      console.error('[Compensation API] Error creating compensation record:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return NextResponse.json({
+        error: 'Failed to create compensation record',
+        details: error.message,
+        code: error.code,
+        hint: error.hint,
+        dbDetails: error.details,
+      }, { status: 500 });
     }
 
     console.log('[Compensation API] Record created successfully:', data.id);
