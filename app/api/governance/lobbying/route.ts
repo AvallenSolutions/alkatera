@@ -67,21 +67,34 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
 
-    if (!body.organization_id || !body.activity_type || !body.activity_name) {
+    if (!body.activity_type || !body.activity_name) {
       return NextResponse.json(
-        { error: 'organization_id, activity_type, and activity_name are required' },
+        { error: 'activity_type and activity_name are required' },
         { status: 400 }
       );
     }
@@ -89,7 +102,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('governance_lobbying')
       .insert({
-        organization_id: body.organization_id,
+        organization_id: body.organization_id || organizationId,
         activity_type: body.activity_type,
         activity_name: body.activity_name,
         description: body.description,

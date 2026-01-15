@@ -61,21 +61,34 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
 
-    if (!body.organization_id || !body.reporting_year) {
+    if (!body.reporting_year) {
       return NextResponse.json(
-        { error: 'organization_id and reporting_year are required' },
+        { error: 'reporting_year is required' },
         { status: 400 }
       );
     }
@@ -84,7 +97,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('community_local_impact')
       .upsert({
-        organization_id: body.organization_id,
+        organization_id: body.organization_id || organizationId,
         reporting_year: body.reporting_year,
         reporting_quarter: body.reporting_quarter || null,
         total_employees: body.total_employees,

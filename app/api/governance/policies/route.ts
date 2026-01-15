@@ -51,22 +51,35 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
 
     // Validate required fields
-    if (!body.organization_id || !body.policy_name || !body.policy_type) {
+    if (!body.policy_name || !body.policy_type) {
       return NextResponse.json(
-        { error: 'organization_id, policy_name, and policy_type are required' },
+        { error: 'policy_name and policy_type are required' },
         { status: 400 }
       );
     }
@@ -75,7 +88,7 @@ export async function POST(request: NextRequest) {
     const { data: policy, error: policyError } = await supabase
       .from('governance_policies')
       .insert({
-        organization_id: body.organization_id,
+        organization_id: body.organization_id || organizationId,
         policy_name: body.policy_name,
         policy_code: body.policy_code,
         policy_type: body.policy_type,
@@ -128,13 +141,9 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

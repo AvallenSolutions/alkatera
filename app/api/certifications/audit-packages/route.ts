@@ -71,21 +71,34 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
 
-    if (!body.organization_id || !body.framework_id || !body.package_name) {
+    if (!body.framework_id || !body.package_name) {
       return NextResponse.json(
-        { error: 'organization_id, framework_id, and package_name are required' },
+        { error: 'framework_id and package_name are required' },
         { status: 400 }
       );
     }
@@ -94,7 +107,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('certification_audit_packages')
       .insert({
-        organization_id: body.organization_id,
+        organization_id: body.organization_id || organizationId,
         framework_id: body.framework_id,
         package_name: body.package_name,
         description: body.description,
@@ -123,14 +136,27 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
@@ -171,14 +197,27 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const cookieStore = cookies();
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore });
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const searchParams = request.nextUrl.searchParams;
