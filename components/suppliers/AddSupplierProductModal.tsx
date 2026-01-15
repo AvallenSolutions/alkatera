@@ -51,12 +51,15 @@ export function AddSupplierProductModal({
   const { createProduct, updateProduct } = useSupplierProducts(supplierId);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [activeTab, setActiveTab] = useState("basic");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(
     product?.product_image_url || null
   );
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Basic product info
   const [basicData, setBasicData] = useState({
@@ -147,7 +150,109 @@ export function AddSupplierProductModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setHasUnsavedChanges(true);
   };
+
+  // Draft management
+  const getDraftKey = () => {
+    if (product?.id) {
+      return `supplier_product_draft_${product.id}`;
+    }
+    return `supplier_product_draft_new_${supplierId}_${currentOrganization?.id}`;
+  };
+
+  const saveDraftToLocalStorage = () => {
+    const draftKey = getDraftKey();
+    const draftData = {
+      basicData,
+      impactData,
+      imagePreview,
+      activeTab,
+      timestamp: new Date().toISOString(),
+    };
+    localStorage.setItem(draftKey, JSON.stringify(draftData));
+  };
+
+  const loadDraftFromLocalStorage = () => {
+    const draftKey = getDraftKey();
+    const savedDraft = localStorage.getItem(draftKey);
+    if (savedDraft) {
+      try {
+        const draftData = JSON.parse(savedDraft);
+        // Only load draft if it's less than 24 hours old
+        const draftAge = Date.now() - new Date(draftData.timestamp).getTime();
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+
+        if (draftAge < twentyFourHours) {
+          return draftData;
+        } else {
+          // Clean up old draft
+          localStorage.removeItem(draftKey);
+        }
+      } catch (error) {
+        console.error("Error loading draft:", error);
+      }
+    }
+    return null;
+  };
+
+  const clearDraft = () => {
+    const draftKey = getDraftKey();
+    localStorage.removeItem(draftKey);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleSaveDraft = () => {
+    setSavingDraft(true);
+    saveDraftToLocalStorage();
+    toast.success("Draft saved successfully");
+    setHasUnsavedChanges(false);
+    setTimeout(() => setSavingDraft(false), 500);
+  };
+
+  // Load draft when modal opens
+  useEffect(() => {
+    if (open && !product && currentOrganization) {
+      const draft = loadDraftFromLocalStorage();
+      if (draft) {
+        toast.info("Draft restored", {
+          description: "Your previous work has been restored. Continue editing or discard the draft.",
+          duration: 5000,
+        });
+        setBasicData(draft.basicData);
+        setImpactData(draft.impactData);
+        setImagePreview(draft.imagePreview);
+        setActiveTab(draft.activeTab || "basic");
+        setHasUnsavedChanges(true);
+      }
+    }
+  }, [open, product, currentOrganization]);
+
+  // Auto-save to localStorage
+  useEffect(() => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    if (hasUnsavedChanges && open) {
+      autoSaveTimerRef.current = setTimeout(() => {
+        saveDraftToLocalStorage();
+      }, 2000); // Auto-save after 2 seconds of inactivity
+    }
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [basicData, impactData, imagePreview, hasUnsavedChanges, open]);
+
+  // Track changes
+  useEffect(() => {
+    if (open && (basicData.name || impactData.impact_climate !== undefined)) {
+      setHasUnsavedChanges(true);
+    }
+  }, [basicData, impactData, open]);
 
   const uploadImage = async (productId: string): Promise<string | null> => {
     if (!imageFile || !currentOrganization) return null;
@@ -269,12 +374,31 @@ export function AddSupplierProductModal({
         }
       }
 
+      clearDraft(); // Clear draft on successful save
       onOpenChange(false);
       resetForm();
     } catch (error) {
       console.error("Error saving product:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCloseWithWarning = (shouldClose: boolean) => {
+    if (shouldClose && hasUnsavedChanges) {
+      if (confirm("You have unsaved changes. Your progress has been auto-saved as a draft. Close anyway?")) {
+        onOpenChange(false);
+      }
+    } else {
+      onOpenChange(shouldClose);
+    }
+  };
+
+  const handleDiscardDraft = () => {
+    if (confirm("Are you sure you want to discard this draft? This cannot be undone.")) {
+      clearDraft();
+      resetForm();
+      toast.success("Draft discarded");
     }
   };
 
@@ -298,7 +422,7 @@ export function AddSupplierProductModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleCloseWithWarning}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
         <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle className="flex items-center gap-2">
@@ -315,11 +439,21 @@ export function AddSupplierProductModal({
                 Pending Verification
               </Badge>
             )}
+            {hasUnsavedChanges && (
+              <Badge variant="outline" className="text-amber-600 border-amber-600">
+                Unsaved Changes
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             {product
               ? "Update product details and environmental impact data"
               : "Add a new product with comprehensive environmental impact data"}
+            {!product && (
+              <span className="block mt-1 text-xs text-muted-foreground">
+                Your work is auto-saved every 2 seconds to prevent data loss
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -517,17 +651,44 @@ export function AddSupplierProductModal({
           </Tabs>
 
           <DialogFooter className="px-6 py-4 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading || uploading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading || uploading || !basicData.name}>
-              {uploading ? "Uploading..." : loading ? "Saving..." : product ? "Update Product" : "Add Product"}
-            </Button>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex gap-2">
+                {hasUnsavedChanges && !product && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDiscardDraft}
+                    disabled={loading || uploading || savingDraft}
+                  >
+                    Discard Draft
+                  </Button>
+                )}
+                {hasUnsavedChanges && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleSaveDraft}
+                    disabled={loading || uploading || savingDraft}
+                  >
+                    {savingDraft ? "Saving..." : "Save Draft"}
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleCloseWithWarning(true)}
+                  disabled={loading || uploading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading || uploading || !basicData.name}>
+                  {uploading ? "Uploading..." : loading ? "Saving..." : product ? "Update Product" : "Add Product"}
+                </Button>
+              </div>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
