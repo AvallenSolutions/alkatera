@@ -32,6 +32,7 @@ import { SupplierProductImpactForm } from "./SupplierProductImpactForm";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 import Image from "next/image";
+import { useAuth } from "@/hooks/useAuth";
 
 interface AddPlatformSupplierProductModalProps {
   platformSupplierId: string;
@@ -46,6 +47,7 @@ export function AddPlatformSupplierProductModal({
   onOpenChange,
   product,
 }: AddPlatformSupplierProductModalProps) {
+  const { user } = useAuth();
   const { createProduct, updateProduct } = usePlatformSupplierProducts(platformSupplierId);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -357,11 +359,18 @@ export function AddPlatformSupplierProductModal({
         external_verification_url: impactData.external_verification_url ?? null,
       };
 
-      // Set verified_at when verifying
-      if (basicData.is_verified && !product?.is_verified) {
-        productData.verified_at = new Date().toISOString();
+      // Set verified_at and verified_by when verifying
+      if (basicData.is_verified) {
+        if (!product?.is_verified) {
+          productData.verified_at = new Date().toISOString();
+          productData.verified_by = user?.id || null;
+        } else if (!productData.verified_by) {
+          // Ensure verified_by is set if missing
+          productData.verified_by = user?.id || null;
+        }
       } else if (!basicData.is_verified && product?.is_verified) {
         productData.verified_at = null;
+        productData.verified_by = null;
       }
 
       let savedProduct;
