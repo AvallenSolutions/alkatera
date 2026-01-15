@@ -87,12 +87,19 @@ export async function POST(request: NextRequest) {
 
     // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (authError) {
+      console.error('[Compensation API] Auth error:', authError);
+      return NextResponse.json({ error: 'Unauthorized', details: authError.message }, { status: 401 });
     }
+    if (!user) {
+      console.error('[Compensation API] No user found');
+      return NextResponse.json({ error: 'Unauthorized', details: 'No user session' }, { status: 401 });
+    }
+    console.log('[Compensation API] User authenticated:', user.id);
 
     // Get user's current organisation from metadata or first membership
     let organizationId = user.user_metadata?.current_organization_id;
+    console.log('[Compensation API] Organization ID from metadata:', organizationId);
 
     if (!organizationId) {
       const { data: membership, error: memberError } = await supabase
@@ -102,10 +109,16 @@ export async function POST(request: NextRequest) {
         .limit(1)
         .maybeSingle();
 
-      if (memberError || !membership) {
+      if (memberError) {
+        console.error('[Compensation API] Error fetching membership:', memberError);
+        return NextResponse.json({ error: 'Database error', details: memberError.message }, { status: 500 });
+      }
+      if (!membership) {
+        console.error('[Compensation API] No organization membership found');
         return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
       }
       organizationId = membership.organization_id;
+      console.log('[Compensation API] Organization ID from membership:', organizationId);
     }
 
     const body = await request.json();
@@ -145,6 +158,8 @@ export async function POST(request: NextRequest) {
       is_active: true,
     };
 
+    console.log('[Compensation API] Attempting to insert record for org:', organizationId);
+
     const { data, error } = await supabase
       .from('people_employee_compensation')
       .insert(recordData)
@@ -152,10 +167,11 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Error creating compensation record:', error);
+      console.error('[Compensation API] Error creating compensation record:', error);
       return NextResponse.json({ error: 'Failed to create compensation record', details: error.message }, { status: 500 });
     }
 
+    console.log('[Compensation API] Record created successfully:', data.id);
     return NextResponse.json({ success: true, data }, { status: 201 });
   } catch (error) {
     console.error('Compensation API error:', error);

@@ -1,10 +1,13 @@
 import 'server-only'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
+import { cookies, headers } from 'next/headers'
 import type { Database } from '@/types/db_types'
 
 export function getSupabaseServerClient() {
-  const cookieStore = cookies()
+  const headersList = headers()
+  const authHeader = headersList.get('authorization')
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
@@ -12,8 +15,21 @@ export function getSupabaseServerClient() {
     throw new Error('Missing Supabase environment variables')
   }
 
-  // Log cookie access for debugging
-  console.log('[Server Client] Creating Supabase client');
+  // If Authorization header is present, use it for authentication
+  if (authHeader) {
+    console.log('[Server Client] Using Authorization header');
+    return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    })
+  }
+
+  // Otherwise use cookie-based authentication
+  const cookieStore = cookies()
+  console.log('[Server Client] Using cookie-based authentication');
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
