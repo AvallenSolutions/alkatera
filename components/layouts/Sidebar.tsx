@@ -714,19 +714,19 @@ export function Sidebar({ className }: SidebarProps) {
                 </Link>
 
                 <Link
-                  href="/admin/supplier-verification/"
+                  href="/admin/suppliers/"
                   className={cn(
                     'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/supplier-verification/')
+                    isActive('/admin/suppliers/')
                       ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                       : 'text-sidebar-foreground hover:bg-secondary/50'
                   )}
                 >
-                  <Shield className={cn(
+                  <Handshake className={cn(
                     'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/supplier-verification/') ? 'text-neon-lime' : ''
+                    isActive('/admin/suppliers/') ? 'text-neon-lime' : ''
                   )} />
-                  <span className="truncate">Supplier Verification</span>
+                  <span className="truncate">Platform Suppliers</span>
                   {isDevelopment && !isAlkateraAdmin && (
                     <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
                   )}
