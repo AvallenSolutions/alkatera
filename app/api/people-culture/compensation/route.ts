@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
 /**
  * GET /api/people-culture/compensation
@@ -7,11 +7,10 @@ import { getSupabaseServerClient } from '@/lib/supabase/server-client';
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabaseServerClient();
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      console.error('[Compensation GET] Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -83,10 +82,8 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabaseServerClient();
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError) {
       console.error('[Compensation API] Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized', details: authError.message }, { status: 401 });
