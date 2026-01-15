@@ -1,31 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import type { SupplierProduct } from "@/lib/types/supplier-product";
 
-export interface SupplierProduct {
-  id: string;
-  supplier_id: string;
-  organization_id: string;
-  name: string;
-  description: string | null;
-  category: string | null;
-  unit: string;
-  carbon_intensity: number | null;
-  product_code: string | null;
-  product_image_url: string | null;
-  is_active: boolean;
-  is_verified: boolean;
-  verified_by: string | null;
-  verified_at: string | null;
-  verification_notes: string | null;
-  metadata: any;
-  created_at: string;
-  updated_at: string;
-  origin_address: string | null;
-  origin_lat: number | null;
-  origin_lng: number | null;
-  origin_country_code: string | null;
-}
+// Re-export the type for backward compatibility
+export type { SupplierProduct } from "@/lib/types/supplier-product";
 
 export function useSupplierProducts(supplierId: string | undefined) {
   const [products, setProducts] = useState<SupplierProduct[]>([]);
