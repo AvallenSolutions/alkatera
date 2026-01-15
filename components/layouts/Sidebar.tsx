@@ -80,16 +80,10 @@ const navigationStructure: NavItem[] = [
   },
   {
     name: 'Company',
-    href: '/company/',
+    href: '/company/facilities/',
     icon: Building2,
     minTier: 1, // Available to all tiers
     children: [
-      {
-        name: 'Overview',
-        href: '/company/overview/',
-        icon: Building2,
-        minTier: 1,
-      },
       {
         name: 'Facilities',
         href: '/company/facilities/',
