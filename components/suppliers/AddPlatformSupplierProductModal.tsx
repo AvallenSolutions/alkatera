@@ -65,6 +65,8 @@ export function AddPlatformSupplierProductModal({
     description: product?.description || "",
     category: product?.category || "",
     unit: product?.unit || "kg",
+    unit_measurement: product?.unit_measurement ?? undefined,
+    unit_measurement_type: product?.unit_measurement_type || "weight",
     product_code: product?.product_code || "",
     is_active: product?.is_active !== undefined ? product.is_active : true,
     is_verified: product?.is_verified || false,
@@ -301,6 +303,8 @@ export function AddPlatformSupplierProductModal({
         description: basicData.description || null,
         category: basicData.category || null,
         unit: basicData.unit,
+        unit_measurement: basicData.unit_measurement ?? null,
+        unit_measurement_type: basicData.unit_measurement_type || null,
         product_code: basicData.product_code || null,
         is_active: basicData.is_active,
         is_verified: basicData.is_verified,
@@ -384,8 +388,9 @@ export function AddPlatformSupplierProductModal({
       clearDraft(); // Clear draft on successful save
       onOpenChange(false);
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving product:", error);
+      toast.error(error?.message || "Failed to save product. Please check all required fields.");
     } finally {
       setLoading(false);
     }
@@ -415,6 +420,8 @@ export function AddPlatformSupplierProductModal({
       description: "",
       category: "",
       unit: "kg",
+      unit_measurement: undefined,
+      unit_measurement_type: "weight",
       product_code: "",
       is_active: true,
       is_verified: false,
@@ -612,6 +619,45 @@ export function AddPlatformSupplierProductModal({
                       <SelectItem value="m3">Cubic Metre (m³)</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_measurement">Unit Measurement</Label>
+                    <Input
+                      id="unit_measurement"
+                      type="number"
+                      step="0.01"
+                      value={basicData.unit_measurement ?? ""}
+                      onChange={(e) => setBasicData({ ...basicData, unit_measurement: e.target.value ? parseFloat(e.target.value) : undefined })}
+                      placeholder="e.g., 570"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Measurement of a single unit
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_measurement_type">Measurement Type</Label>
+                    <Select
+                      value={basicData.unit_measurement_type}
+                      onValueChange={(value) => setBasicData({ ...basicData, unit_measurement_type: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weight">Weight (g/kg)</SelectItem>
+                        <SelectItem value="volume">Volume (ml/L)</SelectItem>
+                        <SelectItem value="length">Length (cm/m)</SelectItem>
+                        <SelectItem value="area">Area (m²)</SelectItem>
+                        <SelectItem value="count">Count (units)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      What type of measurement
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center space-x-2 p-4 bg-muted rounded-lg">
