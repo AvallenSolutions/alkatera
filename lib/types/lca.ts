@@ -50,7 +50,76 @@ export interface PackagingType {
 
 export type MaterialType = 'ingredient' | 'packaging';
 
-export type PackagingCategory = 'container' | 'label' | 'closure' | 'secondary';
+export type PackagingCategory = 'container' | 'label' | 'closure' | 'secondary' | 'shipment' | 'tertiary';
+
+// ============================================================================
+// UK EPR (Extended Producer Responsibility) Types
+// Based on https://www.gov.uk/guidance/how-to-collect-your-packaging-data-for-extended-producer-responsibility
+// ============================================================================
+
+/**
+ * EPR Material Types - aligned with UK gov.uk categories
+ * Used for material breakdown of packaging components
+ */
+export type EPRMaterialType =
+  // Main EPR material categories
+  | 'aluminium'
+  | 'fibre_composite'    // Fibre-based composite
+  | 'glass'
+  | 'paper_cardboard'
+  | 'plastic_rigid'      // Plastic split for large producers
+  | 'plastic_flexible'   // Plastic split for large producers
+  | 'steel'
+  | 'wood'
+  | 'other'              // bamboo, ceramic, cork, silicone, etc.
+  // Sub-component materials for detailed breakdown
+  | 'adhesive'
+  | 'ink'
+  | 'coating'
+  | 'lacquer';
+
+/**
+ * EPR Packaging Level - UK EPR packaging class
+ */
+export type EPRPackagingLevel = 'primary' | 'secondary' | 'tertiary' | 'shipment';
+
+/**
+ * EPR Packaging Activity - how packaging was supplied
+ */
+export type EPRPackagingActivity =
+  | 'brand'           // Supplied under your brand
+  | 'packed_filled'   // Packed or filled
+  | 'imported'        // Imported (first UK owner)
+  | 'empty'           // Supplied as empty packaging
+  | 'hired'           // Hired or loaned
+  | 'marketplace';    // Online marketplace
+
+/**
+ * RAM Recyclability Rating (Recyclability Assessment Methodology)
+ * Used for EPR fee modulation
+ */
+export type EPRRAMRating = 'red' | 'amber' | 'green';
+
+/**
+ * UK Nation - for EPR reporting by nation
+ */
+export type EPRUKNation = 'england' | 'scotland' | 'wales' | 'northern_ireland';
+
+/**
+ * Packaging Material Component - for EPR material breakdown
+ * Represents a single material component within a packaging item (e.g., paper, glue, ink)
+ */
+export interface PackagingMaterialComponent {
+  id?: string;
+  product_material_id?: number;
+  epr_material_type: EPRMaterialType;
+  component_name: string;
+  weight_grams: number;
+  recycled_content_percentage?: number;
+  is_recyclable?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export type LabelPrintingType = 'digital' | 'offset' | 'flexographic' | 'gravure' | 'screen' | 'letterpress' | 'other';
 

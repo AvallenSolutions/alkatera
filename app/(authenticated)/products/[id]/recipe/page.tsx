@@ -88,6 +88,15 @@ export default function ProductRecipePage() {
       origin_country: '',
       transport_mode: 'truck',
       distance_km: '',
+      // EPR Compliance fields
+      has_component_breakdown: false,
+      components: [],
+      epr_packaging_level: undefined,
+      epr_packaging_activity: undefined,
+      epr_is_household: true,
+      epr_ram_rating: undefined,
+      epr_uk_nation: undefined,
+      epr_is_drinks_container: false,
     }
   ]);
 
@@ -246,6 +255,15 @@ export default function ProductRecipePage() {
             origin_country_code: item.origin_country_code || '',
             transport_mode: item.transport_mode || 'truck',
             distance_km: item.distance_km || '',
+            // EPR Compliance fields
+            has_component_breakdown: item.has_component_breakdown || false,
+            components: [], // Components loaded separately if needed
+            epr_packaging_level: item.epr_packaging_level || undefined,
+            epr_packaging_activity: item.epr_packaging_activity || undefined,
+            epr_is_household: item.epr_is_household !== undefined ? item.epr_is_household : true,
+            epr_ram_rating: item.epr_ram_rating || undefined,
+            epr_uk_nation: item.epr_uk_nation || undefined,
+            epr_is_drinks_container: item.epr_is_drinks_container || false,
           };
         }));
       }
@@ -314,6 +332,15 @@ export default function ProductRecipePage() {
         origin_country: '',
         transport_mode: 'truck',
         distance_km: '',
+        // EPR Compliance fields
+        has_component_breakdown: false,
+        components: [],
+        epr_packaging_level: undefined,
+        epr_packaging_activity: undefined,
+        epr_is_household: true,
+        epr_ram_rating: undefined,
+        epr_uk_nation: undefined,
+        epr_is_drinks_container: false,
       }
     ]);
   };
@@ -640,6 +667,23 @@ export default function ProductRecipePage() {
           materialData.origin_country_code = form.origin_country_code || null;
         }
 
+        // Include EPR Compliance fields
+        materialData.has_component_breakdown = form.has_component_breakdown || false;
+        if (form.epr_packaging_level) {
+          materialData.epr_packaging_level = form.epr_packaging_level;
+        }
+        if (form.epr_packaging_activity) {
+          materialData.epr_packaging_activity = form.epr_packaging_activity;
+        }
+        materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
+        if (form.epr_ram_rating) {
+          materialData.epr_ram_rating = form.epr_ram_rating;
+        }
+        if (form.epr_uk_nation) {
+          materialData.epr_uk_nation = form.epr_uk_nation;
+        }
+        materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
+
         return materialData;
       });
 
@@ -658,6 +702,35 @@ export default function ProductRecipePage() {
 
       console.log('=== INSERT SUCCESSFUL ===');
       console.log('Inserted data:', insertedData);
+
+      // Save packaging material components if any forms have component breakdowns
+      if (insertedData) {
+        for (let i = 0; i < validForms.length; i++) {
+          const form = validForms[i];
+          const insertedItem = insertedData[i];
+
+          if (form.has_component_breakdown && form.components && form.components.length > 0 && insertedItem?.id) {
+            // Insert components for this packaging item
+            const componentsToInsert = form.components.map(comp => ({
+              product_material_id: insertedItem.id,
+              epr_material_type: comp.epr_material_type,
+              component_name: comp.component_name,
+              weight_grams: comp.weight_grams,
+              recycled_content_percentage: comp.recycled_content_percentage || 0,
+              is_recyclable: comp.is_recyclable !== undefined ? comp.is_recyclable : true,
+            }));
+
+            const { error: componentError } = await supabase
+              .from('packaging_material_components')
+              .insert(componentsToInsert);
+
+            if (componentError) {
+              console.error('Error saving components for item', insertedItem.id, componentError);
+              // Don't throw - just log the error, main packaging was saved
+            }
+          }
+        }
+      }
 
       // Show success toast
       toast.success(`✓ ${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`);
