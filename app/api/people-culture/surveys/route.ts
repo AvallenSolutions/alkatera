@@ -13,15 +13,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organisation
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get user's current organisation from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     // Parse query params
@@ -34,7 +40,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('people_employee_surveys')
       .select(includeResponses ? '*, people_survey_responses(*)' : '*')
-      .eq('organization_id', membership.organization_id)
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
 
     if (status) {
@@ -73,15 +79,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organisation
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get user's current organisation from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
@@ -104,7 +116,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare record data
     const recordData = {
-      organization_id: membership.organization_id,
+      organization_id: organizationId,
       created_by: user.id,
       survey_name: body.survey_name,
       survey_type: body.survey_type,
@@ -149,15 +161,21 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organisation
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get user's current organisation from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
@@ -179,7 +197,7 @@ export async function PUT(request: NextRequest) {
       .from('people_employee_surveys')
       .update(recordUpdate)
       .eq('id', id)
-      .eq('organization_id', membership.organization_id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 

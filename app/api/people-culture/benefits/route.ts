@@ -13,15 +13,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organisation
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get user's current organisation from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     // Parse query params
@@ -33,7 +39,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('people_benefits')
       .select('*')
-      .eq('organization_id', membership.organization_id)
+      .eq('organization_id', organizationId)
       .order('benefit_type')
       .order('benefit_name');
 
@@ -98,15 +104,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organisation
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get user's current organisation from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
@@ -135,7 +147,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare record data
     const recordData = {
-      organization_id: membership.organization_id,
+      organization_id: organizationId,
       created_by: user.id,
       benefit_name: body.benefit_name,
       benefit_type: body.benefit_type,
