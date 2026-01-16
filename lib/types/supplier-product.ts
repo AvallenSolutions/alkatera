@@ -147,6 +147,8 @@ export interface SupplierProduct {
   description: string | null;
   category: string | null;
   unit: string;
+  unit_measurement: string | null;
+  unit_measurement_type: string | null;
   product_code: string | null;
   product_image_url: string | null;
   is_active: boolean;
@@ -409,6 +411,8 @@ export interface SupplierProductFormData {
   description?: string;
   category?: string;
   unit: string;
+  unit_measurement?: string;
+  unit_measurement_type?: string;
   product_code?: string;
   is_active: boolean;
 

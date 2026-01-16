@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -643,7 +643,7 @@ export function AddSupplierProductModal({
                       type="number"
                       step="0.01"
                       value={basicData.unit_measurement ?? ""}
-                      onChange={(e) => setBasicData({ ...basicData, unit_measurement: e.target.value ? parseFloat(e.target.value) : undefined })}
+                      onChange={(e) => setBasicData({ ...basicData, unit_measurement: e.target.value || undefined })}
                       placeholder="e.g., 570"
                     />
                     <p className="text-xs text-muted-foreground">
