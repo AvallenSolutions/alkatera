@@ -91,34 +91,39 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert gap analysis for this requirement
+    // Insert record
+    console.log('[Gap Analysis API] Attempting to insert record for org:', organizationId);
+
     const { data, error } = await supabase
       .from('certification_gap_analyses')
-      .upsert(
-        {
-          organization_id: body.organization_id || organizationId,
-          framework_id: body.framework_id,
-          requirement_id: body.requirement_id,
-          compliance_status: body.compliance_status || 'not_assessed',
-          current_score: body.current_score,
-          gap_description: body.gap_description,
-          action_required: body.action_required,
-          priority: body.priority,
-          assigned_to: body.assigned_to,
-          target_completion_date: body.target_completion_date,
-          notes: body.notes,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'organization_id,framework_id,requirement_id',
-        }
-      )
+      .insert({
+        organization_id: body.organization_id || organizationId,
+        framework_id: body.framework_id,
+        requirement_id: body.requirement_id,
+        compliance_status: body.compliance_status || 'not_assessed',
+        current_score: body.current_score,
+        gap_description: body.gap_description,
+        action_required: body.action_required,
+        priority: body.priority,
+        assigned_to: body.assigned_to,
+        target_completion_date: body.target_completion_date,
+        notes: body.notes,
+      })
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating/updating gap analysis:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[Gap Analysis API] Error saving data:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return NextResponse.json({
+        error: 'Failed to save gap analysis data',
+        details: error.message,
+        code: error.code,
+      }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });

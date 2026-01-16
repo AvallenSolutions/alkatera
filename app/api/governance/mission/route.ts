@@ -61,10 +61,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Upsert - create or update the mission record
+    // Insert record
+    console.log('[Mission API] Attempting to insert record for org:', organizationId);
+
     const { data, error } = await supabase
       .from('governance_mission')
-      .upsert({
+      .insert({
         organization_id: body.organization_id || organizationId,
         mission_statement: body.mission_statement,
         mission_last_updated: body.mission_last_updated,
@@ -79,16 +81,22 @@ export async function POST(request: NextRequest) {
         articles_last_amended: body.articles_last_amended,
         sdg_commitments: body.sdg_commitments,
         climate_commitments: body.climate_commitments,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'organization_id',
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error saving mission:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[Mission API] Error saving data:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return NextResponse.json({
+        error: 'Failed to save mission data',
+        details: error.message,
+        code: error.code,
+      }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });

@@ -93,10 +93,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert - update if exists for same year/quarter
+    // Insert record
+    console.log('[Local Impact API] Attempting to insert record for org:', organizationId);
+
     const { data, error } = await supabase
       .from('community_local_impact')
-      .upsert({
+      .insert({
         organization_id: body.organization_id || organizationId,
         reporting_year: body.reporting_year,
         reporting_quarter: body.reporting_quarter || null,
@@ -113,16 +115,22 @@ export async function POST(request: NextRequest) {
         community_investment_total: body.community_investment_total,
         infrastructure_investment: body.infrastructure_investment,
         notes: body.notes,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'organization_id,reporting_year,reporting_quarter',
       })
       .select()
       .single();
 
     if (error) {
-      console.error('Error saving local impact data:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[Local Impact API] Error saving data:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return NextResponse.json({
+        error: 'Failed to save local impact data',
+        details: error.message,
+        code: error.code,
+      }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });

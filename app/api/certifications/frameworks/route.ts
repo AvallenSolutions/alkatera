@@ -92,32 +92,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create or update organization certification tracking
+    // Insert record
+    console.log('[Certifications API] Attempting to insert record for org:', organizationId);
+
     const { data, error } = await supabase
       .from('organization_certifications')
-      .upsert(
-        {
-          organization_id: body.organization_id || organizationId,
-          framework_id: body.framework_id,
-          status: body.status || 'not_started',
-          target_date: body.target_date,
-          certification_date: body.certification_date,
-          expiry_date: body.expiry_date,
-          certificate_number: body.certificate_number,
-          current_score: body.current_score,
-          notes: body.notes,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: 'organization_id,framework_id',
-        }
-      )
+      .insert({
+        organization_id: body.organization_id || organizationId,
+        framework_id: body.framework_id,
+        status: body.status || 'not_started',
+        target_date: body.target_date,
+        certification_date: body.certification_date,
+        expiry_date: body.expiry_date,
+        certificate_number: body.certificate_number,
+        current_score: body.current_score,
+        notes: body.notes,
+      })
       .select()
       .single();
 
     if (error) {
-      console.error('Error creating/updating certification:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('[Certifications API] Error saving data:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return NextResponse.json({
+        error: 'Failed to save certification data',
+        details: error.message,
+        code: error.code,
+      }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });

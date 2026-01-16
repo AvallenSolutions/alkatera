@@ -162,17 +162,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Update organization certification with current score
-    await supabase
+    const { error: updateError } = await supabase
       .from('organization_certifications')
-      .upsert({
-        organization_id: targetOrgId,
-        framework_id: body.framework_id,
+      .update({
         current_score: scoreBreakdown.totalScore,
         status: scoreBreakdown.totalScore >= passingScore ? 'ready' : 'in_progress',
         updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'organization_id,framework_id',
-      });
+      })
+      .eq('organization_id', targetOrgId)
+      .eq('framework_id', body.framework_id);
+
+    if (updateError) {
+      console.error('[Score API] Error updating certification:', updateError);
+    }
 
     return NextResponse.json({
       ...data,

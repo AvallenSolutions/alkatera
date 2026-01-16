@@ -129,19 +129,28 @@ export async function POST(request: NextRequest) {
       data_collection_method: body.data_collection_method || 'manual',
     };
 
-    // Upsert (update if exists for same org/period, insert otherwise)
+    // Insert record
+    console.log('[Demographics API] Attempting to insert record for org:', organizationId);
+
     const { data, error } = await supabase
       .from('people_workforce_demographics')
-      .upsert(recordData, {
-        onConflict: 'organization_id,reporting_period',
-        ignoreDuplicates: false,
-      })
+      .insert(recordData)
       .select()
       .single();
 
     if (error) {
-      console.error('Error saving demographics:', error);
-      return NextResponse.json({ error: 'Failed to save demographics', details: error.message }, { status: 500 });
+      console.error('[Demographics API] Error saving demographics:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      return NextResponse.json({
+        error: 'Failed to save demographics',
+        details: error.message,
+        code: error.code,
+        hint: error.hint,
+      }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });
