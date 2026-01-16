@@ -13,15 +13,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organisation
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get user's current organisation from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     // Parse query params
@@ -33,7 +39,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('people_culture_scores')
       .select('*')
-      .eq('organization_id', membership.organization_id)
+      .eq('organization_id', organizationId)
       .order('calculation_date', { ascending: false });
 
     if (!includeHistory) {
@@ -51,7 +57,7 @@ export async function GET(request: NextRequest) {
     const { data: summary, error: summaryError } = await supabase
       .from('people_culture_summary')
       .select('*')
-      .eq('organization_id', membership.organization_id)
+      .eq('organization_id', organizationId)
       .single();
 
     if (summaryError && summaryError.code !== 'PGRST116') {
@@ -100,15 +106,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's organisation
-    const { data: membership, error: memberError } = await supabase
-      .from('organization_members')
-      .select('organization_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get user's current organisation from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
 
-    if (memberError || !membership) {
-      return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
     }
 
     const body = await request.json();
@@ -118,7 +130,7 @@ export async function POST(request: NextRequest) {
     const { data: summary, error: summaryError } = await supabase
       .from('people_culture_summary')
       .select('*')
-      .eq('organization_id', membership.organization_id)
+      .eq('organization_id', organizationId)
       .single();
 
     if (summaryError && summaryError.code !== 'PGRST116') {
@@ -176,7 +188,7 @@ export async function POST(request: NextRequest) {
 
     // Insert or update score
     const scoreData = {
-      organization_id: membership.organization_id,
+      organization_id: organizationId,
       calculation_date: new Date().toISOString(),
       reporting_year: year,
       overall_score: overallScore,
