@@ -234,6 +234,8 @@ export interface PlatformSupplierProduct {
   description: string | null;
   category: string | null;
   unit: string;
+  unit_measurement: string | null;
+  unit_measurement_type: string | null;
   product_code: string | null;
   product_image_url: string | null;
   is_active: boolean;
