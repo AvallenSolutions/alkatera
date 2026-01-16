@@ -82,6 +82,15 @@ export function BOMImportFlow({
             origin_country: '',
             transport_mode: 'truck',
             distance_km: 0,
+            // EPR Compliance fields
+            has_component_breakdown: false,
+            components: [],
+            epr_packaging_level: undefined,
+            epr_packaging_activity: undefined,
+            epr_is_household: true,
+            epr_ram_rating: undefined,
+            epr_uk_nation: undefined,
+            epr_is_drinks_container: false,
           };
           packaging.push(packagingData);
         }
