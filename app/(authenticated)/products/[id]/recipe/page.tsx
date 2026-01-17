@@ -245,9 +245,9 @@ export default function ProductRecipePage() {
             amount: item.quantity,
             unit: item.unit || 'g',
             packaging_category: item.packaging_category || (categoryMatch ? categoryMatch[1] : 'container'),
-            recycled_content_percentage: '',
-            printing_process: 'standard_ink',
-            net_weight_g: item.quantity || '',
+            recycled_content_percentage: item.recycled_content_percentage || '',
+            printing_process: item.printing_process || 'standard_ink',
+            net_weight_g: item.net_weight_g || item.quantity || '',
             origin_country: item.origin_country || '',
             origin_address: item.origin_address || '',
             origin_lat: item.origin_lat || undefined,
@@ -636,11 +636,14 @@ export default function ProductRecipePage() {
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
-          quantity: Number(form.net_weight_g) || Number(form.amount),
+          quantity: Number(form.amount),
           unit: form.unit,
           material_type: 'packaging',
           packaging_category: form.packaging_category || null,
           origin_country: form.origin_country || null,
+          net_weight_g: Number(form.net_weight_g) || null,
+          recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
+          printing_process: form.printing_process || null,
         };
 
         // Only include data_source if it's a valid value with required fields

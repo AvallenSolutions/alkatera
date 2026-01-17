@@ -29,9 +29,11 @@ export function SpecificationTab({ productId, ingredients, packaging }: Specific
     })
     .slice(0, 3);
 
-  // Calculate total packaging weight
+  // Calculate total packaging weight (convert to grams if needed)
   const totalPackagingWeight = packaging.reduce((sum, pkg) => {
-    return sum + pkg.quantity;
+    // If unit is kg, convert to grams; otherwise assume already in grams
+    const weightInGrams = pkg.unit === 'kg' ? pkg.quantity * 1000 : pkg.quantity;
+    return sum + weightInGrams;
   }, 0);
 
   // Get primary container
@@ -173,7 +175,13 @@ export function SpecificationTab({ productId, ingredients, packaging }: Specific
                       </span>
                     </div>
                     <span className="text-sm text-slate-400">
-                      {primaryContainer.quantity} {primaryContainer.unit}
+                      {(() => {
+                        // Display weights under 1kg in grams for better readability
+                        if (primaryContainer.unit === 'kg' && primaryContainer.quantity < 1) {
+                          return `${(primaryContainer.quantity * 1000).toFixed(0)}g`;
+                        }
+                        return `${primaryContainer.quantity.toFixed(2)} ${primaryContainer.unit}`;
+                      })()}
                     </span>
                   </div>
                 </div>
