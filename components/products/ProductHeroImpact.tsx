@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -70,6 +71,7 @@ function BottleVisualization({
   className?: string;
 }) {
   const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0);
+  const fillPercentage = total > 0 ? Math.min(100, Math.max(10, 60 + (total / 5))) : 60;
 
   const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
 
@@ -78,68 +80,85 @@ function BottleVisualization({
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
 
+  const bottleOutline = "M38,10 L62,10 L62,55 C62,75 80,85 80,110 L80,185 C80,193 75,198 65,198 L35,198 C25,198 20,193 20,185 L20,110 C20,85 38,75 38,55 Z";
+  const bottleMask = bottleOutline;
+
   return (
-    <div className={cn('relative', className)}>
-      <svg viewBox="0 0 120 280" className="w-full h-full drop-shadow-2xl">
+    <div className={cn('relative w-[100px] h-[200px]', className)}>
+      <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
         <defs>
-          <linearGradient id="bottleGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id="liquidGradientBottle" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#22d3ee" />
+            <stop offset="50%" stopColor="#06b6d4" />
+            <stop offset="100%" stopColor="#0e7490" />
+          </linearGradient>
+          <linearGradient id="liquidOverlayBottle" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
             <stop offset="50%" stopColor="rgba(255,255,255,0.1)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0.05)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
-          <filter id="bottleGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <mask id="bottleMask">
+            <path d={bottleMask} fill="white" />
+          </mask>
+          <filter id="bottleGlow">
+            <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
-          <clipPath id="bottleClip">
-            <path d="M45 30 Q45 20 50 15 L50 8 Q50 5 55 5 L65 5 Q70 5 70 8 L70 15 Q75 20 75 30 L80 50 Q85 60 85 80 L85 250 Q85 270 60 270 Q35 270 35 250 L35 80 Q35 60 40 50 Z" />
-          </clipPath>
         </defs>
 
-        <g filter="url(#bottleGlow)">
-          <path
-            d="M45 30 Q45 20 50 15 L50 8 Q50 5 55 5 L65 5 Q70 5 70 8 L70 15 Q75 20 75 30 L80 50 Q85 60 85 80 L85 250 Q85 270 60 270 Q35 270 35 250 L35 80 Q35 60 40 50 Z"
-            fill="rgba(30, 30, 30, 0.8)"
-            stroke="rgba(255,255,255,0.2)"
-            strokeWidth="1"
+        <g mask="url(#bottleMask)">
+          <motion.rect
+            x="0"
+            y={200 - (200 * (fillPercentage / 100))}
+            width="100"
+            height={200 * (fillPercentage / 100)}
+            fill="url(#liquidGradientBottle)"
+            initial={{ y: 200, height: 0 }}
+            animate={{
+              y: 200 - (200 * (fillPercentage / 100)),
+              height: 200 * (fillPercentage / 100)
+            }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
           />
-        </g>
+          <rect
+            x="0"
+            y={200 - (200 * (fillPercentage / 100))}
+            width="100"
+            height={200 * (fillPercentage / 100)}
+            fill="url(#liquidOverlayBottle)"
+          />
 
-        <g clipPath="url(#bottleClip)">
-          <rect x="35" y={270 - (transportPct * 2.2)} width="50" height={transportPct * 2.2}
-            fill={LAYER_COLORS.transport.fill} className="transition-all duration-700" />
-          <rect x="35" y={270 - (transportPct * 2.2) - (packagingPct * 2.2)} width="50" height={packagingPct * 2.2}
-            fill={LAYER_COLORS.packaging.fill} className="transition-all duration-700" />
-          <rect x="35" y={270 - (transportPct * 2.2) - (packagingPct * 2.2) - (processPct * 2.2)} width="50" height={processPct * 2.2}
-            fill={LAYER_COLORS.processing.fill} className="transition-all duration-700" />
-          <rect x="35" y={270 - (transportPct * 2.2) - (packagingPct * 2.2) - (processPct * 2.2) - (rawPct * 2.2)} width="50" height={rawPct * 2.2}
-            fill={LAYER_COLORS.rawMaterials.fill} className="transition-all duration-700" />
+          {[...Array(6)].map((_, i) => (
+            <motion.circle
+              key={i}
+              r={1.5 + Math.random() * 1.5}
+              fill="rgba(255,255,255,0.5)"
+              initial={{ cx: 30 + Math.random() * 40, cy: 200 }}
+              animate={{ cy: 60, opacity: [0.6, 0] }}
+              transition={{
+                duration: 2.5 + Math.random() * 2,
+                repeat: Infinity,
+                ease: "linear",
+                delay: i * 0.4
+              }}
+            />
+          ))}
         </g>
 
         <path
-          d="M45 30 Q45 20 50 15 L50 8 Q50 5 55 5 L65 5 Q70 5 70 8 L70 15 Q75 20 75 30 L80 50 Q85 60 85 80 L85 250 Q85 270 60 270 Q35 270 35 250 L35 80 Q35 60 40 50 Z"
-          fill="url(#bottleGradient)"
-          stroke="rgba(255,255,255,0.3)"
-          strokeWidth="1"
+          d={bottleOutline}
+          fill="none"
+          stroke="white"
+          strokeWidth="1.5"
+          className="opacity-80"
+          filter="url(#bottleGlow)"
         />
-      </svg>
 
-      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-2 h-2 rounded-full bg-white/40 animate-bubble"
-            style={{
-              left: `${Math.random() * 40 - 20}px`,
-              animationDelay: `${i * 0.5}s`,
-              animationDuration: `${2 + Math.random()}s`,
-            }}
-          />
-        ))}
-      </div>
+        <rect x="38" y="2" width="24" height="6" rx="1" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
+      </svg>
     </div>
   );
 }
@@ -152,29 +171,30 @@ function CanVisualization({
   className?: string;
 }) {
   const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0);
+  const fillPercentage = total > 0 ? Math.min(100, Math.max(10, 60 + (total / 5))) : 60;
 
-  const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
-
-  const rawPct = getPercentage(breakdown.rawMaterials);
-  const processPct = getPercentage(breakdown.processing);
-  const packagingPct = getPercentage(breakdown.packaging);
-  const transportPct = getPercentage(breakdown.transport);
+  const canOutline = "M28,32 L72,32 L72,36 L80,48 L80,170 C80,180 72,185 50,185 C28,185 20,180 20,170 L20,48 L28,36 Z";
+  const canMask = canOutline;
 
   return (
-    <div className={cn('relative', className)}>
-      <svg viewBox="0 0 100 180" className="w-full h-full drop-shadow-2xl">
+    <div className={cn('relative w-[100px] h-[200px]', className)}>
+      <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
         <defs>
-          <linearGradient id="canGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.4)" />
-            <stop offset="30%" stopColor="rgba(255,255,255,0.1)" />
-            <stop offset="70%" stopColor="rgba(255,255,255,0.05)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0.2)" />
+          <linearGradient id="liquidGradientCan" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#fbbf24" />
+            <stop offset="50%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#b45309" />
           </linearGradient>
-          <clipPath id="canClip">
-            <path d="M20 25 Q20 15 50 15 Q80 15 80 25 L80 155 Q80 165 50 165 Q20 165 20 155 Z" />
-          </clipPath>
-          <filter id="canGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
+          <linearGradient id="liquidOverlayCan" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
+            <stop offset="50%" stopColor="rgba(255,255,255,0.1)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </linearGradient>
+          <mask id="canMask">
+            <path d={canMask} fill="white" />
+          </mask>
+          <filter id="canGlow">
+            <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -182,36 +202,56 @@ function CanVisualization({
           </filter>
         </defs>
 
-        <g filter="url(#canGlow)">
-          <path
-            d="M20 25 Q20 15 50 15 Q80 15 80 25 L80 155 Q80 165 50 165 Q20 165 20 155 Z"
-            fill="rgba(40, 40, 40, 0.9)"
-            stroke="rgba(255,255,255,0.3)"
-            strokeWidth="1"
+        <g mask="url(#canMask)">
+          <motion.rect
+            x="0"
+            y={200 - (200 * (fillPercentage / 100))}
+            width="100"
+            height={200 * (fillPercentage / 100)}
+            fill="url(#liquidGradientCan)"
+            initial={{ y: 200, height: 0 }}
+            animate={{
+              y: 200 - (200 * (fillPercentage / 100)),
+              height: 200 * (fillPercentage / 100)
+            }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
           />
-        </g>
+          <rect
+            x="0"
+            y={200 - (200 * (fillPercentage / 100))}
+            width="100"
+            height={200 * (fillPercentage / 100)}
+            fill="url(#liquidOverlayCan)"
+          />
 
-        <g clipPath="url(#canClip)">
-          <rect x="20" y={165 - (transportPct * 1.4)} width="60" height={transportPct * 1.4}
-            fill={LAYER_COLORS.transport.fill} className="transition-all duration-700" />
-          <rect x="20" y={165 - (transportPct * 1.4) - (packagingPct * 1.4)} width="60" height={packagingPct * 1.4}
-            fill={LAYER_COLORS.packaging.fill} className="transition-all duration-700" />
-          <rect x="20" y={165 - (transportPct * 1.4) - (packagingPct * 1.4) - (processPct * 1.4)} width="60" height={processPct * 1.4}
-            fill={LAYER_COLORS.processing.fill} className="transition-all duration-700" />
-          <rect x="20" y={165 - (transportPct * 1.4) - (packagingPct * 1.4) - (processPct * 1.4) - (rawPct * 1.4)} width="60" height={rawPct * 1.4}
-            fill={LAYER_COLORS.rawMaterials.fill} className="transition-all duration-700" />
+          {[...Array(5)].map((_, i) => (
+            <motion.circle
+              key={i}
+              r={1 + Math.random() * 1.5}
+              fill="rgba(255,255,255,0.4)"
+              initial={{ cx: 30 + Math.random() * 40, cy: 200 }}
+              animate={{ cy: 50, opacity: [0.5, 0] }}
+              transition={{
+                duration: 2 + Math.random() * 2,
+                repeat: Infinity,
+                ease: "linear",
+                delay: i * 0.5
+              }}
+            />
+          ))}
         </g>
-
-        <ellipse cx="50" cy="15" rx="30" ry="8" fill="rgba(60,60,60,0.8)" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
-        <ellipse cx="50" cy="15" rx="20" ry="5" fill="rgba(80,80,80,0.9)" />
-        <circle cx="50" cy="15" r="6" fill="rgba(100,100,100,1)" stroke="rgba(255,255,255,0.2)" />
 
         <path
-          d="M20 25 Q20 15 50 15 Q80 15 80 25 L80 155 Q80 165 50 165 Q20 165 20 155 Z"
-          fill="url(#canGradient)"
-          stroke="rgba(255,255,255,0.2)"
-          strokeWidth="0.5"
+          d={canOutline}
+          fill="none"
+          stroke="white"
+          strokeWidth="1.5"
+          className="opacity-80"
+          filter="url(#canGlow)"
         />
+
+        <path d="M28,36 L72,36" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
+        <path d="M32,32 C32,38 68,38 68,32" fill="none" stroke="white" strokeWidth="1" className="opacity-50" />
       </svg>
     </div>
   );
@@ -225,28 +265,30 @@ function KegVisualization({
   className?: string;
 }) {
   const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0);
+  const fillPercentage = total > 0 ? Math.min(100, Math.max(10, 60 + (total / 5))) : 60;
 
-  const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
-
-  const rawPct = getPercentage(breakdown.rawMaterials);
-  const processPct = getPercentage(breakdown.processing);
-  const packagingPct = getPercentage(breakdown.packaging);
-  const transportPct = getPercentage(breakdown.transport);
+  const kegOutline = "M15,40 L85,40 L85,160 L15,160 Z";
+  const kegMask = kegOutline;
 
   return (
-    <div className={cn('relative', className)}>
-      <svg viewBox="0 0 140 200" className="w-full h-full drop-shadow-2xl">
+    <div className={cn('relative w-[100px] h-[200px]', className)}>
+      <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
         <defs>
-          <linearGradient id="kegGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <linearGradient id="liquidGradientKeg" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#a3e635" />
+            <stop offset="50%" stopColor="#84cc16" />
+            <stop offset="100%" stopColor="#4d7c0f" />
+          </linearGradient>
+          <linearGradient id="liquidOverlayKeg" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
             <stop offset="50%" stopColor="rgba(255,255,255,0.1)" />
-            <stop offset="100%" stopColor="rgba(255,255,255,0.2)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
-          <clipPath id="kegClip">
-            <path d="M25 40 Q25 25 70 25 Q115 25 115 40 L115 160 Q115 175 70 175 Q25 175 25 160 Z" />
-          </clipPath>
-          <filter id="kegGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="4" result="blur" />
+          <mask id="kegMask">
+            <path d={kegMask} fill="white" />
+          </mask>
+          <filter id="kegGlow">
+            <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -254,39 +296,62 @@ function KegVisualization({
           </filter>
         </defs>
 
-        <g filter="url(#kegGlow)">
-          <path
-            d="M25 40 Q25 25 70 25 Q115 25 115 40 L115 160 Q115 175 70 175 Q25 175 25 160 Z"
-            fill="rgba(50, 50, 50, 0.9)"
-            stroke="rgba(200,200,200,0.4)"
-            strokeWidth="2"
+        <g mask="url(#kegMask)">
+          <motion.rect
+            x="0"
+            y={200 - (200 * (fillPercentage / 100))}
+            width="100"
+            height={200 * (fillPercentage / 100)}
+            fill="url(#liquidGradientKeg)"
+            initial={{ y: 200, height: 0 }}
+            animate={{
+              y: 200 - (200 * (fillPercentage / 100)),
+              height: 200 * (fillPercentage / 100)
+            }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
           />
+          <rect
+            x="0"
+            y={200 - (200 * (fillPercentage / 100))}
+            width="100"
+            height={200 * (fillPercentage / 100)}
+            fill="url(#liquidOverlayKeg)"
+          />
+
+          {[...Array(4)].map((_, i) => (
+            <motion.circle
+              key={i}
+              r={2 + Math.random() * 2}
+              fill="rgba(255,255,255,0.3)"
+              initial={{ cx: 25 + Math.random() * 50, cy: 180 }}
+              animate={{ cy: 50, opacity: [0.4, 0] }}
+              transition={{
+                duration: 3 + Math.random() * 2,
+                repeat: Infinity,
+                ease: "linear",
+                delay: i * 0.6
+              }}
+            />
+          ))}
         </g>
-
-        <g clipPath="url(#kegClip)">
-          <rect x="25" y={175 - (transportPct * 1.35)} width="90" height={transportPct * 1.35}
-            fill={LAYER_COLORS.transport.fill} className="transition-all duration-700" />
-          <rect x="25" y={175 - (transportPct * 1.35) - (packagingPct * 1.35)} width="90" height={packagingPct * 1.35}
-            fill={LAYER_COLORS.packaging.fill} className="transition-all duration-700" />
-          <rect x="25" y={175 - (transportPct * 1.35) - (packagingPct * 1.35) - (processPct * 1.35)} width="90" height={processPct * 1.35}
-            fill={LAYER_COLORS.processing.fill} className="transition-all duration-700" />
-          <rect x="25" y={175 - (transportPct * 1.35) - (packagingPct * 1.35) - (processPct * 1.35) - (rawPct * 1.35)} width="90" height={rawPct * 1.35}
-            fill={LAYER_COLORS.rawMaterials.fill} className="transition-all duration-700" />
-        </g>
-
-        <ellipse cx="70" cy="25" rx="45" ry="12" fill="rgba(60,60,60,0.8)" stroke="rgba(200,200,200,0.4)" strokeWidth="2" />
-        <ellipse cx="70" cy="22" rx="15" ry="6" fill="rgba(80,80,80,0.9)" />
-        <rect x="62" y="10" width="16" height="12" rx="3" fill="rgba(100,100,100,1)" stroke="rgba(200,200,200,0.3)" />
-
-        <line x1="25" y1="55" x2="115" y2="55" stroke="rgba(150,150,150,0.5)" strokeWidth="3" />
-        <line x1="25" y1="145" x2="115" y2="145" stroke="rgba(150,150,150,0.5)" strokeWidth="3" />
 
         <path
-          d="M25 40 Q25 25 70 25 Q115 25 115 40 L115 160 Q115 175 70 175 Q25 175 25 160 Z"
-          fill="url(#kegGradient)"
-          stroke="rgba(200,200,200,0.3)"
-          strokeWidth="1"
+          d={kegOutline}
+          fill="none"
+          stroke="white"
+          strokeWidth="1.5"
+          className="opacity-80"
+          filter="url(#kegGlow)"
         />
+
+        <path d="M15,40 L15,25 C15,20 85,20 85,25 L85,40" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
+        <path d="M15,160 L15,175 C15,180 85,180 85,175 L85,160" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
+
+        <path d="M15,70 Q50,75 85,70" fill="none" stroke="white" strokeWidth="1" className="opacity-40" />
+        <path d="M15,130 Q50,135 85,130" fill="none" stroke="white" strokeWidth="1" className="opacity-40" />
+
+        <path d="M25,28 L35,28" fill="none" stroke="white" strokeWidth="2" className="opacity-60" strokeLinecap="round" />
+        <path d="M65,28 L75,28" fill="none" stroke="white" strokeWidth="2" className="opacity-60" strokeLinecap="round" />
       </svg>
     </div>
   );
@@ -523,15 +588,6 @@ export function ProductHeroImpact({
         </div>
       </div>
 
-      <style jsx>{`
-        @keyframes bubble {
-          0% { transform: translateY(0) scale(1); opacity: 0.6; }
-          100% { transform: translateY(-100px) scale(0); opacity: 0; }
-        }
-        .animate-bubble {
-          animation: bubble 3s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
