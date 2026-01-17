@@ -226,16 +226,19 @@ function KegVisualization({
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
 
-  const svgHeight = 200;
+  const kegFillTop = 40;
+  const kegFillBottom = 160;
+  const kegFillHeight = kegFillBottom - kegFillTop;
 
-  const transportHeight = (transportPct / 100) * svgHeight;
-  const packagingHeight = (packagingPct / 100) * svgHeight;
-  const processingHeight = (processPct / 100) * svgHeight;
-  const rawHeight = (rawPct / 100) * svgHeight;
+  const transportHeight = (transportPct / 100) * kegFillHeight;
+  const packagingHeight = (packagingPct / 100) * kegFillHeight;
+  const processingHeight = (processPct / 100) * kegFillHeight;
+  const rawHeight = (rawPct / 100) * kegFillHeight;
 
-  const transportY = svgHeight - transportHeight;
+  const transportY = kegFillBottom - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
+  const rawY = kegFillTop;
 
   const kegOutline = "M15,40 L85,40 L85,160 L15,160 Z";
 
@@ -261,11 +264,11 @@ function KegVisualization({
         </defs>
 
         <g mask="url(#kegMask)">
-          <rect x="0" y="0" width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
+          <rect x="0" y={rawY} width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
           <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
           <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
           <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
-          <rect x="0" y="0" width="100" height="200" fill="url(#kegGlassOverlay)" />
+          <rect x="0" y={kegFillTop} width="100" height={kegFillHeight} fill="url(#kegGlassOverlay)" />
         </g>
 
         <path
