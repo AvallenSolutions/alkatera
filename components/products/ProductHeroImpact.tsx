@@ -81,10 +81,18 @@ function BottleVisualization({
 
   const svgHeight = 200;
 
-  const transportHeight = (transportPct / 100) * svgHeight;
-  const packagingHeight = (packagingPct / 100) * svgHeight;
-  const processingHeight = (processPct / 100) * svgHeight;
-  const rawHeight = (rawPct / 100) * svgHeight;
+  const minVisibleHeight = 3;
+  const applyMinHeight = (calculatedHeight: number, percentage: number) => {
+    if (percentage > 0 && calculatedHeight < minVisibleHeight) {
+      return minVisibleHeight;
+    }
+    return calculatedHeight;
+  };
+
+  const transportHeight = applyMinHeight((transportPct / 100) * svgHeight, transportPct);
+  const packagingHeight = applyMinHeight((packagingPct / 100) * svgHeight, packagingPct);
+  const processingHeight = applyMinHeight((processPct / 100) * svgHeight, processPct);
+  const rawHeight = applyMinHeight((rawPct / 100) * svgHeight, rawPct);
 
   const transportY = svgHeight - transportHeight;
   const packagingY = transportY - packagingHeight;
@@ -154,10 +162,18 @@ function CanVisualization({
 
   const svgHeight = 200;
 
-  const transportHeight = (transportPct / 100) * svgHeight;
-  const packagingHeight = (packagingPct / 100) * svgHeight;
-  const processingHeight = (processPct / 100) * svgHeight;
-  const rawHeight = (rawPct / 100) * svgHeight;
+  const minVisibleHeight = 3;
+  const applyMinHeight = (calculatedHeight: number, percentage: number) => {
+    if (percentage > 0 && calculatedHeight < minVisibleHeight) {
+      return minVisibleHeight;
+    }
+    return calculatedHeight;
+  };
+
+  const transportHeight = applyMinHeight((transportPct / 100) * svgHeight, transportPct);
+  const packagingHeight = applyMinHeight((packagingPct / 100) * svgHeight, packagingPct);
+  const processingHeight = applyMinHeight((processPct / 100) * svgHeight, processPct);
+  const rawHeight = applyMinHeight((rawPct / 100) * svgHeight, rawPct);
 
   const transportY = svgHeight - transportHeight;
   const packagingY = transportY - packagingHeight;
@@ -230,10 +246,18 @@ function KegVisualization({
   const kegFillBottom = 160;
   const kegFillHeight = kegFillBottom - kegFillTop;
 
-  const transportHeight = (transportPct / 100) * kegFillHeight;
-  const packagingHeight = (packagingPct / 100) * kegFillHeight;
-  const processingHeight = (processPct / 100) * kegFillHeight;
-  const rawHeight = (rawPct / 100) * kegFillHeight;
+  const minVisibleHeight = 3;
+  const applyMinHeight = (calculatedHeight: number, percentage: number) => {
+    if (percentage > 0 && calculatedHeight < minVisibleHeight) {
+      return minVisibleHeight;
+    }
+    return calculatedHeight;
+  };
+
+  const transportHeight = applyMinHeight((transportPct / 100) * kegFillHeight, transportPct);
+  const packagingHeight = applyMinHeight((packagingPct / 100) * kegFillHeight, packagingPct);
+  const processingHeight = applyMinHeight((processPct / 100) * kegFillHeight, processPct);
+  const rawHeight = applyMinHeight((rawPct / 100) * kegFillHeight, rawPct);
 
   const transportY = kegFillBottom - transportHeight;
   const packagingY = transportY - packagingHeight;
