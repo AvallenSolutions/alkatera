@@ -79,33 +79,30 @@ function BottleVisualization({
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
 
-  const fillHeight = 188;
-  const startY = 198;
+  const svgHeight = 200;
 
-  const transportHeight = (transportPct / 100) * fillHeight;
-  const packagingHeight = (packagingPct / 100) * fillHeight;
-  const processingHeight = (processPct / 100) * fillHeight;
-  const rawHeight = (rawPct / 100) * fillHeight;
+  const transportHeight = (transportPct / 100) * svgHeight;
+  const packagingHeight = (packagingPct / 100) * svgHeight;
+  const processingHeight = (processPct / 100) * svgHeight;
+  const rawHeight = (rawPct / 100) * svgHeight;
 
-  const transportY = startY - transportHeight;
+  const transportY = svgHeight - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
-  const rawY = processingY - rawHeight;
 
   const bottleOutline = "M38,10 L62,10 L62,55 C62,75 80,85 80,110 L80,185 C80,193 75,198 65,198 L35,198 C25,198 20,193 20,185 L20,110 C20,85 38,75 38,55 Z";
-  const bottleMask = bottleOutline;
 
   return (
     <div className={cn('relative w-[100px] h-[200px]', className)}>
       <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
         <defs>
           <linearGradient id="glassOverlay" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.2)" />
+            <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
             <stop offset="50%" stopColor="rgba(255,255,255,0.05)" />
             <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
           <mask id="bottleMask">
-            <path d={bottleMask} fill="white" />
+            <path d={bottleOutline} fill="white" />
           </mask>
           <filter id="bottleGlow">
             <feGaussianBlur stdDeviation="2" result="blur" />
@@ -117,52 +114,11 @@ function BottleVisualization({
         </defs>
 
         <g mask="url(#bottleMask)">
-          <motion.rect
-            x="0" y={transportY} width="100" height={transportHeight}
-            fill={LAYER_COLORS.transport.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: transportHeight, y: transportY }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-          />
-          <motion.rect
-            x="0" y={packagingY} width="100" height={packagingHeight}
-            fill={LAYER_COLORS.packaging.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: packagingHeight, y: packagingY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.1 }}
-          />
-          <motion.rect
-            x="0" y={processingY} width="100" height={processingHeight}
-            fill={LAYER_COLORS.processing.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: processingHeight, y: processingY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
-          />
-          <motion.rect
-            x="0" y={rawY} width="100" height={rawHeight}
-            fill={LAYER_COLORS.rawMaterials.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: rawHeight, y: rawY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
-          />
-
-          <rect x="0" y={rawY} width="100" height={fillHeight - (startY - (rawY + rawHeight))} fill="url(#glassOverlay)" />
-
-          {[...Array(5)].map((_, i) => (
-            <motion.circle
-              key={i}
-              r={1.5}
-              fill="rgba(255,255,255,0.4)"
-              initial={{ cx: 35 + (i * 8), cy: startY }}
-              animate={{ cy: rawY + 20, opacity: [0.5, 0] }}
-              transition={{
-                duration: 2.5 + i * 0.3,
-                repeat: Infinity,
-                ease: "linear",
-                delay: i * 0.5
-              }}
-            />
-          ))}
+          <rect x="0" y="0" width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
+          <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
+          <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
+          <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
+          <rect x="0" y="0" width="100" height="200" fill="url(#glassOverlay)" />
         </g>
 
         <path
@@ -196,33 +152,30 @@ function CanVisualization({
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
 
-  const fillHeight = 153;
-  const startY = 185;
+  const svgHeight = 200;
 
-  const transportHeight = (transportPct / 100) * fillHeight;
-  const packagingHeight = (packagingPct / 100) * fillHeight;
-  const processingHeight = (processPct / 100) * fillHeight;
-  const rawHeight = (rawPct / 100) * fillHeight;
+  const transportHeight = (transportPct / 100) * svgHeight;
+  const packagingHeight = (packagingPct / 100) * svgHeight;
+  const processingHeight = (processPct / 100) * svgHeight;
+  const rawHeight = (rawPct / 100) * svgHeight;
 
-  const transportY = startY - transportHeight;
+  const transportY = svgHeight - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
-  const rawY = processingY - rawHeight;
 
   const canOutline = "M28,32 L72,32 L72,36 L80,48 L80,170 C80,180 72,185 50,185 C28,185 20,180 20,170 L20,48 L28,36 Z";
-  const canMask = canOutline;
 
   return (
     <div className={cn('relative w-[100px] h-[200px]', className)}>
       <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
         <defs>
           <linearGradient id="canGlassOverlay" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.2)" />
+            <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
             <stop offset="50%" stopColor="rgba(255,255,255,0.05)" />
             <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
           <mask id="canMask">
-            <path d={canMask} fill="white" />
+            <path d={canOutline} fill="white" />
           </mask>
           <filter id="canGlow">
             <feGaussianBlur stdDeviation="2" result="blur" />
@@ -234,52 +187,11 @@ function CanVisualization({
         </defs>
 
         <g mask="url(#canMask)">
-          <motion.rect
-            x="0" y={transportY} width="100" height={transportHeight}
-            fill={LAYER_COLORS.transport.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: transportHeight, y: transportY }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-          />
-          <motion.rect
-            x="0" y={packagingY} width="100" height={packagingHeight}
-            fill={LAYER_COLORS.packaging.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: packagingHeight, y: packagingY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.1 }}
-          />
-          <motion.rect
-            x="0" y={processingY} width="100" height={processingHeight}
-            fill={LAYER_COLORS.processing.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: processingHeight, y: processingY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
-          />
-          <motion.rect
-            x="0" y={rawY} width="100" height={rawHeight}
-            fill={LAYER_COLORS.rawMaterials.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: rawHeight, y: rawY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
-          />
-
-          <rect x="0" y={rawY} width="100" height={fillHeight} fill="url(#canGlassOverlay)" />
-
-          {[...Array(4)].map((_, i) => (
-            <motion.circle
-              key={i}
-              r={1.5}
-              fill="rgba(255,255,255,0.4)"
-              initial={{ cx: 35 + (i * 10), cy: startY }}
-              animate={{ cy: rawY + 20, opacity: [0.5, 0] }}
-              transition={{
-                duration: 2 + i * 0.3,
-                repeat: Infinity,
-                ease: "linear",
-                delay: i * 0.5
-              }}
-            />
-          ))}
+          <rect x="0" y="0" width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
+          <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
+          <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
+          <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
+          <rect x="0" y="0" width="100" height="200" fill="url(#canGlassOverlay)" />
         </g>
 
         <path
@@ -314,33 +226,30 @@ function KegVisualization({
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
 
-  const fillHeight = 120;
-  const startY = 160;
+  const svgHeight = 200;
 
-  const transportHeight = (transportPct / 100) * fillHeight;
-  const packagingHeight = (packagingPct / 100) * fillHeight;
-  const processingHeight = (processPct / 100) * fillHeight;
-  const rawHeight = (rawPct / 100) * fillHeight;
+  const transportHeight = (transportPct / 100) * svgHeight;
+  const packagingHeight = (packagingPct / 100) * svgHeight;
+  const processingHeight = (processPct / 100) * svgHeight;
+  const rawHeight = (rawPct / 100) * svgHeight;
 
-  const transportY = startY - transportHeight;
+  const transportY = svgHeight - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
-  const rawY = processingY - rawHeight;
 
   const kegOutline = "M15,40 L85,40 L85,160 L15,160 Z";
-  const kegMask = kegOutline;
 
   return (
     <div className={cn('relative w-[100px] h-[200px]', className)}>
       <svg viewBox="0 0 100 200" className="w-full h-full drop-shadow-2xl">
         <defs>
           <linearGradient id="kegGlassOverlay" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(255,255,255,0.2)" />
+            <stop offset="0%" stopColor="rgba(255,255,255,0.15)" />
             <stop offset="50%" stopColor="rgba(255,255,255,0.05)" />
             <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
           <mask id="kegMask">
-            <path d={kegMask} fill="white" />
+            <path d={kegOutline} fill="white" />
           </mask>
           <filter id="kegGlow">
             <feGaussianBlur stdDeviation="2" result="blur" />
@@ -352,52 +261,11 @@ function KegVisualization({
         </defs>
 
         <g mask="url(#kegMask)">
-          <motion.rect
-            x="0" y={transportY} width="100" height={transportHeight}
-            fill={LAYER_COLORS.transport.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: transportHeight, y: transportY }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
-          />
-          <motion.rect
-            x="0" y={packagingY} width="100" height={packagingHeight}
-            fill={LAYER_COLORS.packaging.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: packagingHeight, y: packagingY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.1 }}
-          />
-          <motion.rect
-            x="0" y={processingY} width="100" height={processingHeight}
-            fill={LAYER_COLORS.processing.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: processingHeight, y: processingY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.2 }}
-          />
-          <motion.rect
-            x="0" y={rawY} width="100" height={rawHeight}
-            fill={LAYER_COLORS.rawMaterials.fill}
-            initial={{ height: 0, y: startY }}
-            animate={{ height: rawHeight, y: rawY }}
-            transition={{ duration: 1.2, ease: "easeOut", delay: 0.3 }}
-          />
-
-          <rect x="0" y={rawY} width="100" height={fillHeight} fill="url(#kegGlassOverlay)" />
-
-          {[...Array(3)].map((_, i) => (
-            <motion.circle
-              key={i}
-              r={2}
-              fill="rgba(255,255,255,0.3)"
-              initial={{ cx: 30 + (i * 20), cy: startY }}
-              animate={{ cy: rawY + 15, opacity: [0.4, 0] }}
-              transition={{
-                duration: 2.5 + i * 0.4,
-                repeat: Infinity,
-                ease: "linear",
-                delay: i * 0.6
-              }}
-            />
-          ))}
+          <rect x="0" y="0" width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
+          <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
+          <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
+          <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
+          <rect x="0" y="0" width="100" height="200" fill="url(#kegGlassOverlay)" />
         </g>
 
         <path
