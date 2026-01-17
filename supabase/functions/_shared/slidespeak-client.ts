@@ -120,18 +120,25 @@ export class SlideSpeakClient {
     console.log('[SlideSpeak] Starting presentation generation...');
     console.log('[SlideSpeak] Content length:', options.content.length, 'characters');
     console.log('[SlideSpeak] Slide count:', options.slideCount || 15);
-    console.log('[SlideSpeak] Template:', options.template || 'default');
+    console.log('[SlideSpeak] Template:', options.template || 'DEFAULT');
 
     try {
+      // Build request body - SlideSpeak uses 'plain_text' and 'length'
+      const requestBody: Record<string, unknown> = {
+        plain_text: options.content,
+        length: options.slideCount || 15,
+        template: (options.template || 'DEFAULT').toUpperCase(),
+        language: options.language || 'ORIGINAL',
+      };
+
+      // Add custom instructions if provided
+      if (options.customInstructions) {
+        requestBody.fetch_instructions = options.customInstructions;
+      }
+
       const response = await this.request<{ task_id: string }>('/presentation/generate', {
         method: 'POST',
-        body: JSON.stringify({
-          content: options.content,
-          slide_count: options.slideCount || 15,
-          template: options.template || 'default',
-          language: options.language || 'ORIGINAL',
-          custom_instructions: options.customInstructions || '',
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       console.log('[SlideSpeak] Generation started, task ID:', response.task_id);
@@ -154,17 +161,39 @@ export class SlideSpeakClient {
    */
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
     const response = await this.request<{
-      status: string;
-      progress?: number;
-      download_url?: string;
-      error?: string;
+      task_id: string;
+      task_status: string;
+      task_result?: {
+        url?: string;
+        presentation_id?: string;
+        request_id?: string;
+      } | null;
+      task_info?: unknown;
     }>(`/task_status/${taskId}`);
 
+    // Map SlideSpeak statuses to our internal statuses
+    // SlideSpeak uses: PENDING, SENT, STARTED, SUCCESS, FAILED
+    let status: TaskStatus['status'];
+    switch (response.task_status) {
+      case 'SUCCESS':
+        status = 'SUCCESS';
+        break;
+      case 'FAILED':
+        status = 'FAILED';
+        break;
+      case 'STARTED':
+        status = 'PROCESSING';
+        break;
+      case 'PENDING':
+      case 'SENT':
+      default:
+        status = 'PENDING';
+    }
+
     return {
-      status: response.status as TaskStatus['status'],
-      progress: response.progress,
-      downloadUrl: response.download_url,
-      error: response.error,
+      status,
+      downloadUrl: response.task_result?.url,
+      error: response.task_status === 'FAILED' ? 'Generation failed' : undefined,
     };
   }
 
@@ -258,11 +287,12 @@ export class SlideSpeakClient {
   /**
    * Lists available templates
    */
-  async getTemplates(): Promise<{ id: string; name: string }[]> {
-    const response = await this.request<{ templates: { id: string; name: string }[] }>(
+  async getTemplates(): Promise<{ name: string; images: { cover: string; content: string } }[]> {
+    // SlideSpeak returns an array of templates directly
+    const response = await this.request<{ name: string; images: { cover: string; content: string } }[]>(
       '/presentation/templates'
     );
-    return response.templates;
+    return response;
   }
 
   /**
