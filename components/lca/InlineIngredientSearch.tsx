@@ -23,6 +23,8 @@ interface SearchResult {
   source?: string;
   metadata?: any;
   supplier_name?: string;
+  recycled_content_pct?: number;
+  packaging_components?: any;
 }
 
 interface SearchResponse {
@@ -47,6 +49,8 @@ interface InlineIngredientSearchProps {
     unit: string;
     carbon_intensity?: number;
     location?: string;
+    recycled_content_pct?: number;
+    packaging_components?: any;
   }) => void;
   onChange?: (value: string) => void;
   className?: string;
@@ -165,6 +169,8 @@ export function InlineIngredientSearch({
       unit: result.unit || 'kg',
       carbon_intensity: result.co2_factor,
       location: result.location,
+      recycled_content_pct: result.recycled_content_pct,
+      packaging_components: result.packaging_components,
     });
 
     setQuery(result.name);
@@ -282,6 +288,11 @@ export function InlineIngredientSearch({
                       {result.supplier_name && (
                         <Badge variant="outline" className="text-xs">
                           {result.supplier_name}
+                        </Badge>
+                      )}
+                      {result.recycled_content_pct && result.recycled_content_pct > 0 && (
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 text-xs">
+                          {result.recycled_content_pct}% recycled
                         </Badge>
                       )}
                     </div>

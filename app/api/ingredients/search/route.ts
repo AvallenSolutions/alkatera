@@ -219,6 +219,11 @@ export async function GET(request: NextRequest) {
           carbon_intensity,
           product_code,
           verified_at,
+          recycled_content_pct,
+          water_factor,
+          land_factor,
+          waste_factor,
+          packaging_components,
           suppliers!inner(
             name
           )
@@ -239,6 +244,11 @@ export async function GET(request: NextRequest) {
           processType: 'SUPPLIER_PRODUCT',
           location: 'Verified Supplier',
           co2_factor: product.carbon_intensity,
+          water_factor: product.water_factor,
+          land_factor: product.land_factor,
+          waste_factor: product.waste_factor,
+          recycled_content_pct: product.recycled_content_pct,
+          packaging_components: product.packaging_components,
           supplier_name: product.suppliers?.name || 'Unknown Supplier',
           product_code: product.product_code,
           verified_at: product.verified_at,

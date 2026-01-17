@@ -414,6 +414,8 @@ export function PackagingFormCard({
     unit: string;
     carbon_intensity?: number;
     location?: string;
+    recycled_content_pct?: number;
+    packaging_components?: any;
   }) => {
     // Auto-detect packaging category from material name
     const nameLower = selection.name.toLowerCase();
@@ -433,7 +435,7 @@ export function PackagingFormCard({
       detectedCategory = 'container';
     }
 
-    onUpdate(packaging.tempId, {
+    const updates: Partial<PackagingFormData> = {
       name: selection.name,
       data_source: selection.data_source,
       data_source_id: selection.data_source_id,
@@ -443,7 +445,20 @@ export function PackagingFormCard({
       carbon_intensity: selection.carbon_intensity,
       location: selection.location,
       packaging_category: detectedCategory,
-    });
+    };
+
+    // Auto-populate recycled content if provided
+    if (selection.recycled_content_pct !== undefined && selection.recycled_content_pct !== null) {
+      updates.recycled_content_percentage = selection.recycled_content_pct;
+    }
+
+    // Auto-populate component breakdown if provided
+    if (selection.packaging_components && Array.isArray(selection.packaging_components) && selection.packaging_components.length > 0) {
+      updates.components = selection.packaging_components;
+      updates.has_component_breakdown = true;
+    }
+
+    onUpdate(packaging.tempId, updates);
   };
 
   return (
@@ -591,10 +606,22 @@ export function PackagingFormCard({
                   min="0"
                   placeholder="0"
                   value={packaging.net_weight_g}
-                  onChange={(e) => onUpdate(packaging.tempId, {
-                    net_weight_g: e.target.value,
-                    amount: e.target.value
-                  })}
+                  onChange={(e) => {
+                    const weightInGrams = e.target.value;
+                    const weightValue = Number(weightInGrams);
+
+                    // Convert to the unit used by the material
+                    let amount = weightInGrams;
+                    if (packaging.unit === 'kg') {
+                      // Convert grams to kg
+                      amount = (weightValue / 1000).toString();
+                    }
+
+                    onUpdate(packaging.tempId, {
+                      net_weight_g: weightInGrams,
+                      amount: amount
+                    });
+                  }}
                   className={
                     (packaging.packaging_category === 'label' && Number(packaging.net_weight_g) > 10) ||
                     (packaging.packaging_category === 'closure' && Number(packaging.net_weight_g) > 10)
