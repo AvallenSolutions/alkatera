@@ -25,7 +25,7 @@ export interface ReportConfig {
   reportingPeriodStart: string;
   reportingPeriodEnd: string;
   audience: 'investors' | 'regulators' | 'customers' | 'internal' | 'supply-chain' | 'technical';
-  outputFormat: 'pptx' | 'docx' | 'xlsx';
+  outputFormat: 'pptx';
   standards: string[];
   sections: string[];
   branding: {
@@ -169,7 +169,7 @@ export default function ReportBuilderPage() {
             </div>
             <Alert>
               <AlertDescription>
-                The document is editable. You can open it in {config.outputFormat === 'pptx' ? 'PowerPoint' : config.outputFormat === 'docx' ? 'Word' : 'Excel'} and make any final adjustments before sharing.
+                The document is editable. You can open it in PowerPoint and make any final adjustments before sharing.
               </AlertDescription>
             </Alert>
           </CardContent>
