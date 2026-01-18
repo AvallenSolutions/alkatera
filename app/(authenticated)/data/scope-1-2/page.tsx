@@ -1,20 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -47,6 +40,8 @@ import {
   FileText,
   Lock,
   CheckCircle2,
+  Building2,
+  ExternalLink,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
@@ -59,46 +54,41 @@ import { LogisticsDistributionCard } from '@/components/reports/LogisticsDistrib
 import { OperationalWasteCard } from '@/components/reports/OperationalWasteCard';
 import { MarketingMaterialsCard } from '@/components/reports/MarketingMaterialsCard';
 import { SpendImportCard } from '@/components/reports/SpendImportCard';
+import Link from 'next/link';
 
-const scope1Schema = z.object({
-  facility_id: z.string().min(1, 'Facility is required'),
-  fuel_type: z.string().min(1, 'Fuel type is required'),
-  amount: z.string().min(1, 'Amount is required').refine(
-    (val) => !isNaN(Number(val)) && Number(val) > 0,
-    'Amount must be a positive number'
-  ),
-  unit: z.string().min(1, 'Unit is required'),
-  activity_date: z.string().min(1, 'Activity date is required'),
-});
+// Emission factors for auto-calculation from facility utility data
+const EMISSION_FACTORS: Record<string, { factor: number; unit: string; scope: 'Scope 1' | 'Scope 2' }> = {
+  // Scope 1 - Direct emissions
+  diesel_stationary: { factor: 2.68787, unit: 'kgCO2e/litre', scope: 'Scope 1' },
+  diesel_mobile: { factor: 2.68787, unit: 'kgCO2e/litre', scope: 'Scope 1' },
+  petrol_mobile: { factor: 2.31, unit: 'kgCO2e/litre', scope: 'Scope 1' },
+  natural_gas: { factor: 0.18293, unit: 'kgCO2e/kWh', scope: 'Scope 1' },
+  lpg: { factor: 1.55537, unit: 'kgCO2e/litre', scope: 'Scope 1' },
+  heavy_fuel_oil: { factor: 3.17740, unit: 'kgCO2e/litre', scope: 'Scope 1' },
+  biomass_solid: { factor: 0.01551, unit: 'kgCO2e/kg', scope: 'Scope 1' },
+  refrigerant_leakage: { factor: 1430, unit: 'kgCO2e/kg', scope: 'Scope 1' }, // R134a GWP
+  // Scope 2 - Indirect emissions from purchased energy
+  electricity_grid: { factor: 0.207, unit: 'kgCO2e/kWh', scope: 'Scope 2' },
+  heat_steam_purchased: { factor: 0.1662, unit: 'kgCO2e/kWh', scope: 'Scope 2' },
+};
 
-const scope2Schema = z.object({
-  facility_id: z.string().min(1, 'Facility is required'),
-  source_type: z.string().min(1, 'Source type is required'),
-  amount: z.string().min(1, 'Amount consumed is required').refine(
-    (val) => !isNaN(Number(val)) && Number(val) > 0,
-    'Amount must be a positive number'
-  ),
-  unit: z.string().min(1, 'Unit is required'),
-  activity_date: z.string().min(1, 'Activity date is required'),
-});
-
-type Scope1FormValues = z.infer<typeof scope1Schema>;
-type Scope2FormValues = z.infer<typeof scope2Schema>;
+const UTILITY_TYPE_LABELS: Record<string, string> = {
+  electricity_grid: 'Purchased Electricity',
+  heat_steam_purchased: 'Purchased Heat / Steam',
+  natural_gas: 'Natural Gas',
+  lpg: 'LPG (Propane/Butane)',
+  diesel_stationary: 'Diesel (Generators/Stationary)',
+  heavy_fuel_oil: 'Heavy Fuel Oil',
+  biomass_solid: 'Biogas / Biomass',
+  refrigerant_leakage: 'Refrigerants (Leakage)',
+  diesel_mobile: 'Company Fleet (Diesel)',
+  petrol_mobile: 'Company Fleet (Petrol/Gasoline)',
+};
 
 interface Facility {
   id: string;
   name: string;
   location: string | null;
-}
-
-interface ActivityDataRecord {
-  id: string;
-  name: string;
-  category: string;
-  quantity: number;
-  unit: string;
-  activity_date: string;
-  created_at: string;
 }
 
 interface CorporateReport {
@@ -128,13 +118,38 @@ interface OverheadEntry {
   disposal_method?: string;
 }
 
-interface EmissionSource {
+// New interfaces for facility-based utility data
+interface UtilityDataEntry {
   id: string;
-  source_name: string;
-  scope: string;
-  category: string;
-  default_unit: string;
-  emission_factor_id: string | null;
+  facility_id: string;
+  utility_type: string;
+  quantity: number;
+  unit: string;
+  reporting_period_start: string;
+  reporting_period_end: string;
+  calculated_scope: string;
+  facility?: {
+    id: string;
+    name: string;
+    location: string | null;
+  };
+}
+
+interface FacilityBreakdown {
+  facility_id: string;
+  facility_name: string;
+  scope1_co2e: number;
+  scope2_co2e: number;
+  entries: UtilityDataEntry[];
+}
+
+interface SourceBreakdown {
+  utility_type: string;
+  label: string;
+  scope: 'Scope 1' | 'Scope 2';
+  total_quantity: number;
+  unit: string;
+  total_co2e: number;
 }
 
 const currentYear = new Date().getFullYear();
@@ -143,11 +158,8 @@ const availableYears = [currentYear, currentYear - 1, currentYear - 2];
 export default function CompanyEmissionsPage() {
   const { currentOrganization } = useOrganization();
   const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [recentData, setRecentData] = useState<ActivityDataRecord[]>([]);
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(true);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCalculating, setIsCalculating] = useState(false);
   const [activeTab, setActiveTab] = useState('footprint');
 
   const [selectedYear, setSelectedYear] = useState(currentYear);
@@ -157,31 +169,22 @@ export default function CompanyEmissionsPage() {
   const [scope2CO2e, setScope2CO2e] = useState(0);
   const [productsCO2e, setProductsCO2e] = useState(0);
   const [fleetCO2e, setFleetCO2e] = useState(0);
-  const [fuelTypes, setFuelTypes] = useState<string[]>([]);
-  const [isLoadingFuelTypes, setIsLoadingFuelTypes] = useState(true);
-  const [scope1Sources, setScope1Sources] = useState<EmissionSource[]>([]);
-  const [scope2Sources, setScope2Sources] = useState<EmissionSource[]>([]);
   const [scope3Cat1CO2e, setScope3Cat1CO2e] = useState(0);
   const [scope3Cat1Breakdown, setScope3Cat1Breakdown] = useState<Array<{
     product_name: string;
     materials_tco2e: number;
     packaging_tco2e: number;
-    production_volume: number; // Now in consumer units (bottles/cans) not hectolitres
+    production_volume: number;
   }>>([]);
   const [scope3Cat1DataQuality, setScope3Cat1DataQuality] = useState<string>('');
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [scope3OverheadsCO2e, setScope3OverheadsCO2e] = useState(0);
 
-  const scope1Form = useForm<Scope1FormValues>({
-    resolver: zodResolver(scope1Schema),
-    mode: 'onChange',
-  });
-
-  const scope2Form = useForm<Scope2FormValues>({
-    resolver: zodResolver(scope2Schema),
-    mode: 'onChange',
-  });
+  // New state for facility-based utility data
+  const [utilityData, setUtilityData] = useState<UtilityDataEntry[]>([]);
+  const [facilityBreakdown, setFacilityBreakdown] = useState<FacilityBreakdown[]>([]);
+  const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
 
   const fetchFacilities = async () => {
     if (!currentOrganization?.id) {
@@ -210,48 +213,141 @@ export default function CompanyEmissionsPage() {
     }
   };
 
-  const fetchRecentData = async () => {
+  // Fetch utility data from facilities and auto-calculate emissions
+  const fetchUtilityDataAndCalculate = async () => {
     if (!currentOrganization?.id) {
       setIsLoadingData(false);
       return;
     }
 
     try {
+      setIsLoadingData(true);
       const browserSupabase = getSupabaseBrowserClient();
+      const yearStart = `${selectedYear}-01-01`;
+      const yearEnd = `${selectedYear}-12-31`;
+
+      // Fetch utility data from all facilities
       const { data, error } = await browserSupabase
-        .from('facility_activity_data')
+        .from('utility_data_entries')
         .select(`
           id,
+          facility_id,
+          utility_type,
           quantity,
           unit,
           reporting_period_start,
-          created_at,
-          scope_1_2_emission_sources!inner (
-            source_name,
-            scope,
-            category
+          reporting_period_end,
+          calculated_scope,
+          facilities!inner (
+            id,
+            name,
+            address_city
           )
         `)
-        .eq('organization_id', currentOrganization.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .eq('facilities.organization_id', currentOrganization.id)
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd)
+        .order('reporting_period_start', { ascending: false });
 
       if (error) {
-        console.error('Error fetching recent data:', error);
-      } else {
-        const mappedData: ActivityDataRecord[] = (data || []).map((item: any) => ({
-          id: item.id,
-          name: item.scope_1_2_emission_sources?.source_name || 'Unknown',
-          category: item.scope_1_2_emission_sources?.scope || 'Unknown',
-          quantity: item.quantity,
-          unit: item.unit,
-          activity_date: item.reporting_period_start,
-          created_at: item.created_at,
-        }));
-        setRecentData(mappedData);
+        console.error('Error fetching utility data:', error);
+        toast.error('Failed to load utility data');
+        return;
       }
+
+      const utilityEntries: UtilityDataEntry[] = (data || []).map((item: any) => ({
+        id: item.id,
+        facility_id: item.facility_id,
+        utility_type: item.utility_type,
+        quantity: item.quantity,
+        unit: item.unit,
+        reporting_period_start: item.reporting_period_start,
+        reporting_period_end: item.reporting_period_end,
+        calculated_scope: item.calculated_scope,
+        facility: {
+          id: item.facilities?.id,
+          name: item.facilities?.name,
+          location: item.facilities?.address_city,
+        },
+      }));
+
+      setUtilityData(utilityEntries);
+
+      // Calculate emissions and breakdowns
+      let totalScope1 = 0;
+      let totalScope2 = 0;
+
+      // Group by facility
+      const facilityMap = new Map<string, FacilityBreakdown>();
+      // Group by source type
+      const sourceMap = new Map<string, SourceBreakdown>();
+
+      for (const entry of utilityEntries) {
+        const emissionConfig = EMISSION_FACTORS[entry.utility_type];
+        if (!emissionConfig) continue;
+
+        // Calculate emissions for this entry
+        let co2e = entry.quantity * emissionConfig.factor;
+
+        // Handle unit conversion for natural gas (m³ to kWh)
+        if (entry.utility_type === 'natural_gas' && entry.unit === 'm³') {
+          // Convert cubic meters to kWh (approx 10.55 kWh per m³)
+          co2e = entry.quantity * 10.55 * emissionConfig.factor;
+        }
+
+        // Update totals
+        if (emissionConfig.scope === 'Scope 1') {
+          totalScope1 += co2e;
+        } else {
+          totalScope2 += co2e;
+        }
+
+        // Update facility breakdown
+        const facilityName = entry.facility?.name || 'Unknown Facility';
+        const facilityId = entry.facility_id;
+        if (!facilityMap.has(facilityId)) {
+          facilityMap.set(facilityId, {
+            facility_id: facilityId,
+            facility_name: facilityName,
+            scope1_co2e: 0,
+            scope2_co2e: 0,
+            entries: [],
+          });
+        }
+        const facilityData = facilityMap.get(facilityId)!;
+        facilityData.entries.push(entry);
+        if (emissionConfig.scope === 'Scope 1') {
+          facilityData.scope1_co2e += co2e;
+        } else {
+          facilityData.scope2_co2e += co2e;
+        }
+
+        // Update source breakdown
+        if (!sourceMap.has(entry.utility_type)) {
+          sourceMap.set(entry.utility_type, {
+            utility_type: entry.utility_type,
+            label: UTILITY_TYPE_LABELS[entry.utility_type] || entry.utility_type,
+            scope: emissionConfig.scope,
+            total_quantity: 0,
+            unit: entry.unit,
+            total_co2e: 0,
+          });
+        }
+        const sourceData = sourceMap.get(entry.utility_type)!;
+        sourceData.total_quantity += entry.quantity;
+        sourceData.total_co2e += co2e;
+      }
+
+      setScope1CO2e(totalScope1);
+      setScope2CO2e(totalScope2);
+      setFacilityBreakdown(Array.from(facilityMap.values()).sort((a, b) =>
+        (b.scope1_co2e + b.scope2_co2e) - (a.scope1_co2e + a.scope2_co2e)
+      ));
+      setSourceBreakdown(Array.from(sourceMap.values()).sort((a, b) => b.total_co2e - a.total_co2e));
+
     } catch (error) {
-      console.error('Error fetching recent data:', error);
+      console.error('Error fetching utility data:', error);
+      toast.error('Failed to load utility data');
     } finally {
       setIsLoadingData(false);
     }
@@ -469,8 +565,7 @@ export default function CompanyEmissionsPage() {
         setOverheads(overheadData || []);
       }
 
-      await fetchScope1Emissions();
-      await fetchScope2Emissions();
+      await fetchUtilityDataAndCalculate();
       await fetchProductsEmissions();
       await fetchFleetEmissions();
       await fetchScope3Cat1FromLCAs();
@@ -483,157 +578,6 @@ export default function CompanyEmissionsPage() {
     }
   };
 
-  const fetchScope1Emissions = async () => {
-    if (!currentOrganization?.id) return;
-
-    try {
-      const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
-
-      const { data, error } = await browserSupabase
-        .from('facility_activity_data')
-        .select(`
-          quantity,
-          scope_1_2_emission_sources!inner (
-            scope,
-            emission_factor_id
-          )
-        `)
-        .eq('organization_id', currentOrganization.id)
-        .gte('reporting_period_start', yearStart)
-        .lte('reporting_period_end', yearEnd);
-
-      if (error) throw error;
-
-      const scope1Data = data?.filter((item: any) =>
-        item.scope_1_2_emission_sources?.scope === 'Scope 1'
-      ) || [];
-
-      let total = 0;
-      for (const item of scope1Data) {
-        const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
-        if (factorId) {
-          const { data: factor } = await browserSupabase
-            .from('emissions_factors')
-            .select('value')
-            .eq('factor_id', factorId)
-            .maybeSingle();
-          if (factor?.value) {
-            total += item.quantity * parseFloat(factor.value);
-          }
-        }
-      }
-
-      setScope1CO2e(total);
-    } catch (error: any) {
-      console.error('Error fetching Scope 1 emissions:', error);
-      setScope1CO2e(0);
-    }
-  };
-
-  const fetchScope2Emissions = async () => {
-    if (!currentOrganization?.id) return;
-
-    try {
-      const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
-
-      const { data, error } = await browserSupabase
-        .from('facility_activity_data')
-        .select(`
-          quantity,
-          scope_1_2_emission_sources!inner (
-            scope,
-            emission_factor_id
-          )
-        `)
-        .eq('organization_id', currentOrganization.id)
-        .gte('reporting_period_start', yearStart)
-        .lte('reporting_period_end', yearEnd);
-
-      if (error) throw error;
-
-      const scope2Data = data?.filter((item: any) =>
-        item.scope_1_2_emission_sources?.scope === 'Scope 2'
-      ) || [];
-
-      let total = 0;
-      for (const item of scope2Data) {
-        const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
-        if (factorId) {
-          const { data: factor } = await browserSupabase
-            .from('emissions_factors')
-            .select('value')
-            .eq('factor_id', factorId)
-            .maybeSingle();
-          if (factor?.value) {
-            total += item.quantity * parseFloat(factor.value);
-          }
-        }
-      }
-
-      setScope2CO2e(total);
-    } catch (error: any) {
-      console.error('Error fetching Scope 2 emissions:', error);
-      setScope2CO2e(0);
-    }
-  };
-
-  const fetchEmissionSources = async () => {
-    setIsLoadingFuelTypes(true);
-    try {
-      const browserSupabase = getSupabaseBrowserClient();
-
-      const { data: scope1Data, error: scope1Error } = await browserSupabase
-        .from('scope_1_2_emission_sources')
-        .select('id, source_name, scope, category, default_unit, emission_factor_id')
-        .eq('scope', 'Scope 1')
-        .order('category', { ascending: true })
-        .order('source_name', { ascending: true });
-
-      if (scope1Error) {
-        console.error('Error fetching Scope 1 sources:', scope1Error);
-      } else {
-        setScope1Sources(scope1Data || []);
-        const uniqueNames = Array.from(new Set(scope1Data?.map(s => s.source_name) || []));
-        setFuelTypes(uniqueNames);
-      }
-
-      const { data: scope2Data, error: scope2Error } = await browserSupabase
-        .from('scope_1_2_emission_sources')
-        .select('id, source_name, scope, category, default_unit, emission_factor_id')
-        .eq('scope', 'Scope 2')
-        .order('source_name', { ascending: true });
-
-      if (scope2Error) {
-        console.error('Error fetching Scope 2 sources:', scope2Error);
-      } else {
-        setScope2Sources(scope2Data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching emission sources:', error);
-    } finally {
-      setIsLoadingFuelTypes(false);
-    }
-  };
-
-  const handleScope1FuelTypeChange = (fuelTypeName: string) => {
-    scope1Form.setValue('fuel_type', fuelTypeName, { shouldValidate: true });
-    const source = scope1Sources.find(s => s.source_name === fuelTypeName);
-    if (source?.default_unit) {
-      scope1Form.setValue('unit', source.default_unit, { shouldValidate: true });
-    }
-  };
-
-  const handleScope2SourceChange = (sourceName: string) => {
-    scope2Form.setValue('source_type', sourceName, { shouldValidate: true });
-    const source = scope2Sources.find(s => s.source_name === sourceName);
-    if (source?.default_unit) {
-      scope2Form.setValue('unit', source.default_unit, { shouldValidate: true });
-    }
-  };
 
   const fetchProductsEmissions = async () => {
     if (!currentOrganization?.id) return;
@@ -754,8 +698,6 @@ export default function CompanyEmissionsPage() {
 
   useEffect(() => {
     fetchFacilities();
-    fetchRecentData();
-    fetchEmissionSources();
   }, [currentOrganization?.id]);
 
   useEffect(() => {
@@ -764,118 +706,6 @@ export default function CompanyEmissionsPage() {
     }
   }, [currentOrganization?.id, selectedYear]);
 
-  const onSubmitScope1 = async (data: Scope1FormValues) => {
-    if (!currentOrganization?.id) {
-      toast.error('No organisation selected');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const browserSupabase = getSupabaseBrowserClient();
-      const selectedSource = scope1Sources.find(s => s.source_name === data.fuel_type);
-
-      if (!selectedSource) {
-        toast.error('Invalid fuel type selected');
-        return;
-      }
-
-      const { error } = await browserSupabase
-        .from('facility_activity_data')
-        .insert({
-          facility_id: data.facility_id,
-          emission_source_id: selectedSource.id,
-          quantity: parseFloat(data.amount),
-          unit: data.unit,
-          reporting_period_start: data.activity_date,
-          reporting_period_end: data.activity_date,
-          organization_id: currentOrganization.id,
-        });
-
-      if (error) {
-        console.error('Insert error:', error);
-        throw new Error(error.message || 'Failed to save Scope 1 data');
-      }
-
-      toast.success('Scope 1 activity data submitted successfully');
-      scope1Form.reset({
-        facility_id: '',
-        fuel_type: '',
-        amount: '',
-        unit: '',
-        activity_date: '',
-      });
-      await fetchRecentData();
-      await fetchScope1Emissions();
-    } catch (error) {
-      console.error('Error submitting Scope 1 data:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to submit Scope 1 data'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const onSubmitScope2 = async (data: Scope2FormValues) => {
-    if (!currentOrganization?.id) {
-      toast.error('No organisation selected');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const browserSupabase = getSupabaseBrowserClient();
-      const selectedSource = scope2Sources.find(s => s.source_name === data.source_type);
-
-      if (!selectedSource) {
-        toast.error('Invalid source type selected');
-        return;
-      }
-
-      let quantity = parseFloat(data.amount);
-      if (data.unit === 'MWh') {
-        quantity = quantity * 1000;
-      }
-
-      const { error } = await browserSupabase
-        .from('facility_activity_data')
-        .insert({
-          facility_id: data.facility_id,
-          emission_source_id: selectedSource.id,
-          quantity: quantity,
-          unit: 'kWh',
-          reporting_period_start: data.activity_date,
-          reporting_period_end: data.activity_date,
-          organization_id: currentOrganization.id,
-        });
-
-      if (error) {
-        console.error('Insert error:', error);
-        throw new Error(error.message || 'Failed to save Scope 2 data');
-      }
-
-      toast.success('Scope 2 activity data submitted successfully');
-      scope2Form.reset({
-        facility_id: '',
-        source_type: '',
-        amount: '',
-        unit: '',
-        activity_date: '',
-      });
-      await fetchRecentData();
-      await fetchScope2Emissions();
-    } catch (error) {
-      console.error('Error submitting Scope 2 data:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to submit Scope 2 data'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleGenerateReport = async () => {
     if (!report || !currentOrganization?.id) return;
@@ -914,75 +744,6 @@ export default function CompanyEmissionsPage() {
     }
   };
 
-  const handleRunCalculations = async () => {
-    if (!currentOrganization?.id) {
-      toast.error('No organisation selected');
-      return;
-    }
-
-    setIsCalculating(true);
-
-    try {
-      const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
-
-      const { data: activityData, error: activityError } = await browserSupabase
-        .from('facility_activity_data')
-        .select(`
-          id,
-          quantity,
-          unit,
-          scope_1_2_emission_sources!inner (
-            source_name,
-            scope,
-            category,
-            emission_factor_id
-          )
-        `)
-        .eq('organization_id', currentOrganization.id)
-        .gte('reporting_period_start', yearStart)
-        .lte('reporting_period_end', yearEnd);
-
-      if (activityError) throw activityError;
-
-      let scope1Total = 0;
-      let scope2Total = 0;
-
-      for (const activity of activityData || []) {
-        const source = (activity as any).scope_1_2_emission_sources;
-        const factorId = source?.emission_factor_id;
-
-        if (factorId) {
-          const { data: factor } = await browserSupabase
-            .from('emissions_factors')
-            .select('value')
-            .eq('factor_id', factorId)
-            .maybeSingle();
-
-          if (factor?.value) {
-            const emissions = activity.quantity * parseFloat(factor.value);
-            if (source.scope === 'Scope 1') {
-              scope1Total += emissions;
-            } else if (source.scope === 'Scope 2') {
-              scope2Total += emissions;
-            }
-          }
-        }
-      }
-
-      toast.success(`Calculations complete: Scope 1: ${scope1Total.toFixed(2)} kgCO2e, Scope 2: ${scope2Total.toFixed(2)} kgCO2e`);
-      await fetchScope1Emissions();
-      await fetchScope2Emissions();
-    } catch (error) {
-      console.error('Error running calculations:', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Failed to run calculations'
-      );
-    } finally {
-      setIsCalculating(false);
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -1146,7 +907,7 @@ export default function CompanyEmissionsPage() {
                           <Alert>
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription>
-                              No emissions calculated yet for {selectedYear}. Add your Scope 1, 2, and 3 data, then click "Calculate Footprint".
+                              No emissions data found for {selectedYear}. Add utility data at <Link href="/company/facilities" className="underline font-medium">facility level</Link> for Scope 1 & 2, and add Scope 3 data below.
                             </AlertDescription>
                           </Alert>
                         );
@@ -1222,11 +983,12 @@ export default function CompanyEmissionsPage() {
 
                     <div className="flex items-center gap-4 pt-4 border-t">
                       <div className="flex-1">
-                        <h4 className="font-medium mb-1">How to build your footprint</h4>
+                        <h4 className="font-medium mb-1">How your footprint is calculated</h4>
                         <p className="text-sm text-muted-foreground">
-                          1. Select the reporting year above. 2. Add Scope 1 data (fuels, refrigerants).
-                          3. Add Scope 2 data (electricity). 4. Add Scope 3 data (travel, services, waste).
-                          5. Click Calculate Footprint.
+                          <strong>Scope 1 & 2:</strong> Auto-calculated from facility utility data (electricity, gas, diesel, etc.).
+                          <Link href="/company/facilities" className="underline ml-1">Add utility data at facility level</Link>.
+                          <br />
+                          <strong>Scope 3:</strong> Add value chain data (travel, services, waste) in the Scope 3 tab below.
                         </p>
                       </div>
                     </div>
@@ -1239,459 +1001,351 @@ export default function CompanyEmissionsPage() {
 
         <TabsContent value="scope1">
           <div className="space-y-6">
-            <Card>
+            {/* Total Scope 1 Summary */}
+            <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/30 dark:bg-orange-950/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Scope 1: Direct Emissions</CardTitle>
-                    <CardDescription>
-                      Enter data for direct emissions from fuel combustion, mobile sources, and fugitive emissions
+                    <CardTitle className="flex items-center gap-2">
+                      <Flame className="h-5 w-5 text-orange-500" />
+                      Scope 1: Direct Emissions
+                    </CardTitle>
+                    <CardDescription className="mt-2">
+                      Auto-calculated from facility utility data (fuel combustion, mobile sources, fugitive emissions)
                     </CardDescription>
                   </div>
-                  <Button
-                    onClick={handleRunCalculations}
-                    disabled={isCalculating || recentData.length === 0}
-                    variant="outline"
-                  >
-                    {isCalculating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Calculating...
-                      </>
-                    ) : (
-                      <>
-                        <Calculator className="h-4 w-4 mr-2" />
-                        Run Calculations
-                      </>
-                    )}
-                  </Button>
+                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Auto-calculated
+                  </Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={scope1Form.handleSubmit(onSubmitScope1)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="scope1-facility">Facility</Label>
-                      <Select
-                        value={scope1Form.watch('facility_id')}
-                        onValueChange={(value) =>
-                          scope1Form.setValue('facility_id', value, {
-                            shouldValidate: true,
-                          })
-                        }
-                        disabled={isLoadingFacilities || facilities.length === 0}
-                      >
-                        <SelectTrigger id="scope1-facility">
-                          <SelectValue placeholder="Select facility" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {facilities.map((facility) => (
-                            <SelectItem key={facility.id} value={facility.id}>
-                              {facility.name}
-                              {facility.location && ` (${facility.location})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {scope1Form.formState.errors.facility_id && (
-                        <p className="text-sm text-red-600">
-                          {scope1Form.formState.errors.facility_id.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="scope1-fuel-type">Emission Source</Label>
-                      <Select
-                        value={scope1Form.watch('fuel_type')}
-                        onValueChange={handleScope1FuelTypeChange}
-                        disabled={isLoadingFuelTypes || scope1Sources.length === 0}
-                      >
-                        <SelectTrigger id="scope1-fuel-type">
-                          <SelectValue placeholder="Select emission source" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {scope1Sources.filter(s => s.category === 'Stationary Combustion').length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Stationary Combustion</SelectLabel>
-                              {scope1Sources
-                                .filter(s => s.category === 'Stationary Combustion')
-                                .map((source) => (
-                                  <SelectItem key={source.id} value={source.source_name}>
-                                    {source.source_name} ({source.default_unit})
-                                  </SelectItem>
-                                ))}
-                            </SelectGroup>
-                          )}
-                          {scope1Sources.filter(s => s.category === 'Mobile Combustion').length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Mobile Combustion</SelectLabel>
-                              {scope1Sources
-                                .filter(s => s.category === 'Mobile Combustion')
-                                .map((source) => (
-                                  <SelectItem key={source.id} value={source.source_name}>
-                                    {source.source_name} ({source.default_unit})
-                                  </SelectItem>
-                                ))}
-                            </SelectGroup>
-                          )}
-                          {scope1Sources.filter(s => s.category === 'Fugitive Emissions').length > 0 && (
-                            <SelectGroup>
-                              <SelectLabel>Fugitive Emissions</SelectLabel>
-                              {scope1Sources
-                                .filter(s => s.category === 'Fugitive Emissions')
-                                .map((source) => (
-                                  <SelectItem key={source.id} value={source.source_name}>
-                                    {source.source_name} ({source.default_unit})
-                                  </SelectItem>
-                                ))}
-                            </SelectGroup>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {scope1Form.formState.errors.fuel_type && (
-                        <p className="text-sm text-red-600">
-                          {scope1Form.formState.errors.fuel_type.message}
-                        </p>
-                      )}
-                      {!isLoadingFuelTypes && scope1Sources.length === 0 && (
-                        <p className="text-sm text-amber-600">
-                          No emission sources available. Please contact support.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="scope1-amount">Amount Consumed</Label>
-                      <Input
-                        id="scope1-amount"
-                        type="number"
-                        step="0.01"
-                        placeholder="e.g., 1500"
-                        {...scope1Form.register('amount')}
-                      />
-                      {scope1Form.formState.errors.amount && (
-                        <p className="text-sm text-red-600">
-                          {scope1Form.formState.errors.amount.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="scope1-unit">Unit</Label>
-                      <Select
-                        value={scope1Form.watch('unit')}
-                        onValueChange={(value) =>
-                          scope1Form.setValue('unit', value as any, {
-                            shouldValidate: true,
-                          })
-                        }
-                      >
-                        <SelectTrigger id="scope1-unit">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="litres">Litres</SelectItem>
-                          <SelectItem value="kWh">kWh</SelectItem>
-                          <SelectItem value="cubic meters">Cubic Metres</SelectItem>
-                          <SelectItem value="kg">Kilograms</SelectItem>
-                          <SelectItem value="tonnes">Tonnes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {scope1Form.formState.errors.unit && (
-                        <p className="text-sm text-red-600">
-                          {scope1Form.formState.errors.unit.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="scope1-date">Activity Date</Label>
-                      <Input
-                        id="scope1-date"
-                        type="date"
-                        {...scope1Form.register('activity_date')}
-                      />
-                      {scope1Form.formState.errors.activity_date && (
-                        <p className="text-sm text-red-600">
-                          {scope1Form.formState.errors.activity_date.message}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={!scope1Form.formState.isValid || isSubmitting || facilities.length === 0}
-                    className="w-full md:w-auto"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      'Submit Scope 1 Data'
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Scope 1 Activity</CardTitle>
-                <CardDescription>
-                  Recently submitted Scope 1 activity records
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoadingData ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ) : recentData.filter(r => r.category === 'Scope 1').length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No Scope 1 data recorded yet.</p>
                 ) : (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Activity</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {recentData.filter(r => r.category === 'Scope 1').slice(0, 5).map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell>{formatDate(record.activity_date)}</TableCell>
-                            <TableCell className="font-medium">{record.name}</TableCell>
-                            <TableCell className="text-right">
-                              {record.quantity.toLocaleString()} {record.unit}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="space-y-6">
+                    {/* Total */}
+                    <div className="text-center py-6 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <div className="text-sm text-muted-foreground mb-2">Total Scope 1 Emissions ({selectedYear})</div>
+                      <div className="text-4xl font-bold text-orange-900 dark:text-orange-100 mb-2">
+                        {((scope1CO2e / 1000) + fleetCO2e) > 0
+                          ? `${((scope1CO2e / 1000) + fleetCO2e).toFixed(3)} tCO2e`
+                          : 'No data'}
+                      </div>
+                      {scope1CO2e > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          Utilities: {(scope1CO2e / 1000).toFixed(3)} tCO2e | Fleet: {fleetCO2e.toFixed(3)} tCO2e
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Link to add data */}
+                    {sourceBreakdown.filter(s => s.scope === 'Scope 1').length === 0 && (
+                      <Alert>
+                        <Building2 className="h-4 w-4" />
+                        <AlertDescription className="flex items-center justify-between">
+                          <span>No Scope 1 utility data found for {selectedYear}. Add utility data at facility level.</span>
+                          <Link href="/company/facilities">
+                            <Button variant="outline" size="sm" className="ml-4">
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Go to Facilities
+                            </Button>
+                          </Link>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Breakdown by Emission Source */}
+            {sourceBreakdown.filter(s => s.scope === 'Scope 1').length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Breakdown by Emission Source</CardTitle>
+                  <CardDescription>
+                    Scope 1 emissions by fuel type
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Source</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Emissions</TableHead>
+                          <TableHead className="text-right">% of Scope 1</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sourceBreakdown
+                          .filter(s => s.scope === 'Scope 1')
+                          .map((source) => (
+                            <TableRow key={source.utility_type}>
+                              <TableCell className="font-medium">{source.label}</TableCell>
+                              <TableCell className="text-right">
+                                {source.total_quantity.toLocaleString()} {source.unit}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {(source.total_co2e / 1000).toFixed(3)} tCO2e
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {scope1CO2e > 0
+                                  ? `${((source.total_co2e / scope1CO2e) * 100).toFixed(1)}%`
+                                  : '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Breakdown by Facility */}
+            {facilityBreakdown.filter(f => f.scope1_co2e > 0).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Breakdown by Facility</CardTitle>
+                  <CardDescription>
+                    Scope 1 emissions by facility location
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Facility</TableHead>
+                          <TableHead className="text-right">Scope 1 Emissions</TableHead>
+                          <TableHead className="text-right">% of Total</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {facilityBreakdown
+                          .filter(f => f.scope1_co2e > 0)
+                          .map((facility) => (
+                            <TableRow key={facility.facility_id}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  {facility.facility_name}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {(facility.scope1_co2e / 1000).toFixed(3)} tCO2e
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {scope1CO2e > 0
+                                  ? `${((facility.scope1_co2e / scope1CO2e) * 100).toFixed(1)}%`
+                                  : '-'}
+                              </TableCell>
+                              <TableCell>
+                                <Link href={`/company/facilities/${facility.facility_id}`}>
+                                  <Button variant="ghost" size="sm">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                </Link>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Info about data entry */}
+            <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                <strong>Single Source of Truth:</strong> Scope 1 & 2 data is entered at facility level only.
+                Go to <Link href="/company/facilities" className="underline font-medium">Company &gt; Facilities</Link> to add or edit utility consumption data.
+              </AlertDescription>
+            </Alert>
           </div>
         </TabsContent>
 
         <TabsContent value="scope2">
           <div className="space-y-6">
-            <Card>
+            {/* Total Scope 2 Summary */}
+            <Card className="border-blue-200 dark:border-blue-900 bg-blue-50/30 dark:bg-blue-950/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Scope 2: Purchased Energy</CardTitle>
-                    <CardDescription>
-                      Enter data for indirect emissions from purchased electricity, heating, cooling, and steam
+                    <CardTitle className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-blue-500" />
+                      Scope 2: Purchased Energy Emissions
+                    </CardTitle>
+                    <CardDescription className="mt-2">
+                      Auto-calculated from facility utility data (purchased electricity, heat, steam, cooling)
                     </CardDescription>
                   </div>
-                  <Button
-                    onClick={handleRunCalculations}
-                    disabled={isCalculating || recentData.length === 0}
-                    variant="outline"
-                  >
-                    {isCalculating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Calculating...
-                      </>
-                    ) : (
-                      <>
-                        <Calculator className="h-4 w-4 mr-2" />
-                        Run Calculations
-                      </>
-                    )}
-                  </Button>
+                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Auto-calculated
+                  </Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={scope2Form.handleSubmit(onSubmitScope2)} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="scope2-facility">Facility</Label>
-                      <Select
-                        value={scope2Form.watch('facility_id')}
-                        onValueChange={(value) =>
-                          scope2Form.setValue('facility_id', value, {
-                            shouldValidate: true,
-                          })
-                        }
-                        disabled={isLoadingFacilities || facilities.length === 0}
-                      >
-                        <SelectTrigger id="scope2-facility">
-                          <SelectValue placeholder="Select facility" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {facilities.map((facility) => (
-                            <SelectItem key={facility.id} value={facility.id}>
-                              {facility.name}
-                              {facility.location && ` (${facility.location})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {scope2Form.formState.errors.facility_id && (
-                        <p className="text-sm text-red-600">
-                          {scope2Form.formState.errors.facility_id.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="scope2-source-type">Energy Source</Label>
-                      <Select
-                        value={scope2Form.watch('source_type')}
-                        onValueChange={handleScope2SourceChange}
-                        disabled={isLoadingFuelTypes || scope2Sources.length === 0}
-                      >
-                        <SelectTrigger id="scope2-source-type">
-                          <SelectValue placeholder="Select energy source" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {scope2Sources.map((source) => (
-                            <SelectItem key={source.id} value={source.source_name}>
-                              {source.source_name} ({source.default_unit})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {scope2Form.formState.errors.source_type && (
-                        <p className="text-sm text-red-600">
-                          {scope2Form.formState.errors.source_type.message}
-                        </p>
-                      )}
-                      {!isLoadingFuelTypes && scope2Sources.length === 0 && (
-                        <p className="text-sm text-amber-600">
-                          No energy sources available. Please contact support.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="scope2-amount">Amount Consumed</Label>
-                      <Input
-                        id="scope2-amount"
-                        type="number"
-                        step="0.01"
-                        placeholder="e.g., 25000"
-                        {...scope2Form.register('amount')}
-                      />
-                      {scope2Form.formState.errors.amount && (
-                        <p className="text-sm text-red-600">
-                          {scope2Form.formState.errors.amount.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="scope2-unit">Unit</Label>
-                      <Select
-                        value={scope2Form.watch('unit')}
-                        onValueChange={(value) =>
-                          scope2Form.setValue('unit', value as any, {
-                            shouldValidate: true,
-                          })
-                        }
-                      >
-                        <SelectTrigger id="scope2-unit">
-                          <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="kWh">kWh (kilowatt-hours)</SelectItem>
-                          <SelectItem value="MWh">MWh (megawatt-hours)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {scope2Form.formState.errors.unit && (
-                        <p className="text-sm text-red-600">
-                          {scope2Form.formState.errors.unit.message}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="scope2-date">Activity Date</Label>
-                      <Input
-                        id="scope2-date"
-                        type="date"
-                        {...scope2Form.register('activity_date')}
-                      />
-                      {scope2Form.formState.errors.activity_date && (
-                        <p className="text-sm text-red-600">
-                          {scope2Form.formState.errors.activity_date.message}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    disabled={!scope2Form.formState.isValid || isSubmitting || facilities.length === 0}
-                    className="w-full md:w-auto"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      'Submit Scope 2 Data'
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Scope 2 Activity</CardTitle>
-                <CardDescription>
-                  Recently submitted Scope 2 activity records
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoadingData ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
-                ) : recentData.filter(r => r.category === 'Scope 2').length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No Scope 2 data recorded yet.</p>
                 ) : (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Activity</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {recentData.filter(r => r.category === 'Scope 2').slice(0, 5).map((record) => (
-                          <TableRow key={record.id}>
-                            <TableCell>{formatDate(record.activity_date)}</TableCell>
-                            <TableCell className="font-medium">{record.name}</TableCell>
-                            <TableCell className="text-right">
-                              {record.quantity.toLocaleString()} {record.unit}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="space-y-6">
+                    {/* Total */}
+                    <div className="text-center py-6 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="text-sm text-muted-foreground mb-2">Total Scope 2 Emissions ({selectedYear})</div>
+                      <div className="text-4xl font-bold text-blue-900 dark:text-blue-100 mb-2">
+                        {scope2CO2e > 0
+                          ? `${(scope2CO2e / 1000).toFixed(3)} tCO2e`
+                          : 'No data'}
+                      </div>
+                      {scope2CO2e > 0 && (
+                        <div className="text-xs text-muted-foreground">
+                          Location-based method (UK grid average)
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Link to add data */}
+                    {sourceBreakdown.filter(s => s.scope === 'Scope 2').length === 0 && (
+                      <Alert>
+                        <Building2 className="h-4 w-4" />
+                        <AlertDescription className="flex items-center justify-between">
+                          <span>No Scope 2 utility data found for {selectedYear}. Add utility data at facility level.</span>
+                          <Link href="/company/facilities">
+                            <Button variant="outline" size="sm" className="ml-4">
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Go to Facilities
+                            </Button>
+                          </Link>
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
+
+            {/* Breakdown by Emission Source */}
+            {sourceBreakdown.filter(s => s.scope === 'Scope 2').length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Breakdown by Energy Source</CardTitle>
+                  <CardDescription>
+                    Scope 2 emissions by purchased energy type
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Source</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Emissions</TableHead>
+                          <TableHead className="text-right">% of Scope 2</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sourceBreakdown
+                          .filter(s => s.scope === 'Scope 2')
+                          .map((source) => (
+                            <TableRow key={source.utility_type}>
+                              <TableCell className="font-medium">{source.label}</TableCell>
+                              <TableCell className="text-right">
+                                {source.total_quantity.toLocaleString()} {source.unit}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {(source.total_co2e / 1000).toFixed(3)} tCO2e
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {scope2CO2e > 0
+                                  ? `${((source.total_co2e / scope2CO2e) * 100).toFixed(1)}%`
+                                  : '-'}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Breakdown by Facility */}
+            {facilityBreakdown.filter(f => f.scope2_co2e > 0).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Breakdown by Facility</CardTitle>
+                  <CardDescription>
+                    Scope 2 emissions by facility location
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Facility</TableHead>
+                          <TableHead className="text-right">Scope 2 Emissions</TableHead>
+                          <TableHead className="text-right">% of Total</TableHead>
+                          <TableHead></TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {facilityBreakdown
+                          .filter(f => f.scope2_co2e > 0)
+                          .map((facility) => (
+                            <TableRow key={facility.facility_id}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  {facility.facility_name}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {(facility.scope2_co2e / 1000).toFixed(3)} tCO2e
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {scope2CO2e > 0
+                                  ? `${((facility.scope2_co2e / scope2CO2e) * 100).toFixed(1)}%`
+                                  : '-'}
+                              </TableCell>
+                              <TableCell>
+                                <Link href={`/company/facilities/${facility.facility_id}`}>
+                                  <Button variant="ghost" size="sm">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                </Link>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Info about data entry */}
+            <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription>
+                <strong>Single Source of Truth:</strong> Scope 1 & 2 data is entered at facility level only.
+                Go to <Link href="/company/facilities" className="underline font-medium">Company &gt; Facilities</Link> to add or edit utility consumption data.
+              </AlertDescription>
+            </Alert>
           </div>
         </TabsContent>
 
