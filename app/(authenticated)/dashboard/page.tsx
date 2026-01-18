@@ -163,10 +163,10 @@ export default function DashboardPage() {
       else waterScore = 35;
     }
 
-    // Circularity: null if no waste data
+    // Circularity: null if no waste data (check total_waste_kg > 0 to confirm actual data exists)
     let circularityScore: number | null = null;
-    if (wasteMetrics?.waste_diversion_rate !== undefined && wasteMetrics.waste_diversion_rate !== null) {
-      const rate = wasteMetrics.waste_diversion_rate;
+    if (wasteMetrics?.total_waste_kg && wasteMetrics.total_waste_kg > 0) {
+      const rate = wasteMetrics.waste_diversion_rate ?? 0;
       if (rate >= 80) circularityScore = 90;
       else if (rate >= 60) circularityScore = 75;
       else if (rate >= 40) circularityScore = 55;

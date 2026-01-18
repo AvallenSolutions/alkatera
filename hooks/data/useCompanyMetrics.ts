@@ -280,7 +280,7 @@ export function useCompanyMetrics() {
             fossil_resource_scarcity: 0,
           },
           climate_top_contributor: null,
-          water_risk_level: 'low',
+          water_risk_level: null as any, // No data available - don't default to 'low'
           circularity_percentage: 0,
           land_footprint_total: 0,
           total_products_assessed: 0,
