@@ -48,17 +48,33 @@ export interface CorporateEmissionsResult {
 }
 
 // ============================================================================
+// EMISSION FACTORS (for utility_data_entries calculations)
+// ============================================================================
+
+const UTILITY_EMISSION_FACTORS: Record<string, { factor: number; scope: 'Scope 1' | 'Scope 2' }> = {
+  // Scope 1 - Direct emissions
+  diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },
+  diesel_mobile: { factor: 2.68787, scope: 'Scope 1' },
+  petrol_mobile: { factor: 2.31, scope: 'Scope 1' },
+  natural_gas: { factor: 0.18293, scope: 'Scope 1' },
+  lpg: { factor: 1.55537, scope: 'Scope 1' },
+  heavy_fuel_oil: { factor: 3.17740, scope: 'Scope 1' },
+  biomass_solid: { factor: 0.01551, scope: 'Scope 1' },
+  refrigerant_leakage: { factor: 1430, scope: 'Scope 1' },
+  // Scope 2 - Indirect emissions from purchased energy
+  electricity_grid: { factor: 0.207, scope: 'Scope 2' },
+  heat_steam_purchased: { factor: 0.1662, scope: 'Scope 2' },
+};
+
+// ============================================================================
 // SCOPE 1 CALCULATIONS
 // ============================================================================
 
 /**
- * Calculate Scope 1 emissions from facility activity data and fleet
+ * Calculate Scope 1 emissions from facility utility data and fleet
  *
  * Sources:
- * - Facility stationary combustion
- * - Facility mobile combustion
- * - Facility process emissions
- * - Facility fugitive emissions
+ * - Facility utility_data_entries (natural gas, diesel, LPG, etc.)
  * - Fleet vehicles (company-owned combustion)
  */
 export async function calculateScope1(
@@ -69,38 +85,34 @@ export async function calculateScope1(
 ): Promise<number> {
   let scope1Total = 0;
 
-  // 1. Facility activity data
-  const { data: facilityData } = await supabase
-    .from('facility_activity_data')
+  // 1. Fetch utility data from all facilities (PRIMARY SOURCE)
+  const { data: utilityData } = await supabase
+    .from('utility_data_entries')
     .select(`
       quantity,
-      scope_1_2_emission_sources!inner (
-        scope,
-        emission_factor_id
+      unit,
+      utility_type,
+      facilities!inner (
+        organization_id
       )
     `)
-    .eq('organization_id', organizationId)
+    .eq('facilities.organization_id', organizationId)
     .gte('reporting_period_start', yearStart)
     .lte('reporting_period_end', yearEnd);
 
-  if (facilityData) {
-    const scope1Items = facilityData.filter((item: any) =>
-      item.scope_1_2_emission_sources?.scope === 'Scope 1'
-    );
+  if (utilityData) {
+    for (const entry of utilityData) {
+      const emissionConfig = UTILITY_EMISSION_FACTORS[(entry as any).utility_type];
+      if (!emissionConfig || emissionConfig.scope !== 'Scope 1') continue;
 
-    for (const item of scope1Items) {
-      const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
-      if (factorId) {
-        const { data: factor } = await supabase
-          .from('emissions_factors')
-          .select('value')
-          .eq('factor_id', factorId)
-          .maybeSingle();
+      let co2e = (entry as any).quantity * emissionConfig.factor;
 
-        if (factor?.value) {
-          scope1Total += item.quantity * parseFloat(factor.value);
-        }
+      // Handle unit conversion for natural gas (m³ to kWh)
+      if ((entry as any).utility_type === 'natural_gas' && (entry as any).unit === 'm³') {
+        co2e = (entry as any).quantity * 10.55 * emissionConfig.factor;
       }
+
+      scope1Total += co2e;
     }
   }
 
@@ -128,11 +140,10 @@ export async function calculateScope1(
 // ============================================================================
 
 /**
- * Calculate Scope 2 emissions from facility activity data and fleet
+ * Calculate Scope 2 emissions from facility utility data and fleet
  *
  * Sources:
- * - Purchased electricity
- * - Purchased heat/steam
+ * - Facility utility_data_entries (purchased electricity, heat/steam)
  * - Fleet vehicles (company-owned electric)
  */
 export async function calculateScope2(
@@ -143,38 +154,28 @@ export async function calculateScope2(
 ): Promise<number> {
   let scope2Total = 0;
 
-  // 1. Facility activity data
-  const { data: facilityData } = await supabase
-    .from('facility_activity_data')
+  // 1. Fetch utility data from all facilities (PRIMARY SOURCE)
+  const { data: utilityData } = await supabase
+    .from('utility_data_entries')
     .select(`
       quantity,
-      scope_1_2_emission_sources!inner (
-        scope,
-        emission_factor_id
+      unit,
+      utility_type,
+      facilities!inner (
+        organization_id
       )
     `)
-    .eq('organization_id', organizationId)
+    .eq('facilities.organization_id', organizationId)
     .gte('reporting_period_start', yearStart)
     .lte('reporting_period_end', yearEnd);
 
-  if (facilityData) {
-    const scope2Items = facilityData.filter((item: any) =>
-      item.scope_1_2_emission_sources?.scope === 'Scope 2'
-    );
+  if (utilityData) {
+    for (const entry of utilityData) {
+      const emissionConfig = UTILITY_EMISSION_FACTORS[(entry as any).utility_type];
+      if (!emissionConfig || emissionConfig.scope !== 'Scope 2') continue;
 
-    for (const item of scope2Items) {
-      const factorId = (item as any).scope_1_2_emission_sources?.emission_factor_id;
-      if (factorId) {
-        const { data: factor } = await supabase
-          .from('emissions_factors')
-          .select('value')
-          .eq('factor_id', factorId)
-          .maybeSingle();
-
-        if (factor?.value) {
-          scope2Total += item.quantity * parseFloat(factor.value);
-        }
-      }
+      const co2e = (entry as any).quantity * emissionConfig.factor;
+      scope2Total += co2e;
     }
   }
 
