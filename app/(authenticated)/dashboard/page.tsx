@@ -117,14 +117,16 @@ function getStatusFromScore(score: number | null): 'good' | 'warning' | 'critica
   return 'critical';
 }
 
+const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
+
 export default function DashboardPage() {
   const router = useRouter();
   const { currentOrganization } = useOrganization();
   const { enabledWidgets, loading: prefsLoading, error: prefsError, refetch } = useDashboardPreferences();
-  const currentYear = new Date().getFullYear();
-  const { footprint, loading: footprintLoading } = useCompanyFootprint(currentYear);
-  const { footprint: previousYearFootprint } = useCompanyFootprint(currentYear - 1);
-  const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(currentYear);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const { footprint, loading: footprintLoading } = useCompanyFootprint(selectedYear);
+  const { footprint: previousYearFootprint } = useCompanyFootprint(selectedYear - 1);
+  const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
   const { data: supplierData, isLoading: supplierLoading } = useSupplierEngagement();
   const { metrics: companyMetrics, loading: metricsLoading } = useCompanyMetrics();
 
@@ -294,6 +296,17 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            className="px-3 py-2 text-sm font-medium rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          >
+            {AVAILABLE_YEARS.map((year) => (
+              <option key={year} value={year}>
+                {year}
+              </option>
+            ))}
+          </select>
           <Button
             onClick={() => router.push('/products/import')}
             className="gap-2"

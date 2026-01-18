@@ -203,12 +203,14 @@ function generateStrengthsAndImprovements(
   return { strengths, improvements };
 }
 
+const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
+
 export default function PerformancePage() {
-  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const { currentOrganization } = useOrganization();
   const hookResult = useCompanyMetrics();
-  const { footprint: footprintData, loading: footprintLoading } = useCompanyFootprint(currentYear);
-  const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(currentYear);
+  const { footprint: footprintData, loading: footprintLoading, refetch: refetchFootprint } = useCompanyFootprint(selectedYear);
+  const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
   const { getBenchmarkForPillar } = useVitalityBenchmarks();
 
   const {
@@ -376,9 +378,20 @@ export default function PerformancePage() {
       {/* Action Bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Badge variant="outline" className="border-emerald-500 text-emerald-700">
-            {currentYear} Data
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              className="px-3 py-1.5 text-sm font-medium rounded-md border border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-transparent hover:bg-emerald-50 dark:hover:bg-emerald-950/30 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              {AVAILABLE_YEARS.map((year) => (
+                <option key={year} value={year}>
+                  {year} Data
+                </option>
+              ))}
+            </select>
+          </div>
           {metrics?.total_products_assessed && metrics.total_products_assessed > 0 && (
             <span className="text-sm text-muted-foreground">
               Based on {metrics.total_products_assessed} assessed product{metrics.total_products_assessed !== 1 ? 's' : ''}
@@ -442,7 +455,7 @@ export default function PerformancePage() {
             scope3LogisticsDetails={scope3LogisticsDetails}
             scope3WasteDetails={scope3WasteDetails}
             scope3Total={scope3Total}
-            year={currentYear}
+            year={selectedYear}
             isLoadingScope3={footprintLoading}
           />
           <Button
@@ -695,7 +708,7 @@ export default function PerformancePage() {
         scope3LogisticsDetails={scope3LogisticsDetails}
         scope3WasteDetails={scope3WasteDetails}
         scope3Total={scope3Total}
-        year={currentYear}
+        year={selectedYear}
         isLoadingScope3={footprintLoading}
       />
 
@@ -712,7 +725,7 @@ export default function PerformancePage() {
         onOpenChange={setCircularitySheetOpen}
         metrics={wasteMetrics}
         loading={wasteLoading}
-        year={currentYear}
+        year={selectedYear}
       />
 
       <NatureImpactSheet
