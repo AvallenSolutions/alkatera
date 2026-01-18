@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface VitalityRingProps {
-  score: number;
+  score: number | null;
   maxScore?: number;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showLabel?: boolean;
@@ -61,12 +61,18 @@ export function VitalityRing({
   const config = sizeConfig[size];
   const radius = (config.diameter - config.strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const normalizedScore = Math.min(Math.max(score, 0), maxScore);
-  const progress = (normalizedScore / maxScore) * circumference;
+
+  // Handle null score - show empty ring
+  const isNoData = score === null;
+  const actualScore = score ?? 0;
+  const normalizedScore = Math.min(Math.max(actualScore, 0), maxScore);
+  const progress = isNoData ? 0 : (normalizedScore / maxScore) * circumference;
   const dashOffset = circumference - progress;
 
-  const { label: scoreLabel, colorClass } = getScoreLabel(normalizedScore);
-  const strokeColor = getScoreColor(normalizedScore);
+  const { label: scoreLabel, colorClass } = isNoData
+    ? { label: 'NO DATA', colorClass: 'text-gray-400' }
+    : getScoreLabel(normalizedScore);
+  const strokeColor = isNoData ? '#9ca3af' : getScoreColor(normalizedScore);
 
   const TrendIcon = trendDirection === 'up' ? TrendingUp :
                     trendDirection === 'down' ? TrendingDown : Minus;
@@ -134,8 +140,8 @@ export function VitalityRing({
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn('font-bold tabular-nums', config.fontSize)}>
-            {Math.round(normalizedScore)}
+          <span className={cn('font-bold tabular-nums', config.fontSize, isNoData && 'text-gray-400')}>
+            {isNoData ? '--' : Math.round(normalizedScore)}
           </span>
           {showLabel && (
             <span className={cn('font-medium', config.labelSize, colorClass)}>

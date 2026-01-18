@@ -84,20 +84,34 @@ function EmptyDashboard() {
 }
 
 function getVitalityScore(data: {
-  climateScore: number;
-  waterScore: number;
-  circularityScore: number;
-  supplierScore: number;
-}): number {
-  return Math.round(
-    data.climateScore * 0.35 +
-    data.waterScore * 0.25 +
-    data.circularityScore * 0.25 +
-    data.supplierScore * 0.15
-  );
+  climateScore: number | null;
+  waterScore: number | null;
+  circularityScore: number | null;
+  supplierScore: number | null;
+}): number | null {
+  const validScores = [
+    data.climateScore,
+    data.waterScore,
+    data.circularityScore,
+    data.supplierScore,
+  ].filter((s): s is number => s !== null);
+
+  if (validScores.length === 0) return null;
+
+  // Calculate weighted average only for available scores
+  let total = 0;
+  let weightSum = 0;
+
+  if (data.climateScore !== null) { total += data.climateScore * 0.35; weightSum += 0.35; }
+  if (data.waterScore !== null) { total += data.waterScore * 0.25; weightSum += 0.25; }
+  if (data.circularityScore !== null) { total += data.circularityScore * 0.25; weightSum += 0.25; }
+  if (data.supplierScore !== null) { total += data.supplierScore * 0.15; weightSum += 0.15; }
+
+  return Math.round(total / weightSum);
 }
 
-function getStatusFromScore(score: number): 'good' | 'warning' | 'critical' {
+function getStatusFromScore(score: number | null): 'good' | 'warning' | 'critical' | 'neutral' {
+  if (score === null) return 'neutral';
   if (score >= 70) return 'good';
   if (score >= 50) return 'warning';
   return 'critical';
@@ -126,7 +140,8 @@ export default function DashboardPage() {
   }, [companyMetrics]);
 
   const scores = useMemo(() => {
-    let climateScore = 50;
+    // Climate: null if no emissions data
+    let climateScore: number | null = null;
     if (footprint?.total_emissions) {
       const emissionsKg = footprint.total_emissions;
       if (emissionsKg < 10000) climateScore = 85;
@@ -135,7 +150,8 @@ export default function DashboardPage() {
       else climateScore = 35;
     }
 
-    let waterScore = 50;
+    // Water: null if no water data
+    let waterScore: number | null = null;
     if (companyMetrics?.water_risk_level) {
       if (companyMetrics.water_risk_level === 'low') waterScore = 85;
       else if (companyMetrics.water_risk_level === 'medium') waterScore = 60;
@@ -147,8 +163,9 @@ export default function DashboardPage() {
       else waterScore = 35;
     }
 
-    let circularityScore = 50;
-    if (wasteMetrics?.waste_diversion_rate !== undefined) {
+    // Circularity: null if no waste data
+    let circularityScore: number | null = null;
+    if (wasteMetrics?.waste_diversion_rate !== undefined && wasteMetrics.waste_diversion_rate !== null) {
       const rate = wasteMetrics.waste_diversion_rate;
       if (rate >= 80) circularityScore = 90;
       else if (rate >= 60) circularityScore = 75;
@@ -156,16 +173,19 @@ export default function DashboardPage() {
       else circularityScore = 35;
     }
 
-    let supplierScore = 50;
+    // Supplier: null if no supplier data
+    let supplierScore: number | null = null;
     if (supplierData && supplierData.length > 0) {
-      const total = supplierData[0]?.total_suppliers || 1;
-      const activeEntry = supplierData.find(s => s.status === 'active');
-      const engaged = activeEntry?.supplier_count || 0;
-      const engagementRate = (engaged / total) * 100;
-      if (engagementRate >= 70) supplierScore = 85;
-      else if (engagementRate >= 50) supplierScore = 70;
-      else if (engagementRate >= 30) supplierScore = 50;
-      else supplierScore = 30;
+      const total = supplierData[0]?.total_suppliers || 0;
+      if (total > 0) {
+        const activeEntry = supplierData.find(s => s.status === 'active');
+        const engaged = activeEntry?.supplier_count || 0;
+        const engagementRate = (engaged / total) * 100;
+        if (engagementRate >= 70) supplierScore = 85;
+        else if (engagementRate >= 50) supplierScore = 70;
+        else if (engagementRate >= 30) supplierScore = 50;
+        else supplierScore = 30;
+      }
     }
 
     return { climateScore, waterScore, circularityScore, supplierScore };
@@ -258,7 +278,8 @@ export default function DashboardPage() {
     );
   }
 
-  const vitalityLabel = vitalityScore >= 75 ? 'HEALTHY' :
+  const vitalityLabel = vitalityScore === null ? 'NO DATA' :
+                        vitalityScore >= 75 ? 'HEALTHY' :
                         vitalityScore >= 50 ? 'DEVELOPING' : 'NEEDS ATTENTION';
 
   return (
@@ -330,11 +351,13 @@ export default function DashboardPage() {
                 <div className="mb-4">
                   <h2 className="text-lg font-semibold text-white mb-1">Company Vitality</h2>
                   <p className="text-sm text-white/60">
-                    {vitalityScore >= 75
-                      ? 'Your organisation is performing well across sustainability pillars.'
-                      : vitalityScore >= 50
-                        ? 'Good progress with opportunities for improvement.'
-                        : 'Significant opportunities to improve sustainability performance.'}
+                    {vitalityScore === null
+                      ? 'Add products, facilities, or supplier data to calculate your sustainability score.'
+                      : vitalityScore >= 75
+                        ? 'Your organisation is performing well across sustainability pillars.'
+                        : vitalityScore >= 50
+                          ? 'Good progress with opportunities for improvement.'
+                          : 'Significant opportunities to improve sustainability performance.'}
                   </p>
                 </div>
 
@@ -476,7 +499,21 @@ export default function DashboardPage() {
   );
 }
 
-function MiniScoreCard({ title, score, emoji }: { title: string; score: number; emoji: string }) {
+function MiniScoreCard({ title, score, emoji }: { title: string; score: number | null; emoji: string }) {
+  if (score === null) {
+    return (
+      <div className="p-3 rounded-xl bg-white/5 border border-white/10">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm">{emoji}</span>
+          <span className="text-xs text-white/60">{title}</span>
+        </div>
+        <div className="text-sm text-white/40">
+          No data
+        </div>
+      </div>
+    );
+  }
+
   const colorClass = score >= 70 ? 'text-green-400' :
                      score >= 50 ? 'text-amber-400' : 'text-red-400';
 
