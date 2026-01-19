@@ -507,7 +507,27 @@ export function PackagingFormCard({
                       <TooltipTrigger asChild>
                         <button
                           type="button"
-                          onClick={() => onUpdate(packaging.tempId, { packaging_category: type.value as PackagingCategory })}
+                          onClick={() => {
+                            // Only reset material data if the category actually changes
+                            if (packaging.packaging_category !== type.value) {
+                              onUpdate(packaging.tempId, {
+                                packaging_category: type.value as PackagingCategory,
+                                // Reset material-specific fields when packaging type changes
+                                name: '',
+                                data_source: null,
+                                data_source_id: undefined,
+                                supplier_product_id: undefined,
+                                supplier_name: undefined,
+                                carbon_intensity: undefined,
+                                location: undefined,
+                                // Reset EPR components
+                                components: [],
+                                has_component_breakdown: false,
+                                // Reset auto-loaded recycled content
+                                recycled_content_percentage: '',
+                              });
+                            }
+                          }}
                           className={`
                             flex flex-col items-center gap-1.5 p-2.5 rounded-lg border-2 transition-all
                             ${isSelected
