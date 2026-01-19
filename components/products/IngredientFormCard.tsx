@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +19,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
-import { GoogleAddressInput } from "@/components/ui/google-address-input";
+import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import { COUNTRIES } from "@/lib/countries";
 import type { DataSource } from "@/lib/types/lca";
 import { calculateDistance } from "@/lib/utils/distance-calculator";
@@ -309,19 +311,19 @@ export function IngredientFormCard({
                 <Label htmlFor={`origin-address-${ingredient.tempId}`}>
                   Where is this manufactured? (City or Factory Name)
                 </Label>
-                <GoogleAddressInput
+                <LocationPicker
                   value={ingredient.origin_address || ''}
                   placeholder="e.g., Munich, Germany or Yorkshire Maltings, UK"
-                  onAddressSelect={(address) => {
-                    console.log(`[Address Selected] ${address.formatted_address}`);
-                    console.log(`[Material Origin Coordinates] Lat: ${address.lat}, Lng: ${address.lng}`);
-                    const calculatedDistance = calculateAndSetDistance(address.lat, address.lng);
+                  onLocationSelect={(location: LocationData) => {
+                    console.log(`[Address Selected] ${location.address}`);
+                    console.log(`[Material Origin Coordinates] Lat: ${location.lat}, Lng: ${location.lng}`);
+                    const calculatedDistance = calculateAndSetDistance(location.lat, location.lng);
                     onUpdate(ingredient.tempId, {
-                      origin_address: address.formatted_address,
-                      origin_lat: address.lat,
-                      origin_lng: address.lng,
-                      origin_country_code: address.country_code,
-                      origin_country: address.formatted_address,
+                      origin_address: location.address,
+                      origin_lat: location.lat,
+                      origin_lng: location.lng,
+                      origin_country_code: location.countryCode || '',
+                      origin_country: location.address,
                       distance_km: calculatedDistance,
                     });
                   }}
@@ -379,7 +381,11 @@ export function IngredientFormCard({
                   )}
                   {productionFacilities.length === 0 && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Add a facility with location to enable automatic distance calculation
+                      No production sites configured.{' '}
+                      <Link href="/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                        Add a facility with location
+                      </Link>{' '}
+                      and configure production sites to enable automatic distance calculation.
                     </p>
                   )}
                 </div>

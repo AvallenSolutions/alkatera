@@ -834,17 +834,17 @@ export default function ProductRecipePage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">
-            <Info className="h-4 w-4 mr-2" />
-            Overview
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <Info className="h-4 w-4 pointer-events-none" />
+            <span>Overview</span>
           </TabsTrigger>
-          <TabsTrigger value="ingredients">
-            <Leaf className="h-4 w-4 mr-2" />
-            Ingredients
+          <TabsTrigger value="ingredients" className="flex items-center gap-2">
+            <Leaf className="h-4 w-4 pointer-events-none" />
+            <span>Ingredients</span>
           </TabsTrigger>
-          <TabsTrigger value="packaging">
-            <Box className="h-4 w-4 mr-2" />
-            Packaging
+          <TabsTrigger value="packaging" className="flex items-center gap-2">
+            <Box className="h-4 w-4 pointer-events-none" />
+            <span>Packaging</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1015,6 +1015,7 @@ export default function ProductRecipePage() {
               </div>
 
               <Button
+                type="button"
                 onClick={addIngredient}
                 variant="outline"
                 className="w-full border-dashed"
@@ -1025,10 +1026,15 @@ export default function ProductRecipePage() {
               </Button>
 
               <div className="flex gap-2 pt-4 border-t">
-                <Button onClick={saveIngredients} disabled={saving} className="flex-1">
+                <Button
+                  type="button"
+                  onClick={saveIngredients}
+                  disabled={saving}
+                  className="flex-1"
+                >
                   {saving ? 'Saving...' : 'Save Ingredients'}
                 </Button>
-                <Button variant="outline" onClick={fetchProductData} disabled={saving}>
+                <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
                   Cancel
                 </Button>
               </div>
@@ -1083,6 +1089,7 @@ export default function ProductRecipePage() {
               </div>
 
               <Button
+                type="button"
                 onClick={addPackaging}
                 variant="outline"
                 className="w-full border-dashed"
@@ -1093,10 +1100,15 @@ export default function ProductRecipePage() {
               </Button>
 
               <div className="flex gap-2 pt-4 border-t">
-                <Button onClick={savePackaging} disabled={saving} className="flex-1">
+                <Button
+                  type="button"
+                  onClick={savePackaging}
+                  disabled={saving}
+                  className="flex-1"
+                >
                   {saving ? 'Saving...' : 'Save Packaging'}
                 </Button>
-                <Button variant="outline" onClick={fetchProductData} disabled={saving}>
+                <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
                   Cancel
                 </Button>
               </div>
