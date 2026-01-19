@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
-import { GoogleAddressInput } from "@/components/ui/google-address-input";
+import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import { COUNTRIES } from "@/lib/countries";
 import type {
   DataSource,
@@ -672,19 +673,19 @@ export function PackagingFormCard({
                     <Label htmlFor={`origin-address-${packaging.tempId}`}>
                       Where is this manufactured? (City or Factory Name)
                     </Label>
-                    <GoogleAddressInput
+                    <LocationPicker
                       value={packaging.origin_address || ''}
                       placeholder="e.g., Shanghai, China or Birmingham Glass Factory, UK"
-                      onAddressSelect={(address) => {
-                        console.log(`[Address Selected] ${address.formatted_address}`);
-                        console.log(`[Material Origin Coordinates] Lat: ${address.lat}, Lng: ${address.lng}`);
-                        const calculatedDistance = calculateAndSetDistance(address.lat, address.lng);
+                      onLocationSelect={(location: LocationData) => {
+                        console.log(`[Address Selected] ${location.address}`);
+                        console.log(`[Material Origin Coordinates] Lat: ${location.lat}, Lng: ${location.lng}`);
+                        const calculatedDistance = calculateAndSetDistance(location.lat, location.lng);
                         onUpdate(packaging.tempId, {
-                          origin_address: address.formatted_address,
-                          origin_lat: address.lat,
-                          origin_lng: address.lng,
-                          origin_country_code: address.country_code,
-                          origin_country: address.formatted_address,
+                          origin_address: location.address,
+                          origin_lat: location.lat,
+                          origin_lng: location.lng,
+                          origin_country_code: location.countryCode || '',
+                          origin_country: location.address,
                           distance_km: calculatedDistance,
                         });
                       }}
@@ -741,7 +742,11 @@ export function PackagingFormCard({
                       )}
                       {productionFacilities.length === 0 && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                          Add a facility with location to enable automatic distance calculation
+                          No production sites configured.{' '}
+                          <Link href="/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                            Add a facility with location
+                          </Link>{' '}
+                          and configure production sites to enable automatic distance calculation.
                         </p>
                       )}
                     </div>
