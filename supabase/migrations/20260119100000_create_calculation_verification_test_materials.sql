@@ -43,11 +43,14 @@ DECLARE
   v_org_id UUID;
   v_supplier_id UUID;
 BEGIN
-  -- Get current organization (user must be logged into Calculation Verification org)
-  v_org_id := get_current_organization_id();
+  -- Look up the Calculation Verification organization by name
+  SELECT id INTO v_org_id
+  FROM organizations
+  WHERE name ILIKE '%Calculation Verification%'
+  LIMIT 1;
 
   IF v_org_id IS NULL THEN
-    RAISE EXCEPTION 'ERROR: No organization context. Please log into the Calculation Verification organization first.';
+    RAISE EXCEPTION 'ERROR: Could not find "Calculation Verification" organization. Please create the organization first via the UI.';
   END IF;
 
   RAISE NOTICE '========================================';
