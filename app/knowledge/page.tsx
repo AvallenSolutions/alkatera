@@ -196,7 +196,7 @@ export default function KnowledgePage() {
           >
             <h1 className="font-serif text-5xl md:text-8xl mb-8 leading-[0.9]">
               Knowledge for the <br />
-              <span className="text-[#ccff00] italic">Conscious Brewer</span>
+              <span className="text-[#ccff00] italic">Conscious Producer</span>
             </h1>
             <p className="font-mono text-gray-400 text-sm md:text-base max-w-2xl leading-relaxed">
               Insights, guides, and perspectives on building a regenerative drinks brand. From carbon accounting to supply chain strategy, explore the science and stories behind sustainable growth.
