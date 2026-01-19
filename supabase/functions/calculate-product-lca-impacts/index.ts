@@ -287,21 +287,69 @@ Deno.serve(async (req: Request) => {
       console.log("[calculate-product-lca-impacts] Processing production sites...");
 
       for (const site of productionSites as ProductionSite[]) {
-        // CRITICAL: siteEmissions is PER UNIT (per bottle/can)
-        // For owned sites: Use attributable_emissions_per_unit (already weighted)
-        // For contract mfg: Use allocated_emissions_kg_co2e (converted to per-unit above)
         const isContractMfg = (site as any).source === 'contract_manufacturer';
-        const emissionsPerUnit = Number(site.allocated_emissions_kg_co2e || 0);
-        const shareOfProduction = Number(site.share_of_production || 0) / 100;
+
+        // CRITICAL: Handle emissions correctly based on source type
+        // For CONTRACT MFG: allocated_emissions_kg_co2e is already per-unit (converted above)
+        // For OWNED SITES: allocated_emissions_kg_co2e is TOTAL, need to use emission_intensity_kg_co2e_per_unit
+        let emissionsPerUnit: number;
+
+        if (isContractMfg) {
+          // Contract manufacturer: already converted to per-unit above
+          emissionsPerUnit = Number(site.allocated_emissions_kg_co2e || 0);
+        } else {
+          // Owned facility: use per-unit intensity, or calculate from total/volume
+          const perUnitIntensity = Number((site as any).emission_intensity_kg_co2e_per_unit || 0);
+          const totalEmissions = Number(site.allocated_emissions_kg_co2e || 0);
+          const productionVolume = Number((site as any).production_volume || 1);
+
+          if (perUnitIntensity > 0) {
+            emissionsPerUnit = perUnitIntensity;
+            console.log(`[calculate-product-lca-impacts] Owned site ${site.facility_id}: Using emission_intensity_kg_co2e_per_unit = ${perUnitIntensity.toFixed(6)} kg/unit`);
+          } else if (totalEmissions > 0 && productionVolume > 0) {
+            emissionsPerUnit = totalEmissions / productionVolume;
+            console.log(`[calculate-product-lca-impacts] Owned site ${site.facility_id}: Calculated per-unit = ${totalEmissions.toFixed(2)} / ${productionVolume} = ${emissionsPerUnit.toFixed(6)} kg/unit`);
+          } else {
+            emissionsPerUnit = 0;
+          }
+        }
+
+        // For owned facilities, also handle scope breakdown per-unit conversion
+        let scope1PerUnit = Number(site.scope1_emissions_kg_co2e || 0);
+        let scope2PerUnit = Number(site.scope2_emissions_kg_co2e || 0);
+        let scope3PerUnit = Number(site.scope3_emissions_kg_co2e || 0);
+
+        if (!isContractMfg) {
+          // For owned facilities, scope values may be TOTAL - convert to per-unit
+          const productionVolume = Number((site as any).production_volume || 1);
+          if (productionVolume > 1) {
+            // Check if values seem like totals (much larger than typical per-unit)
+            // If scope values are large (>1 kg), they're likely totals
+            if (scope1PerUnit > 1 || scope2PerUnit > 1) {
+              scope1PerUnit = scope1PerUnit / productionVolume;
+              scope2PerUnit = scope2PerUnit / productionVolume;
+              scope3PerUnit = scope3PerUnit / productionVolume;
+              console.log(`[calculate-product-lca-impacts] Owned site ${site.facility_id}: Converted scope values to per-unit (÷ ${productionVolume})`);
+            }
+          }
+        }
+
+        // share_of_production: for multi-facility products, what % comes from this facility
+        // For single-facility products, this is 100%
+        // For owned facilities, check attribution_ratio as fallback
+        const shareRaw = Number(site.share_of_production || 0);
+        const attributionRatio = Number((site as any).attribution_ratio || 0);
+        const shareOfProduction = shareRaw > 0 ? shareRaw / 100 : (attributionRatio > 0 ? attributionRatio : 1);
 
         if (emissionsPerUnit > 0) {
           // Calculate weighted emissions contribution
           // Example: 0.04 kg/bottle * 50% share = 0.02 kg per bottle from this facility
           const attributableEmissions = emissionsPerUnit * shareOfProduction;
 
-          let facilityScope1 = Number(site.scope1_emissions_kg_co2e || 0) * shareOfProduction;
-          let facilityScope2 = Number(site.scope2_emissions_kg_co2e || 0) * shareOfProduction;
-          let facilityScope3 = Number(site.scope3_emissions_kg_co2e || 0) * shareOfProduction;
+          // Use the pre-converted per-unit scope values
+          let facilityScope1 = scope1PerUnit * shareOfProduction;
+          let facilityScope2 = scope2PerUnit * shareOfProduction;
+          let facilityScope3 = scope3PerUnit * shareOfProduction;
 
           // If scope breakdown is missing or zero, apply standard manufacturing allocation
           // Standard: Scope 1 = 35% (on-site combustion, process emissions)

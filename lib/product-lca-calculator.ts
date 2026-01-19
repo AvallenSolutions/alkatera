@@ -84,6 +84,65 @@ export async function calculateProductLCA(params: CalculateLCAParams): Promise<C
 
     console.log(`[calculateProductLCA] Created LCA record: ${lca.id}`);
 
+    // 4a. Copy owned production site allocations from previous LCA (if any)
+    // This ensures Scope 1/2 data persists across LCA recalculations
+    const { data: previousLCA } = await supabase
+      .from('product_lcas')
+      .select('id')
+      .eq('product_id', parseInt(productId))
+      .neq('id', lca.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (previousLCA) {
+      console.log(`[calculateProductLCA] Found previous LCA: ${previousLCA.id}, checking for owned production sites...`);
+
+      const { data: previousSites, error: sitesError } = await supabase
+        .from('product_lca_production_sites')
+        .select('*')
+        .eq('product_lca_id', previousLCA.id);
+
+      if (sitesError) {
+        console.warn('[calculateProductLCA] ⚠️ Failed to query previous production sites:', sitesError);
+      } else if (previousSites && previousSites.length > 0) {
+        console.log(`[calculateProductLCA] Found ${previousSites.length} owned production sites from previous LCA`);
+
+        // Copy sites to new LCA (excluding id and timestamps)
+        const newSites = previousSites.map(site => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { id, created_at, updated_at, ...siteData } = site;
+          return {
+            ...siteData,
+            product_lca_id: lca.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        });
+
+        const { error: insertError } = await supabase
+          .from('product_lca_production_sites')
+          .insert(newSites);
+
+        if (insertError) {
+          console.warn('[calculateProductLCA] ⚠️ Failed to copy production sites:', insertError);
+          console.warn('[calculateProductLCA] This may affect Scope 1/2 calculations');
+        } else {
+          console.log(`[calculateProductLCA] ✅ Copied ${newSites.length} owned production sites to new LCA`);
+
+          // Log the emissions being carried forward
+          const totalCopiedEmissions = newSites.reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0);
+          const totalScope1 = newSites.reduce((sum, s) => sum + (s.scope1_emissions_kg_co2e || 0), 0);
+          const totalScope2 = newSites.reduce((sum, s) => sum + (s.scope2_emissions_kg_co2e || 0), 0);
+          console.log(`[calculateProductLCA] Copied emissions: Total=${totalCopiedEmissions.toFixed(2)} kg, Scope1=${totalScope1.toFixed(2)} kg, Scope2=${totalScope2.toFixed(2)} kg`);
+        }
+      } else {
+        console.log('[calculateProductLCA] No owned production sites found in previous LCA');
+      }
+    } else {
+      console.log('[calculateProductLCA] No previous LCA found, skipping production site copy');
+    }
+
     // 5. Resolve impact factors for each material using waterfall logic
     const lcaMaterialsWithImpacts = [];
 

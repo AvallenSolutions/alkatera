@@ -298,8 +298,20 @@ export default function ProductLcaReportPage() {
   const scope3 = breakdown?.by_scope?.scope3 || 0;
   const totalEmissions = impacts?.climate_change_gwp100 || 0;
 
-  // Check if we have facility data
-  const hasFacilityData = scope1 > 0 || scope2 > 0;
+  // Check if we have facility data from any source (owned OR contract manufacturer)
+  // Contract manufacturer emissions go to Scope 3 per GHG Protocol, so we need to check
+  // production_sites_count which includes both owned and CM allocations
+  const productionSitesCount = lcaData?.aggregated_impacts?.production_sites_count || 0;
+  const processingEmissions = breakdown?.by_lifecycle_stage?.processing || 0;
+
+  // Has owned facility data (Scope 1/2)
+  const hasOwnedFacilityData = scope1 > 0 || scope2 > 0;
+
+  // Has contract manufacturer data (their emissions appear in our Scope 3 and Processing)
+  const hasContractMfgData = productionSitesCount > 0 && processingEmissions > 0 && !hasOwnedFacilityData;
+
+  // Overall: do we have ANY production site data?
+  const hasFacilityData = hasOwnedFacilityData || hasContractMfgData || productionSitesCount > 0;
 
   // Lifecycle stage breakdowns (use real data)
   const lifecycleStagesRaw = breakdown?.by_lifecycle_stage || {
@@ -558,6 +570,7 @@ export default function ProductLcaReportPage() {
                           Emissions by Scope
                         </h4>
 
+                        {/* Warning: No production site data at all */}
                         {!hasFacilityData && totalEmissions > 0 && (
                           <div className="mb-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
                             <div className="flex items-start gap-2">
@@ -566,6 +579,21 @@ export default function ProductLcaReportPage() {
                                 <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">Production Site Data Missing</p>
                                 <p className="text-xs text-amber-800 dark:text-amber-200">
                                   Scope 1 & 2 emissions require production site allocation. Visit the <strong>Production Sites</strong> tab to link facilities and calculate manufacturing emissions.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Info: Contract manufacturer data exists - explain why Scope 1/2 are zero */}
+                        {hasContractMfgData && !hasOwnedFacilityData && (
+                          <div className="mb-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                            <div className="flex items-start gap-2">
+                              <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-1">Contract Manufacturer Emissions</p>
+                                <p className="text-xs text-blue-800 dark:text-blue-200">
+                                  Your production site emissions ({processingEmissions.toFixed(3)} kg CO₂e) appear in <strong>Scope 3</strong> because the facility is a contract manufacturer. Per GHG Protocol, third-party manufacturing emissions are categorized as Scope 3 Category 1 (Purchased Goods & Services).
                                 </p>
                               </div>
                             </div>
@@ -630,7 +658,7 @@ export default function ProductLcaReportPage() {
                           Emissions by Lifecycle Stage
                         </h4>
 
-                        {!hasFacilityData && totalEmissions > 0 && (
+                        {!hasFacilityData && !hasContractMfgData && totalEmissions > 0 && processingEmissions === 0 && (
                           <p className="text-xs text-muted-foreground mb-3 italic">
                             Note: Processing stage emissions are currently 0 because production site data has not been linked. This data comes from facility-level Scope 1 & 2 reporting.
                           </p>
