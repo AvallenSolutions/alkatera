@@ -76,14 +76,14 @@ CREATE TABLE IF NOT EXISTS public.utility_fuel_type_mapping (
 
 COMMENT ON TABLE public.utility_fuel_type_mapping IS 'Maps utility types from the UI to DEFRA fuel types for emission factor lookup';
 
--- Insert the mapping data
+-- Insert the mapping data (must match DEFRA fuel_type values exactly)
 INSERT INTO public.utility_fuel_type_mapping
   (utility_type, utility_type_display, fuel_type, default_unit, normalized_unit, scope)
 VALUES
   ('electricity_grid', 'Purchased Electricity', 'grid_electricity', 'kWh', 'kWh', '2'),
   ('heat_steam_purchased', 'Purchased Heat / Steam', 'heat_steam', 'kWh', 'kWh', '2'),
-  ('natural_gas', 'Natural Gas', 'natural_gas_kwh', 'kWh', 'kWh', '1'),
-  ('natural_gas_m3', 'Natural Gas (by volume)', 'natural_gas_m3', 'm3', 'm3', '1'),
+  ('natural_gas', 'Natural Gas (by kWh)', 'natural_gas_kwh', 'kWh', 'kWh', '1'),
+  ('natural_gas_m3', 'Natural Gas (by m³)', 'natural_gas_m3', 'm3', 'm3', '1'),
   ('lpg', 'LPG (Propane/Butane)', 'lpg_litre', 'litre', 'litre', '1'),
   ('diesel_stationary', 'Diesel (Generators/Stationary)', 'diesel_stationary', 'litre', 'litre', '1'),
   ('heavy_fuel_oil', 'Heavy Fuel Oil', 'heavy_fuel_oil', 'litre', 'litre', '1'),
