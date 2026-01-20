@@ -73,6 +73,7 @@ export function EditFacilityDialog({
   const [addressLine1, setAddressLine1] = useState('');
   const [addressCity, setAddressCity] = useState('');
   const [addressCountry, setAddressCountry] = useState('');
+  const [addressCountryCode, setAddressCountryCode] = useState('');
   const [addressPostcode, setAddressPostcode] = useState('');
 
   useEffect(() => {
@@ -100,8 +101,22 @@ export function EditFacilityDialog({
       setSelectedFunctions(data.functions || []);
       setAddressLine1(data.address_line1 || '');
       setAddressCity(data.address_city || '');
-      setAddressCountry(data.address_country || '');
       setAddressPostcode(data.address_postcode || '');
+
+      // Handle country code - prefer location_country_code if set, otherwise try to derive from address_country
+      let countryCode = data.location_country_code || '';
+      if (!countryCode && data.address_country) {
+        // Try to find ISO code from country name (for legacy facilities)
+        const matchedCountry = COUNTRIES.find(
+          c => c.label.toLowerCase() === data.address_country.toLowerCase() ||
+               c.value.toLowerCase() === data.address_country.toLowerCase()
+        );
+        countryCode = matchedCountry?.value || '';
+      }
+      setAddressCountryCode(countryCode);
+      // Keep address_country synced with the country label for display
+      const countryLabel = COUNTRIES.find(c => c.value === countryCode)?.label || data.address_country || '';
+      setAddressCountry(countryLabel);
     } catch (error: any) {
       console.error('Error loading facility:', error);
       toast.error(error.message || 'Failed to load facility');
@@ -131,7 +146,7 @@ export function EditFacilityDialog({
       return;
     }
 
-    if (!addressLine1.trim() || !addressCity.trim() || !addressCountry.trim()) {
+    if (!addressLine1.trim() || !addressCity.trim() || !addressCountryCode) {
       toast.error('Please complete the address fields');
       return;
     }
@@ -149,6 +164,9 @@ export function EditFacilityDialog({
           address_city: addressCity.trim(),
           address_country: addressCountry.trim(),
           address_postcode: addressPostcode.trim(),
+          // Also update location_country_code for AWARE water stress assessment
+          location_country_code: addressCountryCode,
+          location_address: addressLine1.trim(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', facilityId);
@@ -289,13 +307,20 @@ export function EditFacilityDialog({
 
               <div>
                 <Label htmlFor="addressCountry">Country *</Label>
-                <Select value={addressCountry} onValueChange={setAddressCountry}>
+                <Select
+                  value={addressCountryCode}
+                  onValueChange={(code) => {
+                    setAddressCountryCode(code);
+                    const country = COUNTRIES.find(c => c.value === code);
+                    setAddressCountry(country?.label || '');
+                  }}
+                >
                   <SelectTrigger id="addressCountry">
                     <SelectValue placeholder="Select country..." />
                   </SelectTrigger>
                   <SelectContent className="max-h-[300px]">
                     {COUNTRIES.map((country) => (
-                      <SelectItem key={country.value} value={country.label}>
+                      <SelectItem key={country.value} value={country.value}>
                         {country.label}
                       </SelectItem>
                     ))}
