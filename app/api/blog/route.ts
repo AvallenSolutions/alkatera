@@ -166,10 +166,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get author info
-    // For quotes, use the provided author_name (the person being quoted)
-    // For other content types, use the logged-in user's name
+    // If author_name is provided, use it
+    // Otherwise, fall back to the logged-in user's name
     let finalAuthorName = author_name;
-    if (!isQuote) {
+    if (!finalAuthorName) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('full_name')

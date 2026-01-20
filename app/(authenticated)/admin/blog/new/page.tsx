@@ -366,21 +366,23 @@ export default function NewBlogPost() {
                 )}
               </div>
 
-              {/* Author (for quotes only) */}
-              {formData.content_type === 'quote' && (
-                <div className="space-y-2">
-                  <Label htmlFor="author_name">Author *</Label>
-                  <Input
-                    id="author_name"
-                    placeholder="e.g., CEO, Founder, etc."
-                    value={formData.author_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, author_name: e.target.value }))}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Who said this quote? (e.g., "CEO", "Founder")
-                  </p>
-                </div>
-              )}
+              {/* Author Name */}
+              <div className="space-y-2">
+                <Label htmlFor="author_name">
+                  Author {formData.content_type === 'quote' && '*'}
+                </Label>
+                <Input
+                  id="author_name"
+                  placeholder={formData.content_type === 'quote' ? 'e.g., CEO, Founder, etc.' : 'e.g., John Smith'}
+                  value={formData.author_name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, author_name: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {formData.content_type === 'quote'
+                    ? 'Who said this quote? (e.g., "CEO", "Founder")'
+                    : 'Display name for the author of this post'}
+                </p>
+              </div>
 
               {/* Slug */}
               <div className="space-y-2">

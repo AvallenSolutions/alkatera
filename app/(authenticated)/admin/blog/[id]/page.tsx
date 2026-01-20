@@ -265,21 +265,23 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
                 )}
               </div>
 
-              {/* Author (for quotes only) */}
-              {post.content_type === 'quote' && (
-                <div className="space-y-2">
-                  <Label htmlFor="author_name">Author *</Label>
-                  <Input
-                    id="author_name"
-                    placeholder="e.g., CEO, Founder, etc."
-                    value={post.author_name || ''}
-                    onChange={(e) => setPost(prev => prev ? { ...prev, author_name: e.target.value } : null)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Who said this quote? (e.g., "CEO", "Founder")
-                  </p>
-                </div>
-              )}
+              {/* Author Name */}
+              <div className="space-y-2">
+                <Label htmlFor="author_name">
+                  Author {post.content_type === 'quote' && '*'}
+                </Label>
+                <Input
+                  id="author_name"
+                  placeholder={post.content_type === 'quote' ? 'e.g., CEO, Founder, etc.' : 'e.g., John Smith'}
+                  value={post.author_name || ''}
+                  onChange={(e) => setPost(prev => prev ? { ...prev, author_name: e.target.value } : null)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {post.content_type === 'quote'
+                    ? 'Who said this quote? (e.g., "CEO", "Founder")'
+                    : 'Display name for the author of this post'}
+                </p>
+              </div>
 
               {/* Slug */}
               <div className="space-y-2">
