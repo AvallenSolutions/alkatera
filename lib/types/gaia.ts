@@ -218,3 +218,63 @@ export interface GaiaChatState {
   isStreaming: boolean;
   error: string | null;
 }
+
+// Data availability for smart suggestions
+export interface GaiaDataAvailability {
+  hasProductLCAs: boolean;
+  hasCarbonFootprintData: boolean;
+  hasFacilityData: boolean;
+  hasSupplierData: boolean;
+  hasWaterData: boolean;
+  hasScope3Data: boolean;
+  hasFleetData: boolean;
+  vitalityScoreExists: boolean;
+  productCount: number;
+  productWithLcaCount: number;
+  facilityCount: number;
+  supplierCount: number;
+  fleetVehicleCount: number;
+}
+
+// Enhanced response with data gap handling
+export interface GaiaEnhancedResponse {
+  originalContent: string;
+  isDataGap: boolean;
+  dataGapType?: string;
+  actionButtons?: GaiaActionButton[];
+  helpfulSuggestions?: string[];
+}
+
+export interface GaiaActionButton {
+  label: string;
+  action: 'navigate' | 'explain' | 'suggest';
+  target?: string;
+  icon?: string;
+}
+
+// Data quality indicator
+export type GaiaDataQualityLevel = 'high' | 'medium' | 'low';
+
+export interface GaiaDataQualityIssue {
+  type: 'duplicate' | 'missing_data' | 'outdated' | 'inconsistent';
+  severity: GaiaDataQualityLevel;
+  message: string;
+  affectedItems?: string[];
+}
+
+// Issue report
+export interface GaiaIssueReport {
+  id?: string;
+  message_id?: string;
+  user_id?: string;
+  organization_id?: string;
+  issue_type: 'duplicate' | 'incorrect' | 'missing' | 'outdated' | 'other';
+  description: string;
+  context: {
+    query?: string;
+    response?: string;
+    dataType?: string;
+  };
+  status?: 'pending' | 'reviewed' | 'resolved';
+  created_at?: string;
+}

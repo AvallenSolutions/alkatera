@@ -20,6 +20,41 @@ import type {
 export * from '@/lib/types/gaia';
 export { GAIA_PERSONA, GAIA_SUGGESTED_QUESTIONS, getContextualFollowUps } from './system-prompt';
 
+// Re-export data availability functions
+export {
+  checkDataAvailability,
+  formatDataAvailabilityForContext,
+  type DataAvailability,
+} from './data-availability';
+
+// Re-export smart suggestion generator
+export {
+  generateSmartSuggestions,
+  getSuggestionsByCategory,
+  canAnswerQuestion,
+  type SmartSuggestion,
+} from './suggestion-generator';
+
+// Re-export data gap responses
+export {
+  getDataGapResponse,
+  detectDataGapFromResponse,
+  shouldEnhanceResponse,
+  type DataGapResponse,
+  type ActionButton,
+} from './data-gap-responses';
+
+// Re-export duplicate detection
+export {
+  detectDuplicates,
+  formatProductList,
+  assessDataQuality,
+  getDataQualitySummary,
+  type DuplicateGroup,
+  type DataQualityResult,
+  type DataQualityIssue,
+} from './duplicate-detector';
+
 // ============================================================================
 // Conversation Operations
 // ============================================================================

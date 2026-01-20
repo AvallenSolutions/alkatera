@@ -46,6 +46,15 @@ import {
   exportConversationAsJson,
   GAIA_SUGGESTED_QUESTIONS,
   getContextualFollowUps,
+  // New imports for improvements
+  checkDataAvailability,
+  generateSmartSuggestions,
+  detectDataGapFromResponse,
+  getDataGapResponse,
+  shouldEnhanceResponse,
+  type DataAvailability,
+  type SmartSuggestion,
+  type DataGapResponse,
 } from '@/lib/gaia';
 import type { GaiaStreamEvent } from '@/lib/gaia';
 import type {
@@ -53,8 +62,11 @@ import type {
   GaiaConversationWithMessages,
   GaiaMessage,
   GaiaChartData,
+  GaiaIssueReport,
 } from '@/lib/types/gaia';
 import { GaiaChartRenderer } from './GaiaChartRenderer';
+import { GaiaSmartSuggestions } from './GaiaSmartSuggestions';
+import { GaiaResponseLayout } from './GaiaResponseLayout';
 import { cn } from '@/lib/utils';
 
 interface GaiaChatProps {
@@ -78,11 +90,45 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // New state for improvements
+  const [dataAvailability, setDataAvailability] = useState<DataAvailability | null>(null);
+  const [smartSuggestions, setSmartSuggestions] = useState<SmartSuggestion[]>([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(true);
+  const [enhancedResponses, setEnhancedResponses] = useState<Record<string, DataGapResponse | null>>({});
+
   // Load conversations
   useEffect(() => {
     if (currentOrganization?.id) {
       loadConversations();
     }
+  }, [currentOrganization?.id]);
+
+  // Load data availability and smart suggestions (Improvement #1)
+  useEffect(() => {
+    async function loadDataAvailability() {
+      if (!currentOrganization?.id) return;
+      setIsLoadingSuggestions(true);
+      try {
+        const availability = await checkDataAvailability(currentOrganization.id);
+        setDataAvailability(availability);
+        const suggestions = generateSmartSuggestions(availability);
+        setSmartSuggestions(suggestions);
+      } catch (err) {
+        console.error('Error loading data availability:', err);
+        // Fall back to static suggestions on error
+        setSmartSuggestions(GAIA_SUGGESTED_QUESTIONS.slice(0, 4).map(sq => ({
+          question: sq.question,
+          category: sq.category,
+          icon: sq.icon,
+          priority: 50,
+          requiresData: [],
+        })));
+      } finally {
+        setIsLoadingSuggestions(false);
+      }
+    }
+
+    loadDataAvailability();
   }, [currentOrganization?.id]);
 
   // Scroll to bottom on new messages or streaming content
@@ -215,6 +261,10 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
             if (conversationId) {
               await loadConversation(conversationId);
             }
+            // Process for data gap enhancement after loading
+            if (event.message_id && streamingContent) {
+              processResponseForDataGap(event.message_id, streamingContent);
+            }
             break;
         }
       }
@@ -252,6 +302,43 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
   function handleSuggestionClick(question: string) {
     setInput(question);
     inputRef.current?.focus();
+  }
+
+  // Process response for data gap enhancement (Improvement #2)
+  function processResponseForDataGap(messageId: string, content: string): void {
+    if (shouldEnhanceResponse(content)) {
+      const dataGapType = detectDataGapFromResponse(content);
+      if (dataGapType) {
+        const response = getDataGapResponse(dataGapType, dataAvailability || undefined);
+        setEnhancedResponses(prev => ({ ...prev, [messageId]: response }));
+      }
+    }
+  }
+
+  // Handle explain action from data gap response
+  function handleExplainClick(topic: string) {
+    // Convert explanation topic to a question
+    const explanationQueries: Record<string, string> = {
+      carbon_scopes: 'Can you explain the difference between Scope 1, 2, and 3 emissions?',
+      facility_tracking: 'What data should I track for my facilities?',
+      supplier_engagement: 'How do I engage suppliers on sustainability?',
+      lca_basics: 'What is a Life Cycle Assessment and why is it important?',
+      scope3_categories: 'What are the 15 Scope 3 emissions categories?',
+      fleet_tracking: 'What fleet data should I track for emissions reporting?',
+      vitality_scoring: 'How is the Vitality Score calculated?',
+    };
+
+    const query = explanationQueries[topic] || `Can you explain ${topic}?`;
+    setInput(query);
+    handleSend();
+  }
+
+  // Handle issue report submission (Improvement #4)
+  async function handleReportIssue(report: Omit<GaiaIssueReport, 'id' | 'user_id' | 'organization_id' | 'created_at' | 'status'>) {
+    // In a full implementation, this would submit to an API endpoint
+    // For now, we'll log it and show a success message
+    console.log('Issue reported:', report);
+    // Could implement: await submitIssueReport(report, currentOrganization.id);
   }
 
   async function handleExportMarkdown() {
@@ -433,7 +520,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
         {/* Messages */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4 max-w-3xl mx-auto">
-            {/* Welcome Message */}
+            {/* Welcome Message with Smart Suggestions (Improvement #1) */}
             {(!activeConversation || activeConversation.messages.length === 0) && (
               <div className="text-center py-8">
                 <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
@@ -448,156 +535,99 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                   sustainability metrics.
                 </p>
 
-                <div className="flex flex-wrap justify-center gap-2">
-                  {GAIA_SUGGESTED_QUESTIONS.slice(0, 4).map((sq, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => handleSuggestionClick(sq.question)}
-                    >
-                      {sq.question}
-                    </Button>
-                  ))}
-                </div>
+                {/* Dynamic Smart Suggestions based on available data */}
+                <GaiaSmartSuggestions
+                  suggestions={smartSuggestions}
+                  onSuggestionClick={handleSuggestionClick}
+                  isLoading={isLoadingSuggestions}
+                />
+
+                {/* Data availability indicator */}
+                {dataAvailability && !isLoadingSuggestions && (
+                  <p className="text-xs text-muted-foreground mt-4">
+                    {dataAvailability.hasProductLCAs || dataAvailability.hasFacilityData || dataAvailability.hasSupplierData
+                      ? 'Suggestions personalized based on your available data'
+                      : 'Get started by adding sustainability data to unlock personalized insights'}
+                  </p>
+                )}
               </div>
             )}
 
-            {/* Messages */}
-            {activeConversation?.messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'flex gap-3',
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
-                {message.role === 'assistant' && (
-                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                    <Leaf className="h-4 w-4 text-white" />
-                  </div>
-                )}
+            {/* Messages - Using GaiaResponseLayout for assistant messages (Improvements #2, #3, #4) */}
+            {activeConversation?.messages.map((message, msgIndex) => {
+              // Get the previous user message for context
+              const prevUserMessage = msgIndex > 0 && activeConversation.messages[msgIndex - 1]?.role === 'user'
+                ? activeConversation.messages[msgIndex - 1]
+                : null;
 
-                <div className={cn(
-                  'max-w-[80%] space-y-2',
-                  message.role === 'user' && 'items-end'
-                )}>
-                  <Card className={cn(
-                    message.role === 'user'
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-card border-border'
-                  )}>
-                    <CardContent className="p-3">
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <p className="whitespace-pre-wrap text-sm">
-                          {message.content}
-                        </p>
-                      </div>
-
-                      {/* Chart rendering */}
-                      {message.chart_data && (
-                        <div className="mt-4">
-                          <GaiaChartRenderer chartData={message.chart_data} />
-                        </div>
-                      )}
-
-                      <div className={cn(
-                        'flex items-center justify-between mt-2 pt-2 border-t',
-                        message.role === 'user' ? 'border-emerald-500/30' : 'border-border'
-                      )}>
-                        <span className={cn(
-                          'text-xs',
-                          message.role === 'user' ? 'text-emerald-100' : 'text-muted-foreground'
-                        )}>
-                          {formatTime(message.created_at)}
-                        </span>
-
-                        {/* Feedback buttons for assistant messages */}
-                        {message.role === 'assistant' && !message.id.startsWith('temp-') && (
-                          <div className="flex items-center gap-1">
-                            {feedbackSubmitted[message.id] ? (
-                              <span className="text-xs text-muted-foreground">
-                                Thanks for feedback!
-                              </span>
-                            ) : (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6"
-                                      onClick={() => handleFeedback(message.id, 'positive')}
-                                    >
-                                      <ThumbsUp className="h-3 w-3" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Helpful</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6"
-                                      onClick={() => handleFeedback(message.id, 'negative')}
-                                    >
-                                      <ThumbsDown className="h-3 w-3" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Not helpful</TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
+              if (message.role === 'user') {
+                // User message - keep simple styling
+                return (
+                  <div
+                    key={message.id}
+                    className="flex gap-3 justify-end"
+                  >
+                    <div className="max-w-[80%] space-y-2 items-end">
+                      <Card className="bg-emerald-600 text-white border-emerald-600">
+                        <CardContent className="p-3">
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <p className="whitespace-pre-wrap text-sm text-white">
+                              {message.content}
+                            </p>
                           </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Data sources */}
-                  {message.role === 'assistant' && message.data_sources && message.data_sources.length > 0 && (
-                    <div className="flex flex-wrap gap-1 px-1">
-                      {message.data_sources.map((source, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs">
-                          {source.description}
-                        </Badge>
-                      ))}
+                          <div className="flex items-center justify-between mt-2 pt-2 border-t border-emerald-500/30">
+                            <span className="text-xs text-emerald-100">
+                              {formatTime(message.created_at)}
+                            </span>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                  )}
-                </div>
-
-                {message.role === 'user' && (
-                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-medium">
-                    {user?.email?.charAt(0).toUpperCase() || 'U'}
+                    <div className="flex-shrink-0 h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-medium">
+                      {user?.email?.charAt(0).toUpperCase() || 'U'}
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                );
+              }
 
-            {/* Contextual Follow-up Suggestions */}
-            {activeConversation && activeConversation.messages.length > 0 && !isSending && !isStreaming && (() => {
-              const lastMessage = activeConversation.messages[activeConversation.messages.length - 1];
-              if (lastMessage.role !== 'assistant') return null;
-              const followUps = getContextualFollowUps(lastMessage.content);
-              if (followUps.length === 0) return null;
+              // Assistant message - use GaiaResponseLayout for consistent display
+              const followUps = getContextualFollowUps(message.content);
+              const dataGapEnhancement = enhancedResponses[message.id] || null;
+
+              // Check if this response should be enhanced on first render
+              if (!enhancedResponses.hasOwnProperty(message.id) && !message.id.startsWith('temp-')) {
+                // Process asynchronously to not block render
+                setTimeout(() => processResponseForDataGap(message.id, message.content), 0);
+              }
+
               return (
-                <div className="flex flex-wrap justify-center gap-2 pt-2">
-                  {followUps.map((question, i) => (
-                    <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10"
-                      onClick={() => handleSuggestionClick(question)}
-                    >
-                      {question}
-                    </Button>
-                  ))}
-                </div>
+                <GaiaResponseLayout
+                  key={message.id}
+                  content={message.content}
+                  chartData={message.chart_data}
+                  dataSources={message.data_sources}
+                  timestamp={message.created_at}
+                  feedbackSubmitted={feedbackSubmitted[message.id]}
+                  onFeedback={
+                    !message.id.startsWith('temp-')
+                      ? (rating) => handleFeedback(message.id, rating)
+                      : undefined
+                  }
+                  followUpSuggestions={followUps}
+                  onSuggestionClick={handleSuggestionClick}
+                  dataGapResponse={dataGapEnhancement}
+                  onExplainClick={handleExplainClick}
+                  onReportIssue={handleReportIssue}
+                  messageContext={{
+                    query: prevUserMessage?.content,
+                    response: message.content,
+                    dataType: message.data_sources?.[0]?.table,
+                  }}
+                />
               );
-            })()}
+            })}
+
+            {/* Contextual Follow-up Suggestions are now shown in GaiaResponseLayout */}
 
             {/* Streaming response */}
             {isStreaming && (
