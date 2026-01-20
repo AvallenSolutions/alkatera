@@ -19,17 +19,20 @@ import { Plus, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
+// UTILITY_TYPES with normalized units matching DEFRA emission factor database
+// and fuel_type for direct factor lookup
 const UTILITY_TYPES = [
-  { value: 'electricity_grid', label: 'Purchased Electricity', defaultUnit: 'kWh' },
-  { value: 'heat_steam_purchased', label: 'Purchased Heat / Steam', defaultUnit: 'kWh' },
-  { value: 'natural_gas', label: 'Natural Gas', defaultUnit: 'm³' },
-  { value: 'lpg', label: 'LPG (Propane/Butane)', defaultUnit: 'Litres' },
-  { value: 'diesel_stationary', label: 'Diesel (Generators/Stationary)', defaultUnit: 'Litres' },
-  { value: 'heavy_fuel_oil', label: 'Heavy Fuel Oil', defaultUnit: 'Litres' },
-  { value: 'biomass_solid', label: 'Biogas / Biomass', defaultUnit: 'kg' },
-  { value: 'refrigerant_leakage', label: 'Refrigerants (Leakage)', defaultUnit: 'kg' },
-  { value: 'diesel_mobile', label: 'Company Fleet (Diesel)', defaultUnit: 'Litres' },
-  { value: 'petrol_mobile', label: 'Company Fleet (Petrol/Gasoline)', defaultUnit: 'Litres' },
+  { value: 'electricity_grid', label: 'Purchased Electricity', defaultUnit: 'kWh', fuelType: 'grid_electricity', scope: '2' },
+  { value: 'heat_steam_purchased', label: 'Purchased Heat / Steam', defaultUnit: 'kWh', fuelType: 'heat_steam', scope: '2' },
+  { value: 'natural_gas', label: 'Natural Gas (by kWh)', defaultUnit: 'kWh', fuelType: 'natural_gas_kwh', scope: '1' },
+  { value: 'natural_gas_m3', label: 'Natural Gas (by m³)', defaultUnit: 'm3', fuelType: 'natural_gas_m3', scope: '1' },
+  { value: 'lpg', label: 'LPG (Propane/Butane)', defaultUnit: 'litre', fuelType: 'lpg_litre', scope: '1' },
+  { value: 'diesel_stationary', label: 'Diesel (Generators/Stationary)', defaultUnit: 'litre', fuelType: 'diesel_stationary', scope: '1' },
+  { value: 'heavy_fuel_oil', label: 'Heavy Fuel Oil', defaultUnit: 'litre', fuelType: 'heavy_fuel_oil', scope: '1' },
+  { value: 'biomass_solid', label: 'Biogas / Biomass', defaultUnit: 'kg', fuelType: 'biomass_wood_chips', scope: '1' },
+  { value: 'refrigerant_leakage', label: 'Refrigerants (Leakage)', defaultUnit: 'kg', fuelType: 'refrigerant_r410a', scope: '1' },
+  { value: 'diesel_mobile', label: 'Company Fleet (Diesel)', defaultUnit: 'litre', fuelType: 'diesel_stationary', scope: '1' },
+  { value: 'petrol_mobile', label: 'Company Fleet (Petrol/Gasoline)', defaultUnit: 'litre', fuelType: 'petrol', scope: '1' },
 ];
 
 const FACILITY_ACTIVITY_TYPES = [
@@ -249,25 +252,30 @@ export function LogEmissionsWithProduction({ facilityId, organizationId, onSucce
             return utilityResult;
           }
 
-          // Determine scope for category
-          const utilityTypeValue = entry.utility_type;
-          const scope1Types = ['natural_gas', 'lpg', 'diesel_stationary', 'heavy_fuel_oil', 'biomass_solid', 'refrigerant_leakage', 'diesel_mobile', 'petrol_mobile'];
-          const category = scope1Types.includes(utilityTypeValue) ? 'Scope 1' : 'Scope 2';
+          // Get the utility type config for scope and fuel_type
+          const utilityConfig = UTILITY_TYPES.find(u => u.value === entry.utility_type);
+          const category = utilityConfig?.scope === '1' ? 'Scope 1' : 'Scope 2';
+          const fuelType = utilityConfig?.fuelType || entry.utility_type;
 
           // Get friendly name for utility type
-          const utilityTypeName = UTILITY_TYPES.find(u => u.value === utilityTypeValue)?.label || utilityTypeValue;
+          const utilityTypeName = utilityConfig?.label || entry.utility_type;
 
           // Also insert to activity_data for the calculation engine
+          // Now includes facility_id, fuel_type, and reporting period for proper aggregation
           const activityResult = await supabase
             .from('activity_data')
             .insert({
               organization_id: organizationId,
               user_id: userData.user.id,
+              facility_id: facilityId, // Link to specific facility
               name: `${utilityTypeName} - ${periodStart} to ${periodEnd}`,
               category: category,
               quantity: parseFloat(entry.quantity),
               unit: entry.unit,
-              activity_date: periodEnd, // Use end date as the activity date
+              fuel_type: fuelType, // For direct DEFRA factor matching
+              activity_date: periodEnd,
+              reporting_period_start: periodStart, // For period-based aggregation
+              reporting_period_end: periodEnd,
             })
             .select();
 
