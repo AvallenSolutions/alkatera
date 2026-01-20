@@ -311,3 +311,72 @@
   margin-top: 1.5em;
   margin-bottom: 1.5em;
 }
+
+/* ============================================
+   Gaia Digital Assistant Styles
+   For platform navigation highlighting
+   ============================================ */
+
+/* Gaia highlight animation for guided navigation */
+.gaia-highlight {
+  animation: gaia-pulse 2s ease-in-out;
+  outline: 3px solid hsl(160 84% 39%); /* Emerald green */
+  outline-offset: 4px;
+  border-radius: 8px;
+  position: relative;
+  z-index: 50;
+}
+
+@keyframes gaia-pulse {
+  0%, 100% {
+    outline-color: hsl(160 84% 39%);
+    outline-width: 3px;
+    outline-offset: 4px;
+  }
+  50% {
+    outline-color: hsl(160 84% 50%);
+    outline-width: 5px;
+    outline-offset: 6px;
+  }
+}
+
+/* Dark mode variant */
+.dark .gaia-highlight {
+  outline-color: hsl(160 84% 50%);
+}
+
+.dark .gaia-highlight {
+  animation: gaia-pulse-dark 2s ease-in-out;
+}
+
+@keyframes gaia-pulse-dark {
+  0%, 100% {
+    outline-color: hsl(160 84% 50%);
+    outline-width: 3px;
+    outline-offset: 4px;
+  }
+  50% {
+    outline-color: hsl(160 84% 60%);
+    outline-width: 5px;
+    outline-offset: 6px;
+  }
+}
+
+/* Gaia guided mode overlay */
+.gaia-guided-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  pointer-events: none;
+}
+
+/* Allow clicks through on highlighted elements */
+.gaia-highlight {
+  pointer-events: auto;
+}
+
+/* Gaia action button hover glow */
+.gaia-action-button:hover {
+  box-shadow: 0 0 15px hsla(160, 84%, 39%, 0.3);
+}

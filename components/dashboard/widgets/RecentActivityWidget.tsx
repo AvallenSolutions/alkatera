@@ -1,4 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import {
   Activity,
   FileText,
@@ -11,73 +12,75 @@ import {
   TrendingUp,
   Package,
   CheckCircle,
-  Send
+  Send,
+  ArrowRight
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useActivityStream } from "@/hooks/data/useActivityStream"
 import { formatDistanceToNow } from "date-fns"
+import Link from "next/link"
 
 const eventTypeConfig: Record<string, {
   icon: any
   label: string
   color: string
-  bgColor: string
+  bgGradient: string
 }> = {
   USER_INVITED: {
     icon: Send,
     label: 'User Invited',
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-blue-500 to-blue-600',
   },
   USER_JOINED: {
     icon: UserPlus,
     label: 'User Joined',
-    color: 'text-green-600 dark:text-green-400',
-    bgColor: 'bg-green-100 dark:bg-green-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-green-500 to-emerald-600',
   },
   SUPPLIER_ADDED: {
     icon: Building,
     label: 'Supplier Added',
-    color: 'text-purple-600 dark:text-purple-400',
-    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-purple-500 to-purple-600',
   },
   SUPPLIER_INVITED: {
     icon: Send,
     label: 'Supplier Invited',
-    color: 'text-indigo-600 dark:text-indigo-400',
-    bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
   },
   SUPPLIER_ACTIVATED: {
     icon: CheckCircle,
     label: 'Supplier Activated',
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-emerald-500 to-teal-600',
   },
   SUPPLIER_DATA_RECEIVED: {
     icon: Package,
     label: 'Data Received',
-    color: 'text-teal-600 dark:text-teal-400',
-    bgColor: 'bg-teal-100 dark:bg-teal-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-teal-500 to-cyan-600',
   },
   EMISSION_DATA_ADDED: {
     icon: Leaf,
     label: 'Emissions Recorded',
-    color: 'text-green-600 dark:text-green-400',
-    bgColor: 'bg-green-100 dark:bg-green-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-green-500 to-green-600',
   },
   KPI_DATA_RECORDED: {
     icon: TrendingUp,
     label: 'KPI Updated',
-    color: 'text-orange-600 dark:text-orange-400',
-    bgColor: 'bg-orange-100 dark:bg-orange-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-orange-500 to-amber-600',
   },
   SYSTEM_NOTIFICATION: {
     icon: AlertCircle,
     label: 'System Event',
-    color: 'text-slate-600 dark:text-slate-400',
-    bgColor: 'bg-slate-100 dark:bg-slate-900/30',
+    color: 'text-white',
+    bgGradient: 'bg-gradient-to-br from-slate-500 to-slate-600',
   },
 }
 
@@ -128,8 +131,8 @@ export function RecentActivityWidget() {
     return eventTypeConfig[eventType] || {
       icon: Activity,
       label: eventType.replace(/_/g, ' ').toLowerCase(),
-      color: 'text-slate-600 dark:text-slate-400',
-      bgColor: 'bg-slate-100 dark:bg-slate-900/30',
+      color: 'text-white',
+      bgGradient: 'bg-gradient-to-br from-slate-500 to-slate-600',
     }
   }
 
@@ -167,47 +170,57 @@ export function RecentActivityWidget() {
             </p>
           </div>
         ) : (
-          <ScrollArea className="h-[400px] pr-4">
-            <div className="space-y-4">
-              {activities.map((activity) => {
-                const config = getEventConfig(activity.event_type)
-                const IconComponent = config.icon
-                const description = getEventDescription(activity.event_type, activity.details)
-                const timeAgo = formatDistanceToNow(new Date(activity.event_timestamp), {
-                  addSuffix: true
-                })
+          <>
+            <ScrollArea className="h-[340px] pr-4">
+              <div className="space-y-4">
+                {activities.map((activity) => {
+                  const config = getEventConfig(activity.event_type)
+                  const IconComponent = config.icon
+                  const description = getEventDescription(activity.event_type, activity.details)
+                  const timeAgo = formatDistanceToNow(new Date(activity.event_timestamp), {
+                    addSuffix: true
+                  })
 
-                return (
-                  <div
-                    key={activity.event_id}
-                    className="flex gap-4 items-start p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  >
-                    <div className="mt-1">
-                      <div className={`h-8 w-8 rounded-full ${config.bgColor} flex items-center justify-center`}>
-                        <IconComponent className={`h-4 w-4 ${config.color}`} />
+                  return (
+                    <div
+                      key={activity.event_id}
+                      className="flex gap-4 items-start p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <div className="mt-1">
+                        <div className={`h-8 w-8 rounded-full ${config.bgGradient} flex items-center justify-center shadow-sm`}>
+                          <IconComponent className={`h-4 w-4 ${config.color}`} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex-1 space-y-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-medium leading-none">{config.label}</p>
-                        <Badge variant="secondary" className="text-xs whitespace-nowrap">
-                          {timeAgo}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {description}
-                      </p>
-                      {activity.actor_name && activity.actor_name !== 'System' && (
-                        <p className="text-xs text-muted-foreground">
-                          by {activity.actor_name}
+                      <div className="flex-1 space-y-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium leading-none">{config.label}</p>
+                          <Badge variant="secondary" className="text-xs whitespace-nowrap">
+                            {timeAgo}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {description}
                         </p>
-                      )}
+                        {activity.actor_name && activity.actor_name !== 'System' && (
+                          <p className="text-xs text-muted-foreground">
+                            by {activity.actor_name}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+            </ScrollArea>
+            <div className="pt-4 border-t mt-4">
+              <Button variant="ghost" className="w-full group" asChild>
+                <Link href="/company/activity" className="flex items-center justify-center gap-2">
+                  View all activity
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
             </div>
-          </ScrollArea>
+          </>
         )}
       </CardContent>
     </Card>
