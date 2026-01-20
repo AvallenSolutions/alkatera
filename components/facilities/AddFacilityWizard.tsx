@@ -187,6 +187,11 @@ export function AddFacilityWizard({
           address_postcode: addressPostcode,
           address_lat: addressLat,
           address_lng: addressLng,
+          // Also populate new location columns for AWARE water stress assessment
+          location_country_code: addressCountry,
+          location_address: addressLine1,
+          latitude: addressLat,
+          longitude: addressLng,
         })
         .select()
         .single();
