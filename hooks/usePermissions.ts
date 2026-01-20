@@ -26,7 +26,7 @@ export type Permission =
   | "platform.manage_organizations"
   | "platform.verify_data";
 
-export type UserRole = "alkatera_admin" | "company_admin" | "company_user";
+export type UserRole = "alkatera_admin" | "company_admin" | "company_user" | "advisor";
 
 interface PermissionsState {
   permissions: Permission[];
@@ -34,6 +34,7 @@ interface PermissionsState {
   isAlkateraAdmin: boolean;
   isOrgAdmin: boolean;
   isOrgUser: boolean;
+  isAdvisor: boolean;
   isLoading: boolean;
   canSubmitDirectly: boolean;
   canApproveData: boolean;
@@ -53,6 +54,7 @@ export function usePermissions(): PermissionsState & {
     isAlkateraAdmin: false,
     isOrgAdmin: false,
     isOrgUser: false,
+    isAdvisor: false,
     isLoading: true,
     canSubmitDirectly: false,
     canApproveData: false,
@@ -68,6 +70,7 @@ export function usePermissions(): PermissionsState & {
         isAlkateraAdmin: false,
         isOrgAdmin: false,
         isOrgUser: false,
+        isAdvisor: false,
         isLoading: false,
         canSubmitDirectly: false,
         canApproveData: false,
@@ -106,6 +109,7 @@ export function usePermissions(): PermissionsState & {
         isAlkateraAdmin,
         isOrgAdmin: userRole === "company_admin" || isAlkateraAdmin,
         isOrgUser: userRole === "company_user",
+        isAdvisor: userRole === "advisor",
         isLoading: false,
         canSubmitDirectly,
         canApproveData,
@@ -183,6 +187,69 @@ export function useIsAlkateraAdmin(): {
   }, []);
 
   return { isAlkateraAdmin, isLoading };
+}
+
+export function useIsAdvisor(): {
+  isAdvisor: boolean;
+  isAccreditedAdvisor: boolean;
+  isLoading: boolean;
+} {
+  const [isAdvisor, setIsAdvisor] = useState(false);
+  const [isAccreditedAdvisor, setIsAccreditedAdvisor] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function checkAdvisor() {
+      try {
+        const { data, error } = await supabase.rpc("is_accredited_advisor");
+        if (!error) {
+          setIsAccreditedAdvisor(data === true);
+          setIsAdvisor(data === true);
+        }
+      } catch (err) {
+        console.error("Error checking advisor status:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    checkAdvisor();
+  }, []);
+
+  return { isAdvisor, isAccreditedAdvisor, isLoading };
+}
+
+export interface AdvisorOrganization {
+  organization_id: string;
+  organization_name: string;
+  granted_at: string;
+}
+
+export function useAdvisorOrganizations(): {
+  organizations: AdvisorOrganization[];
+  isLoading: boolean;
+  refresh: () => Promise<void>;
+} {
+  const [organizations, setOrganizations] = useState<AdvisorOrganization[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchOrganizations = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc("get_advisor_organizations");
+      if (!error && data) {
+        setOrganizations(data);
+      }
+    } catch (err) {
+      console.error("Error fetching advisor organizations:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, [fetchOrganizations]);
+
+  return { organizations, isLoading, refresh: fetchOrganizations };
 }
 
 export function usePendingApprovals(): {

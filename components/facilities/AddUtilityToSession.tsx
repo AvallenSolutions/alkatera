@@ -12,17 +12,20 @@ import { Plus, Trash2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
 
+// UTILITY_TYPES with normalized units matching DEFRA emission factor database
+// and fuel_type for direct factor lookup
 const UTILITY_TYPES = [
-  { value: "electricity_grid", label: "Purchased Electricity", defaultUnit: "kWh" },
-  { value: "heat_steam_purchased", label: "Purchased Heat / Steam", defaultUnit: "kWh" },
-  { value: "natural_gas", label: "Natural Gas", defaultUnit: "m³" },
-  { value: "lpg", label: "LPG (Propane/Butane)", defaultUnit: "Litres" },
-  { value: "diesel_stationary", label: "Diesel (Generators/Stationary)", defaultUnit: "Litres" },
-  { value: "heavy_fuel_oil", label: "Heavy Fuel Oil", defaultUnit: "Litres" },
-  { value: "biomass_solid", label: "Biogas / Biomass", defaultUnit: "kg" },
-  { value: "refrigerant_leakage", label: "Refrigerants (Leakage)", defaultUnit: "kg" },
-  { value: "diesel_mobile", label: "Company Fleet (Diesel)", defaultUnit: "Litres" },
-  { value: "petrol_mobile", label: "Company Fleet (Petrol/Gasoline)", defaultUnit: "Litres" },
+  { value: "electricity_grid", label: "Purchased Electricity", defaultUnit: "kWh", fuelType: "grid_electricity", scope: "2" },
+  { value: "heat_steam_purchased", label: "Purchased Heat / Steam", defaultUnit: "kWh", fuelType: "heat_steam", scope: "2" },
+  { value: "natural_gas", label: "Natural Gas", defaultUnit: "kWh", fuelType: "natural_gas_kwh", scope: "1" },
+  { value: "natural_gas_m3", label: "Natural Gas (by m³)", defaultUnit: "m3", fuelType: "natural_gas_m3", scope: "1" },
+  { value: "lpg", label: "LPG (Propane/Butane)", defaultUnit: "litre", fuelType: "lpg_litre", scope: "1" },
+  { value: "diesel_stationary", label: "Diesel (Generators/Stationary)", defaultUnit: "litre", fuelType: "diesel_stationary", scope: "1" },
+  { value: "heavy_fuel_oil", label: "Heavy Fuel Oil", defaultUnit: "litre", fuelType: "heavy_fuel_oil", scope: "1" },
+  { value: "biomass_solid", label: "Biogas / Biomass", defaultUnit: "kg", fuelType: "biomass_wood_chips", scope: "1" },
+  { value: "refrigerant_leakage", label: "Refrigerants (Leakage)", defaultUnit: "kg", fuelType: "refrigerant_r410a", scope: "1" },
+  { value: "diesel_mobile", label: "Company Fleet (Diesel)", defaultUnit: "litre", fuelType: "diesel_stationary", scope: "1" },
+  { value: "petrol_mobile", label: "Company Fleet (Petrol/Gasoline)", defaultUnit: "litre", fuelType: "petrol", scope: "1" },
 ];
 
 interface UtilityEntry {
@@ -139,29 +142,24 @@ export function AddUtilityToSession({
           return utilityResult;
         }
 
-        // Determine scope and insert to activity_data for calculations
-        const scope1Types = [
-          "natural_gas",
-          "lpg",
-          "diesel_stationary",
-          "heavy_fuel_oil",
-          "biomass_solid",
-          "refrigerant_leakage",
-          "diesel_mobile",
-          "petrol_mobile",
-        ];
-        const category = scope1Types.includes(entry.utility_type) ? "Scope 1" : "Scope 2";
-        const utilityTypeName =
-          UTILITY_TYPES.find((u) => u.value === entry.utility_type)?.label || entry.utility_type;
+        // Get utility type info for scope and fuel_type
+        const utilityTypeInfo = UTILITY_TYPES.find((u) => u.value === entry.utility_type);
+        const category = utilityTypeInfo?.scope === "1" ? "Scope 1" : "Scope 2";
+        const utilityTypeName = utilityTypeInfo?.label || entry.utility_type;
+        const fuelType = utilityTypeInfo?.fuelType || entry.utility_type;
 
         const activityResult = await supabase.from("activity_data").insert({
           organization_id: organizationId,
+          facility_id: facilityId,
           user_id: userData.user.id,
           name: `${utilityTypeName} - ${periodStart} to ${periodEnd}`,
           category,
           quantity: parseFloat(entry.quantity),
           unit: entry.unit,
+          fuel_type: fuelType,
           activity_date: periodEnd,
+          reporting_period_start: periodStart,
+          reporting_period_end: periodEnd,
         });
 
         return activityResult;
