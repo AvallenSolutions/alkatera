@@ -1,0 +1,46 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          # Link to the Supabase project
+          supabase link --project-ref $SUPABASE_PROJECT_ID
+
+          # Deploy all edge functions
+          supabase functions deploy add-facility-activity-entry --no-verify-jwt
+          supabase functions deploy add-facility-activity-data --no-verify-jwt
+          supabase functions deploy create-calculation-log --no-verify-jwt
+          supabase functions deploy gaia-query --no-verify-jwt
+          supabase functions deploy ingest-activity-data --no-verify-jwt
+          supabase functions deploy ingest-water-data --no-verify-jwt
+          supabase functions deploy invoke-corporate-calculations --no-verify-jwt
+          supabase functions deploy invoke-scope1-2-calculations --no-verify-jwt
+          supabase functions deploy invoke-waste-circularity-calculations --no-verify-jwt
+          supabase functions deploy invoke-water-calculations --no-verify-jwt
+          supabase functions deploy manage-facility --no-verify-jwt
+
+          echo "All edge functions deployed successfully!"
