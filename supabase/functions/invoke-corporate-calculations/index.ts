@@ -86,15 +86,29 @@ Deno.serve(async (req: Request) => {
       throw new Error("Facility not found");
     }
 
-    const { data: membership, error: membershipError } = await supabase
+    // Check organization membership
+    const { data: membership } = await supabase
       .from("organization_members")
       .select("id, role")
       .eq("organization_id", facility.organization_id)
-      .eq("id", user.id)
-      .single();
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    if (membershipError || !membership) {
-      throw new Error("User is not a member of the facility's organization");
+    // If not a member, check advisor access
+    let hasAccess = !!membership;
+    if (!hasAccess) {
+      const { data: advisorCheck } = await supabase
+        .from("advisor_organization_access")
+        .select("id")
+        .eq("organization_id", facility.organization_id)
+        .eq("advisor_user_id", user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+      hasAccess = !!advisorCheck;
+    }
+
+    if (!hasAccess) {
+      throw new Error("User does not have access to the facility's organization");
     }
 
     const { data: existingCalc } = await supabase

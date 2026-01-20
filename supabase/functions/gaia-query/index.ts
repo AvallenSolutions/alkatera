@@ -203,9 +203,22 @@ Deno.serve(async (req: Request) => {
       .select('id')
       .eq('organization_id', organization_id)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (!membership) {
+    // If not a member, check advisor access
+    let hasAccess = !!membership;
+    if (!hasAccess) {
+      const { data: advisorCheck } = await supabase
+        .from('advisor_organization_access')
+        .select('id')
+        .eq('organization_id', organization_id)
+        .eq('advisor_user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      hasAccess = !!advisorCheck;
+    }
+
+    if (!hasAccess) {
       throw new Error('User does not have access to this organization');
     }
 

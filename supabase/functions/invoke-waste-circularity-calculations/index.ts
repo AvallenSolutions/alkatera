@@ -96,16 +96,30 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    const { data: memberData, error: memberError } = await supabaseAdmin
+    // Check organization membership
+    const { data: memberData } = await supabaseAdmin
       .from("organization_members")
       .select("organization_id")
-      .eq("id", user.id)
+      .eq("user_id", user.id)
       .eq("organization_id", organization_id)
-      .single();
+      .maybeSingle();
 
-    if (memberError || !memberData) {
+    // If not a member, check advisor access
+    let hasAccess = !!memberData;
+    if (!hasAccess) {
+      const { data: advisorData } = await supabaseAdmin
+        .from("advisor_organization_access")
+        .select("id")
+        .eq("advisor_user_id", user.id)
+        .eq("organization_id", organization_id)
+        .eq("is_active", true)
+        .maybeSingle();
+      hasAccess = !!advisorData;
+    }
+
+    if (!hasAccess) {
       return new Response(
-        JSON.stringify({ error: "User is not a member of the specified organization" }),
+        JSON.stringify({ error: "User does not have access to the specified organization" }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
