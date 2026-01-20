@@ -44,6 +44,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { AdvisorManagement } from '@/components/settings/AdvisorManagement'
 
 interface TeamMember {
   membership_id: string
@@ -199,6 +200,8 @@ function TeamManagementContent() {
         return 'default'
       case 'admin':
         return 'secondary'
+      case 'advisor':
+        return 'secondary'
       default:
         return 'outline'
     }
@@ -210,6 +213,7 @@ function TeamManagementContent() {
       admin: 'Admin',
       member: 'Member',
       viewer: 'Viewer',
+      advisor: 'Advisor',
     }
     return roleMap[roleName] || roleName
   }
@@ -393,6 +397,9 @@ function TeamManagementContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Advisor Management Section */}
+      {isAdmin && <AdvisorManagement />}
     </div>
   )
 }
