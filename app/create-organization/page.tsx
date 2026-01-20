@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,9 +15,50 @@ import { Building2, Loader2 } from 'lucide-react'
 export default function CreateOrganizationPage() {
   const [organizationName, setOrganizationName] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
-  const { mutate } = useOrganization()
+  const { mutate, currentOrganization } = useOrganization()
+  const { user } = useAuth()
+
+  // Check if user already has organization access (including advisor access)
+  useEffect(() => {
+    async function checkExistingAccess() {
+      if (!user) {
+        setIsCheckingAccess(false)
+        return
+      }
+
+      // If they already have an organization from context, redirect
+      if (currentOrganization) {
+        router.push('/dashboard')
+        return
+      }
+
+      // Check for advisor access directly
+      const { data: advisorAccess } = await supabase
+        .from('advisor_organization_access')
+        .select('organization_id')
+        .eq('advisor_user_id', user.id)
+        .eq('is_active', true)
+        .limit(1)
+
+      if (advisorAccess && advisorAccess.length > 0) {
+        // User has advisor access, redirect to dashboard
+        // The OrganizationContext will pick up the advisor access
+        toast({
+          title: 'Advisor Access Detected',
+          description: 'Redirecting you to your organization...',
+        })
+        router.push('/dashboard')
+        return
+      }
+
+      setIsCheckingAccess(false)
+    }
+
+    checkExistingAccess()
+  }, [user, currentOrganization, router, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,6 +127,18 @@ export default function CreateOrganizationPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Show loading while checking for existing access
+  if (isCheckingAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-slate-600" />
+          <p className="text-sm text-muted-foreground">Checking access...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
