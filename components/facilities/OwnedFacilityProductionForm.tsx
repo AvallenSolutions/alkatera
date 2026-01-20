@@ -58,14 +58,14 @@ export function OwnedFacilityProductionForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingFacilityData, setLoadingFacilityData] = useState(false);
 
-  const currentYear = new Date().getFullYear();
   const [reportingPeriodStart, setReportingPeriodStart] = useState("");
   const [reportingPeriodEnd, setReportingPeriodEnd] = useState("");
 
   const [facilityTotalEmissions, setFacilityTotalEmissions] = useState<number | null>(null);
   const [facilityTotalWater, setFacilityTotalWater] = useState<number | null>(null);
   const [facilityTotalWaste, setFacilityTotalWaste] = useState<number | null>(null);
-  const [emissionFactorYear, setEmissionFactorYear] = useState(currentYear);
+  // DEFRA year is derived from the reporting period end date, not the current year
+  const [emissionFactorYear, setEmissionFactorYear] = useState<number | null>(null);
 
   const [productVolume, setProductVolume] = useState("");
   const [productVolumeUnit, setProductVolumeUnit] = useState("units");
@@ -131,6 +131,16 @@ export function OwnedFacilityProductionForm({
         setFacilityTotalWater(totalWater);
         setFacilityTotalWaste(totalWaste);
 
+        // Extract and set the DEFRA factor year from results_payload
+        // If not stored, derive from reporting period end date
+        if (payload.defra_factor_year) {
+          setEmissionFactorYear(payload.defra_factor_year);
+        } else if (reportingPeriodEnd) {
+          // Derive from reporting period - use the year of the period end
+          const periodEndYear = new Date(reportingPeriodEnd).getFullYear();
+          setEmissionFactorYear(periodEndYear);
+        }
+
         // Auto-load facility total production for allocation calculation
         if (data.total_production_volume) {
           setFacilityTotalProduction(data.total_production_volume);
@@ -144,7 +154,8 @@ export function OwnedFacilityProductionForm({
           const mappedUnit = unitMapping[data.volume_unit] || 'litres';
           setProductVolumeUnit(mappedUnit);
 
-          const metrics = [`${data.total_co2e.toLocaleString()} kg CO2e`];
+          const factorYear = payload.defra_factor_year || new Date(reportingPeriodEnd).getFullYear();
+          const metrics = [`${data.total_co2e.toLocaleString()} kg CO2e (DEFRA ${factorYear})`];
           if (totalWater > 0) metrics.push(`${totalWater.toLocaleString()} L water`);
           if (totalWaste > 0) metrics.push(`${totalWaste.toLocaleString()} kg waste`);
 
@@ -157,6 +168,10 @@ export function OwnedFacilityProductionForm({
         setFacilityTotalWater(null);
         setFacilityTotalWaste(null);
         setFacilityTotalProduction(null);
+        // Set emission factor year from reporting period even when no data found
+        if (reportingPeriodEnd) {
+          setEmissionFactorYear(new Date(reportingPeriodEnd).getFullYear());
+        }
         toast.info("No facility emissions data found for this period. You'll need to enter it manually.");
       }
     } catch (error: any) {
@@ -586,7 +601,9 @@ export function OwnedFacilityProductionForm({
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   <Badge className="bg-blue-500/20 text-blue-300">Scope 1 & 2</Badge>
                   <Badge className="bg-green-500/20 text-green-300">Owned Facility</Badge>
-                  <Badge variant="outline" className="text-slate-300">DEFRA {emissionFactorYear}</Badge>
+                  <Badge variant="outline" className="text-slate-300">
+                    DEFRA {emissionFactorYear || (reportingPeriodEnd ? new Date(reportingPeriodEnd).getFullYear() : new Date().getFullYear())}
+                  </Badge>
                 </div>
               </div>
             </div>

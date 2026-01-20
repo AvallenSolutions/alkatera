@@ -19,6 +19,10 @@ interface ActivityDataRecord {
   quantity: number;
   unit: string;
   activity_date: string;
+  facility_id?: string;
+  fuel_type?: string;
+  reporting_period_start?: string;
+  reporting_period_end?: string;
 }
 
 interface EmissionsFactorRecord {
@@ -29,6 +33,65 @@ interface EmissionsFactorRecord {
   type: string;
   region: string;
   geographic_scope: string;
+}
+
+// DEFRA Energy Emission Factor record structure
+interface DefraEnergyFactorRecord {
+  id: string;
+  fuel_type: string;
+  fuel_type_display: string;
+  factor_year: number;
+  co2e_factor: number;
+  factor_unit: string;
+  scope: string;
+}
+
+// Utility type to DEFRA fuel type mapping
+const UTILITY_TO_FUEL_TYPE: Record<string, string> = {
+  'electricity_grid': 'grid_electricity',
+  'heat_steam_purchased': 'heat_steam',
+  'natural_gas': 'natural_gas_kwh',
+  'natural_gas_m3': 'natural_gas_m3',
+  'lpg': 'lpg_litre',
+  'diesel_stationary': 'diesel_stationary',
+  'heavy_fuel_oil': 'heavy_fuel_oil',
+  'biomass_solid': 'biomass_wood_chips',
+  'refrigerant_leakage': 'refrigerant_r410a',
+  'diesel_mobile': 'diesel_stationary',
+  'petrol_mobile': 'petrol',
+};
+
+// Normalize unit strings to match DEFRA factor units
+function normalizeUnit(unit: string): string {
+  const lowerUnit = unit.toLowerCase();
+
+  // Volume units
+  if (['litres', 'liters', 'l', 'ltr'].includes(lowerUnit)) return 'litre';
+  if (['m³', 'm3', 'cubic metres', 'cubic meters'].includes(lowerUnit)) return 'm3';
+
+  // Energy units - preserve case for kWh
+  if (['kwh', 'kilowatt-hours', 'kilowatt hours'].includes(lowerUnit)) return 'kWh';
+  if (['mwh', 'megawatt-hours'].includes(lowerUnit)) return 'MWh';
+
+  // Mass units
+  if (['kg', 'kilograms', 'kilogram', 'kgs'].includes(lowerUnit)) return 'kg';
+  if (['tonnes', 'tonne', 'metric tons', 'metric ton'].includes(lowerUnit)) return 'tonne';
+
+  return lowerUnit;
+}
+
+// Get the appropriate DEFRA factor year based on reporting period
+function getDefraFactorYear(reportingPeriodEnd: string, availableYears: number[]): number {
+  const periodYear = new Date(reportingPeriodEnd).getFullYear();
+
+  // Find the closest available year that is <= period year
+  const validYears = availableYears.filter(y => y <= periodYear);
+  if (validYears.length > 0) {
+    return Math.max(...validYears);
+  }
+
+  // Fallback to earliest available year
+  return Math.min(...availableYears);
 }
 
 interface CalculationResult {
@@ -115,6 +178,7 @@ Deno.serve(async (req: Request) => {
 
     // Query activity_data for Scope 1 and 2 records that haven't been processed yet
     // We need to find activity records that don't have a corresponding calculated_emissions entry
+    // Now includes facility_id, fuel_type, and reporting period for proper aggregation
     const { data: unprocessedActivities, error: activityError } = await supabaseAdmin
       .from("activity_data")
       .select(`
@@ -124,7 +188,11 @@ Deno.serve(async (req: Request) => {
         category,
         quantity,
         unit,
-        activity_date
+        activity_date,
+        facility_id,
+        fuel_type,
+        reporting_period_start,
+        reporting_period_end
       `)
       .eq("organization_id", organization_id)
       .in("category", ["Scope 1", "Scope 2"])
@@ -183,17 +251,34 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Fetch all emissions factors
-    const { data: emissionsFactors, error: factorsError } = await supabaseAdmin
-      .from("emissions_factors")
-      .select("factor_id, name, value, unit, type, region, geographic_scope");
+    // Determine the reporting period for DEFRA year selection
+    // Use the most recent activity's reporting period, or fall back to activity_date
+    const sampleActivity = activityData[0];
+    const reportingPeriodEnd = sampleActivity.reporting_period_end || sampleActivity.activity_date;
+
+    // Fetch available DEFRA factor years
+    const { data: availableYearsData } = await supabaseAdmin
+      .from("defra_energy_emission_factors")
+      .select("factor_year")
+      .order("factor_year", { ascending: false });
+
+    const availableYears = [...new Set((availableYearsData || []).map((r: any) => r.factor_year))];
+    const targetFactorYear = getDefraFactorYear(reportingPeriodEnd, availableYears);
+
+    console.log(`Using DEFRA factor year ${targetFactorYear} for reporting period ending ${reportingPeriodEnd}`);
+
+    // Fetch DEFRA energy emission factors for the appropriate year
+    const { data: defraFactors, error: factorsError } = await supabaseAdmin
+      .from("defra_energy_emission_factors")
+      .select("id, fuel_type, fuel_type_display, factor_year, co2e_factor, factor_unit, scope")
+      .eq("factor_year", targetFactorYear);
 
     if (factorsError) {
-      console.error("Error fetching emissions factors:", factorsError);
+      console.error("Error fetching DEFRA emission factors:", factorsError);
       return new Response(
-        JSON.stringify({ 
-          error: "Failed to fetch emissions factors", 
-          details: factorsError.message 
+        JSON.stringify({
+          error: "Failed to fetch DEFRA emission factors",
+          details: factorsError.message
         }),
         {
           status: 500,
@@ -202,11 +287,18 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!emissionsFactors || emissionsFactors.length === 0) {
+    // Also fetch legacy emissions_factors as fallback
+    const { data: legacyFactors } = await supabaseAdmin
+      .from("emissions_factors")
+      .select("factor_id, name, value, unit, type, region, geographic_scope");
+
+    const emissionsFactors = legacyFactors || [];
+
+    if ((!defraFactors || defraFactors.length === 0) && emissionsFactors.length === 0) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: "No emissions factors found in database",
-          message: "Please ensure emissions factors are loaded before running calculations"
+          message: "Please ensure DEFRA emission factors are loaded before running calculations"
         }),
         {
           status: 400,
@@ -215,16 +307,85 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    console.log(`Loaded ${defraFactors?.length || 0} DEFRA factors for year ${targetFactorYear} and ${emissionsFactors.length} legacy factors`);
+
     // Perform calculations by matching activity data with emissions factors
+    // Priority: 1) Match by fuel_type from DEFRA, 2) Match by normalized unit from DEFRA, 3) Fallback to legacy factors
     const calculationResults: CalculationResult[] = [];
     const unmatchedActivities: string[] = [];
 
     for (const activity of activityData) {
-      // Match by unit (and optionally by type/region if available in activity data)
-      // For V1, we'll use unit matching as the primary criterion
-      const matchingFactor = (emissionsFactors as EmissionsFactorRecord[]).find(
-        (factor) => factor.unit.toLowerCase() === activity.unit.toLowerCase()
-      );
+      let matchingFactor: { id: string; value: number } | null = null;
+      const normalizedUnit = normalizeUnit(activity.unit);
+
+      // First, try to match using fuel_type from activity data
+      if (activity.fuel_type && defraFactors) {
+        const defraMatch = (defraFactors as DefraEnergyFactorRecord[]).find(
+          (factor) => factor.fuel_type === activity.fuel_type
+        );
+        if (defraMatch) {
+          matchingFactor = { id: defraMatch.id, value: defraMatch.co2e_factor };
+          console.log(`Matched activity "${activity.name}" to DEFRA factor "${defraMatch.fuel_type}" (${defraMatch.co2e_factor} per ${defraMatch.factor_unit})`);
+        }
+      }
+
+      // Second, try to derive fuel_type from activity name/type and match
+      if (!matchingFactor && defraFactors) {
+        // Extract utility type from activity name (e.g., "Natural Gas - 2024-01-01 to 2024-12-31")
+        const activityNameLower = activity.name.toLowerCase();
+        let derivedFuelType: string | undefined;
+
+        for (const [utilityType, fuelType] of Object.entries(UTILITY_TO_FUEL_TYPE)) {
+          const utilityLabel = utilityType.replace(/_/g, ' ');
+          if (activityNameLower.includes(utilityLabel) || activityNameLower.includes(utilityType)) {
+            derivedFuelType = fuelType;
+            break;
+          }
+        }
+
+        // Also check common fuel type keywords
+        if (!derivedFuelType) {
+          if (activityNameLower.includes('natural gas')) derivedFuelType = normalizedUnit === 'm3' ? 'natural_gas_m3' : 'natural_gas_kwh';
+          else if (activityNameLower.includes('electricity')) derivedFuelType = 'grid_electricity';
+          else if (activityNameLower.includes('diesel')) derivedFuelType = 'diesel_stationary';
+          else if (activityNameLower.includes('lpg') || activityNameLower.includes('propane')) derivedFuelType = 'lpg_litre';
+          else if (activityNameLower.includes('petrol') || activityNameLower.includes('gasoline')) derivedFuelType = 'petrol';
+          else if (activityNameLower.includes('heat') || activityNameLower.includes('steam')) derivedFuelType = 'heat_steam';
+          else if (activityNameLower.includes('heavy fuel')) derivedFuelType = 'heavy_fuel_oil';
+        }
+
+        if (derivedFuelType) {
+          const defraMatch = (defraFactors as DefraEnergyFactorRecord[]).find(
+            (factor) => factor.fuel_type === derivedFuelType
+          );
+          if (defraMatch) {
+            matchingFactor = { id: defraMatch.id, value: defraMatch.co2e_factor };
+            console.log(`Derived fuel_type "${derivedFuelType}" from activity name, matched to DEFRA factor (${defraMatch.co2e_factor} per ${defraMatch.factor_unit})`);
+          }
+        }
+      }
+
+      // Third, try matching by normalized unit from DEFRA factors
+      if (!matchingFactor && defraFactors) {
+        const defraMatch = (defraFactors as DefraEnergyFactorRecord[]).find(
+          (factor) => normalizeUnit(factor.factor_unit) === normalizedUnit
+        );
+        if (defraMatch) {
+          matchingFactor = { id: defraMatch.id, value: defraMatch.co2e_factor };
+          console.log(`Matched activity "${activity.name}" to DEFRA factor by unit "${normalizedUnit}" (${defraMatch.co2e_factor})`);
+        }
+      }
+
+      // Fallback: try legacy emissions_factors table
+      if (!matchingFactor && emissionsFactors.length > 0) {
+        const legacyMatch = (emissionsFactors as EmissionsFactorRecord[]).find(
+          (factor) => normalizeUnit(factor.unit) === normalizedUnit
+        );
+        if (legacyMatch) {
+          matchingFactor = { id: legacyMatch.factor_id, value: legacyMatch.value };
+          console.log(`Matched activity "${activity.name}" to legacy factor by unit "${normalizedUnit}" (${legacyMatch.value})`);
+        }
+      }
 
       if (matchingFactor) {
         // Calculate emissions: quantity × emissions_factor_value
@@ -233,12 +394,12 @@ Deno.serve(async (req: Request) => {
         calculationResults.push({
           organization_id: activity.organization_id,
           activity_data_id: activity.id,
-          emissions_factor_id: matchingFactor.factor_id,
+          emissions_factor_id: matchingFactor.id,
           calculated_value_co2e: calculatedValue,
         });
       } else {
         unmatchedActivities.push(
-          `Activity "${activity.name}" (${activity.category}, unit: ${activity.unit})`
+          `Activity "${activity.name}" (${activity.category}, unit: ${activity.unit}, normalized: ${normalizedUnit})`
         );
       }
     }
@@ -352,55 +513,87 @@ Deno.serve(async (req: Request) => {
 
     // CRITICAL: Aggregate emissions and update facility_emissions_aggregated
     // This enables facility intensity calculation for Product LCA allocation
+    // Now properly aggregates per-facility using facility_id
     console.log("Aggregating emissions for facility intensity calculation...");
 
     try {
-      // Sum up all calculated emissions for this organization
+      // Group calculation results by facility_id
+      const facilityEmissions: Record<string, {
+        total: number;
+        scope1: number;
+        scope2: number;
+        count: number;
+        reportingPeriodStart?: string;
+        reportingPeriodEnd?: string;
+      }> = {};
+
+      calculationResults.forEach((result, idx) => {
+        const activity = activityData[idx];
+        const facilityId = activity?.facility_id || 'unknown';
+
+        if (!facilityEmissions[facilityId]) {
+          facilityEmissions[facilityId] = {
+            total: 0,
+            scope1: 0,
+            scope2: 0,
+            count: 0,
+            reportingPeriodStart: activity?.reporting_period_start,
+            reportingPeriodEnd: activity?.reporting_period_end,
+          };
+        }
+
+        facilityEmissions[facilityId].total += result.calculated_value_co2e;
+        facilityEmissions[facilityId].count += 1;
+
+        if (activity?.category === 'Scope 1') {
+          facilityEmissions[facilityId].scope1 += result.calculated_value_co2e;
+        } else {
+          facilityEmissions[facilityId].scope2 += result.calculated_value_co2e;
+        }
+      });
+
+      console.log(`Emissions calculated for ${Object.keys(facilityEmissions).length} facility(ies)`);
+
+      // Calculate org-wide totals for logging
       const totalEmissions = calculationResults.reduce((sum, result) => sum + result.calculated_value_co2e, 0);
       console.log(`Total emissions calculated: ${totalEmissions.toFixed(2)} kg CO₂e from ${calculationResults.length} activities`);
 
-      // Calculate scope breakdown from the calculation results
-      const scope1Total = calculationResults
-        .filter((_, idx) => activityData[idx]?.category === 'Scope 1')
-        .reduce((sum, result) => sum + result.calculated_value_co2e, 0);
-
-      const scope2Total = calculationResults
-        .filter((_, idx) => activityData[idx]?.category === 'Scope 2')
-        .reduce((sum, result) => sum + result.calculated_value_co2e, 0);
-
-      console.log(`Scope breakdown - Scope 1: ${scope1Total.toFixed(2)} kg CO₂e, Scope 2: ${scope2Total.toFixed(2)} kg CO₂e`);
-
       // Query existing facility_emissions_aggregated records that need updating
-      // These are records with production volume (update ALL records, not just those with zero emissions)
       const { data: facilityRecords, error: queryError } = await supabaseAdmin
         .from('facility_emissions_aggregated')
         .select('id, facility_id, reporting_period_start, reporting_period_end, total_production_volume')
         .eq('organization_id', organization_id)
         .eq('data_source_type', 'Primary')
-        .not('total_production_volume', 'is', null); // Must have production volume
+        .not('total_production_volume', 'is', null);
 
       if (queryError) {
         console.warn('Warning: Could not query facility_emissions_aggregated:', queryError);
       } else if (facilityRecords && facilityRecords.length > 0) {
         console.log(`Found ${facilityRecords.length} facility record(s) awaiting emissions calculation`);
 
-        // For simplicity, update each record with the total calculated emissions
-        // In a real scenario with multiple facilities, you'd need more sophisticated allocation
         for (const record of facilityRecords) {
-          console.log(`Updating facility_emissions_aggregated record ${record.id} for facility ${record.facility_id}`);
+          // Get emissions for this specific facility, or fall back to org total if no facility_id tracking
+          const facilityData = facilityEmissions[record.facility_id] || facilityEmissions['unknown'];
+          const emissionsToApply = facilityData?.total || totalEmissions;
+          const scope1 = facilityData?.scope1 || calculationResults.filter((_, idx) => activityData[idx]?.category === 'Scope 1').reduce((sum, result) => sum + result.calculated_value_co2e, 0);
+          const scope2 = facilityData?.scope2 || calculationResults.filter((_, idx) => activityData[idx]?.category === 'Scope 2').reduce((sum, result) => sum + result.calculated_value_co2e, 0);
+          const activityCount = facilityData?.count || calculationResults.length;
+
+          console.log(`Updating facility ${record.facility_id} with ${emissionsToApply.toFixed(2)} kg CO₂e (Scope 1: ${scope1.toFixed(2)}, Scope 2: ${scope2.toFixed(2)})`);
 
           const { error: updateError } = await supabaseAdmin
             .from('facility_emissions_aggregated')
             .update({
-              total_co2e: totalEmissions,
+              total_co2e: emissionsToApply,
               results_payload: {
                 method: 'primary_verified_bills',
-                activity_count: calculationResults.length,
+                activity_count: activityCount,
                 status: 'calculated',
                 calculation_date: new Date().toISOString(),
+                defra_factor_year: targetFactorYear, // Store the DEFRA year used
                 scope_breakdown: {
-                  scope1: scope1Total,
-                  scope2: scope2Total,
+                  scope1: scope1,
+                  scope2: scope2,
                 },
               },
             })
@@ -409,7 +602,7 @@ Deno.serve(async (req: Request) => {
           if (updateError) {
             console.error(`Warning: Failed to update facility_emissions_aggregated record ${record.id}:`, updateError);
           } else {
-            console.log(`Successfully updated facility_emissions_aggregated record ${record.id} with ${totalEmissions.toFixed(2)} kg CO₂e`);
+            console.log(`Successfully updated facility_emissions_aggregated record ${record.id} with ${emissionsToApply.toFixed(2)} kg CO₂e using DEFRA ${targetFactorYear}`);
           }
         }
       } else {
