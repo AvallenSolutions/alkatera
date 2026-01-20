@@ -1,4 +1,6 @@
-// Gaia AI Agent Types
+// Gaia Digital Assistant Types
+// IMPORTANT: Never refer to Gaia as "AI" or "AI agent" in any user-facing text.
+// Use "digital assistant", "sustainability guide", or simply "Gaia".
 
 export type GaiaMessageRole = 'user' | 'assistant';
 
@@ -7,6 +9,8 @@ export type GaiaKnowledgeEntryType = 'instruction' | 'example_qa' | 'definition'
 export type GaiaFeedbackRating = 'positive' | 'negative';
 
 export type GaiaChartType = 'bar' | 'pie' | 'line' | 'table' | 'area' | 'donut';
+
+export type GaiaActionType = 'navigate' | 'highlight' | 'prefill' | 'open_modal' | 'message';
 
 // Chart data structure for visualizations
 export interface GaiaChartData {
@@ -217,4 +221,116 @@ export interface GaiaChatState {
   isLoading: boolean;
   isStreaming: boolean;
   error: string | null;
+}
+
+// ============================================================================
+// User Context Types (for data entry assistance & platform guidance)
+// ============================================================================
+
+/**
+ * Data availability information for context-aware suggestions
+ */
+export interface GaiaAvailableData {
+  hasProducts: boolean;
+  productCount: number;
+  hasFacilities: boolean;
+  facilityCount: number;
+  hasUtilityData: boolean;
+  hasProductLCAs: boolean;
+  hasIngredients: boolean;
+  hasPackaging: boolean;
+  hasFleet: boolean;
+  fleetCount: number;
+  hasSuppliers: boolean;
+  supplierCount: number;
+}
+
+/**
+ * User context for personalized guidance and suggestions
+ */
+export interface GaiaUserContext {
+  currentPage?: string;
+  currentRoute?: string;
+  onboardingProgress?: number;
+  userRole?: string;
+  companyType?: string[];
+  companySize?: string;
+  recentActions?: string[];
+  availableData?: GaiaAvailableData;
+  missingData?: string[];
+  userGoals?: string[];
+}
+
+// ============================================================================
+// Action Types (for platform navigation & guidance)
+// ============================================================================
+
+/**
+ * Navigation action payload
+ */
+export interface GaiaNavigatePayload {
+  path: string;
+  label?: string;
+}
+
+/**
+ * Highlight action payload
+ */
+export interface GaiaHighlightPayload {
+  selector: string;
+  duration?: number;
+}
+
+/**
+ * Pre-fill action payload
+ */
+export interface GaiaPrefillPayload {
+  formId?: string;
+  fields: Record<string, string | number | boolean>;
+}
+
+/**
+ * Modal action payload
+ */
+export interface GaiaModalPayload {
+  modalId: string;
+  data?: Record<string, unknown>;
+}
+
+/**
+ * Message action payload
+ */
+export interface GaiaMessagePayload {
+  mode?: 'guided' | 'persistent';
+  persistent?: boolean;
+  message?: string;
+}
+
+/**
+ * Union type for all action payloads
+ */
+export type GaiaActionPayload =
+  | GaiaNavigatePayload
+  | GaiaHighlightPayload
+  | GaiaPrefillPayload
+  | GaiaModalPayload
+  | GaiaMessagePayload;
+
+/**
+ * Action that Gaia can suggest/execute
+ */
+export interface GaiaAction {
+  type: GaiaActionType;
+  payload: GaiaActionPayload;
+}
+
+/**
+ * Extended query response with actions
+ */
+export interface GaiaQueryResponseWithActions extends GaiaQueryResponse {
+  actions?: GaiaAction[];
+  context?: {
+    currentPage?: string;
+    suggestions?: string[];
+  };
 }

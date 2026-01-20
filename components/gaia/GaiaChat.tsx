@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,8 @@ import {
   Download,
   FileJson,
   FileText,
+  ArrowRight,
+  Navigation,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -47,12 +50,19 @@ import {
   GAIA_SUGGESTED_QUESTIONS,
   getContextualFollowUps,
 } from '@/lib/gaia';
+import {
+  parseActionsFromResponse,
+  getActionHandler,
+} from '@/lib/gaia/action-handlers';
 import type { GaiaStreamEvent } from '@/lib/gaia';
 import type {
   GaiaConversation,
   GaiaConversationWithMessages,
   GaiaMessage,
   GaiaChartData,
+  GaiaAction,
+  GaiaNavigatePayload,
+  GaiaUserContext,
 } from '@/lib/types/gaia';
 import { GaiaChartRenderer } from './GaiaChartRenderer';
 import { cn } from '@/lib/utils';
@@ -64,6 +74,8 @@ interface GaiaChatProps {
 export function GaiaChat({ fullPage = false }: GaiaChatProps) {
   const { currentOrganization } = useOrganization();
   const { user } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
   const [conversations, setConversations] = useState<GaiaConversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<GaiaConversationWithMessages | null>(null);
   const [input, setInput] = useState('');
@@ -75,8 +87,22 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, boolean>>({});
+  const [messageActions, setMessageActions] = useState<Record<string, GaiaAction[]>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize action handler with router
+  const actionHandler = useMemo(() => {
+    const handler = getActionHandler();
+    handler.setRouter(router);
+    return handler;
+  }, [router]);
+
+  // Build user context for contextual suggestions
+  const userContext: GaiaUserContext = useMemo(() => ({
+    currentRoute: pathname || undefined,
+    currentPage: pathname?.split('/').pop() || undefined,
+  }), [pathname]);
 
   // Load conversations
   useEffect(() => {
@@ -110,15 +136,39 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
       const conv = await getConversationWithMessages(id);
       setActiveConversation(conv);
 
-      // Check feedback status for all assistant messages
+      // Check feedback status and parse actions for all assistant messages
       if (conv?.messages) {
         const feedbackStatus: Record<string, boolean> = {};
+        const newMessageActions: Record<string, GaiaAction[]> = {};
+
         for (const msg of conv.messages) {
           if (msg.role === 'assistant') {
             feedbackStatus[msg.id] = await hasSubmittedFeedback(msg.id);
+
+            // Parse actions from message content
+            const actions = parseActionsFromResponse(msg.content, userContext);
+            if (actions.length > 0) {
+              newMessageActions[msg.id] = actions;
+            }
           }
         }
         setFeedbackSubmitted(feedbackStatus);
+
+        // Transfer pending actions to the last assistant message
+        const pendingKey = `pending-${id}`;
+        if (messageActions[pendingKey] && conv.messages.length > 0) {
+          const lastMessage = conv.messages[conv.messages.length - 1];
+          if (lastMessage.role === 'assistant') {
+            newMessageActions[lastMessage.id] = messageActions[pendingKey];
+          }
+          // Clean up pending actions
+          setMessageActions(prev => {
+            const { [pendingKey]: _, ...rest } = prev;
+            return { ...rest, ...newMessageActions };
+          });
+        } else {
+          setMessageActions(prev => ({ ...prev, ...newMessageActions }));
+        }
       }
     } catch (err) {
       console.error('Error loading conversation:', err);
@@ -126,6 +176,11 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  // Execute a Gaia action (navigation, highlight, etc.)
+  function executeAction(action: GaiaAction) {
+    actionHandler.executeAction(action);
   }
 
   async function handleNewConversation() {
@@ -208,6 +263,17 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
           case 'error':
             throw new Error(event.error || 'Stream error');
           case 'done':
+            // Parse actions from the complete response
+            if (streamingContent) {
+              const actions = parseActionsFromResponse(streamingContent, userContext);
+              if (actions.length > 0 && conversationId) {
+                // Store actions for the message (will be associated after reload)
+                setMessageActions(prev => ({
+                  ...prev,
+                  [`pending-${conversationId}`]: actions,
+                }));
+              }
+            }
             // Stream complete - reload conversation to get persisted message
             if (isNewConversation) {
               await loadConversations();
@@ -388,7 +454,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
           <div>
             <h2 className="font-semibold">Gaia</h2>
             <p className="text-xs text-muted-foreground">
-              Your AI Sustainability Assistant
+              Your sustainability guide
             </p>
           </div>
 
@@ -443,9 +509,9 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                   Hello! I'm Gaia
                 </h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  I can help you understand your environmental impacts, identify
-                  improvement opportunities, and answer questions about your
-                  sustainability metrics.
+                  I'm your sustainability guide. I can help you navigate the platform,
+                  enter data, understand your environmental impacts, and answer
+                  questions about your sustainability metrics.
                 </p>
 
                 <div className="flex flex-wrap justify-center gap-2">
@@ -564,6 +630,29 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                           {source.description}
                         </Badge>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Action buttons (navigation, etc.) */}
+                  {message.role === 'assistant' && messageActions[message.id] && messageActions[message.id].length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2 px-1">
+                      {messageActions[message.id]
+                        .filter(action => action.type === 'navigate')
+                        .map((action, actionIdx) => {
+                          const payload = action.payload as GaiaNavigatePayload;
+                          return (
+                            <Button
+                              key={actionIdx}
+                              variant="outline"
+                              size="sm"
+                              className="text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50"
+                              onClick={() => executeAction(action)}
+                            >
+                              <ArrowRight className="h-3 w-3 mr-1.5" />
+                              {payload.label || `Go to ${payload.path}`}
+                            </Button>
+                          );
+                        })}
                     </div>
                   )}
                 </div>

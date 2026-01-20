@@ -1,5 +1,8 @@
-// Gaia AI Agent - Main Client Library
+// Gaia Digital Assistant - Main Client Library
 // Handles CRUD operations for Gaia conversations, messages, and feedback
+//
+// IMPORTANT: Never refer to Gaia as "AI" or "AI agent" in any user-facing text.
+// Use "digital assistant", "sustainability guide", or simply "Gaia".
 
 import { supabase } from '@/lib/supabaseClient';
 import type {
@@ -18,7 +21,36 @@ import type {
 
 // Re-export types
 export * from '@/lib/types/gaia';
-export { GAIA_PERSONA, GAIA_SUGGESTED_QUESTIONS, getContextualFollowUps } from './system-prompt';
+
+// Re-export from system-prompt
+export {
+  GAIA_PERSONA,
+  GAIA_SYSTEM_PROMPT,
+  GAIA_SUGGESTED_QUESTIONS,
+  GAIA_CONTEXT_TEMPLATE,
+  getContextualFollowUps,
+  buildContextualPrompt,
+  generateContextualSuggestions,
+} from './system-prompt';
+
+// Re-export from action-handlers
+export {
+  GaiaActionHandler,
+  getActionHandler,
+  parseActionsFromResponse,
+  resolveNavigationPath,
+  getPageName,
+  getNavigationSuggestions,
+} from './action-handlers';
+
+// Re-export from knowledge
+export {
+  COMMON_WORKFLOWS,
+  getWorkflow,
+  findWorkflow,
+  getAllWorkflows,
+  formatWorkflowSteps,
+} from './knowledge';
 
 // ============================================================================
 // Conversation Operations
