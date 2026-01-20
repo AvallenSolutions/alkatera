@@ -43,24 +43,32 @@ const priorityConfig: Record<ActionPriority, {
   bgClass: string;
   textClass: string;
   dotClass: string;
+  cardBgClass: string;
+  cardBorderClass: string;
 }> = {
   high: {
-    label: 'HIGH',
+    label: 'URGENT',
     bgClass: 'bg-red-100 dark:bg-red-900/30',
     textClass: 'text-red-700 dark:text-red-400',
-    dotClass: 'bg-red-500',
+    dotClass: 'bg-red-500 animate-pulse',
+    cardBgClass: 'bg-gradient-to-r from-red-500/10 to-transparent dark:from-red-500/20',
+    cardBorderClass: 'border-red-500/30',
   },
   medium: {
     label: 'MEDIUM',
     bgClass: 'bg-amber-100 dark:bg-amber-900/30',
     textClass: 'text-amber-700 dark:text-amber-400',
     dotClass: 'bg-amber-500',
+    cardBgClass: '',
+    cardBorderClass: 'border-gray-200 dark:border-gray-800',
   },
   low: {
     label: 'LOW',
     bgClass: 'bg-blue-100 dark:bg-blue-900/30',
     textClass: 'text-blue-700 dark:text-blue-400',
     dotClass: 'bg-blue-500',
+    cardBgClass: '',
+    cardBorderClass: 'border-gray-200 dark:border-gray-800',
   },
 };
 
@@ -94,7 +102,9 @@ export function PriorityActionCard({
   return (
     <Card
       className={cn(
-        'relative overflow-hidden border border-gray-200 dark:border-gray-800',
+        'relative overflow-hidden border',
+        config.cardBorderClass,
+        config.cardBgClass,
         'hover:shadow-md transition-shadow duration-200',
         className
       )}
@@ -137,10 +147,20 @@ export function PriorityActionCard({
 
         <div className="flex items-center gap-1 shrink-0">
           {href && (
-            <Button variant="ghost" size="sm" asChild className="h-8 px-2">
+            <Button
+              variant={priority === 'high' ? 'default' : 'ghost'}
+              size="sm"
+              asChild
+              className={cn(
+                'h-8 gap-1.5',
+                priority === 'high'
+                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
               <Link href={href}>
-                <span className="sr-only">Take action</span>
-                <ArrowRight className="h-4 w-4" />
+                Take Action
+                <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </Button>
           )}

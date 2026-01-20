@@ -13,6 +13,8 @@ import {
   TreePine,
   Zap,
   Users,
+  Clock,
+  Plus,
   type LucideIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -40,34 +42,38 @@ const statusConfig: Record<RAGStatus, {
   borderClass: string;
   badgeClass: string;
   iconBgClass: string;
+  BadgeIcon?: LucideIcon;
 }> = {
   good: {
-    label: 'ON TRACK',
+    label: 'On Track',
     bgClass: 'bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30',
     borderClass: 'border-emerald-200 dark:border-emerald-800/50',
-    badgeClass: 'bg-emerald-500 text-white',
+    badgeClass: 'bg-green-500/20 text-green-600 dark:text-green-400',
     iconBgClass: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400',
+    BadgeIcon: TrendingUp,
   },
   warning: {
-    label: 'MONITOR',
+    label: 'Monitor',
     bgClass: 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30',
     borderClass: 'border-amber-200 dark:border-amber-800/50',
-    badgeClass: 'bg-amber-500 text-white',
+    badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
     iconBgClass: 'bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400',
+    BadgeIcon: Clock,
   },
   critical: {
-    label: 'ACTION NEEDED',
+    label: 'Action Needed',
     bgClass: 'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30',
     borderClass: 'border-red-200 dark:border-red-800/50',
-    badgeClass: 'bg-red-500 text-white',
+    badgeClass: 'bg-red-500/20 text-red-600 dark:text-red-400',
     iconBgClass: 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400',
   },
   neutral: {
-    label: 'NO DATA',
+    label: 'Needs Data',
     bgClass: 'bg-gradient-to-br from-gray-50 to-slate-50 dark:from-gray-950/30 dark:to-slate-950/30',
     borderClass: 'border-gray-200 dark:border-gray-800/50',
-    badgeClass: 'bg-gray-500 text-white',
+    badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400',
     iconBgClass: 'bg-gray-100 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400',
+    BadgeIcon: Clock,
   },
 };
 
@@ -103,6 +109,9 @@ export function RAGStatusCard({
   const trendIsPositive = (trendDirection === 'down' && category !== 'suppliers') ||
                           (trendDirection === 'up' && category === 'suppliers');
 
+  const BadgeIcon = config.BadgeIcon;
+  const isNeedsData = status === 'neutral';
+
   const content = (
     <Card
       className={cn(
@@ -120,9 +129,10 @@ export function RAGStatusCard({
           <Icon className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
         </div>
         <span className={cn(
-          'text-xs font-bold rounded-full px-2 py-0.5',
+          'text-xs font-medium rounded-full px-2 py-1 flex items-center gap-1',
           config.badgeClass
         )}>
+          {BadgeIcon && <BadgeIcon className="h-3 w-3" />}
           {config.label}
         </span>
       </div>
@@ -162,10 +172,13 @@ export function RAGStatusCard({
             )}
           </div>
         )}
-      </div>
 
-      <div className="absolute -bottom-4 -right-4 opacity-5">
-        <Icon className="h-24 w-24" />
+        {/* Start tracking CTA for empty state */}
+        {isNeedsData && href && (
+          <button className="mt-3 text-xs text-green-600 dark:text-green-400 hover:text-green-500 dark:hover:text-green-300 font-medium flex items-center gap-1 transition-colors">
+            <Plus className="w-3 h-3" /> Start tracking
+          </button>
+        )}
       </div>
     </Card>
   );

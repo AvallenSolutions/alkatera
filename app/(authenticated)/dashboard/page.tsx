@@ -19,7 +19,23 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { Settings2, RefreshCw, Upload, ChevronRight, ArrowRight } from 'lucide-react';
+import {
+  Settings2,
+  RefreshCw,
+  Upload,
+  ChevronRight,
+  ArrowRight,
+  Download,
+  Leaf,
+  Droplets,
+  Recycle,
+  Link2,
+  CheckCircle2,
+  TrendingUp,
+  TrendingDown,
+  Plus,
+  Clock,
+} from 'lucide-react';
 import Link from 'next/link';
 
 import { VitalityRing } from '@/components/vitality/VitalityRing';
@@ -289,10 +305,10 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight">
-            {currentOrganization?.name ? `${currentOrganization.name} Dashboard` : 'Dashboard'}
+            Sustainability Overview
           </h1>
           <p className="text-sm text-muted-foreground">
-            Last updated: {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            Welcome back! Here&apos;s how {currentOrganization?.name || 'your organization'} is performing.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -308,8 +324,16 @@ export default function DashboardPage() {
             ))}
           </select>
           <Button
-            onClick={() => router.push('/products/import')}
+            variant="outline"
+            onClick={() => router.push('/reports')}
             className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export Report
+          </Button>
+          <Button
+            onClick={() => router.push('/products/import')}
+            className="gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
           >
             <Upload className="h-4 w-4" />
             Import Products
@@ -375,10 +399,10 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <MiniScoreCard title="Climate" score={scores.climateScore} emoji="🌍" />
-                  <MiniScoreCard title="Water" score={scores.waterScore} emoji="💧" />
-                  <MiniScoreCard title="Circularity" score={scores.circularityScore} emoji="♻️" />
-                  <MiniScoreCard title="Supply Chain" score={scores.supplierScore} emoji="🔗" />
+                  <MiniScoreCard title="Climate" score={scores.climateScore} />
+                  <MiniScoreCard title="Water" score={scores.waterScore} />
+                  <MiniScoreCard title="Circularity" score={scores.circularityScore} />
+                  <MiniScoreCard title="Supply Chain" score={scores.supplierScore} />
                 </div>
 
                 <div className="mt-4 flex items-center gap-3">
@@ -437,7 +461,14 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center justify-between">
-                <span>Priority Actions</span>
+                <span className="flex items-center gap-2">
+                  Priority Actions
+                  {priorityActions.filter(a => a.priority === 'high').length > 0 && (
+                    <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-500 dark:text-red-400 rounded-full font-medium">
+                      {priorityActions.filter(a => a.priority === 'high').length} urgent
+                    </span>
+                  )}
+                </span>
                 <span className="text-sm font-normal text-muted-foreground">
                   {priorityActions.length} action{priorityActions.length !== 1 ? 's' : ''}
                 </span>
@@ -453,10 +484,15 @@ export default function DashboardPage() {
 
           <Accordion type="single" collapsible className="space-y-2">
             <AccordionItem value="emissions" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="flex items-center gap-2">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                <span className="flex items-center gap-2 flex-1">
                   <span className="text-lg">📊</span>
                   <span>Emissions Breakdown</span>
+                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                    {footprint?.total_emissions
+                      ? `${(footprint.total_emissions / 1000).toFixed(1)} tCO₂e total`
+                      : 'No data yet'}
+                  </span>
                 </span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -465,10 +501,13 @@ export default function DashboardPage() {
             </AccordionItem>
 
             <AccordionItem value="products" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="flex items-center gap-2">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                <span className="flex items-center gap-2 flex-1">
                   <span className="text-lg">📦</span>
                   <span>Product LCA Status</span>
+                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                    View details
+                  </span>
                 </span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -477,10 +516,15 @@ export default function DashboardPage() {
             </AccordionItem>
 
             <AccordionItem value="quality" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="flex items-center gap-2">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                <span className="flex items-center gap-2 flex-1">
                   <span className="text-lg">📈</span>
                   <span>Data Quality</span>
+                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                    {scores.climateScore !== null || scores.waterScore !== null
+                      ? 'Active'
+                      : 'Needs setup'}
+                  </span>
                 </span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -489,10 +533,13 @@ export default function DashboardPage() {
             </AccordionItem>
 
             <AccordionItem value="compliance" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50">
-                <span className="flex items-center gap-2">
+              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                <span className="flex items-center gap-2 flex-1">
                   <span className="text-lg">✅</span>
                   <span>Compliance Status</span>
+                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                    View requirements
+                  </span>
                 </span>
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -512,34 +559,108 @@ export default function DashboardPage() {
   );
 }
 
-function MiniScoreCard({ title, score, emoji }: { title: string; score: number | null; emoji: string }) {
+// Pillar configuration with colors
+const pillarConfig = {
+  Climate: {
+    icon: Leaf,
+    colorClass: 'blue',
+    bgColor: 'bg-blue-500/20',
+    textColor: 'text-blue-400',
+    borderColor: 'border-blue-500/30',
+    href: '/reports/company-footprint',
+    ctaText: 'Add emissions data',
+  },
+  Water: {
+    icon: Droplets,
+    colorClass: 'cyan',
+    bgColor: 'bg-cyan-500/20',
+    textColor: 'text-cyan-400',
+    borderColor: 'border-cyan-500/30',
+    href: '/company/facilities',
+    ctaText: 'Add water data',
+  },
+  Circularity: {
+    icon: Recycle,
+    colorClass: 'purple',
+    bgColor: 'bg-purple-500/20',
+    textColor: 'text-purple-400',
+    borderColor: 'border-purple-500/30',
+    href: '/company/facilities',
+    ctaText: 'Add waste data',
+  },
+  'Supply Chain': {
+    icon: Link2,
+    colorClass: 'orange',
+    bgColor: 'bg-orange-500/20',
+    textColor: 'text-orange-400',
+    borderColor: 'border-orange-500/30',
+    href: '/suppliers',
+    ctaText: 'Add suppliers',
+  },
+};
+
+interface MiniScoreCardProps {
+  title: keyof typeof pillarConfig;
+  score: number | null;
+  trend?: number;
+}
+
+function MiniScoreCard({ title, score, trend }: MiniScoreCardProps) {
+  const config = pillarConfig[title];
+  const Icon = config.icon;
+
+  // Empty state - needs setup
   if (score === null) {
     return (
-      <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm">{emoji}</span>
-          <span className="text-xs text-white/60">{title}</span>
+      <Link href={config.href}>
+        <div className={`p-3 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:${config.borderColor} transition-colors group cursor-pointer`}>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className={`w-7 h-7 rounded-lg ${config.bgColor} flex items-center justify-center`}>
+                <Icon className={`w-3.5 h-3.5 ${config.textColor}`} />
+              </div>
+              <span className="text-sm font-medium text-white/90">{title}</span>
+            </div>
+            <span className="text-xs px-2 py-0.5 bg-slate-700 text-slate-300 rounded-full">Setup</span>
+          </div>
+          <div className={`flex items-center gap-1.5 text-xs text-slate-400 group-hover:${config.textColor} transition-colors`}>
+            <Plus className="w-3 h-3" />
+            <span>{config.ctaText}</span>
+          </div>
         </div>
-        <div className="text-sm text-white/40">
-          No data
-        </div>
-      </div>
+      </Link>
     );
   }
 
-  const colorClass = score >= 70 ? 'text-green-400' :
-                     score >= 50 ? 'text-amber-400' : 'text-red-400';
+  // Active state with data
+  const scoreColorClass = score >= 70 ? 'text-green-400' :
+                          score >= 50 ? 'text-amber-400' : 'text-red-400';
 
   return (
-    <div className="p-3 rounded-xl bg-white/5 border border-white/10">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-sm">{emoji}</span>
-        <span className="text-xs text-white/60">{title}</span>
+    <Link href={config.href}>
+      <div className={`p-3 rounded-xl bg-slate-800/50 border ${config.borderColor} hover:bg-slate-800/70 transition-colors cursor-pointer`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`w-7 h-7 rounded-lg ${config.bgColor} flex items-center justify-center`}>
+              <Icon className={`w-3.5 h-3.5 ${config.textColor}`} />
+            </div>
+            <span className="text-sm font-medium text-white/90">{title}</span>
+          </div>
+          <span className={`text-xs px-2 py-0.5 ${config.bgColor} ${config.textColor} rounded-full flex items-center gap-1`}>
+            <CheckCircle2 className="w-3 h-3" /> Active
+          </span>
+        </div>
+        <div className="flex items-baseline gap-2">
+          <span className={`text-xl font-bold ${scoreColorClass}`}>{score}</span>
+          <span className="text-slate-400 text-xs">/100</span>
+          {trend !== undefined && trend !== 0 && (
+            <span className={`ml-auto flex items-center gap-0.5 text-xs ${trend > 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {trend > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {trend > 0 ? '+' : ''}{trend}%
+            </span>
+          )}
+        </div>
       </div>
-      <div className={`text-xl font-bold tabular-nums ${colorClass}`}>
-        {score}
-        <span className="text-xs text-white/40">/100</span>
-      </div>
-    </div>
+    </Link>
   );
 }
