@@ -168,17 +168,29 @@ export default function DashboardPage() {
       else climateScore = 35;
     }
 
-    // Water: null if no water data
+    // Water: null if no water data, calculated from actual consumption and scarcity
     let waterScore: number | null = null;
-    if (companyMetrics?.water_risk_level) {
-      if (companyMetrics.water_risk_level === 'low') waterScore = 85;
-      else if (companyMetrics.water_risk_level === 'medium') waterScore = 60;
-      else waterScore = 35;
-    } else if (waterConsumption > 0) {
-      if (waterConsumption < 1000) waterScore = 80;
-      else if (waterConsumption < 5000) waterScore = 65;
-      else if (waterConsumption < 10000) waterScore = 50;
-      else waterScore = 35;
+    if (companyMetrics?.total_impacts) {
+      const waterConsumptionTotal = companyMetrics.total_impacts.water_consumption || 0;
+      const waterScarcityAware = companyMetrics.total_impacts.water_scarcity_aware || 0;
+
+      if (waterConsumptionTotal > 0) {
+        // Calculate average scarcity factor (AWARE methodology)
+        const avgScarcityFactor = waterScarcityAware / waterConsumptionTotal;
+
+        // Score based on scarcity-weighted consumption (lower is better)
+        // AWARE factors: <10 = low stress, 10-20 = medium-low, 20-40 = medium-high, >40 = high stress
+        // Convert to 0-100 score (100 = best, 0 = worst)
+        if (avgScarcityFactor <= 10) {
+          waterScore = Math.max(75, Math.round(100 - avgScarcityFactor));
+        } else if (avgScarcityFactor <= 20) {
+          waterScore = Math.max(60, Math.round(90 - avgScarcityFactor));
+        } else if (avgScarcityFactor <= 40) {
+          waterScore = Math.max(40, Math.round(80 - avgScarcityFactor));
+        } else {
+          waterScore = Math.max(20, Math.round(60 - Math.min(avgScarcityFactor, 50)));
+        }
+      }
     }
 
     // Circularity: null if no waste data (check total_waste_kg > 0 to confirm actual data exists)
