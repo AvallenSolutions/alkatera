@@ -394,53 +394,53 @@ export function ProductHeroImpact({
           </div>
 
           <div className="flex-1 flex flex-col lg:flex-row items-center gap-8">
-            <div className="relative w-40 h-72 lg:w-48 lg:h-80">
-              <ContainerViz breakdown={carbonBreakdown} className="w-full h-full" />
-
-              <div className="absolute -right-14 top-4 flex flex-col gap-2">
-                <TooltipProvider>
-                  <ToggleGroup
-                    type="single"
-                    value={containerType}
-                    onValueChange={handleContainerChange}
-                    className="flex flex-col gap-1 bg-white/10 p-1 rounded-lg"
-                  >
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <ToggleGroupItem
-                          value="bottle"
-                          className="w-8 h-8 text-lg data-[state=on]:bg-white/20"
-                        >
-                          🍾
-                        </ToggleGroupItem>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Bottle</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <ToggleGroupItem
-                          value="can"
-                          className="w-8 h-8 text-lg data-[state=on]:bg-white/20"
-                        >
-                          🥫
-                        </ToggleGroupItem>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Can</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <ToggleGroupItem
-                          value="keg"
-                          className="w-8 h-8 text-lg data-[state=on]:bg-white/20"
-                        >
-                          🛢️
-                        </ToggleGroupItem>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">Keg</TooltipContent>
-                    </Tooltip>
-                  </ToggleGroup>
-                </TooltipProvider>
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-40 h-72 lg:w-48 lg:h-80">
+                <ContainerViz breakdown={carbonBreakdown} className="w-full h-full" />
               </div>
+
+              <TooltipProvider>
+                <ToggleGroup
+                  type="single"
+                  value={containerType}
+                  onValueChange={handleContainerChange}
+                  className="flex flex-row gap-1 bg-white/10 p-1.5 rounded-lg"
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem
+                        value="bottle"
+                        className="w-9 h-9 text-lg data-[state=on]:bg-white/20 rounded-md"
+                      >
+                        🍾
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Bottle</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem
+                        value="can"
+                        className="w-9 h-9 text-lg data-[state=on]:bg-white/20 rounded-md"
+                      >
+                        🥫
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Can</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem
+                        value="keg"
+                        className="w-9 h-9 text-lg data-[state=on]:bg-white/20 rounded-md"
+                      >
+                        🛢️
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Keg</TooltipContent>
+                  </Tooltip>
+                </ToggleGroup>
+              </TooltipProvider>
             </div>
 
             <div className="flex-1 text-center lg:text-left">
