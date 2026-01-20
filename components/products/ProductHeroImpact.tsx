@@ -79,7 +79,10 @@ function BottleVisualization({
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
 
-  const svgHeight = 200;
+  // Define fill region for bottle body only (excluding narrow neck)
+  const bottleFillTop = 60;  // Below the neck where body widens
+  const bottleFillBottom = 195;  // Just above bottom curve
+  const fillHeight = bottleFillBottom - bottleFillTop;
 
   const minVisibleHeight = 3;
   const applyMinHeight = (calculatedHeight: number, percentage: number) => {
@@ -89,14 +92,15 @@ function BottleVisualization({
     return calculatedHeight;
   };
 
-  const transportHeight = applyMinHeight((transportPct / 100) * svgHeight, transportPct);
-  const packagingHeight = applyMinHeight((packagingPct / 100) * svgHeight, packagingPct);
-  const processingHeight = applyMinHeight((processPct / 100) * svgHeight, processPct);
-  const rawHeight = applyMinHeight((rawPct / 100) * svgHeight, rawPct);
+  const transportHeight = applyMinHeight((transportPct / 100) * fillHeight, transportPct);
+  const packagingHeight = applyMinHeight((packagingPct / 100) * fillHeight, packagingPct);
+  const processingHeight = applyMinHeight((processPct / 100) * fillHeight, processPct);
+  const rawHeight = applyMinHeight((rawPct / 100) * fillHeight, rawPct);
 
-  const transportY = svgHeight - transportHeight;
+  const transportY = bottleFillBottom - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
+  const rawY = bottleFillTop;
 
   const bottleOutline = "M38,10 L62,10 L62,55 C62,75 80,85 80,110 L80,185 C80,193 75,198 65,198 L35,198 C25,198 20,193 20,185 L20,110 C20,85 38,75 38,55 Z";
 
@@ -122,11 +126,11 @@ function BottleVisualization({
         </defs>
 
         <g mask="url(#bottleMask)">
-          <rect x="0" y="0" width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
+          <rect x="0" y={rawY} width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
           <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
           <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
           <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
-          <rect x="0" y="0" width="100" height="200" fill="url(#glassOverlay)" />
+          <rect x="0" y={bottleFillTop} width="100" height={fillHeight} fill="url(#glassOverlay)" />
         </g>
 
         <path
@@ -160,7 +164,10 @@ function CanVisualization({
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
 
-  const svgHeight = 200;
+  // Define fill region for can body only (excluding tapered top and curved bottom)
+  const canFillTop = 48;  // Where the can body starts (after the lip taper)
+  const canFillBottom = 175;  // Just above the bottom curve
+  const fillHeight = canFillBottom - canFillTop;
 
   const minVisibleHeight = 3;
   const applyMinHeight = (calculatedHeight: number, percentage: number) => {
@@ -170,14 +177,15 @@ function CanVisualization({
     return calculatedHeight;
   };
 
-  const transportHeight = applyMinHeight((transportPct / 100) * svgHeight, transportPct);
-  const packagingHeight = applyMinHeight((packagingPct / 100) * svgHeight, packagingPct);
-  const processingHeight = applyMinHeight((processPct / 100) * svgHeight, processPct);
-  const rawHeight = applyMinHeight((rawPct / 100) * svgHeight, rawPct);
+  const transportHeight = applyMinHeight((transportPct / 100) * fillHeight, transportPct);
+  const packagingHeight = applyMinHeight((packagingPct / 100) * fillHeight, packagingPct);
+  const processingHeight = applyMinHeight((processPct / 100) * fillHeight, processPct);
+  const rawHeight = applyMinHeight((rawPct / 100) * fillHeight, rawPct);
 
-  const transportY = svgHeight - transportHeight;
+  const transportY = canFillBottom - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
+  const rawY = canFillTop;
 
   const canOutline = "M28,32 L72,32 L72,36 L80,48 L80,170 C80,180 72,185 50,185 C28,185 20,180 20,170 L20,48 L28,36 Z";
 
@@ -203,11 +211,11 @@ function CanVisualization({
         </defs>
 
         <g mask="url(#canMask)">
-          <rect x="0" y="0" width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
+          <rect x="0" y={rawY} width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
           <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
           <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
           <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
-          <rect x="0" y="0" width="100" height="200" fill="url(#canGlassOverlay)" />
+          <rect x="0" y={canFillTop} width="100" height={fillHeight} fill="url(#canGlassOverlay)" />
         </g>
 
         <path
