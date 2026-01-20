@@ -116,15 +116,29 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    const { data: memberData, error: memberError } = await supabaseAdmin
+    // Check organization membership
+    const { data: memberData } = await supabaseAdmin
       .from("organization_members")
       .select("organization_id")
-      .eq("id", user.id)
-      .single();
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    if (memberError || !memberData) {
+    // If not a member, check advisor access
+    let organizationId = memberData?.organization_id;
+    if (!organizationId) {
+      const { data: advisorData } = await supabaseAdmin
+        .from("advisor_organization_access")
+        .select("organization_id")
+        .eq("advisor_user_id", user.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      organizationId = advisorData?.organization_id;
+    }
+
+    if (!organizationId) {
       return new Response(
-        JSON.stringify({ error: "User is not a member of any organization" }),
+        JSON.stringify({ error: "User does not have access to any organization" }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -137,7 +151,7 @@ Deno.serve(async (req: Request) => {
         .from("facilities")
         .select("id, name")
         .eq("id", facility_id)
-        .eq("organization_id", memberData.organization_id)
+        .eq("organization_id", organizationId)
         .single();
 
       if (facilityError || !facilityData) {
@@ -174,7 +188,7 @@ Deno.serve(async (req: Request) => {
     const { data: activityData, error: insertError } = await supabaseAdmin
       .from("activity_data")
       .insert({
-        organization_id: memberData.organization_id,
+        organization_id: organizationId,
         user_id: user.id,
         name: activityName,
         category: 'Water',

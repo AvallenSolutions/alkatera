@@ -98,15 +98,28 @@ Deno.serve(async (req: Request) => {
     }
 
     // Check if user is a member of the facility's organization
-    const { data: memberCheck, error: memberError } = await supabase
+    const { data: memberCheck } = await supabase
       .from('organization_members')
       .select('id')
       .eq('organization_id', facilityCheck.organization_id)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (memberError || !memberCheck) {
-      console.error('Organization membership check error:', memberError);
+    // If not a member, check if user has advisor access
+    let hasAccess = !!memberCheck;
+    if (!hasAccess) {
+      const { data: advisorCheck } = await supabase
+        .from('advisor_organization_access')
+        .select('id')
+        .eq('organization_id', facilityCheck.organization_id)
+        .eq('advisor_user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      hasAccess = !!advisorCheck;
+    }
+
+    if (!hasAccess) {
+      console.error('Organization access check failed for user:', user.id);
       return new Response(
         JSON.stringify({ error: 'Unauthorized: You do not have access to this facility' }),
         {

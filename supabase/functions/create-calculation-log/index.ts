@@ -110,15 +110,28 @@ Deno.serve(async (req: Request) => {
     ].join("-");
 
     // Get user's organization_id to ensure they have access
-    const { data: memberData, error: memberError } = await supabaseAdmin
+    const { data: memberData } = await supabaseAdmin
       .from("organization_members")
       .select("organization_id")
-      .eq("id", user.id)
-      .single();
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    if (memberError || !memberData) {
+    // If not a member, check advisor access
+    let userOrgId = memberData?.organization_id;
+    if (!userOrgId) {
+      const { data: advisorData } = await supabaseAdmin
+        .from("advisor_organization_access")
+        .select("organization_id")
+        .eq("advisor_user_id", user.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      userOrgId = advisorData?.organization_id;
+    }
+
+    if (!userOrgId) {
       return new Response(
-        JSON.stringify({ error: "User is not a member of any organization" }),
+        JSON.stringify({ error: "User does not have access to any organization" }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -126,8 +139,21 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verify the calculation belongs to the user's organization
-    if (calculation.organization_id !== memberData.organization_id) {
+    // Verify the calculation belongs to an organization the user has access to
+    // For advisors, check if they have access to the calculation's organization
+    let hasAccessToCalcOrg = calculation.organization_id === userOrgId;
+    if (!hasAccessToCalcOrg) {
+      const { data: advisorAccessCheck } = await supabaseAdmin
+        .from("advisor_organization_access")
+        .select("id")
+        .eq("advisor_user_id", user.id)
+        .eq("organization_id", calculation.organization_id)
+        .eq("is_active", true)
+        .maybeSingle();
+      hasAccessToCalcOrg = !!advisorAccessCheck;
+    }
+
+    if (!hasAccessToCalcOrg) {
       return new Response(
         JSON.stringify({ error: "Access denied: Calculation belongs to a different organization" }),
         {
