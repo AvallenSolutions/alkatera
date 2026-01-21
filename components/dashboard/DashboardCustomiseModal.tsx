@@ -29,6 +29,8 @@ import {
   Droplet,
   TrendingDown,
   ShieldCheck,
+  Check,
+  X,
 } from 'lucide-react';
 import { useDashboardPreferences, DashboardWidget } from '@/hooks/data/useDashboardPreferences';
 
@@ -113,9 +115,14 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Customise Dashboard</DialogTitle>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Customise Dashboard</span>
+            <Badge variant="secondary" className="text-xs font-normal">
+              {preferences.filter(p => p.enabled).length} of {widgets.length} active
+            </Badge>
+          </DialogTitle>
           <DialogDescription>
-            Choose which widgets to display on your dashboard
+            Click any widget card to show or hide it on your dashboard
           </DialogDescription>
         </DialogHeader>
 
@@ -135,29 +142,55 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
                       <div
                         key={widget.id}
                         onClick={() => !loading && handleToggle(widget.id)}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                        className={`relative flex items-center gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer ${
                           enabled
-                            ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
-                            : 'bg-transparent border-slate-100 dark:border-slate-800 opacity-60 hover:opacity-80'
-                        } ${loading ? 'cursor-not-allowed' : ''}`}
+                            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-500 dark:border-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 shadow-sm'
+                            : 'bg-slate-50 dark:bg-slate-900/30 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-900/50'
+                        } ${loading ? 'cursor-not-allowed opacity-60' : ''}`}
                       >
+                        {/* Selected indicator checkmark */}
+                        {enabled && (
+                          <div className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-emerald-500 dark:bg-emerald-600 flex items-center justify-center shadow-md">
+                            <Check className="h-3.5 w-3.5 text-white stroke-[3]" />
+                          </div>
+                        )}
+
                         <div
-                          className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                          className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
                             enabled
-                              ? 'bg-slate-200 dark:bg-slate-700'
-                              : 'bg-slate-100 dark:bg-slate-800'
+                              ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                           }`}
                         >
-                          <Icon className="h-4 w-4" />
+                          <Icon className="h-5 w-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium">{widget.name}</p>
-                            <Badge variant="outline" className="text-xs">
+                            <p className={`text-sm font-semibold ${
+                              enabled
+                                ? 'text-emerald-900 dark:text-emerald-100'
+                                : 'text-slate-700 dark:text-slate-300'
+                            }`}>
+                              {widget.name}
+                            </p>
+                            {enabled && (
+                              <Badge className="text-xs bg-emerald-500 dark:bg-emerald-600 text-white border-0">
+                                Active
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className={`text-xs ${
+                              enabled
+                                ? 'border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-400'
+                                : 'border-slate-300 dark:border-slate-700'
+                            }`}>
                               {widget.default_size}
                             </Badge>
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className={`text-xs truncate ${
+                            enabled
+                              ? 'text-emerald-700 dark:text-emerald-300'
+                              : 'text-muted-foreground'
+                          }`}>
                             {widget.description}
                           </p>
                         </div>
