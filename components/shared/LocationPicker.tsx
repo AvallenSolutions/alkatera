@@ -52,23 +52,7 @@ interface NominatimResult {
   };
 }
 
-// Rate limiting - Nominatim requires 1 request per second max
-let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 1100; // 1.1 seconds to be safe
-
-async function rateLimitedFetch(url: string): Promise<Response> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    await new Promise(resolve =>
-      setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-    );
-  }
-
-  lastRequestTime = Date.now();
-  return fetch(url);
-}
+// No longer need client-side rate limiting - handled by API route
 
 export function LocationPicker({
   value = "",
@@ -106,16 +90,17 @@ export function LocationPicker({
       setIsLoading(true);
       setError(null);
 
-      const url = new URL("https://nominatim.openstreetmap.org/search");
+      // Use our API route instead of direct Nominatim calls
+      const url = new URL("/api/geocode/search", window.location.origin);
       url.searchParams.set("q", query.trim());
-      url.searchParams.set("format", "json");
-      url.searchParams.set("limit", "10");
-      url.searchParams.set("addressdetails", "1");
 
-      const response = await rateLimitedFetch(url.toString());
+      const response = await fetch(url.toString(), {
+        signal: abortControllerRef.current.signal,
+      });
 
       if (!response.ok) {
-        throw new Error("Failed to search locations");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to search locations");
       }
 
       const data = await response.json() as NominatimResult[];
