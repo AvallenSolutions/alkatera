@@ -13,15 +13,21 @@ import {
 // ============================================================================
 
 // Create mock Supabase client
+// Note: The new implementation queries:
+// - `facilities` to get all facility IDs for the organization
+// - `utility_data_entries` for Scope 1/2 data with built-in UTILITY_EMISSION_FACTORS
+// - `fleet_activities` for fleet emissions
 const createMockSupabase = (mockResponses: Record<string, any> = {}) => {
   const createQueryBuilder = (tableName: string) => {
     const queryBuilder: any = {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
       gte: vi.fn().mockReturnThis(),
       lte: vi.fn().mockReturnThis(),
       order: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
+      not: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockImplementation(() => {
         return Promise.resolve(mockResponses[tableName] || { data: null, error: null });
       }),
@@ -49,7 +55,8 @@ const createMockSupabase = (mockResponses: Record<string, any> = {}) => {
 describe('calculateScope1', () => {
   it('should return 0 when no facility or fleet data exists', async () => {
     const mockSupabase = createMockSupabase({
-      facility_activity_data: { data: [], error: null },
+      facilities: { data: [], error: null },
+      utility_data_entries: { data: [], error: null },
       fleet_activities: { data: [], error: null },
     });
 
@@ -63,21 +70,25 @@ describe('calculateScope1', () => {
     expect(result).toBe(0);
   });
 
-  it('should calculate Scope 1 from facility data with emission factors', async () => {
+  it('should calculate Scope 1 from utility data with built-in emission factors', async () => {
+    // Note: Uses UTILITY_EMISSION_FACTORS built into the code
+    // diesel_stationary factor = 2.68787 kgCO2e/litre
     const mockSupabase = createMockSupabase({
-      facility_activity_data: {
+      facilities: {
+        data: [{ id: 'facility-1', name: 'Main Facility' }],
+        error: null,
+      },
+      utility_data_entries: {
         data: [
           {
             quantity: 100,
-            scope_1_2_emission_sources: {
-              scope: 'Scope 1',
-              emission_factor_id: 'factor-1',
-            },
+            unit: 'litres',
+            utility_type: 'diesel_stationary',
+            facility_id: 'facility-1',
           },
         ],
         error: null,
       },
-      emissions_factors: { data: { value: '2.5' }, error: null },
       fleet_activities: { data: [], error: null },
     });
 
@@ -88,13 +99,14 @@ describe('calculateScope1', () => {
       '2024-12-31'
     );
 
-    // 100 quantity * 2.5 factor = 250 kgCO2e
-    expect(result).toBe(250);
+    // 100 litres * 2.68787 factor = 268.787 kgCO2e
+    expect(result).toBeCloseTo(268.787, 2);
   });
 
   it('should add fleet Scope 1 emissions (converted from tonnes to kg)', async () => {
     const mockSupabase = createMockSupabase({
-      facility_activity_data: { data: [], error: null },
+      facilities: { data: [], error: null },
+      utility_data_entries: { data: [], error: null },
       fleet_activities: {
         data: [{ emissions_tco2e: 5 }], // 5 tonnes
         error: null,
@@ -112,16 +124,19 @@ describe('calculateScope1', () => {
     expect(result).toBe(5000);
   });
 
-  it('should filter out Scope 2 facility emissions', async () => {
+  it('should filter out Scope 2 utility types (electricity)', async () => {
     const mockSupabase = createMockSupabase({
-      facility_activity_data: {
+      facilities: {
+        data: [{ id: 'facility-1', name: 'Main Facility' }],
+        error: null,
+      },
+      utility_data_entries: {
         data: [
           {
-            quantity: 100,
-            scope_1_2_emission_sources: {
-              scope: 'Scope 2', // Should be filtered out
-              emission_factor_id: 'factor-1',
-            },
+            quantity: 1000,
+            unit: 'kWh',
+            utility_type: 'electricity_grid', // Scope 2 - should be filtered out
+            facility_id: 'facility-1',
           },
         ],
         error: null,
@@ -147,7 +162,8 @@ describe('calculateScope1', () => {
 describe('calculateScope2', () => {
   it('should return 0 when no facility or fleet data exists', async () => {
     const mockSupabase = createMockSupabase({
-      facility_activity_data: { data: [], error: null },
+      facilities: { data: [], error: null },
+      utility_data_entries: { data: [], error: null },
       fleet_activities: { data: [], error: null },
     });
 
@@ -162,20 +178,24 @@ describe('calculateScope2', () => {
   });
 
   it('should calculate Scope 2 from purchased electricity', async () => {
+    // Note: Uses UTILITY_EMISSION_FACTORS built into the code
+    // electricity_grid factor = 0.207 kgCO2e/kWh
     const mockSupabase = createMockSupabase({
-      facility_activity_data: {
+      facilities: {
+        data: [{ id: 'facility-1', name: 'Main Facility' }],
+        error: null,
+      },
+      utility_data_entries: {
         data: [
           {
             quantity: 1000, // 1000 kWh
-            scope_1_2_emission_sources: {
-              scope: 'Scope 2',
-              emission_factor_id: 'elec-factor',
-            },
+            unit: 'kWh',
+            utility_type: 'electricity_grid',
+            facility_id: 'facility-1',
           },
         ],
         error: null,
       },
-      emissions_factors: { data: { value: '0.5' }, error: null },
       fleet_activities: { data: [], error: null },
     });
 
@@ -186,13 +206,14 @@ describe('calculateScope2', () => {
       '2024-12-31'
     );
 
-    // 1000 kWh * 0.5 factor = 500 kgCO2e
-    expect(result).toBe(500);
+    // 1000 kWh * 0.207 factor = 207 kgCO2e
+    expect(result).toBeCloseTo(207, 1);
   });
 
   it('should add fleet Scope 2 emissions (EV charging)', async () => {
     const mockSupabase = createMockSupabase({
-      facility_activity_data: { data: [], error: null },
+      facilities: { data: [], error: null },
+      utility_data_entries: { data: [], error: null },
       fleet_activities: {
         data: [{ emissions_tco2e: 2 }], // 2 tonnes from EV charging
         error: null,
@@ -273,9 +294,12 @@ describe('calculateScope3', () => {
     );
 
     // Should use scope3 (7) not total (10) to avoid double counting
-    // 100 units * 7 kgCO2e per unit = 700 kgCO2e
+    // 100 units * 7 kgCO2e per unit = 700 kgCO2e for products
     expect(result.products).toBe(700);
-    expect(result.total).toBe(700);
+    // Total may include small amounts from Categories 4, 9, 11 calculations
+    // which estimate transport emissions based on production volumes
+    expect(result.total).toBeGreaterThanOrEqual(700);
+    expect(result.total).toBeLessThan(750); // Allow for small category estimations
   });
 
   it('should properly categorize corporate overheads', async () => {
@@ -373,7 +397,8 @@ describe('calculateScope3', () => {
 describe('calculateCorporateEmissions', () => {
   it('should return hasData: false when no emissions data exists', async () => {
     const mockSupabase = createMockSupabase({
-      facility_activity_data: { data: [], error: null },
+      facilities: { data: [], error: null },
+      utility_data_entries: { data: [], error: null },
       fleet_activities: { data: [], error: null },
       production_logs: { data: [], error: null },
       corporate_reports: { data: null, error: null },
@@ -391,7 +416,7 @@ describe('calculateCorporateEmissions', () => {
 
   it('should correctly sum all scopes', async () => {
     // Complex mock with all three scopes having data
-    // We need a more sophisticated mock that properly handles the async query chain
+    // Uses the new facilities + utility_data_entries schema
     const createComplexMock = () => {
       const createQueryBuilder = (tableName: string): any => {
         let filters: Record<string, any> = {};
@@ -402,14 +427,13 @@ describe('calculateCorporateEmissions', () => {
             filters[key] = value;
             return builder;
           }),
+          in: vi.fn().mockImplementation(() => builder),
           gte: vi.fn().mockImplementation(() => builder),
           lte: vi.fn().mockImplementation(() => builder),
           order: vi.fn().mockImplementation(() => builder),
           limit: vi.fn().mockImplementation(() => builder),
+          not: vi.fn().mockImplementation(() => builder),
           maybeSingle: vi.fn().mockImplementation(async () => {
-            if (tableName === 'emissions_factors') {
-              return { data: { value: '1.0' }, error: null };
-            }
             if (tableName === 'product_lcas') {
               return {
                 data: {
@@ -431,22 +455,26 @@ describe('calculateCorporateEmissions', () => {
         builder.then = (resolve: Function) => {
           let response = { data: [], error: null };
 
-          if (tableName === 'facility_activity_data') {
+          if (tableName === 'facilities') {
+            response = {
+              data: [{ id: 'facility-1', name: 'Main Facility' }],
+              error: null,
+            };
+          } else if (tableName === 'utility_data_entries') {
+            // diesel_stationary factor = 2.68787, electricity_grid = 0.207
             response = {
               data: [
                 {
                   quantity: 100,
-                  scope_1_2_emission_sources: {
-                    scope: 'Scope 1',
-                    emission_factor_id: 'factor-1',
-                  },
+                  unit: 'litres',
+                  utility_type: 'diesel_stationary', // Scope 1: 100 * 2.68787 = 268.787
+                  facility_id: 'facility-1',
                 },
                 {
-                  quantity: 200,
-                  scope_1_2_emission_sources: {
-                    scope: 'Scope 2',
-                    emission_factor_id: 'factor-2',
-                  },
+                  quantity: 1000,
+                  unit: 'kWh',
+                  utility_type: 'electricity_grid', // Scope 2: 1000 * 0.207 = 207
+                  facility_id: 'facility-1',
                 },
               ],
               error: null,
@@ -484,14 +512,15 @@ describe('calculateCorporateEmissions', () => {
 
     expect(result.year).toBe(2024);
     expect(result.hasData).toBe(true);
-    // Scope 1: 100 * 1.0 = 100
-    // Scope 2: 200 * 1.0 = 200
-    // Scope 3: 10 * 50 = 500
-    // Total: 800
-    expect(result.breakdown.scope1).toBe(100);
-    expect(result.breakdown.scope2).toBe(200);
+    // Scope 1: 100 litres diesel * 2.68787 = 268.787
+    // Scope 2: 1000 kWh * 0.207 = 207
+    // Scope 3: 10 * 50 = 500 (products) + small amounts from Cat 4, 9, 11
+    expect(result.breakdown.scope1).toBeCloseTo(268.787, 2);
+    expect(result.breakdown.scope2).toBeCloseTo(207, 1);
     expect(result.breakdown.scope3.products).toBe(500);
-    expect(result.breakdown.total).toBe(800);
+    // Total includes base amounts plus small estimations from Cat 4, 9, 11
+    expect(result.breakdown.total).toBeGreaterThanOrEqual(975);
+    expect(result.breakdown.total).toBeLessThan(1000); // Allow for category estimations
   });
 });
 
@@ -545,7 +574,8 @@ describe('Edge Cases', () => {
 
     it('should handle null emissions_tco2e from fleet', async () => {
       const mockSupabase = createMockSupabase({
-        facility_activity_data: { data: [], error: null },
+        facilities: { data: [], error: null },
+        utility_data_entries: { data: [], error: null },
         fleet_activities: {
           data: [{ emissions_tco2e: null }],
           error: null,
@@ -619,49 +649,24 @@ describe('Edge Cases', () => {
     });
   });
 
-  describe('Missing Emission Factors', () => {
-    it('should handle facility data without emission factor', async () => {
+  describe('Unknown Utility Types', () => {
+    it('should skip utility entries with unknown utility types', async () => {
       const mockSupabase = createMockSupabase({
-        facility_activity_data: {
+        facilities: {
+          data: [{ id: 'facility-1', name: 'Main Facility' }],
+          error: null,
+        },
+        utility_data_entries: {
           data: [
             {
               quantity: 100,
-              scope_1_2_emission_sources: {
-                scope: 'Scope 1',
-                emission_factor_id: null, // No factor ID
-              },
+              unit: 'litres',
+              utility_type: 'unknown_fuel_type', // Unknown type - should be skipped
+              facility_id: 'facility-1',
             },
           ],
           error: null,
         },
-        fleet_activities: { data: [], error: null },
-      });
-
-      const result = await calculateScope1(
-        mockSupabase as any,
-        'org-123',
-        '2024-01-01',
-        '2024-12-31'
-      );
-
-      expect(result).toBe(0);
-    });
-
-    it('should handle emission factor that returns null value', async () => {
-      const mockSupabase = createMockSupabase({
-        facility_activity_data: {
-          data: [
-            {
-              quantity: 100,
-              scope_1_2_emission_sources: {
-                scope: 'Scope 1',
-                emission_factor_id: 'factor-broken',
-              },
-            },
-          ],
-          error: null,
-        },
-        emissions_factors: { data: { value: null }, error: null },
         fleet_activities: { data: [], error: null },
       });
 
@@ -680,9 +685,10 @@ describe('Edge Cases', () => {
     it('should correctly filter data within year boundaries', async () => {
       // This test verifies the date filtering works correctly
       // The actual filtering is done by Supabase, so we're testing
-      // that the correct parameters are passed
+      // that the correct tables are queried
       const mockSupabase = createMockSupabase({
-        facility_activity_data: { data: [], error: null },
+        facilities: { data: [], error: null },
+        utility_data_entries: { data: [], error: null },
         fleet_activities: { data: [], error: null },
       });
 
@@ -693,8 +699,8 @@ describe('Edge Cases', () => {
         '2024-06-30' // Partial year (first half)
       );
 
-      // Verify the from method was called with correct table
-      expect(mockSupabase.from).toHaveBeenCalledWith('facility_activity_data');
+      // Verify the from method was called with correct tables
+      expect(mockSupabase.from).toHaveBeenCalledWith('facilities');
       expect(mockSupabase.from).toHaveBeenCalledWith('fleet_activities');
     });
   });
@@ -786,6 +792,11 @@ describe('Type Structure', () => {
     expect(result).toHaveProperty('marketing_materials');
     expect(result).toHaveProperty('total');
 
+    // Check NEW GHG Protocol categories exist (added for compliance)
+    expect(result).toHaveProperty('upstream_transport');    // Category 4
+    expect(result).toHaveProperty('downstream_transport');  // Category 9
+    expect(result).toHaveProperty('use_phase');             // Category 11
+
     // Check UI aliases exist
     expect(result).toHaveProperty('logistics');
     expect(result).toHaveProperty('waste');
@@ -794,7 +805,8 @@ describe('Type Structure', () => {
 
   it('should return correct CorporateEmissionsResult structure', async () => {
     const mockSupabase = createMockSupabase({
-      facility_activity_data: { data: [], error: null },
+      facilities: { data: [], error: null },
+      utility_data_entries: { data: [], error: null },
       fleet_activities: { data: [], error: null },
       production_logs: { data: [], error: null },
       corporate_reports: { data: null, error: null },

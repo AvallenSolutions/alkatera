@@ -28,6 +28,10 @@ export function useScope3Emissions(
     operational_waste: 0,
     downstream_logistics: 0,
     marketing_materials: 0,
+    // NEW: Previously missing GHG Protocol categories
+    upstream_transport: 0,    // Category 4: Upstream Transportation
+    downstream_transport: 0,  // Category 9: Downstream Transportation
+    use_phase: 0,             // Category 11: Use of Sold Products
     // UI-friendly aliases
     logistics: 0,
     waste: 0,
