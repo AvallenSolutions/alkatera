@@ -18,11 +18,12 @@ function isRateLimited(ip: string): boolean {
   // Clean up old entries periodically
   if (rateLimitMap.size > 1000) {
     const cutoff = now - RATE_LIMIT_WINDOW * 10;
-    for (const [key, time] of rateLimitMap.entries()) {
+    // Use Array.from() to avoid TS downlevelIteration requirement
+    Array.from(rateLimitMap.entries()).forEach(([key, time]) => {
       if (time < cutoff) {
         rateLimitMap.delete(key);
       }
-    }
+    });
   }
 
   return false;
