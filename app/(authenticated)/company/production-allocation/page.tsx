@@ -142,63 +142,74 @@ export default function ProductionAllocationPage() {
       supabase.rpc("get_facility_unallocated_capacity", { p_organization_id: orgId }),
     ]);
 
-    if (facilitiesRes.data) {
-      setFacilities(facilitiesRes.data.map(f => ({
-        id: f.id,
-        name: f.name,
-        city: f.address_city,
-        country: f.address_country,
-        operationalControl: f.operational_control,
-      })));
+    if (facilitiesRes.error) {
+      console.error("Error loading facilities:", facilitiesRes.error);
+    }
+    if (productsRes.error) {
+      console.error("Error loading products:", productsRes.error);
+    }
+    if (matrixRes.error) {
+      console.error("Error loading allocation matrix:", matrixRes.error);
+    }
+    if (capacityRes.error) {
+      console.error("Error loading capacity data:", capacityRes.error);
     }
 
-    if (productsRes.data) {
-      setProducts(productsRes.data);
-    }
+    const facilitiesData = facilitiesRes.data || [];
+    const productsData = productsRes.data || [];
+    const matrixItems = matrixRes.data || [];
+    const capacityData = capacityRes.data || [];
 
-    if (matrixRes.data) {
-      const matrix = new Map<string, MatrixCell>();
-      matrixRes.data.forEach((item: any) => {
-        const key = `${item.facility_id}-${item.product_id}`;
-        matrix.set(key, {
-          assignmentId: item.assignment_id,
-          facilityId: item.facility_id,
-          productId: item.product_id,
-          hasAllocations: item.has_allocations,
-          latestAllocation: item.latest_allocation,
-          assignmentStatus: item.assignment_status,
-        });
+    setFacilities(facilitiesData.map(f => ({
+      id: f.id,
+      name: f.name,
+      city: f.address_city,
+      country: f.address_country,
+      operationalControl: f.operational_control,
+    })));
+
+    setProducts(productsData);
+
+    // Build matrix map from fresh data
+    const matrix = new Map<string, MatrixCell>();
+    matrixItems.forEach((item: any) => {
+      const key = `${item.facility_id}-${item.product_id}`;
+      matrix.set(key, {
+        assignmentId: item.assignment_id,
+        facilityId: item.facility_id,
+        productId: item.product_id,
+        hasAllocations: item.has_allocations,
+        latestAllocation: item.latest_allocation,
+        assignmentStatus: item.assignment_status,
       });
-      setMatrixData(matrix);
-    }
+    });
+    setMatrixData(matrix);
 
-    // Calculate allocation health
-    if (facilitiesRes.data && productsRes.data && capacityRes.data) {
-      const facilitiesWithAllocations = new Set(
-        Array.from(matrixData.values())
-          .filter(cell => cell.hasAllocations)
-          .map(cell => cell.facilityId)
-      ).size;
+    // Calculate allocation health using fresh data (not stale state)
+    const facilitiesWithAllocations = new Set(
+      Array.from(matrix.values())
+        .filter(cell => cell.hasAllocations)
+        .map(cell => cell.facilityId)
+    ).size;
 
-      const productsWithAllocations = new Set(
-        Array.from(matrixData.values())
-          .filter(cell => cell.hasAllocations)
-          .map(cell => cell.productId)
-      ).size;
+    const productsWithAllocations = new Set(
+      Array.from(matrix.values())
+        .filter(cell => cell.hasAllocations)
+        .map(cell => cell.productId)
+    ).size;
 
-      const totalUnallocated = capacityRes.data.reduce(
-        (sum: number, f: any) => sum + (f.unallocated_emissions_kg_co2e || 0),
-        0
-      );
+    const totalUnallocated = capacityData.reduce(
+      (sum: number, f: any) => sum + (f.unallocated_emissions_kg_co2e || 0),
+      0
+    );
 
-      setAllocationHealth({
-        totalFacilities: facilitiesRes.data.length,
-        facilitiesWithAllocations,
-        totalProducts: productsRes.data.length,
-        productsWithAllocations,
-        unallocatedCapacity: totalUnallocated,
-      });
-    }
+    setAllocationHealth({
+      totalFacilities: facilitiesData.length,
+      facilitiesWithAllocations,
+      totalProducts: productsData.length,
+      productsWithAllocations,
+      unallocatedCapacity: totalUnallocated,
+    });
   };
 
   const getCellStatus = (facilityId: string, productId: number) => {
@@ -496,10 +507,63 @@ export default function ProductionAllocationPage() {
                 </Table>
               </div>
 
-              {filteredFacilities.length === 0 && (
+              {facilities.length === 0 && products.length === 0 && (
                 <div className="text-center py-12">
                   <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                  <p className="text-slate-400">No facilities found matching your search</p>
+                  <h4 className="text-lg font-medium text-white mb-2">Get Started</h4>
+                  <p className="text-slate-400 mb-4">
+                    Add facilities and products to start tracking production allocations
+                  </p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Button onClick={() => router.push("/company/facilities")} variant="outline">
+                      <Building2 className="mr-2 h-4 w-4" />
+                      Add Facility
+                    </Button>
+                    <Button onClick={() => router.push("/products")} variant="outline">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Product
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {facilities.length === 0 && products.length > 0 && (
+                <div className="text-center py-12">
+                  <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
+                  <h4 className="text-lg font-medium text-white mb-2">No Facilities Yet</h4>
+                  <p className="text-slate-400 mb-4">
+                    You have {products.length} product{products.length !== 1 ? "s" : ""} but no facilities.
+                    Add facilities to start allocating production.
+                  </p>
+                  <Button onClick={() => router.push("/company/facilities")} variant="outline">
+                    <Building2 className="mr-2 h-4 w-4" />
+                    Add Your First Facility
+                  </Button>
+                </div>
+              )}
+
+              {facilities.length > 0 && products.length === 0 && (
+                <div className="text-center py-12">
+                  <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
+                  <h4 className="text-lg font-medium text-white mb-2">No Products Yet</h4>
+                  <p className="text-slate-400 mb-4">
+                    You have {facilities.length} facilit{facilities.length !== 1 ? "ies" : "y"} but no products.
+                    Add products to start allocating production.
+                  </p>
+                  <Button onClick={() => router.push("/products")} variant="outline">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Your First Product
+                  </Button>
+                </div>
+              )}
+
+              {facilities.length > 0 && products.length > 0 && filteredFacilities.length === 0 && (
+                <div className="text-center py-12">
+                  <Search className="h-12 w-12 mx-auto mb-4 text-slate-600" />
+                  <p className="text-slate-400">No facilities found matching "{searchTerm}"</p>
+                  <Button variant="ghost" className="mt-2" onClick={() => setSearchTerm("")}>
+                    Clear Search
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -507,13 +571,29 @@ export default function ProductionAllocationPage() {
         </TabsContent>
 
         <TabsContent value="timeline" className="space-y-6 mt-6">
-          {organizationId && (
+          {organizationId ? (
             <ReportingPeriodTimeline organizationId={organizationId} viewType="all" />
+          ) : (
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="py-12 text-center">
+                <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-600" />
+                <p className="text-slate-400">Loading organization data...</p>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
         <TabsContent value="flow" className="space-y-6 mt-6">
-          {organizationId && <AllocationSankeyDiagram organizationId={organizationId} />}
+          {organizationId ? (
+            <AllocationSankeyDiagram organizationId={organizationId} />
+          ) : (
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardContent className="py-12 text-center">
+                <TrendingUp className="h-12 w-12 mx-auto mb-4 text-slate-600" />
+                <p className="text-slate-400">Loading organization data...</p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
