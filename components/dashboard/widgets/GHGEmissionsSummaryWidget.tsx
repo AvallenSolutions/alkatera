@@ -142,12 +142,9 @@ export function GHGEmissionsSummaryWidget({
             <CardTitle className="flex items-center gap-2">
               <Cloud className="h-5 w-5" />
               GHG Emissions Summary
-              {previewMode && (
-                <Badge variant="outline" className="ml-2">Preview</Badge>
-              )}
             </CardTitle>
             <CardDescription>
-              {previewMode ? 'Estimated from product LCAs' : 'Official company footprint'}
+              Official company footprint
             </CardDescription>
           </div>
           {reportingPeriod && (
