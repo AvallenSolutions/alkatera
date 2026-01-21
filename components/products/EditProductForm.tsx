@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Info } from "lucide-react";
+import { Plus, Trash2, Info, Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,10 +13,14 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { fetchProduct, updateProduct } from "@/lib/products";
 import type { UnitSizeUnit, Certification, Award } from "@/lib/types/products";
 import { PRODUCT_CATEGORIES, PRODUCT_CATEGORY_GROUPS, getCategoriesByGroup } from "@/lib/product-categories";
+import { useOrganization } from "@/lib/organizationContext";
+import { uploadProductImage } from "@/lib/uploadImage";
+import { cn } from "@/lib/utils";
 
 interface EditProductFormProps {
   productId: string;
@@ -26,6 +30,8 @@ interface EditProductFormProps {
 
 export function EditProductForm({ productId, onSuccess, onCancel }: EditProductFormProps) {
   const router = useRouter();
+  const { currentOrganization } = useOrganization();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [name, setName] = useState("");
@@ -39,6 +45,12 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
   const [awards, setAwards] = useState<Award[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Image upload state
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [imageTab, setImageTab] = useState<"upload" | "url">("upload");
 
   useEffect(() => {
     loadProduct();
@@ -99,6 +111,84 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
 
   const handleRemoveAward = (index: number) => {
     setAwards(awards.filter((_, i) => i !== index));
+  };
+
+  // Image upload handlers
+  const handleImageUpload = async (file: File) => {
+    if (!currentOrganization?.id) {
+      setUploadError("Organization not found. Please try again.");
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadError(null);
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.');
+      }
+
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('File size must be less than 10MB');
+      }
+
+      const result = await uploadProductImage(file, currentOrganization.id);
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      if (result.url) {
+        setImageUrl(result.url);
+        toast.success("Image uploaded successfully!");
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to upload image';
+      setUploadError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+    // Reset input so same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleImageUpload(file);
+    }
+  }, [currentOrganization?.id]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleRemoveImage = () => {
+    setImageUrl("");
+    setUploadError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -292,17 +382,97 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="image-url">Image URL</Label>
-              <Input
-                id="image-url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://example.com/image.jpg"
-                disabled={isSaving}
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the full URL to the product image
-              </p>
+              <Label>Product Image</Label>
+
+              {/* Image Preview */}
+              {imageUrl && (
+                <div className="relative mb-4">
+                  <img
+                    src={imageUrl}
+                    alt="Product preview"
+                    className="w-full h-48 object-cover rounded-lg border border-border"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '';
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2"
+                    onClick={handleRemoveImage}
+                    disabled={isSaving || isUploading}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+
+              <Tabs value={imageTab} onValueChange={(v) => setImageTab(v as "upload" | "url")}>
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="upload">Upload File</TabsTrigger>
+                  <TabsTrigger value="url">Enter URL</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="upload" className="mt-4">
+                  <div
+                    className={cn(
+                      "relative border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer",
+                      isDragging
+                        ? "border-primary bg-primary/10"
+                        : "border-muted-foreground/25 hover:border-muted-foreground/50",
+                      (isUploading || isSaving) && "opacity-50 cursor-not-allowed"
+                    )}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onClick={() => !isUploading && !isSaving && fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      disabled={isUploading || isSaving}
+                    />
+
+                    {isUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                        <p className="text-sm text-muted-foreground">Uploading...</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="w-8 h-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">
+                          Drag and drop or click to upload
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          JPEG, PNG, GIF, or WebP (max 10MB)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  {uploadError && (
+                    <p className="text-sm text-destructive mt-2">{uploadError}</p>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="url" className="mt-4">
+                  <Input
+                    id="image-url"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    disabled={isSaving}
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Enter the full URL to the product image
+                  </p>
+                </TabsContent>
+              </Tabs>
             </div>
 
             <div className="space-y-2">
