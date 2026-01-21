@@ -523,7 +523,10 @@ export default function DashboardPage() {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
-                  <GHGEmissionsSummaryWidget />
+                  <GHGEmissionsSummaryWidget
+                    footprint={footprint}
+                    isLoading={footprintLoading}
+                  />
                 </AccordionContent>
               </AccordionItem>
             )}
