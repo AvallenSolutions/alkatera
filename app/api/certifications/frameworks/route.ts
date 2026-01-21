@@ -1,6 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
+// Transform database framework to API format expected by UI
+function transformFramework(dbFramework: any) {
+  return {
+    id: dbFramework.id,
+    name: dbFramework.name || dbFramework.framework_name,
+    code: dbFramework.code || dbFramework.framework_code,
+    version: dbFramework.version || dbFramework.framework_version,
+    description: dbFramework.description,
+    category: dbFramework.category || 'General',
+    passing_score: dbFramework.passing_score,
+    total_points: dbFramework.total_points || 0,
+    is_active: dbFramework.is_active,
+    display_order: dbFramework.display_order || 0,
+    governing_body: dbFramework.governing_body,
+    website_url: dbFramework.website_url,
+    requirements: (dbFramework.requirements || []).map((req: any) => ({
+      id: req.id,
+      framework_id: req.framework_id,
+      requirement_code: req.requirement_code,
+      requirement_name: req.requirement_name,
+      description: req.description,
+      category: req.requirement_category,
+      sub_category: req.subsection || req.section,
+      points_available: req.points_available || req.max_points || 0,
+      is_required: req.is_required || req.is_mandatory || false,
+      guidance: req.guidance || req.examples,
+      data_sources: req.data_sources || req.required_data_sources || [],
+    })),
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
@@ -14,6 +45,7 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active_only') === 'true';
 
     // Get all frameworks with their requirements
+    // Try the new table name first, fall back to old if it doesn't exist
     let frameworksQuery = supabase
       .from('certification_frameworks')
       .select(`
@@ -26,12 +58,35 @@ export async function GET(request: NextRequest) {
       frameworksQuery = frameworksQuery.eq('is_active', true);
     }
 
-    const { data: frameworks, error: frameworksError } = await frameworksQuery;
+    let { data: frameworks, error: frameworksError } = await frameworksQuery;
+
+    // If the requirements table name is different (framework_requirements), try that
+    if (frameworksError && frameworksError.message.includes('certification_framework_requirements')) {
+      console.log('Trying alternate table name: framework_requirements');
+      frameworksQuery = supabase
+        .from('certification_frameworks')
+        .select(`
+          *,
+          requirements:framework_requirements(*)
+        `)
+        .order('display_order', { ascending: true });
+
+      if (activeOnly) {
+        frameworksQuery = frameworksQuery.eq('is_active', true);
+      }
+
+      const result = await frameworksQuery;
+      frameworks = result.data;
+      frameworksError = result.error;
+    }
 
     if (frameworksError) {
       console.error('Error fetching frameworks:', frameworksError);
       return NextResponse.json({ error: frameworksError.message }, { status: 500 });
     }
+
+    // Transform frameworks to expected format
+    const transformedFrameworks = (frameworks || []).map(transformFramework);
 
     // If organization_id provided, also get their certification status
     let certifications = null;
@@ -44,12 +99,23 @@ export async function GET(request: NextRequest) {
       if (certError) {
         console.error('Error fetching org certifications:', certError);
       } else {
-        certifications = orgCertifications;
+        // Transform certifications to expected format
+        certifications = (orgCertifications || []).map((cert: any) => ({
+          id: cert.id,
+          organization_id: cert.organization_id,
+          framework_id: cert.framework_id,
+          status: cert.status,
+          target_date: cert.target_date,
+          certification_date: cert.certified_date || cert.certification_date,
+          expiry_date: cert.expiry_date,
+          certificate_number: cert.certification_number || cert.certificate_number,
+          current_score: cert.readiness_score || cert.current_score || cert.score_achieved,
+        }));
       }
     }
 
     return NextResponse.json({
-      frameworks,
+      frameworks: transformedFrameworks,
       certifications,
     });
   } catch (error) {

@@ -129,12 +129,15 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  /** If true, sheet won't close when clicking outside or when window loses focus */
+  preventClose?: boolean;
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = 'right', className, children, ...props }, ref) => {
+>(({ side = 'right', className, children, preventClose, onPointerDownOutside, onInteractOutside, ...props }, ref) => {
   const handleKeyDown = React.useCallback((e: React.KeyboardEvent) => {
     e.stopPropagation();
     if (e.nativeEvent) {
@@ -157,6 +160,22 @@ const SheetContent = React.forwardRef<
         className={cn(sheetVariants({ side }), className)}
         onKeyDown={handleKeyDown}
         onClick={handleClick}
+        onPointerDownOutside={(e) => {
+          // Prevent closing when clicking outside if preventClose is true
+          // or if the focus moved outside the document (e.g., switching tabs)
+          if (preventClose || !document.hasFocus()) {
+            e.preventDefault();
+          }
+          onPointerDownOutside?.(e);
+        }}
+        onInteractOutside={(e) => {
+          // Prevent closing on outside interaction if preventClose is true
+          // or if the document doesn't have focus (tab switching)
+          if (preventClose || !document.hasFocus()) {
+            e.preventDefault();
+          }
+          onInteractOutside?.(e);
+        }}
         {...props}
       >
         {children}
