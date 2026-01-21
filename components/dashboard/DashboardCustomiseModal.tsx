@@ -134,11 +134,12 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
                     return (
                       <div
                         key={widget.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                        onClick={() => !loading && handleToggle(widget.id)}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-pointer ${
                           enabled
-                            ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700'
-                            : 'bg-transparent border-slate-100 dark:border-slate-800 opacity-60'
-                        }`}
+                            ? 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            : 'bg-transparent border-slate-100 dark:border-slate-800 opacity-60 hover:opacity-80'
+                        } ${loading ? 'cursor-not-allowed' : ''}`}
                       >
                         <div
                           className={`h-9 w-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
@@ -162,8 +163,11 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
                         </div>
                         <Switch
                           checked={enabled}
-                          onCheckedChange={() => handleToggle(widget.id)}
+                          onCheckedChange={(checked) => {
+                            // Prevent double-toggling from parent div click
+                          }}
                           disabled={loading}
+                          onClick={(e) => e.stopPropagation()}
                         />
                       </div>
                     );
