@@ -140,23 +140,36 @@ export default function CompanyOverviewPage() {
     setIsSaving(true);
 
     try {
-      const { error } = await supabase
+      // Build update payload - tax_id requires migration 20260121100000 to be applied
+      const updatePayload: Record<string, any> = {
+        name: name.trim(),
+        description: description.trim() || null,
+        website: website.trim() || null,
+        address: address.trim() || null,
+        city: city.trim() || null,
+        country: country.trim() || null,
+        industry_sector: industrySector || null,
+        founding_year: foundingYear ? parseInt(foundingYear) : null,
+        company_size: companySize || null,
+        billing_email: billingEmail.trim() || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Try to save with tax_id first, fall back without it if column doesn't exist
+      let result = await supabase
         .from("organizations")
-        .update({
-          name: name.trim(),
-          description: description.trim() || null,
-          website: website.trim() || null,
-          address: address.trim() || null,
-          city: city.trim() || null,
-          country: country.trim() || null,
-          industry_sector: industrySector || null,
-          founding_year: foundingYear ? parseInt(foundingYear) : null,
-          company_size: companySize || null,
-          billing_email: billingEmail.trim() || null,
-          tax_id: taxId.trim() || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...updatePayload, tax_id: taxId.trim() || null })
         .eq("id", currentOrganization.id);
+
+      // If tax_id column doesn't exist, retry without it
+      if (result.error?.code === 'PGRST204' && result.error?.message?.includes('tax_id')) {
+        result = await supabase
+          .from("organizations")
+          .update(updatePayload)
+          .eq("id", currentOrganization.id);
+      }
+
+      const { error } = result;
 
       if (error) throw error;
 
