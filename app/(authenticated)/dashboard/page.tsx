@@ -308,6 +308,20 @@ export default function DashboardPage() {
     );
   }
 
+  // Check if widget is enabled
+  const isWidgetEnabled = (widgetId: string) => {
+    return enabledWidgets.some(w => w.widget_id === widgetId);
+  };
+
+  // Show empty state if no widgets enabled
+  if (enabledWidgets.length === 0) {
+    return (
+      <div className="p-6">
+        <EmptyDashboard />
+      </div>
+    );
+  }
+
   const vitalityLabel = vitalityScore === null ? 'NO DATA' :
                         vitalityScore >= 75 ? 'HEALTHY' :
                         vitalityScore >= 50 ? 'DEVELOPING' : 'NEEDS ATTENTION';
@@ -495,76 +509,86 @@ export default function DashboardPage() {
           </Card>
 
           <Accordion type="single" collapsible className="space-y-2">
-            <AccordionItem value="emissions" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                <span className="flex items-center gap-2 flex-1">
-                  <span className="text-lg">📊</span>
-                  <span>Emissions Breakdown</span>
-                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                    {footprint?.total_emissions
-                      ? `${(footprint.total_emissions / 1000).toFixed(1)} tCO₂e total`
-                      : 'No data yet'}
+            {isWidgetEnabled('ghg-summary') && (
+              <AccordionItem value="emissions" className="border rounded-xl overflow-hidden">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                  <span className="flex items-center gap-2 flex-1">
+                    <span className="text-lg">📊</span>
+                    <span>Emissions Breakdown</span>
+                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                      {footprint?.total_emissions
+                        ? `${(footprint.total_emissions / 1000).toFixed(1)} tCO₂e total`
+                        : 'No data yet'}
+                    </span>
                   </span>
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <GHGEmissionsSummaryWidget />
-              </AccordionContent>
-            </AccordionItem>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <GHGEmissionsSummaryWidget />
+                </AccordionContent>
+              </AccordionItem>
+            )}
 
-            <AccordionItem value="products" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                <span className="flex items-center gap-2 flex-1">
-                  <span className="text-lg">📦</span>
-                  <span>Product LCA Status</span>
-                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                    View details
+            {isWidgetEnabled('product-lca-status') && (
+              <AccordionItem value="products" className="border rounded-xl overflow-hidden">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                  <span className="flex items-center gap-2 flex-1">
+                    <span className="text-lg">📦</span>
+                    <span>Product LCA Status</span>
+                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                      View details
+                    </span>
                   </span>
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <ProductLCAStatusWidget />
-              </AccordionContent>
-            </AccordionItem>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <ProductLCAStatusWidget />
+                </AccordionContent>
+              </AccordionItem>
+            )}
 
-            <AccordionItem value="quality" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                <span className="flex items-center gap-2 flex-1">
-                  <span className="text-lg">📈</span>
-                  <span>Data Quality</span>
-                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                    {scores.climateScore !== null || scores.waterScore !== null
-                      ? 'Active'
-                      : 'Needs setup'}
+            {isWidgetEnabled('data-quality') && (
+              <AccordionItem value="quality" className="border rounded-xl overflow-hidden">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                  <span className="flex items-center gap-2 flex-1">
+                    <span className="text-lg">📈</span>
+                    <span>Data Quality</span>
+                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                      {scores.climateScore !== null || scores.waterScore !== null
+                        ? 'Active'
+                        : 'Needs setup'}
+                    </span>
                   </span>
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <DataQualityWidget />
-              </AccordionContent>
-            </AccordionItem>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <DataQualityWidget />
+                </AccordionContent>
+              </AccordionItem>
+            )}
 
-            <AccordionItem value="compliance" className="border rounded-xl overflow-hidden">
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                <span className="flex items-center gap-2 flex-1">
-                  <span className="text-lg">✅</span>
-                  <span>Compliance Status</span>
-                  <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                    View requirements
+            {isWidgetEnabled('compliance-status') && (
+              <AccordionItem value="compliance" className="border rounded-xl overflow-hidden">
+                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+                  <span className="flex items-center gap-2 flex-1">
+                    <span className="text-lg">✅</span>
+                    <span>Compliance Status</span>
+                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
+                      View requirements
+                    </span>
                   </span>
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4">
-                <ComplianceStatusWidget />
-              </AccordionContent>
-            </AccordionItem>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4">
+                  <ComplianceStatusWidget />
+                </AccordionContent>
+              </AccordionItem>
+            )}
           </Accordion>
         </div>
 
         <div className="space-y-6">
-          <QuickActionsWidget />
-          <RecentActivityWidget />
-          <GettingStartedWidget />
+          {isWidgetEnabled('quick-actions') && <QuickActionsWidget />}
+          {isWidgetEnabled('recent-activity') && <RecentActivityWidget />}
+          {isWidgetEnabled('getting-started') && <GettingStartedWidget />}
+          {isWidgetEnabled('supplier-engagement') && <SupplierEngagementWidget />}
+          {isWidgetEnabled('water-risk') && <WaterRiskWidget />}
         </div>
       </div>
     </div>
