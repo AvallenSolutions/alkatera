@@ -35,6 +35,9 @@ import {
   TrendingDown,
   Plus,
   Clock,
+  Factory,
+  Package,
+  ClipboardList,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -482,8 +485,73 @@ export default function DashboardPage() {
         />
       </RAGStatusCardGrid>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+      {/* Getting Started - Full Width when enabled */}
+      {isWidgetEnabled('getting-started') && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="md:col-span-1">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/20">
+                  <Factory className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">Step 1</p>
+                  <h3 className="text-sm font-semibold">Define Operations</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Add your facilities and utility meters</p>
+                  <Button asChild size="sm" className="mt-2 h-8 bg-neon-lime text-black hover:bg-neon-lime/90">
+                    <Link href="/company/facilities">
+                      Get Started <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="md:col-span-1">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-purple-500/20">
+                  <Package className="h-5 w-5 text-purple-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">Step 2</p>
+                  <h3 className="text-sm font-semibold">Build Products</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Create recipes using supplier data</p>
+                  <Button asChild size="sm" className="mt-2 h-8 bg-neon-lime text-black hover:bg-neon-lime/90">
+                    <Link href="/products">
+                      Get Started <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="md:col-span-1">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-500/20">
+                  <ClipboardList className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-muted-foreground">Step 3</p>
+                  <h3 className="text-sm font-semibold">Log Production</h3>
+                  <p className="text-xs text-muted-foreground mt-1">Track volumes to allocate impact</p>
+                  <Button asChild size="sm" className="mt-2 h-8 bg-neon-lime text-black hover:bg-neon-lime/90">
+                    <Link href="/company/production-allocation">
+                      Get Started <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Main Content Grid - Responsive layout based on enabled widgets */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        {/* Primary Content Area */}
+        <div className="lg:col-span-8 space-y-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center justify-between">
@@ -583,11 +651,11 @@ export default function DashboardPage() {
           </Accordion>
         </div>
 
-        <div className="space-y-6">
+        {/* Secondary Content Area - Sidebar Widgets */}
+        <div className="lg:col-span-4 space-y-6">
           {isWidgetEnabled('quick-actions') && <QuickActionsWidget />}
-          {isWidgetEnabled('recent-activity') && <RecentActivityWidget />}
-          {isWidgetEnabled('getting-started') && <GettingStartedWidget />}
           {isWidgetEnabled('supplier-engagement') && <SupplierEngagementWidget />}
+          {isWidgetEnabled('recent-activity') && <RecentActivityWidget />}
           {isWidgetEnabled('water-risk') && <WaterRiskWidget />}
         </div>
       </div>
