@@ -27,6 +27,95 @@
  * Primary: Database table `staging_emission_factors` (DEFRA 2024)
  * Fallback: Hardcoded defaults when database unavailable
  * See migration: 20260112100000_add_defra_2024_waste_emission_factors.sql
+ *
+ * ============================================================================
+ * CRITICAL: TWO SEPARATE WASTE STREAMS (No Double Counting)
+ * ============================================================================
+ *
+ * This platform tracks TWO DISTINCT waste streams. They are complementary,
+ * NOT overlapping, and should NEVER be added together without context.
+ *
+ * ## 1. OPERATIONAL WASTE (GHG Protocol Scope 3 Category 5)
+ *
+ * Definition: Waste generated during the company's MANUFACTURING OPERATIONS
+ *
+ * Data Sources:
+ * - `corporate_overheads` table (category = 'operational_waste')
+ * - `facility_activity_entries` table (waste data)
+ *
+ * Examples:
+ * - Production scrap and off-cuts
+ * - Packaging waste from incoming materials
+ * - Office waste (paper, food, etc.)
+ * - Quality control rejects
+ * - Cleaning waste and process residues
+ *
+ * Calculation: Scope 3 Cat 5 = Σ(waste_kg × treatment_emission_factor)
+ *
+ * When counted: In CORPORATE emissions inventory for current operations
+ *
+ * ## 2. END-OF-LIFE PRODUCT WASTE (Product Lifecycle)
+ *
+ * Definition: Waste generated when CONSUMERS dispose of the product
+ *             after use (e.g., throwing away a bottle after drinking)
+ *
+ * Data Sources:
+ * - `product_lcas.aggregated_impacts.end_of_life_waste_kg`
+ * - `product_lcas.aggregated_impacts.recyclability_percentage`
+ * - `product_lca_materials` (packaging weights and recyclability)
+ *
+ * Examples:
+ * - Empty glass bottles going to recycling or landfill
+ * - Aluminum cans being recycled
+ * - Plastic packaging in consumer waste stream
+ * - Labels and closures
+ *
+ * Calculation: End-of-Life = Σ(packaging_weight × (1 - recyclability) × disposal_factor)
+ *
+ * When counted: In PRODUCT LCA to assess full lifecycle impacts
+ *
+ * ## WHY THESE ARE NOT THE SAME
+ *
+ * Consider a bottle of wine:
+ *
+ * OPERATIONAL WASTE (during manufacturing):
+ * - 5g of label trim waste (recycled)
+ * - 2g of bottle breakage (glass recycling)
+ * - 10g of cardboard from incoming boxes (recycled)
+ * Total: ~17g per bottle produced
+ *
+ * END-OF-LIFE WASTE (after consumer use):
+ * - 500g glass bottle (70% recycled, 30% landfill)
+ * - 3g aluminum cap (90% recycled)
+ * - 2g label (0% recycled)
+ * Total: ~505g per bottle sold
+ *
+ * These are COMPLETELY DIFFERENT waste streams occurring at
+ * DIFFERENT TIMES and should be tracked SEPARATELY.
+ *
+ * ## CIRCULARITY PERCENTAGE CALCULATION
+ *
+ * Dashboard "Circularity %" uses END-OF-LIFE data (product recyclability)
+ * to show what percentage of product packaging can be recycled.
+ *
+ * Formula: Circularity % = (recyclable_waste_kg / total_eol_waste_kg) × 100
+ *
+ * This does NOT include operational waste, which is separately reported
+ * in the Scope 3 Category 5 breakdown.
+ *
+ * ## AVOIDING DOUBLE COUNTING
+ *
+ * ❌ WRONG: Adding operational_waste + end_of_life_waste as "total waste"
+ * ✅ CORRECT: Report them separately with clear labels
+ *
+ * ❌ WRONG: Using operational_waste to calculate product circularity
+ * ✅ CORRECT: Use end_of_life_waste_kg and recyclability_percentage
+ *
+ * ❌ WRONG: Including product packaging disposal in Scope 3 Cat 5
+ * ✅ CORRECT: Scope 3 Cat 5 = operational waste only; product EoL is
+ *            tracked in LCA lifecycle stage "End of Life"
+ *
+ * ============================================================================
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
