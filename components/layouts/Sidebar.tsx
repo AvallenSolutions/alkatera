@@ -499,16 +499,15 @@ export function Sidebar({ className }: SidebarProps) {
         className
       )}
     >
-      <div className="mb-6 px-3">
-        <div className="flex items-center gap-2 mb-1">
-          <div className="h-8 w-8 rounded-lg bg-neon-lime flex items-center justify-center">
-            <span className="text-black font-bold text-sm">A</span>
-          </div>
-          <h2 className="text-lg font-heading font-bold tracking-tight">
-            AlkaTera
-          </h2>
+      <div className="mb-6 px-2">
+        <div className="flex items-center mb-1">
+          <img
+            src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
+            alt="AlkaTera"
+            className="h-10 w-auto object-contain"
+          />
         </div>
-        <p className="text-xs text-muted-foreground">Carbon Management</p>
+        <p className="text-xs text-muted-foreground">Sustainability, Distilled</p>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto">

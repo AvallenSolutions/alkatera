@@ -1,4 +1,4 @@
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Factory, Package, ClipboardList, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
@@ -14,65 +14,57 @@ interface ActionCardProps {
 
 function ActionCard({ step, title, description, icon, href, disabled }: ActionCardProps) {
   return (
-    <Card className={disabled ? 'opacity-60' : ''}>
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
-                {icon}
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-muted-foreground">{step}</p>
-                <h3 className="text-lg font-semibold">{title}</h3>
-              </div>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">{description}</p>
-          <Button asChild className="w-full" disabled={disabled}>
-            <Link href={href}>
-              {disabled ? 'Coming Soon' : 'Get Started'}
-              {!disabled && <ArrowRight className="ml-2 h-4 w-4" />}
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div className={`flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 ${disabled ? 'opacity-60' : ''}`}>
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-slate-200 dark:bg-slate-700">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0 space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">{step}</p>
+        <h3 className="text-sm font-semibold truncate">{title}</h3>
+        <p className="text-xs text-muted-foreground line-clamp-2">{description}</p>
+        <Button asChild size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={disabled}>
+          <Link href={href}>
+            {disabled ? 'Coming Soon' : 'Get Started'}
+            {!disabled && <ArrowRight className="ml-1 h-3 w-3" />}
+          </Link>
+        </Button>
+      </div>
+    </div>
   )
 }
 
 export function GettingStartedWidget() {
   return (
-    <div className="col-span-full">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold">Getting Started</h2>
-        <p className="text-sm text-muted-foreground">
-          Follow these steps to set up your carbon management system
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base">Getting Started</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Set up your sustainability management
         </p>
-      </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      </CardHeader>
+      <CardContent className="space-y-3">
         <ActionCard
           step="Step 1"
           title="Define Operations"
           description="Add your facilities and utility meters"
-          icon={<Factory className="h-6 w-6 text-slate-700 dark:text-slate-300" />}
-          href="/operations"
+          icon={<Factory className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
+          href="/company/facilities"
         />
         <ActionCard
           step="Step 2"
           title="Build Products"
           description="Create recipes using supplier data"
-          icon={<Package className="h-6 w-6 text-slate-700 dark:text-slate-300" />}
+          icon={<Package className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
           href="/products"
         />
         <ActionCard
           step="Step 3"
           title="Log Production"
           description="Track volumes to allocate impact"
-          icon={<ClipboardList className="h-6 w-6 text-slate-700 dark:text-slate-300" />}
-          href="/production"
+          icon={<ClipboardList className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
+          href="/company/production-allocation"
         />
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
