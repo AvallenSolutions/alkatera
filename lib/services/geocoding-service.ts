@@ -42,10 +42,6 @@ const CACHE_KEY = 'geocoding_cache';
 const RECENT_SEARCHES_KEY = 'recent_location_searches';
 const MAX_RECENT = 10;
 
-// Rate limiting
-let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
-
 // Memory cache for current session
 const memoryCache = new Map<string, Location[]>();
 
@@ -282,24 +278,7 @@ function setCachedResults(query: string, results: Location[]): void {
 }
 
 /**
- * Rate limit requests to respect Nominatim usage policy (1 req/sec)
- */
-async function rateLimitedFetch(url: string): Promise<Response> {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    await new Promise(resolve =>
-      setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-    );
-  }
-
-  lastRequestTime = Date.now();
-  return fetch(url);
-}
-
-/**
- * Search for locations using Nominatim API
+ * Search for locations using our API route (which proxies to Nominatim)
  */
 export async function searchLocations(query: string): Promise<Location[]> {
   if (!query || query.trim().length < 2) {
@@ -323,17 +302,15 @@ export async function searchLocations(query: string): Promise<Location[]> {
   }
 
   try {
-    // Search Nominatim with larger limit to filter later
-    const url = new URL('https://nominatim.openstreetmap.org/search');
+    // Use our API route instead of direct Nominatim calls
+    const url = new URL('/api/geocode/search', window.location.origin);
     url.searchParams.set('q', trimmedQuery);
-    url.searchParams.set('format', 'json');
-    url.searchParams.set('limit', '50'); // Increased to filter intelligently
-    url.searchParams.set('addressdetails', '1');
 
-    const response = await rateLimitedFetch(url.toString());
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
-      throw new Error(`Nominatim API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API error: ${response.status}`);
     }
 
     const data = (await response.json()) as NominatimResult[];
