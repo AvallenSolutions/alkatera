@@ -108,6 +108,10 @@ export interface FacilityWaterRisk {
   operational_net_consumption_m3: number;
   product_lca_water_m3: number;
   scarcity_weighted_consumption_m3: number;
+  // Origin-weighted embedded water (weighted by material origin country AWARE factor)
+  embedded_water_scarcity_weighted_m3: number;
+  // Total scarcity-weighted (operational + embedded, both weighted by appropriate AWARE factors)
+  total_scarcity_weighted_m3: number;
   production_volume: number;
   products_linked: string[];
   has_operational_data: boolean;
@@ -249,18 +253,58 @@ export function useCompanyMetrics() {
       const lcas = Array.from(latestByProduct.values());
 
       // Fetch production volumes for all products
+      // IMPORTANT: units_produced is normalized to consumer units (e.g., bottles)
+      // This was calculated from bulk volume (hectolitres/litres) ÷ product unit size
       const productIds = lcas.map(lca => lca.product_id).filter(id => id);
       const { data: productionData } = await supabase
         .from('production_logs')
-        .select('product_id, units_produced')
+        .select('product_id, units_produced, volume, unit')
         .in('product_id', productIds);
 
-      // Build production volume map
-      const productionMap = new Map();
+      // =========================================================================
+      // CRITICAL FIX: Unit normalization validation
+      // Ensure production logs have proper units_produced calculated
+      // =========================================================================
+      const productionMap = new Map<number, number>();
+      const unitWarnings: string[] = [];
+
       productionData?.forEach(prod => {
+        const unitsProduced = Number(prod.units_produced || 0);
+        const rawVolume = Number(prod.volume || 0);
+
+        // Validate units_produced is populated
+        if (unitsProduced <= 0 && rawVolume > 0) {
+          // Production log has raw volume but no normalized units
+          // This could cause incorrect calculations
+          unitWarnings.push(
+            `Product ${prod.product_id}: Production log has volume ${rawVolume} ${prod.unit} but units_produced is not calculated. ` +
+            `This may indicate missing product unit_size data.`
+          );
+          // Skip this entry to avoid using raw volume as units
+          return;
+        }
+
+        // Sanity check: units_produced should be reasonable relative to volume
+        // For beverages, typical conversion: 100 litres = ~130-200 bottles
+        if (prod.unit?.toLowerCase().includes('hectolitre') || prod.unit?.toLowerCase() === 'hl') {
+          const expectedUnitsMin = rawVolume * 100 / 1.5; // 1.5L max bottle
+          const expectedUnitsMax = rawVolume * 100 / 0.2; // 200ml min bottle
+          if (unitsProduced < expectedUnitsMin || unitsProduced > expectedUnitsMax) {
+            unitWarnings.push(
+              `Product ${prod.product_id}: Units produced (${unitsProduced}) seems inconsistent with volume (${rawVolume} hl). ` +
+              `Expected range: ${Math.round(expectedUnitsMin)} - ${Math.round(expectedUnitsMax)}`
+            );
+          }
+        }
+
         const current = productionMap.get(prod.product_id) || 0;
-        productionMap.set(prod.product_id, current + Number(prod.units_produced || 0));
+        productionMap.set(prod.product_id, current + unitsProduced);
       });
+
+      // Log warnings for visibility
+      if (unitWarnings.length > 0) {
+        console.warn('[useCompanyMetrics] Unit normalization warnings:', unitWarnings);
+      }
 
       // Attach production volume to each LCA
       lcas.forEach(lca => {

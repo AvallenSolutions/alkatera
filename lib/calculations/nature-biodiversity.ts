@@ -188,9 +188,32 @@ export const LAND_INTENSITY_THRESHOLDS = {
  * EU Environmental Footprint 3.1 normalisation factors
  * Used to convert absolute impacts to person-equivalents
  *
- * Source: JRC Technical Report "Development of the EU Environmental
- * Footprint (EF) 3.1 normalisation and weighting factors"
- * Baseline: EU-27+UK 2010
+ * ## Source
+ * JRC Technical Report: "Development of the EU Environmental Footprint (EF) 3.1
+ * normalisation and weighting factors" (Sala et al., 2021)
+ * DOI: https://doi.org/10.2760/14875
+ *
+ * ## Baseline
+ * EU-27+UK 2010 per-capita environmental impacts
+ *
+ * ## Usage
+ * Normalisation converts absolute impact values (in physical units) to
+ * "person-equivalents" - how many average EU citizens' annual impact
+ * the value represents.
+ *
+ * Example:
+ *   Land use of 8,190 m²a ÷ 819,000 = 0.01 person-equivalents
+ *   This means the product's land use equals 1% of an average EU citizen's
+ *   annual land footprint.
+ *
+ * ## When to Apply Normalisation
+ * - ALWAYS apply when comparing different impact categories (apples to apples)
+ * - ALWAYS apply when calculating a single score
+ * - OPTIONAL for single-category analysis (absolute values may be more intuitive)
+ *
+ * ## Full Implementation
+ * For complete EF 3.1 calculations (all 16 categories), see:
+ * supabase/functions/_shared/ef31-calculator.ts
  */
 export const EF31_NORMALISATION_FACTORS = {
   LAND_USE: 819000, // m²a crop eq / person / year
@@ -202,6 +225,24 @@ export const EF31_NORMALISATION_FACTORS = {
 /**
  * EU Environmental Footprint 3.1 weighting factors
  * Contribution to single environmental score
+ *
+ * ## Source
+ * Same as normalisation factors (Sala et al., 2021)
+ *
+ * ## Usage
+ * After normalisation, weighting is applied to reflect the relative
+ * importance of each impact category based on policy priorities.
+ *
+ * Single Score = Σ(normalised_impact × weighting_factor)
+ *
+ * ## Important Notes
+ * - These nature categories represent ~19% of the total EF 3.1 single score
+ * - Climate change (missing here) represents ~21% of total score
+ * - For full single score, include all 16 EF 3.1 categories
+ *
+ * ## Sum of Nature Category Weights
+ * Land Use + Ecotoxicity + Eutrophication + Acidification =
+ * 7.94% + 1.87% + 2.80% + 6.21% = 18.82%
  */
 export const EF31_WEIGHTING_FACTORS = {
   LAND_USE: 0.0794, // 7.94% of total score
@@ -339,6 +380,93 @@ export function weightImpact(
 ): number {
   const weight = getWeightingFactor(category);
   return normalisedValue * weight;
+}
+
+/**
+ * Creates a complete NatureImpactResult with normalization and weighting
+ *
+ * This is the recommended way to generate results for display, as it
+ * includes all optional fields (normalised, weighted) properly populated.
+ *
+ * @param category - The nature impact category
+ * @param value - The absolute impact value in physical units
+ * @param includeNormalisation - Whether to include EF 3.1 normalisation (default: true)
+ *
+ * @example
+ * const result = createNatureImpactResult('land_use', 1500);
+ * // Returns:
+ * // {
+ * //   category: 'land_use',
+ * //   value: 1500,
+ * //   unit: 'm²a crop eq',
+ * //   performanceLevel: 'good',
+ * //   benchmarkExcellent: 500,
+ * //   benchmarkGood: 2000,
+ * //   normalised: 0.00183, // person-equivalents
+ * //   weighted: 0.000145  // contribution to single score
+ * // }
+ */
+export function createNatureImpactResult(
+  category: NatureImpactCategory,
+  value: number,
+  includeNormalisation: boolean = true
+): NatureImpactResult {
+  const thresholds = getThresholdsForCategory(category);
+  const categoryInfo = RECIPE_2016_CATEGORIES[category.toUpperCase() as keyof typeof RECIPE_2016_CATEGORIES];
+
+  const result: NatureImpactResult = {
+    category,
+    value,
+    unit: categoryInfo?.unit || '',
+    performanceLevel: getPerformanceLevel(category, value),
+    benchmarkExcellent: thresholds.excellent,
+    benchmarkGood: thresholds.good,
+  };
+
+  if (includeNormalisation) {
+    result.normalised = normaliseImpact(category, value);
+    result.weighted = weightImpact(category, result.normalised);
+  }
+
+  return result;
+}
+
+/**
+ * Calculates total weighted single score for all nature categories
+ *
+ * This is useful for comparing overall nature impact between products.
+ * Note: This only includes the 4 nature categories (~19% of full EF 3.1 score).
+ *
+ * @param metrics - Object with values for all nature categories
+ * @returns Total weighted score (sum of weighted normalized impacts)
+ */
+export function calculateNatureSingleScore(metrics: NatureImpactMetrics): {
+  total: number;
+  breakdown: Record<NatureImpactCategory, { normalised: number; weighted: number }>;
+} {
+  const categories: NatureImpactCategory[] = [
+    'land_use',
+    'terrestrial_ecotoxicity',
+    'freshwater_eutrophication',
+    'terrestrial_acidification',
+  ];
+
+  const breakdown: Record<string, { normalised: number; weighted: number }> = {};
+  let total = 0;
+
+  categories.forEach((cat) => {
+    const value = metrics[cat] || 0;
+    const normalised = normaliseImpact(cat, value);
+    const weighted = weightImpact(cat, normalised);
+
+    breakdown[cat] = { normalised, weighted };
+    total += weighted;
+  });
+
+  return {
+    total,
+    breakdown: breakdown as Record<NatureImpactCategory, { normalised: number; weighted: number }>,
+  };
 }
 
 function getNormalisationFactor(category: NatureImpactCategory): number {

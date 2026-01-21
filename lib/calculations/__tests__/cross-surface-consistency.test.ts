@@ -33,22 +33,13 @@ const createRealisticMock = () => {
         filters[key] = value;
         return builder;
       }),
+      in: vi.fn().mockImplementation(() => builder),
+      not: vi.fn().mockImplementation(() => builder),
       gte: vi.fn().mockImplementation(() => builder),
       lte: vi.fn().mockImplementation(() => builder),
       order: vi.fn().mockImplementation(() => builder),
       limit: vi.fn().mockImplementation(() => builder),
       maybeSingle: vi.fn().mockImplementation(async () => {
-        // Emissions factors lookup
-        if (tableName === 'emissions_factors') {
-          if (filters.factor_id === 'natural-gas') {
-            return { data: { value: '2.02' }, error: null }; // kgCO2e per m3
-          }
-          if (filters.factor_id === 'electricity-uk') {
-            return { data: { value: '0.233' }, error: null }; // kgCO2e per kWh
-          }
-          return { data: { value: '1.0' }, error: null };
-        }
-
         // Product LCA lookup
         if (tableName === 'product_lcas') {
           if (filters.product_id === 'calvados-001') {
@@ -91,25 +82,34 @@ const createRealisticMock = () => {
     builder.then = (resolve: Function) => {
       let response = { data: [], error: null };
 
-      // Facility activity data (Scope 1 & 2)
-      if (tableName === 'facility_activity_data') {
+      // Facilities list (new schema)
+      if (tableName === 'facilities') {
+        response = {
+          data: [{ id: 'facility-main', name: 'Main Production Facility' }],
+          error: null,
+        };
+      }
+
+      // Utility data entries (new schema - replaces facility_activity_data)
+      // Uses built-in UTILITY_EMISSION_FACTORS:
+      // - natural_gas: 0.18293 kgCO2e/kWh (Scope 1)
+      // - electricity_grid: 0.207 kgCO2e/kWh (Scope 2)
+      if (tableName === 'utility_data_entries') {
         response = {
           data: [
             // Scope 1: Natural gas heating
             {
-              quantity: 5000, // 5000 m3
-              scope_1_2_emission_sources: {
-                scope: 'Scope 1',
-                emission_factor_id: 'natural-gas',
-              },
+              quantity: 5000, // 5000 kWh
+              unit: 'kWh',
+              utility_type: 'natural_gas',
+              facility_id: 'facility-main',
             },
             // Scope 2: Purchased electricity
             {
               quantity: 50000, // 50000 kWh
-              scope_1_2_emission_sources: {
-                scope: 'Scope 2',
-                emission_factor_id: 'electricity-uk',
-              },
+              unit: 'kWh',
+              utility_type: 'electricity_grid',
+              facility_id: 'facility-main',
             },
           ],
           error: null,
@@ -201,9 +201,11 @@ describe('Cross-Surface Consistency', () => {
     // Both should produce identical values
     expect(scope1Direct).toBe(fullResult.breakdown.scope1);
 
-    // Expected: 5000 * 2.02 (natural gas) + 12.5 * 1000 (fleet)
-    // = 10100 + 12500 = 22600 kgCO2e
-    expect(scope1Direct).toBe(22600);
+    // Expected with new built-in UTILITY_EMISSION_FACTORS:
+    // natural_gas: 5000 kWh * 0.18293 = 914.65 kgCO2e
+    // fleet: 12.5 tCO2e * 1000 = 12500 kgCO2e
+    // Total: 914.65 + 12500 = 13414.65 kgCO2e
+    expect(scope1Direct).toBeCloseTo(13414.65, 0);
   });
 
   it('should produce identical Scope 2 values across all calculations', async () => {
@@ -227,9 +229,11 @@ describe('Cross-Surface Consistency', () => {
     // Both should produce identical values
     expect(scope2Direct).toBe(fullResult.breakdown.scope2);
 
-    // Expected: 50000 * 0.233 (electricity) + 2.0 * 1000 (fleet EVs)
-    // = 11650 + 2000 = 13650 kgCO2e
-    expect(scope2Direct).toBe(13650);
+    // Expected with new built-in UTILITY_EMISSION_FACTORS:
+    // electricity_grid: 50000 kWh * 0.207 = 10350 kgCO2e
+    // fleet EVs: 2.0 tCO2e * 1000 = 2000 kgCO2e
+    // Total: 10350 + 2000 = 12350 kgCO2e
+    expect(scope2Direct).toBeCloseTo(12350, 0);
   });
 
   it('should produce identical Scope 3 values across all calculations', async () => {
@@ -355,7 +359,7 @@ describe('Cross-Surface Consistency', () => {
 
     expect(result.breakdown.total).toBe(expectedTotal);
 
-    // Verify scope3.total is sum of all categories
+    // Verify scope3.total is sum of all categories (including new Categories 4, 9, 11)
     const scope3 = result.breakdown.scope3;
     const expectedScope3Total =
       scope3.products +
@@ -365,7 +369,10 @@ describe('Cross-Surface Consistency', () => {
       scope3.capital_goods +
       scope3.operational_waste +
       scope3.downstream_logistics +
-      scope3.marketing_materials;
+      scope3.marketing_materials +
+      scope3.upstream_transport +    // Category 4 (new)
+      scope3.downstream_transport +  // Category 9 (new)
+      scope3.use_phase;              // Category 11 (new)
 
     expect(scope3.total).toBe(expectedScope3Total);
   });

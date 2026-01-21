@@ -187,6 +187,67 @@ Deno.serve(async (req: Request) => {
     console.log(`[calculate-product-lca-impacts] Found ${ownedSites?.length || 0} owned production sites`);
     console.log(`[calculate-product-lca-impacts] Found ${contractMfgAllocations?.length || 0} contract manufacturer sites`);
 
+    // =========================================================================
+    // CRITICAL FIX: Validate production allocation sums to 100%
+    // This prevents double-counting or under-counting of facility emissions
+    // =========================================================================
+    if (productionSites.length > 0) {
+      let totalAllocationPercentage = 0;
+      const allocationDetails: { facilityId: string; source: string; share: number }[] = [];
+
+      for (const site of productionSites) {
+        const shareRaw = Number((site as any).share_of_production || 0);
+        const attributionRatio = Number((site as any).attribution_ratio || 0);
+        // Convert to percentage (0-100 scale)
+        let sharePercent = 0;
+        if (shareRaw > 0) {
+          // share_of_production is stored as percentage (e.g., 50 for 50%)
+          sharePercent = shareRaw;
+        } else if (attributionRatio > 0) {
+          // attribution_ratio is stored as decimal (e.g., 0.5 for 50%)
+          sharePercent = attributionRatio * 100;
+        } else {
+          // Single-facility products default to 100%
+          sharePercent = productionSites.length === 1 ? 100 : 0;
+        }
+        totalAllocationPercentage += sharePercent;
+        allocationDetails.push({
+          facilityId: (site as any).facility_id || 'unknown',
+          source: (site as any).source || 'unknown',
+          share: sharePercent
+        });
+      }
+
+      // Log allocation breakdown
+      console.log(`[calculate-product-lca-impacts] Production allocation breakdown:`);
+      allocationDetails.forEach(d => {
+        console.log(`  - Facility ${d.facilityId} (${d.source}): ${d.share.toFixed(1)}%`);
+      });
+      console.log(`  TOTAL: ${totalAllocationPercentage.toFixed(1)}%`);
+
+      // Validate allocation sum
+      const ALLOCATION_TOLERANCE = 1; // Allow 1% tolerance for rounding
+      if (totalAllocationPercentage < (100 - ALLOCATION_TOLERANCE)) {
+        console.warn(`[calculate-product-lca-impacts] ⚠️ UNDER-ALLOCATION WARNING: Production shares sum to ${totalAllocationPercentage.toFixed(1)}% (expected ~100%). This may result in UNDERESTIMATED emissions.`);
+      } else if (totalAllocationPercentage > (100 + ALLOCATION_TOLERANCE)) {
+        console.error(`[calculate-product-lca-impacts] 🚨 OVER-ALLOCATION ERROR: Production shares sum to ${totalAllocationPercentage.toFixed(1)}% (expected ~100%). This will result in DOUBLE-COUNTED emissions!`);
+        // Store the validation error in the LCA record for visibility
+        await supabaseClient
+          .from("product_lcas")
+          .update({
+            validation_warnings: JSON.stringify([{
+              type: 'over_allocation',
+              message: `Production shares sum to ${totalAllocationPercentage.toFixed(1)}% instead of 100%`,
+              facilities: allocationDetails,
+              timestamp: new Date().toISOString()
+            }])
+          })
+          .eq("id", product_lca_id);
+      } else {
+        console.log(`[calculate-product-lca-impacts] ✓ Allocation validation passed: ${totalAllocationPercentage.toFixed(1)}%`);
+      }
+    }
+
     if (contractMfgSites.length > 0) {
       contractMfgSites.forEach(site => {
         console.log(`[calculate-product-lca-impacts] CM Site: Total ${site._total_allocated_emissions?.toFixed(2)} kg for ${site._production_volume} units = ${site.allocated_emissions_kg_co2e.toFixed(6)} kg per unit`);
