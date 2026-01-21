@@ -79,7 +79,7 @@ function DashboardSkeleton() {
   );
 }
 
-function EmptyDashboard() {
+function EmptyDashboard({ onRefetch }: { onRefetch: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
       <div className="h-16 w-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
@@ -89,7 +89,7 @@ function EmptyDashboard() {
       <p className="text-sm text-muted-foreground mb-4 max-w-md">
         You have hidden all dashboard widgets. Click customise to enable the widgets you want to see.
       </p>
-      <DashboardCustomiseModal>
+      <DashboardCustomiseModal onPreferencesChanged={onRefetch}>
         <Button>
           <Settings2 className="h-4 w-4 mr-2" />
           Customise Dashboard
@@ -317,7 +317,7 @@ export default function DashboardPage() {
   if (enabledWidgets.length === 0) {
     return (
       <div className="p-6">
-        <EmptyDashboard />
+        <EmptyDashboard onRefetch={refetch} />
       </div>
     );
   }
@@ -367,7 +367,7 @@ export default function DashboardPage() {
           <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh dashboard">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <DashboardCustomiseModal />
+          <DashboardCustomiseModal onPreferencesChanged={refetch} />
         </div>
       </div>
 

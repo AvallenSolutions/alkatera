@@ -58,10 +58,12 @@ const categoryLabels: Record<string, string> = {
 
 interface DashboardCustomiseModalProps {
   children?: React.ReactNode;
+  onPreferencesChanged?: () => void;
 }
 
-export function DashboardCustomiseModal({ children }: DashboardCustomiseModalProps) {
+export function DashboardCustomiseModal({ children, onPreferencesChanged }: DashboardCustomiseModalProps) {
   const [open, setOpen] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const {
     widgets,
     preferences,
@@ -69,6 +71,14 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
     resetToDefaults,
     loading,
   } = useDashboardPreferences();
+
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen && hasChanges && onPreferencesChanged) {
+      onPreferencesChanged();
+      setHasChanges(false);
+    }
+  };
 
   const groupedWidgets = widgets.reduce((acc, widget) => {
     const category = widget.category || 'general';
@@ -85,6 +95,7 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
   const handleToggle = async (widgetId: string) => {
     try {
       await toggleWidget(widgetId);
+      setHasChanges(true);
     } catch (err) {
       console.error('Failed to toggle widget:', err);
     }
@@ -93,6 +104,7 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
   const handleReset = async () => {
     try {
       await resetToDefaults();
+      setHasChanges(true);
     } catch (err) {
       console.error('Failed to reset preferences:', err);
     }
@@ -104,7 +116,7 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         {children || (
           <Button variant="outline" size="sm" className="gap-2">
@@ -222,7 +234,7 @@ export function DashboardCustomiseModal({ children }: DashboardCustomiseModalPro
             <RotateCcw className="h-4 w-4 mr-2" />
             Reset to Defaults
           </Button>
-          <Button onClick={() => setOpen(false)}>Done</Button>
+          <Button onClick={() => handleOpenChange(false)}>Done</Button>
         </div>
       </DialogContent>
     </Dialog>
