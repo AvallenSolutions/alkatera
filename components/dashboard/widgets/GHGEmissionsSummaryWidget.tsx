@@ -2,7 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Cloud, Info, AlertCircle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
+import { useMemo } from "react"
+import type { ScopeBreakdown } from '@/lib/calculations/corporate-emissions';
 
 const scopeColors: Record<number, string> = {
   1: 'bg-red-500',
@@ -38,15 +39,41 @@ function ScopeSkeleton() {
   )
 }
 
-export function GHGEmissionsSummaryWidget() {
-  const currentYear = new Date().getFullYear();
-  const { footprint, previewMode, loading: isLoading, error } = useCompanyFootprint(currentYear);
+interface CompanyFootprint {
+  year: number;
+  total_emissions: number;
+  breakdown: ScopeBreakdown | null;
+  status: 'Draft' | 'Finalized';
+  last_updated: string | null;
+  has_data: boolean;
+}
+
+interface GHGEmissionsSummaryWidgetProps {
+  footprint?: CompanyFootprint | null;
+  isLoading?: boolean;
+  error?: string | null;
+}
+
+export function GHGEmissionsSummaryWidget({
+  footprint,
+  isLoading = false,
+  error = null
+}: GHGEmissionsSummaryWidgetProps = {}) {
 
   const formatEmissions = (value: number) => {
     return `${value.toLocaleString('en-GB', { maximumFractionDigits: 1 })} tCO₂e`
   }
 
-  const getScopeData = () => {
+  const scopeData = useMemo(() => {
+    console.log('🔍 [GHG Widget] Received footprint:', {
+      has_footprint: !!footprint,
+      has_breakdown: !!footprint?.breakdown,
+      total_emissions: footprint?.total_emissions,
+      scope1: footprint?.breakdown?.scope1,
+      scope2: footprint?.breakdown?.scope2,
+      scope3_total: footprint?.breakdown?.scope3?.total,
+    });
+
     if (!footprint?.breakdown) {
       return {
         scopeTotals: { 1: 0, 2: 0, 3: 0 },
@@ -56,22 +83,29 @@ export function GHGEmissionsSummaryWidget() {
     }
 
     const scopeTotals = {
-      1: footprint.breakdown.scope1 / 1000,
-      2: footprint.breakdown.scope2 / 1000,
-      3: footprint.breakdown.scope3.total / 1000,
+      1: (footprint.breakdown.scope1 || 0) / 1000,
+      2: (footprint.breakdown.scope2 || 0) / 1000,
+      3: (footprint.breakdown.scope3?.total || 0) / 1000,
     };
 
     const totalEmissions = footprint.total_emissions / 1000;
     const reportingPeriod = footprint.year.toString();
+
+    console.log('📊 [GHG Widget] Calculated values (tonnes):', {
+      scope1_t: scopeTotals[1],
+      scope2_t: scopeTotals[2],
+      scope3_t: scopeTotals[3],
+      total_t: totalEmissions,
+    });
 
     return {
       scopeTotals,
       totalEmissions,
       reportingPeriod,
     };
-  };
+  }, [footprint]);
 
-  const { scopeTotals, totalEmissions, reportingPeriod } = getScopeData();
+  const { scopeTotals, totalEmissions, reportingPeriod } = scopeData;
 
   const getScopePercentage = (scopeTotal: number) => {
     if (totalEmissions === 0) return 0
