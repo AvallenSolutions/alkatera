@@ -68,7 +68,7 @@ interface OrganizationData {
 
 export default function CompanyOverviewPage() {
   const router = useRouter();
-  const { currentOrganization, refreshOrganization } = useOrganization();
+  const { currentOrganization, refreshOrganizations } = useOrganization();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -176,8 +176,8 @@ export default function CompanyOverviewPage() {
       toast.success("Organisation details updated successfully");
 
       // Refresh the organization context
-      if (refreshOrganization) {
-        await refreshOrganization();
+      if (refreshOrganizations) {
+        await refreshOrganizations();
       }
     } catch (error) {
       console.error("Error updating organization:", error);
