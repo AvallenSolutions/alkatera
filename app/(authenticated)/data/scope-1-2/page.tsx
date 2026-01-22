@@ -54,6 +54,10 @@ import { LogisticsDistributionCard } from '@/components/reports/LogisticsDistrib
 import { OperationalWasteCard } from '@/components/reports/OperationalWasteCard';
 import { MarketingMaterialsCard } from '@/components/reports/MarketingMaterialsCard';
 import { SpendImportCard } from '@/components/reports/SpendImportCard';
+// New GHG Protocol Scope 3 category cards
+import { UpstreamTransportCard } from '@/components/reports/UpstreamTransportCard';
+import { DownstreamTransportCard } from '@/components/reports/DownstreamTransportCard';
+import { UsePhaseCard } from '@/components/reports/UsePhaseCard';
 import Link from 'next/link';
 
 // Emission factors for auto-calculation from facility utility data
@@ -761,6 +765,10 @@ export default function CompanyEmissionsPage() {
   const capitalGoodsEntries = overheads.filter((o) => o.category === 'capital_goods') as any[];
   const logisticsEntries = overheads.filter((o) => o.category === 'downstream_logistics') as any[];
   const wasteEntries = overheads.filter((o) => o.category === 'operational_waste') as any[];
+  // New GHG Protocol categories
+  const upstreamTransportEntries = overheads.filter((o) => o.category === 'upstream_transport') as any[];
+  const downstreamTransportEntries = overheads.filter((o) => o.category === 'downstream_transport') as any[];
+  const usePhaseEntries = overheads.filter((o) => o.category === 'use_phase') as any[];
 
   // Calculate total Scope 3 overhead emissions (in kg) from all categories
   const scope3OverheadCategories = [
@@ -770,6 +778,10 @@ export default function CompanyEmissionsPage() {
     'capital_goods',
     'operational_waste',
     'downstream_logistics',
+    // New GHG Protocol categories
+    'upstream_transport',
+    'downstream_transport',
+    'use_phase',
   ];
   const calculatedScope3OverheadsCO2e = overheads
     .filter((o) => scope3OverheadCategories.includes(o.category))
@@ -1531,6 +1543,37 @@ export default function CompanyEmissionsPage() {
                   entries={wasteEntries}
                   onUpdate={fetchReportData}
                 />
+
+                {/* New GHG Protocol Scope 3 category cards */}
+                {currentOrganization && (
+                  <UpstreamTransportCard
+                    reportId={report.id}
+                    organizationId={currentOrganization.id}
+                    year={selectedYear}
+                    entries={upstreamTransportEntries}
+                    onUpdate={fetchReportData}
+                  />
+                )}
+
+                {currentOrganization && (
+                  <DownstreamTransportCard
+                    reportId={report.id}
+                    organizationId={currentOrganization.id}
+                    year={selectedYear}
+                    entries={downstreamTransportEntries}
+                    onUpdate={fetchReportData}
+                  />
+                )}
+
+                {currentOrganization && (
+                  <UsePhaseCard
+                    reportId={report.id}
+                    organizationId={currentOrganization.id}
+                    year={selectedYear}
+                    entries={usePhaseEntries}
+                    onUpdate={fetchReportData}
+                  />
+                )}
               </div>
             ) : (
               <Alert>
