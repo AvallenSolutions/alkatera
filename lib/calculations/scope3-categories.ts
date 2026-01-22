@@ -167,14 +167,14 @@ export async function calculateScope3Cat4(
       unit,
       transport_mode,
       distance_km,
-      product_lcas!inner(
+      product_carbon_footprints!inner(
         organization_id,
         status,
         created_at
       )
     `)
-    .eq('product_lcas.organization_id', organizationId)
-    .eq('product_lcas.status', 'completed')
+    .eq('product_carbon_footprints.organization_id', organizationId)
+    .eq('product_carbon_footprints.status', 'completed')
     .not('transport_mode', 'is', null)
     .not('distance_km', 'is', null);
 

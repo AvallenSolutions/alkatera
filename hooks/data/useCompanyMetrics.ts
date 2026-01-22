@@ -831,10 +831,10 @@ export function useCompanyMetrics() {
             name,
             lca_stage_id
           ),
-          product_lcas!inner(status, organization_id, product_id)
+          product_carbon_footprints!inner(status, organization_id, product_id)
         `)
-        .eq('product_lcas.organization_id', currentOrganization.id)
-        .eq('product_lcas.status', 'completed')
+        .eq('product_carbon_footprints.organization_id', currentOrganization.id)
+        .eq('product_carbon_footprints.status', 'completed')
         .not('impact_climate', 'is', null);
 
       if (error) {
@@ -1117,10 +1117,10 @@ export function useCompanyMetrics() {
             location_city,
             location_country_code
           ),
-          product_lcas!inner(status, organization_id)
+          product_carbon_footprints!inner(status, organization_id)
         `)
-        .eq('product_lcas.organization_id', currentOrganization.id)
-        .eq('product_lcas.status', 'completed');
+        .eq('product_carbon_footprints.organization_id', currentOrganization.id)
+        .eq('product_carbon_footprints.status', 'completed');
 
       if (error) {
         throw error;

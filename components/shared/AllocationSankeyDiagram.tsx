@@ -54,7 +54,7 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
         .select(`
           facility_id,
           allocated_emissions_kg_co2e,
-          product_lca:product_lcas!inner(
+          product_carbon_footprint:product_carbon_footprints!inner(
             product_id,
             product:products!inner(
               id,

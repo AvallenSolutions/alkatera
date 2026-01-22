@@ -131,15 +131,24 @@ ALTER TABLE IF EXISTS public.product_carbon_footprint_production_sites
 -- Drop old trigger on main table
 DROP TRIGGER IF EXISTS product_lcas_updated_at ON public.product_carbon_footprints;
 
--- Rename the function
-ALTER FUNCTION IF EXISTS update_product_lca_updated_at()
-  RENAME TO update_product_carbon_footprint_updated_at;
+-- Rename the function (only if it exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_product_lca_updated_at') THEN
+    ALTER FUNCTION update_product_lca_updated_at() RENAME TO update_product_carbon_footprint_updated_at;
+  END IF;
+END $$;
 
--- Recreate trigger with new name
-CREATE TRIGGER product_carbon_footprints_updated_at
-  BEFORE UPDATE ON public.product_carbon_footprints
-  FOR EACH ROW
-  EXECUTE FUNCTION update_product_carbon_footprint_updated_at();
+-- Recreate trigger with new name (only if function exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_product_carbon_footprint_updated_at') THEN
+    CREATE TRIGGER product_carbon_footprints_updated_at
+      BEFORE UPDATE ON public.product_carbon_footprints
+      FOR EACH ROW
+      EXECUTE FUNCTION update_product_carbon_footprint_updated_at();
+  END IF;
+END $$;
 
 -- Drop old trigger on materials table
 DROP TRIGGER IF EXISTS update_product_lca_materials_updated_at ON public.product_carbon_footprint_materials;
@@ -160,10 +169,8 @@ CREATE TRIGGER trigger_calculate_pcf_production_site_metrics
   FOR EACH ROW
   EXECUTE FUNCTION calculate_production_site_metrics();
 
-CREATE TRIGGER trigger_recalculate_pcf_production_shares
-  AFTER INSERT OR UPDATE OR DELETE ON public.product_carbon_footprint_production_sites
-  FOR EACH ROW
-  EXECUTE FUNCTION recalculate_all_production_shares();
+-- Note: trigger_recalculate_production_shares was intentionally removed in migration
+-- 20251128162952_fix_production_sites_trigger_infinite_recursion.sql due to infinite recursion issues
 
 -- ============================================================================
 -- STEP 6: Update RLS Policies (Drop and Recreate with New Names)
@@ -463,24 +470,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Update the recalculate_all_production_shares function to use new table name
-CREATE OR REPLACE FUNCTION recalculate_all_production_shares()
-RETURNS TRIGGER AS $$
-DECLARE
-  pcf_id UUID;
-BEGIN
-  -- Determine which PCF was affected
-  IF TG_OP = 'DELETE' THEN
-    pcf_id := OLD.product_carbon_footprint_id;
-  ELSE
-    pcf_id := NEW.product_carbon_footprint_id;
-  END IF;
-
-  -- Recalculate shares for all sites in this PCF
-  UPDATE public.product_carbon_footprint_production_sites
-  SET updated_at = now()
-  WHERE product_carbon_footprint_id = pcf_id;
-
-  RETURN COALESCE(NEW, OLD);
-END;
-$$ LANGUAGE plpgsql;
+-- Note: recalculate_all_production_shares function was intentionally removed
+-- in migration 20251128162952 due to infinite recursion issues
