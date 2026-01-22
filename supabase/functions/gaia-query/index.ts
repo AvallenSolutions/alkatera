@@ -487,7 +487,7 @@ async function handleStreamingResponse(
             signal: streamController.signal,
             body: JSON.stringify({
               systemInstruction: {
-                parts: [{ text: GAIA_SYSTEM_PROMPT }],
+                parts: [{ text: ROSA_SYSTEM_PROMPT }],
               },
               contents: [
                 {
