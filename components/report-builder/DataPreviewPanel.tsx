@@ -173,9 +173,9 @@ export function DataPreviewPanel({ config }: DataPreviewPanelProps) {
         ch4_biogenic_kg_co2e,
         n2o_kg_co2e,
         hfc_pfc_kg_co2e,
-        product_lcas!inner (organization_id)
+        product_carbon_footprints!inner (organization_id)
       `)
-      .eq('product_lcas.organization_id', orgId)
+      .eq('product_carbon_footprints.organization_id', orgId)
       .limit(100);
 
     let ch4Fossil = 0;

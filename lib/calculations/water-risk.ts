@@ -311,7 +311,7 @@ export async function calculateFacilityWaterRisks(
       share_of_production_percent,
       production_volume,
       production_unit,
-      product_lcas!inner(
+      product_carbon_footprints!inner(
         id,
         status,
         organization_id,
@@ -319,8 +319,8 @@ export async function calculateFacilityWaterRisks(
         products(name)
       )
     `)
-    .eq('product_lcas.organization_id', organizationId)
-    .eq('product_lcas.status', 'completed');
+    .eq('product_carbon_footprints.organization_id', organizationId)
+    .eq('product_carbon_footprints.status', 'completed');
 
   if (sitesError) {
     console.error('Error fetching production sites:', sitesError);
@@ -448,15 +448,15 @@ export async function calculateFacilityWaterRisks(
       impact_water,
       origin_country_code,
       product_carbon_footprint_id,
-      product_lcas!inner(
+      product_carbon_footprints!inner(
         id,
         status,
         organization_id,
         product_id
       )
     `)
-    .eq('product_lcas.organization_id', organizationId)
-    .eq('product_lcas.status', 'completed')
+    .eq('product_carbon_footprints.organization_id', organizationId)
+    .eq('product_carbon_footprints.status', 'completed')
     .not('impact_water', 'is', null);
 
   if (materialsError) {
