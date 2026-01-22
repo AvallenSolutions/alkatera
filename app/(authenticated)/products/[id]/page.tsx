@@ -11,7 +11,7 @@ import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info, Calcula
 import { ProductHeader } from "@/components/products/ProductHeader";
 import { OverviewTab } from "@/components/products/OverviewTab";
 import { SpecificationTab } from "@/components/products/SpecificationTab";
-import { ProductionSitesTab } from "@/components/products/ProductionSitesTab";
+import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
 import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
@@ -193,11 +193,11 @@ export default function ProductDashboardPage() {
               Specification
             </TabsTrigger>
             <TabsTrigger
-              value="production-sites"
+              value="facilities"
               className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
             >
               <Factory className="mr-2 h-4 w-4" />
-              Production Sites
+              Facilities
             </TabsTrigger>
             <TabsTrigger
               value="passport"
@@ -233,9 +233,9 @@ export default function ProductDashboardPage() {
             />
           </TabsContent>
 
-          <TabsContent value="production-sites" className="space-y-6">
+          <TabsContent value="facilities" className="space-y-6">
             {currentOrganization && (
-              <ProductionSitesTab
+              <FacilitiesTab
                 productId={parseInt(productId)}
                 organizationId={currentOrganization.id}
               />

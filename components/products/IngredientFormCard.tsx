@@ -381,11 +381,11 @@ export function IngredientFormCard({
                   )}
                   {productionFacilities.length === 0 && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      No production sites configured.{' '}
+                      No facilities linked.{' '}
                       <Link href="/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
                         Add a facility with location
                       </Link>{' '}
-                      and configure production sites to enable automatic distance calculation.
+                      and link facilities to this product to enable automatic distance calculation.
                     </p>
                   )}
                 </div>

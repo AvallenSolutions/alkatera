@@ -197,7 +197,7 @@ export default function ProductRecipePage() {
       }
 
       if (facilitiesToUse.length === 0) {
-        console.warn(`[Production Sites] No production sites configured for product ${productId}. Distance calculations will not be available until you configure production sites in the Production Sites tab.`);
+        console.warn(`[Facilities] No facilities linked for product ${productId}. Distance calculations will not be available until you link facilities in the Facilities tab.`);
       }
 
       setProductionFacilities(facilitiesToUse);
