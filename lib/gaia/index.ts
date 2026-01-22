@@ -17,6 +17,15 @@ import type {
   RosaAdminStats,
   RosaQueryRequest,
   RosaQueryResponse,
+  // Backwards compatibility aliases
+  GaiaConversation,
+  GaiaMessage,
+  GaiaConversationWithMessages,
+  GaiaKnowledgeEntry,
+  GaiaKnowledgeEntryInput,
+  GaiaFeedback,
+  GaiaFeedbackWithMessage,
+  GaiaAdminStats,
 } from '@/lib/types/gaia';
 
 // Re-export types
