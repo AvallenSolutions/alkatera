@@ -65,7 +65,7 @@ import type {
   RosaNavigatePayload,
   RosaUserContext,
 } from '@/lib/types/gaia';
-import { RosaChartRenderer } from './RosaChartRenderer';
+import { RosaChartRenderer } from './GaiaChartRenderer';
 import { cn } from '@/lib/utils';
 
 interface RosaChatProps {
