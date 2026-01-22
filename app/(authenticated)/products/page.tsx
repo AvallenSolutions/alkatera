@@ -108,7 +108,7 @@ export default function ProductsPage() {
   };
 
   const getBoundaryBadge = (boundary: string) => {
-    if (boundary === "cradle_to_grave") {
+    if (boundary === "cradle-to-grave") {
       return (
         <Badge variant="default" className="bg-green-600">
           Cradle-to-Grave

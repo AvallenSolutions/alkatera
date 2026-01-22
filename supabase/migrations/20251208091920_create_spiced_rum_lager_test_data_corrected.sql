@@ -45,7 +45,7 @@ INSERT INTO products (
   id, organization_id, name, sku, is_draft, system_boundary, functional_unit
 ) VALUES (
   1001, '2d86de84-e24e-458b-84b9-fd4057998bda'::UUID,
-  'Test Spiced Rum 700ml', 'TEST-RUM-001', false, 'cradle_to_gate', '1 bottle (700ml)'
+  'Test Spiced Rum 700ml', 'TEST-RUM-001', false, 'cradle-to-gate', '1 bottle (700ml)'
 ) ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name, sku = EXCLUDED.sku, system_boundary = EXCLUDED.system_boundary,
   functional_unit = EXCLUDED.functional_unit, updated_at = now();
@@ -163,7 +163,7 @@ INSERT INTO products (
   id, organization_id, name, sku, is_draft, system_boundary, functional_unit
 ) VALUES (
   1002, '2d86de84-e24e-458b-84b9-fd4057998bda'::UUID,
-  'Test Lager Beer 330ml', 'TEST-LAGER-001', false, 'cradle_to_gate', '1 can (330ml)'
+  'Test Lager Beer 330ml', 'TEST-LAGER-001', false, 'cradle-to-gate', '1 can (330ml)'
 ) ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name, sku = EXCLUDED.sku, system_boundary = EXCLUDED.system_boundary,
   functional_unit = EXCLUDED.functional_unit, updated_at = now();

@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS public.pending_products (
   functional_unit_type public.functional_unit_type_enum,
   functional_unit_volume NUMERIC,
   functional_unit_measure public.functional_unit_measure_enum,
-  system_boundary public.system_boundary_enum DEFAULT 'cradle_to_gate',
+  system_boundary public.system_boundary_enum DEFAULT 'cradle-to-gate',
   product_category TEXT,
   is_draft BOOLEAN DEFAULT false,
   notes TEXT,

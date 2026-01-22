@@ -50,12 +50,12 @@ const UNIT_OPTIONS = [
 
 const SYSTEM_BOUNDARY_OPTIONS = [
   {
-    value: "cradle_to_gate",
+    value: "cradle-to-gate",
     label: "Cradle-to-Gate",
     description: "From raw material extraction to finished product leaving the factory gate"
   },
   {
-    value: "cradle_to_grave",
+    value: "cradle-to-grave",
     label: "Cradle-to-Grave",
     description: "Complete lifecycle from raw material extraction through end-of-life disposal"
   },
@@ -96,7 +96,7 @@ export default function NewProductLCAPage() {
     product_category: "",
     unit_size_value: "",
     unit_size_unit: "",
-    system_boundary: "cradle_to_gate",
+    system_boundary: "cradle-to-gate",
     product_image_url: "",
   });
   const [isSavingDraft, setIsSavingDraft] = useState(false);

@@ -304,7 +304,7 @@ export async function createCompleteMultipack(
       product_description: input.product_description || null,
       product_category: input.product_category || null,
       product_image_url: input.product_image_url || null,
-      system_boundary: input.system_boundary || 'cradle_to_gate',
+      system_boundary: input.system_boundary || 'cradle-to-gate',
       is_multipack: true,
       is_draft: false,
       created_by: user.id,

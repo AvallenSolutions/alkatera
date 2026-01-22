@@ -11,7 +11,7 @@
 
 export type DataSourceType = 'primary_verified' | 'secondary_modelled' | 'hybrid_proxy';
 
-export type SystemBoundaryType = 'cradle_to_gate' | 'cradle_to_grave' | 'gate_to_gate' | 'cradle_to_cradle';
+export type SystemBoundaryType = 'cradle-to-gate' | 'cradle-to-grave' | 'gate-to-gate' | 'cradle-to-cradle';
 
 export type UncertaintyType = 'range' | 'std_dev' | 'coefficient_of_variation' | 'pedigree_matrix';
 
@@ -61,10 +61,10 @@ export const DATA_SOURCE_TYPE_LABELS: Record<DataSourceType, string> = {
 };
 
 export const SYSTEM_BOUNDARY_LABELS: Record<SystemBoundaryType, string> = {
-  cradle_to_gate: 'Cradle-to-Gate',
-  cradle_to_grave: 'Cradle-to-Grave',
-  gate_to_gate: 'Gate-to-Gate',
-  cradle_to_cradle: 'Cradle-to-Cradle',
+  'cradle-to-gate': 'Cradle-to-Gate',
+  'cradle-to-grave': 'Cradle-to-Grave',
+  'gate-to-gate': 'Gate-to-Gate',
+  'cradle-to-cradle': 'Cradle-to-Cradle',
 };
 
 export const METHODOLOGY_STANDARDS = [

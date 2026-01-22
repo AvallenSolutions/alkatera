@@ -95,7 +95,7 @@ BEGIN
     upstream_ingredients_complete, upstream_packaging_complete, core_operations_complete)
   VALUES (v_org_id, 'TEST CALVADOS', 'TEST-CAL-001',
     'An apple brandy from Normandy in France. Made from 8kg of organic apples and water, distilled and bottled at a third-party distillery. Packaged in a 700ml glass bottle with traditional wood and cork stopper.',
-    700, 'ml', '1 x 700ml bottle', 'cradle_to_gate', 'Spirits', false, true, true, true)
+    700, 'ml', '1 x 700ml bottle', 'cradle-to-gate', 'Spirits', false, true, true, true)
   RETURNING id INTO v_calvados_id;
 
   INSERT INTO products (organization_id, name, sku, product_description, unit_size_value, unit_size_unit,
@@ -103,7 +103,7 @@ BEGIN
     upstream_ingredients_complete, upstream_packaging_complete, core_operations_complete, core_operations_facility_id)
   VALUES (v_org_id, 'TEST NON-ALC BEER', 'TEST-NAB-001',
     'A non-alcoholic beer brewed and canned on the same site in Oxford, UK. Made from barley, hops, and water, canned in a 330ml aluminium can with direct printing.',
-    330, 'ml', '1 x 330ml can', 'cradle_to_gate', 'Beer', false, true, true, true, v_brewery_id)
+    330, 'ml', '1 x 330ml can', 'cradle-to-gate', 'Beer', false, true, true, true, v_brewery_id)
   RETURNING id INTO v_beer_id;
 
   INSERT INTO products (organization_id, name, sku, product_description, unit_size_value, unit_size_unit,
@@ -111,7 +111,7 @@ BEGIN
     upstream_ingredients_complete, upstream_packaging_complete, core_operations_complete, core_operations_facility_id)
   VALUES (v_org_id, 'TEST WINE', 'TEST-WIN-001',
     'A red wine made from Pinot Noir grapes in Central Otago, New Zealand. Grapes grown at the vineyard, wine processed on site but bottled at a central bottling plant 100km away. Packaged in a 750ml green glass bottle with paper label, traditional cork, and foil wrapper.',
-    750, 'ml', '1 x 750ml bottle', 'cradle_to_gate', 'Wine', false, true, true, true, v_winery_id)
+    750, 'ml', '1 x 750ml bottle', 'cradle-to-gate', 'Wine', false, true, true, true, v_winery_id)
   RETURNING id INTO v_wine_id;
 
   -- PRODUCT LCAs

@@ -155,7 +155,7 @@ export default function ProductDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
-                {product.system_boundary === "cradle_to_grave" ? (
+                {product.system_boundary === "cradle-to-grave" ? (
                   <>
                     <CheckCircle className="h-6 w-6 text-green-600" />
                     <div>
@@ -178,7 +178,7 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
-              {product.system_boundary === "cradle_to_gate" && (
+              {product.system_boundary === "cradle-to-gate" && (
                 <Alert variant="destructive" className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-amber-900 dark:text-amber-200">
@@ -190,7 +190,7 @@ export default function ProductDetailPage() {
             </CardContent>
           </Card>
 
-          {product.system_boundary === "cradle_to_grave" && (
+          {product.system_boundary === "cradle-to-grave" && (
             <Card>
               <CardHeader>
                 <CardTitle>Lifecycle Stages</CardTitle>
