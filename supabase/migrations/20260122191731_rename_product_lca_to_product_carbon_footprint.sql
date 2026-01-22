@@ -131,15 +131,24 @@ ALTER TABLE IF EXISTS public.product_carbon_footprint_production_sites
 -- Drop old trigger on main table
 DROP TRIGGER IF EXISTS product_lcas_updated_at ON public.product_carbon_footprints;
 
--- Rename the function
-ALTER FUNCTION IF EXISTS update_product_lca_updated_at()
-  RENAME TO update_product_carbon_footprint_updated_at;
+-- Rename the function (only if it exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_product_lca_updated_at') THEN
+    ALTER FUNCTION update_product_lca_updated_at() RENAME TO update_product_carbon_footprint_updated_at;
+  END IF;
+END $$;
 
--- Recreate trigger with new name
-CREATE TRIGGER product_carbon_footprints_updated_at
-  BEFORE UPDATE ON public.product_carbon_footprints
-  FOR EACH ROW
-  EXECUTE FUNCTION update_product_carbon_footprint_updated_at();
+-- Recreate trigger with new name (only if function exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'update_product_carbon_footprint_updated_at') THEN
+    CREATE TRIGGER product_carbon_footprints_updated_at
+      BEFORE UPDATE ON public.product_carbon_footprints
+      FOR EACH ROW
+      EXECUTE FUNCTION update_product_carbon_footprint_updated_at();
+  END IF;
+END $$;
 
 -- Drop old trigger on materials table
 DROP TRIGGER IF EXISTS update_product_lca_materials_updated_at ON public.product_carbon_footprint_materials;
