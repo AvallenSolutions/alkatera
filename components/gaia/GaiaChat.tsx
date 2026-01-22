@@ -42,52 +42,53 @@ import {
   getConversations,
   getConversationWithMessages,
   deleteConversation,
-  sendGaiaQueryStream,
+  sendRosaQueryStream,
   submitFeedback,
   hasSubmittedFeedback,
   exportConversationAsMarkdown,
   exportConversationAsJson,
-  GAIA_SUGGESTED_QUESTIONS,
+  ROSA_SUGGESTED_QUESTIONS,
+  ROSA_PHOTO_URL,
   getContextualFollowUps,
 } from '@/lib/gaia';
 import {
   parseActionsFromResponse,
   getActionHandler,
 } from '@/lib/gaia/action-handlers';
-import type { GaiaStreamEvent } from '@/lib/gaia';
+import type { RosaStreamEvent } from '@/lib/gaia';
 import type {
-  GaiaConversation,
-  GaiaConversationWithMessages,
-  GaiaMessage,
-  GaiaChartData,
-  GaiaAction,
-  GaiaNavigatePayload,
-  GaiaUserContext,
+  RosaConversation,
+  RosaConversationWithMessages,
+  RosaMessage,
+  RosaChartData,
+  RosaAction,
+  RosaNavigatePayload,
+  RosaUserContext,
 } from '@/lib/types/gaia';
-import { GaiaChartRenderer } from './GaiaChartRenderer';
+import { RosaChartRenderer } from './RosaChartRenderer';
 import { cn } from '@/lib/utils';
 
-interface GaiaChatProps {
+interface RosaChatProps {
   fullPage?: boolean;
 }
 
-export function GaiaChat({ fullPage = false }: GaiaChatProps) {
+export function RosaChat({ fullPage = false }: RosaChatProps) {
   const { currentOrganization } = useOrganization();
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [conversations, setConversations] = useState<GaiaConversation[]>([]);
-  const [activeConversation, setActiveConversation] = useState<GaiaConversationWithMessages | null>(null);
+  const [conversations, setConversations] = useState<RosaConversation[]>([]);
+  const [activeConversation, setActiveConversation] = useState<RosaConversationWithMessages | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState('');
-  const [streamingChartData, setStreamingChartData] = useState<GaiaChartData | null>(null);
+  const [streamingChartData, setStreamingChartData] = useState<RosaChartData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, boolean>>({});
-  const [messageActions, setMessageActions] = useState<Record<string, GaiaAction[]>>({});
+  const [messageActions, setMessageActions] = useState<Record<string, RosaAction[]>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -99,7 +100,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
   }, [router]);
 
   // Build user context for contextual suggestions
-  const userContext: GaiaUserContext = useMemo(() => ({
+  const userContext: RosaUserContext = useMemo(() => ({
     currentRoute: pathname || undefined,
     currentPage: pathname?.split('/').pop() || undefined,
   }), [pathname]);
@@ -139,7 +140,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
       // Check feedback status and parse actions for all assistant messages
       if (conv?.messages) {
         const feedbackStatus: Record<string, boolean> = {};
-        const newMessageActions: Record<string, GaiaAction[]> = {};
+        const newMessageActions: Record<string, RosaAction[]> = {};
 
         for (const msg of conv.messages) {
           if (msg.role === 'assistant') {
@@ -178,8 +179,8 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
     }
   }
 
-  // Execute a Gaia action (navigation, highlight, etc.)
-  function executeAction(action: GaiaAction) {
+  // Execute a Rosa action (navigation, highlight, etc.)
+  function executeAction(action: RosaAction) {
     actionHandler.executeAction(action);
   }
 
@@ -213,7 +214,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
     setStreamingChartData(null);
 
     // Optimistically add user message
-    const tempUserMessage: GaiaMessage = {
+    const tempUserMessage: RosaMessage = {
       id: `temp-${Date.now()}`,
       conversation_id: activeConversation?.id || '',
       role: 'user',
@@ -240,7 +241,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
       setIsStreaming(true);
       setIsSending(false);
 
-      for await (const event of sendGaiaQueryStream({
+      for await (const event of sendRosaQueryStream({
         message: userMessage,
         conversation_id: activeConversation?.id,
         organization_id: currentOrganization.id,
@@ -257,7 +258,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
             break;
           case 'chart':
             if (event.chart_data) {
-              setStreamingChartData(event.chart_data as GaiaChartData);
+              setStreamingChartData(event.chart_data as RosaChartData);
             }
             break;
           case 'error':
@@ -328,7 +329,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `gaia-conversation-${activeConversation.id.substring(0, 8)}.md`;
+      a.download = `rosa-conversation-${activeConversation.id.substring(0, 8)}.md`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -344,7 +345,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `gaia-conversation-${activeConversation.id.substring(0, 8)}.json`;
+      a.download = `rosa-conversation-${activeConversation.id.substring(0, 8)}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
@@ -452,7 +453,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
           </div>
 
           <div>
-            <h2 className="font-semibold">Gaia</h2>
+            <h2 className="font-semibold">Rosa</h2>
             <p className="text-xs text-muted-foreground">
               Your sustainability guide
             </p>
@@ -506,7 +507,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                   <Leaf className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">
-                  Hello! I'm Gaia
+                  Hello! I'm Rosa
                 </h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                   I'm your sustainability guide. I can help you navigate the platform,
@@ -515,7 +516,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                 </p>
 
                 <div className="flex flex-wrap justify-center gap-2">
-                  {GAIA_SUGGESTED_QUESTIONS.slice(0, 4).map((sq, i) => (
+                  {ROSA_SUGGESTED_QUESTIONS.slice(0, 4).map((sq, i) => (
                     <Button
                       key={i}
                       variant="outline"
@@ -564,7 +565,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                       {/* Chart rendering */}
                       {message.chart_data && (
                         <div className="mt-4">
-                          <GaiaChartRenderer chartData={message.chart_data} />
+                          <RosaChartRenderer chartData={message.chart_data} />
                         </div>
                       )}
 
@@ -639,7 +640,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                       {messageActions[message.id]
                         .filter(action => action.type === 'navigate')
                         .map((action, actionIdx) => {
-                          const payload = action.payload as GaiaNavigatePayload;
+                          const payload = action.payload as RosaNavigatePayload;
                           return (
                             <Button
                               key={actionIdx}
@@ -702,7 +703,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                           {streamingContent || (
                             <span className="flex items-center gap-2 text-muted-foreground">
                               <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
-                              Gaia is thinking...
+                              Rosa is thinking...
                             </span>
                           )}
                           {streamingContent && (
@@ -713,7 +714,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                       {/* Show chart while streaming if available */}
                       {streamingChartData && (
                         <div className="mt-4">
-                          <GaiaChartRenderer chartData={streamingChartData} />
+                          <RosaChartRenderer chartData={streamingChartData} />
                         </div>
                       )}
                     </CardContent>
@@ -733,7 +734,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
                       <span className="text-sm text-muted-foreground">
-                        Gaia is thinking...
+                        Rosa is thinking...
                       </span>
                     </div>
                   </CardContent>
@@ -778,7 +779,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
                   handleSend();
                 }
               }}
-              placeholder="Ask Gaia about your sustainability data..."
+              placeholder="Ask Rosa about your sustainability data..."
               disabled={isSending || isStreaming}
               className="flex-1"
             />
@@ -799,3 +800,7 @@ export function GaiaChat({ fullPage = false }: GaiaChatProps) {
     </div>
   );
 }
+
+// Backwards compatibility alias
+/** @deprecated Use RosaChat instead */
+export const GaiaChat = RosaChat;

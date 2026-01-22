@@ -313,13 +313,14 @@
 }
 
 /* ============================================
-   Gaia Digital Assistant Styles
+   Rosa Digital Assistant Styles
    For platform navigation highlighting
    ============================================ */
 
-/* Gaia highlight animation for guided navigation */
+/* Rosa highlight animation for guided navigation */
+.rosa-highlight,
 .gaia-highlight {
-  animation: gaia-pulse 2s ease-in-out;
+  animation: rosa-pulse 2s ease-in-out;
   outline: 3px solid hsl(160 84% 39%); /* Emerald green */
   outline-offset: 4px;
   border-radius: 8px;
@@ -327,6 +328,20 @@
   z-index: 50;
 }
 
+@keyframes rosa-pulse {
+  0%, 100% {
+    outline-color: hsl(160 84% 39%);
+    outline-width: 3px;
+    outline-offset: 4px;
+  }
+  50% {
+    outline-color: hsl(160 84% 50%);
+    outline-width: 5px;
+    outline-offset: 6px;
+  }
+}
+
+/* Backwards compatibility */
 @keyframes gaia-pulse {
   0%, 100% {
     outline-color: hsl(160 84% 39%);
@@ -341,14 +356,26 @@
 }
 
 /* Dark mode variant */
+.dark .rosa-highlight,
 .dark .gaia-highlight {
   outline-color: hsl(160 84% 50%);
+  animation: rosa-pulse-dark 2s ease-in-out;
 }
 
-.dark .gaia-highlight {
-  animation: gaia-pulse-dark 2s ease-in-out;
+@keyframes rosa-pulse-dark {
+  0%, 100% {
+    outline-color: hsl(160 84% 50%);
+    outline-width: 3px;
+    outline-offset: 4px;
+  }
+  50% {
+    outline-color: hsl(160 84% 60%);
+    outline-width: 5px;
+    outline-offset: 6px;
+  }
 }
 
+/* Backwards compatibility */
 @keyframes gaia-pulse-dark {
   0%, 100% {
     outline-color: hsl(160 84% 50%);
@@ -362,7 +389,8 @@
   }
 }
 
-/* Gaia guided mode overlay */
+/* Rosa guided mode overlay */
+.rosa-guided-overlay,
 .gaia-guided-overlay {
   position: fixed;
   inset: 0;
@@ -372,11 +400,13 @@
 }
 
 /* Allow clicks through on highlighted elements */
+.rosa-highlight,
 .gaia-highlight {
   pointer-events: auto;
 }
 
-/* Gaia action button hover glow */
+/* Rosa action button hover glow */
+.rosa-action-button:hover,
 .gaia-action-button:hover {
   box-shadow: 0 0 15px hsla(160, 84%, 39%, 0.3);
 }

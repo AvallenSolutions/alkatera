@@ -1,2 +1,2 @@
-export { GaiaChat } from './GaiaChat';
-export { GaiaChartRenderer } from './GaiaChartRenderer';
+export { RosaChat, GaiaChat } from './GaiaChat';
+export { RosaChartRenderer, GaiaChartRenderer } from './GaiaChartRenderer';

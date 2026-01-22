@@ -1,22 +1,22 @@
-// Gaia Digital Assistant - Main Client Library
-// Handles CRUD operations for Gaia conversations, messages, and feedback
+// Rosa Digital Assistant - Main Client Library
+// Handles CRUD operations for Rosa conversations, messages, and feedback
 //
-// IMPORTANT: Never refer to Gaia as "AI" or "AI agent" in any user-facing text.
-// Use "digital assistant", "sustainability guide", or simply "Gaia".
+// IMPORTANT: Never refer to Rosa as "AI" or "AI agent" in any user-facing text.
+// Use "digital assistant", "sustainability guide", or simply "Rosa".
 
 import { supabase } from '@/lib/supabaseClient';
 import type {
-  GaiaConversation,
-  GaiaMessage,
-  GaiaConversationWithMessages,
-  GaiaKnowledgeEntry,
-  GaiaKnowledgeEntryInput,
-  GaiaFeedback,
-  GaiaFeedbackWithMessage,
-  GaiaFeedbackRating,
-  GaiaAdminStats,
-  GaiaQueryRequest,
-  GaiaQueryResponse,
+  RosaConversation,
+  RosaMessage,
+  RosaConversationWithMessages,
+  RosaKnowledgeEntry,
+  RosaKnowledgeEntryInput,
+  RosaFeedback,
+  RosaFeedbackWithMessage,
+  RosaFeedbackRating,
+  RosaAdminStats,
+  RosaQueryRequest,
+  RosaQueryResponse,
 } from '@/lib/types/gaia';
 
 // Re-export types
@@ -24,10 +24,18 @@ export * from '@/lib/types/gaia';
 
 // Re-export from system-prompt
 export {
+  ROSA_PERSONA,
+  ROSA_SYSTEM_PROMPT,
+  ROSA_SUGGESTED_QUESTIONS,
+  ROSA_CONTEXT_TEMPLATE,
+  ROSA_FOLLOWUP_QUESTIONS,
+  ROSA_PHOTO_URL,
+  // Backwards compatibility
   GAIA_PERSONA,
   GAIA_SYSTEM_PROMPT,
   GAIA_SUGGESTED_QUESTIONS,
   GAIA_CONTEXT_TEMPLATE,
+  GAIA_FOLLOWUP_QUESTIONS,
   getContextualFollowUps,
   buildContextualPrompt,
   generateContextualSuggestions,
@@ -35,6 +43,8 @@ export {
 
 // Re-export from action-handlers
 export {
+  RosaActionHandler,
+  // Backwards compatibility
   GaiaActionHandler,
   getActionHandler,
   parseActionsFromResponse,
@@ -160,7 +170,7 @@ export async function exportConversationAsMarkdown(
   if (!conversation) throw new Error('Conversation not found');
 
   const lines: string[] = [];
-  lines.push(`# Gaia Conversation Export`);
+  lines.push(`# Rosa Conversation Export`);
   lines.push(`**Title:** ${conversation.title || 'Untitled conversation'}`);
   lines.push(`**Date:** ${new Date(conversation.created_at).toLocaleDateString()}`);
   lines.push(`**Messages:** ${conversation.messages.length}`);
@@ -173,7 +183,7 @@ export async function exportConversationAsMarkdown(
     if (msg.role === 'user') {
       lines.push(`## User (${timestamp})`);
     } else {
-      lines.push(`## Gaia (${timestamp})`);
+      lines.push(`## Rosa (${timestamp})`);
     }
     lines.push('');
     lines.push(msg.content);
@@ -260,11 +270,12 @@ export async function addMessage(
 // ============================================================================
 
 /**
- * Send a query to Gaia
+ * Send a query to Rosa
  */
-export async function sendGaiaQuery(
-  request: GaiaQueryRequest
-): Promise<GaiaQueryResponse> {
+export async function sendRosaQuery(
+  request: RosaQueryRequest
+): Promise<RosaQueryResponse> {
+  // Note: Edge function is still named gaia-query for database compatibility
   const { data, error } = await supabase.functions.invoke('gaia-query', {
     body: request,
   });
@@ -273,10 +284,14 @@ export async function sendGaiaQuery(
   return data;
 }
 
+// Backwards compatibility
+/** @deprecated Use sendRosaQuery instead */
+export const sendGaiaQuery = sendRosaQuery;
+
 /**
- * Stream chunk type for Gaia streaming responses
+ * Stream chunk type for Rosa streaming responses
  */
-export interface GaiaStreamEvent {
+export interface RosaStreamEvent {
   type: 'start' | 'text' | 'chart' | 'sources' | 'done' | 'error';
   content?: string;
   conversation_id?: string;
@@ -288,13 +303,17 @@ export interface GaiaStreamEvent {
   error?: string;
 }
 
+// Backwards compatibility
+/** @deprecated Use RosaStreamEvent instead */
+export type GaiaStreamEvent = RosaStreamEvent;
+
 /**
- * Send a streaming query to Gaia
+ * Send a streaming query to Rosa
  * Returns an async generator that yields stream events
  */
-export async function* sendGaiaQueryStream(
-  request: GaiaQueryRequest
-): AsyncGenerator<GaiaStreamEvent> {
+export async function* sendRosaQueryStream(
+  request: RosaQueryRequest
+): AsyncGenerator<RosaStreamEvent> {
   const { data: sessionData } = await supabase.auth.getSession();
   const accessToken = sessionData?.session?.access_token;
 
@@ -307,6 +326,7 @@ export async function* sendGaiaQueryStream(
     throw new Error('Supabase URL not configured');
   }
 
+  // Note: Edge function is still named gaia-query for database compatibility
   const response = await fetch(`${supabaseUrl}/functions/v1/gaia-query`, {
     method: 'POST',
     headers: {
@@ -344,7 +364,7 @@ export async function* sendGaiaQueryStream(
         if (eventBlock.startsWith('data: ')) {
           const jsonStr = eventBlock.slice(6);
           try {
-            const event: GaiaStreamEvent = JSON.parse(jsonStr);
+            const event: RosaStreamEvent = JSON.parse(jsonStr);
             yield event;
           } catch {
             // Skip invalid JSON
@@ -357,7 +377,7 @@ export async function* sendGaiaQueryStream(
     if (buffer.startsWith('data: ')) {
       const jsonStr = buffer.slice(6);
       try {
-        const event: GaiaStreamEvent = JSON.parse(jsonStr);
+        const event: RosaStreamEvent = JSON.parse(jsonStr);
         yield event;
       } catch {
         // Skip invalid JSON
@@ -368,19 +388,23 @@ export async function* sendGaiaQueryStream(
   }
 }
 
+// Backwards compatibility
+/** @deprecated Use sendRosaQueryStream instead */
+export const sendGaiaQueryStream = sendRosaQueryStream;
+
 // ============================================================================
 // Feedback Operations
 // ============================================================================
 
 /**
- * Submit feedback on a Gaia response (with duplicate prevention)
+ * Submit feedback on a Rosa response (with duplicate prevention)
  */
 export async function submitFeedback(
   messageId: string,
   organizationId: string,
-  rating: GaiaFeedbackRating,
+  rating: RosaFeedbackRating,
   feedbackText?: string
-): Promise<GaiaFeedback> {
+): Promise<RosaFeedback> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
