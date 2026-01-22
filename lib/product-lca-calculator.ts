@@ -3,11 +3,23 @@ import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './imp
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { resolveImpactSource } from './utils/data-quality-mapper';
 
+export interface FacilityAllocationInput {
+  facilityId: string;
+  facilityName: string;
+  operationalControl: 'owned' | 'third_party';
+  reportingPeriodStart: string;
+  reportingPeriodEnd: string;
+  productionVolume: number;
+  productionVolumeUnit: string;
+  facilityTotalProduction: number;
+}
+
 export interface CalculatePCFParams {
   productId: string;
   functionalUnit?: string;
   systemBoundary?: 'cradle-to-gate' | 'cradle-to-grave';
   referenceYear?: number;
+  facilityAllocations?: FacilityAllocationInput[];
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -96,63 +108,138 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     console.log(`[calculateProductCarbonFootprint] Created LCA record: ${lca.id}`);
 
-    // 4a. Copy owned production site allocations from previous LCA (if any)
-    // This ensures Scope 1/2 data persists across LCA recalculations
-    const { data: previousLCA } = await supabase
-      .from('product_carbon_footprints')
-      .select('id')
-      .eq('product_id', parseInt(productId))
-      .neq('id', lca.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // 4a. Handle facility allocations
+    const { facilityAllocations } = params;
 
-    if (previousLCA) {
-      console.log(`[calculateProductCarbonFootprint] Found previous LCA: ${previousLCA.id}, checking for owned production sites...`);
+    if (facilityAllocations && facilityAllocations.length > 0) {
+      // New flow: Use facility allocations provided by user
+      console.log(`[calculateProductCarbonFootprint] Processing ${facilityAllocations.length} facility allocations...`);
 
-      const { data: previousSites, error: sitesError } = await supabase
-        .from('product_carbon_footprint_production_sites')
-        .select('*')
-        .eq('product_carbon_footprint_id', previousLCA.id);
+      for (const allocation of facilityAllocations) {
+        // Fetch facility emissions for the reporting period
+        const { data: emissionsData } = await supabase
+          .from('facility_emissions_aggregated')
+          .select('total_co2e, total_production_volume, volume_unit, results_payload')
+          .eq('facility_id', allocation.facilityId)
+          .lte('reporting_period_start', allocation.reportingPeriodEnd)
+          .gte('reporting_period_end', allocation.reportingPeriodStart)
+          .order('reporting_period_start', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (sitesError) {
-        console.warn('[calculateProductCarbonFootprint] ⚠️ Failed to query previous production sites:', sitesError);
-      } else if (previousSites && previousSites.length > 0) {
-        console.log(`[calculateProductCarbonFootprint] Found ${previousSites.length} owned production sites from previous LCA`);
+        const facilityTotalEmissions = emissionsData?.total_co2e || 0;
+        const attributionRatio = allocation.productionVolume / allocation.facilityTotalProduction;
+        const allocatedEmissions = facilityTotalEmissions * attributionRatio;
 
-        // Copy sites to new LCA (excluding id and timestamps)
-        const newSites = previousSites.map(site => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { id, created_at, updated_at, ...siteData } = site;
-          return {
-            ...siteData,
-            product_carbon_footprint_id: lca.id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-        });
+        // Extract scope breakdown from results_payload
+        const payload = emissionsData?.results_payload || {};
+        const scope1Emissions = (payload.scope1_total || 0) * attributionRatio;
+        const scope2Emissions = (payload.scope2_total || 0) * attributionRatio;
+
+        // Extract water and waste
+        const totalWater = Number(payload.total_water_consumption?.value || payload.total_water_usage || 0);
+        const totalWaste = Number(payload.total_waste_generated?.value || payload.total_waste_generated || 0);
+        const allocatedWater = totalWater * attributionRatio;
+        const allocatedWaste = totalWaste * attributionRatio;
+
+        const productionSiteRecord = {
+          product_carbon_footprint_id: lca.id,
+          facility_id: allocation.facilityId,
+          production_volume: allocation.productionVolume,
+          share_of_production: attributionRatio * 100,
+          facility_intensity: facilityTotalEmissions > 0 && allocation.facilityTotalProduction > 0
+            ? facilityTotalEmissions / allocation.facilityTotalProduction
+            : 0,
+          data_source: emissionsData ? 'Facility Data' : 'User Input',
+          reporting_period_start: allocation.reportingPeriodStart,
+          reporting_period_end: allocation.reportingPeriodEnd,
+          attribution_ratio: attributionRatio * 100,
+          allocated_emissions_kg_co2e: allocatedEmissions,
+          allocated_water_litres: allocatedWater,
+          allocated_waste_kg: allocatedWaste,
+          emission_intensity_kg_co2e_per_unit: allocatedEmissions / allocation.productionVolume,
+          water_intensity_litres_per_unit: allocatedWater / allocation.productionVolume,
+          waste_intensity_kg_per_unit: allocatedWaste / allocation.productionVolume,
+          scope1_emissions_kg_co2e: scope1Emissions,
+          scope2_emissions_kg_co2e: scope2Emissions,
+          status: emissionsData ? 'verified' : 'provisional',
+          is_energy_intensive_process: false,
+          uses_proxy_data: !emissionsData,
+          data_source_tag: emissionsData ? 'Facility_Verified' : 'User_Input',
+          co2e_entry_method: 'Production Volume Allocation',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
 
         const { error: insertError } = await supabase
           .from('product_carbon_footprint_production_sites')
-          .insert(newSites);
+          .insert(productionSiteRecord);
 
         if (insertError) {
-          console.warn('[calculateProductCarbonFootprint] ⚠️ Failed to copy production sites:', insertError);
-          console.warn('[calculateProductCarbonFootprint] This may affect Scope 1/2 calculations');
+          console.warn(`[calculateProductCarbonFootprint] ⚠️ Failed to insert production site for ${allocation.facilityName}:`, insertError);
         } else {
-          console.log(`[calculateProductCarbonFootprint] ✅ Copied ${newSites.length} owned production sites to new LCA`);
-
-          // Log the emissions being carried forward
-          const totalCopiedEmissions = newSites.reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0);
-          const totalScope1 = newSites.reduce((sum, s) => sum + (s.scope1_emissions_kg_co2e || 0), 0);
-          const totalScope2 = newSites.reduce((sum, s) => sum + (s.scope2_emissions_kg_co2e || 0), 0);
-          console.log(`[calculateProductCarbonFootprint] Copied emissions: Total=${totalCopiedEmissions.toFixed(2)} kg, Scope1=${totalScope1.toFixed(2)} kg, Scope2=${totalScope2.toFixed(2)} kg`);
+          console.log(`[calculateProductCarbonFootprint] ✅ Created production site record for ${allocation.facilityName}: ${allocatedEmissions.toFixed(2)} kg CO2e`);
         }
-      } else {
-        console.log('[calculateProductCarbonFootprint] No owned production sites found in previous LCA');
       }
     } else {
-      console.log('[calculateProductCarbonFootprint] No previous LCA found, skipping production site copy');
+      // Legacy flow: Copy owned production site allocations from previous PCF (if any)
+      // This ensures Scope 1/2 data persists across PCF recalculations
+      const { data: previousPCF } = await supabase
+        .from('product_carbon_footprints')
+        .select('id')
+        .eq('product_id', parseInt(productId))
+        .neq('id', lca.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (previousPCF) {
+        console.log(`[calculateProductCarbonFootprint] Found previous PCF: ${previousPCF.id}, checking for owned production sites...`);
+
+        const { data: previousSites, error: sitesError } = await supabase
+          .from('product_carbon_footprint_production_sites')
+          .select('*')
+          .eq('product_carbon_footprint_id', previousPCF.id);
+
+        if (sitesError) {
+          console.warn('[calculateProductCarbonFootprint] ⚠️ Failed to query previous production sites:', sitesError);
+        } else if (previousSites && previousSites.length > 0) {
+          console.log(`[calculateProductCarbonFootprint] Found ${previousSites.length} owned production sites from previous PCF`);
+
+          // Copy sites to new PCF (excluding id and timestamps)
+          const newSites = previousSites.map(site => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id, created_at, updated_at, ...siteData } = site;
+            return {
+              ...siteData,
+              product_carbon_footprint_id: lca.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+          });
+
+          const { error: insertError } = await supabase
+            .from('product_carbon_footprint_production_sites')
+            .insert(newSites);
+
+          if (insertError) {
+            console.warn('[calculateProductCarbonFootprint] ⚠️ Failed to copy production sites:', insertError);
+            console.warn('[calculateProductCarbonFootprint] This may affect Scope 1/2 calculations');
+          } else {
+            console.log(`[calculateProductCarbonFootprint] ✅ Copied ${newSites.length} owned production sites to new PCF`);
+
+            // Log the emissions being carried forward
+            const totalCopiedEmissions = newSites.reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0);
+            const totalScope1 = newSites.reduce((sum, s) => sum + (s.scope1_emissions_kg_co2e || 0), 0);
+            const totalScope2 = newSites.reduce((sum, s) => sum + (s.scope2_emissions_kg_co2e || 0), 0);
+            console.log(`[calculateProductCarbonFootprint] Copied emissions: Total=${totalCopiedEmissions.toFixed(2)} kg, Scope1=${totalScope1.toFixed(2)} kg, Scope2=${totalScope2.toFixed(2)} kg`);
+          }
+        } else {
+          console.log('[calculateProductCarbonFootprint] No owned production sites found in previous PCF');
+        }
+      } else {
+        console.log('[calculateProductCarbonFootprint] No previous PCF found, skipping production site copy');
+      }
     }
 
     // 5. Resolve impact factors for each material using waterfall logic

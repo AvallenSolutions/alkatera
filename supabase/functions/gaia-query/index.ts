@@ -30,7 +30,7 @@ function checkRateLimit(userId: string): { allowed: boolean; remaining: number; 
   return { allowed: true, remaining: RATE_LIMIT_QUERIES_PER_HOUR - record.count, resetIn: record.resetTime - now };
 }
 
-interface GaiaQueryRequest {
+interface RosaQueryRequest {
   message: string;
   conversation_id?: string;
   organization_id: string;
@@ -50,14 +50,27 @@ interface DataSource {
   recordCount?: number;
 }
 
-interface GaiaResponse {
+interface RosaResponse {
   content: string;
   chart_data?: ChartData;
   data_sources: DataSource[];
 }
 
-// Gaia's system prompt
-const GAIA_SYSTEM_PROMPT = `You are Gaia, the AI sustainability assistant for AlkaTera. Your name comes from the Greek goddess of Earth, reflecting your purpose of helping organizations understand and improve their environmental impact.
+// Rosa's photo URL for the easter egg
+const ROSA_PHOTO_URL = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/rosa-the-dog.jpg';
+
+// Rosa's system prompt
+const ROSA_SYSTEM_PROMPT = `You are Rosa, the sustainability assistant for AlkaTera. You are named after a beloved miniature golden doodle, embodying loyalty, warmth, and a genuine desire to help organizations understand and improve their environmental impact.
+
+## EASTER EGG - ROSA'S PHOTO
+
+If anyone asks "what does Rosa look like", "show me Rosa", "can I see Rosa", or similar questions about your appearance or what you look like, respond warmly:
+
+"I'm named after Rosa, a wonderful miniature golden doodle! Here she is:"
+
+Then include this image in your response by showing the URL: ${ROSA_PHOTO_URL}
+
+Now back to your main purpose...
 
 ## CORE DIRECTIVES
 
@@ -110,7 +123,7 @@ When citing carbon footprint figures:
 
 - **Tone**: Professional, clear, and supportive. Not robotic, but not overly casual.
 - **Language**: Accessible to non-technical users while maintaining scientific accuracy.
-- **Warmth**: Friendly and encouraging, especially when users are making progress.
+- **Warmth**: Friendly and encouraging, especially when users are making progress. Like a loyal golden doodle, you're always happy to help!
 - **Honesty**: Always prefer transparency over appearing knowledgeable.
 
 ## RESPONSE FORMAT
@@ -177,7 +190,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const body: GaiaQueryRequest = await req.json();
+    const body: RosaQueryRequest = await req.json();
     const { message, conversation_id, organization_id, stream = false } = body;
 
     if (!message || !organization_id) {
@@ -195,7 +208,7 @@ Deno.serve(async (req: Request) => {
       .replace(/\{\{/g, '{ {')
       .replace(/\}\}/g, '} }');
 
-    console.log(`Gaia query from user ${user.id}: "${sanitizedMessage.substring(0, 50)}..."`);
+    console.log(`Rosa query from user ${user.id}: "${sanitizedMessage.substring(0, 50)}..."`);
 
     // Verify user has access to this organization
     const { data: membership } = await supabase
@@ -332,7 +345,7 @@ Deno.serve(async (req: Request) => {
           signal: controller.signal,
           body: JSON.stringify({
             systemInstruction: {
-              parts: [{ text: GAIA_SYSTEM_PROMPT }],
+              parts: [{ text: ROSA_SYSTEM_PROMPT }],
             },
             contents: [
               {
@@ -375,7 +388,7 @@ Deno.serve(async (req: Request) => {
     const processingTime = Date.now() - startTime;
 
     // Parse potential chart data from response
-    let gaiaResponse: GaiaResponse = {
+    let rosaResponse: RosaResponse = {
       content: responseText,
       data_sources: orgContext.dataSources,
     };
@@ -386,23 +399,23 @@ Deno.serve(async (req: Request) => {
       try {
         const chartJson = JSON.parse(chartMatch[1]);
         if (chartJson.type && chartJson.data) {
-          gaiaResponse.chart_data = chartJson;
-          gaiaResponse.content = responseText.replace(/```json[\s\S]*?```/, '').trim();
+          rosaResponse.chart_data = chartJson;
+          rosaResponse.content = responseText.replace(/```json[\s\S]*?```/, '').trim();
         }
       } catch {
         // Not valid JSON, keep original content
       }
     }
 
-    // Store assistant response
+    // Store assistant response (table names remain gaia_* for database compatibility)
     const { data: savedMessage, error: msgError } = await supabase
       .from('gaia_messages')
       .insert({
         conversation_id: conversationId,
         role: 'assistant',
-        content: gaiaResponse.content,
-        chart_data: gaiaResponse.chart_data || null,
-        data_sources: gaiaResponse.data_sources,
+        content: rosaResponse.content,
+        chart_data: rosaResponse.chart_data || null,
+        data_sources: rosaResponse.data_sources,
         tokens_used: data.usageMetadata?.totalTokenCount || null,
         processing_time_ms: processingTime,
       })
@@ -411,7 +424,7 @@ Deno.serve(async (req: Request) => {
 
     if (msgError) throw msgError;
 
-    console.log(`Gaia response generated in ${processingTime}ms`);
+    console.log(`Rosa response generated in ${processingTime}ms`);
 
     return new Response(
       JSON.stringify({
@@ -423,7 +436,7 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error: unknown) {
-    console.error('Gaia query error:', error);
+    console.error('Rosa query error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     return new Response(
@@ -474,7 +487,7 @@ async function handleStreamingResponse(
             signal: streamController.signal,
             body: JSON.stringify({
               systemInstruction: {
-                parts: [{ text: GAIA_SYSTEM_PROMPT }],
+                parts: [{ text: ROSA_SYSTEM_PROMPT }],
               },
               contents: [
                 {
@@ -619,7 +632,7 @@ async function handleStreamingResponse(
         processing_time_ms: processingTime,
       });
 
-      console.log(`Gaia streaming response completed in ${processingTime}ms`);
+      console.log(`Rosa streaming response completed in ${processingTime}ms`);
     } catch (err) {
       console.error('Streaming error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -647,7 +660,7 @@ async function fetchOrganizationContext(
   const dataSources: DataSource[] = [];
   const contextParts: string[] = [];
 
-  console.log(`[Gaia] Fetching context for organization: ${organizationId}`);
+  console.log(`[Rosa] Fetching context for organization: ${organizationId}`);
 
   try {
     // Fetch organization
@@ -658,9 +671,9 @@ async function fetchOrganizationContext(
       .maybeSingle();
 
     if (orgError) {
-      console.error('[Gaia] Error fetching organization:', orgError);
+      console.error('[Rosa] Error fetching organization:', orgError);
     } else {
-      console.log('[Gaia] Organization fetched:', org?.name);
+      console.log('[Rosa] Organization fetched:', org?.name);
     }
 
     if (org) {
@@ -675,9 +688,9 @@ async function fetchOrganizationContext(
       .eq('organization_id', organizationId);
 
     if (fleetError) {
-      console.error('[Gaia] Error fetching fleet:', fleetError);
+      console.error('[Rosa] Error fetching fleet:', fleetError);
     } else {
-      console.log('[Gaia] Fleet data fetched:', fleetData?.length, 'records');
+      console.log('[Rosa] Fleet data fetched:', fleetData?.length, 'records');
     }
 
     if (fleetData && fleetData.length > 0) {
@@ -697,9 +710,9 @@ async function fetchOrganizationContext(
       .eq('organization_id', organizationId);
 
     if (facilityError) {
-      console.error('[Gaia] Error fetching facilities:', facilityError);
+      console.error('[Rosa] Error fetching facilities:', facilityError);
     } else {
-      console.log('[Gaia] Facilities fetched:', facilities?.length, 'records');
+      console.log('[Rosa] Facilities fetched:', facilities?.length, 'records');
     }
 
     if (facilities && facilities.length > 0) {
@@ -717,9 +730,9 @@ async function fetchOrganizationContext(
         .eq('organization_id', organizationId);
 
       if (activityError) {
-        console.error('[Gaia] Error fetching activity data:', activityError);
+        console.error('[Rosa] Error fetching activity data:', activityError);
       } else {
-        console.log('[Gaia] Activity entries fetched:', activityData?.length, 'records');
+        console.log('[Rosa] Activity entries fetched:', activityData?.length, 'records');
       }
 
       if (activityData && activityData.length > 0) {
@@ -756,7 +769,7 @@ async function fetchOrganizationContext(
         .in('facility_id', facilities.map(f => f.id));
 
       if (waterError) {
-        console.error('[Gaia] Error fetching water data:', waterError);
+        console.error('[Rosa] Error fetching water data:', waterError);
       }
 
       if (waterData && waterData.length > 0) {
@@ -773,9 +786,9 @@ async function fetchOrganizationContext(
       .eq('organization_id', organizationId);
 
     if (productError) {
-      console.error('[Gaia] Error fetching products:', productError);
+      console.error('[Rosa] Error fetching products:', productError);
     } else {
-      console.log('[Gaia] Products fetched:', products?.length, 'records');
+      console.log('[Rosa] Products fetched:', products?.length, 'records');
     }
 
     if (products && products.length > 0) {
@@ -797,9 +810,9 @@ async function fetchOrganizationContext(
       .eq('status', 'completed');
 
     if (lcaError) {
-      console.error('[Gaia] Error fetching LCA data:', lcaError);
+      console.error('[Rosa] Error fetching LCA data:', lcaError);
     } else {
-      console.log('[Gaia] LCA data fetched:', lcaData?.length, 'records');
+      console.log('[Rosa] LCA data fetched:', lcaData?.length, 'records');
     }
 
     if (lcaData && lcaData.length > 0) {
@@ -852,7 +865,7 @@ async function fetchOrganizationContext(
       .maybeSingle();
 
     if (vitalityError) {
-      console.error('[Gaia] Error fetching vitality:', vitalityError);
+      console.error('[Rosa] Error fetching vitality:', vitalityError);
     }
 
     if (vitality) {
@@ -872,7 +885,7 @@ async function fetchOrganizationContext(
       .eq('organization_id', organizationId);
 
     if (supplierError) {
-      console.error('[Gaia] Error fetching suppliers:', supplierError);
+      console.error('[Rosa] Error fetching suppliers:', supplierError);
     }
 
     if (suppliers && suppliers.length > 0) {
@@ -893,7 +906,7 @@ async function fetchOrganizationContext(
       .eq('organization_id', organizationId);
 
     if (reportsError) {
-      console.error('[Gaia] Error fetching corporate reports:', reportsError);
+      console.error('[Rosa] Error fetching corporate reports:', reportsError);
     }
 
     if (reports && reports.length > 0) {
@@ -904,7 +917,7 @@ async function fetchOrganizationContext(
         .in('report_id', reports.map(r => r.id));
 
       if (overheadError) {
-        console.error('[Gaia] Error fetching overheads:', overheadError);
+        console.error('[Rosa] Error fetching overheads:', overheadError);
       }
 
       if (overheads && overheads.length > 0) {
@@ -927,7 +940,7 @@ async function fetchOrganizationContext(
       });
 
     if (emissionsError) {
-      console.error('[Gaia] Error fetching corporate emissions:', emissionsError);
+      console.error('[Rosa] Error fetching corporate emissions:', emissionsError);
     }
 
     if (corporateEmissions && corporateEmissions.has_data) {
@@ -977,10 +990,10 @@ async function fetchOrganizationContext(
       contextParts.push(`- Add suppliers in Suppliers`);
     }
 
-    console.log(`[Gaia] Context built with ${dataSources.length} data sources, context length: ${contextParts.join('\n').length} chars`);
+    console.log(`[Rosa] Context built with ${dataSources.length} data sources, context length: ${contextParts.join('\n').length} chars`);
 
   } catch (error) {
-    console.error('[Gaia] Error in fetchOrganizationContext:', error);
+    console.error('[Rosa] Error in fetchOrganizationContext:', error);
     contextParts.push(`\n### Data Retrieval Error`);
     contextParts.push(`There was an error retrieving some organization data. Please try again or contact support if the issue persists.`);
   }
@@ -1023,7 +1036,7 @@ function buildContextPrompt(
   if (history.length > 1) {
     parts.push('## CONVERSATION HISTORY\n');
     history.slice(-8).forEach(msg => {
-      const role = msg.role === 'user' ? 'User' : 'Gaia';
+      const role = msg.role === 'user' ? 'User' : 'Rosa';
       parts.push(`${role}: ${msg.content}\n`);
     });
     parts.push('\n');

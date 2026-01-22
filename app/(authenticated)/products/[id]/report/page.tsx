@@ -578,7 +578,7 @@ export default function ProductLcaReportPage() {
                               <div>
                                 <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-1">Production Site Data Missing</p>
                                 <p className="text-xs text-amber-800 dark:text-amber-200">
-                                  Scope 1 & 2 emissions require production site allocation. Visit the <strong>Production Sites</strong> tab to link facilities and calculate manufacturing emissions.
+                                  Scope 1 & 2 emissions require facility allocation. Visit the <strong>Facilities</strong> tab to link facilities and calculate manufacturing emissions.
                                 </p>
                               </div>
                             </div>

@@ -1,20 +1,20 @@
-// Gaia Digital Assistant Types
-// IMPORTANT: Never refer to Gaia as "AI" or "AI agent" in any user-facing text.
-// Use "digital assistant", "sustainability guide", or simply "Gaia".
+// Rosa Digital Assistant Types
+// IMPORTANT: Never refer to Rosa as "AI" or "AI agent" in any user-facing text.
+// Use "digital assistant", "sustainability guide", or simply "Rosa".
 
-export type GaiaMessageRole = 'user' | 'assistant';
+export type RosaMessageRole = 'user' | 'assistant';
 
-export type GaiaKnowledgeEntryType = 'instruction' | 'example_qa' | 'definition' | 'guideline';
+export type RosaKnowledgeEntryType = 'instruction' | 'example_qa' | 'definition' | 'guideline';
 
-export type GaiaFeedbackRating = 'positive' | 'negative';
+export type RosaFeedbackRating = 'positive' | 'negative';
 
-export type GaiaChartType = 'bar' | 'pie' | 'line' | 'table' | 'area' | 'donut';
+export type RosaChartType = 'bar' | 'pie' | 'line' | 'table' | 'area' | 'donut';
 
-export type GaiaActionType = 'navigate' | 'highlight' | 'prefill' | 'open_modal' | 'message';
+export type RosaActionType = 'navigate' | 'highlight' | 'prefill' | 'open_modal' | 'message';
 
 // Chart data structure for visualizations
-export interface GaiaChartData {
-  type: GaiaChartType;
+export interface RosaChartData {
+  type: RosaChartType;
   title?: string;
   data: Record<string, unknown>[] | unknown[][];
   config?: {
@@ -31,14 +31,14 @@ export interface GaiaChartData {
 }
 
 // Data source reference
-export interface GaiaDataSource {
+export interface RosaDataSource {
   table: string;
   description: string;
   recordCount?: number;
 }
 
 // Conversation types
-export interface GaiaConversation {
+export interface RosaConversation {
   id: string;
   organization_id: string;
   user_id: string;
@@ -50,28 +50,28 @@ export interface GaiaConversation {
   last_message_at: string | null;
 }
 
-export interface GaiaMessage {
+export interface RosaMessage {
   id: string;
   conversation_id: string;
-  role: GaiaMessageRole;
+  role: RosaMessageRole;
   content: string;
-  chart_data: GaiaChartData | null;
-  data_sources: GaiaDataSource[];
+  chart_data: RosaChartData | null;
+  data_sources: RosaDataSource[];
   tokens_used: number | null;
   processing_time_ms: number | null;
   created_at: string;
 }
 
 // For the UI - combined conversation with messages
-export interface GaiaConversationWithMessages extends GaiaConversation {
-  messages: GaiaMessage[];
+export interface RosaConversationWithMessages extends RosaConversation {
+  messages: RosaMessage[];
 }
 
 // Knowledge base types
-export interface GaiaKnowledgeEntry {
+export interface RosaKnowledgeEntry {
   id: string;
   created_by: string | null;
-  entry_type: GaiaKnowledgeEntryType;
+  entry_type: RosaKnowledgeEntryType;
   title: string;
   content: string;
   example_question: string | null;
@@ -85,8 +85,8 @@ export interface GaiaKnowledgeEntry {
 }
 
 // For creating/updating knowledge entries
-export interface GaiaKnowledgeEntryInput {
-  entry_type: GaiaKnowledgeEntryType;
+export interface RosaKnowledgeEntryInput {
+  entry_type: RosaKnowledgeEntryType;
   title: string;
   content: string;
   example_question?: string;
@@ -98,12 +98,12 @@ export interface GaiaKnowledgeEntryInput {
 }
 
 // Feedback types
-export interface GaiaFeedback {
+export interface RosaFeedback {
   id: string;
   message_id: string;
   user_id: string;
   organization_id: string;
-  rating: GaiaFeedbackRating;
+  rating: RosaFeedbackRating;
   feedback_text: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
@@ -111,15 +111,15 @@ export interface GaiaFeedback {
   created_at: string;
 }
 
-export interface GaiaFeedbackWithMessage extends GaiaFeedback {
-  message: GaiaMessage;
-  conversation: GaiaConversation;
+export interface RosaFeedbackWithMessage extends RosaFeedback {
+  message: RosaMessage;
+  conversation: RosaConversation;
   user_email?: string;
   organization_name?: string;
 }
 
 // Analytics types
-export interface GaiaAnalytics {
+export interface RosaAnalytics {
   id: string;
   date: string;
   total_conversations: number;
@@ -138,29 +138,29 @@ export interface GaiaAnalytics {
 }
 
 // Query request/response types for the Edge Function
-export interface GaiaQueryRequest {
+export interface RosaQueryRequest {
   message: string;
   conversation_id?: string;
   organization_id: string;
 }
 
-export interface GaiaQueryResponse {
-  message: GaiaMessage;
+export interface RosaQueryResponse {
+  message: RosaMessage;
   conversation_id: string;
   is_new_conversation: boolean;
 }
 
 // Streaming response chunk
-export interface GaiaStreamChunk {
+export interface RosaStreamChunk {
   type: 'text' | 'chart' | 'sources' | 'done' | 'error';
   content?: string;
-  chart_data?: GaiaChartData;
-  data_sources?: GaiaDataSource[];
+  chart_data?: RosaChartData;
+  data_sources?: RosaDataSource[];
   error?: string;
 }
 
 // Context types for building Gemini prompts
-export interface GaiaOrganizationContext {
+export interface RosaOrganizationContext {
   organization: {
     id: string;
     name: string;
@@ -196,7 +196,7 @@ export interface GaiaOrganizationContext {
 }
 
 // Admin dashboard stats
-export interface GaiaAdminStats {
+export interface RosaAdminStats {
   total_conversations: number;
   total_messages: number;
   active_users: number;
@@ -208,16 +208,16 @@ export interface GaiaAdminStats {
 }
 
 // Suggested questions based on data state
-export interface GaiaSuggestedQuestion {
+export interface RosaSuggestedQuestion {
   question: string;
   category: string;
   icon?: string;
 }
 
 // UI state types
-export interface GaiaChatState {
-  conversations: GaiaConversation[];
-  activeConversation: GaiaConversationWithMessages | null;
+export interface RosaChatState {
+  conversations: RosaConversation[];
+  activeConversation: RosaConversationWithMessages | null;
   isLoading: boolean;
   isStreaming: boolean;
   error: string | null;
@@ -230,7 +230,7 @@ export interface GaiaChatState {
 /**
  * Data availability information for context-aware suggestions
  */
-export interface GaiaAvailableData {
+export interface RosaAvailableData {
   hasProducts: boolean;
   productCount: number;
   hasFacilities: boolean;
@@ -248,7 +248,7 @@ export interface GaiaAvailableData {
 /**
  * User context for personalized guidance and suggestions
  */
-export interface GaiaUserContext {
+export interface RosaUserContext {
   currentPage?: string;
   currentRoute?: string;
   onboardingProgress?: number;
@@ -256,7 +256,7 @@ export interface GaiaUserContext {
   companyType?: string[];
   companySize?: string;
   recentActions?: string[];
-  availableData?: GaiaAvailableData;
+  availableData?: RosaAvailableData;
   missingData?: string[];
   userGoals?: string[];
 }
@@ -268,7 +268,7 @@ export interface GaiaUserContext {
 /**
  * Navigation action payload
  */
-export interface GaiaNavigatePayload {
+export interface RosaNavigatePayload {
   path: string;
   label?: string;
 }
@@ -276,7 +276,7 @@ export interface GaiaNavigatePayload {
 /**
  * Highlight action payload
  */
-export interface GaiaHighlightPayload {
+export interface RosaHighlightPayload {
   selector: string;
   duration?: number;
 }
@@ -284,7 +284,7 @@ export interface GaiaHighlightPayload {
 /**
  * Pre-fill action payload
  */
-export interface GaiaPrefillPayload {
+export interface RosaPrefillPayload {
   formId?: string;
   fields: Record<string, string | number | boolean>;
 }
@@ -292,7 +292,7 @@ export interface GaiaPrefillPayload {
 /**
  * Modal action payload
  */
-export interface GaiaModalPayload {
+export interface RosaModalPayload {
   modalId: string;
   data?: Record<string, unknown>;
 }
@@ -300,7 +300,7 @@ export interface GaiaModalPayload {
 /**
  * Message action payload
  */
-export interface GaiaMessagePayload {
+export interface RosaMessagePayload {
   mode?: 'guided' | 'persistent';
   persistent?: boolean;
   message?: string;
@@ -309,28 +309,97 @@ export interface GaiaMessagePayload {
 /**
  * Union type for all action payloads
  */
-export type GaiaActionPayload =
-  | GaiaNavigatePayload
-  | GaiaHighlightPayload
-  | GaiaPrefillPayload
-  | GaiaModalPayload
-  | GaiaMessagePayload;
+export type RosaActionPayload =
+  | RosaNavigatePayload
+  | RosaHighlightPayload
+  | RosaPrefillPayload
+  | RosaModalPayload
+  | RosaMessagePayload;
 
 /**
- * Action that Gaia can suggest/execute
+ * Action that Rosa can suggest/execute
  */
-export interface GaiaAction {
-  type: GaiaActionType;
-  payload: GaiaActionPayload;
+export interface RosaAction {
+  type: RosaActionType;
+  payload: RosaActionPayload;
 }
 
 /**
  * Extended query response with actions
  */
-export interface GaiaQueryResponseWithActions extends GaiaQueryResponse {
-  actions?: GaiaAction[];
+export interface RosaQueryResponseWithActions extends RosaQueryResponse {
+  actions?: RosaAction[];
   context?: {
     currentPage?: string;
     suggestions?: string[];
   };
 }
+
+// ============================================================================
+// Backwards compatibility aliases (Gaia -> Rosa)
+// ============================================================================
+
+/** @deprecated Use RosaMessageRole instead */
+export type GaiaMessageRole = RosaMessageRole;
+/** @deprecated Use RosaKnowledgeEntryType instead */
+export type GaiaKnowledgeEntryType = RosaKnowledgeEntryType;
+/** @deprecated Use RosaFeedbackRating instead */
+export type GaiaFeedbackRating = RosaFeedbackRating;
+/** @deprecated Use RosaChartType instead */
+export type GaiaChartType = RosaChartType;
+/** @deprecated Use RosaActionType instead */
+export type GaiaActionType = RosaActionType;
+/** @deprecated Use RosaChartData instead */
+export type GaiaChartData = RosaChartData;
+/** @deprecated Use RosaDataSource instead */
+export type GaiaDataSource = RosaDataSource;
+/** @deprecated Use RosaConversation instead */
+export type GaiaConversation = RosaConversation;
+/** @deprecated Use RosaMessage instead */
+export type GaiaMessage = RosaMessage;
+/** @deprecated Use RosaConversationWithMessages instead */
+export type GaiaConversationWithMessages = RosaConversationWithMessages;
+/** @deprecated Use RosaKnowledgeEntry instead */
+export type GaiaKnowledgeEntry = RosaKnowledgeEntry;
+/** @deprecated Use RosaKnowledgeEntryInput instead */
+export type GaiaKnowledgeEntryInput = RosaKnowledgeEntryInput;
+/** @deprecated Use RosaFeedback instead */
+export type GaiaFeedback = RosaFeedback;
+/** @deprecated Use RosaFeedbackWithMessage instead */
+export type GaiaFeedbackWithMessage = RosaFeedbackWithMessage;
+/** @deprecated Use RosaAnalytics instead */
+export type GaiaAnalytics = RosaAnalytics;
+/** @deprecated Use RosaQueryRequest instead */
+export type GaiaQueryRequest = RosaQueryRequest;
+/** @deprecated Use RosaQueryResponse instead */
+export type GaiaQueryResponse = RosaQueryResponse;
+/** @deprecated Use RosaStreamChunk instead */
+export type GaiaStreamChunk = RosaStreamChunk;
+/** @deprecated Use RosaOrganizationContext instead */
+export type GaiaOrganizationContext = RosaOrganizationContext;
+/** @deprecated Use RosaAdminStats instead */
+export type GaiaAdminStats = RosaAdminStats;
+/** @deprecated Use RosaSuggestedQuestion instead */
+export type GaiaSuggestedQuestion = RosaSuggestedQuestion;
+/** @deprecated Use RosaChatState instead */
+export type GaiaChatState = RosaChatState;
+/** @deprecated Use RosaAvailableData instead */
+export type GaiaAvailableData = RosaAvailableData;
+/** @deprecated Use RosaUserContext instead */
+export type GaiaUserContext = RosaUserContext;
+/** @deprecated Use RosaNavigatePayload instead */
+export type GaiaNavigatePayload = RosaNavigatePayload;
+/** @deprecated Use RosaHighlightPayload instead */
+export type GaiaHighlightPayload = RosaHighlightPayload;
+/** @deprecated Use RosaPrefillPayload instead */
+export type GaiaPrefillPayload = RosaPrefillPayload;
+/** @deprecated Use RosaModalPayload instead */
+export type GaiaModalPayload = RosaModalPayload;
+/** @deprecated Use RosaMessagePayload instead */
+export type GaiaMessagePayload = RosaMessagePayload;
+/** @deprecated Use RosaActionPayload instead */
+export type GaiaActionPayload = RosaActionPayload;
+/** @deprecated Use RosaAction instead */
+export type GaiaAction = RosaAction;
+/** @deprecated Use RosaQueryResponseWithActions instead */
+export type GaiaQueryResponseWithActions = RosaQueryResponseWithActions;

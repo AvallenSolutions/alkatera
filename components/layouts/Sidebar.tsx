@@ -170,8 +170,8 @@ const navigationStructure: NavItem[] = [
     ],
   },
   {
-    name: 'Gaia',
-    href: '/gaia/',
+    name: 'Rosa',
+    href: '/rosa/',
     icon: Bot,
     minTier: 2, // Blossom and above
   },
@@ -764,19 +764,19 @@ export function Sidebar({ className }: SidebarProps) {
                 </Link>
 
                 <Link
-                  href="/admin/gaia/"
+                  href="/admin/rosa/"
                   className={cn(
                     'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/gaia/')
+                    isActive('/admin/rosa/')
                       ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                       : 'text-sidebar-foreground hover:bg-secondary/50'
                   )}
                 >
                   <Bot className={cn(
                     'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/gaia/') ? 'text-neon-lime' : ''
+                    isActive('/admin/rosa/') ? 'text-neon-lime' : ''
                   )} />
-                  <span className="truncate">Gaia AI Admin</span>
+                  <span className="truncate">Rosa Admin</span>
                   {isDevelopment && !isAlkateraAdmin && (
                     <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
                   )}

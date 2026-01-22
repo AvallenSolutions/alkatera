@@ -50,6 +50,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const isFetchingRef = useRef(false)
+  const lastFetchedUserIdRef = useRef<string | null>(null)
   const { user, session, loading: authLoading, onAuthStateChanged } = useAuth()
 
   const fetchOrganizations = useCallback(async () => {
@@ -255,16 +256,34 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
   };
 
+  // Only fetch organizations when user ID changes (not on every user object reference change)
   useEffect(() => {
-    if (!authLoading && user) {
-      fetchOrganizations()
-    }
-  }, [user, authLoading, fetchOrganizations])
+    if (authLoading) return
 
+    const currentUserId = user?.id || null
+    const userChanged = currentUserId !== lastFetchedUserIdRef.current
+
+    if (userChanged) {
+      lastFetchedUserIdRef.current = currentUserId
+      if (user) {
+        console.log('🔄 OrganizationContext: User changed, fetching organizations...')
+        fetchOrganizations()
+      } else {
+        // User signed out
+        setOrganizations([])
+        setCurrentOrganization(null)
+        setUserRole(null)
+        setIsLoading(false)
+      }
+    }
+  }, [user?.id, authLoading, fetchOrganizations])
+
+  // Note: onAuthStateChanged callback is now only triggered on actual sign-in
+  // (not on token refresh), so this won't cause unnecessary refetches
   useEffect(() => {
     if (onAuthStateChanged) {
       onAuthStateChanged(() => {
-        console.log('🔄 OrganizationContext: Auth state changed, refetching organizations...')
+        console.log('🔄 OrganizationContext: User signed in, refetching organizations...')
         fetchOrganizations()
       })
     }

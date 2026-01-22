@@ -16,8 +16,23 @@ import {
   Shield,
   Info,
   TrendingUp,
-  Database
+  Database,
+  Factory,
+  Building2,
+  Users,
+  MapPin,
+  Calendar
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { validateMaterialsBeforeCalculation, type ProductMaterial } from "@/lib/impact-waterfall-resolver";
 import { calculateProductLCA } from "@/lib/product-lca-calculator";
@@ -30,6 +45,38 @@ interface MaterialWithValidation extends ProductMaterial {
   error?: string;
 }
 
+interface LinkedFacility {
+  id: string;
+  facility_id: string;
+  facility: {
+    id: string;
+    name: string;
+    operational_control: "owned" | "third_party";
+    address_city: string | null;
+    address_country: string | null;
+  };
+}
+
+interface FacilityAllocation {
+  facilityId: string;
+  facilityName: string;
+  operationalControl: "owned" | "third_party";
+  reportingPeriodStart: string;
+  reportingPeriodEnd: string;
+  productionVolume: string;
+  productionVolumeUnit: string;
+  facilityTotalProduction: string;
+}
+
+const PRODUCTION_UNITS = [
+  { value: "units", label: "Units" },
+  { value: "litres", label: "Litres" },
+  { value: "kg", label: "Kilograms" },
+  { value: "tonnes", label: "Tonnes" },
+  { value: "cases", label: "Cases" },
+  { value: "pallets", label: "Pallets" },
+];
+
 export default function CalculateLCAPage() {
   const router = useRouter();
   const params = useParams();
@@ -41,6 +88,8 @@ export default function CalculateLCAPage() {
   const [materials, setMaterials] = useState<MaterialWithValidation[]>([]);
   const [canCalculate, setCanCalculate] = useState(false);
   const [missingCount, setMissingCount] = useState(0);
+  const [linkedFacilities, setLinkedFacilities] = useState<LinkedFacility[]>([]);
+  const [facilityAllocations, setFacilityAllocations] = useState<FacilityAllocation[]>([]);
 
   useEffect(() => {
     async function loadAndValidate() {
@@ -113,6 +162,48 @@ export default function CalculateLCAPage() {
         setCanCalculate(validation.valid);
         setMissingCount(validation.missingData.length);
 
+        // Fetch linked facilities
+        const { data: facilitiesData, error: facilitiesError } = await supabase
+          .from('facility_product_assignments')
+          .select(`
+            id,
+            facility_id,
+            facilities (
+              id,
+              name,
+              operational_control,
+              address_city,
+              address_country
+            )
+          `)
+          .eq('product_id', productId)
+          .eq('assignment_status', 'active');
+
+        if (!facilitiesError && facilitiesData) {
+          const facilities = facilitiesData.map((f: any) => ({
+            id: f.id,
+            facility_id: f.facility_id,
+            facility: f.facilities
+          })) as LinkedFacility[];
+
+          setLinkedFacilities(facilities);
+
+          // Initialize allocations for each facility
+          const defaultEndDate = new Date().toISOString().split('T')[0];
+          const defaultStartDate = new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0];
+
+          setFacilityAllocations(facilities.map(f => ({
+            facilityId: f.facility_id,
+            facilityName: f.facility.name,
+            operationalControl: f.facility.operational_control,
+            reportingPeriodStart: defaultStartDate,
+            reportingPeriodEnd: defaultEndDate,
+            productionVolume: '',
+            productionVolumeUnit: 'units',
+            facilityTotalProduction: '',
+          })));
+        }
+
       } catch (error: any) {
         console.error('Error loading materials:', error);
         toast.error(error.message || 'Failed to load materials');
@@ -135,11 +226,26 @@ export default function CalculateLCAPage() {
     try {
       toast.info('Starting LCA calculation...');
 
+      // Prepare facility allocations if available
+      const validAllocations = facilityAllocations
+        .filter(a => a.productionVolume && a.facilityTotalProduction)
+        .map(a => ({
+          facilityId: a.facilityId,
+          facilityName: a.facilityName,
+          operationalControl: a.operationalControl,
+          reportingPeriodStart: a.reportingPeriodStart,
+          reportingPeriodEnd: a.reportingPeriodEnd,
+          productionVolume: parseFloat(a.productionVolume),
+          productionVolumeUnit: a.productionVolumeUnit,
+          facilityTotalProduction: parseFloat(a.facilityTotalProduction),
+        }));
+
       const result = await calculateProductLCA({
         productId,
         functionalUnit: `1 ${product.unit || 'unit'} of ${product.name}`,
         systemBoundary: 'cradle-to-gate',
-        referenceYear: new Date().getFullYear()
+        referenceYear: new Date().getFullYear(),
+        facilityAllocations: validAllocations.length > 0 ? validAllocations : undefined
       });
 
       if (!result.success) {
@@ -175,6 +281,15 @@ export default function CalculateLCAPage() {
     if (score >= 70) return 'text-blue-600 dark:text-blue-400';
     return 'text-slate-600 dark:text-slate-400';
   };
+
+  const updateAllocation = (facilityId: string, field: keyof FacilityAllocation, value: string) => {
+    setFacilityAllocations(prev => prev.map(a =>
+      a.facilityId === facilityId ? { ...a, [field]: value } : a
+    ));
+  };
+
+  const hasFacilitiesWithAllocations = linkedFacilities.length > 0 &&
+    facilityAllocations.every(a => a.productionVolume && a.facilityTotalProduction);
 
   if (loading) {
     return <PageLoader message="Validating materials..." />;
@@ -294,6 +409,156 @@ export default function CalculateLCAPage() {
               })}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Facility Allocation Section */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Factory className="h-5 w-5" />
+                Facility Allocation
+              </CardTitle>
+              <CardDescription>
+                Enter production volumes for each linked facility to calculate manufacturing emissions
+              </CardDescription>
+            </div>
+            {linkedFacilities.length === 0 && (
+              <Link href={`/products/${productId}?tab=facilities`}>
+                <Button variant="outline" size="sm">
+                  Link Facilities
+                </Button>
+              </Link>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {linkedFacilities.length === 0 ? (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                No facilities linked to this product. Manufacturing emissions (Scope 1 & 2) will not be included.
+                <Link href={`/products/${productId}?tab=facilities`} className="ml-1 underline">
+                  Link facilities
+                </Link> to include facility-level emissions in the calculation.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <div className="space-y-6">
+              {facilityAllocations.map((allocation) => (
+                <div key={allocation.facilityId} className="p-4 rounded-lg border bg-slate-50 dark:bg-slate-900/50 space-y-4">
+                  <div className="flex items-center gap-3">
+                    {allocation.operationalControl === 'owned' ? (
+                      <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                        <Building2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                    ) : (
+                      <div className="h-10 w-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                        <Users className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold">{allocation.facilityName}</p>
+                      <Badge variant="outline" className="text-xs">
+                        {allocation.operationalControl === 'owned' ? 'Owned Facility' : 'Contract Manufacturer'}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Reporting Period Start
+                      </Label>
+                      <Input
+                        type="date"
+                        value={allocation.reportingPeriodStart}
+                        onChange={(e) => updateAllocation(allocation.facilityId, 'reportingPeriodStart', e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Reporting Period End
+                      </Label>
+                      <Input
+                        type="date"
+                        value={allocation.reportingPeriodEnd}
+                        onChange={(e) => updateAllocation(allocation.facilityId, 'reportingPeriodEnd', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label>Product Volume</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 10000"
+                        value={allocation.productionVolume}
+                        onChange={(e) => updateAllocation(allocation.facilityId, 'productionVolume', e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Volume of this product made at this facility
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Unit</Label>
+                      <Select
+                        value={allocation.productionVolumeUnit}
+                        onValueChange={(value) => updateAllocation(allocation.facilityId, 'productionVolumeUnit', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PRODUCTION_UNITS.map((unit) => (
+                            <SelectItem key={unit.value} value={unit.value}>
+                              {unit.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Total Facility Production</Label>
+                      <Input
+                        type="number"
+                        placeholder="e.g. 100000"
+                        value={allocation.facilityTotalProduction}
+                        onChange={(e) => updateAllocation(allocation.facilityId, 'facilityTotalProduction', e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Total production at facility in the period
+                      </p>
+                    </div>
+                  </div>
+
+                  {allocation.productionVolume && allocation.facilityTotalProduction && (
+                    <div className="p-3 rounded-lg bg-lime-50 dark:bg-lime-900/20 border border-lime-200 dark:border-lime-800">
+                      <p className="text-sm text-lime-800 dark:text-lime-200">
+                        <strong>Attribution Ratio:</strong>{' '}
+                        {((parseFloat(allocation.productionVolume) / parseFloat(allocation.facilityTotalProduction)) * 100).toFixed(2)}%
+                        of facility emissions will be allocated to this product
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {linkedFacilities.length > 0 && !hasFacilitiesWithAllocations && (
+                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800 dark:text-amber-200">
+                    Enter production volumes for all facilities to include manufacturing emissions in the calculation.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

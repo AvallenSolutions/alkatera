@@ -34,6 +34,10 @@ interface Product {
   name: string;
   product_description: string | null;
   product_image_url: string | null;
+  functional_unit: string | null;
+  unit_size_value: number | null;
+  unit_size_unit: string | null;
+  // Legacy fields (kept for backwards compatibility)
   functional_unit_type: string | null;
   functional_unit_volume: number | null;
   functional_unit_measure: string | null;
@@ -85,9 +89,22 @@ export default function ProductsPage() {
   };
 
   const formatFunctionalUnit = (product: Product) => {
-    if (!product.functional_unit_type) return "Not specified";
+    // First check the new functional_unit text field
+    if (product.functional_unit) {
+      return product.functional_unit;
+    }
 
-    return `${product.functional_unit_volume || "?"} ${product.functional_unit_measure || ""} ${product.functional_unit_type}`;
+    // Fallback: check unit_size fields
+    if (product.unit_size_value && product.unit_size_unit) {
+      return `${product.unit_size_value} ${product.unit_size_unit}`;
+    }
+
+    // Legacy fallback: check old functional_unit_type fields
+    if (product.functional_unit_type) {
+      return `${product.functional_unit_volume || "?"} ${product.functional_unit_measure || ""} ${product.functional_unit_type}`;
+    }
+
+    return "Not specified";
   };
 
   const getBoundaryBadge = (boundary: string) => {
@@ -144,6 +161,7 @@ export default function ProductsPage() {
     return (
       product.name.toLowerCase().includes(query) ||
       product.product_description?.toLowerCase().includes(query) ||
+      product.functional_unit?.toLowerCase().includes(query) ||
       product.functional_unit_type?.toLowerCase().includes(query)
     );
   });

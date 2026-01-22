@@ -27,10 +27,10 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import type { GaiaChartData } from '@/lib/types/gaia';
+import type { RosaChartData } from '@/lib/types/gaia';
 
-interface GaiaChartRendererProps {
-  chartData: GaiaChartData;
+interface RosaChartRendererProps {
+  chartData: RosaChartData;
 }
 
 const CHART_COLORS = [
@@ -44,7 +44,7 @@ const CHART_COLORS = [
   '#EF4444', // red-500
 ];
 
-export function GaiaChartRenderer({ chartData }: GaiaChartRendererProps) {
+export function RosaChartRenderer({ chartData }: RosaChartRendererProps) {
   const { type, title, data, config } = chartData;
 
   if (!data || (Array.isArray(data) && data.length === 0)) {
@@ -266,3 +266,7 @@ export function GaiaChartRenderer({ chartData }: GaiaChartRendererProps) {
     </Card>
   );
 }
+
+// Backwards compatibility alias
+/** @deprecated Use RosaChartRenderer instead */
+export const GaiaChartRenderer = RosaChartRenderer;

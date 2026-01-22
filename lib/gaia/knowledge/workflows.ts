@@ -1,8 +1,8 @@
-// Gaia Knowledge Base - Common Workflows
+// Rosa Knowledge Base - Common Workflows
 // Step-by-step guides for data entry and platform navigation
 //
-// IMPORTANT: Never refer to Gaia as "AI" or "AI agent" in any user-facing text.
-// Use "digital assistant", "sustainability guide", or simply "Gaia".
+// IMPORTANT: Never refer to Rosa as "AI" or "AI agent" in any user-facing text.
+// Use "digital assistant", "sustainability guide", or simply "Rosa".
 
 export interface WorkflowStep {
   instruction: string;

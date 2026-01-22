@@ -410,8 +410,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                     }`} />
                   </div>
                   <div>
-                    <CardTitle className="text-white">Production Sites</CardTitle>
-                    <CardDescription className="text-slate-400">CM allocations</CardDescription>
+                    <CardTitle className="text-white">Facilities</CardTitle>
+                    <CardDescription className="text-slate-400">Manufacturing allocations</CardDescription>
                   </div>
                 </div>
                 {allocationStatus.hasProvisionalAllocations ? (

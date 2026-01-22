@@ -231,7 +231,7 @@ export default function ProductionAllocationPage() {
   };
 
   const handleCellClick = (facilityId: string, productId: number) => {
-    router.push(`/products/${productId}?tab=production-sites&facility=${facilityId}`);
+    router.push(`/products/${productId}?tab=facilities&facility=${facilityId}`);
   };
 
   const handleToggleAssignment = async (facilityId: string, productId: number) => {
