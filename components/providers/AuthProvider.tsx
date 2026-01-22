@@ -22,11 +22,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
   const authStateCallbackRef = useRef<(() => void) | null>(null)
+  const currentUserIdRef = useRef<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Stable state updater - only triggers user state change if user ID actually changed
+  // This prevents cascading refetches when just refreshing tokens
+  const updateUserIfChanged = (newUser: User | null, newSession: Session | null) => {
+    const newUserId = newUser?.id || null
+    const userChanged = newUserId !== currentUserIdRef.current
+
+    // Always update session (needed for fresh tokens)
+    setSession(newSession)
+
+    // Only update user state if the user ID actually changed
+    if (userChanged) {
+      console.log('🔐 AuthProvider: User changed from', currentUserIdRef.current, 'to', newUserId)
+      currentUserIdRef.current = newUserId
+      setUser(newUser)
+      return true // User changed
+    }
+    return false // User did not change
+  }
 
   useEffect(() => {
     let mounted = true
@@ -52,10 +72,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             userId: initialSession.user.id,
             email: initialSession.user.email,
           })
+          currentUserIdRef.current = initialSession.user.id
           setSession(initialSession)
           setUser(initialSession.user)
         } else {
           console.log('ℹ️ AuthProvider: No active session')
+          currentUserIdRef.current = null
           setSession(null)
           setUser(null)
         }
@@ -83,29 +105,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (event === 'SIGNED_IN' && currentSession) {
         console.log('✅ User signed in:', currentSession.user.email)
-        setSession(currentSession)
-        setUser(currentSession.user)
+        const userChanged = updateUserIfChanged(currentSession.user, currentSession)
         setLoading(false)
-        if (authStateCallbackRef.current) {
+        // Only trigger callback on actual sign-in (user changed)
+        if (userChanged && authStateCallbackRef.current) {
           authStateCallbackRef.current()
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 User signed out')
+        currentUserIdRef.current = null
         setSession(null)
         setUser(null)
         setLoading(false)
         router.push('/login')
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {
-        console.log('🔄 Token refreshed')
+        // Only update session for token refresh - don't update user state
+        // This prevents cascading refetches when switching tabs
+        console.log('🔄 Token refreshed (session only, no cascade)')
         setSession(currentSession)
-        setUser(currentSession.user)
       } else if (event === 'USER_UPDATED' && currentSession) {
         console.log('👤 User updated')
+        // User metadata may have changed, so update user state
         setSession(currentSession)
         setUser(currentSession.user)
       } else if (currentSession) {
-        setSession(currentSession)
-        setUser(currentSession.user)
+        updateUserIfChanged(currentSession.user, currentSession)
         setLoading(false)
       }
     })
@@ -149,8 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (refreshedSession) {
         console.log('✅ AuthProvider: Session refreshed successfully')
+        // Only update session, not user - to prevent cascading refetches
         setSession(refreshedSession)
-        setUser(refreshedSession.user)
       }
     } catch (error) {
       console.error('❌ AuthProvider: Fatal refresh error:', error)
