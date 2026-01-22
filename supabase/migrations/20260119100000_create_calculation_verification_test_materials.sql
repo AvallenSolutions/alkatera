@@ -112,7 +112,7 @@ BEGIN
     0.45, 0.15,
     '{"co2_fossil": 0.45, "co2_biogenic": 0.15, "ch4_fossil": 0.001, "ch4_biogenic": 0.002, "n2o": 0.0008}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'UK',
-    2, 85, '1 kg malted barley at maltings gate', 'cradle_to_gate'
+    2, 85, '1 kg malted barley at maltings gate', 'cradle-to-gate'
   );
 
   -- Barley (raw)
@@ -128,7 +128,7 @@ BEGIN
     0.32, 0.10,
     '{"co2_fossil": 0.32, "co2_biogenic": 0.10, "ch4_fossil": 0.0008, "ch4_biogenic": 0.0015, "n2o": 0.0006}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'UK',
-    2, 85, '1 kg raw barley at farm gate', 'cradle_to_gate'
+    2, 85, '1 kg raw barley at farm gate', 'cradle-to-gate'
   );
 
   -- Wheat
@@ -144,7 +144,7 @@ BEGIN
     0.28, 0.08,
     '{"co2_fossil": 0.28, "co2_biogenic": 0.08, "ch4_fossil": 0.0006, "ch4_biogenic": 0.0012, "n2o": 0.0007}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'UK',
-    2, 85, '1 kg wheat at farm gate', 'cradle_to_gate'
+    2, 85, '1 kg wheat at farm gate', 'cradle-to-gate'
   );
 
   -- Maize/Corn
@@ -160,7 +160,7 @@ BEGIN
     0.26, 0.07,
     '{"co2_fossil": 0.26, "co2_biogenic": 0.07, "ch4_fossil": 0.0005, "ch4_biogenic": 0.0010, "n2o": 0.0006}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'Global',
-    2, 80, '1 kg maize at farm gate', 'cradle_to_gate'
+    2, 80, '1 kg maize at farm gate', 'cradle-to-gate'
   );
 
   -- Rice
@@ -176,7 +176,7 @@ BEGIN
     0.85, 0.25,
     '{"co2_fossil": 0.85, "co2_biogenic": 0.25, "ch4_fossil": 0.035, "ch4_biogenic": 0.015, "n2o": 0.0012}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'Global',
-    2, 80, '1 kg rice at mill gate', 'cradle_to_gate'
+    2, 80, '1 kg rice at mill gate', 'cradle-to-gate'
   );
 
   -- Oats
@@ -192,7 +192,7 @@ BEGIN
     0.38, 0.12,
     '{"co2_fossil": 0.38, "co2_biogenic": 0.12, "ch4_fossil": 0.0007, "ch4_biogenic": 0.0014, "n2o": 0.0006}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'UK',
-    2, 85, '1 kg oats at farm gate', 'cradle_to_gate'
+    2, 85, '1 kg oats at farm gate', 'cradle-to-gate'
   );
 
   RAISE NOTICE '  Created 6 grain ingredients';
@@ -216,7 +216,7 @@ BEGIN
     0.35, 0.12,
     '{"co2_fossil": 0.35, "co2_biogenic": 0.12, "ch4_fossil": 0.0005, "ch4_biogenic": 0.0008, "n2o": 0.0004}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'NZ',
-    2, 85, '1 kg grapes at vineyard gate', 'cradle_to_gate'
+    2, 85, '1 kg grapes at vineyard gate', 'cradle-to-gate'
   );
 
   -- Pinot Noir Grapes
@@ -232,7 +232,7 @@ BEGIN
     0.38, 0.13,
     '{"co2_fossil": 0.38, "co2_biogenic": 0.13, "ch4_fossil": 0.0005, "ch4_biogenic": 0.0008, "n2o": 0.0004}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'FR',
-    2, 85, '1 kg grapes at vineyard gate', 'cradle_to_gate'
+    2, 85, '1 kg grapes at vineyard gate', 'cradle-to-gate'
   );
 
   -- Chardonnay Grapes
@@ -248,7 +248,7 @@ BEGIN
     0.34, 0.12,
     '{"co2_fossil": 0.34, "co2_biogenic": 0.12, "ch4_fossil": 0.0005, "ch4_biogenic": 0.0008, "n2o": 0.0004}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'FR',
-    2, 85, '1 kg grapes at vineyard gate', 'cradle_to_gate'
+    2, 85, '1 kg grapes at vineyard gate', 'cradle-to-gate'
   );
 
   -- Apples (cider)
@@ -264,7 +264,7 @@ BEGIN
     0.20, 0.08,
     '{"co2_fossil": 0.20, "co2_biogenic": 0.08, "ch4_fossil": 0.0003, "ch4_biogenic": 0.0006, "n2o": 0.0003}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'UK',
-    2, 85, '1 kg cider apples at orchard gate', 'cradle_to_gate'
+    2, 85, '1 kg cider apples at orchard gate', 'cradle-to-gate'
   );
 
   -- Agave
@@ -280,7 +280,7 @@ BEGIN
     0.28, 0.10,
     '{"co2_fossil": 0.28, "co2_biogenic": 0.10, "ch4_fossil": 0.0004, "ch4_biogenic": 0.0008, "n2o": 0.0004}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'MX',
-    2, 80, '1 kg agave at farm gate', 'cradle_to_gate'
+    2, 80, '1 kg agave at farm gate', 'cradle-to-gate'
   );
 
   -- Juniper Berries
@@ -296,7 +296,7 @@ BEGIN
     0.75, 0.25,
     '{"co2_fossil": 0.75, "co2_biogenic": 0.25, "ch4_fossil": 0.0010, "ch4_biogenic": 0.0020, "n2o": 0.0008}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 80, '1 kg juniper berries dried', 'cradle_to_gate'
+    2, 80, '1 kg juniper berries dried', 'cradle-to-gate'
   );
 
   RAISE NOTICE '  Created 6 fruit/grape ingredients';
@@ -320,7 +320,7 @@ BEGIN
     1.35, 0.45,
     '{"co2_fossil": 1.35, "co2_biogenic": 0.45, "ch4_fossil": 0.0015, "ch4_biogenic": 0.0030, "n2o": 0.0015}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'UK',
-    2, 85, '1 kg whole hops at processing gate', 'cradle_to_gate'
+    2, 85, '1 kg whole hops at processing gate', 'cradle-to-gate'
   );
 
   -- Hops (pellets)
@@ -336,7 +336,7 @@ BEGIN
     1.55, 0.50,
     '{"co2_fossil": 1.55, "co2_biogenic": 0.50, "ch4_fossil": 0.0018, "ch4_biogenic": 0.0035, "n2o": 0.0016}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'UK',
-    2, 85, '1 kg hop pellets at processing gate', 'cradle_to_gate'
+    2, 85, '1 kg hop pellets at processing gate', 'cradle-to-gate'
   );
 
   -- Brewing Yeast
@@ -352,7 +352,7 @@ BEGIN
     1.20, 0.40,
     '{"co2_fossil": 1.20, "co2_biogenic": 0.40, "ch4_fossil": 0.0012, "ch4_biogenic": 0.0025, "n2o": 0.0010}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 80, '1 kg active dried yeast', 'cradle_to_gate'
+    2, 80, '1 kg active dried yeast', 'cradle-to-gate'
   );
 
   -- Wine Yeast
@@ -368,7 +368,7 @@ BEGIN
     1.20, 0.40,
     '{"co2_fossil": 1.20, "co2_biogenic": 0.40, "ch4_fossil": 0.0012, "ch4_biogenic": 0.0025, "n2o": 0.0010}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 80, '1 kg active dried yeast', 'cradle_to_gate'
+    2, 80, '1 kg active dried yeast', 'cradle-to-gate'
   );
 
   -- Distilling Yeast
@@ -384,7 +384,7 @@ BEGIN
     1.20, 0.40,
     '{"co2_fossil": 1.20, "co2_biogenic": 0.40, "ch4_fossil": 0.0012, "ch4_biogenic": 0.0025, "n2o": 0.0010}'::jsonb,
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 80, '1 kg active dried yeast', 'cradle_to_gate'
+    2, 80, '1 kg active dried yeast', 'cradle-to-gate'
   );
 
   RAISE NOTICE '  Created 5 hops/yeast ingredients';
@@ -408,7 +408,7 @@ BEGIN
     0.00032, 0.0,
     '{"co2_fossil": 0.00032, "co2_biogenic": 0.0, "ch4": 0.000001, "n2o": 0.0000001}'::jsonb,
     'secondary_modelled', 'DEFRA_2025', 2025, 'UK',
-    1, 95, '1 L municipal water delivered', 'cradle_to_gate'
+    1, 95, '1 L municipal water delivered', 'cradle-to-gate'
   );
 
   -- Brewing Water
@@ -424,7 +424,7 @@ BEGIN
     0.00032, 0.0,
     '{"co2_fossil": 0.00032, "co2_biogenic": 0.0, "ch4": 0.000001, "n2o": 0.0000001}'::jsonb,
     'secondary_modelled', 'DEFRA_2025', 2025, 'UK',
-    1, 95, '1 L brewing water', 'cradle_to_gate'
+    1, 95, '1 L brewing water', 'cradle-to-gate'
   );
 
   -- Spring Water
@@ -440,7 +440,7 @@ BEGIN
     0.00014, 0.0,
     '{"co2_fossil": 0.00014, "co2_biogenic": 0.0, "ch4": 0.0000005, "n2o": 0.00000005}'::jsonb,
     'secondary_modelled', 'DEFRA_2025', 2025, 'UK',
-    2, 90, '1 L spring water at source', 'cradle_to_gate'
+    2, 90, '1 L spring water at source', 'cradle-to-gate'
   );
 
   -- Bore Water
@@ -456,7 +456,7 @@ BEGIN
     0.00019, 0.0,
     '{"co2_fossil": 0.00019, "co2_biogenic": 0.0, "ch4": 0.0000008, "n2o": 0.00000008}'::jsonb,
     'secondary_modelled', 'DEFRA_2025', 2025, 'UK',
-    2, 90, '1 L bore water pumped', 'cradle_to_gate'
+    2, 90, '1 L bore water pumped', 'cradle-to-gate'
   );
 
   RAISE NOTICE '  Created 4 water ingredients';
@@ -482,7 +482,7 @@ BEGIN
     '{"co2_fossil": 1.05, "co2_biogenic": 0.02, "ch4": 0.0005, "n2o": 0.0001}'::jsonb,
     0, 95, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg glass at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg glass at factory gate', 'cradle-to-gate'
   );
 
   -- Glass (green)
@@ -500,7 +500,7 @@ BEGIN
     '{"co2_fossil": 1.01, "co2_biogenic": 0.02, "ch4": 0.0005, "n2o": 0.0001}'::jsonb,
     0, 95, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg glass at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg glass at factory gate', 'cradle-to-gate'
   );
 
   -- Glass (amber)
@@ -518,7 +518,7 @@ BEGIN
     '{"co2_fossil": 1.03, "co2_biogenic": 0.02, "ch4": 0.0005, "n2o": 0.0001}'::jsonb,
     0, 95, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg glass at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg glass at factory gate', 'cradle-to-gate'
   );
 
   -- Glass (35% recycled)
@@ -536,7 +536,7 @@ BEGIN
     '{"co2_fossil": 0.82, "co2_biogenic": 0.015, "ch4": 0.0004, "n2o": 0.0001}'::jsonb,
     35, 95, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg glass at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg glass at factory gate', 'cradle-to-gate'
   );
 
   -- Glass (50% recycled)
@@ -554,7 +554,7 @@ BEGIN
     '{"co2_fossil": 0.69, "co2_biogenic": 0.015, "ch4": 0.0003, "n2o": 0.0001}'::jsonb,
     50, 95, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg glass at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg glass at factory gate', 'cradle-to-gate'
   );
 
   -- Glass (80% recycled)
@@ -572,7 +572,7 @@ BEGIN
     '{"co2_fossil": 0.50, "co2_biogenic": 0.01, "ch4": 0.0002, "n2o": 0.0001}'::jsonb,
     80, 95, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg glass at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg glass at factory gate', 'cradle-to-gate'
   );
 
   RAISE NOTICE '  Created 6 glass packaging materials';
@@ -598,7 +598,7 @@ BEGIN
     '{"co2_fossil": 11.20, "co2_biogenic": 0.10, "ch4": 0.005, "n2o": 0.002}'::jsonb,
     0, 100, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'Global',
-    2, 85, '1 kg aluminium at smelter gate', 'cradle_to_gate'
+    2, 85, '1 kg aluminium at smelter gate', 'cradle-to-gate'
   );
 
   -- Aluminium (30% recycled)
@@ -616,7 +616,7 @@ BEGIN
     '{"co2_fossil": 8.40, "co2_biogenic": 0.08, "ch4": 0.004, "n2o": 0.0015}'::jsonb,
     30, 100, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'Global',
-    2, 85, '1 kg aluminium at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg aluminium at factory gate', 'cradle-to-gate'
   );
 
   -- Aluminium (50% recycled)
@@ -634,7 +634,7 @@ BEGIN
     '{"co2_fossil": 6.70, "co2_biogenic": 0.06, "ch4": 0.003, "n2o": 0.0012}'::jsonb,
     50, 100, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'Global',
-    2, 85, '1 kg aluminium at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg aluminium at factory gate', 'cradle-to-gate'
   );
 
   -- Aluminium (70% recycled)
@@ -652,7 +652,7 @@ BEGIN
     '{"co2_fossil": 5.00, "co2_biogenic": 0.05, "ch4": 0.002, "n2o": 0.0010}'::jsonb,
     70, 100, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'Global',
-    2, 85, '1 kg aluminium at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg aluminium at factory gate', 'cradle-to-gate'
   );
 
   -- Steel (primary)
@@ -670,7 +670,7 @@ BEGIN
     '{"co2_fossil": 2.80, "co2_biogenic": 0.03, "ch4": 0.002, "n2o": 0.001}'::jsonb,
     0, 90, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg steel at mill gate', 'cradle_to_gate'
+    2, 85, '1 kg steel at mill gate', 'cradle-to-gate'
   );
 
   -- Steel (60% recycled)
@@ -688,7 +688,7 @@ BEGIN
     '{"co2_fossil": 1.40, "co2_biogenic": 0.02, "ch4": 0.001, "n2o": 0.0005}'::jsonb,
     60, 90, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg steel at mill gate', 'cradle_to_gate'
+    2, 85, '1 kg steel at mill gate', 'cradle-to-gate'
   );
 
   -- Tinplate
@@ -706,7 +706,7 @@ BEGIN
     '{"co2_fossil": 3.00, "co2_biogenic": 0.03, "ch4": 0.002, "n2o": 0.001}'::jsonb,
     25, 85, 'recycling',
     'secondary_modelled', 'IPCC_AR6_GWP100', 2025, 'EU',
-    2, 85, '1 kg tinplate at factory gate', 'cradle_to_gate'
+    2, 85, '1 kg tinplate at factory gate', 'cradle-to-gate'
   );
 
   RAISE NOTICE '  Created 7 metal packaging materials';

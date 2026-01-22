@@ -91,10 +91,10 @@ DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'system_boundary_type') THEN
     CREATE TYPE system_boundary_type AS ENUM (
-      'cradle_to_gate',
-      'cradle_to_grave',
-      'gate_to_gate',
-      'cradle_to_cradle'
+      'cradle-to-gate',
+      'cradle-to-grave',
+      'gate-to-gate',
+      'cradle-to-cradle'
     );
   END IF;
 END $$;
@@ -510,7 +510,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.supplier_products
       ADD COLUMN system_boundary TEXT
-      CHECK (system_boundary IS NULL OR system_boundary IN ('cradle_to_gate', 'cradle_to_grave', 'gate_to_gate', 'cradle_to_cradle'));
+      CHECK (system_boundary IS NULL OR system_boundary IN ('cradle-to-gate', 'cradle-to-grave', 'gate-to-gate', 'cradle-to-cradle'));
   END IF;
 END $$;
 
@@ -762,7 +762,7 @@ CREATE TABLE IF NOT EXISTS public.platform_supplier_products (
   data_source_type TEXT CHECK (data_source_type IS NULL OR data_source_type IN ('primary_verified', 'secondary_modelled', 'hybrid_proxy')),
   methodology_standard TEXT,
   functional_unit TEXT,
-  system_boundary TEXT CHECK (system_boundary IS NULL OR system_boundary IN ('cradle_to_gate', 'cradle_to_grave', 'gate_to_gate', 'cradle_to_cradle')),
+  system_boundary TEXT CHECK (system_boundary IS NULL OR system_boundary IN ('cradle-to-gate', 'cradle-to-grave', 'gate-to-gate', 'cradle-to-cradle')),
 
   -- Validity & temporal
   valid_from DATE,

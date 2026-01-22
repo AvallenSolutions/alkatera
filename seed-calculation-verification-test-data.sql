@@ -175,7 +175,7 @@ BEGIN
     upstream_ingredients_complete, upstream_packaging_complete, core_operations_complete, core_operations_facility_id)
   VALUES (v_org_id, 'Highland Single Malt Whisky', 'TEST-SPR-001',
     'A premium single malt whisky from the Scottish Highlands. Made from malted barley, spring water, and a touch of peat smoke. Packaged in a 700ml glass bottle with traditional cork closure.',
-    700, 'ml', '1 x 700ml bottle', 'cradle_to_gate', 'Spirits', false, true, true, true, v_distillery_id)
+    700, 'ml', '1 x 700ml bottle', 'cradle-to-gate', 'Spirits', false, true, true, true, v_distillery_id)
   RETURNING id INTO v_whisky_id;
 
   -- Marlborough Sauvignon Blanc
@@ -184,7 +184,7 @@ BEGIN
     upstream_ingredients_complete, upstream_packaging_complete, core_operations_complete, core_operations_facility_id)
   VALUES (v_org_id, 'Marlborough Sauvignon Blanc', 'TEST-WIN-001',
     'A crisp Sauvignon Blanc from Marlborough, New Zealand. Made from estate-grown grapes. Packaged in a 750ml glass bottle with natural cork. Transported by sea to UK market.',
-    750, 'ml', '1 x 750ml bottle', 'cradle_to_gate', 'Wine', false, true, true, true, v_winery_id)
+    750, 'ml', '1 x 750ml bottle', 'cradle-to-gate', 'Wine', false, true, true, true, v_winery_id)
   RETURNING id INTO v_wine_id;
 
   -- Oxford Craft Lager
@@ -193,7 +193,7 @@ BEGIN
     upstream_ingredients_complete, upstream_packaging_complete, core_operations_complete, core_operations_facility_id)
   VALUES (v_org_id, 'Oxford Craft Lager', 'TEST-BER-001',
     'A refreshing craft lager brewed in Oxford, UK. Made from local malted barley, premium hops, and pure water. Packaged in a 330ml aluminium can.',
-    330, 'ml', '1 x 330ml can', 'cradle_to_gate', 'Beer', false, true, true, true, v_brewery_id)
+    330, 'ml', '1 x 330ml can', 'cradle-to-gate', 'Beer', false, true, true, true, v_brewery_id)
   RETURNING id INTO v_beer_id;
 
   RAISE NOTICE '✓ Created 3 products';

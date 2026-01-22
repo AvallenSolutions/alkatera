@@ -50,7 +50,7 @@ END $$;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'system_boundary_enum') THEN
-    CREATE TYPE public.system_boundary_enum AS ENUM ('cradle_to_gate', 'cradle_to_grave');
+    CREATE TYPE public.system_boundary_enum AS ENUM ('cradle-to-gate', 'gate-to-gate', 'cradle-to-grave');
   END IF;
 END $$;
 
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS public.products (
     functional_unit_type public.functional_unit_type_enum,
     functional_unit_volume NUMERIC,
     functional_unit_measure public.functional_unit_measure_enum,
-    system_boundary public.system_boundary_enum NOT NULL DEFAULT 'cradle_to_gate',
+    system_boundary public.system_boundary_enum NOT NULL DEFAULT 'cradle-to-gate',
     created_by UUID REFERENCES auth.users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

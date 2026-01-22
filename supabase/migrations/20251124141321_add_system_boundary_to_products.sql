@@ -14,7 +14,7 @@
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'system_boundary_enum') THEN
-    CREATE TYPE public.system_boundary_enum AS ENUM ('cradle_to_gate', 'cradle_to_grave');
+    CREATE TYPE public.system_boundary_enum AS ENUM ('cradle-to-gate', 'gate-to-gate', 'cradle-to-grave');
   END IF;
 END $$;
 
@@ -27,8 +27,8 @@ BEGIN
     AND table_name = 'products'
     AND column_name = 'system_boundary'
   ) THEN
-    ALTER TABLE public.products 
-    ADD COLUMN system_boundary public.system_boundary_enum NOT NULL DEFAULT 'cradle_to_gate';
+    ALTER TABLE public.products
+    ADD COLUMN system_boundary public.system_boundary_enum NOT NULL DEFAULT 'cradle-to-gate';
   END IF;
 END $$;
 
