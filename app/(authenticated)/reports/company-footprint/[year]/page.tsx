@@ -20,6 +20,10 @@ import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard"
 import { CompanyFleetCard } from "@/components/reports/CompanyFleetCard";
 import { MarketingMaterialsCard } from "@/components/reports/MarketingMaterialsCard";
 import { FootprintSummaryDashboard } from "@/components/reports/FootprintSummaryDashboard";
+// New GHG Protocol Scope 3 category cards
+import { UpstreamTransportCard } from "@/components/reports/UpstreamTransportCard";
+import { DownstreamTransportCard } from "@/components/reports/DownstreamTransportCard";
+import { UsePhaseCard } from "@/components/reports/UsePhaseCard";
 import { useScope3Emissions } from "@/hooks/data/useScope3Emissions";
 import { toast } from "sonner";
 
@@ -258,6 +262,10 @@ export default function FootprintBuilderPage() {
   const capitalGoodsEntries = overheads.filter((o) => o.category === "capital_goods") as any[];
   const logisticsEntries = overheads.filter((o) => o.category === "downstream_logistics") as any[];
   const wasteEntries = overheads.filter((o) => o.category === "operational_waste") as any[];
+  // New GHG Protocol categories
+  const upstreamTransportEntries = overheads.filter((o) => o.category === "upstream_transport") as any[];
+  const downstreamTransportEntries = overheads.filter((o) => o.category === "downstream_transport") as any[];
+  const usePhaseEntries = overheads.filter((o) => o.category === "use_phase") as any[];
 
   // Use the total from the shared hook
   const scope3TotalCO2e = scope3Emissions.total;
@@ -372,6 +380,39 @@ export default function FootprintBuilderPage() {
         {report && (
           <OperationalWasteCard reportId={report.id} entries={wasteEntries} onUpdate={fetchReportData} />
         )}
+
+        {/* Card 11: Upstream Transport (Category 4) */}
+        {report && currentOrganization && (
+          <UpstreamTransportCard
+            reportId={report.id}
+            organizationId={currentOrganization.id}
+            year={year}
+            entries={upstreamTransportEntries}
+            onUpdate={fetchReportData}
+          />
+        )}
+
+        {/* Card 12: Downstream Transport (Category 9) */}
+        {report && currentOrganization && (
+          <DownstreamTransportCard
+            reportId={report.id}
+            organizationId={currentOrganization.id}
+            year={year}
+            entries={downstreamTransportEntries}
+            onUpdate={fetchReportData}
+          />
+        )}
+
+        {/* Card 13: Use of Products (Category 11) */}
+        {report && currentOrganization && (
+          <UsePhaseCard
+            reportId={report.id}
+            organizationId={currentOrganization.id}
+            year={year}
+            entries={usePhaseEntries}
+            onUpdate={fetchReportData}
+          />
+        )}
       </div>
 
       {/* Summary Dashboard */}
@@ -389,6 +430,10 @@ export default function FootprintBuilderPage() {
           downstream_logistics: scope3Emissions.downstream_logistics,
           operational_waste: scope3Emissions.operational_waste,
           marketing_materials: scope3Emissions.marketing_materials,
+          // New GHG Protocol categories
+          upstream_transport: scope3Emissions.upstream_transport,
+          downstream_transport: scope3Emissions.downstream_transport,
+          use_phase: scope3Emissions.use_phase,
         }}
         operationsEmissions={operationsCO2e}
         fleetEmissions={fleetCO2e}
