@@ -1,14 +1,14 @@
-// Gaia Action Handlers
+// Rosa Action Handlers
 // Handles platform navigation, UI highlighting, and guided workflows
 //
-// IMPORTANT: Never refer to Gaia as "AI" or "AI agent" in any user-facing text.
-// Use "digital assistant", "sustainability guide", or simply "Gaia".
+// IMPORTANT: Never refer to Rosa as "AI" or "AI agent" in any user-facing text.
+// Use "digital assistant", "sustainability guide", or simply "Rosa".
 
 import type {
-  GaiaAction,
-  GaiaUserContext,
-  GaiaNavigatePayload,
-  GaiaHighlightPayload,
+  RosaAction,
+  RosaUserContext,
+  RosaNavigatePayload,
+  RosaHighlightPayload,
 } from '@/lib/types/gaia';
 
 /**
@@ -34,7 +34,8 @@ const NAVIGATION_MAP: Record<string, string> = {
   'resources': '/resources',
   'certifications': '/certifications',
   'settings': '/settings',
-  'gaia': '/gaia',
+  'rosa': '/rosa',
+  'gaia': '/rosa', // Backwards compatibility
 
   // Common actions - products
   'add product': '/products/new',
@@ -87,7 +88,8 @@ const PAGE_NAME_MAP: Record<string, string> = {
   '/resources': 'Resources',
   '/certifications': 'Certifications',
   '/settings': 'Settings',
-  '/gaia': 'Gaia',
+  '/rosa': 'Rosa',
+  '/gaia': 'Rosa', // Backwards compatibility
   '/reports': 'Reports',
   '/import': 'Bulk Import',
 };
@@ -131,13 +133,13 @@ export function resolveNavigationPath(
 }
 
 /**
- * Parse navigation instructions from Gaia's response text
+ * Parse navigation instructions from Rosa's response text
  */
 export function parseActionsFromResponse(
   response: string,
-  _context: GaiaUserContext
-): GaiaAction[] {
-  const actions: GaiaAction[] = [];
+  _context: RosaUserContext
+): RosaAction[] {
+  const actions: RosaAction[] = [];
   const addedPaths = new Set<string>();
 
   // Navigation patterns to detect
@@ -178,7 +180,7 @@ export function parseActionsFromResponse(
             payload: {
               path: destination,
               label,
-            } as GaiaNavigatePayload,
+            } as RosaNavigatePayload,
           });
         }
       }
@@ -211,9 +213,9 @@ export function parseActionsFromResponse(
 }
 
 /**
- * GaiaActionHandler class for executing actions on the frontend
+ * RosaActionHandler class for executing actions on the frontend
  */
-export class GaiaActionHandler {
+export class RosaActionHandler {
   private router: { push: (path: string) => void } | null = null;
 
   /**
@@ -224,23 +226,23 @@ export class GaiaActionHandler {
   }
 
   /**
-   * Parse actions from Gaia's response
+   * Parse actions from Rosa's response
    */
-  parseActionsFromResponse(response: string, context: GaiaUserContext): GaiaAction[] {
+  parseActionsFromResponse(response: string, context: RosaUserContext): RosaAction[] {
     return parseActionsFromResponse(response, context);
   }
 
   /**
    * Execute an action
    */
-  executeAction(action: GaiaAction): void {
+  executeAction(action: RosaAction): void {
     switch (action.type) {
       case 'navigate':
-        this.handleNavigate(action.payload as GaiaNavigatePayload);
+        this.handleNavigate(action.payload as RosaNavigatePayload);
         break;
 
       case 'highlight':
-        this.handleHighlight(action.payload as GaiaHighlightPayload);
+        this.handleHighlight(action.payload as RosaHighlightPayload);
         break;
 
       case 'open_modal':
@@ -261,7 +263,7 @@ export class GaiaActionHandler {
   /**
    * Handle navigation action
    */
-  private handleNavigate(payload: GaiaNavigatePayload): void {
+  private handleNavigate(payload: RosaNavigatePayload): void {
     if (this.router && payload.path) {
       this.router.push(payload.path);
     } else if (typeof window !== 'undefined' && payload.path) {
@@ -273,7 +275,7 @@ export class GaiaActionHandler {
   /**
    * Handle highlight action - highlights a UI element
    */
-  private handleHighlight(payload: GaiaHighlightPayload): void {
+  private handleHighlight(payload: RosaHighlightPayload): void {
     if (typeof window === 'undefined') return;
 
     const element = document.querySelector(payload.selector);
@@ -281,12 +283,14 @@ export class GaiaActionHandler {
       // Scroll element into view
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-      // Add highlight class
-      element.classList.add('gaia-highlight');
+      // Add highlight class (using rosa-highlight, with gaia-highlight for backwards compatibility)
+      element.classList.add('rosa-highlight');
+      element.classList.add('gaia-highlight'); // Backwards compatibility
 
       // Remove after duration (default 3 seconds)
       const duration = payload.duration || 3000;
       setTimeout(() => {
+        element.classList.remove('rosa-highlight');
         element.classList.remove('gaia-highlight');
       }, duration);
     }
@@ -298,6 +302,12 @@ export class GaiaActionHandler {
   private handleOpenModal(payload: unknown): void {
     if (typeof window === 'undefined') return;
 
+    window.dispatchEvent(
+      new CustomEvent('rosa:open-modal', {
+        detail: payload,
+      })
+    );
+    // Backwards compatibility event
     window.dispatchEvent(
       new CustomEvent('gaia:open-modal', {
         detail: payload,
@@ -312,6 +322,12 @@ export class GaiaActionHandler {
     if (typeof window === 'undefined') return;
 
     window.dispatchEvent(
+      new CustomEvent('rosa:message', {
+        detail: payload,
+      })
+    );
+    // Backwards compatibility event
+    window.dispatchEvent(
       new CustomEvent('gaia:message', {
         detail: payload,
       })
@@ -325,6 +341,12 @@ export class GaiaActionHandler {
     if (typeof window === 'undefined') return;
 
     window.dispatchEvent(
+      new CustomEvent('rosa:prefill', {
+        detail: payload,
+      })
+    );
+    // Backwards compatibility event
+    window.dispatchEvent(
       new CustomEvent('gaia:prefill', {
         detail: payload,
       })
@@ -332,14 +354,18 @@ export class GaiaActionHandler {
   }
 }
 
+// Backwards compatibility alias
+/** @deprecated Use RosaActionHandler instead */
+export const GaiaActionHandler = RosaActionHandler;
+
 /**
  * Create a singleton instance of the action handler
  */
-let actionHandlerInstance: GaiaActionHandler | null = null;
+let actionHandlerInstance: RosaActionHandler | null = null;
 
-export function getActionHandler(): GaiaActionHandler {
+export function getActionHandler(): RosaActionHandler {
   if (!actionHandlerInstance) {
-    actionHandlerInstance = new GaiaActionHandler();
+    actionHandlerInstance = new RosaActionHandler();
   }
   return actionHandlerInstance;
 }
@@ -347,8 +373,8 @@ export function getActionHandler(): GaiaActionHandler {
 /**
  * Generate navigation suggestions based on current context
  */
-export function getNavigationSuggestions(context: GaiaUserContext): GaiaAction[] {
-  const suggestions: GaiaAction[] = [];
+export function getNavigationSuggestions(context: RosaUserContext): RosaAction[] {
+  const suggestions: RosaAction[] = [];
 
   // Suggest based on missing data
   if (context.missingData) {
@@ -401,7 +427,8 @@ export function getNavigationSuggestions(context: GaiaUserContext): GaiaAction[]
 }
 
 export default {
-  GaiaActionHandler,
+  RosaActionHandler,
+  GaiaActionHandler, // Backwards compatibility
   getActionHandler,
   parseActionsFromResponse,
   resolveNavigationPath,

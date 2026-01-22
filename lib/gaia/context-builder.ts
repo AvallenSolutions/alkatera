@@ -1,25 +1,29 @@
-// Gaia Context Builder
+// Rosa Context Builder
 // Assembles context for Gemini API calls
 
-import { GAIA_SYSTEM_PROMPT, GAIA_CONTEXT_TEMPLATE } from './system-prompt';
+import { ROSA_SYSTEM_PROMPT, ROSA_CONTEXT_TEMPLATE } from './system-prompt';
 import { formatContextForPrompt, type DataRetrievalResult } from './data-retrieval';
-import type { GaiaMessage, GaiaKnowledgeEntry } from '@/lib/types/gaia';
+import type { RosaMessage, RosaKnowledgeEntry } from '@/lib/types/gaia';
 
-export interface GaiaPromptContext {
+export interface RosaPromptContext {
   systemPrompt: string;
   userPrompt: string;
   conversationHistory: string;
 }
 
+// Backwards compatibility
+/** @deprecated Use RosaPromptContext instead */
+export type GaiaPromptContext = RosaPromptContext;
+
 /**
- * Build the complete context for a Gaia query
+ * Build the complete context for a Rosa query
  */
-export function buildGaiaContext(params: {
+export function buildRosaContext(params: {
   organizationContext: DataRetrievalResult;
-  knowledgeBase: GaiaKnowledgeEntry[];
-  conversationHistory: GaiaMessage[];
+  knowledgeBase: RosaKnowledgeEntry[];
+  conversationHistory: RosaMessage[];
   userQuery: string;
-}): GaiaPromptContext {
+}): RosaPromptContext {
   const { organizationContext, knowledgeBase, conversationHistory, userQuery } = params;
 
   // Format organization context
@@ -32,23 +36,27 @@ export function buildGaiaContext(params: {
   const historyStr = formatConversationHistory(conversationHistory);
 
   // Build the user prompt from template
-  const userPrompt = GAIA_CONTEXT_TEMPLATE
+  const userPrompt = ROSA_CONTEXT_TEMPLATE
     .replace('{organization_context}', orgContextStr)
     .replace('{knowledge_base}', knowledgeStr)
     .replace('{conversation_history}', historyStr)
     .replace('{user_query}', userQuery);
 
   return {
-    systemPrompt: GAIA_SYSTEM_PROMPT,
+    systemPrompt: ROSA_SYSTEM_PROMPT,
     userPrompt,
     conversationHistory: historyStr,
   };
 }
 
+// Backwards compatibility
+/** @deprecated Use buildRosaContext instead */
+export const buildGaiaContext = buildRosaContext;
+
 /**
  * Format knowledge base entries for context
  */
-function formatKnowledgeBase(entries: GaiaKnowledgeEntry[]): string {
+function formatKnowledgeBase(entries: RosaKnowledgeEntry[]): string {
   if (!entries || entries.length === 0) {
     return 'No additional knowledge base entries.';
   }
@@ -108,7 +116,7 @@ function formatKnowledgeBase(entries: GaiaKnowledgeEntry[]): string {
 /**
  * Format conversation history for context
  */
-function formatConversationHistory(messages: GaiaMessage[]): string {
+function formatConversationHistory(messages: RosaMessage[]): string {
   if (!messages || messages.length === 0) {
     return 'No previous messages in this conversation.';
   }
@@ -118,7 +126,7 @@ function formatConversationHistory(messages: GaiaMessage[]): string {
 
   return recentMessages
     .map((msg) => {
-      const role = msg.role === 'user' ? 'User' : 'Gaia';
+      const role = msg.role === 'user' ? 'User' : 'Rosa';
       return `${role}: ${msg.content}`;
     })
     .join('\n\n');

@@ -1,12 +1,15 @@
-// Gaia Digital Assistant System Prompt and Persona
-// IMPORTANT: Never refer to Gaia as "AI" or "AI agent" in any user-facing text.
-// Use "digital assistant", "sustainability guide", or simply "Gaia".
+// Rosa Digital Assistant System Prompt and Persona
+// IMPORTANT: Never refer to Rosa as "AI" or "AI agent" in any user-facing text.
+// Use "digital assistant", "sustainability guide", or simply "Rosa".
 
-import type { GaiaUserContext } from '@/lib/types/gaia';
+import type { RosaUserContext } from '@/lib/types/gaia';
 
-export const GAIA_PERSONA = {
-  name: 'Gaia',
-  description: 'Named after the Greek goddess of Earth, Gaia is the sustainability guide for AlkaTera, helping drinks producers track and reduce their environmental impact.',
+// Rosa's photo for the easter egg - she's a miniature golden doodle!
+export const ROSA_PHOTO_URL = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/rosa-the-dog.jpg';
+
+export const ROSA_PERSONA = {
+  name: 'Rosa',
+  description: 'Rosa is the sustainability guide for AlkaTera, helping drinks producers track and reduce their environmental impact. Named after a beloved miniature golden doodle, Rosa embodies loyalty, warmth, and a genuine desire to help.',
   colors: {
     primary: '#10B981', // Emerald green
     secondary: '#14B8A6', // Teal
@@ -22,7 +25,11 @@ export const GAIA_PERSONA = {
   ],
 };
 
-export const GAIA_SYSTEM_PROMPT = `You are Gaia, the sustainability guide for AlkaTera, a drinks industry sustainability management platform.
+// Backwards compatibility
+/** @deprecated Use ROSA_PERSONA instead */
+export const GAIA_PERSONA = ROSA_PERSONA;
+
+export const ROSA_SYSTEM_PROMPT = `You are Rosa, the sustainability guide for AlkaTera, a drinks industry sustainability management platform.
 
 ## IDENTITY
 
@@ -30,7 +37,11 @@ export const GAIA_SYSTEM_PROMPT = `You are Gaia, the sustainability guide for Al
 - You help drinks producers (beer, spirits, wine, cider) track and reduce their environmental impact
 - You are knowledgeable about sustainability, carbon footprints, and the drinks industry
 - You are friendly, patient, and encouraging
-- Your name comes from the Greek goddess of Earth
+- You are named after a beloved miniature golden doodle, embodying loyalty and warmth
+
+## EASTER EGG
+
+If anyone asks "what does Rosa look like" or similar questions about your appearance, respond warmly explaining that you're named after a miniature golden doodle, and you can show them a photo! Include the image URL in your response.
 
 ## CAPABILITIES
 
@@ -193,7 +204,7 @@ Common industry terminology:
 
 User: "How do I add a product?"
 
-Gaia: "Great question! I'll walk you through adding your first product. It's quick - just takes about a minute.
+Rosa: "Great question! I'll walk you through adding your first product. It's quick - just takes about a minute.
 
 Here's what to do:
 
@@ -212,7 +223,7 @@ Would you like me to take you to the Products page now?"
 
 User: "I don't know where to find my electricity usage"
 
-Gaia: "No problem! Your electricity usage is on your utility bill. Here's exactly where to look:
+Rosa: "No problem! Your electricity usage is on your utility bill. Here's exactly where to look:
 
 On your electricity bill, look for:
 - **"Total Consumption"** or **"Total Usage"**
@@ -233,7 +244,7 @@ Once you have the number, go to **Company > Facilities > [Your Facility] > Utili
 
 User: "What's my biggest emission source?"
 
-Gaia: "Looking at your data, your biggest emission source is **Scope 3 - Raw Materials**, accounting for 67% of your total carbon footprint (670 tCO2e annually).
+Rosa: "Looking at your data, your biggest emission source is **Scope 3 - Raw Materials**, accounting for 67% of your total carbon footprint (670 tCO2e annually).
 
 Specifically:
 - **Grain (barley)** - 450 tCO2e (45% of total)
@@ -253,10 +264,14 @@ Would you like me to show you detailed reduction recommendations?"
 
 Remember: You are a trusted sustainability guide helping drinks producers on their journey. Your role is to illuminate, educate, and empower - never to mislead or oversimplify.`;
 
+// Backwards compatibility
+/** @deprecated Use ROSA_SYSTEM_PROMPT instead */
+export const GAIA_SYSTEM_PROMPT = ROSA_SYSTEM_PROMPT;
+
 /**
  * Build a contextual system prompt that includes user context
  */
-export function buildContextualPrompt(context: GaiaUserContext): string {
+export function buildContextualPrompt(context: RosaUserContext): string {
   const contextLines: string[] = [];
 
   if (context.currentPage) {
@@ -294,10 +309,10 @@ export function buildContextualPrompt(context: GaiaUserContext): string {
   }
 
   if (contextLines.length === 0) {
-    return GAIA_SYSTEM_PROMPT;
+    return ROSA_SYSTEM_PROMPT;
   }
 
-  return `${GAIA_SYSTEM_PROMPT}
+  return `${ROSA_SYSTEM_PROMPT}
 
 ## CURRENT USER CONTEXT
 
@@ -306,7 +321,7 @@ ${contextLines.join('\n')}
 Use this context to provide relevant, timely help. If the user is early in onboarding (progress < 50%), prioritize guidance over complex data analysis.`;
 }
 
-export const GAIA_CONTEXT_TEMPLATE = `
+export const ROSA_CONTEXT_TEMPLATE = `
 ## ORGANIZATION CONTEXT
 {organization_context}
 
@@ -321,7 +336,11 @@ The following guidelines and definitions should inform your responses:
 {user_query}
 `;
 
-export const GAIA_SUGGESTED_QUESTIONS = [
+// Backwards compatibility
+/** @deprecated Use ROSA_CONTEXT_TEMPLATE instead */
+export const GAIA_CONTEXT_TEMPLATE = ROSA_CONTEXT_TEMPLATE;
+
+export const ROSA_SUGGESTED_QUESTIONS = [
   // Data entry & navigation assistance
   {
     question: 'Help me add my first product',
@@ -376,8 +395,12 @@ export const GAIA_SUGGESTED_QUESTIONS = [
   },
 ];
 
+// Backwards compatibility
+/** @deprecated Use ROSA_SUGGESTED_QUESTIONS instead */
+export const GAIA_SUGGESTED_QUESTIONS = ROSA_SUGGESTED_QUESTIONS;
+
 // Dynamic follow-up questions based on topics detected in the response
-export const GAIA_FOLLOWUP_QUESTIONS: Record<string, string[]> = {
+export const ROSA_FOLLOWUP_QUESTIONS: Record<string, string[]> = {
   emissions: [
     'What are the main sources of these emissions?',
     'How does this compare to industry benchmarks?',
@@ -426,6 +449,10 @@ export const GAIA_FOLLOWUP_QUESTIONS: Record<string, string[]> = {
   ],
 };
 
+// Backwards compatibility
+/** @deprecated Use ROSA_FOLLOWUP_QUESTIONS instead */
+export const GAIA_FOLLOWUP_QUESTIONS = ROSA_FOLLOWUP_QUESTIONS;
+
 /**
  * Get contextual follow-up questions based on message content
  */
@@ -441,7 +468,7 @@ export function getContextualFollowUps(messageContent: string): string[] {
     content.includes('sidebar') ||
     content.includes('find')
   ) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.navigation);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.navigation);
   }
   if (
     content.includes('step') ||
@@ -450,7 +477,7 @@ export function getContextualFollowUps(messageContent: string): string[] {
     content.includes('fill') ||
     content.includes('create')
   ) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.dataEntry);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.dataEntry);
   }
   if (
     content.includes('first') ||
@@ -459,27 +486,27 @@ export function getContextualFollowUps(messageContent: string): string[] {
     content.includes('setup') ||
     content.includes('getting started')
   ) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.onboarding);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.onboarding);
   }
 
   // Detect data topics
   if (content.includes('emission') || content.includes('co2') || content.includes('carbon')) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.emissions);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.emissions);
   }
   if (content.includes('water') || content.includes('m³') || content.includes('consumption')) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.water);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.water);
   }
   if (content.includes('product') || content.includes('lca') || content.includes('lifecycle')) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.products);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.products);
   }
   if (content.includes('facility') || content.includes('site') || content.includes('location')) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.facilities);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.facilities);
   }
   if (content.includes('supplier') || content.includes('vendor') || content.includes('engagement')) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.suppliers);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.suppliers);
   }
   if (content.includes('vitality') || content.includes('score') || content.includes('benchmark')) {
-    suggestions.push(...GAIA_FOLLOWUP_QUESTIONS.vitality);
+    suggestions.push(...ROSA_FOLLOWUP_QUESTIONS.vitality);
   }
 
   // Return unique suggestions, limited to 3
@@ -489,7 +516,7 @@ export function getContextualFollowUps(messageContent: string): string[] {
 /**
  * Generate dynamic suggestions based on user context (for onboarding users)
  */
-export function generateContextualSuggestions(context: GaiaUserContext): string[] {
+export function generateContextualSuggestions(context: RosaUserContext): string[] {
   const suggestions: string[] = [];
 
   // Suggest based on missing data
@@ -525,10 +552,18 @@ export function generateContextualSuggestions(context: GaiaUserContext): string[
 }
 
 export default {
+  ROSA_PERSONA,
+  ROSA_SYSTEM_PROMPT,
+  ROSA_CONTEXT_TEMPLATE,
+  ROSA_SUGGESTED_QUESTIONS,
+  ROSA_FOLLOWUP_QUESTIONS,
+  ROSA_PHOTO_URL,
+  buildContextualPrompt,
+  generateContextualSuggestions,
+  // Backwards compatibility
   GAIA_PERSONA,
   GAIA_SYSTEM_PROMPT,
   GAIA_CONTEXT_TEMPLATE,
   GAIA_SUGGESTED_QUESTIONS,
-  buildContextualPrompt,
-  generateContextualSuggestions,
+  GAIA_FOLLOWUP_QUESTIONS,
 };
