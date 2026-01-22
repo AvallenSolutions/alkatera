@@ -86,7 +86,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     // Support both old and new parameter names for backward compatibility
-    const product_carbon_footprint_id = body.product_carbon_footprint_id || body.product_carbon_footprint_id;
+    const product_carbon_footprint_id = body.product_carbon_footprint_id || body.product_lca_id;
 
     if (!product_carbon_footprint_id) {
       return new Response(

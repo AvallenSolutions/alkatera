@@ -132,7 +132,7 @@ export async function getIngredientAuditTrail(lcaId: string, organizationId: str
           email
         )
       `)
-      .eq('product_lca_id', lcaId)
+      .eq('product_carbon_footprint_id', lcaId)
       .eq('organization_id', organizationId)
       .order('confirmation_timestamp', { ascending: true });
 
