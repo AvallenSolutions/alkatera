@@ -266,6 +266,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
         const { error: insertError } = await supabase
           .from("facility_product_assignments")
           .insert(toAdd.map((facilityId, index) => ({
+            organization_id: organizationId,
             facility_id: facilityId,
             product_id: productId,
             is_primary_facility: index === 0 && assignments.length === 0,
