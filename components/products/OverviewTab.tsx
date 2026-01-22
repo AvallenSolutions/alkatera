@@ -388,7 +388,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         </Card>
       </Collapsible>
 
-      {/* Production Sites & LCA Reports Row */}
+      {/* Facilities & LCA Reports Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Contract Manufacturer Allocations */}
         {(allocationStatus.provisionalCount > 0 || allocationStatus.verifiedCount > 0 || allocationStatus.totalAllocatedEmissions > 0) && (
@@ -410,8 +410,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                     }`} />
                   </div>
                   <div>
-                    <CardTitle className="text-white">Production Sites</CardTitle>
-                    <CardDescription className="text-slate-400">CM allocations</CardDescription>
+                    <CardTitle className="text-white">Facilities</CardTitle>
+                    <CardDescription className="text-slate-400">Manufacturing allocations</CardDescription>
                   </div>
                 </div>
                 {allocationStatus.hasProvisionalAllocations ? (

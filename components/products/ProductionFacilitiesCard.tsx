@@ -300,7 +300,7 @@ export function ProductionFacilitiesCard({
                           onClick={(e) => {
                             e.stopPropagation();
                             router.push(
-                              `/products/${productId}?tab=production-sites&facility=${facility.facilityId}`
+                              `/products/${productId}?tab=facilities&facility=${facility.facilityId}`
                             );
                           }}
                         >
@@ -325,7 +325,7 @@ export function ProductionFacilitiesCard({
               {stats.withAllocations < stats.total && (
                 <Button
                   className="flex-1 bg-lime-500 hover:bg-lime-600 text-black"
-                  onClick={() => router.push(`/products/${productId}?tab=production-sites`)}
+                  onClick={() => router.push(`/products/${productId}?tab=facilities`)}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Allocations
