@@ -36,6 +36,9 @@ import {
   Calendar,
   TrendingDown,
   TrendingUp,
+  ArrowUpFromLine,
+  ArrowDownToLine,
+  Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +51,10 @@ interface Scope3Breakdown {
   downstream_logistics: number;
   operational_waste: number;
   marketing_materials: number;
+  // New GHG Protocol categories
+  upstream_transport?: number;    // Category 4: Upstream Transportation
+  downstream_transport?: number;  // Category 9: Downstream Transportation
+  use_phase?: number;             // Category 11: Use of Sold Products
 }
 
 interface FootprintSummaryDashboardProps {
@@ -216,6 +223,40 @@ export function FootprintSummaryDashboard({
           dataQuality: 'partial',
         });
       }
+      // New GHG Protocol categories
+      if (scope3Breakdown.upstream_transport && scope3Breakdown.upstream_transport > 0) {
+        items.push({
+          name: 'Cat 4: Upstream Transport',
+          value: scope3Breakdown.upstream_transport,
+          scope: 3,
+          category: 'Cat 4',
+          icon: ArrowUpFromLine,
+          color: 'bg-violet-500',
+          dataQuality: 'partial',
+        });
+      }
+      if (scope3Breakdown.downstream_transport && scope3Breakdown.downstream_transport > 0) {
+        items.push({
+          name: 'Cat 9: Downstream Transport',
+          value: scope3Breakdown.downstream_transport,
+          scope: 3,
+          category: 'Cat 9',
+          icon: ArrowDownToLine,
+          color: 'bg-purple-500',
+          dataQuality: 'partial',
+        });
+      }
+      if (scope3Breakdown.use_phase && scope3Breakdown.use_phase > 0) {
+        items.push({
+          name: 'Cat 11: Use of Products',
+          value: scope3Breakdown.use_phase,
+          scope: 3,
+          category: 'Cat 11',
+          icon: Zap,
+          color: 'bg-yellow-500',
+          dataQuality: 'partial',
+        });
+      }
     } else if (scope3Emissions > 0) {
       items.push({
         name: 'Scope 3: Value Chain',
@@ -231,7 +272,7 @@ export function FootprintSummaryDashboard({
   }, [scope1Emissions, scope2Emissions, scope3Emissions, scope3Breakdown, operationsEmissions]);
 
   const dataCompletenessScore = useMemo(() => {
-    const totalCategories = 10;
+    const totalCategories = 13; // Updated to include new categories
     let completed = 0;
     if (operationsEmissions > 0) completed += 2;
     if (fleetEmissions > 0) completed += 1;
@@ -242,6 +283,10 @@ export function FootprintSummaryDashboard({
     if (scope3Breakdown?.downstream_logistics && scope3Breakdown.downstream_logistics > 0) completed += 1;
     if (scope3Breakdown?.operational_waste && scope3Breakdown.operational_waste > 0) completed += 1;
     if (scope3Breakdown?.purchased_services && scope3Breakdown.purchased_services > 0) completed += 1;
+    // New categories
+    if (scope3Breakdown?.upstream_transport && scope3Breakdown.upstream_transport > 0) completed += 1;
+    if (scope3Breakdown?.downstream_transport && scope3Breakdown.downstream_transport > 0) completed += 1;
+    if (scope3Breakdown?.use_phase && scope3Breakdown.use_phase > 0) completed += 1;
     return Math.round((completed / totalCategories) * 100);
   }, [operationsEmissions, fleetEmissions, scope3Breakdown]);
 

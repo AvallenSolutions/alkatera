@@ -356,6 +356,20 @@ export async function calculateScope3(
               breakdown.purchased_services += co2e;
             }
             break;
+          // NEW: Manual entries for Categories 4, 9, 11
+          // These ADD to the LCA-calculated values from scope3-categories.ts
+          case 'upstream_transport':
+            // Category 4: Upstream Transportation - manual entries
+            breakdown.upstream_transport += co2e;
+            break;
+          case 'downstream_transport':
+            // Category 9: Downstream Transportation - manual entries (distinct from downstream_logistics)
+            breakdown.downstream_transport += co2e;
+            break;
+          case 'use_phase':
+            // Category 11: Use of Sold Products - manual entries
+            breakdown.use_phase += co2e;
+            break;
           default:
             // Fallback to purchased_services
             breakdown.purchased_services += co2e;

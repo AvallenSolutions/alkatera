@@ -57,7 +57,15 @@ export default function Scope3Page() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-green-600 dark:text-green-400 mt-0.5">•</span>
-                  <span><strong>Upstream & Downstream Transportation:</strong> Emissions from transporting purchased and sold products</span>
+                  <span><strong>Upstream Transportation (Cat 4):</strong> Emissions from transporting materials from suppliers to your facilities</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">•</span>
+                  <span><strong>Downstream Transportation (Cat 9):</strong> Emissions from delivering products to customers and end users</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-green-600 dark:text-green-400 mt-0.5">•</span>
+                  <span><strong>Use of Sold Products (Cat 11):</strong> Emissions from customer use of your products (e.g., refrigeration)</span>
                 </li>
               </ul>
             </div>
