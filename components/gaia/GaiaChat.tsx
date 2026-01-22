@@ -67,6 +67,67 @@ import type {
 } from '@/lib/types/gaia';
 import { RosaChartRenderer } from './GaiaChartRenderer';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
+
+// Helper function to render message content with images
+// Detects image URLs and renders them as actual images
+function renderMessageContent(content: string): React.ReactNode {
+  // Regex to detect image URLs (Supabase storage, common image extensions)
+  const imageUrlRegex = /(https?:\/\/[^\s]+\.(?:jpg|jpeg|png|gif|webp|svg)(?:\?[^\s]*)?|https?:\/\/[^\s]*supabase[^\s]*\/storage\/[^\s]+)/gi;
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  // Reset regex state
+  imageUrlRegex.lastIndex = 0;
+
+  while ((match = imageUrlRegex.exec(content)) !== null) {
+    // Add text before the image URL
+    if (match.index > lastIndex) {
+      parts.push(
+        <span key={key++}>{content.slice(lastIndex, match.index)}</span>
+      );
+    }
+
+    // Add the image
+    const imageUrl = match[0];
+    parts.push(
+      <div key={key++} className="my-3">
+        <a href={imageUrl} target="_blank" rel="noopener noreferrer" className="block">
+          <img
+            src={imageUrl}
+            alt="Rosa shared image"
+            className="max-w-full max-h-64 rounded-lg border border-border shadow-sm hover:opacity-90 transition-opacity"
+            onError={(e) => {
+              // If image fails to load, show the URL as a link instead
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              target.parentElement!.innerHTML = `<a href="${imageUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline break-all">${imageUrl}</a>`;
+            }}
+          />
+        </a>
+      </div>
+    );
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text after the last image
+  if (lastIndex < content.length) {
+    parts.push(
+      <span key={key++}>{content.slice(lastIndex)}</span>
+    );
+  }
+
+  // If no images found, return original content
+  if (parts.length === 0) {
+    return content;
+  }
+
+  return <>{parts}</>;
+}
 
 interface RosaChatProps {
   fullPage?: boolean;
@@ -557,9 +618,9 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
                   )}>
                     <CardContent className="p-3">
                       <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <p className="whitespace-pre-wrap text-sm">
-                          {message.content}
-                        </p>
+                        <div className="whitespace-pre-wrap text-sm">
+                          {renderMessageContent(message.content)}
+                        </div>
                       </div>
 
                       {/* Chart rendering */}
@@ -699,17 +760,19 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
                   <Card className="bg-card border-border">
                     <CardContent className="p-3">
                       <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <p className="whitespace-pre-wrap text-sm">
-                          {streamingContent || (
+                        <div className="whitespace-pre-wrap text-sm">
+                          {streamingContent ? (
+                            <>
+                              {renderMessageContent(streamingContent)}
+                              <span className="inline-block w-2 h-4 ml-0.5 bg-emerald-500 animate-pulse" />
+                            </>
+                          ) : (
                             <span className="flex items-center gap-2 text-muted-foreground">
                               <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
                               Rosa is thinking...
                             </span>
                           )}
-                          {streamingContent && (
-                            <span className="inline-block w-2 h-4 ml-0.5 bg-emerald-500 animate-pulse" />
-                          )}
-                        </p>
+                        </div>
                       </div>
                       {/* Show chart while streaming if available */}
                       {streamingChartData && (
