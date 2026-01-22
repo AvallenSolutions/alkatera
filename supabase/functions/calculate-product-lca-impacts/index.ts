@@ -84,21 +84,23 @@ Deno.serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const { product_lca_id } = await req.json();
+    const body = await req.json();
+    // Support both old and new parameter names for backward compatibility
+    const product_carbon_footprint_id = body.product_carbon_footprint_id || body.product_lca_id;
 
-    if (!product_lca_id) {
+    if (!product_carbon_footprint_id) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing product_lca_id" }),
+        JSON.stringify({ success: false, error: "Missing product_carbon_footprint_id" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`[calculate-product-lca-impacts] Processing LCA: ${product_lca_id}`);
+    console.log(`[calculate-product-lca-impacts] Processing PCF: ${product_carbon_footprint_id}`);
 
     const { data: materials, error: materialsError } = await supabaseClient
-      .from("product_lca_materials")
+      .from("product_carbon_footprint_materials")
       .select("*")
-      .eq("product_lca_id", product_lca_id);
+      .eq("product_carbon_footprint_id", product_carbon_footprint_id);
 
     if (materialsError) {
       console.error("[calculate-product-lca-impacts] Failed to fetch materials:", materialsError);
@@ -119,9 +121,9 @@ Deno.serve(async (req: Request) => {
 
     // Fetch production sites from BOTH owned facilities AND contract manufacturers
     const { data: ownedSites, error: ownedSitesError } = await supabaseClient
-      .from("product_lca_production_sites")
+      .from("product_carbon_footprint_production_sites")
       .select("*")
-      .eq("product_lca_id", product_lca_id);
+      .eq("product_carbon_footprint_id", product_carbon_footprint_id);
 
     if (ownedSitesError) {
       console.warn("[calculate-product-lca-impacts] Failed to fetch owned production sites:", ownedSitesError);
@@ -129,9 +131,9 @@ Deno.serve(async (req: Request) => {
 
     // Get the product_id from the LCA to query contract manufacturers
     const { data: lcaData } = await supabaseClient
-      .from("product_lcas")
+      .from("product_carbon_footprints")
       .select("product_id, organization_id")
-      .eq("id", product_lca_id)
+      .eq("id", product_carbon_footprint_id)
       .single();
 
     // Fetch contract manufacturer allocations for this product
@@ -233,7 +235,7 @@ Deno.serve(async (req: Request) => {
         console.error(`[calculate-product-lca-impacts] 🚨 OVER-ALLOCATION ERROR: Production shares sum to ${totalAllocationPercentage.toFixed(1)}% (expected ~100%). This will result in DOUBLE-COUNTED emissions!`);
         // Store the validation error in the LCA record for visibility
         await supabaseClient
-          .from("product_lcas")
+          .from("product_carbon_footprints")
           .update({
             validation_warnings: JSON.stringify([{
               type: 'over_allocation',
@@ -242,7 +244,7 @@ Deno.serve(async (req: Request) => {
               timestamp: new Date().toISOString()
             }])
           })
-          .eq("id", product_lca_id);
+          .eq("id", product_carbon_footprint_id);
       } else {
         console.log(`[calculate-product-lca-impacts] ✓ Allocation validation passed: ${totalAllocationPercentage.toFixed(1)}%`);
       }
@@ -655,7 +657,7 @@ Deno.serve(async (req: Request) => {
     console.log(`[calculate-product-lca-impacts] ✓ Per litre: ${(totalCarbonFootprint / bulkVolumePerUnit).toFixed(4)} kg CO2e/L`);
 
     const { error: updateError } = await supabaseClient
-      .from("product_lcas")
+      .from("product_carbon_footprints")
       .update({
         aggregated_impacts: aggregatedImpacts,
         total_ghg_emissions: totalCarbonFootprint,
@@ -665,7 +667,7 @@ Deno.serve(async (req: Request) => {
         status: "completed",
         updated_at: new Date().toISOString(),
       })
-      .eq("id", product_lca_id);
+      .eq("id", product_carbon_footprint_id);
 
     if (updateError) {
       console.error("[calculate-product-lca-impacts] Failed to update LCA:", updateError);
@@ -676,16 +678,16 @@ Deno.serve(async (req: Request) => {
     }
 
     const { data: lcaRecord, error: lcaError } = await supabaseClient
-      .from("product_lcas")
+      .from("product_carbon_footprints")
       .select("product_id")
-      .eq("id", product_lca_id)
+      .eq("id", product_carbon_footprint_id)
       .single();
 
     if (!lcaError && lcaRecord) {
       await supabaseClient
         .from("products")
         .update({
-          latest_lca_id: product_lca_id,
+          latest_lca_id: product_carbon_footprint_id,
           latest_lca_carbon_footprint: totalCarbonFootprint,
           updated_at: new Date().toISOString(),
         })
@@ -694,12 +696,12 @@ Deno.serve(async (req: Request) => {
       console.log(`[calculate-product-lca-impacts] Updated product ${lcaRecord.product_id} with latest LCA`);
     }
 
-    console.log(`[calculate-product-lca-impacts] LCA calculation complete: ${product_lca_id}`);
+    console.log(`[calculate-product-lca-impacts] LCA calculation complete: ${product_carbon_footprint_id}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        lca_id: product_lca_id,
+        lca_id: product_carbon_footprint_id,
         total_carbon_footprint: totalCarbonFootprint,
         impacts: aggregatedImpacts,
         materials_count: materials.length,

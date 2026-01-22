@@ -106,7 +106,7 @@ export default function ProductDetailPage() {
         <div className="flex-1">
           <h1 className="text-3xl font-bold">{product.name}</h1>
           <p className="text-muted-foreground mt-1">
-            Product LCA Definition
+            Product Carbon Footprint Definition
           </p>
         </div>
       </div>

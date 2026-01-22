@@ -505,7 +505,7 @@ export function ProductHeroImpact({
                   <Button variant="secondary" asChild className="bg-white/10 hover:bg-white/20 text-white border-0">
                     <Link href={lcaReportUrl}>
                       <FileText className="h-4 w-4 mr-2" />
-                      View Full LCA Report
+                      View Full Carbon Footprint Report
                     </Link>
                   </Button>
                 )}

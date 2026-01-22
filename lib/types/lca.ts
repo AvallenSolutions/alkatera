@@ -220,7 +220,11 @@ export interface MaterialSelectionOutput {
   quantity: number;
 }
 
-export interface ProductLca {
+/**
+ * Product Carbon Footprint (PCF) - aligned with ISO 14067 and GHG Protocol Product Standard
+ * Represents the greenhouse gas emissions associated with a product throughout its lifecycle
+ */
+export interface ProductCarbonFootprint {
   id: string;
   organization_id: string;
   product_name: string;
@@ -233,9 +237,16 @@ export interface ProductLca {
   updated_at: string;
 }
 
-export interface ProductLcaMaterial {
+/** @deprecated Use ProductCarbonFootprint instead */
+export type ProductLca = ProductCarbonFootprint;
+
+/**
+ * Material associated with a Product Carbon Footprint
+ * Includes ingredients and packaging with their environmental impact data
+ */
+export interface ProductCarbonFootprintMaterial {
   id: string;
-  product_lca_id: string;
+  product_carbon_footprint_id: string;
   material_id?: string | null;
   material_type?: MaterialType | null;
   name?: string | null;
@@ -265,6 +276,11 @@ export interface ProductLcaMaterial {
   impact_metadata?: Record<string, any> | null;
   created_at: string;
   updated_at: string;
+}
+
+/** @deprecated Use ProductCarbonFootprintMaterial instead */
+export interface ProductLcaMaterial extends Omit<ProductCarbonFootprintMaterial, 'product_carbon_footprint_id'> {
+  product_lca_id: string;
 }
 
 export interface SimpleMaterialInput {
@@ -341,7 +357,10 @@ export interface MaterialWithDetails {
   lca_sub_stage_name?: string;
 }
 
-export interface CreateLcaPayload {
+/**
+ * Payload for creating a new Product Carbon Footprint
+ */
+export interface CreatePcfPayload {
   productDetails: {
     product_name: string;
     product_description: string;
@@ -360,3 +379,6 @@ export interface CreateLcaPayload {
     lca_sub_stage_id: number;
   }>;
 }
+
+/** @deprecated Use CreatePcfPayload instead */
+export type CreateLcaPayload = CreatePcfPayload;

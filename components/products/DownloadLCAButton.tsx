@@ -59,7 +59,7 @@ export function DownloadLCAButton({
       setIsGenerating(true);
 
       const { data: lca, error: lcaError } = await supabase
-        .from("product_lcas")
+        .from("product_carbon_footprints")
         .select("*")
         .eq("id", lcaId)
         .single();

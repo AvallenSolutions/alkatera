@@ -125,7 +125,7 @@ export default function ProductRecipePage() {
       // Fetch owned facilities
       if (productData.latest_lca_id) {
         const result = await supabase
-          .from("product_lca_production_sites")
+          .from("product_carbon_footprint_production_sites")
           .select(`
             id,
             share_of_production,
@@ -136,7 +136,7 @@ export default function ProductRecipePage() {
               address_lng
             )
           `)
-          .eq("product_lca_id", productData.latest_lca_id);
+          .eq("product_carbon_footprint_id", productData.latest_lca_id);
 
         if (result.data && result.data.length > 0) {
           const ownedFacilities = result.data

@@ -335,7 +335,7 @@ export function SupplierEvidenceTab({ supplierId }: SupplierEvidenceTabProps) {
             <div className="flex items-start gap-2">
               <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div>
-                <p className="font-medium">LCA Reports</p>
+                <p className="font-medium">Carbon Footprint Reports</p>
                 <p className="text-xs text-muted-foreground">Full lifecycle assessment studies</p>
               </div>
             </div>
@@ -377,7 +377,7 @@ export function SupplierEvidenceTab({ supplierId }: SupplierEvidenceTabProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="lca_report">LCA Report</SelectItem>
+                  <SelectItem value="lca_report">Carbon Footprint Report</SelectItem>
                   <SelectItem value="epd">Environmental Product Declaration</SelectItem>
                   <SelectItem value="carbon_certificate">Carbon Certificate</SelectItem>
                   <SelectItem value="sustainability_report">Sustainability Report</SelectItem>

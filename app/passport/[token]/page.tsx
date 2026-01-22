@@ -39,7 +39,7 @@ async function getProductByToken(token: string) {
   console.log('Product with organization:', JSON.stringify(product, null, 2));
 
   const { data: lca } = await supabase
-    .from('product_lcas')
+    .from('product_carbon_footprints')
     .select('*')
     .eq('product_id', product.id)
     .eq('status', 'completed')
@@ -50,9 +50,9 @@ async function getProductByToken(token: string) {
   console.log('LCA data:', JSON.stringify(lca, null, 2));
 
   const { data: materials } = await supabase
-    .from('product_lca_materials')
+    .from('product_carbon_footprint_materials')
     .select('*')
-    .eq('product_lca_id', lca?.id || '')
+    .eq('product_carbon_footprint_id', lca?.id || '')
     .order('created_at');
 
   console.log('Materials count:', materials?.length);

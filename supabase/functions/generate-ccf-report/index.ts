@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
         // total_ghg_emissions includes owned facility Scope 1 & 2 which would cause double counting
         // breakdown.by_scope.scope3 contains only: materials + transport + contract mfg + end-of-life
         const { data: lca } = await supabase
-          .from("product_lcas")
+          .from("product_carbon_footprints")
           .select("id, aggregated_impacts")
           .eq("product_id", log.product_id)
           .eq("status", "completed")

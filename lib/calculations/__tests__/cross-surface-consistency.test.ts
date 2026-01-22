@@ -395,7 +395,7 @@ describe('Regression Tests', () => {
     // When fetching product LCA for passport or product page
     // Both should use the same query and get the same result
     const productLCA = await (mockSupabase as any)
-      .from('product_lcas')
+      .from('product_carbon_footprints')
       .eq('product_id', 'calvados-001')
       .eq('status', 'completed')
       .order('updated_at', { ascending: false })

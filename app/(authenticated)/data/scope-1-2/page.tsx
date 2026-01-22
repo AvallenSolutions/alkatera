@@ -416,7 +416,7 @@ export default function CompanyEmissionsPage() {
         });
 
         const { data: lca, error: lcaError } = await browserSupabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('id, total_ghg_emissions, status, per_unit_emissions_verified')
           .eq('product_id', log.product_id)
           .order('created_at', { ascending: false })
@@ -464,9 +464,9 @@ export default function CompanyEmissionsPage() {
 
         // Fetch materials breakdown for UI display purposes only
         const { data: materials } = await browserSupabase
-          .from('product_lca_materials')
+          .from('product_carbon_footprint_materials')
           .select('material_type, impact_climate')
-          .eq('product_lca_id', lca.id);
+          .eq('product_carbon_footprint_id', lca.id);
 
         let materialsPerUnit = 0;
         let packagingPerUnit = 0;
@@ -613,7 +613,7 @@ export default function CompanyEmissionsPage() {
           if (!product) continue;
 
           const { data: lca } = await browserSupabase
-            .from('product_lcas')
+            .from('product_carbon_footprints')
             .select('total_ghg_emissions')
             .eq('product_id', log.product_id)
             .eq('status', 'completed')
@@ -1399,7 +1399,7 @@ export default function CompanyEmissionsPage() {
                       Category 1: Purchased Goods & Services
                       <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
                         <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Auto-calculated from Product LCAs
+                        Auto-calculated from Product Carbon Footprints
                       </Badge>
                     </CardTitle>
                     <CardDescription className="mt-2">
@@ -1485,7 +1485,7 @@ export default function CompanyEmissionsPage() {
                       className="mt-4"
                       onClick={() => window.location.href = '/products'}
                     >
-                      Go to Product LCAs
+                      Go to Product Carbon Footprints
                     </Button>
                   </div>
                 )}

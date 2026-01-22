@@ -234,7 +234,7 @@ export function OwnedFacilityProductionForm({
       // First, find the most recent product_lca for this product
       // Note: There may be multiple LCAs per product (versioning), so we get the latest one
       const { data: productLCAs, error: lcaError } = await supabase
-        .from("product_lcas")
+        .from("product_carbon_footprints")
         .select("id")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
@@ -256,7 +256,7 @@ export function OwnedFacilityProductionForm({
         if (productError) throw productError;
 
         const { data: newLCA, error: createError } = await supabase
-          .from("product_lcas")
+          .from("product_carbon_footprints")
           .insert({
             product_id: productId,
             organization_id: organizationId,
@@ -275,9 +275,9 @@ export function OwnedFacilityProductionForm({
 
       // Check if this facility is already linked to this product LCA
       const { data: existingSite } = await supabase
-        .from("product_lca_production_sites")
+        .from("product_carbon_footprint_production_sites")
         .select("id")
-        .eq("product_lca_id", productLCA.id)
+        .eq("product_carbon_footprint_id", productLCA.id)
         .eq("facility_id", facilityId)
         .maybeSingle();
 
@@ -318,7 +318,7 @@ export function OwnedFacilityProductionForm({
       if (existingSite) {
         // Update existing site with full allocation data
         const { error: updateError } = await supabase
-          .from("product_lca_production_sites")
+          .from("product_carbon_footprint_production_sites")
           .update(allocationData)
           .eq("id", existingSite.id);
 
@@ -327,14 +327,14 @@ export function OwnedFacilityProductionForm({
       } else {
         // Insert new site with full allocation data
         const productionSiteData = {
-          product_lca_id: productLCA.id,
+          product_carbon_footprint_id: productLCA.id,
           facility_id: facilityId,
           organization_id: organizationId,
           ...allocationData,
         };
 
         const { error: siteError } = await supabase
-          .from("product_lca_production_sites")
+          .from("product_carbon_footprint_production_sites")
           .insert(productionSiteData);
 
         if (siteError) throw siteError;

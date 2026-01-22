@@ -305,7 +305,7 @@ export async function calculateFacilityWaterRisks(
 
   // Fetch embedded water from product LCA production sites
   const { data: productionSites, error: sitesError } = await supabase
-    .from('product_lca_production_sites')
+    .from('product_carbon_footprint_production_sites')
     .select(`
       facility_id,
       share_of_production_percent,
@@ -442,12 +442,12 @@ export async function calculateFacilityWaterRisks(
   // Fetch materials with origin_country_code to weight water by source location
   // =========================================================================
   const { data: lcaMaterials, error: materialsError } = await supabase
-    .from('product_lca_materials')
+    .from('product_carbon_footprint_materials')
     .select(`
       id,
       impact_water,
       origin_country_code,
-      product_lca_id,
+      product_carbon_footprint_id,
       product_lcas!inner(
         id,
         status,

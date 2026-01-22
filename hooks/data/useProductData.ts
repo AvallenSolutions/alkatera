@@ -166,7 +166,7 @@ export function useProductData(productId: string | undefined) {
       // Fetch LCA reports - filter by completed status and order by updated_at
       // to match passport fetch behavior and ensure consistency
       const { data: lcaData, error: lcaError } = await supabase
-        .from("product_lcas")
+        .from("product_carbon_footprints")
         .select("id, created_at, updated_at, system_boundary, aggregated_impacts, status")
         .eq("product_id", productId)
         .eq("status", "completed")

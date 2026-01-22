@@ -159,7 +159,7 @@ export async function calculateScope3Cat4(
   // Method 1: Fetch material transport data from product_lca_materials
   // Materials with transport distance and mode data
   const { data: materialsWithTransport, error: materialsError } = await supabase
-    .from('product_lca_materials')
+    .from('product_carbon_footprint_materials')
     .select(`
       id,
       material_name,

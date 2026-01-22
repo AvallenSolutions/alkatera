@@ -804,7 +804,7 @@ async function fetchOrganizationContext(
 
     // Fetch product LCA data directly by organization (correct column: total_ghg_emissions)
     const { data: lcaData, count: lcaCount, error: lcaError } = await supabase
-      .from('product_lcas')
+      .from('product_carbon_footprints')
       .select('id, product_name, total_ghg_emissions, functional_unit, status, aggregated_impacts', { count: 'exact' })
       .eq('organization_id', organizationId)
       .eq('status', 'completed');
@@ -852,7 +852,7 @@ async function fetchOrganizationContext(
         contextParts.push(`- Total Water Footprint: ${totalWaterFootprint.toFixed(2)} L`);
       }
 
-      dataSources.push({ table: 'product_lcas', description: 'Product LCA calculations', recordCount: lcaCount || 0 });
+      dataSources.push({ table: 'product_carbon_footprints', description: 'Product LCA calculations', recordCount: lcaCount || 0 });
     }
 
     // Fetch vitality scores

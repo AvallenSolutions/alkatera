@@ -143,7 +143,7 @@ SELECT
   impact_land,
   impact_waste
 FROM product_lca_materials
-WHERE product_lca_id = '00000000-0000-0000-0000-000000000001'
+WHERE product_carbon_footprint_id = '00000000-0000-0000-0000-000000000001'
 ORDER BY name;
 
 -- View results
@@ -153,7 +153,7 @@ SELECT
   unit,
   method
 FROM product_lca_results
-WHERE product_lca_id = '00000000-0000-0000-0000-000000000001'
+WHERE product_carbon_footprint_id = '00000000-0000-0000-0000-000000000001'
 ORDER BY
   CASE impact_category
     WHEN 'Climate Change' THEN 1
@@ -168,7 +168,7 @@ ORDER BY
 
 1. Navigate to Products → New Product
 2. Create "My Test Beverage"
-3. Click "Create LCA"
+3. Click "Create Carbon Footprint"
 4. Add the following materials using AssistedIngredientSearch:
    - Search "Water" → Select "Water (Municipal Treatment)" → 0.3 kg
    - Search "Sugar" → Select "Sugar (Cane - Global)" → 0.025 kg
@@ -192,7 +192,7 @@ curl -X POST https://YOUR_PROJECT.supabase.co/auth/v1/token?grant_type=password 
 curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/invoke-openlca \\
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
   -H "Content-Type: application/json" \\
-  -d '{"product_lca_id":"00000000-0000-0000-0000-000000000001"}'
+  -d '{"product_carbon_footprint_id":"00000000-0000-0000-0000-000000000001"}'
 \`\`\`
 
 ---
@@ -245,7 +245,7 @@ WITH expected AS (
 actual AS (
   SELECT impact_category as category, value as actual_value
   FROM product_lca_results
-  WHERE product_lca_id = '00000000-0000-0000-0000-000000000001'
+  WHERE product_carbon_footprint_id = '00000000-0000-0000-0000-000000000001'
 )
 SELECT
   e.category,

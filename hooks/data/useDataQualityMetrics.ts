@@ -84,7 +84,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         setError(null);
 
         const { data: lcas, error: lcasError } = await supabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('id, product_id')
           .eq('organization_id', organizationId);
 
@@ -117,10 +117,10 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         const lcaProductMap = new Map(lcas.map(l => [l.id, l.product_id]));
 
         const { data: materials, error: materialsError } = await supabase
-          .from('product_lca_materials')
+          .from('product_carbon_footprint_materials')
           .select(`
             id,
-            product_lca_id,
+            product_carbon_footprint_id,
             name,
             quantity,
             unit,
@@ -133,7 +133,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
             category_type,
             supplier_product_id
           `)
-          .in('product_lca_id', lcaIds);
+          .in('product_carbon_footprint_id', lcaIds);
 
         if (materialsError) throw materialsError;
 
@@ -205,7 +205,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
               recommendation = 'Low impact - Consider when updating product';
             }
 
-            const productId = lcaProductMap.get(m.product_lca_id) || '';
+            const productId = lcaProductMap.get(m.product_carbon_footprint_id) || '';
             const productName = productMap.get(productId) || 'Unknown Product';
 
             return {

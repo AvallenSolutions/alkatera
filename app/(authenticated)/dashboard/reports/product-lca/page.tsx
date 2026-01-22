@@ -63,7 +63,7 @@ export default function ProductLCAReportsPage() {
   const fetchLCAs = async () => {
     try {
       const { data, error } = await supabase
-        .from("product_lcas")
+        .from("product_carbon_footprints")
         .select("*")
         .eq("organization_id", currentOrganization!.id)
         .order("created_at", { ascending: false });
@@ -85,7 +85,7 @@ export default function ProductLCAReportsPage() {
       const { data, error } = await supabase
         .from("product_lca_results")
         .select("*")
-        .eq("product_lca_id", lcaId)
+        .eq("product_carbon_footprint_id", lcaId)
         .order("impact_category", { ascending: true });
 
       if (error) throw error;
@@ -125,7 +125,7 @@ export default function ProductLCAReportsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          product_lca_id: lcaId,
+          product_carbon_footprint_id: lcaId,
         }),
       });
 
@@ -170,7 +170,7 @@ export default function ProductLCAReportsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Product LCA Reports</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Product Carbon Footprint Reports</h1>
             <p className="text-muted-foreground mt-2">
               View and manage life cycle assessments for your products
             </p>
@@ -197,7 +197,7 @@ export default function ProductLCAReportsPage() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>All Product LCAs</CardTitle>
+              <CardTitle>All Product Carbon Footprints</CardTitle>
               <CardDescription>
                 {lcas.length} {lcas.length === 1 ? "assessment" : "assessments"} found
               </CardDescription>
@@ -314,7 +314,7 @@ export default function ProductLCAReportsPage() {
                             Calculating...
                           </>
                         ) : (
-                          "Calculate LCA"
+                          "Calculate Carbon Footprint"
                         )}
                       </Button>
                     </div>

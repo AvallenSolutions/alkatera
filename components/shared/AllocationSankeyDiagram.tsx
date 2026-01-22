@@ -50,7 +50,7 @@ export function AllocationSankeyDiagram({ organizationId }: AllocationSankeyDiag
 
       // Load product allocations
       const { data: productAllocations, error: productError } = await supabase
-        .from("product_lca_production_sites")
+        .from("product_carbon_footprint_production_sites")
         .select(`
           facility_id,
           allocated_emissions_kg_co2e,

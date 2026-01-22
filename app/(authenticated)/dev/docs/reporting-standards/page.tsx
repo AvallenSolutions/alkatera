@@ -714,7 +714,7 @@ export default function ReportingStandardsPage() {
                     <FileText className="h-4 w-4" />
                     <AlertTitle>Category 1: Purchased Goods & Services</AlertTitle>
                     <AlertDescription className="text-sm mt-1">
-                      This is typically the largest Scope 3 category. Platform uses Product LCAs with Ecoinvent data for accurate tracking of supply chain emissions.
+                      This is typically the largest Scope 3 category. Platform uses Product Carbon Footprints with Ecoinvent data for accurate tracking of supply chain emissions.
                     </AlertDescription>
                   </Alert>
                 </CardContent>

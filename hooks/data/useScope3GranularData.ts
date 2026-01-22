@@ -179,7 +179,7 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
       if (productionLogs && productionLogs.length > 0) {
         for (const log of productionLogs) {
           const { data: lca } = await supabase
-            .from('product_lcas')
+            .from('product_carbon_footprints')
             .select('id, total_ghg_emissions, status')
             .eq('product_id', log.product_id)
             .eq('status', 'completed')
@@ -195,9 +195,9 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
             cat1Total += totalEmissions;
 
             const { data: materials } = await supabase
-              .from('product_lca_materials')
+              .from('product_carbon_footprint_materials')
               .select('name, quantity, unit, impact_climate, material_type')
-              .eq('product_lca_id', lca.id);
+              .eq('product_carbon_footprint_id', lca.id);
 
             const ingredientsList: ProductEmissionDetail['materials'] = [];
             const packagingList: ProductEmissionDetail['packaging'] = [];

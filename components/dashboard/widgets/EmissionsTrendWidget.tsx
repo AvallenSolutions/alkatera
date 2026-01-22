@@ -41,7 +41,7 @@ export function EmissionsTrendWidget() {
         setError(null);
 
         const { data: lcas, error: lcaError } = await supabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('aggregated_impacts, created_at, updated_at')
           .eq('organization_id', currentOrganization.id)
           .eq('status', 'completed')
