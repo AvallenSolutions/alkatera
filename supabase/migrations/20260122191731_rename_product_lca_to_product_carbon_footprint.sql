@@ -169,10 +169,8 @@ CREATE TRIGGER trigger_calculate_pcf_production_site_metrics
   FOR EACH ROW
   EXECUTE FUNCTION calculate_production_site_metrics();
 
-CREATE TRIGGER trigger_recalculate_pcf_production_shares
-  AFTER INSERT OR UPDATE OR DELETE ON public.product_carbon_footprint_production_sites
-  FOR EACH ROW
-  EXECUTE FUNCTION recalculate_all_production_shares();
+-- Note: trigger_recalculate_production_shares was intentionally removed in migration
+-- 20251128162952_fix_production_sites_trigger_infinite_recursion.sql due to infinite recursion issues
 
 -- ============================================================================
 -- STEP 6: Update RLS Policies (Drop and Recreate with New Names)
@@ -472,24 +470,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Update the recalculate_all_production_shares function to use new table name
-CREATE OR REPLACE FUNCTION recalculate_all_production_shares()
-RETURNS TRIGGER AS $$
-DECLARE
-  pcf_id UUID;
-BEGIN
-  -- Determine which PCF was affected
-  IF TG_OP = 'DELETE' THEN
-    pcf_id := OLD.product_carbon_footprint_id;
-  ELSE
-    pcf_id := NEW.product_carbon_footprint_id;
-  END IF;
-
-  -- Recalculate shares for all sites in this PCF
-  UPDATE public.product_carbon_footprint_production_sites
-  SET updated_at = now()
-  WHERE product_carbon_footprint_id = pcf_id;
-
-  RETURN COALESCE(NEW, OLD);
-END;
-$$ LANGUAGE plpgsql;
+-- Note: recalculate_all_production_shares function was intentionally removed
+-- in migration 20251128162952 due to infinite recursion issues
