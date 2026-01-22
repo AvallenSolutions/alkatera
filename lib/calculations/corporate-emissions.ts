@@ -289,7 +289,7 @@ export async function calculateScope3(
       if (!log.units_produced || log.units_produced <= 0) continue;
 
       const { data: lca } = await supabase
-        .from('product_lcas')
+        .from('product_carbon_footprints')
         .select('aggregated_impacts')
         .eq('product_id', log.product_id)
         .eq('status', 'completed')

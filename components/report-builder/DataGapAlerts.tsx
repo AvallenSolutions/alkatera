@@ -156,7 +156,7 @@ export function DataGapAlerts({ config }: DataGapAlertsProps) {
     // Check product LCA data
     if (config.sections.includes('product-footprints')) {
       const { data: products } = await supabase
-        .from('product_lcas')
+        .from('product_carbon_footprints')
         .select('id')
         .eq('organization_id', orgId)
         .eq('status', 'completed');

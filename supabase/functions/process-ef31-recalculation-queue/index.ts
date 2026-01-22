@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
             'Authorization': `Bearer ${supabaseServiceKey}`,
           },
           body: JSON.stringify({
-            product_lca_id: jobData.product_lca_id,
+            product_carbon_footprint_id: jobData.product_carbon_footprint_id,
             calculate_ef31: true,
             force_ef31: true,
           }),
@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
           });
           successCount++;
           results.push({
-            product_lca_id: jobData.product_lca_id,
+            product_carbon_footprint_id: jobData.product_carbon_footprint_id,
             status: 'success',
             ef31_single_score: calcResult.ef31_single_score,
           });
@@ -81,7 +81,7 @@ Deno.serve(async (req: Request) => {
           });
           failureCount++;
           results.push({
-            product_lca_id: jobData.product_lca_id,
+            product_carbon_footprint_id: jobData.product_carbon_footprint_id,
             status: 'failed',
             error: calcResult.error,
           });
@@ -95,7 +95,7 @@ Deno.serve(async (req: Request) => {
         });
         failureCount++;
         results.push({
-          product_lca_id: jobData.product_lca_id,
+          product_carbon_footprint_id: jobData.product_carbon_footprint_id,
           status: 'failed',
           error: calcError.message,
         });

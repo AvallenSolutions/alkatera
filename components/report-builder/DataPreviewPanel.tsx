@@ -143,7 +143,7 @@ export function DataPreviewPanel({ config }: DataPreviewPanelProps) {
 
   async function loadProductData(orgId: string): Promise<PreviewData> {
     const { data: products } = await supabase
-      .from('product_lcas')
+      .from('product_carbon_footprints')
       .select('product_name, aggregated_impacts, status')
       .eq('organization_id', orgId)
       .eq('status', 'completed')
@@ -167,7 +167,7 @@ export function DataPreviewPanel({ config }: DataPreviewPanelProps) {
 
   async function loadGHGInventoryData(orgId: string, year: number): Promise<PreviewData> {
     const { data: materials } = await supabase
-      .from('product_lca_materials')
+      .from('product_carbon_footprint_materials')
       .select(`
         ch4_fossil_kg_co2e,
         ch4_biogenic_kg_co2e,

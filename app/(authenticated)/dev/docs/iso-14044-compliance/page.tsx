@@ -327,7 +327,7 @@ waste_factor       -- Waste generation (kg)
 - Goal & Scope Summary
 - Completion status of three phases (Ingredients, Packaging, Production)
 - Item counts per phase
-- "Calculate LCA" button
+- "Calculate Carbon Footprint" button
 \`\`\`
 
 **Strengths:**

@@ -20,7 +20,7 @@ export default function PublicLCAReportPage() {
 
         // Fetch LCA by ID
         const { data: lca, error: lcaError } = await supabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('*')
           .eq('id', lcaId)
           .eq('status', 'completed')
@@ -33,9 +33,9 @@ export default function PublicLCAReportPage() {
 
         // Fetch materials for this LCA
         const { data: materials } = await supabase
-          .from('product_lca_materials')
+          .from('product_carbon_footprint_materials')
           .select('*')
-          .eq('product_lca_id', lca.id);
+          .eq('product_carbon_footprint_id', lca.id);
 
         if (materials) {
           lca.materials = materials;

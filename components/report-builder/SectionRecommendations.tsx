@@ -75,7 +75,7 @@ export function SectionRecommendations({ config, onChange }: SectionRecommendati
           .eq('year', year)
           .single(),
         supabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('id, status')
           .eq('organization_id', orgId)
           .eq('status', 'completed'),
@@ -191,7 +191,7 @@ export function SectionRecommendations({ config, onChange }: SectionRecommendati
         estimatedImpact: 'Would enhance customer engagement',
         dataAvailability: {
           available: [],
-          missing: ['Product LCA data'],
+          missing: ['Product Carbon Footprint data'],
         },
       });
     }

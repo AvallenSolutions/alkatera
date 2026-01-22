@@ -44,7 +44,7 @@ export default function CalculationVerifierPage() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="product-lca" className="text-base">
-                Product LCA Test
+                Product Carbon Footprint Test
               </TabsTrigger>
               <TabsTrigger value="company-footprint" className="text-base">
                 Company Footprint Test

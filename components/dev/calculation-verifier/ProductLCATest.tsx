@@ -48,7 +48,7 @@ export default function ProductLCATest() {
       setTestState({ status: 'running', message: 'Fetching test product LCA data...' })
 
       const { data: productLcas, error: lcaError } = await supabase
-        .from('product_lcas')
+        .from('product_carbon_footprints')
         .select('*')
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
@@ -62,9 +62,9 @@ export default function ProductLCATest() {
       setTestState({ status: 'running', message: 'Fetching materials and impact data...' })
 
       const { data: materials, error: materialsError } = await supabase
-        .from('product_lca_materials')
+        .from('product_carbon_footprint_materials')
         .select('*')
-        .eq('product_lca_id', productLcas.id)
+        .eq('product_carbon_footprint_id', productLcas.id)
 
       if (materialsError) {
         throw new Error(`Failed to fetch materials: ${materialsError.message}`)
@@ -125,7 +125,7 @@ export default function ProductLCATest() {
         const { data: logsData, error: logsError } = await supabase
           .from('product_lca_calculation_logs')
           .select('*')
-          .eq('product_lca_id', productLcas.id)
+          .eq('product_carbon_footprint_id', productLcas.id)
           .order('created_at', { ascending: false })
           .limit(10)
 
@@ -187,7 +187,7 @@ export default function ProductLCATest() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Product LCA Calculation Test</CardTitle>
+          <CardTitle>Product Carbon Footprint Calculation Test</CardTitle>
           <CardDescription>
             Tests the complete product lifecycle assessment calculation flow from materials to final impacts
           </CardDescription>
@@ -240,7 +240,7 @@ export default function ProductLCATest() {
             <CardContent>
               <dl className="grid grid-cols-2 gap-4">
                 <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Product LCA ID</dt>
+                  <dt className="text-sm font-medium text-muted-foreground">Product Carbon Footprint ID</dt>
                   <dd className="text-sm font-mono mt-1">{testState.data.productLca.id}</dd>
                 </div>
                 <div>

@@ -81,7 +81,7 @@ export function ReportingPeriodTimeline({
 
       // Load product LCA reporting periods
       const { data: productLCAs, error: productError } = await supabase
-        .from("product_lcas")
+        .from("product_carbon_footprints")
         .select(`
           id,
           temporal_anchor_start,

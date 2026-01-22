@@ -76,7 +76,7 @@ export function AllocationOnboardingGuide({
             .eq("organization_id", organizationId),
 
           supabase
-            .from("product_lca_production_sites")
+            .from("product_carbon_footprint_production_sites")
             .select("id", { count: "exact", head: true })
             .eq("organization_id", organizationId),
 

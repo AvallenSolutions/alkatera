@@ -342,7 +342,7 @@ export async function resolveImpactFactors(
 
       if (productRecord) {
         const { data: supplierLca } = await supabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('id, aggregated_impacts')
           .eq('product_id', productRecord.id)
           .eq('status', 'completed')

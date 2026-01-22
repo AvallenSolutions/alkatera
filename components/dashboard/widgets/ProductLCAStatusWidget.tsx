@@ -46,7 +46,7 @@ export function ProductLCAStatusWidget() {
         if (productsError) throw productsError;
 
         const { data: lcas, error: lcasError } = await supabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('id, product_id, status')
           .eq('organization_id', currentOrganization.id);
 
@@ -105,7 +105,7 @@ export function ProductLCAStatusWidget() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Product LCA Status
+            Carbon Footprint Status
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -123,7 +123,7 @@ export function ProductLCAStatusWidget() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Product LCA Status
+            Carbon Footprint Status
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -141,7 +141,7 @@ export function ProductLCAStatusWidget() {
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Package className="h-5 w-5" />
-          Product LCA Status
+          Carbon Footprint Status
         </CardTitle>
         <CardDescription>
           {stats?.total || 0} products in your portfolio
@@ -152,7 +152,7 @@ export function ProductLCAStatusWidget() {
           <>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">LCA Completion</span>
+                <span className="text-muted-foreground">PCF Completion</span>
                 <span className="font-medium">{completionRate}%</span>
               </div>
               <Progress value={completionRate} className="h-2" />
@@ -164,21 +164,21 @@ export function ProductLCAStatusWidget() {
                 <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
                   {stats.completed}
                 </span>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400">Complete LCA</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">Complete PCF</span>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30">
                 <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mb-1" />
                 <span className="text-lg font-bold text-amber-700 dark:text-amber-300">
                   {stats.inProgress}
                 </span>
-                <span className="text-xs text-amber-600 dark:text-amber-400">LCA In Progress</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">PCF In Progress</span>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
                 <AlertCircle className="h-5 w-5 text-slate-500 mb-1" />
                 <span className="text-lg font-bold text-slate-700 dark:text-slate-300">
                   {stats.draft}
                 </span>
-                <span className="text-xs text-slate-500">No LCA</span>
+                <span className="text-xs text-slate-500">No PCF</span>
               </div>
             </div>
 

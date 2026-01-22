@@ -58,7 +58,7 @@ export default function ReportsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Product LCA Reports
+                Product Carbon Footprint Reports
               </CardTitle>
               <CardDescription>
                 Life cycle assessments for your products

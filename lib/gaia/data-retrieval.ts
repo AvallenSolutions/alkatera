@@ -239,7 +239,7 @@ async function fetchProductsSummary(supabase: SupabaseClient, organizationId: st
 
   if (productsWithLca.length > 0) {
     const { data } = await supabase
-      .from('product_lcas')
+      .from('product_carbon_footprints')
       .select('product_id, total_gwp_kg_co2e, functional_unit')
       .in('product_id', productsWithLca);
     lcaData = data;

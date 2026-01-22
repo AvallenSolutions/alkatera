@@ -105,9 +105,9 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
   const loadData = async () => {
     setLoading(true);
     try {
-      // First get the product_lca_id for this product
+      // First get the product_carbon_footprint_id for this product
       const { data: productLCAs } = await supabase
-        .from("product_lcas")
+        .from("product_carbon_footprints")
         .select("id")
         .eq("product_id", productId)
         .order("created_at", { ascending: false })
@@ -128,7 +128,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
           .order("reporting_period_start", { ascending: false }),
         // Fetch owned facility production sites
         productLcaId ? supabase
-          .from("product_lca_production_sites")
+          .from("product_carbon_footprint_production_sites")
           .select(`
             id,
             facility_id,
@@ -160,7 +160,7 @@ export function ProductionSitesTab({ productId, organizationId }: ProductionSite
               address_country
             )
           `)
-          .eq("product_lca_id", productLcaId)
+          .eq("product_carbon_footprint_id", productLcaId)
           .order("created_at", { ascending: false }) : Promise.resolve({ data: [] }),
       ]);
 

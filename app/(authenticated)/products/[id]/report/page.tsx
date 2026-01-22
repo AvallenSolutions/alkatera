@@ -94,7 +94,7 @@ export default function ProductLcaReportPage() {
         }
 
         const { data: lca, error: lcaError } = await supabase
-          .from('product_lcas')
+          .from('product_carbon_footprints')
           .select('*')
           .eq('product_id', productId)
           .eq('status', 'completed')
@@ -109,9 +109,9 @@ export default function ProductLcaReportPage() {
 
         if (lca) {
           const { data: materials, error: materialsError } = await supabase
-            .from('product_lca_materials')
+            .from('product_carbon_footprint_materials')
             .select('*')
-            .eq('product_lca_id', lca.id);
+            .eq('product_carbon_footprint_id', lca.id);
 
           if (!materialsError && materials) {
             lca.materials = materials;

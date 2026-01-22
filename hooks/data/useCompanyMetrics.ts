@@ -232,7 +232,7 @@ export function useCompanyMetrics() {
 
       // Fetch all LCAs first
       const { data: allLcas, error: lcaError } = await supabase
-        .from('product_lcas')
+        .from('product_carbon_footprints')
         .select('id, product_id, product_name, aggregated_impacts, csrd_compliant, updated_at')
         .eq('organization_id', currentOrganization.id)
         .eq('status', 'completed')
@@ -798,7 +798,7 @@ export function useCompanyMetrics() {
 
       // Fetch materials from all completed LCAs with lifecycle stage information and GHG breakdown
       const { data: materials, error } = await supabase
-        .from('product_lca_materials')
+        .from('product_carbon_footprint_materials')
         .select(`
           name,
           quantity,
@@ -825,7 +825,7 @@ export function useCompanyMetrics() {
           gwp_ch4_biogenic,
           gwp_n2o,
           ghg_data_quality,
-          product_lca_id,
+          product_carbon_footprint_id,
           lca_sub_stages (
             id,
             name,
@@ -1104,7 +1104,7 @@ export function useCompanyMetrics() {
 
       // Fetch facility emissions from production sites linked to completed LCAs
       const { data: productionSites, error } = await supabase
-        .from('product_lca_production_sites')
+        .from('product_carbon_footprint_production_sites')
         .select(`
           facility_id,
           production_volume,

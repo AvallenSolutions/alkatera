@@ -44,7 +44,7 @@ export default function LcasPage() {
 
       // Fetch all product LCAs for the organization
       const { data: lcas, error: lcaError } = await supabase
-        .from('product_lcas')
+        .from('product_carbon_footprints')
         .select('*')
         .eq('organization_id', currentOrganization!.id)
         .order('created_at', { ascending: false });
@@ -329,7 +329,7 @@ export default function LcasPage() {
               <Award className="h-6 w-6 text-blue-600" />
             </div>
             <div className="space-y-2">
-              <h3 className="font-semibold text-blue-900">About LCA Reports</h3>
+              <h3 className="font-semibold text-blue-900">About Carbon Footprint Reports</h3>
               <p className="text-sm text-blue-800">
                 Life Cycle Assessments (LCAs) provide a comprehensive environmental profile of your products following ISO 14044:2006 standards.
                 Each report includes cradle-to-gate impacts across multiple environmental categories including climate change, water use,

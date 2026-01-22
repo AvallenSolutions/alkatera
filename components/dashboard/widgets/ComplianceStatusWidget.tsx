@@ -70,7 +70,7 @@ export function ComplianceStatusWidget() {
     },
     {
       id: 'product-lcas',
-      label: 'Product LCAs',
+      label: 'Product Carbon Footprints',
       status: csrdPercentage >= 100 ? 'complete' : csrdPercentage > 0 ? 'partial' : 'pending',
       description: 'Life cycle assessments',
     },

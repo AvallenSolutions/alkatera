@@ -146,7 +146,7 @@ The calculation system is correctly designed:
 1. **Query Test LCA**
    \`\`\`sql
    SELECT * FROM product_lca_results
-   WHERE product_lca_id = '00000000-0000-0000-0000-000000000001';
+   WHERE product_carbon_footprint_id = '00000000-0000-0000-0000-000000000001';
    \`\`\`
    Expected: 4 rows with non-zero values
 

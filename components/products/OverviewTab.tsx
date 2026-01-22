@@ -150,7 +150,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                 </div>
                 <Link href={`/products/${product.id}/calculate-lca`}>
                   <Button className="bg-lime-500 hover:bg-lime-600 text-slate-900">
-                    Calculate LCA
+                    Calculate Carbon Footprint
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -388,7 +388,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         </Card>
       </Collapsible>
 
-      {/* Production Sites & LCA Reports Row */}
+      {/* Production Sites & Carbon Footprint Reports Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Contract Manufacturer Allocations */}
         {(allocationStatus.provisionalCount > 0 || allocationStatus.verifiedCount > 0 || allocationStatus.totalAllocatedEmissions > 0) && (
@@ -468,7 +468,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </Card>
         )}
 
-        {/* LCA Reports */}
+        {/* Carbon Footprint Reports */}
         <Card className="backdrop-blur-xl bg-white/5 border border-white/10">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -477,7 +477,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                   <FileText className="h-5 w-5 text-cyan-400" />
                 </div>
                 <div>
-                  <CardTitle className="text-white">LCA Reports</CardTitle>
+                  <CardTitle className="text-white">Carbon Footprint Reports</CardTitle>
                   <CardDescription className="text-slate-400">Calculation history</CardDescription>
                 </div>
               </div>
@@ -571,7 +571,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${lcaReports.length > 0 ? 'bg-green-500' : 'bg-slate-600'}`} />
-                  <span className="text-sm text-slate-300">LCA Reports</span>
+                  <span className="text-sm text-slate-300">Carbon Footprint Reports</span>
                 </div>
                 <span className="text-sm font-medium text-white">{lcaReports.length}</span>
               </div>

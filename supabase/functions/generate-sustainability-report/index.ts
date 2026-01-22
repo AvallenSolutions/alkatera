@@ -424,7 +424,7 @@ async function aggregateReportData(
     try {
       console.log('[Data] Fetching product LCA data...');
       const { data: products, error: productsError } = await supabaseClient
-        .from('product_lcas')
+        .from('product_carbon_footprints')
         .select('product_name, functional_unit, aggregated_impacts')
         .eq('organization_id', organizationId)
         .eq('status', 'completed')
