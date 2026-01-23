@@ -615,6 +615,15 @@ export function useCompanyMetrics() {
       const breakdown = lca.aggregated_impacts?.breakdown;
       const ghg = lca.aggregated_impacts?.ghg_breakdown;
 
+      // DEBUG: Log what we're getting from aggregated_impacts
+      console.log('📊 LCA GHG data check:', {
+        lca_id: lca.id,
+        has_breakdown: !!breakdown,
+        has_ghg: !!ghg,
+        ghg_keys: ghg ? Object.keys(ghg) : [],
+        production_volume: lca.production_volume
+      });
+
       if (breakdown) {
         // Aggregate scope data
         if (breakdown.by_scope) {
@@ -789,13 +798,19 @@ export function useCompanyMetrics() {
     }
 
     // Set GHG breakdown
+    console.log('🔍 GHG extraction result:', {
+      hasGhgData,
+      ghgTotal_carbon_origin: ghgTotal.carbon_origin,
+      ghgTotal_gas_inventory: ghgTotal.gas_inventory,
+      ghgTotal_gwp_factors: ghgTotal.gwp_factors,
+      materialMapSize: materialMap.size
+    });
+
     if (hasGhgData) {
-      console.log('🔄 Setting GHG from aggregated_impacts:', ghgTotal);
+      console.log('✅ Setting GHG breakdown from aggregated_impacts');
       setGhgBreakdown(ghgTotal);
     } else {
-      console.log('⚠️ No GHG data in aggregated_impacts, will fetch from database');
-      // IMPORTANT: Don't set ghgTotal with zeros! This will overwrite real data from fetchMaterialAndGHGBreakdown
-      // setGhgBreakdown(ghgTotal); // DO NOT SET ZEROS
+      console.log('⚠️ hasGhgData is false - GHG breakdown will not be set from aggregated_impacts');
     }
   }
 
