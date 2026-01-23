@@ -167,31 +167,31 @@ export function SectionRecommendations({ config, onChange }: SectionRecommendati
       });
     }
 
-    // Product Carbon Footprints
+    // Product Environmental Impacts
     if (data.productCount > 0) {
       recs.push({
         id: 'product-footprints',
-        name: 'Product Carbon Footprints',
+        name: 'Product Environmental Impacts',
         priority: data.productCount >= 5 ? 'high' : 'medium',
         dataCompleteness: Math.min(100, (data.productCount / 10) * 100),
-        rationale: `${data.productCount} completed product LCA${data.productCount > 1 ? 's' : ''} available.`,
+        rationale: `${data.productCount} completed product PEI${data.productCount > 1 ? 's' : ''} available.`,
         estimatedImpact: data.productCount >= 5 ? 'Strong differentiation for customers' : 'Good foundation for product disclosure',
         dataAvailability: {
-          available: [`${data.productCount} product LCAs`],
+          available: [`${data.productCount} product PEIs`],
           missing: data.productCount < 5 ? ['Additional product assessments recommended'] : [],
         },
       });
     } else {
       recs.push({
         id: 'product-footprints',
-        name: 'Product Carbon Footprints',
+        name: 'Product Environmental Impacts',
         priority: 'low',
         dataCompleteness: 0,
-        rationale: 'No completed product LCAs found.',
+        rationale: 'No completed product PEIs found.',
         estimatedImpact: 'Would enhance customer engagement',
         dataAvailability: {
           available: [],
-          missing: ['Product Carbon Footprint data'],
+          missing: ['Product Environmental Impact data'],
         },
       });
     }

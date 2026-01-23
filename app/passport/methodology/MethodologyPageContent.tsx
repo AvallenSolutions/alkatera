@@ -210,7 +210,7 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
               </span>
             </div>
             <h1 className="font-serif text-4xl md:text-5xl mb-4">
-              Product Carbon Footprint Methodology
+              Product Environmental Impact Methodology
             </h1>
             <p className="text-stone-400 max-w-2xl">
               {config.description}
@@ -220,7 +220,7 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-16">
-        {/* PCF Explanation Section */}
+        {/* PEI Explanation Section */}
         <section className="mb-16">
           <div className="bg-gradient-to-br from-emerald-50 to-lime-50 rounded-xl border border-emerald-200 p-8">
             <div className="flex items-start gap-4">
@@ -229,12 +229,12 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
               </div>
               <div className="flex-1">
                 <h2 className="font-serif text-2xl text-stone-900 mb-3">
-                  What is a Product Carbon Footprint?
+                  What is a Product Environmental Impact?
                 </h2>
                 <p className="text-stone-700 mb-4">
-                  A <strong>Product Carbon Footprint (PCF)</strong> measures the total greenhouse gas emissions
-                  associated with a product throughout its lifecycle, expressed as kg CO₂ equivalent (CO₂e)
-                  per functional unit (e.g., per bottle, per pack).
+                  A <strong>Product Environmental Impact (PEI)</strong> measures the total environmental impacts
+                  associated with a product throughout its lifecycle, including carbon emissions (kg CO₂e),
+                  water consumption, land use, and other critical factors per functional unit (e.g., per bottle, per pack).
                 </p>
                 <div className="grid md:grid-cols-2 gap-4 mt-6">
                   <div className="bg-white/60 rounded-lg p-4">
@@ -243,9 +243,9 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
                       Standards Aligned
                     </h3>
                     <p className="text-sm text-stone-600">
-                      Our calculations follow <strong>ISO 14067:2018</strong> (Carbon footprint of products)
-                      and the <strong>GHG Protocol Product Standard</strong>, ensuring methodological rigour
-                      and comparability.
+                      Our calculations follow <strong>ISO 14044:2006</strong> (Life cycle assessment),
+                      <strong> ISO 14067:2018</strong> (Carbon footprint), and the <strong>GHG Protocol Product Standard</strong>,
+                      ensuring methodological rigour and comparability.
                     </p>
                   </div>
                   <div className="bg-white/60 rounded-lg p-4">
@@ -262,9 +262,8 @@ export default function MethodologyPageContent({ tier }: MethodologyPageContentP
                 </div>
                 <div className="mt-6 pt-4 border-t border-emerald-200/50">
                   <p className="text-sm text-stone-500">
-                    <strong>Note:</strong> A Product Carbon Footprint is a focused assessment of greenhouse gas
-                    emissions. For broader environmental impact categories (water, land use, biodiversity),
-                    see the full impact assessment in your product report.
+                    <strong>Note:</strong> A Product Environmental Impact goes beyond just carbon to include water consumption,
+                    land use, biodiversity impacts, and other critical environmental factors for a comprehensive assessment.
                   </p>
                 </div>
               </div>

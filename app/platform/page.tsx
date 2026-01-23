@@ -147,7 +147,7 @@ const ModulesSection = () => {
     },
     {
       title: "Liquid & Packaging Intelligence",
-      subtitle: "PRODUCT LIFE CYCLE ASSESSMENT",
+      subtitle: "PRODUCT ENVIRONMENTAL IMPACT",
       desc: "Map the environmental footprint of every SKU you produce. Our engine lets you run 'what-if' scenarios to instantly see how a glass-weight change or a new recipe affects your total ecological score. It's product development, powered by data.",
       icon: Layers,
       color: "from-blue-900/20 to-black"

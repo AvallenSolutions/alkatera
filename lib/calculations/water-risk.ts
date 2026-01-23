@@ -362,7 +362,7 @@ export async function calculateFacilityWaterRisks(
     const facilityId = site.facility_id;
     if (!facilityId) return;
 
-    const lca = site.product_lcas;
+    const lca = site.product_carbon_footprints;
     const waterPerUnit = lca?.aggregated_impacts?.water_consumption || 0;
     const prodVolume = Number(site.production_volume || 0);
     const sharePercent = (Number(site.share_of_production_percent || 100)) / 100;
@@ -476,7 +476,7 @@ export async function calculateFacilityWaterRisks(
   // Map product_id to facility_id via production sites
   const productToFacilityMap = new Map<string, string[]>();
   (productionSites || []).forEach((site: any) => {
-    const productId = site.product_lcas?.product_id;
+    const productId = site.product_carbon_footprints?.product_id;
     const facilityId = site.facility_id;
     if (productId && facilityId) {
       const facilities = productToFacilityMap.get(productId) || [];

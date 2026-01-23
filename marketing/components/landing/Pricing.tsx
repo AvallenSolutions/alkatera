@@ -48,7 +48,7 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
       capacity: "20 Products | 3 Facilities | 5 Users",
       features: [
         "Everything in Seed, plus:",
-        "Full Product LCA: Cradle-to-gate impact analysis for every SKU in your portfolio.",
+        "Full Product Environmental Impact: Cradle-to-gate impact analysis for every SKU in your portfolio.",
         "Customisable Sustainability Reporting: Design and export bespoke reports tailored to your brand's specific aesthetic and stakeholder needs.",
         "B Corp Performance Hub: Strategic tools to track and improve your score over time, moving from compliance to leadership.",
         "'What-If' Scenario Modelling: Test packaging and recipe changes in a digital sandbox before committing to production.",

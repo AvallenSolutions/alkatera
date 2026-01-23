@@ -152,7 +152,7 @@ export function ProductLCAStatusWidget() {
           <>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">PCF Completion</span>
+                <span className="text-muted-foreground">PEI Completion</span>
                 <span className="font-medium">{completionRate}%</span>
               </div>
               <Progress value={completionRate} className="h-2" />
@@ -164,21 +164,21 @@ export function ProductLCAStatusWidget() {
                 <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
                   {stats.completed}
                 </span>
-                <span className="text-xs text-emerald-600 dark:text-emerald-400">Complete PCF</span>
+                <span className="text-xs text-emerald-600 dark:text-emerald-400">Complete PEI</span>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30">
                 <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400 mb-1" />
                 <span className="text-lg font-bold text-amber-700 dark:text-amber-300">
                   {stats.inProgress}
                 </span>
-                <span className="text-xs text-amber-600 dark:text-amber-400">PCF In Progress</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">PEI In Progress</span>
               </div>
               <div className="flex flex-col items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800">
                 <AlertCircle className="h-5 w-5 text-slate-500 mb-1" />
                 <span className="text-lg font-bold text-slate-700 dark:text-slate-300">
                   {stats.draft}
                 </span>
-                <span className="text-xs text-slate-500">No PCF</span>
+                <span className="text-xs text-slate-500">No PEI</span>
               </div>
             </div>
 
