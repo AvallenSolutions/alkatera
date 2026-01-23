@@ -34,6 +34,12 @@ export interface WaterfallResult {
   impact_land: number;
   impact_waste: number;
 
+  // GHG Gas Breakdown (ISO 14067 / IPCC AR6)
+  ch4_kg?: number;           // Total methane (kg CH4)
+  ch4_fossil_kg?: number;    // Fossil methane (kg CH4) - GWP 29.8
+  ch4_biogenic_kg?: number;  // Biogenic methane (kg CH4) - GWP 27.2
+  n2o_kg?: number;           // Nitrous oxide (kg N2O) - GWP 273
+
   // Extended ReCiPe 2016 impacts (complete 18 categories)
   impact_ozone_depletion: number;
   impact_photochemical_ozone_formation: number;
@@ -52,7 +58,7 @@ export interface WaterfallResult {
 
   // Provenance tracking
   data_priority: 1 | 2 | 3;
-  data_quality_tag: 'Primary_Verified' | 'Regional_Standard' | 'Secondary_Modelled';
+  data_quality_tag: 'Primary_Verified' | 'Regional_Standard' | 'Secondary_Modelled' | 'Secondary_Estimated';
   data_quality_grade: 'HIGH' | 'MEDIUM' | 'LOW';
   source_reference: string;
   confidence_score: number;
@@ -441,12 +447,25 @@ export async function resolveImpactFactors(
 
         const gwpTotal = Number(defraFactor.co2_factor || 0) * quantity_kg;
 
+        // Use actual GHG breakdown from Ecoinvent if available, else estimate
+        const fossilRatio = ecoinventProxy.impact_climate_fossil && ecoinventProxy.impact_climate
+          ? ecoinventProxy.impact_climate_fossil / ecoinventProxy.impact_climate
+          : 0.85;
+        const biogenicRatio = ecoinventProxy.impact_climate_biogenic && ecoinventProxy.impact_climate
+          ? ecoinventProxy.impact_climate_biogenic / ecoinventProxy.impact_climate
+          : 0.15;
+
         return {
-          // GWP from DEFRA
+          // GWP from DEFRA, split using Ecoinvent ratios
           impact_climate: gwpTotal,
-          impact_climate_fossil: gwpTotal * 0.85,
-          impact_climate_biogenic: gwpTotal * 0.15,
-          impact_climate_dluc: 0,
+          impact_climate_fossil: gwpTotal * fossilRatio,
+          impact_climate_biogenic: gwpTotal * biogenicRatio,
+          impact_climate_dluc: Number(ecoinventProxy.impact_climate_dluc || 0) * quantity_kg,
+          // GHG gas breakdown from Ecoinvent
+          ch4_kg: Number(ecoinventProxy.ch4_factor || 0) * quantity_kg,
+          ch4_fossil_kg: Number(ecoinventProxy.ch4_fossil_factor || 0) * quantity_kg,
+          ch4_biogenic_kg: Number(ecoinventProxy.ch4_biogenic_factor || 0) * quantity_kg,
+          n2o_kg: Number(ecoinventProxy.n2o_factor || 0) * quantity_kg,
 
           // All other impacts from Ecoinvent
           impact_water: Number(ecoinventProxy.impact_water || 0) * quantity_kg,
@@ -519,11 +538,26 @@ export async function resolveImpactFactors(
     const marineEcotoxicity = Number(stagingFactor.marine_ecotoxicity_factor || 0) * quantity_kg;
     const marineEutrophication = Number(stagingFactor.marine_eutrophication_factor || 0) * quantity_kg;
 
+    // Use actual GHG breakdown from staging factors if available
+    const hasFossilBiogenicSplit = stagingFactor.co2_fossil_factor || stagingFactor.co2_biogenic_factor;
+    const fossilCO2 = hasFossilBiogenicSplit
+      ? Number(stagingFactor.co2_fossil_factor || 0) * quantity_kg
+      : co2Total * 0.85;
+    const biogenicCO2 = hasFossilBiogenicSplit
+      ? Number(stagingFactor.co2_biogenic_factor || 0) * quantity_kg
+      : co2Total * 0.15;
+    const dlucCO2 = Number(stagingFactor.co2_dluc_factor || 0) * quantity_kg;
+
     return {
       impact_climate: co2Total,
-      impact_climate_fossil: co2Total * 0.85,
-      impact_climate_biogenic: co2Total * 0.15,
-      impact_climate_dluc: 0,
+      impact_climate_fossil: fossilCO2,
+      impact_climate_biogenic: biogenicCO2,
+      impact_climate_dluc: dlucCO2,
+      // GHG gas breakdown
+      ch4_kg: Number(stagingFactor.ch4_factor || 0) * quantity_kg,
+      ch4_fossil_kg: Number(stagingFactor.ch4_fossil_factor || 0) * quantity_kg,
+      ch4_biogenic_kg: Number(stagingFactor.ch4_biogenic_factor || 0) * quantity_kg,
+      n2o_kg: Number(stagingFactor.n2o_factor || 0) * quantity_kg,
       impact_water: waterTotal,
       impact_water_scarcity: waterTotal * awareFactor,
       impact_land: landTotal,
@@ -543,10 +577,10 @@ export async function resolveImpactFactors(
       impact_mineral_resource_scarcity: 0,
       impact_fossil_resource_scarcity: 0,
       data_priority: 3,
-      data_quality_tag: 'Secondary_Modelled',
+      data_quality_tag: hasFossilBiogenicSplit ? 'Secondary_Modelled' : 'Secondary_Estimated',
       data_quality_grade: 'MEDIUM',
       source_reference: `Staging: ${stagingFactor.name} (${stagingFactor.source || 'Internal'})`,
-      confidence_score: 70,
+      confidence_score: hasFossilBiogenicSplit ? 75 : 70,
       methodology: 'ReCiPe 2016 Midpoint (H) / Ecoinvent 3.12',
       gwp_data_source: stagingFactor.source || 'Staging Factors',
       non_gwp_data_source: stagingFactor.source || 'Staging Factors',
@@ -567,11 +601,27 @@ export async function resolveImpactFactors(
   if (ecoinventProxy && ecoinventProxy.impact_climate) {
     console.log(`[Waterfall] ✓ Priority 3 SUCCESS: Using Ecoinvent proxy for ${material.material_name}`);
 
+    const climateTotal = Number(ecoinventProxy.impact_climate || 0) * quantity_kg;
+
+    // Use actual GHG breakdown from Ecoinvent if available
+    const hasGHGBreakdown = ecoinventProxy.impact_climate_fossil || ecoinventProxy.impact_climate_biogenic;
+    const fossilCO2 = hasGHGBreakdown
+      ? Number(ecoinventProxy.impact_climate_fossil || 0) * quantity_kg
+      : climateTotal * 0.85;
+    const biogenicCO2 = hasGHGBreakdown
+      ? Number(ecoinventProxy.impact_climate_biogenic || 0) * quantity_kg
+      : climateTotal * 0.15;
+
     return {
-      impact_climate: Number(ecoinventProxy.impact_climate || 0) * quantity_kg,
-      impact_climate_fossil: Number(ecoinventProxy.impact_climate || 0) * quantity_kg * 0.85,
-      impact_climate_biogenic: Number(ecoinventProxy.impact_climate || 0) * quantity_kg * 0.15,
-      impact_climate_dluc: 0,
+      impact_climate: climateTotal,
+      impact_climate_fossil: fossilCO2,
+      impact_climate_biogenic: biogenicCO2,
+      impact_climate_dluc: Number(ecoinventProxy.impact_climate_dluc || 0) * quantity_kg,
+      // GHG gas breakdown from Ecoinvent
+      ch4_kg: Number(ecoinventProxy.ch4_factor || 0) * quantity_kg,
+      ch4_fossil_kg: Number(ecoinventProxy.ch4_fossil_factor || 0) * quantity_kg,
+      ch4_biogenic_kg: Number(ecoinventProxy.ch4_biogenic_factor || 0) * quantity_kg,
+      n2o_kg: Number(ecoinventProxy.n2o_factor || 0) * quantity_kg,
       impact_water: Number(ecoinventProxy.impact_water || 0) * quantity_kg,
       impact_water_scarcity: Number(ecoinventProxy.impact_water || 0) * quantity_kg * awareFactor,
       impact_land: Number(ecoinventProxy.impact_land_use || ecoinventProxy.impact_land || 0) * quantity_kg,

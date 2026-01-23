@@ -314,6 +314,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           impact_climate_fossil: resolved.impact_climate_fossil,
           impact_climate_biogenic: resolved.impact_climate_biogenic,
           impact_climate_dluc: resolved.impact_climate_dluc,
+          // GHG gas breakdown (ISO 14067)
+          ch4_kg: resolved.ch4_kg || 0,
+          ch4_fossil_kg: resolved.ch4_fossil_kg || 0,
+          ch4_biogenic_kg: resolved.ch4_biogenic_kg || 0,
+          n2o_kg: resolved.n2o_kg || 0,
           impact_water: resolved.impact_water,
           impact_water_scarcity: resolved.impact_water_scarcity,
           impact_land: resolved.impact_land,
