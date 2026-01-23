@@ -1132,7 +1132,10 @@ export function useCompanyMetrics() {
           ghgData
         });
 
-        setGhgBreakdown(ghgData);
+        // Only set GHG breakdown if we have actual data, to avoid overwriting good data from aggregated_impacts
+        if (hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0) {
+          setGhgBreakdown(ghgData);
+        }
       }
 
     } catch (err) {
