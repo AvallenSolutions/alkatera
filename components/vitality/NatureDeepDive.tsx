@@ -1,7 +1,9 @@
 import React from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Mountain, Leaf, Droplets, Wind, TrendingUp, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Mountain, Leaf, Droplets, Wind, TrendingUp, Info, Sparkles, ArrowRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
 import {
@@ -240,48 +242,47 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
             })}
           </div>
 
-          <Card className="border-2 border-green-200 bg-green-50">
+          <Card className="border-2 border-teal-200 bg-gradient-to-br from-teal-50 to-emerald-50">
             <CardContent className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-green-900">
-                  Nature-Positive Actions
-                </h3>
-                <Badge variant="outline" className="text-xs border-green-300 text-green-700">
-                  ReCiPe 2016
-                </Badge>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-green-200">
-                  <Mountain className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-green-900">Reduce Land Footprint</p>
-                    <p className="text-xs text-green-700">
-                      Optimise sourcing from low-impact suppliers and prioritise regenerative agriculture
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-emerald-500">
+                  <Sparkles className="h-5 w-5 text-white" />
                 </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-green-200">
-                  <Leaf className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-green-900">Minimise Ecotoxicity</p>
-                    <p className="text-xs text-green-700">
-                      Phase out harmful chemicals and support organic/sustainable farming practices
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-white border border-green-200">
-                  <Droplets className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-green-900">Control Nutrient Loading</p>
-                    <p className="text-xs text-green-700">
-                      Improve wastewater treatment and reduce agricultural runoff in supply chain
-                    </p>
-                  </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-teal-900">
+                    Get Nature-Positive Recommendations
+                  </h3>
+                  <p className="text-xs text-teal-700">
+                    Personalised actions based on your actual data
+                  </p>
                 </div>
               </div>
+
+              <div className="p-4 rounded-lg bg-white border border-teal-200 space-y-3">
+                <p className="text-sm text-teal-800">
+                  Rosa can analyse your nature impact data and provide specific recommendations to:
+                </p>
+                <ul className="text-xs text-teal-700 space-y-1.5 ml-4 list-disc">
+                  <li>Identify your highest-impact materials and suppliers</li>
+                  <li>Suggest alternative sourcing strategies to reduce land use</li>
+                  <li>Recommend actions to minimise ecotoxicity and eutrophication</li>
+                  <li>Prioritise improvement initiatives based on your data</li>
+                </ul>
+              </div>
+
+              <Link href="/rosa/" className="block">
+                <Button
+                  className="w-full gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Ask Rosa for Nature Recommendations
+                  <ArrowRight className="h-4 w-4 ml-auto" />
+                </Button>
+              </Link>
+
+              <p className="text-xs text-center text-teal-600">
+                Try: "What actions can I take to reduce my nature impact based on my product data?"
+              </p>
             </CardContent>
           </Card>
 

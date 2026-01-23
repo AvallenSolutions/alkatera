@@ -815,6 +815,9 @@ export function useCompanyMetrics() {
           impact_water,
           impact_land,
           impact_waste,
+          impact_terrestrial_ecotoxicity,
+          impact_freshwater_eutrophication,
+          impact_terrestrial_acidification,
           impact_source,
           packaging_category,
           lca_sub_stage_id,
@@ -895,6 +898,43 @@ export function useCompanyMetrics() {
       const totalClimate = aggregatedMaterials.reduce((sum, m) => sum + m.climate, 0);
 
       setMaterialBreakdown(aggregatedMaterials);
+
+      // Aggregate nature impacts from materials
+      // These fields exist at material level but may not be in aggregated_impacts on LCA
+      let totalTerrestrialEcotoxicity = 0;
+      let totalFreshwaterEutrophication = 0;
+      let totalTerrestrialAcidification = 0;
+      let totalLandUse = 0;
+      let totalNatureProductionVolume = 0;
+
+      materials.forEach((material: any) => {
+        const productId = material.product_carbon_footprints?.product_id;
+        const productionVolume = productionMap.get(productId) || 1;
+
+        totalTerrestrialEcotoxicity += (Number(material.impact_terrestrial_ecotoxicity) || 0) * productionVolume;
+        totalFreshwaterEutrophication += (Number(material.impact_freshwater_eutrophication) || 0) * productionVolume;
+        totalTerrestrialAcidification += (Number(material.impact_terrestrial_acidification) || 0) * productionVolume;
+        totalLandUse += (Number(material.impact_land) || 0) * productionVolume;
+        totalNatureProductionVolume += productionVolume;
+      });
+
+      // Update natureMetrics with aggregated values from materials if we have data
+      if (totalTerrestrialEcotoxicity > 0 || totalFreshwaterEutrophication > 0 || totalTerrestrialAcidification > 0 || totalLandUse > 0) {
+        const avgProductionVolume = totalNatureProductionVolume / materials.length || 1;
+        setNatureMetrics(prev => ({
+          land_use: totalLandUse > 0 ? totalLandUse : (prev?.land_use || 0),
+          terrestrial_ecotoxicity: totalTerrestrialEcotoxicity,
+          freshwater_eutrophication: totalFreshwaterEutrophication,
+          terrestrial_acidification: totalTerrestrialAcidification,
+          per_unit: {
+            land_use: avgProductionVolume > 0 ? (totalLandUse > 0 ? totalLandUse / avgProductionVolume : (prev?.per_unit?.land_use || 0)) : 0,
+            terrestrial_ecotoxicity: avgProductionVolume > 0 ? totalTerrestrialEcotoxicity / avgProductionVolume : 0,
+            freshwater_eutrophication: avgProductionVolume > 0 ? totalFreshwaterEutrophication / avgProductionVolume : 0,
+            terrestrial_acidification: avgProductionVolume > 0 ? totalTerrestrialAcidification / avgProductionVolume : 0,
+          },
+          total_production_volume: prev?.total_production_volume || avgProductionVolume,
+        }));
+      }
 
       // Fetch lifecycle stages mapping
       const { data: lifecycleStages } = await supabase
