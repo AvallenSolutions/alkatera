@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Sparkles,
   RefreshCw,
   Calendar,
   TrendingUp,
@@ -47,7 +46,6 @@ import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
 import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
 import { WasteDeepDive } from '@/components/vitality/WasteDeepDive';
 import { NatureDeepDive } from '@/components/vitality/NatureDeepDive';
-import { AICopilotModal } from '@/components/vitality/AICopilotModal';
 import { CarbonBreakdownSheet } from '@/components/vitality/CarbonBreakdownSheet';
 import { WaterImpactSheet } from '@/components/vitality/WaterImpactSheet';
 import { CircularitySheet } from '@/components/vitality/CircularitySheet';
@@ -241,7 +239,6 @@ export default function PerformancePage() {
     scope3: footprintData.breakdown.scope3.total,
   } : null;
 
-  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [carbonSheetOpen, setCarbonSheetOpen] = useState(false);
   const [waterSheetOpen, setWaterSheetOpen] = useState(false);
   const [circularitySheetOpen, setCircularitySheetOpen] = useState(false);
@@ -398,13 +395,6 @@ export default function PerformancePage() {
             </span>
           )}
         </div>
-        <Button
-          onClick={() => setAiModalOpen(true)}
-          className="gap-2 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700"
-        >
-          <Sparkles className="h-4 w-4" />
-          Ask the Data (AI)
-        </Button>
       </div>
 
       {error && (
@@ -691,8 +681,6 @@ export default function PerformancePage() {
       )}
 
       {/* Modals and Sheets */}
-      <AICopilotModal open={aiModalOpen} onOpenChange={setAiModalOpen} />
-
       <CarbonBreakdownSheet
         open={carbonSheetOpen}
         onOpenChange={setCarbonSheetOpen}
