@@ -2,7 +2,7 @@
 -- This adds realistic multi-capital impact metrics to existing product LCAs
 
 -- Update product LCAs with ReCiPe 2016 metrics (beverage industry values)
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 245.50,
     "water_consumption": 32.40,
@@ -18,7 +18,7 @@ UPDATE product_lcas SET
   updated_at = now()
 WHERE id = '3112ac57-942c-4513-9103-907dac5d7189';
 
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 189.30,
     "water_consumption": 25.60,
@@ -34,7 +34,7 @@ UPDATE product_lcas SET
   updated_at = now()
 WHERE id = '3ba58ab6-350d-4861-8758-209b9f1836ba';
 
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 320.75,
     "water_consumption": 42.30,
@@ -50,7 +50,7 @@ UPDATE product_lcas SET
   updated_at = now()
 WHERE id = '2ff6d3b0-923b-4fdf-af2c-f39e8530c971';
 
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 156.20,
     "water_consumption": 18.50,
@@ -66,7 +66,7 @@ UPDATE product_lcas SET
   updated_at = now()
 WHERE id = 'de469f87-045e-4589-b101-855ef2941799';
 
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 425.60,
     "water_consumption": 55.80,
@@ -82,7 +82,7 @@ UPDATE product_lcas SET
   updated_at = now()
 WHERE id = '47d5c47b-10a8-4b98-a422-8cd58430f4f0';
 
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 278.90,
     "water_consumption": 38.20,
@@ -98,7 +98,7 @@ UPDATE product_lcas SET
   updated_at = now()
 WHERE id = '1c5e4ebd-aa65-4777-bf15-550a9b0e5d77';
 
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 198.40,
     "water_consumption": 28.90,
@@ -114,7 +114,7 @@ UPDATE product_lcas SET
   updated_at = now()
 WHERE id = 'c0d04915-b235-45e4-b636-cbae81f477b5';
 
-UPDATE product_lcas SET
+UPDATE product_carbon_footprints SET
   aggregated_impacts = '{
     "climate_change_gwp100": 362.15,
     "water_consumption": 48.70,
@@ -166,8 +166,8 @@ INSERT INTO facilities (
   name,
   facility_type_id,
   location_country_code,
-  latitude,
-  longitude,
+  address_lat,
+  address_lng,
   created_at
 )
 SELECT
@@ -189,8 +189,8 @@ INSERT INTO facilities (
   name,
   facility_type_id,
   location_country_code,
-  latitude,
-  longitude,
+  address_lat,
+  address_lng,
   created_at
 )
 SELECT
@@ -212,8 +212,8 @@ INSERT INTO facilities (
   name,
   facility_type_id,
   location_country_code,
-  latitude,
-  longitude,
+  address_lat,
+  address_lng,
   created_at
 )
 SELECT
@@ -234,7 +234,7 @@ WHERE NOT EXISTS (
 SELECT
   'Product LCAs Updated' as data_type,
   COUNT(*) as count
-FROM product_lcas
+FROM product_carbon_footprints
 WHERE organization_id = '2d86de84-e24e-458b-84b9-fd4057998bda'
   AND aggregated_impacts IS NOT NULL
 UNION ALL
