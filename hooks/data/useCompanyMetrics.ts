@@ -265,7 +265,8 @@ export function useCompanyMetrics() {
       // CRITICAL FIX: Unit normalization validation
       // Ensure production logs have proper units_produced calculated
       // =========================================================================
-      const productionMap = new Map<number, number>();
+      // Use string keys to handle bigint type coercion from Supabase
+      const productionMap = new Map<string, number>();
       const unitWarnings: string[] = [];
 
       productionData?.forEach(prod => {
@@ -297,8 +298,9 @@ export function useCompanyMetrics() {
           }
         }
 
-        const current = productionMap.get(prod.product_id) || 0;
-        productionMap.set(prod.product_id, current + unitsProduced);
+        const key = String(prod.product_id);
+        const current = productionMap.get(key) || 0;
+        productionMap.set(key, current + unitsProduced);
       });
 
       // Log warnings for visibility
@@ -308,7 +310,7 @@ export function useCompanyMetrics() {
 
       // Attach production volume to each LCA
       lcas.forEach(lca => {
-        (lca as any).production_volume = productionMap.get(lca.product_id) || 0;
+        (lca as any).production_volume = productionMap.get(String(lca.product_id)) || 0;
       });
 
       if (!lcas || lcas.length === 0) {
@@ -860,11 +862,12 @@ export function useCompanyMetrics() {
         .select('product_id, units_produced')
         .in('product_id', productIds);
 
-      // Build production volume map
+      // Build production volume map (use string keys for bigint type safety)
       const productionMap = new Map<string, number>();
       productionData?.forEach(prod => {
-        const current = productionMap.get(prod.product_id) || 0;
-        productionMap.set(prod.product_id, current + Number(prod.units_produced || 0));
+        const key = String(prod.product_id);
+        const current = productionMap.get(key) || 0;
+        productionMap.set(key, current + Number(prod.units_produced || 0));
       });
 
       // Aggregate materials by name, scaling by production volume
@@ -872,7 +875,7 @@ export function useCompanyMetrics() {
 
       materials.forEach((material: any) => {
         const productId = material.product_carbon_footprints?.product_id;
-        const productionVolume = productionMap.get(productId) || 1;
+        const productionVolume = productionMap.get(String(productId)) || 1;
 
         const name = material.name || 'Unknown Material';
         const existing = materialMap.get(name);
@@ -909,7 +912,7 @@ export function useCompanyMetrics() {
 
       materials.forEach((material: any) => {
         const productId = material.product_carbon_footprints?.product_id;
-        const productionVolume = productionMap.get(productId) || 1;
+        const productionVolume = productionMap.get(String(productId)) || 1;
 
         totalTerrestrialEcotoxicity += (Number(material.impact_terrestrial_ecotoxicity) || 0) * productionVolume;
         totalFreshwaterEutrophication += (Number(material.impact_freshwater_eutrophication) || 0) * productionVolume;
@@ -955,7 +958,7 @@ export function useCompanyMetrics() {
 
       materials.forEach((material: any) => {
         const productId = material.product_carbon_footprints?.product_id;
-        const productionVolume = productionMap.get(productId) || 1;
+        const productionVolume = productionMap.get(String(productId)) || 1;
 
         const impact = (Number(material.impact_climate) || 0) * productionVolume;
         const lca_stage_id = material.lca_sub_stages?.lca_stage_id;
