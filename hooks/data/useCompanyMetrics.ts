@@ -477,7 +477,12 @@ export function useCompanyMetrics() {
       }
 
       // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
-      const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
+      // IMPORTANT: Check that the array has actual items, not just that it exists (empty array is truthy)
+      const hasMaterialBreakdown = lcas.some(lca =>
+        lca.aggregated_impacts?.breakdown?.by_material &&
+        Array.isArray(lca.aggregated_impacts.breakdown.by_material) &&
+        lca.aggregated_impacts.breakdown.by_material.length > 0
+      );
 
       // Check if there's ACTUAL non-zero GHG BREAKDOWN data (require biogenic/fossil split)
       const hasGHGBreakdown = lcas.some(lca => {
@@ -846,7 +851,7 @@ export function useCompanyMetrics() {
       }
 
       // Fetch production volumes for all products
-      const productIds = Array.from(new Set(materials.map((m: any) => m.product_lcas?.product_id).filter(Boolean)));
+      const productIds = Array.from(new Set(materials.map((m: any) => m.product_carbon_footprints?.product_id).filter(Boolean)));
       const { data: productionData } = await supabase
         .from('production_logs')
         .select('product_id, units_produced')
@@ -863,7 +868,7 @@ export function useCompanyMetrics() {
       const materialMap = new Map<string, MaterialBreakdownItem>();
 
       materials.forEach((material: any) => {
-        const productId = material.product_lcas?.product_id;
+        const productId = material.product_carbon_footprints?.product_id;
         const productionVolume = productionMap.get(productId) || 1;
 
         const name = material.name || 'Unknown Material';
@@ -909,7 +914,7 @@ export function useCompanyMetrics() {
       }>();
 
       materials.forEach((material: any) => {
-        const productId = material.product_lcas?.product_id;
+        const productId = material.product_carbon_footprints?.product_id;
         const productionVolume = productionMap.get(productId) || 1;
 
         const impact = (Number(material.impact_climate) || 0) * productionVolume;
@@ -971,7 +976,7 @@ export function useCompanyMetrics() {
         let hasActualGhgData = false;
 
         materials.forEach((material: any) => {
-          const productId = material.product_lcas?.product_id;
+          const productId = material.product_carbon_footprints?.product_id;
           const productionVolume = productionMap.get(productId) || 1;
 
           const fossilFromDB = Number(material.impact_climate_fossil || 0) * productionVolume;
