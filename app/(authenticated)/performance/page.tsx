@@ -222,7 +222,8 @@ const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
 export default function PerformancePage() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const { currentOrganization } = useOrganization();
-  const hookResult = useCompanyMetrics();
+  // All hooks now consistently use selectedYear for reporting period
+  const hookResult = useCompanyMetrics(selectedYear);
   const { footprint: footprintData, loading: footprintLoading, refetch: refetchFootprint } = useCompanyFootprint(selectedYear);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
   const { getBenchmarkForPillar } = useVitalityBenchmarks();
@@ -232,7 +233,7 @@ export default function PerformancePage() {
     waterTimeSeries,
     sourceBreakdown: waterSourceBreakdown,
     loading: waterLoading,
-  } = useFacilityWaterData();
+  } = useFacilityWaterData(selectedYear);
 
   const {
     categories: scope3Categories,

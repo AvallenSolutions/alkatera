@@ -199,7 +199,7 @@ export interface FacilityEmissionsBreakdown {
   scope2_emissions: number;
 }
 
-export function useCompanyMetrics() {
+export function useCompanyMetrics(year?: number) {
   const { currentOrganization } = useOrganization();
   const [metrics, setMetrics] = useState<CompanyMetrics | null>(null);
   const [facilityWaterRisks, setFacilityWaterRisks] = useState<FacilityWaterRisk[]>([]);
@@ -212,6 +212,9 @@ export function useCompanyMetrics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Use provided year or default to current year
+  const selectedYear = year || new Date().getFullYear();
+
   useEffect(() => {
     if (!currentOrganization?.id) {
       setLoading(false);
@@ -219,7 +222,7 @@ export function useCompanyMetrics() {
     }
 
     fetchCompanyMetrics();
-  }, [currentOrganization?.id]);
+  }, [currentOrganization?.id, selectedYear]);
 
   async function fetchCompanyMetrics() {
     try {
@@ -230,13 +233,19 @@ export function useCompanyMetrics() {
         throw new Error('No organization selected');
       }
 
-      // Fetch all LCAs first
+      // Fetch PEIs (Product Environmental Impacts) for the selected year
+      // Filter by updated_at to get assessments completed within the calendar year
+      const yearStart = `${selectedYear}-01-01`;
+      const yearEnd = `${selectedYear}-12-31`;
+
       const { data: allLcas, error: lcaError } = await supabase
         .from('product_carbon_footprints')
         .select('id, product_id, product_name, aggregated_impacts, csrd_compliant, updated_at')
         .eq('organization_id', currentOrganization.id)
         .eq('status', 'completed')
         .not('aggregated_impacts', 'is', null)
+        .gte('updated_at', yearStart)
+        .lte('updated_at', `${yearEnd}T23:59:59`)
         .order('updated_at', { ascending: false });
 
       if (lcaError) throw lcaError;
@@ -252,14 +261,16 @@ export function useCompanyMetrics() {
 
       const lcas = Array.from(latestByProduct.values());
 
-      // Fetch production volumes for all products
+      // Fetch production volumes for all products within the selected year
       // IMPORTANT: units_produced is normalized to consumer units (e.g., bottles)
       // This was calculated from bulk volume (hectolitres/litres) ÷ product unit size
       const productIds = lcas.map(lca => lca.product_id).filter(id => id);
       const { data: productionData } = await supabase
         .from('production_logs')
-        .select('product_id, units_produced, volume, unit')
-        .in('product_id', productIds);
+        .select('product_id, units_produced, volume, unit, production_date')
+        .in('product_id', productIds)
+        .gte('production_date', yearStart)
+        .lte('production_date', yearEnd);
 
       // =========================================================================
       // CRITICAL FIX: Unit normalization validation
@@ -563,7 +574,7 @@ export function useCompanyMetrics() {
           lifecycle: !hasLifecycleStageBreakdown
         }, ')');
         try {
-          await fetchMaterialAndGHGBreakdown();
+          await fetchMaterialAndGHGBreakdown(yearStart, yearEnd);
         } catch (err) {
           console.error('❌ Error in fetchMaterialAndGHGBreakdown:', err);
         }
@@ -856,13 +867,13 @@ export function useCompanyMetrics() {
     }
   }
 
-  async function fetchMaterialAndGHGBreakdown() {
+  async function fetchMaterialAndGHGBreakdown(yearStart: string, yearEnd: string) {
     try {
       if (!currentOrganization?.id) {
         return;
       }
 
-      // Fetch materials from all completed LCAs with lifecycle stage information and GHG breakdown
+      // Fetch materials from completed PEIs within the selected year
       const { data: materials, error } = await supabase
         .from('product_carbon_footprint_materials')
         .select(`
@@ -901,10 +912,12 @@ export function useCompanyMetrics() {
             name,
             lca_stage_id
           ),
-          product_carbon_footprints!inner(status, organization_id, product_id)
+          product_carbon_footprints!inner(status, organization_id, product_id, updated_at)
         `)
         .eq('product_carbon_footprints.organization_id', currentOrganization.id)
         .eq('product_carbon_footprints.status', 'completed')
+        .gte('product_carbon_footprints.updated_at', yearStart)
+        .lte('product_carbon_footprints.updated_at', `${yearEnd}T23:59:59`)
         .not('impact_climate', 'is', null);
 
       if (error) {
@@ -915,12 +928,14 @@ export function useCompanyMetrics() {
         return;
       }
 
-      // Fetch production volumes for all products
+      // Fetch production volumes for all products within the selected year
       const productIds = Array.from(new Set(materials.map((m: any) => m.product_carbon_footprints?.product_id).filter(Boolean)));
       const { data: productionData } = await supabase
         .from('production_logs')
         .select('product_id, units_produced')
-        .in('product_id', productIds);
+        .in('product_id', productIds)
+        .gte('production_date', yearStart)
+        .lte('production_date', yearEnd);
 
       // Build production volume map (use string keys for bigint type safety)
       const productionMap = new Map<string, number>();
