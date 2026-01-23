@@ -115,19 +115,34 @@ function transformFootprintToScope3Categories(
 
   const scope3Data = footprintData.breakdown.scope3;
 
+  // Map all available scope 3 category data from corporate emissions calculator
+  // Categories not populated remain as 0 with 'missing' quality
   const categoryMapping: Record<number, { value: number; dataQuality: 'primary' | 'secondary' | 'estimated' | 'missing' }> = {
+    // Cat 1: Purchased Goods & Services (from product LCA Scope 3 breakdown)
     1: { value: scope3Data.products || 0, dataQuality: scope3Data.products > 0 ? 'primary' : 'missing' },
+    // Cat 2: Capital Goods
     2: { value: scope3Data.capital_goods || 0, dataQuality: scope3Data.capital_goods > 0 ? 'secondary' : 'missing' },
+    // Cat 3: Fuel & Energy Related (WTT) - estimated as ~15% of fuel-related emissions
     3: { value: 0, dataQuality: 'missing' },
-    4: { value: 0, dataQuality: 'missing' },
-    5: { value: scope3Data.waste || 0, dataQuality: scope3Data.waste > 0 ? 'secondary' : 'missing' },
+    // Cat 4: Upstream Transportation (from product LCA transport impacts)
+    4: { value: scope3Data.upstream_transport || 0, dataQuality: scope3Data.upstream_transport > 0 ? 'secondary' : 'missing' },
+    // Cat 5: Waste Generated in Operations
+    5: { value: scope3Data.waste || scope3Data.operational_waste || 0, dataQuality: (scope3Data.waste || scope3Data.operational_waste) > 0 ? 'secondary' : 'missing' },
+    // Cat 6: Business Travel
     6: { value: scope3Data.business_travel || 0, dataQuality: scope3Data.business_travel > 0 ? 'primary' : 'missing' },
+    // Cat 7: Employee Commuting
     7: { value: scope3Data.employee_commuting || 0, dataQuality: scope3Data.employee_commuting > 0 ? 'secondary' : 'missing' },
-    8: { value: 0, dataQuality: 'missing' },
-    9: { value: scope3Data.logistics || 0, dataQuality: scope3Data.logistics > 0 ? 'secondary' : 'missing' },
+    // Cat 8: Upstream Leased Assets / Purchased Services (includes marketing materials)
+    8: { value: (scope3Data.purchased_services || 0) + (scope3Data.marketing_materials || scope3Data.marketing || 0), dataQuality: (scope3Data.purchased_services || scope3Data.marketing_materials || scope3Data.marketing) > 0 ? 'secondary' : 'missing' },
+    // Cat 9: Downstream Transportation (logistics spend + downstream transport)
+    9: { value: (scope3Data.logistics || scope3Data.downstream_logistics || 0) + (scope3Data.downstream_transport || 0), dataQuality: (scope3Data.logistics || scope3Data.downstream_logistics || scope3Data.downstream_transport) > 0 ? 'secondary' : 'missing' },
+    // Cat 10: Processing of Sold Products - typically not applicable for finished goods
     10: { value: 0, dataQuality: 'missing' },
-    11: { value: 0, dataQuality: 'missing' },
+    // Cat 11: Use of Sold Products (from product LCA use phase)
+    11: { value: scope3Data.use_phase || 0, dataQuality: scope3Data.use_phase > 0 ? 'secondary' : 'missing' },
+    // Cat 12: End-of-Life Treatment (would need separate calculation from product LCA)
     12: { value: 0, dataQuality: 'missing' },
+    // Cat 13-15: Downstream Leased Assets, Franchises, Investments - typically not applicable
     13: { value: 0, dataQuality: 'missing' },
     14: { value: 0, dataQuality: 'missing' },
     15: { value: 0, dataQuality: 'missing' },
