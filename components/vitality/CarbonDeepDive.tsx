@@ -544,20 +544,20 @@ export function CarbonDeepDive({
 
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div className="flex items-center justify-between p-2 bg-red-50 rounded">
-                            <span className="text-muted-foreground">Scope 1</span>
-                            <span className="font-semibold">{((facility.scope1_emissions ?? 0) / 1000).toFixed(3)} t</span>
+                            <span className="text-red-700">Scope 1</span>
+                            <span className="font-semibold text-red-900">{((facility.scope1_emissions ?? 0) / 1000).toFixed(3)} t</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-orange-50 rounded">
-                            <span className="text-muted-foreground">Scope 2</span>
-                            <span className="font-semibold">{((facility.scope2_emissions ?? 0) / 1000).toFixed(3)} t</span>
+                            <span className="text-orange-700">Scope 2</span>
+                            <span className="font-semibold text-orange-900">{((facility.scope2_emissions ?? 0) / 1000).toFixed(3)} t</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-blue-50 rounded">
-                            <span className="text-muted-foreground">Production</span>
-                            <span className="font-semibold">{(facility.production_volume ?? 0).toLocaleString()} units</span>
+                            <span className="text-blue-700">Production</span>
+                            <span className="font-semibold text-blue-900">{(facility.production_volume ?? 0).toLocaleString()} units</span>
                           </div>
                           <div className="flex items-center justify-between p-2 bg-green-50 rounded">
-                            <span className="text-muted-foreground">Intensity</span>
-                            <span className="font-semibold">{((facility.facility_intensity ?? 0) / 1000).toFixed(6)} t/unit</span>
+                            <span className="text-green-700">Intensity</span>
+                            <span className="font-semibold text-green-900">{((facility.facility_intensity ?? 0) / 1000).toFixed(6)} t/unit</span>
                           </div>
                         </div>
                       </CardContent>

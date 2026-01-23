@@ -392,31 +392,50 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
                 break;
               }
               case 'purchased_services': {
-                if (entry.material_type) {
-                  const cat1 = categoryData.get(1)!;
-                  cat1.entries.push({
-                    id: entry.id,
-                    date: entry.entry_date,
-                    description: entry.description || 'Marketing materials',
-                    emissions: co2e,
-                    unit: 'kg CO₂e',
-                    quantity: entry.spend_amount,
-                    source: 'Spend-based',
-                    dataQuality: 'secondary',
-                  });
-                } else {
-                  const cat1 = categoryData.get(1)!;
-                  cat1.entries.push({
-                    id: entry.id,
-                    date: entry.entry_date,
-                    description: entry.description || 'Purchased services',
-                    emissions: co2e,
-                    unit: 'kg CO₂e',
-                    quantity: entry.spend_amount,
-                    source: 'Spend-based',
-                    dataQuality: 'secondary',
-                  });
-                }
+                const cat1 = categoryData.get(1)!;
+                cat1.totalEmissions += co2e;
+                cat1.entryCount += 1;
+                if (cat1.dataQuality === 'missing') cat1.dataQuality = 'secondary';
+                cat1.entries.push({
+                  id: entry.id,
+                  date: entry.entry_date,
+                  description: entry.description || (entry.material_type ? 'Marketing materials' : 'Purchased services'),
+                  emissions: co2e,
+                  unit: 'kg CO₂e',
+                  quantity: entry.spend_amount,
+                  source: 'Spend-based',
+                  dataQuality: 'secondary',
+                });
+                break;
+              }
+              case 'upstream_transportation': {
+                const cat4 = categoryData.get(4)!;
+                cat4.totalEmissions += co2e;
+                cat4.entryCount += 1;
+                cat4.dataQuality = 'secondary';
+                cat4.entries.push({
+                  id: entry.id,
+                  date: entry.entry_date,
+                  description: entry.description || 'Upstream transportation',
+                  emissions: co2e,
+                  unit: 'kg CO₂e',
+                  quantity: entry.weight_kg,
+                  source: entry.distance_km ? 'Distance-based' : 'Spend-based',
+                  dataQuality: 'secondary',
+                  metadata: {
+                    transportMode: entry.transport_mode,
+                    distance: entry.distance_km,
+                    weight: entry.weight_kg,
+                  },
+                });
+                logisticsArr.push({
+                  id: entry.id,
+                  date: entry.entry_date,
+                  transportMode: entry.transport_mode || 'Unknown',
+                  distance: entry.distance_km,
+                  weight: entry.weight_kg,
+                  emissions: co2e,
+                });
                 break;
               }
             }
@@ -454,6 +473,188 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
           });
         });
         if (cat6.dataQuality === 'missing') cat6.dataQuality = 'primary';
+      }
+
+      // =========================================================================
+      // Categories from scope3-categories.ts (Cat 4, 9, 11)
+      // =========================================================================
+      try {
+        const { calculateScope3Cat4, calculateScope3Cat9, calculateScope3Cat11 } =
+          await import('@/lib/calculations/scope3-categories');
+
+        const [cat4Result, cat9Result, cat11Result] = await Promise.all([
+          calculateScope3Cat4(supabase, organizationId, yearStart, yearEnd),
+          calculateScope3Cat9(supabase, organizationId, yearStart, yearEnd),
+          calculateScope3Cat11(supabase, organizationId, yearStart, yearEnd),
+        ]);
+
+        // Cat 4: Upstream Transportation (add to existing if any overhead entries)
+        if (cat4Result.totalKgCO2e > 0) {
+          const cat4 = categoryData.get(4)!;
+          cat4.totalEmissions += cat4Result.totalKgCO2e;
+          cat4.entryCount += cat4Result.breakdown.length;
+          cat4.dataQuality = cat4Result.dataQuality === 'primary' ? 'primary' : 'secondary';
+          cat4Result.breakdown.forEach((emission, idx) => {
+            cat4.entries.push({
+              id: `cat4-calc-${idx}`,
+              date: yearStart,
+              description: `${emission.mode} transport: ${emission.weightTonnes.toFixed(1)}t × ${emission.distanceKm}km`,
+              emissions: emission.emissionsKgCO2e,
+              unit: 'kg CO₂e',
+              source: emission.source,
+              dataQuality: cat4Result.dataQuality === 'primary' ? 'primary' : 'secondary',
+            });
+          });
+        }
+
+        // Cat 9: Downstream Transportation (add to existing downstream_logistics if any)
+        if (cat9Result.totalKgCO2e > 0) {
+          const cat9 = categoryData.get(9)!;
+          // Only add if no manual entries exist (to avoid double counting)
+          if (cat9.totalEmissions === 0) {
+            cat9.totalEmissions = cat9Result.totalKgCO2e;
+            cat9.entryCount = cat9Result.breakdown.length;
+            cat9.dataQuality = cat9Result.dataQuality === 'primary' ? 'primary' : 'estimated';
+            cat9Result.breakdown.forEach((emission, idx) => {
+              cat9.entries.push({
+                id: `cat9-calc-${idx}`,
+                date: yearStart,
+                description: `Distribution: ${emission.weightTonnes.toFixed(1)}t × ${emission.distanceKm}km`,
+                emissions: emission.emissionsKgCO2e,
+                unit: 'kg CO₂e',
+                source: emission.source,
+                dataQuality: cat9Result.dataQuality === 'estimated' ? 'estimated' : 'secondary',
+              });
+            });
+          }
+        }
+
+        // Cat 11: Use of Sold Products
+        if (cat11Result.totalKgCO2e > 0) {
+          const cat11 = categoryData.get(11)!;
+          cat11.totalEmissions = cat11Result.totalKgCO2e;
+          cat11.entryCount = cat11Result.breakdown.length;
+          cat11.dataQuality = 'estimated';
+          cat11Result.breakdown.forEach(emission => {
+            cat11.entries.push({
+              id: `cat11-${emission.productId}`,
+              date: yearStart,
+              description: `${emission.productName}: ${emission.useCategory}`,
+              emissions: emission.emissionsKgCO2e,
+              unit: 'kg CO₂e',
+              source: emission.assumptionsUsed.join('; '),
+              dataQuality: 'estimated',
+            });
+          });
+        }
+      } catch (err) {
+        console.warn('[useScope3GranularData] Could not calculate Categories 4, 9, 11:', err);
+      }
+
+      // =========================================================================
+      // Cat 12: End-of-Life Treatment (from product LCA data)
+      // =========================================================================
+      try {
+        const { data: lcasWithEol } = await supabase
+          .from('product_carbon_footprints')
+          .select('id, product_name, aggregated_impacts')
+          .eq('organization_id', organizationId)
+          .eq('status', 'completed')
+          .not('aggregated_impacts', 'is', null);
+
+        let cat12Total = 0;
+        const cat12Entries: Scope3Entry[] = [];
+
+        lcasWithEol?.forEach(lca => {
+          const eolEmissions = lca.aggregated_impacts?.breakdown?.by_lifecycle_stage?.end_of_life ||
+                              lca.aggregated_impacts?.end_of_life_emissions || 0;
+          if (eolEmissions > 0) {
+            // Find production volume for this product
+            const prodLog = productionLogs?.find(p => p.product_id === (lca as any).product_id);
+            const unitsProduced = prodLog?.units_produced || 0;
+            const totalEol = eolEmissions * unitsProduced;
+            if (totalEol > 0) {
+              cat12Total += totalEol;
+              cat12Entries.push({
+                id: `cat12-${lca.id}`,
+                date: yearStart,
+                description: `${lca.product_name}: End-of-life treatment`,
+                emissions: totalEol,
+                unit: 'kg CO₂e',
+                source: 'Product LCA',
+                dataQuality: 'secondary',
+              });
+            }
+          }
+        });
+
+        if (cat12Total > 0) {
+          const cat12 = categoryData.get(12)!;
+          cat12.totalEmissions = cat12Total;
+          cat12.entryCount = cat12Entries.length;
+          cat12.dataQuality = 'secondary';
+          cat12.entries = cat12Entries;
+        }
+      } catch (err) {
+        console.warn('[useScope3GranularData] Could not calculate Category 12:', err);
+      }
+
+      // =========================================================================
+      // Cat 3: Fuel & Energy Related Activities (Well-to-Tank emissions)
+      // Calculated as ~15% of Scope 1+2 emissions (industry estimate for WTT)
+      // =========================================================================
+      try {
+        const { data: utilityData } = await supabase
+          .from('utility_data_entries')
+          .select('quantity, utility_type')
+          .eq('organization_id', organizationId)
+          .gte('reporting_period_start', yearStart)
+          .lte('reporting_period_end', yearEnd);
+
+        if (utilityData && utilityData.length > 0) {
+          // WTT factors (approximate % of direct emission factor)
+          const wttFactors: Record<string, number> = {
+            natural_gas: 0.15,
+            electricity_grid: 0.12,
+            diesel_stationary: 0.18,
+            diesel_mobile: 0.18,
+            petrol_mobile: 0.16,
+          };
+
+          let cat3Total = 0;
+          utilityData.forEach((entry: any) => {
+            const wttFactor = wttFactors[entry.utility_type] || 0.15;
+            // Rough estimate: WTT is ~15% additional to direct emissions
+            const directEmissionFactors: Record<string, number> = {
+              natural_gas: 0.18293,
+              electricity_grid: 0.207,
+              diesel_stationary: 2.68787,
+              diesel_mobile: 2.68787,
+              petrol_mobile: 2.31,
+            };
+            const directFactor = directEmissionFactors[entry.utility_type] || 0;
+            const directEmissions = entry.quantity * directFactor;
+            cat3Total += directEmissions * wttFactor;
+          });
+
+          if (cat3Total > 0) {
+            const cat3 = categoryData.get(3)!;
+            cat3.totalEmissions = cat3Total;
+            cat3.entryCount = 1;
+            cat3.dataQuality = 'estimated';
+            cat3.entries.push({
+              id: 'cat3-wtt',
+              date: yearStart,
+              description: 'Well-to-tank emissions for fuel & energy',
+              emissions: cat3Total,
+              unit: 'kg CO₂e',
+              source: 'Estimated from utility consumption (WTT ~15%)',
+              dataQuality: 'estimated',
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('[useScope3GranularData] Could not calculate Category 3:', err);
       }
 
       let total = 0;

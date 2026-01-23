@@ -378,18 +378,24 @@ export function useCompanyMetrics() {
       });
 
       // Find top climate contributor
-      const topContributor = productContributions.length > 0
-        ? productContributions.reduce((max, current) =>
+      // Use only positive contributions for "top contributor" - this shows emissions, not sequestration
+      const positiveContributions = productContributions.filter(c => c.value > 0);
+      const topContributor = positiveContributions.length > 0
+        ? positiveContributions.reduce((max, current) =>
             current.value > max.value ? current : max
           )
         : null;
+
+      // Calculate percentage based on sum of positive contributions only
+      // This avoids impossible percentages when negative values (biogenic carbon) reduce the net total
+      const totalPositiveEmissions = positiveContributions.reduce((sum, c) => sum + c.value, 0);
 
       const topContributorData: TopContributor | null = topContributor
         ? {
             name: topContributor.name,
             value: topContributor.value,
-            percentage: totalImpacts.climate_change_gwp100 > 0
-              ? (topContributor.value / totalImpacts.climate_change_gwp100) * 100
+            percentage: totalPositiveEmissions > 0
+              ? (topContributor.value / totalPositiveEmissions) * 100
               : 0,
             category: 'Product',
           }
@@ -486,6 +492,14 @@ export function useCompanyMetrics() {
         lca.aggregated_impacts.breakdown.by_material.length > 0
       );
 
+      // Check if lifecycle stage breakdown was extracted from aggregated_impacts
+      const hasLifecycleStageBreakdown = lcas.some(lca =>
+        lca.aggregated_impacts?.breakdown?.by_lifecycle_stage &&
+        (Array.isArray(lca.aggregated_impacts.breakdown.by_lifecycle_stage)
+          ? lca.aggregated_impacts.breakdown.by_lifecycle_stage.length > 0
+          : Object.keys(lca.aggregated_impacts.breakdown.by_lifecycle_stage).length > 0)
+      );
+
       // Check if there's ACTUAL non-zero GHG BREAKDOWN data (require biogenic/fossil split)
       const hasGHGBreakdown = lcas.some(lca => {
         const ghg = lca.aggregated_impacts?.ghg_breakdown;
@@ -537,12 +551,17 @@ export function useCompanyMetrics() {
       console.log('🔍 Checking fallback conditions:', {
         lcaCount: lcas.length,
         hasMaterialBreakdown,
-        hasGHGBreakdown
+        hasGHGBreakdown,
+        hasLifecycleStageBreakdown
       });
 
-      // Always fetch GHG data from database if not in aggregated_impacts
-      if (!hasMaterialBreakdown || !hasGHGBreakdown) {
-        console.log('✅ Calling fetchMaterialAndGHGBreakdown');
+      // Fetch from database if material, GHG, or lifecycle stage data is missing from aggregated_impacts
+      if (!hasMaterialBreakdown || !hasGHGBreakdown || !hasLifecycleStageBreakdown) {
+        console.log('✅ Calling fetchMaterialAndGHGBreakdown (missing:', {
+          material: !hasMaterialBreakdown,
+          ghg: !hasGHGBreakdown,
+          lifecycle: !hasLifecycleStageBreakdown
+        }, ')');
         try {
           await fetchMaterialAndGHGBreakdown();
         } catch (err) {
@@ -670,6 +689,12 @@ export function useCompanyMetrics() {
 
         // Aggregate lifecycle stage data
         if (breakdown.by_lifecycle_stage) {
+          console.log('🔍 Lifecycle stage data found:', {
+            lca_id: lca.id,
+            by_lifecycle_stage: breakdown.by_lifecycle_stage,
+            type: typeof breakdown.by_lifecycle_stage,
+            isArray: Array.isArray(breakdown.by_lifecycle_stage)
+          });
           const productionVolume = lca.production_volume || 0;
           const stages = breakdown.by_lifecycle_stage;
 
@@ -1098,7 +1123,8 @@ export function useCompanyMetrics() {
           else if (materialQuality === 'secondary' && dataQuality !== 'primary') dataQuality = 'secondary';
 
           // CONSERVATIVE FALLBACK: If no biogenic/fossil split provided, assume all fossil
-          if (material.impact_climate_fossil === 0 && material.impact_climate_biogenic === 0 && material.impact_climate_dluc === 0 && Number(material.impact_climate || 0) > 0) {
+          // Use !fossilFromDB instead of === 0 to handle null/undefined fields
+          if (!fossilFromDB && !biogenicFromDB && !dlucFromDB && totalClimateImpact > 0) {
             fossilCO2 += totalClimateImpact;
           }
         });
@@ -1144,12 +1170,16 @@ export function useCompanyMetrics() {
           fossilCO2,
           biogenicCO2,
           totalClimate,
-          ghgData
+          willSetGhgBreakdown: hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0 || totalClimate > 0
         });
 
-        // Only set GHG breakdown if we have actual data, to avoid overwriting good data from aggregated_impacts
-        if (hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0) {
+        // Set GHG breakdown if we have any climate data
+        // The fallback above ensures fossilCO2 is populated from totalClimate if no specific split exists
+        if (hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0 || totalClimate > 0) {
+          console.log('✅ Setting GHG breakdown from materials data');
           setGhgBreakdown(ghgData);
+        } else {
+          console.log('⚠️ No GHG data to set - totalClimate:', totalClimate);
         }
       }
 
