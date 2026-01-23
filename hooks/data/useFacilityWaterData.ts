@@ -137,6 +137,7 @@ export function useFacilityWaterData() {
     setError(null);
 
     try {
+      // Fetch time series from facility_activity_entries (where water data is actually stored)
       const [overviewResult, summariesResult, timeSeriesResult] = await Promise.all([
         supabase
           .from('company_water_overview')
@@ -150,12 +151,13 @@ export function useFacilityWaterData() {
           .eq('organization_id', currentOrganization.id)
           .order('total_consumption_m3', { ascending: false }),
 
+        // Query facility_activity_entries for water data (not the empty facility_water_data table)
         supabase
-          .from('facility_water_data')
+          .from('facility_activity_entries')
           .select('*')
           .eq('organization_id', currentOrganization.id)
-          .order('reporting_year', { ascending: true })
-          .order('reporting_month', { ascending: true })
+          .in('activity_category', ['water_intake', 'water_discharge', 'water_recycled'])
+          .order('reporting_period_start', { ascending: true })
       ]);
 
       if (overviewResult.error) throw overviewResult.error;
@@ -165,26 +167,49 @@ export function useFacilityWaterData() {
       setCompanyOverview(overviewResult.data);
       setFacilitySummaries(summariesResult.data || []);
 
+      // Transform facility_activity_entries into time series data
       const timeSeriesData: WaterTimeSeries[] = [];
       const monthlyAggregates: Record<string, WaterTimeSeries> = {};
 
-      (timeSeriesResult.data || []).forEach((entry: FacilityWaterEntry) => {
-        const key = `${entry.reporting_year}-${String(entry.reporting_month).padStart(2, '0')}`;
+      interface WaterActivityEntry {
+        activity_category: string;
+        quantity: number;
+        reporting_period_start: string;
+      }
+
+      (timeSeriesResult.data || []).forEach((entry: WaterActivityEntry) => {
+        const date = new Date(entry.reporting_period_start);
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1; // 1-indexed
+        const key = `${year}-${String(month).padStart(2, '0')}`;
+
         if (!monthlyAggregates[key]) {
           monthlyAggregates[key] = {
             period: key,
-            year: entry.reporting_year,
-            month: entry.reporting_month,
+            year,
+            month,
             consumption: 0,
             discharge: 0,
             netConsumption: 0,
             scarcityWeighted: 0
           };
         }
-        monthlyAggregates[key].consumption += entry.total_consumption_m3;
-        monthlyAggregates[key].discharge += entry.total_discharge_m3;
-        monthlyAggregates[key].netConsumption += entry.net_consumption_m3;
-        monthlyAggregates[key].scarcityWeighted += entry.scarcity_weighted_consumption_m3;
+
+        // Aggregate by activity category
+        if (entry.activity_category === 'water_intake') {
+          monthlyAggregates[key].consumption += entry.quantity || 0;
+        } else if (entry.activity_category === 'water_discharge') {
+          monthlyAggregates[key].discharge += entry.quantity || 0;
+        }
+        // water_recycled doesn't directly affect these metrics
+      });
+
+      // Calculate net consumption and scarcity weighted for each period
+      Object.values(monthlyAggregates).forEach(period => {
+        period.netConsumption = Math.max(0, period.consumption - period.discharge);
+        // Use average AWARE factor from company overview if available, otherwise default to 1
+        const awareFactor = overviewResult.data?.avg_aware_factor || 1;
+        period.scarcityWeighted = period.netConsumption * awareFactor;
       });
 
       Object.values(monthlyAggregates)

@@ -15,7 +15,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { TrendingDown, TrendingUp, Minus } from 'lucide-react';
+import { TrendingDown, TrendingUp, Minus, Droplets } from 'lucide-react';
 import type { WaterTimeSeries } from '@/hooks/data/useFacilityWaterData';
 
 interface WaterConsumptionChartProps {
@@ -100,10 +100,14 @@ export function WaterConsumptionChart({
         </CardHeader>
         <CardContent>
           <div
-            className="flex items-center justify-center text-muted-foreground text-sm"
+            className="flex flex-col items-center justify-center text-muted-foreground text-sm gap-2"
             style={{ height }}
           >
-            No water consumption data available
+            <Droplets className="h-8 w-8 opacity-50" />
+            <span>No water consumption data available</span>
+            <span className="text-xs text-center max-w-xs">
+              Log water intake and discharge data for your facilities to see consumption trends over time
+            </span>
           </div>
         </CardContent>
       </Card>

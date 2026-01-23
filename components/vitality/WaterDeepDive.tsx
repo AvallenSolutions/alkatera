@@ -531,7 +531,10 @@ export function WaterDeepDive({
                 {waterTimeSeries.length < 2 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Clock className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                    <p>Not enough data for trend analysis</p>
+                    <p className="font-medium">Not enough data for trend analysis</p>
+                    <p className="text-xs mt-1 max-w-xs mx-auto">
+                      Log water data across multiple reporting periods to see consumption trends and patterns
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
