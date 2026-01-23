@@ -604,7 +604,7 @@ export default function DashboardPage() {
                 <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
                   <span className="flex items-center gap-2 flex-1">
                     <span className="text-lg">📦</span>
-                    <span>Product Carbon Footprint Status</span>
+                    <span>Product Environmental Impact Status</span>
                     <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
                       View details
                     </span>

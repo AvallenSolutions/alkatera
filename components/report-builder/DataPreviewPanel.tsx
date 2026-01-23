@@ -157,11 +157,11 @@ export function DataPreviewPanel({ config }: DataPreviewPanelProps) {
     })) || [];
 
     return {
-      section: 'Product Carbon Footprints',
+      section: 'Product Environmental Impacts',
       dataPoints,
       completeness: products && products.length > 0 ? 100 : 0,
       confidence: products && products.length > 0 ? 90 : 0,
-      missing: products && products.length === 0 ? ['No completed product LCAs found'] : [],
+      missing: products && products.length === 0 ? ['No completed product PEIs found'] : [],
     };
   }
 

@@ -49,8 +49,8 @@ const AVAILABLE_SECTIONS = [
   },
   {
     id: 'product-footprints',
-    label: 'Product Carbon Footprints',
-    description: 'Individual product LCA results with functional units',
+    label: 'Product Environmental Impacts',
+    description: 'Individual product environmental impact results with functional units',
     required: false,
     category: 'Products',
   },

@@ -262,7 +262,7 @@ export function WaterDeepDive({
           unit="m³"
           icon={Droplets}
           color="blue"
-          subtitle={hasOperationalWaterData ? 'Direct facility data' : hasProductLcaData ? 'From Product Carbon Footprints' : undefined}
+          subtitle={hasOperationalWaterData ? 'Direct facility data' : hasProductLcaData ? 'From Product Environmental Impacts' : undefined}
         />
         <MetricCard
           title="Scarcity Impact"
@@ -270,7 +270,7 @@ export function WaterDeepDive({
           unit="m³ eq"
           icon={Waves}
           color="amber"
-          subtitle={hasOperationalWaterData ? 'AWARE weighted' : hasProductLcaData ? 'From Product Carbon Footprints' : undefined}
+          subtitle={hasOperationalWaterData ? 'AWARE weighted' : hasProductLcaData ? 'From Product Environmental Impacts' : undefined}
         />
         <MetricCard
           title="Net Consumption"
@@ -924,7 +924,7 @@ function FacilityDetailView({
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Waves className="h-4 w-4" />
-                  Product Carbon Footprint Embedded Water
+                  Product Environmental Impact Embedded Water
                 </CardTitle>
                 <CardDescription className="text-xs">Supply chain water from linked products</CardDescription>
               </CardHeader>

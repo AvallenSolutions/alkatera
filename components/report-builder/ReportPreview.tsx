@@ -43,7 +43,7 @@ const SECTION_LABELS: Record<string, string> = {
   'scope-1-2-3': 'Scope 1/2/3 Emissions Breakdown',
   'ghg-inventory': 'GHG Gas Inventory (ISO 14067)',
   'carbon-origin': 'Carbon Origin Breakdown',
-  'product-footprints': 'Product Carbon Footprints',
+  'product-footprints': 'Product Environmental Impacts',
   'multi-capital': 'Multi-capital Impacts',
   'supply-chain': 'Supply Chain Analysis',
   facilities: 'Facility Emissions Breakdown',

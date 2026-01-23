@@ -222,7 +222,7 @@ export function UpstreamTransportCard({
             <Alert className="bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800">
               <Package className="h-4 w-4 text-violet-600" />
               <AlertDescription className="text-xs text-violet-800 dark:text-violet-200">
-                Calculated from material origins in your Product Carbon Footprints. To update, edit transport details on your products.
+                Calculated from material origins in your Product Environmental Impacts. To update, edit transport details on your products.
               </AlertDescription>
             </Alert>
           </>
@@ -230,7 +230,7 @@ export function UpstreamTransportCard({
           <div className="py-8 text-center">
             <div className="text-sm text-muted-foreground mb-4">No transport data yet</div>
             <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-              Add material origins and transport modes to your Product Carbon Footprints to automatically calculate upstream transport emissions.
+              Add material origins and transport modes to your Product Environmental Impacts to automatically calculate upstream transport emissions.
             </p>
           </div>
         )}

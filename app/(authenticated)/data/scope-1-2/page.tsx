@@ -1399,11 +1399,11 @@ export default function CompanyEmissionsPage() {
                       Category 1: Purchased Goods & Services
                       <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
                         <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Auto-calculated from Product Carbon Footprints
+                        Auto-calculated from Product Environmental Impacts
                       </Badge>
                     </CardTitle>
                     <CardDescription className="mt-2">
-                      Emissions from raw materials and packaging calculated from your product LCAs using ecoinvent database
+                      Emissions from raw materials and packaging calculated from your product PEIs using ecoinvent database
                     </CardDescription>
                   </div>
                 </div>
@@ -1485,7 +1485,7 @@ export default function CompanyEmissionsPage() {
                       className="mt-4"
                       onClick={() => window.location.href = '/products'}
                     >
-                      Go to Product Carbon Footprints
+                      Go to Product Environmental Impacts
                     </Button>
                   </div>
                 )}
