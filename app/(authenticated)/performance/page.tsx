@@ -482,7 +482,7 @@ export default function PerformancePage() {
             companyOverview={waterCompanyOverview}
             sourceBreakdown={waterSourceBreakdown}
             waterTimeSeries={waterTimeSeries}
-            loading={waterLoading}
+            loading={loading || waterLoading}
             productLcaWaterConsumption={waterConsumption}
             productLcaWaterScarcity={waterScarcityImpact}
           />
