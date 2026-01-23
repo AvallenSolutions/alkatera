@@ -494,7 +494,7 @@ export async function calculateFacilityWaterRisks(
     const waterM3 = Number(material.impact_water || 0);
     if (waterM3 <= 0) return;
 
-    const productId = material.product_lcas?.product_id;
+    const productId = material.product_carbon_footprints?.product_id;
     const originCountry = material.origin_country_code?.toUpperCase();
 
     // Get AWARE factor for material origin country

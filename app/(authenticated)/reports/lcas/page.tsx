@@ -133,15 +133,15 @@ export default function LcasPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">LCA's & EPD's</h1>
+          <h1 className="text-4xl font-bold tracking-tight">Product Environmental Impacts</h1>
           <p className="text-lg text-muted-foreground">
-            Life Cycle Assessments and Environmental Product Declarations
+            Product Environmental Impact assessments and Environmental Product Declarations
           </p>
         </div>
         <Link href="/products">
           <Button className="gap-2">
             <Package className="h-4 w-4" />
-            Create New LCA
+            Create New PEI
           </Button>
         </Link>
       </div>
