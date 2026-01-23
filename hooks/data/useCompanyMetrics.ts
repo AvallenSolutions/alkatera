@@ -882,6 +882,7 @@ export function useCompanyMetrics() {
           impact_source,
           packaging_category,
           lca_sub_stage_id,
+          ch4_kg,
           ch4_fossil_kg,
           ch4_biogenic_kg,
           n2o_kg,
