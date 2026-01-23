@@ -378,18 +378,24 @@ export function useCompanyMetrics() {
       });
 
       // Find top climate contributor
-      const topContributor = productContributions.length > 0
-        ? productContributions.reduce((max, current) =>
+      // Use only positive contributions for "top contributor" - this shows emissions, not sequestration
+      const positiveContributions = productContributions.filter(c => c.value > 0);
+      const topContributor = positiveContributions.length > 0
+        ? positiveContributions.reduce((max, current) =>
             current.value > max.value ? current : max
           )
         : null;
+
+      // Calculate percentage based on sum of positive contributions only
+      // This avoids impossible percentages when negative values (biogenic carbon) reduce the net total
+      const totalPositiveEmissions = positiveContributions.reduce((sum, c) => sum + c.value, 0);
 
       const topContributorData: TopContributor | null = topContributor
         ? {
             name: topContributor.name,
             value: topContributor.value,
-            percentage: totalImpacts.climate_change_gwp100 > 0
-              ? (topContributor.value / totalImpacts.climate_change_gwp100) * 100
+            percentage: totalPositiveEmissions > 0
+              ? (topContributor.value / totalPositiveEmissions) * 100
               : 0,
             category: 'Product',
           }
