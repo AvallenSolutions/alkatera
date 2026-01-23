@@ -725,18 +725,37 @@ export function useCompanyMetrics() {
           ghgTotal.gas_inventory.co2_fossil += (ghg.gas_inventory.co2_fossil || 0) * productionVolume;
           ghgTotal.gas_inventory.co2_biogenic += (ghg.gas_inventory.co2_biogenic || 0) * productionVolume;
           ghgTotal.gas_inventory.methane += (ghg.gas_inventory.methane || 0) * productionVolume;
+          // Handle both separate (methane_fossil/biogenic) and combined (methane) formats
           ghgTotal.gas_inventory.methane_fossil += (ghg.gas_inventory.methane_fossil || 0) * productionVolume;
           ghgTotal.gas_inventory.methane_biogenic += (ghg.gas_inventory.methane_biogenic || 0) * productionVolume;
           ghgTotal.gas_inventory.nitrous_oxide += (ghg.gas_inventory.nitrous_oxide || 0) * productionVolume;
           ghgTotal.gas_inventory.hfc_pfc += (ghg.gas_inventory.hfc_pfc || 0) * productionVolume;
         }
+        // Handle physical_mass or calculate from gas_inventory
         if (ghg.physical_mass) {
           ghgTotal.physical_mass.ch4_fossil_kg += (ghg.physical_mass.ch4_fossil_kg || 0) * productionVolume;
           ghgTotal.physical_mass.ch4_biogenic_kg += (ghg.physical_mass.ch4_biogenic_kg || 0) * productionVolume;
           ghgTotal.physical_mass.n2o_kg += (ghg.physical_mass.n2o_kg || 0) * productionVolume;
+        } else if (ghg.gas_inventory) {
+          // Calculate physical mass from gas inventory if not provided
+          // methane in gas_inventory is already in kg, n2o needs to be derived from nitrous_oxide CO2eq
+          const methaneKg = (ghg.gas_inventory.methane || 0) * productionVolume;
+          const n2oGwp = ghg.gwp_factors?.n2o_gwp100 || 273;
+          const n2oKg = ((ghg.gas_inventory.nitrous_oxide || 0) / n2oGwp) * productionVolume;
+          ghgTotal.physical_mass.ch4_fossil_kg += methaneKg * 0.5; // Assume 50/50 split if not specified
+          ghgTotal.physical_mass.ch4_biogenic_kg += methaneKg * 0.5;
+          ghgTotal.physical_mass.n2o_kg += n2oKg;
         }
+        // Handle gwp_factors with different field names
         if (ghg.gwp_factors) {
-          ghgTotal.gwp_factors = ghg.gwp_factors;
+          const gwp = ghg.gwp_factors;
+          ghgTotal.gwp_factors = {
+            // Handle both methane_gwp100 (single) and ch4_fossil/biogenic_gwp100 (separate)
+            ch4_fossil_gwp100: gwp.ch4_fossil_gwp100 || gwp.methane_gwp100 || 29.8,
+            ch4_biogenic_gwp100: gwp.ch4_biogenic_gwp100 || gwp.methane_gwp100 || 27.2,
+            n2o_gwp100: gwp.n2o_gwp100 || 273,
+            method: gwp.method || 'IPCC AR6 GWP100'
+          };
         }
         if (ghg.data_quality) {
           if (ghg.data_quality === 'primary') ghgTotal.data_quality = 'primary';
