@@ -1123,7 +1123,8 @@ export function useCompanyMetrics() {
           else if (materialQuality === 'secondary' && dataQuality !== 'primary') dataQuality = 'secondary';
 
           // CONSERVATIVE FALLBACK: If no biogenic/fossil split provided, assume all fossil
-          if (material.impact_climate_fossil === 0 && material.impact_climate_biogenic === 0 && material.impact_climate_dluc === 0 && Number(material.impact_climate || 0) > 0) {
+          // Use !fossilFromDB instead of === 0 to handle null/undefined fields
+          if (!fossilFromDB && !biogenicFromDB && !dlucFromDB && totalClimateImpact > 0) {
             fossilCO2 += totalClimateImpact;
           }
         });
@@ -1169,12 +1170,16 @@ export function useCompanyMetrics() {
           fossilCO2,
           biogenicCO2,
           totalClimate,
-          ghgData
+          willSetGhgBreakdown: hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0 || totalClimate > 0
         });
 
-        // Only set GHG breakdown if we have actual data, to avoid overwriting good data from aggregated_impacts
-        if (hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0) {
+        // Set GHG breakdown if we have any climate data
+        // The fallback above ensures fossilCO2 is populated from totalClimate if no specific split exists
+        if (hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0 || totalClimate > 0) {
+          console.log('✅ Setting GHG breakdown from materials data');
           setGhgBreakdown(ghgData);
+        } else {
+          console.log('⚠️ No GHG data to set - totalClimate:', totalClimate);
         }
       }
 
