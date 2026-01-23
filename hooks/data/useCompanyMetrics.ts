@@ -492,6 +492,14 @@ export function useCompanyMetrics() {
         lca.aggregated_impacts.breakdown.by_material.length > 0
       );
 
+      // Check if lifecycle stage breakdown was extracted from aggregated_impacts
+      const hasLifecycleStageBreakdown = lcas.some(lca =>
+        lca.aggregated_impacts?.breakdown?.by_lifecycle_stage &&
+        (Array.isArray(lca.aggregated_impacts.breakdown.by_lifecycle_stage)
+          ? lca.aggregated_impacts.breakdown.by_lifecycle_stage.length > 0
+          : Object.keys(lca.aggregated_impacts.breakdown.by_lifecycle_stage).length > 0)
+      );
+
       // Check if there's ACTUAL non-zero GHG BREAKDOWN data (require biogenic/fossil split)
       const hasGHGBreakdown = lcas.some(lca => {
         const ghg = lca.aggregated_impacts?.ghg_breakdown;
@@ -543,12 +551,17 @@ export function useCompanyMetrics() {
       console.log('🔍 Checking fallback conditions:', {
         lcaCount: lcas.length,
         hasMaterialBreakdown,
-        hasGHGBreakdown
+        hasGHGBreakdown,
+        hasLifecycleStageBreakdown
       });
 
-      // Always fetch GHG data from database if not in aggregated_impacts
-      if (!hasMaterialBreakdown || !hasGHGBreakdown) {
-        console.log('✅ Calling fetchMaterialAndGHGBreakdown');
+      // Fetch from database if material, GHG, or lifecycle stage data is missing from aggregated_impacts
+      if (!hasMaterialBreakdown || !hasGHGBreakdown || !hasLifecycleStageBreakdown) {
+        console.log('✅ Calling fetchMaterialAndGHGBreakdown (missing:', {
+          material: !hasMaterialBreakdown,
+          ghg: !hasGHGBreakdown,
+          lifecycle: !hasLifecycleStageBreakdown
+        }, ')');
         try {
           await fetchMaterialAndGHGBreakdown();
         } catch (err) {
@@ -676,6 +689,12 @@ export function useCompanyMetrics() {
 
         // Aggregate lifecycle stage data
         if (breakdown.by_lifecycle_stage) {
+          console.log('🔍 Lifecycle stage data found:', {
+            lca_id: lca.id,
+            by_lifecycle_stage: breakdown.by_lifecycle_stage,
+            type: typeof breakdown.by_lifecycle_stage,
+            isArray: Array.isArray(breakdown.by_lifecycle_stage)
+          });
           const productionVolume = lca.production_volume || 0;
           const stages = breakdown.by_lifecycle_stage;
 
