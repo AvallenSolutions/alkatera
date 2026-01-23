@@ -477,7 +477,12 @@ export function useCompanyMetrics() {
       }
 
       // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
-      const hasMaterialBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_material);
+      // IMPORTANT: Check that the array has actual items, not just that it exists (empty array is truthy)
+      const hasMaterialBreakdown = lcas.some(lca =>
+        lca.aggregated_impacts?.breakdown?.by_material &&
+        Array.isArray(lca.aggregated_impacts.breakdown.by_material) &&
+        lca.aggregated_impacts.breakdown.by_material.length > 0
+      );
 
       // Check if there's ACTUAL non-zero GHG BREAKDOWN data (require biogenic/fossil split)
       const hasGHGBreakdown = lcas.some(lca => {
@@ -810,6 +815,9 @@ export function useCompanyMetrics() {
           impact_water,
           impact_land,
           impact_waste,
+          impact_terrestrial_ecotoxicity,
+          impact_freshwater_eutrophication,
+          impact_terrestrial_acidification,
           impact_source,
           packaging_category,
           lca_sub_stage_id,
@@ -846,7 +854,7 @@ export function useCompanyMetrics() {
       }
 
       // Fetch production volumes for all products
-      const productIds = Array.from(new Set(materials.map((m: any) => m.product_lcas?.product_id).filter(Boolean)));
+      const productIds = Array.from(new Set(materials.map((m: any) => m.product_carbon_footprints?.product_id).filter(Boolean)));
       const { data: productionData } = await supabase
         .from('production_logs')
         .select('product_id, units_produced')
@@ -863,7 +871,7 @@ export function useCompanyMetrics() {
       const materialMap = new Map<string, MaterialBreakdownItem>();
 
       materials.forEach((material: any) => {
-        const productId = material.product_lcas?.product_id;
+        const productId = material.product_carbon_footprints?.product_id;
         const productionVolume = productionMap.get(productId) || 1;
 
         const name = material.name || 'Unknown Material';
@@ -891,6 +899,43 @@ export function useCompanyMetrics() {
 
       setMaterialBreakdown(aggregatedMaterials);
 
+      // Aggregate nature impacts from materials
+      // These fields exist at material level but may not be in aggregated_impacts on LCA
+      let totalTerrestrialEcotoxicity = 0;
+      let totalFreshwaterEutrophication = 0;
+      let totalTerrestrialAcidification = 0;
+      let totalLandUse = 0;
+      let totalNatureProductionVolume = 0;
+
+      materials.forEach((material: any) => {
+        const productId = material.product_carbon_footprints?.product_id;
+        const productionVolume = productionMap.get(productId) || 1;
+
+        totalTerrestrialEcotoxicity += (Number(material.impact_terrestrial_ecotoxicity) || 0) * productionVolume;
+        totalFreshwaterEutrophication += (Number(material.impact_freshwater_eutrophication) || 0) * productionVolume;
+        totalTerrestrialAcidification += (Number(material.impact_terrestrial_acidification) || 0) * productionVolume;
+        totalLandUse += (Number(material.impact_land) || 0) * productionVolume;
+        totalNatureProductionVolume += productionVolume;
+      });
+
+      // Update natureMetrics with aggregated values from materials if we have data
+      if (totalTerrestrialEcotoxicity > 0 || totalFreshwaterEutrophication > 0 || totalTerrestrialAcidification > 0 || totalLandUse > 0) {
+        const avgProductionVolume = totalNatureProductionVolume / materials.length || 1;
+        setNatureMetrics(prev => ({
+          land_use: totalLandUse > 0 ? totalLandUse : (prev?.land_use || 0),
+          terrestrial_ecotoxicity: totalTerrestrialEcotoxicity,
+          freshwater_eutrophication: totalFreshwaterEutrophication,
+          terrestrial_acidification: totalTerrestrialAcidification,
+          per_unit: {
+            land_use: avgProductionVolume > 0 ? (totalLandUse > 0 ? totalLandUse / avgProductionVolume : (prev?.per_unit?.land_use || 0)) : 0,
+            terrestrial_ecotoxicity: avgProductionVolume > 0 ? totalTerrestrialEcotoxicity / avgProductionVolume : 0,
+            freshwater_eutrophication: avgProductionVolume > 0 ? totalFreshwaterEutrophication / avgProductionVolume : 0,
+            terrestrial_acidification: avgProductionVolume > 0 ? totalTerrestrialAcidification / avgProductionVolume : 0,
+          },
+          total_production_volume: prev?.total_production_volume || avgProductionVolume,
+        }));
+      }
+
       // Fetch lifecycle stages mapping
       const { data: lifecycleStages } = await supabase
         .from('lca_life_cycle_stages')
@@ -909,7 +954,7 @@ export function useCompanyMetrics() {
       }>();
 
       materials.forEach((material: any) => {
-        const productId = material.product_lcas?.product_id;
+        const productId = material.product_carbon_footprints?.product_id;
         const productionVolume = productionMap.get(productId) || 1;
 
         const impact = (Number(material.impact_climate) || 0) * productionVolume;
@@ -971,7 +1016,7 @@ export function useCompanyMetrics() {
         let hasActualGhgData = false;
 
         materials.forEach((material: any) => {
-          const productId = material.product_lcas?.product_id;
+          const productId = material.product_carbon_footprints?.product_id;
           const productionVolume = productionMap.get(productId) || 1;
 
           const fossilFromDB = Number(material.impact_climate_fossil || 0) * productionVolume;

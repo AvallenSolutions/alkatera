@@ -78,6 +78,46 @@ export function WaterDeepDive({
   const [sortBy, setSortBy] = useState<SortOption>('consumption');
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Derive a basic source breakdown from facility water risks if detailed source data isn't available
+  const derivedSourceBreakdown = useMemo((): WaterSourceBreakdown[] => {
+    // If we have detailed source breakdown from facility water data, use that
+    if (sourceBreakdown.length > 0) {
+      return sourceBreakdown;
+    }
+
+    // Otherwise, derive a basic breakdown from operational vs embedded water
+    const totalOperational = facilityWaterRisks.reduce((sum, f) => sum + (f.operational_water_intake_m3 || 0), 0);
+    const totalEmbedded = facilityWaterRisks.reduce((sum, f) => sum + (f.product_lca_water_m3 || 0), 0);
+
+    // Also include product LCA water that might not be facility-linked
+    const embeddedWithProductLca = totalEmbedded > 0 ? totalEmbedded : productLcaWaterConsumption;
+
+    const total = totalOperational + embeddedWithProductLca;
+    if (total === 0) return [];
+
+    const breakdown: WaterSourceBreakdown[] = [];
+
+    if (totalOperational > 0) {
+      breakdown.push({
+        source: 'Operational (Direct)',
+        value: totalOperational,
+        percentage: (totalOperational / total) * 100,
+        color: '#3b82f6', // blue
+      });
+    }
+
+    if (embeddedWithProductLca > 0) {
+      breakdown.push({
+        source: 'Embedded (Supply Chain)',
+        value: embeddedWithProductLca,
+        percentage: (embeddedWithProductLca / total) * 100,
+        color: '#06b6d4', // cyan
+      });
+    }
+
+    return breakdown;
+  }, [sourceBreakdown, facilityWaterRisks, productLcaWaterConsumption]);
+
   const facilities = useMemo((): FacilityWaterSummary[] => {
     if (facilitySummaries.length > 0) {
       return facilitySummaries;
@@ -408,7 +448,7 @@ export function WaterDeepDive({
         <TabsContent value="sources" className="space-y-6">
           <div className="grid lg:grid-cols-2 gap-6">
             <WaterSourceBreakdownChart
-              data={sourceBreakdown}
+              data={derivedSourceBreakdown}
               loading={loading}
               title="Water Sources Breakdown"
               height={320}
@@ -419,13 +459,13 @@ export function WaterDeepDive({
                 <CardDescription>Percentage of water from each source type</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {sourceBreakdown.length === 0 ? (
+                {derivedSourceBreakdown.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Droplets className="h-10 w-10 mx-auto mb-2 opacity-50" />
                     <p>No source data available</p>
                   </div>
                 ) : (
-                  sourceBreakdown.map((source, index) => (
+                  derivedSourceBreakdown.map((source, index) => (
                     <div key={index} className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-2">
