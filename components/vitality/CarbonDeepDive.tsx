@@ -135,19 +135,26 @@ export function CarbonDeepDive({
   }));
 
   // Separate ingredients from packaging
-  const ingredients = materialsWithPercentage.filter(m =>
-    !m.name.toLowerCase().includes('bottle') &&
-    !m.name.toLowerCase().includes('cap') &&
-    !m.name.toLowerCase().includes('label') &&
-    !m.name.toLowerCase().includes('packaging')
-  );
+  const isPackaging = (name: string) => {
+    const lower = name.toLowerCase();
+    return lower.includes('bottle') ||
+           lower.includes('cap') ||
+           lower.includes('label') ||
+           lower.includes('packaging') ||
+           lower.includes('stopper') ||
+           lower.includes('cork') ||
+           lower.includes('closure') ||
+           lower.includes('carton') ||
+           lower.includes('box') ||
+           lower.includes('can') ||
+           lower.includes('tin') ||
+           lower.includes('wrapper') ||
+           lower.includes('shrink') ||
+           lower.includes('sleeve');
+  };
 
-  const packaging = materialsWithPercentage.filter(m =>
-    m.name.toLowerCase().includes('bottle') ||
-    m.name.toLowerCase().includes('cap') ||
-    m.name.toLowerCase().includes('label') ||
-    m.name.toLowerCase().includes('packaging')
-  );
+  const ingredients = materialsWithPercentage.filter(m => !isPackaging(m.name));
+  const packaging = materialsWithPercentage.filter(m => isPackaging(m.name));
 
   const ingredientsTotal = ingredients.reduce((sum, m) => sum + m.climate, 0);
   const packagingTotal = packaging.reduce((sum, m) => sum + m.climate, 0);
