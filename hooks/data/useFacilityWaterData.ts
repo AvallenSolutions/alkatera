@@ -116,7 +116,7 @@ export interface WaterTimeSeries {
   scarcityWeighted: number;
 }
 
-export function useFacilityWaterData() {
+export function useFacilityWaterData(year?: number) {
   const { currentOrganization } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -124,6 +124,9 @@ export function useFacilityWaterData() {
   const [facilitySummaries, setFacilitySummaries] = useState<FacilityWaterSummary[]>([]);
   const [waterTimeSeries, setWaterTimeSeries] = useState<WaterTimeSeries[]>([]);
   const [sourceBreakdown, setSourceBreakdown] = useState<WaterSourceBreakdown[]>([]);
+
+  // Use provided year or default to current year
+  const selectedYear = year || new Date().getFullYear();
 
   const supabase = getSupabaseBrowserClient();
 
@@ -135,6 +138,10 @@ export function useFacilityWaterData() {
 
     setLoading(true);
     setError(null);
+
+    // Filter by selected calendar year
+    const yearStart = `${selectedYear}-01-01`;
+    const yearEnd = `${selectedYear}-12-31`;
 
     try {
       // Fetch time series from facility_activity_entries (where water data is actually stored)
@@ -151,12 +158,14 @@ export function useFacilityWaterData() {
           .eq('organization_id', currentOrganization.id)
           .order('total_consumption_m3', { ascending: false }),
 
-        // Query facility_activity_entries for water data (not the empty facility_water_data table)
+        // Query facility_activity_entries for water data within the selected year
         supabase
           .from('facility_activity_entries')
           .select('*')
           .eq('organization_id', currentOrganization.id)
           .in('activity_category', ['water_intake', 'water_discharge', 'water_recycled'])
+          .gte('reporting_period_start', yearStart)
+          .lte('reporting_period_start', yearEnd)
           .order('reporting_period_start', { ascending: true })
       ]);
 
@@ -275,7 +284,7 @@ export function useFacilityWaterData() {
     } finally {
       setLoading(false);
     }
-  }, [currentOrganization?.id, supabase]);
+  }, [currentOrganization?.id, supabase, selectedYear]);
 
   useEffect(() => {
     fetchWaterData();
