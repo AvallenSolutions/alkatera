@@ -31,6 +31,7 @@ import { useCompanyMetrics, CompanyMetrics } from '@/hooks/data/useCompanyMetric
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
 import { useVitalityBenchmarks } from '@/hooks/data/useVitalityBenchmarks';
+import { useFacilityWaterData } from '@/hooks/data/useFacilityWaterData';
 import { useOrganization } from '@/lib/organizationContext';
 import type {
   Scope3CategoryData,
@@ -210,6 +211,13 @@ export default function PerformancePage() {
   const { footprint: footprintData, loading: footprintLoading, refetch: refetchFootprint } = useCompanyFootprint(selectedYear);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
   const { getBenchmarkForPillar } = useVitalityBenchmarks();
+  const {
+    companyOverview: waterCompanyOverview,
+    facilitySummaries: waterFacilitySummaries,
+    waterTimeSeries,
+    sourceBreakdown: waterSourceBreakdown,
+    loading: waterLoading,
+  } = useFacilityWaterData();
 
   const {
     categories: scope3Categories,
@@ -470,6 +478,11 @@ export default function PerformancePage() {
         >
           <WaterDeepDive
             facilityWaterRisks={facilityWaterRisks}
+            facilitySummaries={waterFacilitySummaries}
+            companyOverview={waterCompanyOverview}
+            sourceBreakdown={waterSourceBreakdown}
+            waterTimeSeries={waterTimeSeries}
+            loading={waterLoading}
             productLcaWaterConsumption={waterConsumption}
             productLcaWaterScarcity={waterScarcityImpact}
           />
