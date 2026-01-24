@@ -44,10 +44,23 @@ export interface RosaConversation {
   user_id: string;
   title: string | null;
   is_active: boolean;
+  is_archived: boolean;
   message_count: number;
   created_at: string;
   updated_at: string;
   last_message_at: string | null;
+}
+
+// Search result type for conversation search
+export interface RosaConversationSearchResult {
+  conversation_id: string;
+  title: string | null;
+  is_archived: boolean;
+  message_count: number;
+  updated_at: string;
+  last_message_at: string | null;
+  match_type: 'title' | 'message';
+  matched_content: string | null;
 }
 
 export interface RosaMessage {
@@ -403,3 +416,5 @@ export type GaiaActionPayload = RosaActionPayload;
 export type GaiaAction = RosaAction;
 /** @deprecated Use RosaQueryResponseWithActions instead */
 export type GaiaQueryResponseWithActions = RosaQueryResponseWithActions;
+/** @deprecated Use RosaConversationSearchResult instead */
+export type GaiaConversationSearchResult = RosaConversationSearchResult;

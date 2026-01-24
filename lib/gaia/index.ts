@@ -9,6 +9,7 @@ import type {
   RosaConversation,
   RosaMessage,
   RosaConversationWithMessages,
+  RosaConversationSearchResult,
   RosaKnowledgeEntry,
   RosaKnowledgeEntryInput,
   RosaFeedback,
@@ -77,14 +78,39 @@ export {
 
 /**
  * Get all conversations for the current user
+ * @param organizationId - The organization ID
+ * @param includeArchived - Whether to include archived conversations (default: false)
  */
 export async function getConversations(
+  organizationId: string,
+  includeArchived: boolean = false
+): Promise<GaiaConversation[]> {
+  let query = supabase
+    .from('gaia_conversations')
+    .select('*')
+    .eq('organization_id', organizationId);
+
+  if (!includeArchived) {
+    query = query.eq('is_archived', false);
+  }
+
+  const { data, error } = await query.order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Get only archived conversations for the current user
+ */
+export async function getArchivedConversations(
   organizationId: string
 ): Promise<GaiaConversation[]> {
   const { data, error } = await supabase
     .from('gaia_conversations')
     .select('*')
     .eq('organization_id', organizationId)
+    .eq('is_archived', true)
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
@@ -167,6 +193,53 @@ export async function deleteConversation(conversationId: string): Promise<void> 
     .eq('id', conversationId);
 
   if (error) throw error;
+}
+
+/**
+ * Archive a conversation
+ */
+export async function archiveConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase
+    .from('gaia_conversations')
+    .update({ is_archived: true })
+    .eq('id', conversationId);
+
+  if (error) throw error;
+}
+
+/**
+ * Unarchive a conversation
+ */
+export async function unarchiveConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase
+    .from('gaia_conversations')
+    .update({ is_archived: false })
+    .eq('id', conversationId);
+
+  if (error) throw error;
+}
+
+/**
+ * Search conversations by title and message content
+ * Uses full-text search for efficient querying
+ */
+export async function searchConversations(
+  organizationId: string,
+  searchQuery: string,
+  includeArchived: boolean = false
+): Promise<RosaConversationSearchResult[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data, error } = await supabase.rpc('search_rosa_conversations', {
+    p_user_id: user.id,
+    p_organization_id: organizationId,
+    p_search_query: searchQuery,
+    p_include_archived: includeArchived,
+  });
+
+  if (error) throw error;
+  return data || [];
 }
 
 /**
