@@ -72,6 +72,23 @@ Then include this image in your response by showing the URL: ${ROSA_PHOTO_URL}
 
 Now back to your main purpose...
 
+## CRITICAL: YOU HAVE ACCESS TO USER DATA
+
+**IMPORTANT**: You have FULL ACCESS to the user's organization data. The "ORGANIZATION DATA" section below contains their actual data. You MUST use this data to answer questions.
+
+When users ask about their data (products, suppliers, emissions, facilities, fleet, vitality scores), you MUST:
+1. **Look at the ORGANIZATION DATA section** - their data is there
+2. **Report their actual data** - list names, numbers, and details
+3. **Be specific** - don't say "I can't access" when the data is in the context
+
+Examples of what you CAN and SHOULD do:
+- "What products do I have?" → List the products from the Products section
+- "What suppliers do I have?" → List the suppliers from the Suppliers section
+- "What are my emissions?" → Report from the Corporate Carbon Footprint section
+- "What is my vitality score?" → Report from the Vitality Scores section
+
+If data is genuinely not present in the ORGANIZATION DATA section, say "You haven't added any [products/suppliers/etc.] yet" and guide them to add it.
+
 ## CORE DIRECTIVES
 
 1. **TRUTHFULNESS IS PARAMOUNT**: Never invent facts, statistics, or data. If data doesn't exist in the provided context, say so clearly. Guessing or estimating without explicit data is forbidden.
@@ -89,6 +106,95 @@ Now back to your main purpose...
    - Data from organizations the user doesn't belong to
 
 6. **BE HELPFUL**: After answering, suggest relevant follow-up questions, related insights, or actions users can take to improve their sustainability metrics.
+
+## PLATFORM NAVIGATION STRUCTURE
+
+The AlkaTera platform has this navigation structure. Use this to provide precise navigation guidance:
+
+**Main Sidebar Navigation:**
+- **Dashboard** - Main overview with key metrics and priority actions
+- **Company** (dropdown menu):
+  - Facilities - Production sites, offices, warehouses
+  - Fleet - Company vehicles and travel
+  - Production Allocation - Resource allocation
+  - Company Emissions - Overall emissions view
+  - Company Vitality - Vitality score tracking
+- **Products** - Product catalog, LCAs, ingredients, packaging
+- **Suppliers** - Supply chain management
+- **People & Culture** (dropdown) - Team sustainability initiatives
+- **Governance** (dropdown) - Policies and compliance
+- **Community Impact** (dropdown) - Social initiatives
+- **Resources** (dropdown):
+  - Knowledge Bank - Help documentation
+  - Reports - Generate sustainability reports
+  - Greenwash Guardian - Marketing claim checker
+- **Rosa** - Chat with me!
+- **Certifications** - B Corp, ISO 14001, etc.
+- **Settings** (dropdown):
+  - Subscription - Plan management
+  - Billing - Payment settings
+  - Profile - User profile
+  - Team - Team members
+  - Organisation - Organization settings
+
+## WHEN HELPING WITH "HOW DO I..." AND NAVIGATION QUESTIONS
+
+**This is a core capability.** When users ask how to do things or navigate the platform:
+
+1. **Provide step-by-step guidance** with specific navigation paths
+2. **Use clear navigation language**: "Click 'Products' in the left sidebar"
+3. **Be specific**: "Go to Company > Facilities > Add New Facility"
+4. **Explain what information they'll need** for each action
+5. **Offer to walk them through** step by step
+
+**Example Navigation Responses:**
+
+"How do I add a product?" →
+"To add a product:
+1. Click **Products** in the left sidebar
+2. Click the **Add New Product** button
+3. Enter your product name (e.g., 'Pale Ale 330ml')
+4. Select category and sub-category
+5. Upload a product image (optional)
+6. Click **Create Product**
+
+You can add ingredients and packaging details later when you're ready to calculate the carbon footprint. Would you like me to explain what information you'll need?"
+
+"How do I add a facility?" →
+"To add a facility:
+1. Click **Company** in the left sidebar
+2. Select **Facilities**
+3. Click **Add New Facility**
+4. Enter the facility name and address
+5. Select the facility type (Distillery, Brewery, etc.)
+6. Click **Create Facility**
+
+Once created, you can add utility data (electricity, gas, water) to track your emissions."
+
+"How do I navigate to the dashboard?" →
+"Click **Dashboard** at the top of the left sidebar - it's the first item in the navigation menu. The dashboard shows your key sustainability metrics, recent activity, and priority actions."
+
+## PERSONALIZED RECOMMENDATIONS
+
+When users ask for recommendations or what to focus on, you MUST:
+
+1. **Analyze their actual data** from the ORGANIZATION DATA section
+2. **Identify gaps and opportunities** based on what's missing or incomplete
+3. **Prioritize based on impact** - biggest emission sources first
+4. **Be specific** - reference their actual products, facilities, suppliers by name
+
+**Example Recommendation Response:**
+
+"What should I focus on first?" →
+"Based on your data, here are my top recommendations:
+
+1. **Complete your product LCAs** - You have [X] products but only [Y] have carbon footprints calculated. Start with your highest-volume product.
+
+2. **Add facility utility data** - Your facility '[Facility Name]' needs electricity and gas data to calculate Scope 1 & 2 emissions.
+
+3. **Engage your suppliers** - You have [X] suppliers but [Y]% are engaged. Supplier emissions often make up 60-80% of a drinks company's footprint.
+
+Would you like me to walk you through any of these?"
 
 ## CORPORATE EMISSIONS DATA (CRITICAL)
 
@@ -129,7 +235,7 @@ When citing carbon footprint figures:
 ## RESPONSE FORMAT
 
 Structure your responses as follows:
-1. **Direct Answer First**: Lead with the key number or finding
+1. **Direct Answer First**: Lead with the key number, list, or guidance
 2. **Supporting Details**: Provide breakdown, context, or methodology
 3. **Data Sources**: Cite where the data comes from
 4. **Limitations**: Note any missing data or caveats
@@ -681,7 +787,17 @@ async function fetchOrganizationContext(
       if (org.industry) contextParts.push(`Industry: ${org.industry}`);
     }
 
-    // Fetch emissions summary from fleet activities (correct column: emissions_tco2e)
+    // Fetch fleet vehicles first
+    const { data: fleetVehicles, count: vehicleCount, error: vehicleError } = await supabase
+      .from('fleet_vehicles')
+      .select('id, registration, vehicle_type, fuel_type', { count: 'exact' })
+      .eq('organization_id', organizationId);
+
+    if (vehicleError) {
+      console.error('[Rosa] Error fetching fleet vehicles:', vehicleError);
+    }
+
+    // Fetch fleet activities (correct column: emissions_tco2e)
     const { data: fleetData, count: fleetCount, error: fleetError } = await supabase
       .from('fleet_activities')
       .select('emissions_tco2e, distance_km', { count: 'exact' })
@@ -693,20 +809,42 @@ async function fetchOrganizationContext(
       console.log('[Rosa] Fleet data fetched:', fleetData?.length, 'records');
     }
 
-    if (fleetData && fleetData.length > 0) {
-      const totalFleetEmissions = fleetData.reduce((sum, f) => sum + (f.emissions_tco2e || 0), 0);
-      const totalDistance = fleetData.reduce((sum, f) => sum + (f.distance_km || 0), 0);
+    if ((fleetVehicles && fleetVehicles.length > 0) || (fleetData && fleetData.length > 0)) {
       contextParts.push(`\n### Fleet Data`);
-      contextParts.push(`- Total Fleet Emissions: ${totalFleetEmissions.toFixed(2)} tCO2e`);
-      contextParts.push(`- Total Distance Travelled: ${totalDistance.toLocaleString()} km`);
-      contextParts.push(`- Number of Activity Records: ${fleetCount}`);
-      dataSources.push({ table: 'fleet_activities', description: 'Fleet activity logs', recordCount: fleetCount || 0 });
+
+      if (fleetVehicles && fleetVehicles.length > 0) {
+        contextParts.push(`- Number of Vehicles: ${fleetVehicles.length}`);
+        contextParts.push(`\n**Vehicle List:**`);
+        fleetVehicles.slice(0, 10).forEach((v, i) => {
+          const type = v.vehicle_type ? ` - ${v.vehicle_type}` : '';
+          const fuel = v.fuel_type ? ` (${v.fuel_type})` : '';
+          contextParts.push(`  ${i + 1}. ${v.registration}${type}${fuel}`);
+        });
+        if (fleetVehicles.length > 10) {
+          contextParts.push(`  ... and ${fleetVehicles.length - 10} more vehicles`);
+        }
+        dataSources.push({ table: 'fleet_vehicles', description: 'Fleet vehicle records', recordCount: vehicleCount || 0 });
+      }
+
+      if (fleetData && fleetData.length > 0) {
+        const totalFleetEmissions = fleetData.reduce((sum, f) => sum + (f.emissions_tco2e || 0), 0);
+        const totalDistance = fleetData.reduce((sum, f) => sum + (f.distance_km || 0), 0);
+        contextParts.push(`\n**Fleet Activity Summary:**`);
+        contextParts.push(`- Total Fleet Emissions: ${totalFleetEmissions.toFixed(2)} tCO2e`);
+        contextParts.push(`- Total Distance Travelled: ${totalDistance.toLocaleString()} km`);
+        contextParts.push(`- Number of Activity Records: ${fleetCount}`);
+        dataSources.push({ table: 'fleet_activities', description: 'Fleet activity logs', recordCount: fleetCount || 0 });
+      }
+    } else {
+      contextParts.push(`\n### Fleet Data`);
+      contextParts.push(`- No fleet vehicles or activities recorded yet`);
+      contextParts.push(`- To add vehicles: Go to Company > Fleet and click "Add Vehicle"`);
     }
 
-    // Fetch facility data
+    // Fetch facility data with more detail
     const { data: facilities, count: facilityCount, error: facilityError } = await supabase
       .from('facilities')
-      .select('id, name, facility_type', { count: 'exact' })
+      .select('id, name, facility_type, country, city', { count: 'exact' })
       .eq('organization_id', organizationId);
 
     if (facilityError) {
@@ -719,8 +857,13 @@ async function fetchOrganizationContext(
       contextParts.push(`\n### Facilities`);
       contextParts.push(`- Number of Facilities: ${facilities.length}`);
 
-      const facilityNames = facilities.slice(0, 5).map(f => f.name).join(', ');
-      contextParts.push(`- Facilities: ${facilityNames}${facilities.length > 5 ? '...' : ''}`);
+      // List ALL facilities with details
+      contextParts.push(`\n**Facility List:**`);
+      facilities.forEach((f, i) => {
+        const facilityType = f.facility_type ? ` - ${f.facility_type}` : '';
+        const location = f.city && f.country ? ` (${f.city}, ${f.country})` : f.country ? ` (${f.country})` : '';
+        contextParts.push(`  ${i + 1}. ${f.name}${facilityType}${location}`);
+      });
       dataSources.push({ table: 'facilities', description: 'Organization facilities', recordCount: facilityCount || 0 });
 
       // Fetch facility activity entries (correct columns: activity_category, calculated_emissions_kg_co2e)
@@ -782,7 +925,7 @@ async function fetchOrganizationContext(
     // Fetch products with more detail
     const { data: products, count: productCount, error: productError } = await supabase
       .from('products')
-      .select('id, name, has_lca, sku', { count: 'exact' })
+      .select('id, name, has_lca, sku, category, subcategory', { count: 'exact' })
       .eq('organization_id', organizationId);
 
     if (productError) {
@@ -797,9 +940,22 @@ async function fetchOrganizationContext(
       contextParts.push(`- Total Products: ${products.length}`);
       contextParts.push(`- Products with LCA: ${lcaCount} (${Math.round((lcaCount / products.length) * 100)}%)`);
 
-      const productNames = products.slice(0, 5).map(p => p.name).join(', ');
-      contextParts.push(`- Products: ${productNames}${products.length > 5 ? '...' : ''}`);
+      // List ALL products with details (up to 20)
+      contextParts.push(`\n**Product List:**`);
+      products.slice(0, 20).forEach((p, i) => {
+        const lcaStatus = p.has_lca ? 'LCA Complete' : 'Needs LCA';
+        const sku = p.sku ? ` (SKU: ${p.sku})` : '';
+        const category = p.category ? ` - ${p.category}${p.subcategory ? '/' + p.subcategory : ''}` : '';
+        contextParts.push(`  ${i + 1}. ${p.name}${sku}${category} - ${lcaStatus}`);
+      });
+      if (products.length > 20) {
+        contextParts.push(`  ... and ${products.length - 20} more products`);
+      }
       dataSources.push({ table: 'products', description: 'Product catalog', recordCount: productCount || 0 });
+    } else {
+      contextParts.push(`\n### Products`);
+      contextParts.push(`- No products added yet`);
+      contextParts.push(`- To add products: Go to Products in the sidebar and click "Add New Product"`);
     }
 
     // Fetch product LCA data directly by organization (correct column: total_ghg_emissions)
@@ -868,20 +1024,34 @@ async function fetchOrganizationContext(
       console.error('[Rosa] Error fetching vitality:', vitalityError);
     }
 
+    contextParts.push(`\n### Company Vitality Scores`);
     if (vitality) {
-      contextParts.push(`\n### Vitality Scores`);
-      if (vitality.overall_score !== null) contextParts.push(`- Overall Score: ${vitality.overall_score}/100`);
+      contextParts.push(`*Vitality measures sustainability performance across 4 pillars: Climate (30%), Water (25%), Circularity (25%), Nature (20%)*`);
+      if (vitality.overall_score !== null) contextParts.push(`- **Overall Score: ${vitality.overall_score}/100**`);
       if (vitality.climate_score !== null) contextParts.push(`- Climate Score: ${vitality.climate_score}/100`);
       if (vitality.water_score !== null) contextParts.push(`- Water Score: ${vitality.water_score}/100`);
       if (vitality.circularity_score !== null) contextParts.push(`- Circularity Score: ${vitality.circularity_score}/100`);
       if (vitality.nature_score !== null) contextParts.push(`- Nature Score: ${vitality.nature_score}/100`);
+
+      // Add status interpretation
+      const score = vitality.overall_score || 0;
+      let status = 'DEVELOPING';
+      if (score >= 80) status = 'LEADING';
+      else if (score >= 60) status = 'MATURING';
+      else if (score >= 40) status = 'PROGRESSING';
+      contextParts.push(`- Status: ${status}`);
+
       dataSources.push({ table: 'organization_vitality_scores', description: 'Vitality performance scores', recordCount: 1 });
+    } else {
+      contextParts.push(`- No vitality scores calculated yet`);
+      contextParts.push(`- Vitality scores are calculated based on: emissions data, water consumption, waste/circularity, and supplier engagement`);
+      contextParts.push(`- To see vitality scores: Go to Company > Company Vitality`);
     }
 
-    // Fetch suppliers
+    // Fetch suppliers with more detail
     const { data: suppliers, count: supplierCount, error: supplierError } = await supabase
       .from('suppliers')
-      .select('name, engagement_status, category', { count: 'exact' })
+      .select('name, engagement_status, category, country, annual_spend_gbp', { count: 'exact' })
       .eq('organization_id', organizationId);
 
     if (supplierError) {
@@ -894,9 +1064,23 @@ async function fetchOrganizationContext(
       contextParts.push(`- Total Suppliers: ${suppliers.length}`);
       contextParts.push(`- Engaged Suppliers: ${engaged} (${Math.round((engaged / suppliers.length) * 100)}%)`);
 
-      const supplierNames = suppliers.slice(0, 5).map(s => s.name).join(', ');
-      contextParts.push(`- Suppliers: ${supplierNames}${suppliers.length > 5 ? '...' : ''}`);
+      // List ALL suppliers with details (up to 20)
+      contextParts.push(`\n**Supplier List:**`);
+      suppliers.slice(0, 20).forEach((s, i) => {
+        const category = s.category ? ` - ${s.category}` : '';
+        const country = s.country ? `, ${s.country}` : '';
+        const spend = s.annual_spend_gbp ? ` (£${Number(s.annual_spend_gbp).toLocaleString()}/year)` : '';
+        const status = s.engagement_status ? ` [${s.engagement_status.replace(/_/g, ' ')}]` : '';
+        contextParts.push(`  ${i + 1}. ${s.name}${category}${country}${spend}${status}`);
+      });
+      if (suppliers.length > 20) {
+        contextParts.push(`  ... and ${suppliers.length - 20} more suppliers`);
+      }
       dataSources.push({ table: 'suppliers', description: 'Supplier records', recordCount: supplierCount || 0 });
+    } else {
+      contextParts.push(`\n### Suppliers`);
+      contextParts.push(`- No suppliers added yet`);
+      contextParts.push(`- To add suppliers: Go to Suppliers in the sidebar and click "Add Supplier"`);
     }
 
     // Fetch corporate reports and overheads (correct table structure)
@@ -943,11 +1127,11 @@ async function fetchOrganizationContext(
       console.error('[Rosa] Error fetching corporate emissions:', emissionsError);
     }
 
+    contextParts.push(`\n### Corporate Carbon Footprint (${currentYear})`);
     if (corporateEmissions && corporateEmissions.has_data) {
       const breakdown = corporateEmissions.breakdown;
       const scope3 = breakdown.scope3;
 
-      contextParts.push(`\n### Corporate Carbon Footprint (${currentYear})`);
       contextParts.push(`**AUTHORITATIVE DATA - Use these figures for all emissions queries**`);
       contextParts.push(`- **Total Emissions: ${(breakdown.total / 1000).toFixed(2)} tCO2e**`);
       contextParts.push(`- Scope 1 (Direct): ${(breakdown.scope1 / 1000).toFixed(2)} tCO2e`);
@@ -974,6 +1158,14 @@ async function fetchOrganizationContext(
         description: 'Authoritative corporate emissions (GHG Protocol)',
         recordCount: 1
       });
+    } else {
+      contextParts.push(`- No corporate emissions calculated yet`);
+      contextParts.push(`- To calculate emissions, add data in these areas:`);
+      contextParts.push(`  - Facility utility data (electricity, gas) for Scope 1 & 2`);
+      contextParts.push(`  - Fleet activities for Scope 1`);
+      contextParts.push(`  - Product LCAs for Scope 3`);
+      contextParts.push(`  - Corporate overheads (business travel, commuting) for Scope 3`);
+      contextParts.push(`- View emissions: Go to Company > Company Emissions`);
     }
 
     // Add summary section
@@ -1004,6 +1196,74 @@ async function fetchOrganizationContext(
   };
 }
 
+// Common workflows for navigation help
+const WORKFLOW_KNOWLEDGE = `
+## STEP-BY-STEP WORKFLOWS
+
+**Adding a Product:**
+1. Click **Products** in the left sidebar
+2. Click the **"Add New Product"** button
+3. Enter your product name (e.g., "Pale Ale 330ml")
+4. Select category (Beer/Spirits/Wine/Cider/RTD) and sub-category
+5. Upload a product image (optional but recommended)
+6. Click **"Create Product"**
+*Tip: You can add ingredients and packaging later when ready for LCA calculation*
+
+**Adding a Facility:**
+1. Click **Company** in the left sidebar
+2. Select **Facilities**
+3. Click **"Add New Facility"**
+4. Enter the facility name and address
+5. Select the facility type (Distillery, Brewery, Winery, Bottling, Office, Warehouse)
+6. Add facility size in square metres if known
+7. Click **"Create Facility"**
+*Tip: After creating, add utility data (electricity, gas, water) in the facility's Utilities tab*
+
+**Adding Utility Data:**
+1. Go to **Company > Facilities**
+2. Click on the facility you want to update
+3. Go to the **"Utilities"** tab
+4. Click **"Add Data"** for each utility type
+5. Enter consumption amount and units (kWh for electricity, m³ for gas/water)
+6. Select the billing period
+7. Click **"Save"**
+*Tip: Monthly data is best for trend tracking*
+
+**Adding a Supplier:**
+1. Click **Suppliers** in the left sidebar
+2. Click **"Add Supplier"**
+3. Enter the supplier name
+4. Select the category (Ingredients, Packaging, Services, etc.)
+5. Add contact details and location
+6. Click **"Save"**
+*Tip: Start with your biggest suppliers by spend*
+
+**Completing a Product LCA:**
+1. Ensure product has ingredients added (Products > [Product] > Ingredients tab)
+2. Ensure product has packaging added (Products > [Product] > Packaging tab)
+3. Go to **Products** and click on the product
+4. Go to the **"LCA"** tab
+5. Click **"Calculate LCA"**
+6. Review the carbon footprint breakdown
+*Tip: Aim for 80%+ completeness before calculating*
+
+**Adding Fleet Vehicles:**
+1. Click **Company** in the left sidebar
+2. Select **Fleet**
+3. Click **"Add Vehicle"**
+4. Enter vehicle registration, type, and fuel type
+5. Click **"Save"**
+*Tip: After creating, add mileage data in the vehicle's Activity tab*
+
+**Generating a Report:**
+1. Go to **Dashboard**
+2. Click **"Generate Report"** button
+3. Select report type and date range
+4. Choose sections to include
+5. Click **"Generate"**
+6. Download as PDF or share via link
+`;
+
 // Build the context prompt for Gemini
 function buildContextPrompt(
   orgContext: { context: string; dataSources: DataSource[] },
@@ -1013,10 +1273,20 @@ function buildContextPrompt(
 ): string {
   const parts: string[] = [];
 
-  // Organization context
+  // Organization context - this is the user's actual data
   parts.push('## ORGANIZATION DATA\n');
+  parts.push('**This is the user\'s actual data. Use this to answer their questions.**\n');
   parts.push(orgContext.context);
   parts.push('\n');
+
+  // Workflow knowledge for navigation help - only include if message seems navigation-related
+  const lowerMessage = userMessage.toLowerCase();
+  if (lowerMessage.includes('how') || lowerMessage.includes('add') || lowerMessage.includes('create') ||
+      lowerMessage.includes('navigate') || lowerMessage.includes('where') || lowerMessage.includes('find') ||
+      lowerMessage.includes('help me') || lowerMessage.includes('walk me') || lowerMessage.includes('guide')) {
+    parts.push(WORKFLOW_KNOWLEDGE);
+    parts.push('\n');
+  }
 
   // Knowledge base
   if (knowledgeBase.length > 0) {
