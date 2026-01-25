@@ -173,7 +173,7 @@ export async function createDocumentExtraction(
 
   return {
     ...extraction,
-    id: data.id,
+    id: (data as any).id,
   };
 }
 
@@ -187,20 +187,22 @@ export async function processDocumentExtraction(
   geminiApiKey: string
 ): Promise<RosaDocumentExtraction> {
   // Fetch the extraction record
-  const { data: extraction, error: fetchError } = await supabase
+  const { data: extractionData, error: fetchError } = await supabase
     .from('rosa_document_extractions')
     .select('*')
     .eq('id', extractionId)
     .single();
 
-  if (fetchError || !extraction) {
+  if (fetchError || !extractionData) {
     throw new Error('Extraction not found');
   }
 
+  const extraction = extractionData as any;
+
   // Update status to processing
-  await supabase
-    .from('rosa_document_extractions')
-    .update({ status: 'processing' } as any)
+  await (supabase
+    .from('rosa_document_extractions') as any)
+    .update({ status: 'processing' })
     .eq('id', extractionId);
 
   try {
@@ -234,8 +236,8 @@ export async function processDocumentExtraction(
     const metadata = extractMetadata(extractedFields);
 
     // Update the extraction record
-    const { data: updated, error: updateError } = await supabase
-      .from('rosa_document_extractions')
+    const { data: updatedData, error: updateError } = await (supabase
+      .from('rosa_document_extractions') as any)
       .update({
         status,
         extracted_fields: extractedFields,
@@ -243,13 +245,14 @@ export async function processDocumentExtraction(
         suggested_actions: suggestedActions,
         validation_errors: validationErrors,
         processed_at: new Date().toISOString(),
-      } as any)
+      })
       .eq('id', extractionId)
       .select()
       .single();
 
     if (updateError) throw updateError;
 
+    const updated = updatedData as any;
     return {
       id: updated.id,
       organizationId: updated.organization_id,
@@ -267,12 +270,12 @@ export async function processDocumentExtraction(
     };
   } catch (error) {
     // Update status to failed
-    await supabase
-      .from('rosa_document_extractions')
+    await (supabase
+      .from('rosa_document_extractions') as any)
       .update({
         status: 'failed',
         validation_errors: [(error as Error).message],
-      } as any)
+      })
       .eq('id', extractionId);
 
     throw error;
@@ -494,7 +497,7 @@ export async function getPendingExtractions(
 
   if (error) throw error;
 
-  return (data || []).map(d => ({
+  return ((data || []) as any[]).map(d => ({
     id: d.id,
     organizationId: d.organization_id,
     userId: d.user_id,
@@ -519,16 +522,17 @@ export async function applyExtractedData(
   extractionId: string,
   selectedActions: number[] // Indices of actions to apply
 ): Promise<void> {
-  const { data: extraction, error: fetchError } = await supabase
+  const { data: extractionData, error: fetchError } = await supabase
     .from('rosa_document_extractions')
     .select('*')
     .eq('id', extractionId)
     .single();
 
-  if (fetchError || !extraction) {
+  if (fetchError || !extractionData) {
     throw new Error('Extraction not found');
   }
 
+  const extraction = extractionData as any;
   const actions = extraction.suggested_actions as RosaDocumentExtraction['suggestedActions'];
   const selectedActionsList = selectedActions.map(i => actions[i]).filter(Boolean);
 
@@ -541,7 +545,7 @@ export async function applyExtractedData(
   }
 
   // Apply actions to each table
-  for (const [table, tableActions] of actionsByTable) {
+  for (const [table, tableActions] of Array.from(actionsByTable.entries())) {
     const record: Record<string, unknown> = {
       organization_id: extraction.organization_id,
     };
@@ -550,16 +554,16 @@ export async function applyExtractedData(
       record[action.targetField] = action.value;
     }
 
-    const { error } = await supabase.from(table).insert(record);
+    const { error } = await (supabase.from(table) as any).insert(record);
     if (error) {
       throw new Error(`Failed to insert into ${table}: ${error.message}`);
     }
   }
 
   // Mark extraction as completed
-  await supabase
-    .from('rosa_document_extractions')
-    .update({ status: 'completed' } as any)
+  await (supabase
+    .from('rosa_document_extractions') as any)
+    .update({ status: 'completed' })
     .eq('id', extractionId);
 }
 
