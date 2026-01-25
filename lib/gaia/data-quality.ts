@@ -9,6 +9,9 @@ import type {
   RosaDataQualitySeverity,
 } from '@/lib/types/gaia';
 
+// Re-export types for consumers
+export type { RosaDataQualityMetrics, RosaDataQualityIssue, RosaDataQualityStatus, RosaDataQualitySeverity };
+
 type SupabaseClient = ReturnType<typeof createClient>;
 
 interface DataQualityCheck {
