@@ -9,6 +9,7 @@ import type {
   RosaConversation,
   RosaMessage,
   RosaConversationWithMessages,
+  RosaConversationSearchResult,
   RosaKnowledgeEntry,
   RosaKnowledgeEntryInput,
   RosaFeedback,
@@ -71,20 +72,131 @@ export {
   formatWorkflowSteps,
 } from './knowledge';
 
+// Re-export from data-quality (Feature 1)
+export {
+  analyzeDataQuality,
+  formatDataQualityForPrompt,
+} from './data-quality';
+
+// Re-export from benchmarking (Feature 2)
+export {
+  getIndustryBenchmarks,
+  formatBenchmarksForPrompt,
+} from './benchmarking';
+
+// Re-export from trend-analysis (Feature 3)
+export {
+  generateTrendReport,
+  formatTrendReportForPrompt,
+} from './trend-analysis';
+
+// Re-export from document-extraction (Feature 4)
+export {
+  createDocumentExtraction,
+  processDocumentExtraction,
+  getPendingExtractions,
+  applyExtractedData,
+  formatExtractionForPrompt,
+  detectDocumentType,
+} from './document-extraction';
+
+// Re-export from feedback-learning (Feature 5)
+export {
+  analyzeFeedbackPatterns,
+  generateKnowledgeFromPatterns,
+  getFeedbackStats,
+  formatFeedbackAnalyticsForPrompt,
+} from './feedback-learning';
+
+// Re-export context builder with enhanced context support
+export {
+  buildRosaContext,
+  buildRosaContextWithKnowledge,
+  buildGaiaContext,
+  detectQueryIntent,
+  suggestChartType,
+  fetchExternalKnowledge,
+  type RosaPromptContext,
+  type RosaEnhancedContext,
+  type GaiaPromptContext,
+} from './context-builder';
+
+// Re-export from sustainability-knowledge (Curated Knowledge Base)
+export {
+  CURATED_KNOWLEDGE,
+  seedCuratedKnowledge,
+  getCuratedKnowledgeByCategory,
+  searchCuratedKnowledge,
+  type KnowledgeCategory,
+  type CuratedKnowledgeEntry,
+} from './sustainability-knowledge';
+
+// Re-export from knowledge-indexing (Document Processing Pipeline)
+export {
+  processDocument,
+  reprocessDocument,
+  deleteDocument as deleteKnowledgeDocument,
+  archiveDocument as archiveKnowledgeDocument,
+  getKnowledgeDocuments,
+  createKnowledgeDocument,
+  generateQueryEmbedding,
+  indexCuratedKnowledge,
+  type DocumentCategory,
+  type DocumentStatus,
+  type KnowledgeDocument,
+  type DocumentChunk,
+  type ProcessingResult,
+} from './knowledge-indexing';
+
+// Re-export from knowledge-search (Semantic Search)
+export {
+  searchKnowledge,
+  searchKnowledgeWithFallback,
+  getRelevantKnowledge,
+  getKnowledgeStats,
+  type KnowledgeSearchResult,
+  type KnowledgeSearchOptions,
+} from './knowledge-search';
+
 // ============================================================================
 // Conversation Operations
 // ============================================================================
 
 /**
  * Get all conversations for the current user
+ * @param organizationId - The organization ID
+ * @param includeArchived - Whether to include archived conversations (default: false)
  */
 export async function getConversations(
+  organizationId: string,
+  includeArchived: boolean = false
+): Promise<GaiaConversation[]> {
+  let query = supabase
+    .from('gaia_conversations')
+    .select('*')
+    .eq('organization_id', organizationId);
+
+  if (!includeArchived) {
+    query = query.eq('is_archived', false);
+  }
+
+  const { data, error } = await query.order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Get only archived conversations for the current user
+ */
+export async function getArchivedConversations(
   organizationId: string
 ): Promise<GaiaConversation[]> {
   const { data, error } = await supabase
     .from('gaia_conversations')
     .select('*')
     .eq('organization_id', organizationId)
+    .eq('is_archived', true)
     .order('updated_at', { ascending: false });
 
   if (error) throw error;
@@ -167,6 +279,53 @@ export async function deleteConversation(conversationId: string): Promise<void> 
     .eq('id', conversationId);
 
   if (error) throw error;
+}
+
+/**
+ * Archive a conversation
+ */
+export async function archiveConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase
+    .from('gaia_conversations')
+    .update({ is_archived: true })
+    .eq('id', conversationId);
+
+  if (error) throw error;
+}
+
+/**
+ * Unarchive a conversation
+ */
+export async function unarchiveConversation(conversationId: string): Promise<void> {
+  const { error } = await supabase
+    .from('gaia_conversations')
+    .update({ is_archived: false })
+    .eq('id', conversationId);
+
+  if (error) throw error;
+}
+
+/**
+ * Search conversations by title and message content
+ * Uses full-text search for efficient querying
+ */
+export async function searchConversations(
+  organizationId: string,
+  searchQuery: string,
+  includeArchived: boolean = false
+): Promise<RosaConversationSearchResult[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data, error } = await supabase.rpc('search_rosa_conversations', {
+    p_user_id: user.id,
+    p_organization_id: organizationId,
+    p_search_query: searchQuery,
+    p_include_archived: includeArchived,
+  });
+
+  if (error) throw error;
+  return data || [];
 }
 
 /**

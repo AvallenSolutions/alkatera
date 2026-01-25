@@ -35,13 +35,21 @@ import {
   FileText,
   ArrowRight,
   Navigation,
+  Archive,
+  ArchiveRestore,
+  Search,
+  X,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/hooks/useAuth';
 import {
   getConversations,
+  getArchivedConversations,
   getConversationWithMessages,
   deleteConversation,
+  archiveConversation,
+  unarchiveConversation,
+  searchConversations,
   sendRosaQueryStream,
   submitFeedback,
   hasSubmittedFeedback,
@@ -59,6 +67,7 @@ import type { RosaStreamEvent } from '@/lib/gaia';
 import type {
   RosaConversation,
   RosaConversationWithMessages,
+  RosaConversationSearchResult,
   RosaMessage,
   RosaChartData,
   RosaAction,
@@ -150,8 +159,15 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
   const [showSidebar, setShowSidebar] = useState(true);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState<Record<string, boolean>>({});
   const [messageActions, setMessageActions] = useState<Record<string, RosaAction[]>>({});
+  // Search and archive state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<RosaConversationSearchResult[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Initialize action handler with router
   const actionHandler = useMemo(() => {
@@ -182,7 +198,9 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
     if (!currentOrganization?.id) return;
     setIsLoading(true);
     try {
-      const convs = await getConversations(currentOrganization.id);
+      const convs = showArchived
+        ? await getArchivedConversations(currentOrganization.id)
+        : await getConversations(currentOrganization.id);
       setConversations(convs);
     } catch (err) {
       console.error('Error loading conversations:', err);
@@ -190,6 +208,54 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
       setIsLoading(false);
     }
   }
+
+  // Reload conversations when showArchived changes
+  useEffect(() => {
+    if (currentOrganization?.id) {
+      setSearchQuery('');
+      setSearchResults(null);
+      loadConversations();
+    }
+  }, [showArchived]);
+
+  // Search conversations with debounce
+  useEffect(() => {
+    if (!currentOrganization?.id) return;
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    // Debounce search by 300ms
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchConversations(
+          currentOrganization.id,
+          searchQuery.trim(),
+          showArchived
+        );
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Error searching conversations:', err);
+        setSearchResults(null);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery, currentOrganization?.id, showArchived]);
 
   async function loadConversation(id: string) {
     setIsLoading(true);
@@ -262,6 +328,36 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
     } catch (err) {
       console.error('Error deleting conversation:', err);
     }
+  }
+
+  async function handleArchiveConversation(id: string) {
+    try {
+      await archiveConversation(id);
+      setConversations(convs => convs.filter(c => c.id !== id));
+      if (activeConversation?.id === id) {
+        setActiveConversation(null);
+      }
+    } catch (err) {
+      console.error('Error archiving conversation:', err);
+    }
+  }
+
+  async function handleUnarchiveConversation(id: string) {
+    try {
+      await unarchiveConversation(id);
+      setConversations(convs => convs.filter(c => c.id !== id));
+      if (activeConversation?.id === id) {
+        setActiveConversation(null);
+      }
+    } catch (err) {
+      console.error('Error unarchiving conversation:', err);
+    }
+  }
+
+  function handleClearSearch() {
+    setSearchQuery('');
+    setSearchResults(null);
+    searchInputRef.current?.focus();
   }
 
   async function handleSend() {
@@ -440,7 +536,7 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
       {/* Sidebar - Conversation History */}
       {showSidebar && (
         <div className="w-64 border-r flex flex-col bg-muted/30">
-          <div className="p-4 border-b">
+          <div className="p-4 border-b space-y-3">
             <Button
               onClick={handleNewConversation}
               className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
@@ -448,11 +544,112 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
               <Plus className="h-4 w-4 mr-2" />
               New Chat
             </Button>
+
+            {/* Search input */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search conversations..."
+                className="pl-8 pr-8 h-8 text-sm"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                  onClick={handleClearSearch}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+
+            {/* Archive toggle */}
+            <div className="flex rounded-lg bg-muted p-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'flex-1 h-7 text-xs rounded-md',
+                  !showArchived && 'bg-background shadow-sm'
+                )}
+                onClick={() => setShowArchived(false)}
+              >
+                Active
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'flex-1 h-7 text-xs rounded-md',
+                  showArchived && 'bg-background shadow-sm'
+                )}
+                onClick={() => setShowArchived(true)}
+              >
+                <Archive className="h-3 w-3 mr-1" />
+                Archived
+              </Button>
+            </div>
           </div>
 
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
-              {conversations.map(conv => (
+              {/* Loading indicator for search */}
+              {isSearching && (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+
+              {/* Search results */}
+              {!isSearching && searchResults !== null && (
+                <>
+                  {searchResults.length > 0 ? (
+                    <>
+                      <p className="text-xs text-muted-foreground px-2 py-1">
+                        {searchResults.length} result{searchResults.length !== 1 ? 's' : ''}
+                      </p>
+                      {searchResults.map(result => (
+                        <div
+                          key={result.conversation_id}
+                          className={cn(
+                            'group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors',
+                            activeConversation?.id === result.conversation_id
+                              ? 'bg-emerald-500/10 text-emerald-600'
+                              : 'hover:bg-muted'
+                          )}
+                          onClick={() => loadConversation(result.conversation_id)}
+                        >
+                          <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm truncate">
+                              {result.title || 'New conversation'}
+                            </p>
+                            {result.match_type === 'message' && result.matched_content && (
+                              <p className="text-xs text-muted-foreground truncate italic">
+                                "...{result.matched_content.slice(0, 50)}..."
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(result.updated_at)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      No results found for "{searchQuery}"
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* Regular conversation list */}
+              {!isSearching && searchResults === null && conversations.map(conv => (
                 <div
                   key={conv.id}
                   className={cn(
@@ -472,23 +669,67 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
                       {formatDate(conv.updated_at)}
                     </p>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteConversation(conv.id);
-                    }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center opacity-0 group-hover:opacity-100">
+                    <TooltipProvider>
+                      {showArchived ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnarchiveConversation(conv.id);
+                              }}
+                            >
+                              <ArchiveRestore className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Unarchive</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleArchiveConversation(conv.id);
+                              }}
+                            >
+                              <Archive className="h-3 w-3" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Archive</TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteConversation(conv.id);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
               ))}
 
-              {conversations.length === 0 && !isLoading && (
+              {!isSearching && searchResults === null && conversations.length === 0 && !isLoading && (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  No conversations yet
+                  {showArchived ? 'No archived conversations' : 'No conversations yet'}
                 </p>
               )}
             </div>
