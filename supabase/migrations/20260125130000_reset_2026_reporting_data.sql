@@ -9,6 +9,9 @@ BEGIN;
 -- Delete child tables first, then parent
 -- ============================================================================
 
+-- Clear the latest_lca_id reference from products table first (preserves products, clears FK)
+UPDATE products SET latest_lca_id = NULL WHERE latest_lca_id IS NOT NULL;
+
 -- PCF child tables
 DELETE FROM product_carbon_footprint_results WHERE TRUE;
 DELETE FROM product_carbon_footprint_inputs WHERE TRUE;
