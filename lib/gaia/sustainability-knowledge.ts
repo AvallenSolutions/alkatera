@@ -1,7 +1,9 @@
 // Rosa Curated Sustainability Knowledge
 // Pre-loaded expertise on sustainability frameworks, regulations, and best practices
 
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 /**
  * Categories of curated knowledge
@@ -705,12 +707,13 @@ Metrics for circularity:
 /**
  * Seed the curated knowledge to the database
  */
-export async function seedCuratedKnowledge(): Promise<{
+export async function seedCuratedKnowledge(
+  supabase: SupabaseClient
+): Promise<{
   success: boolean;
   insertedCount: number;
   error?: string;
 }> {
-  const supabase = await createClient();
 
   try {
     // Check for existing entries
@@ -774,9 +777,9 @@ export async function seedCuratedKnowledge(): Promise<{
  * Get curated knowledge by category
  */
 export async function getCuratedKnowledgeByCategory(
+  supabase: SupabaseClient,
   category: KnowledgeCategory
 ): Promise<CuratedKnowledgeEntry[]> {
-  const supabase = await createClient();
 
   const { data, error } = await supabase
     .from('rosa_curated_knowledge')
@@ -808,9 +811,9 @@ export async function getCuratedKnowledgeByCategory(
  * Search curated knowledge by keywords
  */
 export async function searchCuratedKnowledge(
+  supabase: SupabaseClient,
   searchTerms: string[]
 ): Promise<CuratedKnowledgeEntry[]> {
-  const supabase = await createClient();
 
   // Build query to search in keywords array
   const { data, error } = await supabase
