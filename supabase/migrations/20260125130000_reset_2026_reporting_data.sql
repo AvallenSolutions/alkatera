@@ -106,15 +106,7 @@ DELETE FROM data_provenance_verification_history WHERE TRUE;
 DELETE FROM data_provenance_trail WHERE TRUE;
 
 -- ============================================================================
--- SECTION 12: Report Generation Data
--- ============================================================================
-
-DELETE FROM report_reviews WHERE TRUE;
-DELETE FROM report_versions WHERE TRUE;
-DELETE FROM generated_reports WHERE TRUE;
-
--- ============================================================================
--- SECTION 13: Certification & Scoring History
+-- SECTION 12: Certification & Scoring History
 -- ============================================================================
 
 DELETE FROM certification_score_history WHERE TRUE;
