@@ -89,21 +89,23 @@ export async function processDocument(
 ): Promise<ProcessingResult> {
   try {
     // Update status to processing
-    await supabase
-      .from('rosa_knowledge_documents')
+    await (supabase
+      .from('rosa_knowledge_documents') as any)
       .update({ status: 'processing' })
       .eq('id', documentId);
 
     // Fetch the document
-    const { data: document, error: fetchError } = await supabase
+    const { data: documentData, error: fetchError } = await supabase
       .from('rosa_knowledge_documents')
       .select('*')
       .eq('id', documentId)
       .single();
 
-    if (fetchError || !document) {
+    if (fetchError || !documentData) {
       throw new Error(`Document not found: ${documentId}`);
     }
+
+    const document = documentData as any;
 
     // Download the file content
     const fileContent = await downloadAndExtractText(document.file_url, document.file_type);
@@ -133,8 +135,8 @@ export async function processDocument(
     const batchSize = 10;
     for (let i = 0; i < chunkRecords.length; i += batchSize) {
       const batch = chunkRecords.slice(i, i + batchSize);
-      const { error: insertError } = await supabase
-        .from('rosa_knowledge_chunks')
+      const { error: insertError } = await (supabase
+        .from('rosa_knowledge_chunks') as any)
         .insert(batch);
 
       if (insertError) {
@@ -143,8 +145,8 @@ export async function processDocument(
     }
 
     // Update document status
-    await supabase
-      .from('rosa_knowledge_documents')
+    await (supabase
+      .from('rosa_knowledge_documents') as any)
       .update({
         status: 'ready',
         chunk_count: chunkRecords.length,
@@ -161,8 +163,8 @@ export async function processDocument(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
     // Update document with error status
-    await supabase
-      .from('rosa_knowledge_documents')
+    await (supabase
+      .from('rosa_knowledge_documents') as any)
       .update({
         status: 'failed',
         processing_error: errorMessage,
@@ -464,14 +466,14 @@ export async function reprocessDocument(
   documentId: string
 ): Promise<ProcessingResult> {
   // Delete existing chunks
-  await supabase
-    .from('rosa_knowledge_chunks')
+  await (supabase
+    .from('rosa_knowledge_chunks') as any)
     .delete()
     .eq('document_id', documentId);
 
   // Reset status
-  await supabase
-    .from('rosa_knowledge_documents')
+  await (supabase
+    .from('rosa_knowledge_documents') as any)
     .update({
       status: 'pending',
       processing_error: null,
@@ -505,8 +507,8 @@ export async function archiveDocument(
   supabase: SupabaseClient,
   documentId: string
 ): Promise<boolean> {
-  const { error } = await supabase
-    .from('rosa_knowledge_documents')
+  const { error } = await (supabase
+    .from('rosa_knowledge_documents') as any)
     .update({ status: 'archived' })
     .eq('id', documentId);
 
@@ -554,7 +556,7 @@ export async function getKnowledgeDocuments(
     return { documents: [], total: 0 };
   }
 
-  const documents: KnowledgeDocument[] = (data || []).map((row) => ({
+  const documents: KnowledgeDocument[] = ((data || []) as any[]).map((row) => ({
     id: row.id,
     title: row.title,
     description: row.description,
@@ -604,8 +606,8 @@ export async function createKnowledgeDocument(
     uploadedBy: string;
   }
 ): Promise<{ id: string; success: boolean; error?: string }> {
-  const { data, error } = await supabase
-    .from('rosa_knowledge_documents')
+  const { data, error } = await (supabase
+    .from('rosa_knowledge_documents') as any)
     .insert({
       title: params.title,
       description: params.description,
@@ -632,11 +634,11 @@ export async function createKnowledgeDocument(
 
   // Automatically trigger processing
   // In production, this would be done via a background job/queue
-  processDocument(supabase, data.id).catch((err) => {
+  processDocument(supabase, (data as any).id).catch((err) => {
     console.error('Background processing failed:', err);
   });
 
-  return { id: data.id, success: true };
+  return { id: (data as any).id, success: true };
 }
 
 /**
@@ -685,13 +687,13 @@ export async function indexCuratedKnowledge(
 
     let indexed = 0;
 
-    for (const entry of entries) {
+    for (const entry of entries as any[]) {
       try {
         const result = await model.embedContent(entry.content);
         const embedding = padEmbedding(result.embedding.values, 1536);
 
-        await supabase
-          .from('rosa_curated_knowledge')
+        await (supabase
+          .from('rosa_curated_knowledge') as any)
           .update({ embedding: `[${embedding.join(',')}]` })
           .eq('id', entry.id);
 

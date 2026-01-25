@@ -98,12 +98,13 @@ export default function ProductionAllocationPage() {
         return;
       }
 
-      const { data: profile } = await supabase
+      const { data: profileData } = await supabase
         .from("profiles")
         .select("default_organization_id")
         .eq("id", user.id)
         .single();
 
+      const profile = profileData as any;
       if (!profile?.default_organization_id) {
         toast.error("No organization found");
         return;
@@ -139,7 +140,7 @@ export default function ProductionAllocationPage() {
         .select("*")
         .eq("organization_id", orgId),
 
-      supabase.rpc("get_facility_unallocated_capacity", { p_organization_id: orgId }),
+      (supabase.rpc as any)("get_facility_unallocated_capacity", { p_organization_id: orgId }),
     ]);
 
     if (facilitiesRes.error) {
@@ -155,7 +156,7 @@ export default function ProductionAllocationPage() {
       console.error("Error loading capacity data:", capacityRes.error);
     }
 
-    const facilitiesData = facilitiesRes.data || [];
+    const facilitiesData = (facilitiesRes.data || []) as any[];
     const productsData = productsRes.data || [];
     const matrixItems = matrixRes.data || [];
     const capacityData = capacityRes.data || [];
@@ -250,8 +251,8 @@ export default function ProductionAllocationPage() {
         if (error) throw error;
         toast.success("Assignment removed");
       } else {
-        const { error } = await supabase
-          .from("facility_product_assignments")
+        const { error } = await (supabase
+          .from("facility_product_assignments") as any)
           .insert({
             organization_id: organizationId,
             facility_id: facilityId,

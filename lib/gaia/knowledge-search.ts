@@ -56,7 +56,7 @@ export async function searchKnowledge(
     const queryEmbedding = await generateQueryEmbedding(query);
 
     // Use the database function for semantic search
-    const { data, error } = await supabase.rpc('search_rosa_knowledge', {
+    const { data, error } = await (supabase.rpc as any)('search_rosa_knowledge', {
       query_embedding: `[${queryEmbedding.join(',')}]`,
       match_threshold: matchThreshold,
       match_count: matchCount * 2, // Get more to filter
@@ -70,7 +70,7 @@ export async function searchKnowledge(
     }
 
     // Filter based on source type preferences
-    let results: KnowledgeSearchResult[] = (data || []).map((row: {
+    let results: KnowledgeSearchResult[] = ((data || []) as any[]).map((row: {
       id: string;
       source_type: string;
       document_title: string;
@@ -173,7 +173,7 @@ async function keywordSearchCurated(
     return [];
   }
 
-  return (data || []).map((row) => ({
+  return ((data || []) as any[]).map((row) => ({
     id: row.id,
     sourceType: 'curated' as const,
     documentTitle: row.topic,
@@ -388,7 +388,7 @@ export async function getKnowledgeStats(
     .eq('status', 'ready');
 
   const categoryCounts: Record<string, number> = {};
-  (categoryData || []).forEach((row) => {
+  ((categoryData || []) as any[]).forEach((row) => {
     categoryCounts[row.category] = (categoryCounts[row.category] || 0) + 1;
   });
 

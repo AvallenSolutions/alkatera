@@ -106,18 +106,19 @@ export default function CompanyOverviewPage() {
 
       if (error) throw error;
 
-      setOrgData(data);
-      setName(data.name || "");
-      setDescription(data.description || "");
-      setWebsite(data.website || "");
-      setAddress(data.address || "");
-      setCity(data.city || "");
-      setCountry(data.country || "");
-      setIndustrySector(data.industry_sector || "");
-      setFoundingYear(data.founding_year?.toString() || "");
-      setCompanySize(data.company_size || "");
-      setBillingEmail(data.billing_email || "");
-      setTaxId(data.tax_id || "");
+      const orgInfo = data as any;
+      setOrgData(orgInfo);
+      setName(orgInfo.name || "");
+      setDescription(orgInfo.description || "");
+      setWebsite(orgInfo.website || "");
+      setAddress(orgInfo.address || "");
+      setCity(orgInfo.city || "");
+      setCountry(orgInfo.country || "");
+      setIndustrySector(orgInfo.industry_sector || "");
+      setFoundingYear(orgInfo.founding_year?.toString() || "");
+      setCompanySize(orgInfo.company_size || "");
+      setBillingEmail(orgInfo.billing_email || "");
+      setTaxId(orgInfo.tax_id || "");
     } catch (error) {
       console.error("Error fetching organization data:", error);
       toast.error("Failed to load organization details");
@@ -156,15 +157,15 @@ export default function CompanyOverviewPage() {
       };
 
       // Try to save with tax_id first, fall back without it if column doesn't exist
-      let result = await supabase
-        .from("organizations")
+      let result = await (supabase
+        .from("organizations") as any)
         .update({ ...updatePayload, tax_id: taxId.trim() || null })
         .eq("id", currentOrganization.id);
 
       // If tax_id column doesn't exist, retry without it
       if (result.error?.code === 'PGRST204' && result.error?.message?.includes('tax_id')) {
-        result = await supabase
-          .from("organizations")
+        result = await (supabase
+          .from("organizations") as any)
           .update(updatePayload)
           .eq("id", currentOrganization.id);
       }

@@ -128,8 +128,8 @@ export default function SupplierVerificationPage() {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
-        .from('supplier_products')
+      const { error } = await (supabase
+        .from('supplier_products') as any)
         .update({
           is_verified: true,
           verified_by: user.user.id,

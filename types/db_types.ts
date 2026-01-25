@@ -401,13 +401,17 @@ export interface DatabaseTables {
 }
 
 // ============================================================================
-// Database Type (extends base with Rosa tables)
+// Database Type
 // ============================================================================
 
-export type Database = {
+// Keep Database as 'any' for backwards compatibility with existing code
+// The specific Rosa types above can be used directly when needed
+export type Database = any
+
+// Typed Database definition for future use when full types are generated
+export type TypedDatabase = {
   public: {
     Tables: DatabaseTables & {
-      // Other existing tables will be typed as any until full generation
       [key: string]: {
         Row: Record<string, unknown>
         Insert: Record<string, unknown>

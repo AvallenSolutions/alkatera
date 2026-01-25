@@ -173,8 +173,8 @@ export default function AdminSuppliersPage() {
       setSaving(true);
 
       if (editingSupplier) {
-        const { error } = await supabase
-          .from('platform_suppliers')
+        const { error } = await (supabase
+          .from('platform_suppliers') as any)
           .update({
             ...formData,
             updated_at: new Date().toISOString(),
@@ -184,8 +184,8 @@ export default function AdminSuppliersPage() {
         if (error) throw error;
         toast.success('Supplier updated successfully');
       } else {
-        const { error } = await supabase
-          .from('platform_suppliers')
+        const { error } = await (supabase
+          .from('platform_suppliers') as any)
           .insert([formData]);
 
         if (error) throw error;
@@ -236,8 +236,8 @@ export default function AdminSuppliersPage() {
 
   const toggleVerification = async (supplier: PlatformSupplier) => {
     try {
-      const { error } = await supabase
-        .from('platform_suppliers')
+      const { error } = await (supabase
+        .from('platform_suppliers') as any)
         .update({
           is_verified: !supplier.is_verified,
           verification_date: !supplier.is_verified ? new Date().toISOString() : null,
