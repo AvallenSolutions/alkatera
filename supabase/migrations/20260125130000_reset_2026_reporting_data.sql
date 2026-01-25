@@ -54,13 +54,7 @@ DELETE FROM product_end_of_life_scenarios WHERE TRUE;
 DELETE FROM circularity_targets WHERE TRUE;
 
 -- ============================================================================
--- SECTION 5: Nature/Biodiversity Reporting Data
--- ============================================================================
-
-DELETE FROM nature_performance_benchmarks WHERE TRUE;
-
--- ============================================================================
--- SECTION 6: Core Emissions & Calculations
+-- SECTION 5: Core Emissions & Calculations
 -- ============================================================================
 
 -- Calculated results (child of activity_data)
