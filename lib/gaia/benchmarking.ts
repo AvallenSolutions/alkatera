@@ -8,6 +8,9 @@ import type {
   RosaBenchmarkComparison,
 } from '@/lib/types/gaia';
 
+// Re-export types for consumers
+export type { RosaIndustryBenchmarks, RosaBenchmarkMetric, RosaBenchmarkComparison };
+
 type SupabaseClient = ReturnType<typeof createClient>;
 
 // Industry benchmark data for drinks industry

@@ -9,6 +9,9 @@ import type {
   RosaTrendDirection,
 } from '@/lib/types/gaia';
 
+// Re-export types for consumers
+export type { RosaTrendReport, RosaTrendAnalysis, RosaTrendDataPoint, RosaTrendDirection };
+
 type SupabaseClient = ReturnType<typeof createClient>;
 
 interface RawTimeSeriesData {
