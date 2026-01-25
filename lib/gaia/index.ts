@@ -111,13 +111,52 @@ export {
 // Re-export context builder with enhanced context support
 export {
   buildRosaContext,
+  buildRosaContextWithKnowledge,
   buildGaiaContext,
   detectQueryIntent,
   suggestChartType,
+  fetchExternalKnowledge,
   type RosaPromptContext,
   type RosaEnhancedContext,
   type GaiaPromptContext,
 } from './context-builder';
+
+// Re-export from sustainability-knowledge (Curated Knowledge Base)
+export {
+  CURATED_KNOWLEDGE,
+  seedCuratedKnowledge,
+  getCuratedKnowledgeByCategory,
+  searchCuratedKnowledge,
+  type KnowledgeCategory,
+  type CuratedKnowledgeEntry,
+} from './sustainability-knowledge';
+
+// Re-export from knowledge-indexing (Document Processing Pipeline)
+export {
+  processDocument,
+  reprocessDocument,
+  deleteDocument as deleteKnowledgeDocument,
+  archiveDocument as archiveKnowledgeDocument,
+  getKnowledgeDocuments,
+  createKnowledgeDocument,
+  generateQueryEmbedding,
+  indexCuratedKnowledge,
+  type DocumentCategory,
+  type DocumentStatus,
+  type KnowledgeDocument,
+  type DocumentChunk,
+  type ProcessingResult,
+} from './knowledge-indexing';
+
+// Re-export from knowledge-search (Semantic Search)
+export {
+  searchKnowledge,
+  searchKnowledgeWithFallback,
+  getRelevantKnowledge,
+  getKnowledgeStats,
+  type KnowledgeSearchResult,
+  type KnowledgeSearchOptions,
+} from './knowledge-search';
 
 // ============================================================================
 // Conversation Operations

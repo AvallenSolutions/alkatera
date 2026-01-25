@@ -6,6 +6,7 @@ import { formatContextForPrompt, type DataRetrievalResult } from './data-retriev
 import { formatDataQualityForPrompt, type RosaDataQualityMetrics } from './data-quality';
 import { formatBenchmarksForPrompt, type RosaIndustryBenchmarks } from './benchmarking';
 import { formatTrendReportForPrompt, type RosaTrendReport } from './trend-analysis';
+import { getRelevantKnowledge, type KnowledgeSearchResult } from './knowledge-search';
 import type { RosaMessage, RosaKnowledgeEntry } from '@/lib/types/gaia';
 
 export interface RosaPromptContext {
@@ -19,6 +20,7 @@ export interface RosaEnhancedContext {
   dataQuality?: RosaDataQualityMetrics;
   benchmarks?: RosaIndustryBenchmarks;
   trends?: RosaTrendReport;
+  externalKnowledge?: string; // Pre-formatted knowledge from RAG search
 }
 
 // Backwards compatibility
@@ -70,12 +72,17 @@ export function buildRosaContext(params: {
 }
 
 /**
- * Format enhanced context (data quality, benchmarks, trends)
+ * Format enhanced context (data quality, benchmarks, trends, external knowledge)
  */
 function formatEnhancedContext(context?: RosaEnhancedContext): string {
   if (!context) return '';
 
   const sections: string[] = [];
+
+  // External knowledge (RAG results) - added first for prominence
+  if (context.externalKnowledge) {
+    sections.push(context.externalKnowledge);
+  }
 
   // Data quality insights
   if (context.dataQuality) {
@@ -310,4 +317,52 @@ export function suggestChartType(
 
   // Many items - table
   return { type: 'table', suggestion: 'A table would be best for displaying this many items' };
+}
+
+/**
+ * Fetch relevant external knowledge for a query
+ * This is called before building context to enrich Rosa's responses
+ */
+export async function fetchExternalKnowledge(
+  query: string,
+  organizationId?: string
+): Promise<{ formattedContext: string; results: KnowledgeSearchResult[] }> {
+  try {
+    const { results, formattedContext } = await getRelevantKnowledge(query, organizationId);
+    return { formattedContext, results };
+  } catch (error) {
+    console.error('Error fetching external knowledge:', error);
+    return { formattedContext: '', results: [] };
+  }
+}
+
+/**
+ * Build Rosa context with automatic knowledge retrieval
+ * This is the recommended entry point that handles everything
+ */
+export async function buildRosaContextWithKnowledge(params: {
+  organizationContext: DataRetrievalResult;
+  knowledgeBase: RosaKnowledgeEntry[];
+  conversationHistory: RosaMessage[];
+  userQuery: string;
+  organizationId?: string;
+  enhancedContext?: Omit<RosaEnhancedContext, 'externalKnowledge'>;
+}): Promise<RosaPromptContext> {
+  const { organizationId, userQuery, enhancedContext, ...rest } = params;
+
+  // Fetch relevant external knowledge
+  const { formattedContext: externalKnowledge } = await fetchExternalKnowledge(
+    userQuery,
+    organizationId
+  );
+
+  // Build context with external knowledge included
+  return buildRosaContext({
+    ...rest,
+    userQuery,
+    enhancedContext: {
+      ...enhancedContext,
+      externalKnowledge,
+    },
+  });
 }
