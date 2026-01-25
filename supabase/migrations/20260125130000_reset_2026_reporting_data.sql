@@ -111,7 +111,6 @@ DELETE FROM data_provenance_trail WHERE TRUE;
 
 DELETE FROM certification_score_history WHERE TRUE;
 DELETE FROM organization_certifications WHERE TRUE;
-DELETE FROM supplier_sustainability_scores WHERE TRUE;
 
 COMMIT;
 
