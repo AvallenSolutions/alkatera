@@ -1,8 +1,10 @@
 // Rosa Knowledge Document Indexing Pipeline
 // Processes uploaded documents, chunks them, and generates embeddings for RAG
 
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 // Types for document processing
 export type DocumentCategory =
@@ -62,11 +64,9 @@ export interface ProcessingResult {
 }
 
 // Configuration
-const CHUNK_SIZE = 1000; // Target tokens per chunk
-const CHUNK_OVERLAP = 200; // Token overlap between chunks
 const MAX_CHUNK_SIZE = 1500; // Maximum chunk size
+const CHUNK_OVERLAP = 200; // Token overlap between chunks
 const EMBEDDING_MODEL = 'text-embedding-004'; // Google's embedding model
-const EMBEDDING_DIMENSIONS = 768; // Output dimensions (we'll pad to 1536 for compatibility)
 
 /**
  * Initialize the Gemini client for embeddings
@@ -83,9 +83,10 @@ function getGeminiClient(): GoogleGenerativeAI {
  * Process a newly uploaded document
  * This is the main entry point called after a document is uploaded
  */
-export async function processDocument(documentId: string): Promise<ProcessingResult> {
-  const supabase = await createClient();
-
+export async function processDocument(
+  supabase: SupabaseClient,
+  documentId: string
+): Promise<ProcessingResult> {
   try {
     // Update status to processing
     await supabase
@@ -458,9 +459,10 @@ function padEmbedding(embedding: number[], targetDimensions: number): number[] {
 /**
  * Re-process a failed document
  */
-export async function reprocessDocument(documentId: string): Promise<ProcessingResult> {
-  const supabase = await createClient();
-
+export async function reprocessDocument(
+  supabase: SupabaseClient,
+  documentId: string
+): Promise<ProcessingResult> {
   // Delete existing chunks
   await supabase
     .from('rosa_knowledge_chunks')
@@ -478,15 +480,16 @@ export async function reprocessDocument(documentId: string): Promise<ProcessingR
     .eq('id', documentId);
 
   // Process again
-  return processDocument(documentId);
+  return processDocument(supabase, documentId);
 }
 
 /**
  * Delete a document and its chunks
  */
-export async function deleteDocument(documentId: string): Promise<boolean> {
-  const supabase = await createClient();
-
+export async function deleteDocument(
+  supabase: SupabaseClient,
+  documentId: string
+): Promise<boolean> {
   const { error } = await supabase
     .from('rosa_knowledge_documents')
     .delete()
@@ -498,9 +501,10 @@ export async function deleteDocument(documentId: string): Promise<boolean> {
 /**
  * Archive a document (soft delete)
  */
-export async function archiveDocument(documentId: string): Promise<boolean> {
-  const supabase = await createClient();
-
+export async function archiveDocument(
+  supabase: SupabaseClient,
+  documentId: string
+): Promise<boolean> {
   const { error } = await supabase
     .from('rosa_knowledge_documents')
     .update({ status: 'archived' })
@@ -512,14 +516,15 @@ export async function archiveDocument(documentId: string): Promise<boolean> {
 /**
  * Get all documents for admin management
  */
-export async function getKnowledgeDocuments(options?: {
-  category?: DocumentCategory;
-  status?: DocumentStatus;
-  limit?: number;
-  offset?: number;
-}): Promise<{ documents: KnowledgeDocument[]; total: number }> {
-  const supabase = await createClient();
-
+export async function getKnowledgeDocuments(
+  supabase: SupabaseClient,
+  options?: {
+    category?: DocumentCategory;
+    status?: DocumentStatus;
+    limit?: number;
+    offset?: number;
+  }
+): Promise<{ documents: KnowledgeDocument[]; total: number }> {
   let query = supabase
     .from('rosa_knowledge_documents')
     .select('*', { count: 'exact' });
@@ -580,24 +585,25 @@ export async function getKnowledgeDocuments(options?: {
  * Upload and create a new knowledge document
  * Call processDocument() after the file is uploaded to storage
  */
-export async function createKnowledgeDocument(params: {
-  title: string;
-  description?: string;
-  fileName: string;
-  fileUrl: string;
-  fileType: string;
-  fileSizeBytes?: number;
-  category: DocumentCategory;
-  tags?: string[];
-  sourceName?: string;
-  sourceUrl?: string;
-  publicationDate?: Date;
-  isPublic?: boolean;
-  organizationId?: string;
-  uploadedBy: string;
-}): Promise<{ id: string; success: boolean; error?: string }> {
-  const supabase = await createClient();
-
+export async function createKnowledgeDocument(
+  supabase: SupabaseClient,
+  params: {
+    title: string;
+    description?: string;
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSizeBytes?: number;
+    category: DocumentCategory;
+    tags?: string[];
+    sourceName?: string;
+    sourceUrl?: string;
+    publicationDate?: Date;
+    isPublic?: boolean;
+    organizationId?: string;
+    uploadedBy: string;
+  }
+): Promise<{ id: string; success: boolean; error?: string }> {
   const { data, error } = await supabase
     .from('rosa_knowledge_documents')
     .insert({
@@ -626,7 +632,7 @@ export async function createKnowledgeDocument(params: {
 
   // Automatically trigger processing
   // In production, this would be done via a background job/queue
-  processDocument(data.id).catch((err) => {
+  processDocument(supabase, data.id).catch((err) => {
     console.error('Background processing failed:', err);
   });
 
@@ -650,13 +656,13 @@ export async function generateQueryEmbedding(query: string): Promise<number[]> {
 /**
  * Index curated knowledge entries with embeddings
  */
-export async function indexCuratedKnowledge(): Promise<{
+export async function indexCuratedKnowledge(
+  supabase: SupabaseClient
+): Promise<{
   success: boolean;
   indexed: number;
   error?: string;
 }> {
-  const supabase = await createClient();
-
   try {
     // Fetch entries without embeddings
     const { data: entries, error: fetchError } = await supabase

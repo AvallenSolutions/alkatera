@@ -1,8 +1,10 @@
 // Rosa Knowledge Search
 // Semantic search across knowledge documents and curated content
 
-import { createClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { generateQueryEmbedding, type DocumentCategory } from './knowledge-indexing';
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 /**
  * Knowledge search result
@@ -36,6 +38,7 @@ export interface KnowledgeSearchOptions {
  * This is the main function Rosa uses to find relevant knowledge
  */
 export async function searchKnowledge(
+  supabase: SupabaseClient,
   options: KnowledgeSearchOptions
 ): Promise<KnowledgeSearchResult[]> {
   const {
@@ -51,8 +54,6 @@ export async function searchKnowledge(
   try {
     // Generate embedding for the query
     const queryEmbedding = await generateQueryEmbedding(query);
-
-    const supabase = await createClient();
 
     // Use the database function for semantic search
     const { data, error } = await supabase.rpc('search_rosa_knowledge', {
@@ -110,10 +111,11 @@ export async function searchKnowledge(
  * If semantic search returns few results, falls back to keyword matching
  */
 export async function searchKnowledgeWithFallback(
+  supabase: SupabaseClient,
   options: KnowledgeSearchOptions
 ): Promise<KnowledgeSearchResult[]> {
   // First try semantic search
-  const semanticResults = await searchKnowledge(options);
+  const semanticResults = await searchKnowledge(supabase, options);
 
   // If we have enough results, return them
   if (semanticResults.length >= (options.matchCount || 5) / 2) {
@@ -121,7 +123,7 @@ export async function searchKnowledgeWithFallback(
   }
 
   // Fall back to keyword search for curated knowledge
-  const keywordResults = await keywordSearchCurated(options.query, options.categories);
+  const keywordResults = await keywordSearchCurated(supabase, options.query, options.categories);
 
   // Merge and deduplicate
   const allResults = [...semanticResults];
@@ -141,11 +143,10 @@ export async function searchKnowledgeWithFallback(
  * Keyword-based search for curated knowledge
  */
 async function keywordSearchCurated(
+  supabase: SupabaseClient,
   query: string,
   categories?: DocumentCategory[]
 ): Promise<KnowledgeSearchResult[]> {
-  const supabase = await createClient();
-
   // Extract keywords from query
   const keywords = extractKeywords(query);
 
@@ -221,6 +222,7 @@ function extractKeywords(query: string): string[] {
  * This is the main entry point used by the context builder
  */
 export async function getRelevantKnowledge(
+  supabase: SupabaseClient,
   query: string,
   organizationId?: string
 ): Promise<{
@@ -231,7 +233,7 @@ export async function getRelevantKnowledge(
   const categories = detectRelevantCategories(query);
 
   // Search with fallback
-  const results = await searchKnowledgeWithFallback({
+  const results = await searchKnowledgeWithFallback(supabase, {
     query,
     categories: categories.length > 0 ? categories : undefined,
     organizationId,
@@ -351,15 +353,15 @@ function formatKnowledgeForContext(results: KnowledgeSearchResult[]): string {
 /**
  * Get knowledge statistics
  */
-export async function getKnowledgeStats(): Promise<{
+export async function getKnowledgeStats(
+  supabase: SupabaseClient
+): Promise<{
   totalDocuments: number;
   readyDocuments: number;
   totalChunks: number;
   curatedEntries: number;
   categoryCounts: Record<string, number>;
 }> {
-  const supabase = await createClient();
-
   // Get document counts
   const { count: totalDocs } = await supabase
     .from('rosa_knowledge_documents')

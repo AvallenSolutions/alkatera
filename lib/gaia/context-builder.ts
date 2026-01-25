@@ -1,6 +1,7 @@
 // Rosa Context Builder
 // Assembles context for Gemini API calls
 
+import { createClient } from '@supabase/supabase-js';
 import { ROSA_SYSTEM_PROMPT, ROSA_CONTEXT_TEMPLATE } from './system-prompt';
 import { formatContextForPrompt, type DataRetrievalResult } from './data-retrieval';
 import { formatDataQualityForPrompt, type RosaDataQualityMetrics } from './data-quality';
@@ -8,6 +9,8 @@ import { formatBenchmarksForPrompt, type RosaIndustryBenchmarks } from './benchm
 import { formatTrendReportForPrompt, type RosaTrendReport } from './trend-analysis';
 import { getRelevantKnowledge, type KnowledgeSearchResult } from './knowledge-search';
 import type { RosaMessage, RosaKnowledgeEntry } from '@/lib/types/gaia';
+
+type SupabaseClient = ReturnType<typeof createClient>;
 
 export interface RosaPromptContext {
   systemPrompt: string;
@@ -324,11 +327,12 @@ export function suggestChartType(
  * This is called before building context to enrich Rosa's responses
  */
 export async function fetchExternalKnowledge(
+  supabase: SupabaseClient,
   query: string,
   organizationId?: string
 ): Promise<{ formattedContext: string; results: KnowledgeSearchResult[] }> {
   try {
-    const { results, formattedContext } = await getRelevantKnowledge(query, organizationId);
+    const { results, formattedContext } = await getRelevantKnowledge(supabase, query, organizationId);
     return { formattedContext, results };
   } catch (error) {
     console.error('Error fetching external knowledge:', error);
@@ -340,18 +344,22 @@ export async function fetchExternalKnowledge(
  * Build Rosa context with automatic knowledge retrieval
  * This is the recommended entry point that handles everything
  */
-export async function buildRosaContextWithKnowledge(params: {
-  organizationContext: DataRetrievalResult;
-  knowledgeBase: RosaKnowledgeEntry[];
-  conversationHistory: RosaMessage[];
-  userQuery: string;
-  organizationId?: string;
-  enhancedContext?: Omit<RosaEnhancedContext, 'externalKnowledge'>;
-}): Promise<RosaPromptContext> {
+export async function buildRosaContextWithKnowledge(
+  supabase: SupabaseClient,
+  params: {
+    organizationContext: DataRetrievalResult;
+    knowledgeBase: RosaKnowledgeEntry[];
+    conversationHistory: RosaMessage[];
+    userQuery: string;
+    organizationId?: string;
+    enhancedContext?: Omit<RosaEnhancedContext, 'externalKnowledge'>;
+  }
+): Promise<RosaPromptContext> {
   const { organizationId, userQuery, enhancedContext, ...rest } = params;
 
   // Fetch relevant external knowledge
   const { formattedContext: externalKnowledge } = await fetchExternalKnowledge(
+    supabase,
     userQuery,
     organizationId
   );
