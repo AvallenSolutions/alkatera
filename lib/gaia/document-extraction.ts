@@ -165,7 +165,7 @@ export async function createDocumentExtraction(
       extracted_fields: [],
       metadata: {},
       suggested_actions: [],
-    })
+    } as any)
     .select()
     .single();
 
@@ -200,7 +200,7 @@ export async function processDocumentExtraction(
   // Update status to processing
   await supabase
     .from('rosa_document_extractions')
-    .update({ status: 'processing' })
+    .update({ status: 'processing' } as any)
     .eq('id', extractionId);
 
   try {
@@ -243,7 +243,7 @@ export async function processDocumentExtraction(
         suggested_actions: suggestedActions,
         validation_errors: validationErrors,
         processed_at: new Date().toISOString(),
-      })
+      } as any)
       .eq('id', extractionId)
       .select()
       .single();
@@ -272,7 +272,7 @@ export async function processDocumentExtraction(
       .update({
         status: 'failed',
         validation_errors: [(error as Error).message],
-      })
+      } as any)
       .eq('id', extractionId);
 
     throw error;
@@ -559,7 +559,7 @@ export async function applyExtractedData(
   // Mark extraction as completed
   await supabase
     .from('rosa_document_extractions')
-    .update({ status: 'completed' })
+    .update({ status: 'completed' } as any)
     .eq('id', extractionId);
 }
 
