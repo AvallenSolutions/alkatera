@@ -93,18 +93,18 @@ export default function PlatformDashboardPage() {
   const fetchData = async () => {
     try {
       const [statsResult, adoptionResult, orgsResult] = await Promise.all([
-        supabase.rpc("get_platform_statistics"),
-        supabase.rpc("get_feature_adoption"),
-        supabase.rpc("get_platform_organizations"),
+        (supabase.rpc as any)("get_platform_statistics"),
+        (supabase.rpc as any)("get_feature_adoption"),
+        (supabase.rpc as any)("get_platform_organizations"),
       ]);
 
-      if (statsResult.data && !statsResult.data.error) {
+      if (statsResult.data && !(statsResult.data as any).error) {
         setStats(statsResult.data);
       }
-      if (adoptionResult.data && !adoptionResult.data.error) {
+      if (adoptionResult.data && !(adoptionResult.data as any).error) {
         setFeatureAdoption(adoptionResult.data);
       }
-      if (orgsResult.data && !orgsResult.data.error) {
+      if (orgsResult.data && !(orgsResult.data as any).error) {
         setOrganizations(orgsResult.data || []);
       }
     } catch (err) {

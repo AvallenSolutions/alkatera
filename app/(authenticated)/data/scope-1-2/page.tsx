@@ -401,13 +401,14 @@ export default function CompanyEmissionsPage() {
         production_volume: number;
       }> = [];
 
-      for (const log of productionLogs) {
-        const { data: product } = await browserSupabase
+      for (const log of productionLogs as any[]) {
+        const { data: productData } = await browserSupabase
           .from('products')
           .select('name')
           .eq('id', log.product_id)
           .maybeSingle();
 
+        const product = productData as any;
         if (!product) continue;
 
         console.log('🔍 [SCOPE 3 CAT 1] Product found', {
@@ -415,7 +416,7 @@ export default function CompanyEmissionsPage() {
           product
         });
 
-        const { data: lca, error: lcaError } = await browserSupabase
+        const { data: lcaData, error: lcaError } = await browserSupabase
           .from('product_carbon_footprints')
           .select('id, total_ghg_emissions, status, per_unit_emissions_verified')
           .eq('product_id', log.product_id)
@@ -423,6 +424,7 @@ export default function CompanyEmissionsPage() {
           .limit(1)
           .maybeSingle();
 
+        const lca = lcaData as any;
         console.log('🔍 [SCOPE 3 CAT 1] LCA data', {
           productId: log.product_id,
           hasLCA: !!lca,
@@ -472,7 +474,7 @@ export default function CompanyEmissionsPage() {
         let packagingPerUnit = 0;
 
         if (materials) {
-          materials.forEach((m: any) => {
+          (materials as any[]).forEach((m: any) => {
             if (m.material_type === 'ingredient') {
               materialsPerUnit += m.impact_climate || 0;
             } else if (m.material_type === 'packaging') {
@@ -541,8 +543,8 @@ export default function CompanyEmissionsPage() {
       if (reportError) throw reportError;
 
       if (!reportData) {
-        const { data: newReport, error: createError } = await browserSupabase
-          .from('corporate_reports')
+        const { data: newReport, error: createError } = await (browserSupabase
+          .from('corporate_reports') as any)
           .insert({
             organization_id: currentOrganization.id,
             year: selectedYear,

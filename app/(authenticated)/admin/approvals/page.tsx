@@ -184,7 +184,7 @@ export default function ApprovalsPage() {
     setProcessing(true);
     try {
       const functionName = `approve_pending_${activeTab.replace("_data", "")}${activeTab === "activity_data" ? "_data" : ""}`;
-      const { error } = await supabase.rpc(
+      const { error } = await (supabase.rpc as any)(
         activeTab === "activity_data"
           ? "approve_pending_activity_data"
           : activeTab === "facilities"
@@ -216,7 +216,7 @@ export default function ApprovalsPage() {
 
     setProcessing(true);
     try {
-      const { error } = await supabase.rpc("reject_pending_submission", {
+      const { error } = await (supabase.rpc as any)("reject_pending_submission", {
         p_table_name: `pending_${activeTab}`,
         p_pending_id: selectedItem.id,
         p_reason: rejectReason.trim(),

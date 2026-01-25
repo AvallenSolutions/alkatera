@@ -167,11 +167,11 @@ export default function AllocationReviewPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { error } = await supabase
-        .from("contract_manufacturer_allocations")
+      const { error } = await (supabase
+        .from("contract_manufacturer_allocations") as any)
         .update({
           status: "verified",
-          verified_by: user?.id,
+          verified_by: user?.id ?? null,
           verified_at: new Date().toISOString(),
           verification_notes: verificationNotes || null,
         })
@@ -202,11 +202,11 @@ export default function AllocationReviewPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { error } = await supabase
-        .from("contract_manufacturer_allocations")
+      const { error } = await (supabase
+        .from("contract_manufacturer_allocations") as any)
         .update({
           status: "draft",
-          verified_by: user?.id,
+          verified_by: user?.id ?? null,
           verified_at: new Date().toISOString(),
           verification_notes: `REJECTED: ${verificationNotes}`,
         })

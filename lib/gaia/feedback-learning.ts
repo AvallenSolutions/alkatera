@@ -269,7 +269,7 @@ function extractPatternKey(question: string): string {
 function generateSuggestedKnowledgeEntry(
   question: string,
   category: string
-): RosaKnowledgeEntryInput {
+): RosaFeedbackPattern['suggestedKnowledgeEntry'] {
   const entryType = category === 'how-to' || category === 'navigation'
     ? 'instruction'
     : category === 'explanation'
@@ -277,15 +277,9 @@ function generateSuggestedKnowledgeEntry(
       : 'example_qa';
 
   return {
-    entry_type: entryType,
+    entryType,
     title: `Answer for: ${question.substring(0, 100)}`,
     content: `[TODO: Add a clear answer to this question]`,
-    example_question: question,
-    example_answer: '[TODO: Add example answer]',
-    category,
-    tags: [category],
-    is_active: false, // Start as inactive until reviewed
-    priority: 5,
   };
 }
 
@@ -437,25 +431,21 @@ export async function generateKnowledgeFromPatterns(
     const { data: existing } = await supabase
       .from('gaia_knowledge_base')
       .select('id')
-      .ilike('example_question', `%${pattern.suggestedKnowledgeEntry.example_question?.substring(0, 30) || ''}%`)
+      .ilike('title', `%${pattern.suggestedKnowledgeEntry.title.substring(0, 30)}%`)
       .limit(1);
 
-    if (existing && existing.length > 0) continue;
+    if (existing && (existing as any[]).length > 0) continue;
 
     // Create the knowledge entry
-    const { error } = await supabase
-      .from('gaia_knowledge_base')
+    const { error } = await (supabase
+      .from('gaia_knowledge_base') as any)
       .insert({
         created_by: adminUserId,
-        entry_type: pattern.suggestedKnowledgeEntry.entry_type,
+        entry_type: pattern.suggestedKnowledgeEntry.entryType,
         title: pattern.suggestedKnowledgeEntry.title,
         content: pattern.suggestedKnowledgeEntry.content,
-        example_question: pattern.suggestedKnowledgeEntry.example_question,
-        example_answer: pattern.suggestedKnowledgeEntry.example_answer,
-        category: pattern.suggestedKnowledgeEntry.category,
-        tags: pattern.suggestedKnowledgeEntry.tags,
         is_active: false,
-        priority: pattern.suggestedKnowledgeEntry.priority,
+        priority: 5,
       });
 
     if (!error) {

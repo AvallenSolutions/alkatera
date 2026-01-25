@@ -750,7 +750,7 @@ export async function seedCuratedKnowledge(
 
     for (let i = 0; i < entries.length; i += batchSize) {
       const batch = entries.slice(i, i + batchSize);
-      const { error } = await supabase.from('rosa_curated_knowledge').insert(batch);
+      const { error } = await (supabase.from('rosa_curated_knowledge') as any).insert(batch);
 
       if (error) {
         throw error;
@@ -793,7 +793,7 @@ export async function getCuratedKnowledgeByCategory(
     return [];
   }
 
-  return data.map((row) => ({
+  return ((data || []) as any[]).map((row) => ({
     topic: row.topic,
     subtopic: row.subtopic,
     content: row.content,
@@ -829,7 +829,7 @@ export async function searchCuratedKnowledge(
     return [];
   }
 
-  return data.map((row) => ({
+  return ((data || []) as any[]).map((row) => ({
     topic: row.topic,
     subtopic: row.subtopic,
     content: row.content,

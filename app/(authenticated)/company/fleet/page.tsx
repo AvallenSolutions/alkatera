@@ -65,18 +65,21 @@ export default function FleetPage() {
         .eq("organization_id", currentOrganization.id)
         .gte("activity_date", `${currentYear}-01-01`);
 
-      const totalVehicles = vehicleData?.length || 0;
-      const activeVehicles = vehicleData?.filter((v) => v.status === "active").length || 0;
+      const vehicles = vehicleData as any[] | null;
+      const emissions = emissionsData as any[] | null;
+
+      const totalVehicles = vehicles?.length || 0;
+      const activeVehicles = vehicles?.filter((v) => v.status === "active").length || 0;
 
       let scope1 = 0;
       let scope2 = 0;
       let scope3 = 0;
 
-      emissionsData?.forEach((activity) => {
-        const emissions = activity.emissions_tco2e || 0;
-        if (activity.scope === "Scope 1") scope1 += emissions;
-        else if (activity.scope === "Scope 2") scope2 += emissions;
-        else if (activity.scope?.includes("Scope 3")) scope3 += emissions;
+      emissions?.forEach((activity) => {
+        const emissionsVal = activity.emissions_tco2e || 0;
+        if (activity.scope === "Scope 1") scope1 += emissionsVal;
+        else if (activity.scope === "Scope 2") scope2 += emissionsVal;
+        else if (activity.scope?.includes("Scope 3")) scope3 += emissionsVal;
       });
 
       setSummary({
