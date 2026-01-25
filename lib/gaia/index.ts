@@ -72,6 +72,53 @@ export {
   formatWorkflowSteps,
 } from './knowledge';
 
+// Re-export from data-quality (Feature 1)
+export {
+  analyzeDataQuality,
+  formatDataQualityForPrompt,
+} from './data-quality';
+
+// Re-export from benchmarking (Feature 2)
+export {
+  getIndustryBenchmarks,
+  formatBenchmarksForPrompt,
+} from './benchmarking';
+
+// Re-export from trend-analysis (Feature 3)
+export {
+  generateTrendReport,
+  formatTrendReportForPrompt,
+} from './trend-analysis';
+
+// Re-export from document-extraction (Feature 4)
+export {
+  createDocumentExtraction,
+  processDocumentExtraction,
+  getPendingExtractions,
+  applyExtractedData,
+  formatExtractionForPrompt,
+  detectDocumentType,
+} from './document-extraction';
+
+// Re-export from feedback-learning (Feature 5)
+export {
+  analyzeFeedbackPatterns,
+  generateKnowledgeFromPatterns,
+  getFeedbackStats,
+  formatFeedbackAnalyticsForPrompt,
+} from './feedback-learning';
+
+// Re-export context builder with enhanced context support
+export {
+  buildRosaContext,
+  buildGaiaContext,
+  detectQueryIntent,
+  suggestChartType,
+  type RosaPromptContext,
+  type RosaEnhancedContext,
+  type GaiaPromptContext,
+} from './context-builder';
+
 // ============================================================================
 // Conversation Operations
 // ============================================================================

@@ -220,6 +220,238 @@ export interface RosaAdminStats {
   knowledge_entries: number;
 }
 
+// ============================================================================
+// Data Quality Types (Feature 1: Proactive Data Quality Insights)
+// ============================================================================
+
+export type RosaDataQualityStatus = 'complete' | 'partial' | 'missing' | 'stale';
+export type RosaDataQualitySeverity = 'critical' | 'warning' | 'info';
+
+export interface RosaDataQualityIssue {
+  category: string;
+  issue: string;
+  severity: RosaDataQualitySeverity;
+  recommendation: string;
+  actionPath?: string;
+  impactDescription?: string;
+}
+
+export interface RosaDataQualityMetrics {
+  overallScore: number; // 0-100
+  completenessScore: number;
+  freshnessScore: number;
+  accuracyScore: number;
+  issues: RosaDataQualityIssue[];
+  categoryScores: {
+    products: { score: number; status: RosaDataQualityStatus; lastUpdated?: string };
+    facilities: { score: number; status: RosaDataQualityStatus; lastUpdated?: string };
+    fleet: { score: number; status: RosaDataQualityStatus; lastUpdated?: string };
+    suppliers: { score: number; status: RosaDataQualityStatus; lastUpdated?: string };
+    emissions: { score: number; status: RosaDataQualityStatus; lastUpdated?: string };
+  };
+  recommendations: string[];
+}
+
+// ============================================================================
+// Industry Benchmarking Types (Feature 2: Industry Comparisons)
+// ============================================================================
+
+export type RosaBenchmarkComparison = 'above_average' | 'average' | 'below_average' | 'top_quartile' | 'bottom_quartile';
+
+export interface RosaBenchmarkMetric {
+  metricName: string;
+  metricKey: string;
+  userValue: number;
+  benchmarkValue: number;
+  unit: string;
+  comparison: RosaBenchmarkComparison;
+  percentileDifference: number; // e.g., +15% or -20%
+  industryAverage: number;
+  topQuartile: number;
+  bottomQuartile: number;
+}
+
+export interface RosaIndustryBenchmarks {
+  industry: string;
+  companySize?: string;
+  region?: string;
+  benchmarkDate: string;
+  metrics: {
+    carbonIntensity?: RosaBenchmarkMetric;
+    waterIntensity?: RosaBenchmarkMetric;
+    wasteIntensity?: RosaBenchmarkMetric;
+    renewableEnergyShare?: RosaBenchmarkMetric;
+    scope1PerRevenue?: RosaBenchmarkMetric;
+    scope2PerRevenue?: RosaBenchmarkMetric;
+    scope3PerRevenue?: RosaBenchmarkMetric;
+    supplierEngagementRate?: RosaBenchmarkMetric;
+    lcaCoverageRate?: RosaBenchmarkMetric;
+  };
+  insights: string[];
+  quickWins: string[];
+}
+
+// ============================================================================
+// Temporal Trend Analysis Types (Feature 3: Time-Series Analysis)
+// ============================================================================
+
+export type RosaTrendDirection = 'increasing' | 'decreasing' | 'stable' | 'volatile';
+
+export interface RosaTrendDataPoint {
+  date: string;
+  value: number;
+  label?: string;
+}
+
+export interface RosaTrendAnalysis {
+  metricName: string;
+  metricKey: string;
+  unit: string;
+  currentValue: number;
+  previousValue: number;
+  changePercent: number;
+  trendDirection: RosaTrendDirection;
+  dataPoints: RosaTrendDataPoint[];
+  periodStart: string;
+  periodEnd: string;
+  periodType: 'monthly' | 'quarterly' | 'yearly';
+  forecast?: {
+    predictedValue: number;
+    confidence: number;
+    targetDate: string;
+  };
+  anomalies?: {
+    date: string;
+    value: number;
+    expectedValue: number;
+    deviationPercent: number;
+    description: string;
+  }[];
+  insights: string[];
+}
+
+export interface RosaTrendReport {
+  organizationId: string;
+  generatedAt: string;
+  reportingPeriod: {
+    start: string;
+    end: string;
+    comparisonStart?: string;
+    comparisonEnd?: string;
+  };
+  trends: {
+    scope1Emissions?: RosaTrendAnalysis;
+    scope2Emissions?: RosaTrendAnalysis;
+    scope3Emissions?: RosaTrendAnalysis;
+    totalEmissions?: RosaTrendAnalysis;
+    waterConsumption?: RosaTrendAnalysis;
+    energyConsumption?: RosaTrendAnalysis;
+    wasteGenerated?: RosaTrendAnalysis;
+    vitalityScore?: RosaTrendAnalysis;
+  };
+  yearOverYearSummary?: {
+    totalEmissionsChange: number;
+    waterChange: number;
+    energyChange: number;
+    vitalityScoreChange: number;
+  };
+  keyFindings: string[];
+}
+
+// ============================================================================
+// Document Extraction Types (Feature 4: Smart Document Processing)
+// ============================================================================
+
+export type RosaDocumentType = 'utility_bill' | 'invoice' | 'waste_manifest' | 'supplier_report' | 'certificate' | 'other';
+export type RosaExtractionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'needs_review';
+
+export interface RosaExtractedField {
+  fieldName: string;
+  value: string | number;
+  confidence: number; // 0-1
+  suggestedMapping?: string; // Which database field this should map to
+  needsReview: boolean;
+  originalText?: string;
+  boundingBox?: { x: number; y: number; width: number; height: number };
+}
+
+export interface RosaDocumentExtraction {
+  id: string;
+  organizationId: string;
+  userId: string;
+  documentType: RosaDocumentType;
+  fileName: string;
+  fileUrl: string;
+  status: RosaExtractionStatus;
+  extractedFields: RosaExtractedField[];
+  metadata: {
+    vendor?: string;
+    documentDate?: string;
+    periodStart?: string;
+    periodEnd?: string;
+    totalAmount?: number;
+    currency?: string;
+  };
+  suggestedActions: {
+    action: string;
+    targetTable: string;
+    targetField: string;
+    value: string | number;
+    confidence: number;
+  }[];
+  validationErrors?: string[];
+  createdAt: string;
+  processedAt?: string;
+}
+
+// ============================================================================
+// Feedback Learning Types (Feature 5: Continuous Improvement)
+// ============================================================================
+
+export interface RosaFeedbackPattern {
+  id: string;
+  pattern: string; // Regex or keyword pattern
+  category: string;
+  negativeCount: number;
+  positiveCount: number;
+  successRate: number;
+  lastOccurrence: string;
+  suggestedKnowledgeEntry?: {
+    title: string;
+    content: string;
+    entryType: 'instruction' | 'example_qa' | 'definition' | 'guideline';
+  };
+  status: 'pending_review' | 'addressed' | 'ignored';
+}
+
+export interface RosaFeedbackAnalytics {
+  periodStart: string;
+  periodEnd: string;
+  totalFeedback: number;
+  positiveCount: number;
+  negativeCount: number;
+  positiveRate: number;
+  topNegativePatterns: RosaFeedbackPattern[];
+  topPositivePatterns: RosaFeedbackPattern[];
+  categoryBreakdown: {
+    category: string;
+    positiveRate: number;
+    totalCount: number;
+  }[];
+  improvementSuggestions: {
+    priority: number;
+    suggestion: string;
+    expectedImpact: string;
+    relatedPatterns: string[];
+  }[];
+  knowledgeGaps: {
+    topic: string;
+    questionCount: number;
+    avgRating: number;
+    suggestedContent: string;
+  }[];
+}
+
 // Suggested questions based on data state
 export interface RosaSuggestedQuestion {
   question: string;
