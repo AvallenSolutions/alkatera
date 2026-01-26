@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Package, Droplets, Zap, Wind, MapPin, AlertTriangle, FileText, CheckCircle2, ArrowRight, Map, Factory, ShieldAlert, Clock, Layers } from "lucide-react";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
-import { useFacilityLocation } from "@/hooks/data/useFacilityLocation";
+import { useProductFacility } from "@/hooks/data/useProductFacility";
 import { useAllocationStatus } from "@/hooks/data/useAllocationStatus";
 import { SupplyChainMap } from "./SupplyChainMap";
 import { ProductHeroImpact, ContainerType } from "./ProductHeroImpact";
@@ -33,7 +33,8 @@ interface OverviewTabProps {
 export function OverviewTab({ product, ingredients, packaging, lcaReports, isHealthy }: OverviewTabProps) {
   const latestLCA = lcaReports[0];
   const hasLCAData = latestLCA && latestLCA.aggregated_impacts;
-  const { facility } = useFacilityLocation(product.organization_id);
+  // Use the product's assigned facility, not just any organization facility
+  const { facility } = useProductFacility(product.id, product.organization_id);
   const allocationStatus = useAllocationStatus(product.id);
   const [showSupplyChain, setShowSupplyChain] = useState(false);
   const [showDataCompleteness, setShowDataCompleteness] = useState(false);
