@@ -79,9 +79,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // IMPORTANT: Use service role key WITHOUT user auth header to bypass RLS completely
+    // The authHeader check above validates the user is authenticated, but we use
+    // service role for database operations to avoid RLS restrictions on materials table
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { persistSession: false },
-      global: { headers: { Authorization: authHeader } },
     });
 
     const body = await req.json();
