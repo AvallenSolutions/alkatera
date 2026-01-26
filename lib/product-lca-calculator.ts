@@ -186,6 +186,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           }
         } else {
           // Insert to product_carbon_footprint_production_sites table for owned facilities
+          // Safeguard against division by zero for intensity calculations
+          const safeProductionVolume = allocation.productionVolume > 0 ? allocation.productionVolume : 1;
+
           const productionSiteRecord = {
             product_carbon_footprint_id: lca.id,
             organization_id: product.organization_id,
@@ -203,9 +206,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             allocated_emissions_kg_co2e: allocatedEmissions,
             allocated_water_litres: allocatedWater,
             allocated_waste_kg: allocatedWaste,
-            emission_intensity_kg_co2e_per_unit: allocatedEmissions / allocation.productionVolume,
-            water_intensity_litres_per_unit: allocatedWater / allocation.productionVolume,
-            waste_intensity_kg_per_unit: allocatedWaste / allocation.productionVolume,
+            emission_intensity_kg_co2e_per_unit: allocatedEmissions / safeProductionVolume,
+            water_intensity_litres_per_unit: allocatedWater / safeProductionVolume,
+            waste_intensity_kg_per_unit: allocatedWaste / safeProductionVolume,
             scope1_emissions_kg_co2e: scope1Emissions,
             scope2_emissions_kg_co2e: scope2Emissions,
             status: emissionsData ? 'verified' : 'provisional',
@@ -217,12 +220,28 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             updated_at: new Date().toISOString(),
           };
 
+          console.log(`[calculateProductCarbonFootprint] Attempting to insert owned production site:`, {
+            facilityId: allocation.facilityId,
+            facilityName: allocation.facilityName,
+            operationalControl: allocation.operationalControl,
+            productionVolume: allocation.productionVolume,
+            allocatedEmissions,
+            scope1Emissions,
+            scope2Emissions,
+          });
+
           const { error: insertError } = await supabase
             .from('product_carbon_footprint_production_sites')
             .insert(productionSiteRecord);
 
           if (insertError) {
-            console.warn(`[calculateProductCarbonFootprint] ⚠️ Failed to insert production site for ${allocation.facilityName}:`, insertError);
+            console.error(`[calculateProductCarbonFootprint] ❌ Failed to insert owned production site for ${allocation.facilityName}:`, {
+              errorMessage: insertError.message,
+              errorCode: insertError.code,
+              errorDetails: insertError.details,
+              errorHint: insertError.hint,
+              record: productionSiteRecord,
+            });
           } else {
             console.log(`[calculateProductCarbonFootprint] ✅ Created owned production site for ${allocation.facilityName}: ${allocatedEmissions.toFixed(2)} kg CO2e (Scope 1/2)`);
           }
