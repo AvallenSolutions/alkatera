@@ -406,64 +406,86 @@ export function parseBOMFromPDFText(pdfText: string): BOMParseResult {
 
 /**
  * Parse PDF text that was extracted from a tabular format.
- * PDF text extraction often joins columns with spaces, so we need to
- * identify patterns like: "Name Unit Quantity WastageQty UnitCost TotalCost"
+ * This handles the specific format where numbers are concatenated and
+ * items can span multiple lines.
  */
 function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
   const items: ExtractedBOMItem[] = [];
 
-  // Split into lines and normalize whitespace
+  // Split into lines
   const lines = pdfText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-  // Skip header lines
+  // Skip patterns for headers/footers
   const skipPatterns = [
-    /component\s*product/i,
-    /^units?\s*$/i,
-    /wastage/i,
-    /unit\s*cost/i,
-    /total\s*cost/i,
+    /^total\s*cost/i,
+    /^unit\s*cost/i,
+    /^wastage/i,
+    /^quantity/i,
+    /^units?$/i,
+    /^component\s*product/i,
     /^page\s*\d/i,
     /www\./i,
     /^bom-\d+/i,
     /beyond alcohol/i,
     /acklam road/i,
-    /bill of materials/i,
-    /london/i,
+    /^bill of materials$/i,
+    /^london/i,
     /product code:/i,
     /product description:/i,
     /total value:/i,
-    /comments:/i,
+    /^comments:?$/i,
     /created date:/i,
     /created by:/i,
   ];
 
-  // This PDF format has numbers concatenated like: 0.0675.33560.00000.0008KG  -  [Code] Name
-  // Pattern: TotalCost + UnitCost + Wastage + Quantity + Unit + separator + [Code] + Name
-  // The numbers flow into each other without spaces
+  // Pattern: line starts with numbers, optionally ends with unit
+  const numbersLinePattern = /^([\d.,]+)(L|KG|G|ML|M|EA)?$/i;
 
-  for (let i = 0; i < lines.length; i++) {
+  // Pattern: numbers followed by unit and separator with code/name on same line
+  const sameLinePattern = /^([\d.,]+)(L|KG|G|ML|M|EA)\s*-\s*\[([^\]]+)\]\s*(.*)$/i;
+
+  // Pattern: numbers (no unit) followed by separator with code/name on same line
+  const sameLineNoUnitPattern = /^([\d.,]+)\s+-\s+\[([^\]]+)\]\s*(.*)$/i;
+
+  let i = 0;
+  while (i < lines.length) {
     const line = lines[i];
 
     // Skip header/footer lines
     if (skipPatterns.some(p => p.test(line))) {
+      i++;
       continue;
     }
 
-    // Pattern for concatenated numbers followed by unit, separator, and component name
-    // Example: "0.0675.33560.00000.0008KG  -  [BABS GVAL003] N04 Valerian Extract"
-    const concatenatedPattern = /^([\d.,]+)(L|KG|G|ML|M|EA)\s*-\s*\[([^\]]+)\]\s*(.+)$/i;
-    const concatMatch = line.match(concatenatedPattern);
+    // Try same-line pattern with unit: "0.0675.33560.00000.0008KG  -  [BABS GVAL003] N04 Valerian Extract"
+    const sameLineMatch = line.match(sameLinePattern);
+    if (sameLineMatch) {
+      const numbersStr = sameLineMatch[1];
+      const unit = sameLineMatch[2];
+      const code = sameLineMatch[3].trim();
+      let name = sameLineMatch[4].trim();
 
-    if (concatMatch) {
-      const numbersStr = concatMatch[1];
-      const unit = concatMatch[2];
-      const code = concatMatch[3].trim();
-      const name = concatMatch[4].trim();
+      // Check if name continues on next lines
+      let j = i + 1;
+      while (j < lines.length) {
+        const nextLine = lines[j];
+        // Stop if next line starts with numbers or is a header
+        if (numbersLinePattern.test(nextLine) ||
+            sameLinePattern.test(nextLine) ||
+            sameLineNoUnitPattern.test(nextLine) ||
+            skipPatterns.some(p => p.test(nextLine))) {
+          break;
+        }
+        // Stop if next line looks like a new item continuation pattern
+        if (/^\s*-\s*\[/.test(nextLine)) {
+          break;
+        }
+        name += ' ' + nextLine;
+        j++;
+      }
 
-      // Parse the concatenated numbers (they're in reverse order: TotalCost, UnitCost, Wastage, Quantity)
       const numbers = parseConcatenatedNumbers(numbersStr);
-
-      if (numbers && name.length > 1) {
+      if (numbers) {
         const rawName = `[${code}] ${name}`;
         const cleanName = cleanMaterialName(rawName);
 
@@ -476,35 +498,92 @@ function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
           unitCost: numbers.unitCost,
           totalCost: numbers.totalCost,
         });
-        continue;
       }
+      i = j;
+      continue;
     }
 
-    // Pattern for first item which might have numbers on previous line
-    // Check if current line is just a component name starting with [
-    if (line.startsWith('[') && i > 0) {
-      // Look at previous line for numbers
-      const prevLine = lines[i - 1];
-      const numbersPattern = /^([\d.,]+)(L|KG|G|ML|M|EA)?\s*$/i;
-      const numbersMatch = prevLine.match(numbersPattern);
+    // Try same-line pattern without unit: "0.08333.29750.00000.0003  -  [Hop Extract] Name"
+    const sameLineNoUnitMatch = line.match(sameLineNoUnitPattern);
+    if (sameLineNoUnitMatch) {
+      const numbersStr = sameLineNoUnitMatch[1];
+      const code = sameLineNoUnitMatch[2].trim();
+      let name = sameLineNoUnitMatch[3].trim();
 
-      if (numbersMatch) {
-        const numbersStr = numbersMatch[1];
-        const unit = numbersMatch[2] || null;
+      // Check if name continues on next lines
+      let j = i + 1;
+      while (j < lines.length) {
+        const nextLine = lines[j];
+        if (numbersLinePattern.test(nextLine) ||
+            sameLinePattern.test(nextLine) ||
+            sameLineNoUnitPattern.test(nextLine) ||
+            skipPatterns.some(p => p.test(nextLine))) {
+          break;
+        }
+        if (/^\s*-\s*\[/.test(nextLine)) {
+          break;
+        }
+        name += ' ' + nextLine;
+        j++;
+      }
 
-        // Parse the component name from current line (might span multiple lines)
-        let fullName = line;
-        // Check if next line continues the name (doesn't start with numbers)
-        if (i + 1 < lines.length && !lines[i + 1].match(/^[\d.,]/)) {
-          fullName += ' ' + lines[i + 1];
+      const numbers = parseConcatenatedNumbers(numbersStr);
+      if (numbers) {
+        const rawName = `[${code}] ${name}`;
+        const cleanName = cleanMaterialName(rawName);
+
+        items.push({
+          rawName,
+          cleanName,
+          quantity: numbers.quantity,
+          unit: 'kg', // Default unit
+          itemType: detectItemType(cleanName),
+          unitCost: numbers.unitCost,
+          totalCost: numbers.totalCost,
+        });
+      }
+      i = j;
+      continue;
+    }
+
+    // Try numbers-only line pattern (numbers on this line, name on next lines)
+    const numbersOnlyMatch = line.match(numbersLinePattern);
+    if (numbersOnlyMatch) {
+      const numbersStr = numbersOnlyMatch[1];
+      const unit = numbersOnlyMatch[2] || null;
+
+      // Look at next line(s) for the item name
+      let j = i + 1;
+      let nameLines: string[] = [];
+
+      while (j < lines.length) {
+        const nextLine = lines[j];
+
+        // Stop if we hit another numbers line or header
+        if (numbersLinePattern.test(nextLine) ||
+            sameLinePattern.test(nextLine) ||
+            sameLineNoUnitPattern.test(nextLine) ||
+            skipPatterns.some(p => p.test(nextLine))) {
+          break;
         }
 
-        const codeMatch = fullName.match(/^\[([^\]]+)\]\s*(.+)/);
-        if (codeMatch) {
-          const code = codeMatch[1].trim();
-          const name = codeMatch[2].trim();
-          const numbers = parseConcatenatedNumbers(numbersStr);
+        nameLines.push(nextLine);
+        j++;
+      }
 
+      if (nameLines.length > 0) {
+        // Join all name lines
+        const fullNameText = nameLines.join(' ').trim();
+
+        // Try to extract code and name from the joined text
+        // Pattern: "  -  [code] name" or "[code] name"
+        const codeNameMatch = fullNameText.match(/^\s*-?\s*\[([^\]]+)\]\s*(.*)$/);
+
+        if (codeNameMatch) {
+          const code = codeNameMatch[1].trim();
+          const name = codeNameMatch[2].trim();
+
+          const numbers = parseConcatenatedNumbers(numbersStr);
           if (numbers) {
             const rawName = `[${code}] ${name}`;
             const cleanName = cleanMaterialName(rawName);
@@ -521,68 +600,12 @@ function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
           }
         }
       }
+      i = j;
+      continue;
     }
 
-    // Original patterns as fallback
-    // Pattern 1: [Code] Name followed by Unit and numbers
-    const pattern1 = /^(.+?)\s+(L|KG|G|ML|M|EA|unit|units|pc|pcs|each)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s*$/i;
-    const match1 = line.match(pattern1);
-
-    if (match1) {
-      const rawName = match1[1].trim();
-      const cleanName = cleanMaterialName(rawName);
-      const unit = match1[2];
-      const quantity = parseQuantity(match1[3]);
-      const unitCost = parseQuantity(match1[5]);
-      const totalCost = parseQuantity(match1[6]);
-
-      if (cleanName.length > 2) {
-        items.push({
-          rawName,
-          cleanName,
-          quantity,
-          unit: normalizeUnit(unit),
-          itemType: detectItemType(cleanName),
-          unitCost,
-          totalCost,
-        });
-        continue;
-      }
-    }
-
-    // Pattern 2: Name followed by numbers only
-    const pattern2 = /^(.+?)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s*$/;
-    const match2 = line.match(pattern2);
-
-    if (match2) {
-      const rawName = match2[1].trim();
-      const unitSuffixMatch = rawName.match(/\s+(L|KG|G|ML|M|EA|unit|units|pc|pcs|each)$/i);
-      let cleanRawName = rawName;
-      let detectedUnit: string | null = null;
-
-      if (unitSuffixMatch) {
-        cleanRawName = rawName.slice(0, -unitSuffixMatch[0].length).trim();
-        detectedUnit = unitSuffixMatch[1];
-      }
-
-      const cleanName = cleanMaterialName(cleanRawName);
-      const quantity = parseQuantity(match2[2]);
-      const unitCost = parseQuantity(match2[4]);
-      const totalCost = parseQuantity(match2[5]);
-
-      if (cleanName.length > 2 && !/^[\d.,\s]+$/.test(cleanName)) {
-        items.push({
-          rawName: cleanRawName,
-          cleanName,
-          quantity,
-          unit: detectedUnit ? normalizeUnit(detectedUnit) : 'kg',
-          itemType: detectItemType(cleanName),
-          unitCost,
-          totalCost,
-        });
-        continue;
-      }
-    }
+    // Move to next line if no pattern matched
+    i++;
   }
 
   return deduplicateItems(items);
