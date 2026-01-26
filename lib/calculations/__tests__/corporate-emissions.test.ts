@@ -266,7 +266,7 @@ describe('calculateScope3', () => {
         data: [{ product_id: 'prod-1', units_produced: 100 }],
         error: null,
       },
-      product_lcas: {
+      product_carbon_footprints: {
         data: {
           aggregated_impacts: {
             total_ghg_emissions: 10, // 10 kgCO2e total (includes S1+S2)
@@ -434,7 +434,7 @@ describe('calculateCorporateEmissions', () => {
           limit: vi.fn().mockImplementation(() => builder),
           not: vi.fn().mockImplementation(() => builder),
           maybeSingle: vi.fn().mockImplementation(async () => {
-            if (tableName === 'product_lcas') {
+            if (tableName === 'product_carbon_footprints') {
               return {
                 data: {
                   aggregated_impacts: {
@@ -600,7 +600,7 @@ describe('Edge Cases', () => {
           data: [{ product_id: 'prod-no-lca', units_produced: 100 }],
           error: null,
         },
-        product_lcas: { data: null, error: null }, // No LCA found
+        product_carbon_footprints: { data: null, error: null }, // No LCA found
         corporate_reports: { data: null, error: null },
         fleet_activities: { data: [], error: null },
       });
@@ -623,7 +623,7 @@ describe('Edge Cases', () => {
           data: [{ product_id: 'prod-1', units_produced: 100 }],
           error: null,
         },
-        product_lcas: {
+        product_carbon_footprints: {
           data: {
             aggregated_impacts: {
               total_ghg_emissions: 10,
@@ -726,7 +726,7 @@ describe('Double Counting Prevention', () => {
         data: [{ product_id: 'prod-1', units_produced: 1 }],
         error: null,
       },
-      product_lcas: {
+      product_carbon_footprints: {
         data: {
           aggregated_impacts: {
             total_ghg_emissions: 15,

@@ -41,7 +41,7 @@ const createRealisticMock = () => {
       limit: vi.fn().mockImplementation(() => builder),
       maybeSingle: vi.fn().mockImplementation(async () => {
         // Product LCA lookup
-        if (tableName === 'product_lcas') {
+        if (tableName === 'product_carbon_footprints') {
           if (filters.product_id === 'calvados-001') {
             return {
               data: {
