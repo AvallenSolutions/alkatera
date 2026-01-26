@@ -93,6 +93,7 @@ interface PackagingFormCardProps {
   organizationLng?: number | null;
   onUpdate: (tempId: string, updates: Partial<PackagingFormData>) => void;
   onRemove: (tempId: string) => void;
+  onAddNewWithType?: (category: PackagingCategory) => void;
   canRemove: boolean;
 }
 
@@ -327,6 +328,7 @@ export function PackagingFormCard({
   organizationLng,
   onUpdate,
   onRemove,
+  onAddNewWithType,
   canRemove,
 }: PackagingFormCardProps) {
   const calculateAndSetDistance = (originLat: number, originLng: number) => {
@@ -508,34 +510,44 @@ export function PackagingFormCard({
                         <button
                           type="button"
                           onClick={() => {
-                            // Only reset material data if the category actually changes
+                            // Only do something if the category actually changes
                             if (packaging.packaging_category !== type.value) {
-                              onUpdate(packaging.tempId, {
-                                packaging_category: type.value as PackagingCategory,
-                                // Reset material-specific fields when packaging type changes
-                                name: '',
-                                data_source: null,
-                                data_source_id: undefined,
-                                supplier_product_id: undefined,
-                                supplier_name: undefined,
-                                carbon_intensity: undefined,
-                                location: undefined,
-                                // Reset EPR components
-                                components: [],
-                                has_component_breakdown: false,
-                                // Reset auto-loaded recycled content
-                                recycled_content_percentage: '',
-                                // Reset weight fields
-                                net_weight_g: '',
-                                amount: '',
-                                // Reset origin & logistics fields
-                                origin_address: '',
-                                origin_lat: undefined,
-                                origin_lng: undefined,
-                                origin_country: '',
-                                origin_country_code: '',
-                                distance_km: '',
-                              });
+                              // Check if this is a saved item (has database ID, not temp- prefix)
+                              const isSavedItem = !packaging.tempId.startsWith('temp-');
+
+                              if (isSavedItem && onAddNewWithType) {
+                                // For saved items, ADD a new packaging item with the selected type
+                                // This preserves the existing item instead of overwriting it
+                                onAddNewWithType(type.value as PackagingCategory);
+                              } else {
+                                // For new/unsaved items, just update the type and reset fields
+                                onUpdate(packaging.tempId, {
+                                  packaging_category: type.value as PackagingCategory,
+                                  // Reset material-specific fields when packaging type changes
+                                  name: '',
+                                  data_source: null,
+                                  data_source_id: undefined,
+                                  supplier_product_id: undefined,
+                                  supplier_name: undefined,
+                                  carbon_intensity: undefined,
+                                  location: undefined,
+                                  // Reset EPR components
+                                  components: [],
+                                  has_component_breakdown: false,
+                                  // Reset auto-loaded recycled content
+                                  recycled_content_percentage: '',
+                                  // Reset weight fields
+                                  net_weight_g: '',
+                                  amount: '',
+                                  // Reset origin & logistics fields
+                                  origin_address: '',
+                                  origin_lat: undefined,
+                                  origin_lng: undefined,
+                                  origin_country: '',
+                                  origin_country_code: '',
+                                  distance_km: '',
+                                });
+                              }
                             }
                           }}
                           className={`
