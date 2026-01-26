@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers, FileUp, PenLine } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
@@ -28,6 +28,9 @@ import { LimitReachedBanner, UpgradePromptModal } from "@/components/subscriptio
 import { MultipackProductSelector, SelectedComponent } from "@/components/products/MultipackProductSelector";
 import { MultipackSecondaryPackagingForm, SecondaryPackagingItem } from "@/components/products/MultipackSecondaryPackagingForm";
 import { createCompleteMultipack } from "@/lib/multipacks";
+import { BOMImportFlow } from "@/components/products/BOMImportFlow";
+import type { IngredientFormData } from "@/components/products/IngredientFormCard";
+import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 
 interface ProductFormData {
   name: string;
@@ -77,6 +80,12 @@ export default function NewProductLCAPage() {
   const [selectedComponents, setSelectedComponents] = useState<SelectedComponent[]>([]);
   const [secondaryPackaging, setSecondaryPackaging] = useState<SecondaryPackagingItem[]>([]);
 
+  // Creation method state (null = show selector, 'manual' = show form, 'import' = BOM flow)
+  const [creationMethod, setCreationMethod] = useState<"manual" | "import" | null>(null);
+  const [showBOMImport, setShowBOMImport] = useState(false);
+  const [importedIngredients, setImportedIngredients] = useState<IngredientFormData[]>([]);
+  const [importedPackaging, setImportedPackaging] = useState<PackagingFormData[]>([]);
+
   const {
     currentCount,
     maxCount,
@@ -103,6 +112,27 @@ export default function NewProductLCAPage() {
 
   const handleInputChange = (field: keyof ProductFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleBOMImportComplete = (
+    ingredients: IngredientFormData[],
+    packaging: PackagingFormData[]
+  ) => {
+    setImportedIngredients(ingredients);
+    setImportedPackaging(packaging);
+    setShowBOMImport(false);
+    setCreationMethod("manual"); // Show form after import
+    toast.success(
+      `Imported ${ingredients.length} ingredient${ingredients.length !== 1 ? "s" : ""} and ${packaging.length} packaging item${packaging.length !== 1 ? "s" : ""}`
+    );
+  };
+
+  const handleCreationMethodSelect = (method: "manual" | "import") => {
+    if (method === "import") {
+      setShowBOMImport(true);
+    } else {
+      setCreationMethod("manual");
+    }
   };
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -338,11 +368,56 @@ export default function NewProductLCAPage() {
         p_organization_id: currentOrganization.id,
       });
 
+      // Save imported ingredients and packaging if any
+      const hasImportedMaterials = importedIngredients.length > 0 || importedPackaging.length > 0;
+
+      if (hasImportedMaterials) {
+        const materialsToInsert = [
+          ...importedIngredients.map((ing) => ({
+            product_id: data.id,
+            material_name: ing.name,
+            quantity: ing.amount || null,
+            unit: ing.unit || null,
+            material_type: "ingredient" as const,
+            origin_country: ing.origin_country || null,
+            is_organic_certified: ing.is_organic_certified || false,
+            transport_mode: ing.transport_mode || null,
+            distance_km: ing.distance_km || null,
+          })),
+          ...importedPackaging.map((pkg) => ({
+            product_id: data.id,
+            material_name: pkg.name,
+            quantity: pkg.amount || null,
+            unit: pkg.unit || null,
+            material_type: "packaging" as const,
+            origin_country: pkg.origin_country || null,
+            transport_mode: pkg.transport_mode || null,
+            distance_km: pkg.distance_km || null,
+            packaging_category: pkg.packaging_category || null,
+            recycled_content_percentage: pkg.recycled_content_percentage || null,
+            printing_process: pkg.printing_process || null,
+            net_weight_g: pkg.net_weight_g || null,
+          })),
+        ];
+
+        const { error: materialsError } = await supabase
+          .from("product_materials")
+          .insert(materialsToInsert);
+
+        if (materialsError) {
+          console.error("Error saving imported materials:", materialsError);
+          toast.warning("Product created but some materials failed to import");
+        }
+      }
+
       if (isDraft) {
         toast.success("Product draft saved successfully");
         router.push(`/products/${data.id}`);
       } else {
-        toast.success("Product created successfully");
+        const successMessage = hasImportedMaterials
+          ? `Product created with ${importedIngredients.length + importedPackaging.length} imported materials`
+          : "Product created successfully";
+        toast.success(successMessage);
         router.push(`/products/${data.id}/recipe`);
       }
     } catch (error: any) {
@@ -382,6 +457,108 @@ export default function NewProductLCAPage() {
     );
   }
 
+  // Show creation method selector if not yet chosen
+  if (creationMethod === null) {
+    return (
+      <div className="container mx-auto p-6 max-w-4xl space-y-6">
+        <UpgradePromptModal
+          open={showUpgradeModal}
+          onOpenChange={setShowUpgradeModal}
+          limitType="products"
+        />
+
+        {currentOrganization && (
+          <BOMImportFlow
+            open={showBOMImport}
+            onOpenChange={(open) => {
+              setShowBOMImport(open);
+              if (!open && importedIngredients.length === 0 && importedPackaging.length === 0) {
+                // User closed without importing
+              }
+            }}
+            onImportComplete={handleBOMImportComplete}
+            organizationId={currentOrganization.id}
+          />
+        )}
+
+        <div className="flex items-center gap-4">
+          <Link href="/products">
+            <Button variant="outline" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div>
+            <h1 className="text-3xl font-bold">Create New Product</h1>
+            <p className="text-muted-foreground mt-1">
+              Choose how you want to create your product
+            </p>
+          </div>
+        </div>
+
+        {!limitLoading && !isUnlimited && maxCount !== null && maxCount !== undefined && (
+          <LimitReachedBanner
+            type="products"
+            current={currentCount}
+            max={maxCount}
+            onUpgrade={() => setShowUpgradeModal(true)}
+          />
+        )}
+
+        <div className="grid md:grid-cols-2 gap-6 pt-4">
+          <Card
+            className="cursor-pointer hover:border-primary hover:shadow-md transition-all"
+            onClick={() => handleCreationMethodSelect("manual")}
+          >
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <PenLine className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle>Create from Scratch</CardTitle>
+              <CardDescription>
+                Manually enter product details, ingredients, and packaging
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>Enter product information step by step</li>
+                <li>Add ingredients and packaging manually</li>
+                <li>Full control over all details</li>
+              </ul>
+              <Button className="mt-4 w-full" variant="outline">
+                Start from Scratch
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:border-primary hover:shadow-md transition-all"
+            onClick={() => handleCreationMethodSelect("import")}
+          >
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <FileUp className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle>Import from Bill of Materials</CardTitle>
+              <CardDescription>
+                Upload a PDF or CSV to automatically extract ingredients and packaging
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>Upload PDF or CSV bill of materials</li>
+                <li>Automatically extract ingredients</li>
+                <li>Review and edit before saving</li>
+              </ul>
+              <Button className="mt-4 w-full" variant="outline">
+                Import BOM
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-4xl space-y-6">
       <UpgradePromptModal
@@ -391,11 +568,9 @@ export default function NewProductLCAPage() {
       />
 
       <div className="flex items-center gap-4">
-        <Link href="/products">
-          <Button variant="outline" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
+        <Button variant="outline" size="icon" onClick={() => setCreationMethod(null)}>
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div>
           <h1 className="text-3xl font-bold">Create New Product</h1>
           <p className="text-muted-foreground mt-1">
@@ -411,6 +586,16 @@ export default function NewProductLCAPage() {
           max={maxCount}
           onUpgrade={() => setShowUpgradeModal(true)}
         />
+      )}
+
+      {/* Show imported materials summary */}
+      {(importedIngredients.length > 0 || importedPackaging.length > 0) && (
+        <Alert className="border-green-200 bg-green-50">
+          <FileUp className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            <strong>BOM Import Ready:</strong> {importedIngredients.length} ingredient{importedIngredients.length !== 1 ? "s" : ""} and {importedPackaging.length} packaging item{importedPackaging.length !== 1 ? "s" : ""} will be added when you create this product.
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Product Type Toggle */}
