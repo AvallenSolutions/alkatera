@@ -689,21 +689,42 @@ export default function ProductRecipePage() {
 
     setSaving(true);
     try {
-      // Delete existing packaging
-      const { error: deleteError } = await supabase
+      // Separate existing items (have DB IDs) from new items (have temp- prefix)
+      const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
+      const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
+
+      // Get IDs of items that should be kept
+      const idsToKeep = existingItems.map(f => f.tempId);
+
+      // Delete only items that are no longer in the form (not in idsToKeep)
+      // First, get all current packaging IDs for this product
+      const { data: currentPackaging } = await supabase
         .from("product_materials")
-        .delete()
+        .select("id")
         .eq("product_id", productId)
         .eq("material_type", "packaging");
 
-      if (deleteError) {
-        console.error("Delete error:", deleteError);
-        throw new Error(`Failed to clear existing packaging: ${deleteError.message}`);
+      if (currentPackaging && currentPackaging.length > 0) {
+        const idsToDelete = currentPackaging
+          .map(p => p.id)
+          .filter(id => !idsToKeep.includes(id.toString()));
+
+        if (idsToDelete.length > 0) {
+          const { error: deleteError } = await supabase
+            .from("product_materials")
+            .delete()
+            .in("id", idsToDelete);
+
+          if (deleteError) {
+            console.error("Delete error:", deleteError);
+            throw new Error(`Failed to remove old packaging: ${deleteError.message}`);
+          }
+          console.log(`[Packaging Save] Deleted ${idsToDelete.length} removed items`);
+        }
       }
 
-      // Prepare materials to insert
-      const materialsToInsert = validForms.map(form => {
-        // Handle data source fields according to constraint requirements
+      // Helper function to build material data object
+      const buildMaterialData = (form: PackagingFormData) => {
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
@@ -725,7 +746,6 @@ export default function ProductRecipePage() {
           materialData.data_source = 'supplier';
           materialData.supplier_product_id = form.supplier_product_id;
         }
-        // Otherwise, leave data_source as null (don't include it)
 
         // Include transport data if available
         if (form.transport_mode && form.distance_km) {
@@ -759,34 +779,78 @@ export default function ProductRecipePage() {
         materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
 
         return materialData;
-      });
+      };
 
-      console.log('Inserting materials:', materialsToInsert);
+      // Update existing items
+      let allSavedIds: string[] = [];
+      for (const form of existingItems) {
+        const materialData = buildMaterialData(form);
+        const { error: updateError } = await supabase
+          .from("product_materials")
+          .update(materialData)
+          .eq("id", form.tempId);
 
-      // Insert new packaging
-      const { data: insertedData, error: insertError } = await supabase
-        .from("product_materials")
-        .insert(materialsToInsert)
-        .select();
-
-      if (insertError) {
-        console.error("Insert error:", insertError);
-        throw new Error(`Failed to save packaging: ${insertError.message}`);
+        if (updateError) {
+          console.error("Update error for item", form.tempId, updateError);
+          throw new Error(`Failed to update packaging: ${updateError.message}`);
+        }
+        allSavedIds.push(form.tempId);
+        console.log(`[Packaging Save] Updated existing item ${form.tempId}: ${form.name}`);
       }
 
-      console.log('=== INSERT SUCCESSFUL ===');
-      console.log('Inserted data:', insertedData);
+      // Insert new items
+      let insertedData: any[] = [];
+      if (newItems.length > 0) {
+        const materialsToInsert = newItems.map(buildMaterialData);
+        console.log('Inserting new materials:', materialsToInsert);
+
+        const { data, error: insertError } = await supabase
+          .from("product_materials")
+          .insert(materialsToInsert)
+          .select();
+
+        if (insertError) {
+          console.error("Insert error:", insertError);
+          throw new Error(`Failed to save packaging: ${insertError.message}`);
+        }
+        insertedData = data || [];
+        allSavedIds.push(...insertedData.map((d: any) => d.id.toString()));
+        console.log(`[Packaging Save] Inserted ${insertedData.length} new items`);
+      }
+
+      console.log('=== SAVE SUCCESSFUL ===');
+      console.log(`Updated: ${existingItems.length}, Inserted: ${newItems.length}`);
 
       // Save packaging material components if any forms have component breakdowns
-      if (insertedData) {
-        for (let i = 0; i < validForms.length; i++) {
-          const form = validForms[i];
-          const insertedItem = insertedData[i];
+      // Handle both existing items (updated) and new items (inserted)
+      for (const form of validForms) {
+        if (form.has_component_breakdown && form.components && form.components.length > 0) {
+          // Determine the material ID - either from existing item or from inserted data
+          let materialId: number | null = null;
 
-          if (form.has_component_breakdown && form.components && form.components.length > 0 && insertedItem?.id) {
-            // Insert components for this packaging item
+          if (!form.tempId.startsWith('temp-')) {
+            // Existing item - use its ID
+            materialId = parseInt(form.tempId);
+          } else {
+            // New item - find it in insertedData by matching the name and category
+            const insertedItem = insertedData.find((d: any) =>
+              d.material_name === form.name && d.packaging_category === form.packaging_category
+            );
+            if (insertedItem) {
+              materialId = insertedItem.id;
+            }
+          }
+
+          if (materialId) {
+            // Delete existing components first (for updates)
+            await supabase
+              .from('packaging_material_components')
+              .delete()
+              .eq('product_material_id', materialId);
+
+            // Insert new components
             const componentsToInsert = form.components.map(comp => ({
-              product_material_id: insertedItem.id,
+              product_material_id: materialId,
               epr_material_type: comp.epr_material_type,
               component_name: comp.component_name,
               weight_grams: comp.weight_grams,
@@ -799,7 +863,7 @@ export default function ProductRecipePage() {
               .insert(componentsToInsert);
 
             if (componentError) {
-              console.error('Error saving components for item', insertedItem.id, componentError);
+              console.error('Error saving components for item', materialId, componentError);
               // Don't throw - just log the error, main packaging was saved
             }
           }
