@@ -282,7 +282,7 @@ export default function ProductLcaReportPage() {
     }
   };
 
-  const displayTitle = lcaData ? '2025 Product Impact Assessment' : MOCK_LCA_REPORT.title;
+  const displayTitle = lcaData ? `${lcaData.reference_year || new Date().getFullYear()} Product Impact Assessment` : MOCK_LCA_REPORT.title;
   const displayProductName = productData?.name || lcaData?.product_name || MOCK_LCA_REPORT.product_name;
   const displayStatus = lcaData?.status || MOCK_LCA_REPORT.status;
   const displayVersion = lcaData?.lca_version || MOCK_LCA_REPORT.version;
