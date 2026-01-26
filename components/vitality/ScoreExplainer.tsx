@@ -15,7 +15,7 @@ type ScoreType = 'overall' | 'climate' | 'water' | 'circularity' | 'nature';
 
 interface ScoreExplainerProps {
   scoreType: ScoreType;
-  currentScore: number;
+  currentScore: number | null;
   benchmark?: {
     platform_average?: number;
     category_average?: number;
@@ -103,7 +103,10 @@ export function ScoreExplainer({
   className,
 }: ScoreExplainerProps) {
   const config = scoreTypeConfig[scoreType];
-  const currentBand = config.bands.find(band => currentScore >= band.min) || config.bands[config.bands.length - 1];
+  const hasData = currentScore !== null;
+  const currentBand = hasData
+    ? config.bands.find(band => currentScore >= band.min) || config.bands[config.bands.length - 1]
+    : null;
 
   return (
     <Popover>
@@ -138,22 +141,33 @@ export function ScoreExplainer({
               <Target className="h-4 w-4 mt-0.5 text-muted-foreground" />
               <div>
                 <p className="text-sm font-medium">Your Score</p>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-2xl font-bold">{currentScore}</span>
-                  <Badge variant="outline" className={cn(
-                    'text-xs',
-                    currentBand.color === 'green' && 'border-green-500 text-green-700 dark:text-green-400',
-                    currentBand.color === 'emerald' && 'border-emerald-500 text-emerald-700 dark:text-emerald-400',
-                    currentBand.color === 'amber' && 'border-amber-500 text-amber-700 dark:text-amber-400',
-                    currentBand.color === 'orange' && 'border-orange-500 text-orange-700 dark:text-orange-400',
-                    currentBand.color === 'red' && 'border-red-500 text-red-700 dark:text-red-400',
-                  )}>
-                    {currentBand.label}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {currentBand.description}
-                </p>
+                {hasData && currentBand ? (
+                  <>
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <span className="text-2xl font-bold">{currentScore}</span>
+                      <Badge variant="outline" className={cn(
+                        'text-xs',
+                        currentBand.color === 'green' && 'border-green-500 text-green-700 dark:text-green-400',
+                        currentBand.color === 'emerald' && 'border-emerald-500 text-emerald-700 dark:text-emerald-400',
+                        currentBand.color === 'amber' && 'border-amber-500 text-amber-700 dark:text-amber-400',
+                        currentBand.color === 'orange' && 'border-orange-500 text-orange-700 dark:text-orange-400',
+                        currentBand.color === 'red' && 'border-red-500 text-red-700 dark:text-red-400',
+                      )}>
+                        {currentBand.label}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {currentBand.description}
+                    </p>
+                  </>
+                ) : (
+                  <div className="mt-1">
+                    <span className="text-lg font-medium text-muted-foreground">Awaiting Data</span>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Add relevant data to calculate this score
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -203,7 +217,7 @@ export function ScoreExplainer({
                   key={band.label}
                   className={cn(
                     'flex items-center gap-2 p-2 rounded-md text-xs transition-colors',
-                    currentScore >= band.min && currentScore < (config.bands.find(b => b.min > band.min)?.min || 101)
+                    hasData && currentScore !== null && currentScore >= band.min && currentScore < (config.bands.find(b => b.min > band.min)?.min || 101)
                       ? 'bg-primary/10 border border-primary/20'
                       : 'bg-muted/30'
                   )}
