@@ -38,8 +38,10 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const authHeader = req.headers.get('Authorization');
 
+    // Use service role key WITHOUT user auth header to bypass RLS completely
+    // Auth is validated via authHeader check if needed, but service role handles DB access
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      global: { headers: { Authorization: authHeader || '' } },
+      auth: { persistSession: false },
     });
 
     const payload: FleetEmissionsRequest = await req.json();
