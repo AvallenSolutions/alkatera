@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCSV, parseBOMFromPDFText } from '@/lib/bom/parser';
 import type { BOMParseResult } from '@/lib/bom/types';
+
+// Polyfill for Promise.withResolvers (ES2024 feature required by pdfjs-dist v4.x)
+if (typeof Promise.withResolvers === 'undefined') {
+  (Promise as any).withResolvers = function <T>() {
+    let resolve: (value: T | PromiseLike<T>) => void;
+    let reject: (reason?: any) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve: resolve!, reject: reject! };
+  };
+}
+
 import * as pdfjsLib from 'pdfjs-dist';
 
 export async function POST(request: NextRequest) {
