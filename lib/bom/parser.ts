@@ -323,12 +323,15 @@ function detectColumnMapping(headers: string[]): ColumnMapping {
 }
 
 export function parseBOMFromPDFText(pdfText: string): BOMParseResult {
-  const result: BOMParseResult = {
+  const result: BOMParseResult & { _rawTextSample?: string } = {
     success: false,
     items: [],
     errors: [],
     metadata: {},
   };
+
+  // Store sample of raw text for debugging
+  result._rawTextSample = pdfText.substring(0, 1500);
 
   const lines = pdfText.split('\n').map(l => l.trim());
 
