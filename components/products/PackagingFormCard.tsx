@@ -525,6 +525,16 @@ export function PackagingFormCard({
                                 has_component_breakdown: false,
                                 // Reset auto-loaded recycled content
                                 recycled_content_percentage: '',
+                                // Reset weight fields
+                                net_weight_g: '',
+                                amount: '',
+                                // Reset origin & logistics fields
+                                origin_address: '',
+                                origin_lat: undefined,
+                                origin_lng: undefined,
+                                origin_country: '',
+                                origin_country_code: '',
+                                distance_km: '',
                               });
                             }
                           }}
