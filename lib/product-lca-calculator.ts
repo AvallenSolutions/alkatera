@@ -142,44 +142,90 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         const allocatedWater = totalWater * attributionRatio;
         const allocatedWaste = totalWaste * attributionRatio;
 
-        const productionSiteRecord = {
-          product_carbon_footprint_id: lca.id,
-          organization_id: product.organization_id,  // Required for RLS policy
-          facility_id: allocation.facilityId,
-          production_volume: allocation.productionVolume,
-          share_of_production: attributionRatio * 100,
-          facility_intensity: facilityTotalEmissions > 0 && allocation.facilityTotalProduction > 0
-            ? facilityTotalEmissions / allocation.facilityTotalProduction
-            : 0,
-          data_source: emissionsData ? 'Facility Data' : 'User Input',
-          reporting_period_start: allocation.reportingPeriodStart,
-          reporting_period_end: allocation.reportingPeriodEnd,
-          attribution_ratio: attributionRatio * 100,
-          allocated_emissions_kg_co2e: allocatedEmissions,
-          allocated_water_litres: allocatedWater,
-          allocated_waste_kg: allocatedWaste,
-          emission_intensity_kg_co2e_per_unit: allocatedEmissions / allocation.productionVolume,
-          water_intensity_litres_per_unit: allocatedWater / allocation.productionVolume,
-          waste_intensity_kg_per_unit: allocatedWaste / allocation.productionVolume,
-          scope1_emissions_kg_co2e: scope1Emissions,
-          scope2_emissions_kg_co2e: scope2Emissions,
-          status: emissionsData ? 'verified' : 'provisional',
-          is_energy_intensive_process: false,
-          uses_proxy_data: !emissionsData,
-          data_source_tag: emissionsData ? 'Facility_Verified' : 'User_Input',
-          co2e_entry_method: 'Production Volume Allocation',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+        // Route to correct table based on facility ownership
+        // - Owned facilities → product_carbon_footprint_production_sites (Scope 1 & 2)
+        // - Third party (contract manufacturers) → contract_manufacturer_allocations (Scope 3)
+        const isContractManufacturer = allocation.operationalControl === 'third_party';
 
-        const { error: insertError } = await supabase
-          .from('product_carbon_footprint_production_sites')
-          .insert(productionSiteRecord);
+        if (isContractManufacturer) {
+          // Insert to contract_manufacturer_allocations table
+          const cmAllocationRecord = {
+            organization_id: product.organization_id,
+            product_id: parseInt(productId),
+            facility_id: allocation.facilityId,
+            reporting_period_start: allocation.reportingPeriodStart,
+            reporting_period_end: allocation.reportingPeriodEnd,
+            total_facility_production_volume: allocation.facilityTotalProduction,
+            production_volume_unit: allocation.productionVolumeUnit || 'units',
+            total_facility_co2e_kg: facilityTotalEmissions,
+            co2e_entry_method: emissionsData ? 'direct' : 'direct',
+            client_production_volume: allocation.productionVolume,
+            // These are auto-calculated by trigger but we can provide them:
+            // attribution_ratio, allocated_emissions_kg_co2e, emission_intensity_kg_co2e_per_unit
+            scope1_emissions_kg_co2e: scope1Emissions,
+            scope2_emissions_kg_co2e: scope2Emissions,
+            scope3_emissions_kg_co2e: 0,
+            allocated_water_litres: allocatedWater,
+            allocated_waste_kg: allocatedWaste,
+            status: emissionsData ? 'verified' : 'provisional',
+            is_energy_intensive_process: false,
+            data_source_tag: emissionsData ? 'Facility_Verified' : 'User_Input',
+          };
 
-        if (insertError) {
-          console.warn(`[calculateProductCarbonFootprint] ⚠️ Failed to insert production site for ${allocation.facilityName}:`, insertError);
+          // Use upsert to handle existing allocations for same period
+          const { error: insertError } = await supabase
+            .from('contract_manufacturer_allocations')
+            .upsert(cmAllocationRecord, {
+              onConflict: 'product_id,facility_id,reporting_period_start,reporting_period_end'
+            });
+
+          if (insertError) {
+            console.warn(`[calculateProductCarbonFootprint] ⚠️ Failed to insert CM allocation for ${allocation.facilityName}:`, insertError);
+          } else {
+            console.log(`[calculateProductCarbonFootprint] ✅ Created contract manufacturer allocation for ${allocation.facilityName}: ${allocatedEmissions.toFixed(2)} kg CO2e (Scope 3)`);
+          }
         } else {
-          console.log(`[calculateProductCarbonFootprint] ✅ Created production site record for ${allocation.facilityName}: ${allocatedEmissions.toFixed(2)} kg CO2e`);
+          // Insert to product_carbon_footprint_production_sites table for owned facilities
+          const productionSiteRecord = {
+            product_carbon_footprint_id: lca.id,
+            organization_id: product.organization_id,
+            facility_id: allocation.facilityId,
+            production_volume: allocation.productionVolume,
+            share_of_production: attributionRatio * 100,
+            facility_intensity: facilityTotalEmissions > 0 && allocation.facilityTotalProduction > 0
+              ? facilityTotalEmissions / allocation.facilityTotalProduction
+              : 0,
+            // IMPORTANT: data_source has CHECK constraint: only 'Verified' or 'Industry_Average' allowed
+            data_source: emissionsData ? 'Verified' : 'Industry_Average',
+            reporting_period_start: allocation.reportingPeriodStart,
+            reporting_period_end: allocation.reportingPeriodEnd,
+            attribution_ratio: attributionRatio * 100,
+            allocated_emissions_kg_co2e: allocatedEmissions,
+            allocated_water_litres: allocatedWater,
+            allocated_waste_kg: allocatedWaste,
+            emission_intensity_kg_co2e_per_unit: allocatedEmissions / allocation.productionVolume,
+            water_intensity_litres_per_unit: allocatedWater / allocation.productionVolume,
+            waste_intensity_kg_per_unit: allocatedWaste / allocation.productionVolume,
+            scope1_emissions_kg_co2e: scope1Emissions,
+            scope2_emissions_kg_co2e: scope2Emissions,
+            status: emissionsData ? 'verified' : 'provisional',
+            is_energy_intensive_process: false,
+            uses_proxy_data: !emissionsData,
+            data_source_tag: emissionsData ? 'Facility_Verified' : 'User_Input',
+            co2e_entry_method: 'Production Volume Allocation',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          const { error: insertError } = await supabase
+            .from('product_carbon_footprint_production_sites')
+            .insert(productionSiteRecord);
+
+          if (insertError) {
+            console.warn(`[calculateProductCarbonFootprint] ⚠️ Failed to insert production site for ${allocation.facilityName}:`, insertError);
+          } else {
+            console.log(`[calculateProductCarbonFootprint] ✅ Created owned production site for ${allocation.facilityName}: ${allocatedEmissions.toFixed(2)} kg CO2e (Scope 1/2)`);
+          }
         }
       }
     } else {
