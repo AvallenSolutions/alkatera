@@ -424,16 +424,107 @@ function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
     /total\s*cost/i,
     /^page\s*\d/i,
     /www\./i,
+    /^bom-\d+/i,
+    /beyond alcohol/i,
+    /acklam road/i,
+    /bill of materials/i,
+    /london/i,
+    /product code:/i,
+    /product description:/i,
+    /total value:/i,
+    /comments:/i,
+    /created date:/i,
+    /created by:/i,
   ];
 
-  for (const line of lines) {
+  // This PDF format has numbers concatenated like: 0.0675.33560.00000.0008KG  -  [Code] Name
+  // Pattern: TotalCost + UnitCost + Wastage + Quantity + Unit + separator + [Code] + Name
+  // The numbers flow into each other without spaces
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
     // Skip header/footer lines
     if (skipPatterns.some(p => p.test(line))) {
       continue;
     }
 
+    // Pattern for concatenated numbers followed by unit, separator, and component name
+    // Example: "0.0675.33560.00000.0008KG  -  [BABS GVAL003] N04 Valerian Extract"
+    const concatenatedPattern = /^([\d.,]+)(L|KG|G|ML|M|EA)\s*-\s*\[([^\]]+)\]\s*(.+)$/i;
+    const concatMatch = line.match(concatenatedPattern);
+
+    if (concatMatch) {
+      const numbersStr = concatMatch[1];
+      const unit = concatMatch[2];
+      const code = concatMatch[3].trim();
+      const name = concatMatch[4].trim();
+
+      // Parse the concatenated numbers (they're in reverse order: TotalCost, UnitCost, Wastage, Quantity)
+      const numbers = parseConcatenatedNumbers(numbersStr);
+
+      if (numbers && name.length > 1) {
+        const rawName = `[${code}] ${name}`;
+        const cleanName = cleanMaterialName(rawName);
+
+        items.push({
+          rawName,
+          cleanName,
+          quantity: numbers.quantity,
+          unit: normalizeUnit(unit),
+          itemType: detectItemType(cleanName),
+          unitCost: numbers.unitCost,
+          totalCost: numbers.totalCost,
+        });
+        continue;
+      }
+    }
+
+    // Pattern for first item which might have numbers on previous line
+    // Check if current line is just a component name starting with [
+    if (line.startsWith('[') && i > 0) {
+      // Look at previous line for numbers
+      const prevLine = lines[i - 1];
+      const numbersPattern = /^([\d.,]+)(L|KG|G|ML|M|EA)?\s*$/i;
+      const numbersMatch = prevLine.match(numbersPattern);
+
+      if (numbersMatch) {
+        const numbersStr = numbersMatch[1];
+        const unit = numbersMatch[2] || null;
+
+        // Parse the component name from current line (might span multiple lines)
+        let fullName = line;
+        // Check if next line continues the name (doesn't start with numbers)
+        if (i + 1 < lines.length && !lines[i + 1].match(/^[\d.,]/)) {
+          fullName += ' ' + lines[i + 1];
+        }
+
+        const codeMatch = fullName.match(/^\[([^\]]+)\]\s*(.+)/);
+        if (codeMatch) {
+          const code = codeMatch[1].trim();
+          const name = codeMatch[2].trim();
+          const numbers = parseConcatenatedNumbers(numbersStr);
+
+          if (numbers) {
+            const rawName = `[${code}] ${name}`;
+            const cleanName = cleanMaterialName(rawName);
+
+            items.push({
+              rawName,
+              cleanName,
+              quantity: numbers.quantity,
+              unit: unit ? normalizeUnit(unit) : 'kg',
+              itemType: detectItemType(cleanName),
+              unitCost: numbers.unitCost,
+              totalCost: numbers.totalCost,
+            });
+          }
+        }
+      }
+    }
+
+    // Original patterns as fallback
     // Pattern 1: [Code] Name followed by Unit and numbers
-    // Example: "[500L Three Spirit - Nightcap] 500L Three Spirit - Nightcap L 0.0010 0.0000 1,257.9282 1.26"
     const pattern1 = /^(.+?)\s+(L|KG|G|ML|M|EA|unit|units|pc|pcs|each)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s*$/i;
     const match1 = line.match(pattern1);
 
@@ -442,7 +533,6 @@ function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
       const cleanName = cleanMaterialName(rawName);
       const unit = match1[2];
       const quantity = parseQuantity(match1[3]);
-      const wastage = parseQuantity(match1[4]);
       const unitCost = parseQuantity(match1[5]);
       const totalCost = parseQuantity(match1[6]);
 
@@ -460,14 +550,12 @@ function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
       }
     }
 
-    // Pattern 2: Name followed by numbers only (unit might be on separate line or missing)
-    // Example: "Hop Extract Mosaic P21 0.0003 0.0000 333.2975 0.08"
+    // Pattern 2: Name followed by numbers only
     const pattern2 = /^(.+?)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s*$/;
     const match2 = line.match(pattern2);
 
     if (match2) {
       const rawName = match2[1].trim();
-      // Make sure rawName doesn't end with a unit that got captured
       const unitSuffixMatch = rawName.match(/\s+(L|KG|G|ML|M|EA|unit|units|pc|pcs|each)$/i);
       let cleanRawName = rawName;
       let detectedUnit: string | null = null;
@@ -479,17 +567,15 @@ function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
 
       const cleanName = cleanMaterialName(cleanRawName);
       const quantity = parseQuantity(match2[2]);
-      const wastage = parseQuantity(match2[3]);
       const unitCost = parseQuantity(match2[4]);
       const totalCost = parseQuantity(match2[5]);
 
-      // Filter out things that look like numbers or are too short
       if (cleanName.length > 2 && !/^[\d.,\s]+$/.test(cleanName)) {
         items.push({
           rawName: cleanRawName,
           cleanName,
           quantity,
-          unit: detectedUnit ? normalizeUnit(detectedUnit) : 'kg', // Default to kg
+          unit: detectedUnit ? normalizeUnit(detectedUnit) : 'kg',
           itemType: detectItemType(cleanName),
           unitCost,
           totalCost,
@@ -497,45 +583,117 @@ function parseTabularPDFText(pdfText: string): ExtractedBOMItem[] {
         continue;
       }
     }
-
-    // Pattern 3: Line with bracketed code at start
-    // Example: "[BABS GVAL003] N04 Valerian Extract 0.0008 0.0000 75.3356 0.06"
-    const pattern3 = /^\[([^\]]+)\]\s*(.+?)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)\s*$/;
-    const match3 = line.match(pattern3);
-
-    if (match3) {
-      const code = match3[1].trim();
-      let namePart = match3[2].trim();
-
-      // Check if unit is at the end of namePart
-      const unitMatch = namePart.match(/\s+(L|KG|G|ML|M|EA|unit|units|pc|pcs|each)$/i);
-      let unit: string | null = null;
-      if (unitMatch) {
-        unit = unitMatch[1];
-        namePart = namePart.slice(0, -unitMatch[0].length).trim();
-      }
-
-      const rawName = `[${code}] ${namePart}`;
-      const cleanName = cleanMaterialName(rawName);
-      const quantity = parseQuantity(match3[3]);
-      const unitCost = parseQuantity(match3[5]);
-      const totalCost = parseQuantity(match3[6]);
-
-      if (cleanName.length > 2) {
-        items.push({
-          rawName,
-          cleanName,
-          quantity,
-          unit: unit ? normalizeUnit(unit) : 'kg',
-          itemType: detectItemType(cleanName),
-          unitCost,
-          totalCost,
-        });
-      }
-    }
   }
 
   return deduplicateItems(items);
+}
+
+/**
+ * Parse concatenated numbers from PDF extraction.
+ * Numbers are in format: TotalCost + UnitCost + Wastage + Quantity
+ * Example: "0.0675.33560.00000.0008" -> { totalCost: 0.06, unitCost: 75.3356, wastage: 0.0000, quantity: 0.0008 }
+ */
+function parseConcatenatedNumbers(str: string): { totalCost: number; unitCost: number; wastage: number; quantity: number } | null {
+  // Remove any commas
+  const cleaned = str.replace(/,/g, '');
+
+  // Strategy: Find all decimal points and try to split intelligently
+  // The numbers are concatenated, so we need to find boundaries
+  // Pattern: each number typically has format X.XXXX or XX.XXXX etc.
+
+  // Find all positions of decimal points
+  const decimalPositions: number[] = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '.') {
+      decimalPositions.push(i);
+    }
+  }
+
+  // We expect 4 numbers, so we need 4 decimal points
+  if (decimalPositions.length < 4) {
+    return null;
+  }
+
+  // Try to extract 4 numbers by splitting at decimal boundaries
+  // Each number ends where the next number's integer part begins
+  // We'll work backwards since quantity is last and most important
+
+  const numbers: number[] = [];
+
+  // Split the string into potential numbers
+  // Look for patterns like: digits + decimal + digits
+  const numberPattern = /(\d+\.\d+)/g;
+  const matches = cleaned.match(numberPattern);
+
+  if (matches && matches.length >= 4) {
+    // Take the last 4 numbers (totalCost, unitCost, wastage, quantity - but they're concatenated)
+    // Actually the order in the PDF is: TotalCost, UnitCost, Wastage, Quantity (left to right visually)
+    // But when extracted, they appear in that same order
+
+    // We need exactly 4 numbers
+    const relevantMatches = matches.slice(-4);
+    if (relevantMatches.length === 4) {
+      return {
+        totalCost: parseFloat(relevantMatches[0]),
+        unitCost: parseFloat(relevantMatches[1]),
+        wastage: parseFloat(relevantMatches[2]),
+        quantity: parseFloat(relevantMatches[3]),
+      };
+    }
+  }
+
+  // Fallback: try manual parsing
+  // Pattern observed: numbers are touching, like "0.0675.33560.00000.0008"
+  // This means: 0.06, 75.3356, 0.0000, 0.0008
+  // The tricky part is 0.06 followed by 75.3356 looks like 0.0675.3356
+
+  // Try splitting by looking for digit sequences after decimal
+  // A new number starts when we see a pattern that would be invalid for a single number
+  // i.e., a second decimal point
+
+  try {
+    let remaining = cleaned;
+    const extractedNumbers: number[] = [];
+
+    while (remaining.length > 0 && extractedNumbers.length < 4) {
+      // Find the first decimal point
+      const firstDot = remaining.indexOf('.');
+      if (firstDot === -1) break;
+
+      // Find the next decimal point after this one
+      const secondDot = remaining.indexOf('.', firstDot + 1);
+
+      if (secondDot === -1) {
+        // No more decimals, take the rest as the last number
+        extractedNumbers.push(parseFloat(remaining));
+        break;
+      }
+
+      // The first number ends just before where the second number's integer part begins
+      // Work backwards from secondDot to find where the integer part of the second number starts
+      let splitPoint = secondDot;
+      while (splitPoint > firstDot + 1 && remaining[splitPoint - 1] >= '0' && remaining[splitPoint - 1] <= '9') {
+        splitPoint--;
+      }
+
+      const firstNum = remaining.substring(0, splitPoint);
+      extractedNumbers.push(parseFloat(firstNum));
+      remaining = remaining.substring(splitPoint);
+    }
+
+    if (extractedNumbers.length === 4) {
+      return {
+        totalCost: extractedNumbers[0],
+        unitCost: extractedNumbers[1],
+        wastage: extractedNumbers[2],
+        quantity: extractedNumbers[3],
+      };
+    }
+  } catch (e) {
+    // Parsing failed
+  }
+
+  return null;
 }
 
 function extractItemsLineByLine(lines: string[]): ExtractedBOMItem[] {
