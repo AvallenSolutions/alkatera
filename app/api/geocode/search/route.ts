@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Rate limiting - track requests per IP
 const rateLimitMap = new Map<string, number>();
-const RATE_LIMIT_WINDOW = 1000; // 1 second
+const RATE_LIMIT_WINDOW = 500; // 500ms between requests (was 1000ms)
 const MAX_REQUESTS_PER_WINDOW = 1;
 
 function isRateLimited(ip: string): boolean {
@@ -79,6 +79,9 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+
+    // Log for debugging
+    console.log(`[Geocode] Search for "${query}" returned ${data.length} results`);
 
     // Filter and transform results
     const results = data.map((result: any) => ({
