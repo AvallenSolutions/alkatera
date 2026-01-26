@@ -1,24 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseCSV, parseBOMFromPDFText } from '@/lib/bom/parser';
 import type { BOMParseResult } from '@/lib/bom/types';
-
-// Polyfill for Promise.withResolvers (ES2024 feature required by pdfjs-dist v4.x)
-if (typeof Promise.withResolvers === 'undefined') {
-  (Promise as any).withResolvers = function <T>() {
-    let resolve: (value: T | PromiseLike<T>) => void;
-    let reject: (reason?: any) => void;
-    const promise = new Promise<T>((res, rej) => {
-      resolve = res;
-      reject = rej;
-    });
-    return { promise, resolve: resolve!, reject: reject! };
-  };
-}
-
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
-
-// Disable worker for serverless environments
-GlobalWorkerOptions.workerSrc = 'data:text/javascript,';
+import pdfParse from 'pdf-parse';
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,11 +25,13 @@ export async function POST(request: NextRequest) {
       result = parseCSV(text, delimiter);
     } else if (fileType === 'pdf') {
       const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
 
       try {
-        const pdfText = await extractTextFromPDF(arrayBuffer);
-        result = parseBOMFromPDFText(pdfText);
+        const pdfData = await pdfParse(buffer);
+        result = parseBOMFromPDFText(pdfData.text);
       } catch (pdfError: any) {
+        console.error('PDF parsing error:', pdfError);
         return NextResponse.json(
           { error: `Failed to parse PDF: ${pdfError.message}` },
           { status: 400 }
@@ -74,35 +59,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
-  const uint8Array = new Uint8Array(arrayBuffer);
-  const loadingTask = getDocument({
-    data: uint8Array,
-    useWorkerFetch: false,
-    isEvalSupported: false,
-    useSystemFonts: true,
-  });
-  const pdf = await loadingTask.promise;
-
-  let fullText = '';
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-
-    const pageText = textContent.items
-      .map((item: any) => {
-        if ('str' in item) {
-          return item.str;
-        }
-        return '';
-      })
-      .join(' ');
-
-    fullText += pageText + '\n';
-  }
-
-  return fullText;
 }
