@@ -15,7 +15,10 @@ if (typeof Promise.withResolvers === 'undefined') {
   };
 }
 
-import * as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+// Disable worker for server-side use (serverless environments don't support workers)
+pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
 export async function POST(request: NextRequest) {
   try {
