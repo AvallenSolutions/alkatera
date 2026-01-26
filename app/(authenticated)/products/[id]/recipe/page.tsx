@@ -24,6 +24,7 @@ import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
 import { IngredientFormCard, IngredientFormData } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard, PackagingFormData } from "@/components/products/PackagingFormCard";
+import type { PackagingCategory } from "@/lib/types/lca";
 import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 
@@ -378,6 +379,39 @@ export default function ProductRecipePage() {
         epr_is_drinks_container: false,
       }
     ]);
+  };
+
+  // Add a new packaging item with a specific type pre-selected
+  // Used when user clicks a different type on an already-saved item
+  const addPackagingWithType = (category: PackagingCategory) => {
+    setPackagingForms(prev => [
+      ...prev,
+      {
+        tempId: `temp-pkg-${Date.now()}`,
+        name: '',
+        data_source: null,
+        amount: '',
+        unit: 'g',
+        packaging_category: category,
+        recycled_content_percentage: '',
+        printing_process: 'standard_ink',
+        net_weight_g: '',
+        origin_country: '',
+        transport_mode: 'truck',
+        distance_km: '',
+        // EPR Compliance fields
+        has_component_breakdown: false,
+        components: [],
+        epr_packaging_level: undefined,
+        epr_packaging_activity: undefined,
+        epr_is_household: true,
+        epr_ram_rating: undefined,
+        epr_uk_nation: undefined,
+        epr_is_drinks_container: false,
+      }
+    ]);
+    // Show a helpful toast
+    toast.info(`Adding new ${category} packaging. Your existing items are preserved.`);
   };
 
   const handleBOMImportComplete = async (
@@ -1218,6 +1252,7 @@ export default function ProductRecipePage() {
                     organizationLng={currentOrganization?.address_lng}
                     onUpdate={updatePackaging}
                     onRemove={removePackaging}
+                    onAddNewWithType={addPackagingWithType}
                     canRemove={packagingForms.length > 1}
                   />
                 ))}
