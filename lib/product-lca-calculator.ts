@@ -144,6 +144,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         const productionSiteRecord = {
           product_carbon_footprint_id: lca.id,
+          organization_id: product.organization_id,  // Required for RLS policy
           facility_id: allocation.facilityId,
           production_volume: allocation.productionVolume,
           share_of_production: attributionRatio * 100,
