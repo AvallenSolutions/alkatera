@@ -15,11 +15,12 @@ import {
 import { ScoreExplainer } from './ScoreExplainer';
 
 interface VitalityScoreHeroProps {
-  overallScore: number;
-  climateScore: number;
-  waterScore: number;
-  circularityScore: number;
-  natureScore: number;
+  overallScore: number | null;
+  climateScore: number | null;
+  waterScore: number | null;
+  circularityScore: number | null;
+  natureScore: number | null;
+  hasData?: boolean;
   trend?: number;
   trendDirection?: 'up' | 'down' | 'stable';
   trendData?: number[];
@@ -36,7 +37,11 @@ interface VitalityScoreHeroProps {
   className?: string;
 }
 
-function getOverallLabel(score: number): { label: string; description: string } {
+function getOverallLabel(score: number | null): { label: string; description: string } {
+  if (score === null) return {
+    label: 'AWAITING DATA',
+    description: 'Add products or facilities to calculate your sustainability score'
+  };
   if (score >= 85) return {
     label: 'EXCELLENT',
     description: 'Your organisation is a sustainability leader'
@@ -65,6 +70,7 @@ export function VitalityScoreHero({
   waterScore,
   circularityScore,
   natureScore,
+  hasData = true,
   trend,
   trendDirection,
   trendData,
@@ -135,9 +141,9 @@ export function VitalityScoreHero({
               score={overallScore}
               size="xl"
               label={label}
-              trend={trend}
-              trendDirection={trendDirection}
-              benchmark={benchmark}
+              trend={overallScore !== null ? trend : undefined}
+              trendDirection={overallScore !== null ? trendDirection : undefined}
+              benchmark={overallScore !== null ? benchmark : undefined}
               className="text-white"
             />
 
@@ -207,7 +213,7 @@ export function VitalityScoreHero({
 
 interface PillarScoreCardProps {
   pillar: string;
-  score: number;
+  score: number | null;
   icon: string;
   color: 'emerald' | 'blue' | 'amber' | 'green';
   weight: number;
@@ -221,7 +227,10 @@ function PillarScoreCard({ pillar, score, icon, color, weight }: PillarScoreCard
     green: 'from-green-500/20 to-green-600/10 border-green-500/30',
   };
 
-  const scoreColor = score >= 70 ? 'text-green-400' :
+  const noDataClasses = 'from-slate-500/10 to-slate-600/5 border-slate-500/20';
+
+  const scoreColor = score === null ? 'text-white/40' :
+                     score >= 70 ? 'text-green-400' :
                      score >= 50 ? 'text-amber-400' : 'text-red-400';
 
   return (
@@ -231,21 +240,31 @@ function PillarScoreCard({ pillar, score, icon, color, weight }: PillarScoreCard
           <div className={cn(
             'p-4 rounded-xl bg-gradient-to-br border cursor-help',
             'transition-all duration-200 hover:scale-[1.02]',
-            colorClasses[color]
+            score === null ? noDataClasses : colorClasses[color]
           )}>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">{icon}</span>
+              <span className={cn('text-xl', score === null && 'opacity-50')}>{icon}</span>
               <span className="text-xs text-white/40">{weight}%</span>
             </div>
             <div className="text-white/80 text-sm font-medium">{pillar}</div>
-            <div className={cn('text-2xl font-bold tabular-nums', scoreColor)}>
-              {score}
-              <span className="text-sm text-white/40">/100</span>
-            </div>
+            {score === null ? (
+              <div className="text-white/40 text-sm font-medium mt-1">
+                No data
+              </div>
+            ) : (
+              <div className={cn('text-2xl font-bold tabular-nums', scoreColor)}>
+                {score}
+                <span className="text-sm text-white/40">/100</span>
+              </div>
+            )}
           </div>
         </TooltipTrigger>
         <TooltipContent>
-          <p>{pillar} contributes {weight}% to overall score</p>
+          {score === null ? (
+            <p>Add data to calculate {pillar.toLowerCase()} score</p>
+          ) : (
+            <p>{pillar} contributes {weight}% to overall score</p>
+          )}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -263,16 +282,26 @@ export function calculateVitalityScores(data: {
   circularityRate?: number;
   landUseIntensity?: number;
   biodiversityRisk?: 'high' | 'medium' | 'low';
+  // Flag to indicate if we have actual product/facility data
+  hasProductData?: boolean;
+  hasWasteData?: boolean;
 }): {
-  overall: number;
-  climate: number;
-  water: number;
-  circularity: number;
-  nature: number;
+  overall: number | null;
+  climate: number | null;
+  water: number | null;
+  circularity: number | null;
+  nature: number | null;
+  hasData: boolean;
 } {
-  let climateScore = 50;
-  if (data.emissionsIntensity !== undefined && data.industryBenchmark !== undefined) {
-    const ratio = data.emissionsIntensity / data.industryBenchmark;
+  // Climate score - requires actual emissions data (not just zero)
+  let climateScore: number | null = null;
+  const hasClimateData = data.totalEmissions !== undefined &&
+                          data.totalEmissions > 0 &&
+                          data.emissionsIntensity !== undefined &&
+                          data.industryBenchmark !== undefined;
+
+  if (hasClimateData) {
+    const ratio = data.emissionsIntensity! / data.industryBenchmark!;
     if (ratio <= 0.7) climateScore = 90;
     else if (ratio <= 0.85) climateScore = 80;
     else if (ratio <= 1.0) climateScore = 70;
@@ -281,37 +310,64 @@ export function calculateVitalityScores(data: {
     else climateScore = 25;
   }
 
-  let waterScore = 50;
-  if (data.waterRiskLevel === 'low') waterScore = 85;
-  else if (data.waterRiskLevel === 'medium') waterScore = 60;
-  else if (data.waterRiskLevel === 'high') waterScore = 35;
+  // Water score - requires water risk level data
+  let waterScore: number | null = null;
+  if (data.waterRiskLevel !== undefined) {
+    if (data.waterRiskLevel === 'low') waterScore = 85;
+    else if (data.waterRiskLevel === 'medium') waterScore = 60;
+    else if (data.waterRiskLevel === 'high') waterScore = 35;
+  }
 
-  let circularityScore = 50;
-  if (data.circularityRate !== undefined) {
-    if (data.circularityRate >= 80) circularityScore = 95;
-    else if (data.circularityRate >= 60) circularityScore = 80;
-    else if (data.circularityRate >= 40) circularityScore = 60;
-    else if (data.circularityRate >= 20) circularityScore = 40;
+  // Circularity score - requires actual waste/circularity data (not just default zero)
+  let circularityScore: number | null = null;
+  const hasCircularityData = data.circularityRate !== undefined &&
+                              data.circularityRate > 0 &&
+                              data.hasWasteData !== false;
+
+  if (hasCircularityData) {
+    if (data.circularityRate! >= 80) circularityScore = 95;
+    else if (data.circularityRate! >= 60) circularityScore = 80;
+    else if (data.circularityRate! >= 40) circularityScore = 60;
+    else if (data.circularityRate! >= 20) circularityScore = 40;
     else circularityScore = 20;
   }
 
-  let natureScore = 50;
-  if (data.biodiversityRisk === 'low') natureScore = 80;
-  else if (data.biodiversityRisk === 'medium') natureScore = 55;
-  else if (data.biodiversityRisk === 'high') natureScore = 30;
+  // Nature score - requires biodiversity risk assessment
+  let natureScore: number | null = null;
+  if (data.biodiversityRisk !== undefined) {
+    if (data.biodiversityRisk === 'low') natureScore = 80;
+    else if (data.biodiversityRisk === 'medium') natureScore = 55;
+    else if (data.biodiversityRisk === 'high') natureScore = 30;
+  }
 
-  const overall = Math.round(
-    climateScore * 0.30 +
-    waterScore * 0.25 +
-    circularityScore * 0.25 +
-    natureScore * 0.20
-  );
+  // Calculate overall score only if we have at least one pillar with data
+  const validScores = [
+    { score: climateScore, weight: 0.30 },
+    { score: waterScore, weight: 0.25 },
+    { score: circularityScore, weight: 0.25 },
+    { score: natureScore, weight: 0.20 },
+  ].filter(s => s.score !== null);
+
+  let overall: number | null = null;
+  const hasData = validScores.length > 0;
+
+  if (hasData) {
+    // Calculate weighted average using only available scores
+    // Redistribute weights proportionally among available pillars
+    const totalWeight = validScores.reduce((sum, s) => sum + s.weight, 0);
+    const weightedSum = validScores.reduce(
+      (sum, s) => sum + (s.score! * (s.weight / totalWeight)),
+      0
+    );
+    overall = Math.round(weightedSum);
+  }
 
   return {
     overall,
-    climate: Math.round(climateScore),
-    water: Math.round(waterScore),
-    circularity: Math.round(circularityScore),
-    nature: Math.round(natureScore),
+    climate: climateScore !== null ? Math.round(climateScore) : null,
+    water: waterScore !== null ? Math.round(waterScore) : null,
+    circularity: circularityScore !== null ? Math.round(circularityScore) : null,
+    nature: natureScore !== null ? Math.round(natureScore) : null,
+    hasData,
   };
 }

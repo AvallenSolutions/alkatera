@@ -282,6 +282,12 @@ export default function PerformancePage() {
 
   const vitalityScores = useMemo(() => {
     const industryBenchmark = 50000;
+    // Check if we have actual product data (not just zeros)
+    const hasProductData = metrics?.total_products_assessed !== undefined &&
+                           metrics.total_products_assessed > 0;
+    // Check if we have actual waste data
+    const hasWasteData = wasteMetrics !== null && wasteMetrics !== undefined;
+
     return calculateVitalityScores({
       totalEmissions: totalCO2,
       emissionsIntensity: totalCO2 / (metrics?.total_products_assessed || 1),
@@ -292,6 +298,8 @@ export default function PerformancePage() {
       circularityRate: circularityRate,
       landUseIntensity: landUse,
       biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
+      hasProductData,
+      hasWasteData,
     });
   }, [totalCO2, waterConsumption, metrics, wasteMetrics, circularityRate, landUse, natureMetrics]);
 
@@ -387,6 +395,7 @@ export default function PerformancePage() {
         waterScore={vitalityScores.water}
         circularityScore={vitalityScores.circularity}
         natureScore={vitalityScores.nature}
+        hasData={vitalityScores.hasData}
         benchmarkData={getBenchmarkForPillar('overall')}
         lastUpdated={metrics?.last_updated
           ? new Date(metrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })

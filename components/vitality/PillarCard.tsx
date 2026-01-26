@@ -21,7 +21,7 @@ export type PillarType = 'climate' | 'water' | 'circularity' | 'nature';
 
 interface PillarCardProps {
   pillar: PillarType;
-  score: number;
+  score: number | null;
   value?: string;
   unit?: string;
   trend?: number;
@@ -107,8 +107,10 @@ export function PillarCard({
 }: PillarCardProps) {
   const config = pillarConfig[pillar];
   const Icon = config.icon;
+  const hasData = score !== null;
 
-  const statusLabel = score >= 70 ? 'On Track' :
+  const statusLabel = !hasData ? 'Awaiting Data' :
+                      score >= 70 ? 'On Track' :
                       score >= 50 ? 'Monitor' : 'Action Needed';
 
   return (
@@ -151,7 +153,16 @@ export function PillarCard({
           </div>
 
           <div className="flex items-center gap-3">
-            <MiniVitalityRing score={score} size={48} strokeWidth={4} />
+            {hasData ? (
+              <MiniVitalityRing score={score} size={48} strokeWidth={4} />
+            ) : (
+              <div
+                className="flex items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-medium"
+                style={{ width: 48, height: 48 }}
+              >
+                --
+              </div>
+            )}
             {onToggle && (
               <div className="text-muted-foreground">
                 {expanded ? (
@@ -188,9 +199,10 @@ export function PillarCard({
 
           <span className={cn(
             'text-xs font-medium px-2 py-1 rounded-full',
-            score >= 70 && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-            score >= 50 && score < 70 && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-            score < 50 && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+            !hasData && 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400',
+            hasData && score >= 70 && 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+            hasData && score >= 50 && score < 70 && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+            hasData && score < 50 && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
           )}>
             {statusLabel}
           </span>
