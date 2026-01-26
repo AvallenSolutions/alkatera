@@ -117,13 +117,48 @@ export default function ProductRecipePage() {
       if (productError) throw productError;
       setProduct(productData);
 
-      // Fetch production sites from BOTH:
-      // 1. Owned facilities (product_lca_production_sites)
-      // 2. Contract manufacturers (contract_manufacturer_allocation_summary)
+      // Fetch production sites from multiple sources:
+      // 1. facility_product_assignments (NEW - primary source from Facilities tab)
+      // 2. product_carbon_footprint_production_sites (legacy - from LCA)
+      // 3. Contract manufacturers (contract_manufacturer_allocation_summary)
       let facilitiesToUse: ProductionFacility[] = [];
 
-      // Fetch owned facilities
-      if (productData.latest_lca_id) {
+      // Fetch from facility_product_assignments (primary source - this is where Facilities tab stores links)
+      const { data: assignmentsData } = await supabase
+        .from("facility_product_assignments")
+        .select(`
+          id,
+          facility_id,
+          is_primary_facility,
+          facilities (
+            id,
+            name,
+            address_lat,
+            address_lng
+          )
+        `)
+        .eq("product_id", productId)
+        .eq("assignment_status", "active");
+
+      if (assignmentsData && assignmentsData.length > 0) {
+        const assignedFacilities = assignmentsData
+          .filter((a: any) => a.facilities && a.facilities.address_lat && a.facilities.address_lng)
+          .map((a: any) => {
+            const facility = a.facilities;
+            return {
+              id: facility.id,
+              name: facility.name,
+              address_lat: typeof facility.address_lat === 'string' ? parseFloat(facility.address_lat) : facility.address_lat,
+              address_lng: typeof facility.address_lng === 'string' ? parseFloat(facility.address_lng) : facility.address_lng,
+              production_share: a.is_primary_facility ? 100 : 0,
+            };
+          });
+        facilitiesToUse.push(...assignedFacilities);
+        console.log(`[Production Sites] Loaded ${assignedFacilities.length} facilities from facility_product_assignments for product ${productId}:`, assignedFacilities);
+      }
+
+      // Fetch from legacy product_carbon_footprint_production_sites (fallback for older data)
+      if (productData.latest_lca_id && facilitiesToUse.length === 0) {
         const result = await supabase
           .from("product_carbon_footprint_production_sites")
           .select(`
@@ -152,7 +187,7 @@ export default function ProductRecipePage() {
               };
             });
           facilitiesToUse.push(...ownedFacilities);
-          console.log(`[Production Sites] Loaded ${ownedFacilities.length} owned facilities for product ${productId}:`, ownedFacilities);
+          console.log(`[Production Sites] Loaded ${ownedFacilities.length} owned facilities from legacy LCA data for product ${productId}:`, ownedFacilities);
         }
       }
 
