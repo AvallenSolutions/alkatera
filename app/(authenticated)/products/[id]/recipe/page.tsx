@@ -620,16 +620,37 @@ export default function ProductRecipePage() {
     console.log('=== SAVE PACKAGING DEBUG ===');
     console.log('All packaging forms:', packagingForms);
 
+    // Check each form and collect validation errors
+    const validationErrors: string[] = [];
     packagingForms.forEach((form, idx) => {
+      const formErrors: string[] = [];
+      if (!form.packaging_category) {
+        formErrors.push('packaging type');
+      }
+      if (!form.name) {
+        formErrors.push('material name');
+      }
+      if (!form.amount && !form.net_weight_g) {
+        formErrors.push('net weight');
+      } else if (Number(form.amount) <= 0 && Number(form.net_weight_g) <= 0) {
+        formErrors.push('net weight (must be greater than 0)');
+      }
+
+      if (formErrors.length > 0) {
+        validationErrors.push(`Packaging ${idx + 1}: missing ${formErrors.join(', ')}`);
+      }
+
       console.log(`Form ${idx}:`, {
         name: form.name,
         hasName: !!form.name,
         amount: form.amount,
         hasAmount: !!form.amount,
+        net_weight_g: form.net_weight_g,
         amountNumber: Number(form.amount),
         amountValid: Number(form.amount) > 0,
         packaging_category: form.packaging_category,
         hasCategory: !!form.packaging_category,
+        errors: formErrors,
       });
     });
 
@@ -638,12 +659,27 @@ export default function ProductRecipePage() {
     );
 
     console.log('Valid forms:', validForms);
+    console.log('Validation errors:', validationErrors);
     console.log('Product ID:', productId);
     console.log('Current Organization:', currentOrganization);
 
     if (validForms.length === 0) {
-      toast.error("Please add at least one valid packaging item with category selected");
+      // Show specific validation errors
+      if (validationErrors.length > 0) {
+        toast.error(validationErrors[0]); // Show first error
+        if (validationErrors.length > 1) {
+          console.warn('Additional validation errors:', validationErrors.slice(1));
+        }
+      } else {
+        toast.error("Please add at least one valid packaging item with type, material name, and net weight");
+      }
       return;
+    }
+
+    // Warn if some forms are invalid
+    if (validForms.length < packagingForms.length) {
+      const skippedCount = packagingForms.length - validForms.length;
+      toast.warning(`${skippedCount} incomplete packaging item${skippedCount > 1 ? 's' : ''} will be skipped`);
     }
 
     if (!currentOrganization?.id) {
