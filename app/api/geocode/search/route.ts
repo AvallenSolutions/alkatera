@@ -58,11 +58,15 @@ export async function GET(request: NextRequest) {
     url.searchParams.set('format', 'json');
     url.searchParams.set('limit', '15');
     url.searchParams.set('addressdetails', '1');
+    // Request results in English to ensure consistent display for all users
+    url.searchParams.set('accept-language', 'en');
 
     const response = await fetch(url.toString(), {
       headers: {
         'User-Agent': 'AlkaTera-Sustainability-Platform/1.0 (https://alkatera.com)',
         'Accept': 'application/json',
+        // Also set Accept-Language header as fallback
+        'Accept-Language': 'en',
       },
     });
 
