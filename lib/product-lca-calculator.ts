@@ -127,14 +127,81 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           .limit(1)
           .maybeSingle();
 
-        const facilityTotalEmissions = emissionsData?.total_co2e || 0;
-        const attributionRatio = allocation.productionVolume / allocation.facilityTotalProduction;
-        const allocatedEmissions = facilityTotalEmissions * attributionRatio;
+        let facilityTotalEmissions = emissionsData?.total_co2e || 0;
+        let scope1Raw = 0;
+        let scope2Raw = 0;
 
         // Extract scope breakdown from results_payload
+        // invoke-scope1-2-calculations stores in scope_breakdown.scope1/scope2
+        // invoke-corporate-calculations may store in scope1_total/scope2_total
         const payload = emissionsData?.results_payload || {};
-        const scope1Emissions = (payload.scope1_total || 0) * attributionRatio;
-        const scope2Emissions = (payload.scope2_total || 0) * attributionRatio;
+        const scopeBreakdown = payload.scope_breakdown || {};
+        scope1Raw = scopeBreakdown.scope1 || payload.scope1_total || 0;
+        scope2Raw = scopeBreakdown.scope2 || payload.scope2_total || 0;
+
+        // FALLBACK: If facility_emissions_aggregated has no data or zero emissions,
+        // query calculated_emissions directly to sum up facility emissions
+        if (facilityTotalEmissions === 0) {
+          console.log(`[calculateProductCarbonFootprint] No aggregated data for ${allocation.facilityName}, querying calculated_emissions directly...`);
+
+          // Query activity_data joined with calculated_emissions to get facility emissions
+          const { data: activityEmissions, error: activityError } = await supabase
+            .from('activity_data')
+            .select(`
+              id,
+              category,
+              calculated_emissions!inner(calculated_value_co2e)
+            `)
+            .eq('facility_id', allocation.facilityId)
+            .gte('activity_date', allocation.reportingPeriodStart)
+            .lte('activity_date', allocation.reportingPeriodEnd);
+
+          if (!activityError && activityEmissions && activityEmissions.length > 0) {
+            console.log(`[calculateProductCarbonFootprint] Found ${activityEmissions.length} activity records with emissions for ${allocation.facilityName}`);
+
+            // Sum up emissions by scope
+            for (const activity of activityEmissions) {
+              const emissions = Array.isArray(activity.calculated_emissions)
+                ? activity.calculated_emissions.reduce((sum: number, e: any) => sum + (e.calculated_value_co2e || 0), 0)
+                : (activity.calculated_emissions as any)?.calculated_value_co2e || 0;
+
+              if (activity.category === 'Scope 1') {
+                scope1Raw += emissions;
+              } else if (activity.category === 'Scope 2') {
+                scope2Raw += emissions;
+              }
+              facilityTotalEmissions += emissions;
+            }
+
+            console.log(`[calculateProductCarbonFootprint] Fallback emissions for ${allocation.facilityName}:`, {
+              totalEmissions: facilityTotalEmissions,
+              scope1: scope1Raw,
+              scope2: scope2Raw,
+              activityCount: activityEmissions.length,
+            });
+          } else {
+            console.log(`[calculateProductCarbonFootprint] No calculated emissions found for ${allocation.facilityName}`);
+          }
+        }
+
+        const attributionRatio = allocation.productionVolume / allocation.facilityTotalProduction;
+        const allocatedEmissions = facilityTotalEmissions * attributionRatio;
+        const scope1Emissions = scope1Raw * attributionRatio;
+        const scope2Emissions = scope2Raw * attributionRatio;
+
+        // Track if we found verified facility data (from either source)
+        const hasVerifiedFacilityData = facilityTotalEmissions > 0;
+
+        console.log(`[calculateProductCarbonFootprint] Facility ${allocation.facilityName} emissions data:`, {
+          hasAggregatedData: !!emissionsData && (emissionsData.total_co2e || 0) > 0,
+          hasVerifiedFacilityData,
+          facilityTotalEmissions,
+          scope1BeforeAllocation: scope1Raw,
+          scope2BeforeAllocation: scope2Raw,
+          attributionRatio,
+          allocatedScope1: scope1Emissions,
+          allocatedScope2: scope2Emissions,
+        });
 
         // Extract water and waste
         const totalWater = Number(payload.total_water_consumption?.value || payload.total_water_usage || 0);
@@ -158,7 +225,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             total_facility_production_volume: allocation.facilityTotalProduction,
             production_volume_unit: allocation.productionVolumeUnit || 'units',
             total_facility_co2e_kg: facilityTotalEmissions,
-            co2e_entry_method: emissionsData ? 'direct' : 'direct',
+            co2e_entry_method: hasVerifiedFacilityData ? 'direct' : 'direct',
             client_production_volume: allocation.productionVolume,
             // These are auto-calculated by trigger but we can provide them:
             // attribution_ratio, allocated_emissions_kg_co2e, emission_intensity_kg_co2e_per_unit
@@ -167,9 +234,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             scope3_emissions_kg_co2e: 0,
             allocated_water_litres: allocatedWater,
             allocated_waste_kg: allocatedWaste,
-            status: emissionsData ? 'verified' : 'provisional',
+            status: hasVerifiedFacilityData ? 'verified' : 'provisional',
             is_energy_intensive_process: false,
-            data_source_tag: emissionsData ? 'Facility_Verified' : 'User_Input',
+            data_source_tag: hasVerifiedFacilityData ? 'Facility_Verified' : 'User_Input',
           };
 
           // Use upsert to handle existing allocations for same period
@@ -199,7 +266,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
               ? facilityTotalEmissions / allocation.facilityTotalProduction
               : 0,
             // IMPORTANT: data_source has CHECK constraint: only 'Verified' or 'Industry_Average' allowed
-            data_source: emissionsData ? 'Verified' : 'Industry_Average',
+            data_source: hasVerifiedFacilityData ? 'Verified' : 'Industry_Average',
             reporting_period_start: allocation.reportingPeriodStart,
             reporting_period_end: allocation.reportingPeriodEnd,
             attribution_ratio: attributionRatio * 100,
@@ -211,10 +278,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             waste_intensity_kg_per_unit: allocatedWaste / safeProductionVolume,
             scope1_emissions_kg_co2e: scope1Emissions,
             scope2_emissions_kg_co2e: scope2Emissions,
-            status: emissionsData ? 'verified' : 'provisional',
+            status: hasVerifiedFacilityData ? 'verified' : 'provisional',
             is_energy_intensive_process: false,
-            uses_proxy_data: !emissionsData,
-            data_source_tag: emissionsData ? 'Facility_Verified' : 'User_Input',
+            uses_proxy_data: !hasVerifiedFacilityData,
+            data_source_tag: hasVerifiedFacilityData ? 'Facility_Verified' : 'User_Input',
             co2e_entry_method: 'Production Volume Allocation',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
