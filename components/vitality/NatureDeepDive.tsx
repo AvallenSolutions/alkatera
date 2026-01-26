@@ -281,7 +281,7 @@ export function NatureDeepDive({ natureMetrics }: NatureDeepDiveProps) {
               </Link>
 
               <p className="text-xs text-center text-teal-600">
-                Try: "What actions can I take to reduce my nature impact based on my product data?"
+                Try: &quot;What actions can I take to reduce my nature impact based on my product data?&quot;
               </p>
             </CardContent>
           </Card>

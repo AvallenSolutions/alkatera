@@ -116,7 +116,7 @@ export function TeamCommutingCard({ reportId, initialFteCount, onUpdate }: TeamC
               onChange={(e) => setFteCount(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              We'll estimate commuting emissions using UK average data
+              We&apos;ll estimate commuting emissions using UK average data
             </p>
             <DataProvenanceBadge variant="block" />
           </div>

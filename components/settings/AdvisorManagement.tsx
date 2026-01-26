@@ -560,7 +560,7 @@ export function AdvisorManagement() {
             <AlertDialogTitle>Revoke Advisor Access?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to revoke{' '}
-              {advisorToRevoke?.advisor_name || advisorToRevoke?.advisor_email}'s access to your
+              {advisorToRevoke?.advisor_name || advisorToRevoke?.advisor_email}&apos;s access to your
               organisation? They will no longer be able to view or edit your data.
             </AlertDialogDescription>
           </AlertDialogHeader>

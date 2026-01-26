@@ -344,7 +344,7 @@ export function TemplateLibrary({ config, onChange }: TemplateLibraryProps) {
           <div>
             <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
               <Building2 className="h-5 w-5 text-purple-600" />
-              Your Organization's Templates
+              Your Organization&apos;s Templates
             </h3>
             <div className="grid gap-3">
               {orgTemplates.map((template) => (
@@ -393,7 +393,7 @@ export function TemplateLibrary({ config, onChange }: TemplateLibraryProps) {
               Industry Benchmarks
             </CardTitle>
             <CardDescription>
-              Compare your organization's performance against industry averages
+              Compare your organization&apos;s performance against industry averages
               {organizationData?.industry && ` in ${organizationData.industry.replace('_', ' ')}`}
             </CardDescription>
           </CardHeader>

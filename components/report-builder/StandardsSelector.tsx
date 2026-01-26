@@ -124,7 +124,7 @@ export function StandardsSelector({ config, onChange }: StandardsSelectorProps) 
       <Alert>
         <InfoIcon className="h-4 w-4" />
         <AlertDescription>
-          Your report will be structured to align with the selected standards. The platform automatically formats data to meet each standard's requirements.
+          Your report will be structured to align with the selected standards. The platform automatically formats data to meet each standard&apos;s requirements.
         </AlertDescription>
       </Alert>
 

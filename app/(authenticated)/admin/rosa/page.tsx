@@ -245,7 +245,7 @@ export default function AdminRosaPage() {
         <div>
           <h1 className="text-2xl font-bold">Rosa Admin Dashboard</h1>
           <p className="text-muted-foreground">
-            Manage and improve Rosa's knowledge and performance
+            Manage and improve Rosa&apos;s knowledge and performance
           </p>
         </div>
       </div>
@@ -401,7 +401,7 @@ export default function AdminRosaPage() {
               <div>
                 <CardTitle>Knowledge Base</CardTitle>
                 <CardDescription>
-                  Manage instructions and guidelines that improve Rosa's responses
+                  Manage instructions and guidelines that improve Rosa&apos;s responses
                 </CardDescription>
               </div>
               <Dialog open={isKnowledgeDialogOpen} onOpenChange={setIsKnowledgeDialogOpen}>
@@ -626,7 +626,7 @@ export default function AdminRosaPage() {
             <CardHeader>
               <CardTitle>User Feedback</CardTitle>
               <CardDescription>
-                Review and respond to user feedback on Rosa's responses
+                Review and respond to user feedback on Rosa&apos;s responses
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -709,7 +709,7 @@ export default function AdminRosaPage() {
             <CardHeader>
               <CardTitle>Test Rosa</CardTitle>
               <CardDescription>
-                Test Rosa's responses with sample queries
+                Test Rosa&apos;s responses with sample queries
               </CardDescription>
             </CardHeader>
             <CardContent>

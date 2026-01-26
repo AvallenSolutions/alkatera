@@ -146,7 +146,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            You don't have permission to edit blog posts.
+            You don&apos;t have permission to edit blog posts.
           </AlertDescription>
         </Alert>
       </div>

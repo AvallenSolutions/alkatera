@@ -644,7 +644,7 @@ export default function NewProductLCAPage() {
         <CardHeader>
           <CardTitle>{productType === "multipack" ? "Multipack" : "Product"} Information</CardTitle>
           <CardDescription>
-            Basic details about the product you're assessing
+            Basic details about the product you&apos;re assessing
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

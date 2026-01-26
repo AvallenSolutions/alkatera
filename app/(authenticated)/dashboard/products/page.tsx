@@ -157,7 +157,7 @@ export default function ProductsPage() {
             <div className="text-center py-12">
               <p className="text-sm text-muted-foreground">No products found.</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Click "Add New Product" to create your first product.
+                Click &quot;Add New Product&quot; to create your first product.
               </p>
             </div>
           ) : (
@@ -234,7 +234,7 @@ export default function ProductsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the product "{productToDelete?.name}".
+              This will permanently delete the product &quot;{productToDelete?.name}&quot;.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

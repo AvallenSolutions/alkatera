@@ -442,7 +442,7 @@ export function SupplierEvidenceTab({ supplierId }: SupplierEvidenceTabProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Document</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{documentToDelete?.source_description}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{documentToDelete?.source_description}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

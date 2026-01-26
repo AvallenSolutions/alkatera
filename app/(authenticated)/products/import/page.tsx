@@ -182,7 +182,7 @@ export default function ImportPage() {
 
             <div className="space-y-4">
               <div>
-                <h3 className="font-medium mb-2">What you'll get:</h3>
+                <h3 className="font-medium mb-2">What you&apos;ll get:</h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li>✓ Company information sheet</li>
                   <li>✓ Products sheet with ingredient tracking</li>

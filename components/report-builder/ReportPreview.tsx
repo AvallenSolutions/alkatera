@@ -60,7 +60,7 @@ export function ReportPreview({ config }: ReportPreviewProps) {
       <Alert>
         <CheckCircle2 className="h-4 w-4 text-green-600" />
         <AlertDescription>
-          Review your report configuration before generating. Once generated, you'll receive an editable {FORMAT_LABELS[config.outputFormat].toLowerCase()} file.
+          Review your report configuration before generating. Once generated, you&apos;ll receive an editable {FORMAT_LABELS[config.outputFormat].toLowerCase()} file.
         </AlertDescription>
       </Alert>
 
@@ -196,7 +196,7 @@ export function ReportPreview({ config }: ReportPreviewProps) {
             <Alert>
               <AlertDescription className="text-sm">
                 <strong>Estimated generation time:</strong> 1-2 minutes for {config.sections.length} section
-                {config.sections.length !== 1 ? 's' : ''}. You'll receive a download link when ready.
+                {config.sections.length !== 1 ? 's' : ''}. You&apos;ll receive a download link when ready.
               </AlertDescription>
             </Alert>
           </div>

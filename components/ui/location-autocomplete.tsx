@@ -168,7 +168,7 @@ export function LocationAutocomplete({
               <CommandEmpty>
                 <div className="py-6 text-center">
                   <p className="text-sm text-muted-foreground">
-                    No locations found for "{searchQuery}"
+                    No locations found for &quot;{searchQuery}&quot;
                   </p>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Try searching for a major city or airport code

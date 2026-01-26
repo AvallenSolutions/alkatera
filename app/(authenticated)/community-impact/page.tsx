@@ -668,7 +668,7 @@ export default function CommunityImpactPage() {
                 </div>
               ) : (
                 <p className="text-muted-foreground text-center py-8">
-                  No donations logged yet. Click "Log Donation" to get started.
+                  No donations logged yet. Click &quot;Log Donation&quot; to get started.
                 </p>
               )}
             </CardContent>

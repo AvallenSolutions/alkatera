@@ -214,7 +214,7 @@ export function InviteSupplierModal({
                 <li>Your supplier will receive an email invitation</li>
                 <li>A copy will be sent to hello@alkatera.com</li>
                 <li>They can complete their profile and upload product data</li>
-                <li>You'll be notified when they accept</li>
+                <li>You&apos;ll be notified when they accept</li>
               </ul>
             </div>
 

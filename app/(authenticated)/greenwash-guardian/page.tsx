@@ -358,7 +358,7 @@ export default function GreenwashGuardianPage() {
                     className="bg-white/5 border-white/10 text-white placeholder:text-slate-500"
                   />
                   <p className="text-xs text-slate-500">
-                    We'll analyze the page and its subpages (up to 10 pages)
+                    We&apos;ll analyze the page and its subpages (up to 10 pages)
                   </p>
                 </div>
               </TabsContent>

@@ -135,7 +135,7 @@ export default function FeedbackPage() {
             <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-medium mb-2">No feedback yet</h3>
             <p className="text-muted-foreground mb-6">
-              Have a bug to report or a feature to suggest? We'd love to hear from you!
+              Have a bug to report or a feature to suggest? We&apos;d love to hear from you!
             </p>
             <FeedbackDialog
               trigger={

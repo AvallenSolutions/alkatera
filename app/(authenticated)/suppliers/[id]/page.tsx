@@ -164,7 +164,7 @@ export default function SupplierDetailPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{supplier.name}"? This action cannot be undone and will remove all associated products and data.
+                      Are you sure you want to delete &quot;{supplier.name}&quot;? This action cannot be undone and will remove all associated products and data.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -386,7 +386,7 @@ export default function SupplierDetailPage() {
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                   <p className="text-sm text-muted-foreground mb-4">
                     {canCreateSuppliers
-                      ? "No products added yet. Start building this supplier's product portfolio."
+                      ? "No products added yet. Start building this supplier&apos;s product portfolio."
                       : "No products added yet. Only administrators can add products."}
                   </p>
                   {canCreateSuppliers && (

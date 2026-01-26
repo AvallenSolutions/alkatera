@@ -85,7 +85,7 @@ export function ProductActions({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Product?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{productName}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{productName}&quot;? This action cannot be undone.
               All associated LCA calculations and materials will also be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>

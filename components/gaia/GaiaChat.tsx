@@ -630,7 +630,7 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
                             </p>
                             {result.match_type === 'message' && result.matched_content && (
                               <p className="text-xs text-muted-foreground truncate italic">
-                                "...{result.matched_content.slice(0, 50)}..."
+                                &quot;...{result.matched_content.slice(0, 50)}...&quot;
                               </p>
                             )}
                             <p className="text-xs text-muted-foreground">
@@ -642,7 +642,7 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
                     </>
                   ) : (
                     <p className="text-xs text-muted-foreground text-center py-4">
-                      No results found for "{searchQuery}"
+                      No results found for &quot;{searchQuery}&quot;
                     </p>
                   )}
                 </>
@@ -809,10 +809,10 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
                   <Leaf className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">
-                  Hello! I'm Rosa
+                  Hello! I&apos;m Rosa
                 </h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  I'm your sustainability guide. I can help you navigate the platform,
+                  I&apos;m your sustainability guide. I can help you navigate the platform,
                   enter data, understand your environmental impacts, and answer
                   questions about your sustainability metrics.
                 </p>

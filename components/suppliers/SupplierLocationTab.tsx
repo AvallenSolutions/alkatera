@@ -109,7 +109,7 @@ export function SupplierLocationTab({ supplier, onUpdate }: SupplierLocationTabP
                   placeholder="Search for supplier location..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  Search for the supplier's primary facility or headquarters
+                  Search for the supplier&apos;s primary facility or headquarters
                 </p>
               </div>
 

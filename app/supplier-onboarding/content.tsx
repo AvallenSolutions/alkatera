@@ -161,7 +161,7 @@ export default function SupplierOnboardingContent() {
             <Mail className="h-8 w-8 text-blue-500" />
           </div>
           <h1 className="text-3xl font-bold text-white">Supplier Invitation</h1>
-          <p className="text-slate-400">You've been invited to join the Alkatera platform</p>
+          <p className="text-slate-400">You&apos;ve been invited to join the Alkatera platform</p>
         </div>
 
         <Card className="backdrop-blur-xl bg-white/5 border border-white/10">

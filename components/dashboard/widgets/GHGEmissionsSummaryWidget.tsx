@@ -209,7 +209,7 @@ export function GHGEmissionsSummaryWidget({
               {totalEmissions === 0 ? (
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                   <Info className="h-4 w-4" />
-                  <span>Begin tracking emissions to see your organisation's carbon footprint</span>
+                  <span>Begin tracking emissions to see your organisation&apos;s carbon footprint</span>
                 </div>
               ) : (
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">

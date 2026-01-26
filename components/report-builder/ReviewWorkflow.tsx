@@ -379,7 +379,7 @@ export function ReviewWorkflow({ reportId, reportName, sections }: ReviewWorkflo
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Review Status for "{reportName}"</CardTitle>
+              <CardTitle>Review Status for &quot;{reportName}&quot;</CardTitle>
               <CardDescription>Collaborative review and approval workflow</CardDescription>
             </div>
             <Dialog open={showAddReviewerDialog} onOpenChange={setShowAddReviewerDialog}>

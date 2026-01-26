@@ -350,7 +350,7 @@ export default function SupplierVerificationPage() {
               <Alert className="bg-emerald-50 border-emerald-200 dark:bg-emerald-950 dark:border-emerald-800">
                 <Shield className="h-4 w-4 text-emerald-600" />
                 <AlertDescription className="text-emerald-800 dark:text-emerald-100">
-                  Once verified, this product will immediately appear in material search results for the organisation's users.
+                  Once verified, this product will immediately appear in material search results for the organisation&apos;s users.
                 </AlertDescription>
               </Alert>
             </div>

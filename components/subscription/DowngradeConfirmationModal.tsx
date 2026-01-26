@@ -214,7 +214,7 @@ export function DowngradeConfirmationModal({
                         7-Day Grace Period
                       </h4>
                       <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                        Your current usage exceeds the new plan limits. You'll have{' '}
+                        Your current usage exceeds the new plan limits. You&apos;ll have{' '}
                         <strong>7 days</strong> to reduce your usage. After that, the
                         oldest excess items will be automatically removed:
                       </p>

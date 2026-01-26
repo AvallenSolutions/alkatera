@@ -56,7 +56,7 @@ export default function UIDocumentationPage() {
                     <li>Registration number, make/model, vehicle class</li>
                     <li>Propulsion type badges (ICE/BEV with icons)</li>
                     <li>Automatic Scope badge (Scope 1/2 based on propulsion)</li>
-                    <li>Quick "Log Journey" action button per vehicle</li>
+                    <li>Quick &quot;Log Journey&quot; action button per vehicle</li>
                   </ul>
                 </div>
               </div>
@@ -78,7 +78,7 @@ export default function UIDocumentationPage() {
                       <p className="text-sm font-semibold">Step 1: Vehicle Classification</p>
                       <ul className="list-disc list-inside text-sm ml-4">
                         <li>Propulsion Type: ICE, BEV, PHEV, HEV</li>
-                        <li>Real-time Scope Preview (shows "Scope 1" or "Scope 2")</li>
+                        <li>Real-time Scope Preview (shows &quot;Scope 1&quot; or &quot;Scope 2&quot;)</li>
                         <li>Fuel Type for ICE vehicles (Diesel, Petrol, LPG, etc.)</li>
                         <li>Vehicle Class (DEFRA classifications)</li>
                       </ul>
@@ -146,9 +146,9 @@ export default function UIDocumentationPage() {
               <div className="border-l-4 border-blue-500 pl-4 bg-blue-50 dark:bg-blue-950/20 p-4 rounded">
                 <h4 className="font-semibold mb-2">Example: Adding Electric Van</h4>
                 <ol className="list-decimal list-inside text-sm space-y-1">
-                  <li>Click "Add Vehicle" → Wizard opens</li>
-                  <li>Select Propulsion Type: "BEV" → Badge shows <Badge variant="default">Scope 2</Badge></li>
-                  <li>Select Vehicle Class: "Class III Van"</li>
+                  <li>Click &quot;Add Vehicle&quot; → Wizard opens</li>
+                  <li>Select Propulsion Type: &quot;BEV&quot; → Badge shows <Badge variant="default">Scope 2</Badge></li>
+                  <li>Select Vehicle Class: &quot;Class III Van&quot;</li>
                   <li>Enter Registration: EV25 ABC, Make/Model: Nissan e-NV200</li>
                   <li>Review shows Scope 2 badge confirmation</li>
                   <li>Vehicle appears in table with Zap icon and Scope 2 badge</li>
@@ -158,8 +158,8 @@ export default function UIDocumentationPage() {
               <div className="border-l-4 border-orange-500 pl-4 bg-orange-50 dark:bg-orange-950/20 p-4 rounded">
                 <h4 className="font-semibold mb-2">Example: Logging Diesel Van Journey</h4>
                 <ol className="list-decimal list-inside text-sm space-y-1">
-                  <li>Click "Log Journey" on diesel van row</li>
-                  <li>Vehicle pre-selected: "Ford Transit - Class III Van (ICE - Diesel)"</li>
+                  <li>Click &quot;Log Journey&quot; on diesel van row</li>
+                  <li>Vehicle pre-selected: &quot;Ford Transit - Class III Van (ICE - Diesel)&quot;</li>
                   <li>Enter Distance: 85 km</li>
                   <li><strong>Emissions preview appears:</strong></li>
                 </ol>
@@ -169,8 +169,8 @@ export default function UIDocumentationPage() {
                   <p>Factor: Class III Van - Diesel (0.26385 kgCO2e/km)</p>
                 </div>
                 <ol className="list-decimal list-inside text-sm space-y-1 mt-2" start={5}>
-                  <li>Add purpose: "Delivery to warehouse"</li>
-                  <li>Click "Log Journey" → Success toast shows emission value</li>
+                  <li>Add purpose: &quot;Delivery to warehouse&quot;</li>
+                  <li>Click &quot;Log Journey&quot; → Success toast shows emission value</li>
                 </ol>
               </div>
             </div>

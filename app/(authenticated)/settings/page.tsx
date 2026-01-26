@@ -1010,7 +1010,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Have a bug to report or a feature suggestion? We'd love to hear from you.
+                Have a bug to report or a feature suggestion? We&apos;d love to hear from you.
                 Your feedback helps us improve the platform.
               </p>
               <div className="flex gap-3">

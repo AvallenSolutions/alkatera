@@ -36,7 +36,7 @@ export function ActivityDataTable({ data, onRefresh }: ActivityDataTableProps) {
     return (
       <div className="text-center py-12 text-muted-foreground">
         <p>No activity data recorded yet</p>
-        <p className="text-sm mt-2">Click "Add Data" to get started</p>
+        <p className="text-sm mt-2">Click &quot;Add Data&quot; to get started</p>
       </div>
     );
   }

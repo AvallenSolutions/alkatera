@@ -261,7 +261,7 @@ export default function TransparencyPage() {
       <Card className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
         <CardContent className="p-4">
           <p className="text-sm text-amber-800 dark:text-amber-200">
-            <strong>About Transparency:</strong> Document your organization's mission, vision,
+            <strong>About Transparency:</strong> Document your organization&apos;s mission, vision,
             values, and public commitments. This information supports B Corp certification and
             demonstrates purpose-driven governance.
           </p>
@@ -275,7 +275,7 @@ export default function TransparencyPage() {
             <Target className="h-5 w-5 text-blue-600" />
             <CardTitle className="text-base">Mission & Vision</CardTitle>
           </div>
-          <CardDescription>Your organization's purpose and direction</CardDescription>
+          <CardDescription>Your organization&apos;s purpose and direction</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -377,7 +377,7 @@ export default function TransparencyPage() {
             <Building2 className="h-5 w-5 text-emerald-600" />
             <CardTitle className="text-base">Legal Structure</CardTitle>
           </div>
-          <CardDescription>Your organization's legal form and governance</CardDescription>
+          <CardDescription>Your organization&apos;s legal form and governance</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center space-x-2">

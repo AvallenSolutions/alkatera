@@ -471,7 +471,7 @@ export default function ReportingStandardsPage() {
                   <Badge variant="outline">Data Source</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  World's most comprehensive life cycle inventory database with 20,000+ activities across all economic sectors.
+                  World&apos;s most comprehensive life cycle inventory database with 20,000+ activities across all economic sectors.
                 </p>
 
                 <div className="grid md:grid-cols-3 gap-4">
@@ -741,7 +741,7 @@ export default function ReportingStandardsPage() {
                 <AlertTitle>TNFD Compliance Status</AlertTitle>
                 <AlertDescription className="text-sm mt-2 space-y-2">
                   <p>
-                    Platform provides the underlying impact assessment data required for TNFD's LEAP approach (Locate, Evaluate, Assess, Prepare).
+                    Platform provides the underlying impact assessment data required for TNFD&apos;s LEAP approach (Locate, Evaluate, Assess, Prepare).
                   </p>
                   <p className="font-semibold">
                     Focus: Biodiversity and ecosystem dependencies in supply chain and operations
@@ -921,9 +921,9 @@ export default function ReportingStandardsPage() {
                     <CardContent className="text-sm space-y-2">
                       <p className="text-muted-foreground">The authoritative data source name and version</p>
                       <div className="space-y-1 font-mono text-xs bg-gray-100 p-2 rounded">
-                        <div>"Ecoinvent 3.12"</div>
-                        <div>"DEFRA 2025"</div>
-                        <div>"Supplier: ABC Ltd"</div>
+                        <div>&quot;Ecoinvent 3.12&quot;</div>
+                        <div>&quot;DEFRA 2025&quot;</div>
+                        <div>&quot;Supplier: ABC Ltd&quot;</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -935,9 +935,9 @@ export default function ReportingStandardsPage() {
                     <CardContent className="text-sm space-y-2">
                       <p className="text-muted-foreground">Unique identifier tracing back to source database</p>
                       <div className="space-y-1 font-mono text-xs bg-gray-100 p-2 rounded">
-                        <div>"8a4e5c7d-2f3b-4e9a-b1c3..."</div>
-                        <div>"defra_2025_wheat_uk_123"</div>
-                        <div>"supplier_product_456"</div>
+                        <div>&quot;8a4e5c7d-2f3b-4e9a-b1c3...&quot;</div>
+                        <div>&quot;defra_2025_wheat_uk_123&quot;</div>
+                        <div>&quot;supplier_product_456&quot;</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -963,9 +963,9 @@ export default function ReportingStandardsPage() {
                     <CardContent className="text-sm space-y-2">
                       <p className="text-muted-foreground">LCA methodology and system boundary</p>
                       <div className="space-y-1 font-mono text-xs bg-gray-100 p-2 rounded">
-                        <div>"Cradle-to-Gate (Cut-off)"</div>
-                        <div>"Cradle-to-Grave"</div>
-                        <div>"Gate-to-Gate"</div>
+                        <div>&quot;Cradle-to-Gate (Cut-off)&quot;</div>
+                        <div>&quot;Cradle-to-Grave&quot;</div>
+                        <div>&quot;Gate-to-Gate&quot;</div>
                       </div>
                     </CardContent>
                   </Card>
@@ -998,7 +998,7 @@ export default function ReportingStandardsPage() {
                       <Alert className="mt-2">
                         <CheckCircle2 className="h-4 w-4" />
                         <AlertDescription className="text-xs">
-                          Code checks <code className="font-mono">data_source === "supplier"</code> BEFORE any external API calls
+                          Code checks <code className="font-mono">data_source === &quot;supplier&quot;</code> BEFORE any external API calls
                         </AlertDescription>
                       </Alert>
                     </CardContent>

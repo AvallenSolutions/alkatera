@@ -414,7 +414,7 @@ export function DataGapAlerts({ config }: DataGapAlertsProps) {
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
           <AlertDescription>
-            Excellent! All required data is available for your selected sections. You're ready to generate a high-quality report.
+            Excellent! All required data is available for your selected sections. You&apos;re ready to generate a high-quality report.
           </AlertDescription>
         </Alert>
       ) : (
