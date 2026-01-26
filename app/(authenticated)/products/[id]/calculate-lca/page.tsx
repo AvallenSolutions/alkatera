@@ -221,6 +221,22 @@ export default function CalculateLCAPage() {
       return;
     }
 
+    // Validate: if facilities are linked, require production volumes
+    if (linkedFacilities.length > 0) {
+      const missingVolumes = facilityAllocations.filter(
+        a => !a.productionVolume || !a.facilityTotalProduction
+      );
+
+      if (missingVolumes.length > 0) {
+        const facilityNames = missingVolumes.map(a => a.facilityName).join(', ');
+        toast.error(
+          `Please enter production volumes for all linked facilities: ${facilityNames}`,
+          { duration: 6000 }
+        );
+        return;
+      }
+    }
+
     setCalculating(true);
 
     try {
@@ -290,6 +306,10 @@ export default function CalculateLCAPage() {
 
   const hasFacilitiesWithAllocations = linkedFacilities.length > 0 &&
     facilityAllocations.every(a => a.productionVolume && a.facilityTotalProduction);
+
+  // Check if facilities are linked but missing production volumes
+  const hasFacilitiesMissingVolumes = linkedFacilities.length > 0 &&
+    facilityAllocations.some(a => !a.productionVolume || !a.facilityTotalProduction);
 
   if (loading) {
     return <PageLoader message="Validating materials..." />;
@@ -550,10 +570,13 @@ export default function CalculateLCAPage() {
               ))}
 
               {linkedFacilities.length > 0 && !hasFacilitiesWithAllocations && (
-                <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-800 dark:text-amber-200">
-                    Enter production volumes for all facilities to include manufacturing emissions in the calculation.
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Production Volumes Required</AlertTitle>
+                  <AlertDescription>
+                    You have {linkedFacilities.length} facilit{linkedFacilities.length === 1 ? 'y' : 'ies'} linked to this product.
+                    Enter the product volume and total facility production for each facility to calculate manufacturing emissions.
+                    This data is required to determine how much of each facility's emissions should be allocated to this product.
                   </AlertDescription>
                 </Alert>
               )}
@@ -593,10 +616,15 @@ export default function CalculateLCAPage() {
       </Card>
 
       {/* Calculate Button */}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-4 items-center">
+        {hasFacilitiesMissingVolumes && (
+          <span className="text-sm text-muted-foreground">
+            Enter production volumes above to enable calculation
+          </span>
+        )}
         <Button
           onClick={handleCalculate}
-          disabled={!canCalculate || calculating}
+          disabled={!canCalculate || calculating || hasFacilitiesMissingVolumes}
           size="lg"
           className="min-w-[200px]"
         >
