@@ -109,7 +109,7 @@ export function BrandingPanel({ config, onChange }: BrandingPanelProps) {
       <Alert>
         <ImageIcon className="h-4 w-4" />
         <AlertDescription>
-          Customize the look and feel of your report with your organization's branding.
+          Customize the look and feel of your report with your organization&apos;s branding.
           This will apply to the generated document.
         </AlertDescription>
       </Alert>
@@ -118,7 +118,7 @@ export function BrandingPanel({ config, onChange }: BrandingPanelProps) {
       <div className="space-y-3">
         <Label>Company Logo</Label>
         <p className="text-sm text-muted-foreground">
-          Upload your organization's logo (PNG, JPG, or SVG, max 5MB)
+          Upload your organization&apos;s logo (PNG, JPG, or SVG, max 5MB)
         </p>
 
         {logoPreview ? (

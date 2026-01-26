@@ -81,7 +81,7 @@ export function AICopilotModal({ open, onOpenChange }: AICopilotModalProps) {
             <div className="flex-1">
               <DialogTitle>Ask the Data (AI Copilot)</DialogTitle>
               <DialogDescription>
-                Get instant insights from your company's environmental data
+                Get instant insights from your company&apos;s environmental data
               </DialogDescription>
             </div>
             <Badge variant="outline" className="text-xs">
@@ -205,7 +205,7 @@ export function AICopilotModal({ open, onOpenChange }: AICopilotModalProps) {
             <CardContent className="p-3 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-amber-600 flex-shrink-0" />
               <p className="text-xs text-muted-foreground">
-                <strong>Coming Soon:</strong> Full RAG backend integration for context-aware answers based on your company's actual data.
+                <strong>Coming Soon:</strong> Full RAG backend integration for context-aware answers based on your company&apos;s actual data.
               </p>
             </CardContent>
           </Card>

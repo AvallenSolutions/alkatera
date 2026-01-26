@@ -24,7 +24,7 @@ export default function FleetImplementationPage() {
             <h2 className="text-2xl font-bold mb-4">Executive Summary</h2>
             <p className="text-muted-foreground">
               Successfully implemented DEFRA 2025 emission factors and Smart Fleet logic with automatic Scope 1/Scope 2 routing
-              based on vehicle propulsion type. All calculations are fully compliant with the "Glass Box" auditability principle.
+              based on vehicle propulsion type. All calculations are fully compliant with the &quot;Glass Box&quot; auditability principle.
             </p>
           </section>
 
@@ -97,7 +97,7 @@ export default function FleetImplementationPage() {
 
                 <div className="bg-slate-100 dark:bg-slate-900 p-4 rounded-lg mb-3">
                   <p className="text-sm font-mono">
-                    const scope = propulsion_type === "BEV" ? "Scope 2" : "Scope 1";
+                    const scope = propulsion_type === &quot;BEV&quot; ? &quot;Scope 2&quot; : &quot;Scope 1&quot;;
                   </p>
                 </div>
 

@@ -266,7 +266,7 @@ export function FleetActivityTable({
           <div className="text-center py-8 text-muted-foreground">
             <p>No fleet activities recorded yet</p>
             <p className="text-sm">
-              Use the "Log Fleet Activity" button to record vehicle usage
+              Use the &quot;Log Fleet Activity&quot; button to record vehicle usage
             </p>
           </div>
         ) : (

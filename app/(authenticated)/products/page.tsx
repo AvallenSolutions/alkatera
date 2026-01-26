@@ -297,7 +297,7 @@ export default function ProductsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Product</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{productToDelete?.name}"? This action cannot be undone and will remove all associated data including materials, LCA results, and calculations.
+              Are you sure you want to delete &quot;{productToDelete?.name}&quot;? This action cannot be undone and will remove all associated data including materials, LCA results, and calculations.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

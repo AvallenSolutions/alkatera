@@ -325,7 +325,7 @@ export default function VolunteeringPage() {
             <p className="text-muted-foreground text-center py-8">Loading activities...</p>
           ) : activities.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              No volunteer activities logged yet. Click "Log Activity" to get started.
+              No volunteer activities logged yet. Click &quot;Log Activity&quot; to get started.
             </p>
           ) : (
             <Table>

@@ -54,7 +54,7 @@ export default function DistributionPage({ params }: DistributionPageProps) {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            You'll be able to add information about:
+            You&apos;ll be able to add information about:
           </p>
           <ul className="list-disc list-inside text-sm text-muted-foreground mt-2 space-y-1">
             <li>Transportation modes</li>

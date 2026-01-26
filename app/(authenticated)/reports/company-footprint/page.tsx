@@ -214,7 +214,7 @@ export default function CompanyFootprintPage() {
               <TrendingUp className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
               <h3 className="text-lg font-semibold mb-2">No Footprints Yet</h3>
               <p className="text-sm text-muted-foreground mb-4 max-w-md">
-                Create your first company footprint to track your organisation's greenhouse gas
+                Create your first company footprint to track your organisation&apos;s greenhouse gas
                 emissions across all operations, products, and services.
               </p>
             </div>

@@ -221,7 +221,7 @@ export default function CompanyOverviewPage() {
               Basic Information
             </CardTitle>
             <CardDescription>
-              Your organisation's core details
+              Your organisation&apos;s core details
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -328,7 +328,7 @@ export default function CompanyOverviewPage() {
                 Location
               </CardTitle>
               <CardDescription>
-                Your organisation's address
+                Your organisation&apos;s address
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

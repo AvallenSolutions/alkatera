@@ -823,7 +823,7 @@ export function ContractManufacturerAllocationForm({
 
               {energyInputs.length === 0 ? (
                 <div className="text-center py-8 text-slate-400">
-                  No energy sources added. Click "Add Energy Source" to begin.
+                  No energy sources added. Click &quot;Add Energy Source&quot; to begin.
                 </div>
               ) : (
                 <div className="space-y-3">

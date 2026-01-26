@@ -561,7 +561,7 @@ export default function ProductionAllocationPage() {
               {facilities.length > 0 && products.length > 0 && filteredFacilities.length === 0 && (
                 <div className="text-center py-12">
                   <Search className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                  <p className="text-slate-400">No facilities found matching "{searchTerm}"</p>
+                  <p className="text-slate-400">No facilities found matching &quot;{searchTerm}&quot;</p>
                   <Button variant="ghost" className="mt-2" onClick={() => setSearchTerm("")}>
                     Clear Search
                   </Button>

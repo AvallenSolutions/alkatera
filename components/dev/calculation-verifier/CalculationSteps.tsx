@@ -210,7 +210,7 @@ export default function CalculationSteps({ calculations }: CalculationStepsProps
                     Total Impact = Σ (Material Quantity × Emission Factor)
                   </p>
                   <p className="mt-2 text-xs">
-                    Each material's impact is calculated by multiplying its quantity by the relevant
+                    Each material&apos;s impact is calculated by multiplying its quantity by the relevant
                     emission factor. The total is the sum of all material-level impacts.
                   </p>
                 </div>

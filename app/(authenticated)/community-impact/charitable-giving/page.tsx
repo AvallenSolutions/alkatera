@@ -355,7 +355,7 @@ export default function CharitableGivingPage() {
             <p className="text-muted-foreground text-center py-8">Loading donations...</p>
           ) : donations.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              No donations logged yet. Click "Log Donation" to get started.
+              No donations logged yet. Click &quot;Log Donation&quot; to get started.
             </p>
           ) : (
             <Table>

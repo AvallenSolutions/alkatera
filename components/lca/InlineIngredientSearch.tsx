@@ -312,7 +312,7 @@ export function InlineIngredientSearch({
       {showResults && results.length === 0 && !isSearching && query.length >= 2 && (
         <Card className="absolute z-50 mt-1 w-full shadow-lg">
           <div className="p-4 text-center text-sm text-muted-foreground">
-            No results found for "{query}"
+            No results found for &quot;{query}&quot;
           </div>
         </Card>
       )}

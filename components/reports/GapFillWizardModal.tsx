@@ -179,7 +179,7 @@ export function GapFillWizardModal({
         {step === "gap-fill" && (
           <>
             <DialogHeader>
-              <DialogTitle>We've calculated {calculatedPercentage}% of your footprint</DialogTitle>
+              <DialogTitle>We&apos;ve calculated {calculatedPercentage}% of your footprint</DialogTitle>
               <DialogDescription>
                 Help us fill in the remaining {100 - calculatedPercentage}% with Scope 3 overhead data
               </DialogDescription>
@@ -243,7 +243,7 @@ export function GapFillWizardModal({
                   onChange={(e) => setEmployeeFtes(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  We'll use UK average commuting emissions per employee
+                  We&apos;ll use UK average commuting emissions per employee
                 </p>
               </div>
             </div>

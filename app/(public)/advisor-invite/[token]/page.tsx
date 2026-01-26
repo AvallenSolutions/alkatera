@@ -235,7 +235,7 @@ export default function AdvisorInvitePage() {
             <CardTitle>Advisor Invitation</CardTitle>
           </div>
           <CardDescription>
-            You've been invited to be a sustainability advisor
+            You&apos;ve been invited to be a sustainability advisor
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

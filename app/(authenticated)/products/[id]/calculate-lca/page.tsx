@@ -576,7 +576,7 @@ export default function CalculateLCAPage() {
                   <AlertDescription>
                     You have {linkedFacilities.length} facilit{linkedFacilities.length === 1 ? 'y' : 'ies'} linked to this product.
                     Enter the product volume and total facility production for each facility to calculate manufacturing emissions.
-                    This data is required to determine how much of each facility's emissions should be allocated to this product.
+                    This data is required to determine how much of each facility&apos;s emissions should be allocated to this product.
                   </AlertDescription>
                 </Alert>
               )}

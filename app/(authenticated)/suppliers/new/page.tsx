@@ -329,7 +329,7 @@ export default function NewSupplierPage() {
               disabled={isSubmitting}
             />
             <p className="text-xs text-muted-foreground">
-              The supplier's company website (include https:// or http://)
+              The supplier&apos;s company website (include https:// or http://)
             </p>
           </div>
         </CardContent>

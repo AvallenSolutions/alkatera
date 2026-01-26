@@ -475,7 +475,7 @@ export default function AssessmentReportPage() {
                   <CheckCircle2 className="h-12 w-12 text-green-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-white mb-2">No Issues Found</h3>
                   <p className="text-slate-400">
-                    We didn't identify any significant greenwashing risks in your content.
+                    We didn&apos;t identify any significant greenwashing risks in your content.
                   </p>
                 </CardContent>
               </Card>
@@ -523,7 +523,7 @@ function ClaimCard({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-white font-medium">"{claim.claim_text}"</p>
+              <p className="text-white font-medium">&quot;{claim.claim_text}&quot;</p>
               <p className="text-slate-400 text-sm mt-1 truncate">
                 {claim.issue_description}
               </p>
@@ -582,7 +582,7 @@ function ClaimCard({
               {claim.suggested_revision && (
                 <div className="mt-3 p-3 bg-white/5 rounded-lg">
                   <h6 className="text-xs font-medium text-slate-400 mb-1">Suggested Revision:</h6>
-                  <p className="text-white italic">"{claim.suggested_revision}"</p>
+                  <p className="text-white italic">&quot;{claim.suggested_revision}&quot;</p>
                 </div>
               )}
             </div>

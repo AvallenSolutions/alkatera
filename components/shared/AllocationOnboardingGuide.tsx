@@ -259,7 +259,7 @@ export function AllocationOnboardingGuide({
             <CheckCircle2 className="h-4 w-4 text-green-400" />
             <AlertDescription className="text-green-200">
               <div className="space-y-2">
-                <p className="font-medium">You're all set!</p>
+                <p className="font-medium">You&apos;re all set!</p>
                 <p className="text-sm">
                   Your allocation workflow is configured. You can now:
                 </p>

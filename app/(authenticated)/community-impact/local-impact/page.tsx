@@ -258,7 +258,7 @@ export default function LocalImpactPage() {
             <p className="text-muted-foreground text-center py-8">Loading data...</p>
           ) : data.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              No local impact data logged yet. Click "Add Data" to get started.
+              No local impact data logged yet. Click &quot;Add Data&quot; to get started.
             </p>
           ) : (
             <div className="space-y-4">

@@ -208,8 +208,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
           // Copy sites to new PCF (excluding id and timestamps)
           const newSites = previousSites.map(site => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { id, created_at, updated_at, ...siteData } = site;
+            const { id: _id, created_at: _createdAt, updated_at: _updatedAt, ...siteData } = site;
             return {
               ...siteData,
               product_carbon_footprint_id: lca.id,

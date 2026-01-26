@@ -131,7 +131,7 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
       <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive "{productName}"?</AlertDialogTitle>
+            <AlertDialogTitle>Archive &quot;{productName}&quot;?</AlertDialogTitle>
             <AlertDialogDescription>
               This product will be hidden from active listings but can be restored at any time.
               All data will be preserved.
@@ -154,7 +154,7 @@ export function SettingsTab({ productName, onArchive, onDelete }: SettingsTabPro
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete "{productName}"?</AlertDialogTitle>
+            <AlertDialogTitle>Delete &quot;{productName}&quot;?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the product and all associated
               ingredients, packaging, and calculation history.

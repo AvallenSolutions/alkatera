@@ -188,7 +188,7 @@ export function FeedbackDialog({ trigger, defaultCategory }: FeedbackDialogProps
             </div>
             <h3 className="text-lg font-semibold mb-2">Thank you!</h3>
             <p className="text-muted-foreground">
-              Your feedback has been submitted. We'll review it and get back to you if needed.
+              Your feedback has been submitted. We&apos;ll review it and get back to you if needed.
             </p>
           </div>
         ) : (

@@ -797,7 +797,7 @@ export default function CompanyEmissionsPage() {
             Company Emissions
           </h1>
           <p className="text-muted-foreground mt-2">
-            Build and track your organisation's annual carbon footprint
+            Build and track your organisation&apos;s annual carbon footprint
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -867,7 +867,7 @@ export default function CompanyEmissionsPage() {
                   <div>
                     <CardTitle>{selectedYear} Company Footprint</CardTitle>
                     <CardDescription>
-                      Overview of your organisation's greenhouse gas inventory for {selectedYear}
+                      Overview of your organisation&apos;s greenhouse gas inventory for {selectedYear}
                     </CardDescription>
                   </div>
                   <Button onClick={handleGenerateReport} disabled={isGenerating || isLoadingReport}>
@@ -1369,14 +1369,14 @@ export default function CompanyEmissionsPage() {
               <CardHeader>
                 <CardTitle>Scope 3: Value Chain Emissions</CardTitle>
                 <CardDescription>
-                  Track indirect emissions from your organisation's value chain for {selectedYear}
+                  Track indirect emissions from your organisation&apos;s value chain for {selectedYear}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Alert className="mb-4">
                   <Globe className="h-4 w-4" />
                   <AlertDescription>
-                    Scope 3 emissions typically represent the largest portion of a company's carbon footprint.
+                    Scope 3 emissions typically represent the largest portion of a company&apos;s carbon footprint.
                     Add data for business travel, purchased services, employee commuting, and more.
                   </AlertDescription>
                 </Alert>
