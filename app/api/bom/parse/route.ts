@@ -15,10 +15,10 @@ if (typeof Promise.withResolvers === 'undefined') {
   };
 }
 
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
-// Disable worker for server-side use (serverless environments don't support workers)
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+// Disable worker for serverless environments
+GlobalWorkerOptions.workerSrc = 'data:text/javascript,';
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,7 +78,12 @@ export async function POST(request: NextRequest) {
 
 async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
   const uint8Array = new Uint8Array(arrayBuffer);
-  const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+  const loadingTask = getDocument({
+    data: uint8Array,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
   const pdf = await loadingTask.promise;
 
   let fullText = '';
