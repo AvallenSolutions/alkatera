@@ -237,6 +237,31 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           console.warn(`[calculateProductCarbonFootprint] No utility data entries found for ${allocation.facilityName}`);
         }
 
+        // Query water data from facility_activity_entries (separate table from utilities)
+        const { data: waterEntries, error: waterError } = await supabase
+          .from('facility_activity_entries')
+          .select('activity_category, quantity, unit')
+          .eq('facility_id', allocation.facilityId)
+          .in('activity_category', ['water_intake', 'water_recycled'])
+          .lte('reporting_period_start', allocation.reportingPeriodEnd)
+          .gte('reporting_period_end', allocation.reportingPeriodStart);
+
+        if (waterError) {
+          console.warn(`[calculateProductCarbonFootprint] Failed to query water data for ${allocation.facilityName}:`, waterError);
+        }
+
+        if (waterEntries && waterEntries.length > 0) {
+          for (const entry of waterEntries) {
+            let quantityM3 = Number(entry.quantity || 0);
+            // Convert to m³ if needed (water is typically stored in m³)
+            if (entry.unit === 'litres' || entry.unit === 'L') {
+              quantityM3 = quantityM3 / 1000;
+            }
+            totalWaterFromUtility += quantityM3;
+          }
+          console.log(`[calculateProductCarbonFootprint] Water data for ${allocation.facilityName}: ${totalWaterFromUtility} m³ from ${waterEntries.length} entries`);
+        }
+
         const attributionRatio = allocation.productionVolume / allocation.facilityTotalProduction;
         const allocatedEmissions = facilityTotalEmissions * attributionRatio;
         const scope1Emissions = scope1Raw * attributionRatio;
