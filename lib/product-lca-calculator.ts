@@ -274,6 +274,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           allocatedWater,
           allocatedWaste,
           attributionRatio,
+          productVolume: allocation.productionVolume,
         });
 
         // Route to correct table based on facility ownership

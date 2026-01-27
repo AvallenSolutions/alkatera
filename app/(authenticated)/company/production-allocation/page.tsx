@@ -132,7 +132,6 @@ export default function ProductionAllocationPage() {
         .from("products")
         .select("id, name, sku")
         .eq("organization_id", orgId)
-        .eq("is_draft", false)
         .order("name"),
 
       supabase
