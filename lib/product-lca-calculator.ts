@@ -2,6 +2,7 @@ import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './impact-waterfall-resolver';
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { resolveImpactSource } from './utils/data-quality-mapper';
+import { aggregateProductImpacts } from './product-lca-aggregator';
 
 export interface FacilityAllocationInput {
   facilityId: string;
@@ -590,19 +591,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       console.warn('[calculateProductCarbonFootprint] Processing emissions will be zero unless manually entered');
     }
 
-    // 8. Call aggregation edge function to calculate totals
+    // 8. Run aggregation to calculate totals (client-side, no edge function needed)
     console.log(`[calculateProductCarbonFootprint] Calling aggregation engine...`);
 
-    const { data: aggregationResult, error: aggregationError } = await supabase.functions.invoke(
-      'calculate-product-lca-impacts',
-      {
-        body: { product_carbon_footprint_id: lca.id }
-      }
-    );
+    const aggregationResult = await aggregateProductImpacts(supabase, lca.id);
 
-    if (aggregationError) {
-      console.error('[calculateProductCarbonFootprint] Aggregation error:', aggregationError);
-      throw new Error(`Calculation failed: ${aggregationError.message}`);
+    if (!aggregationResult.success) {
+      console.error('[calculateProductCarbonFootprint] Aggregation error:', aggregationResult.error);
+      throw new Error(`Calculation failed: ${aggregationResult.error}`);
     }
 
     console.log(`[calculateProductCarbonFootprint] ✓ Calculation complete for LCA: ${lca.id}`);
