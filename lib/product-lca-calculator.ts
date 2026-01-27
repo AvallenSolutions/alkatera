@@ -3,6 +3,7 @@ import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './imp
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { resolveImpactSource } from './utils/data-quality-mapper';
 import { aggregateProductImpacts } from './product-lca-aggregator';
+import { calculateDistance } from './utils/distance-calculator';
 
 export interface FacilityAllocationInput {
   facilityId: string;
@@ -83,6 +84,52 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     console.log(`[calculateProductCarbonFootprint] Found ${materials.length} materials to process`);
 
+    // 3b. Recalculate distances based on current production facilities
+    // Distances are stored at ingredient creation time and become stale when facilities change
+    if (params.facilityAllocations && params.facilityAllocations.length > 0) {
+      // Get coordinates for the primary (highest production share) facility
+      const primaryAllocation = params.facilityAllocations[0]; // First facility is primary
+      const { data: primaryFacility } = await supabase
+        .from('facilities')
+        .select('address_lat, address_lng, name')
+        .eq('id', primaryAllocation.facilityId)
+        .single();
+
+      if (primaryFacility?.address_lat && primaryFacility?.address_lng) {
+        const facilityLat = Number(primaryFacility.address_lat);
+        const facilityLng = Number(primaryFacility.address_lng);
+        console.log(`[calculateProductCarbonFootprint] Recalculating distances to primary facility: ${primaryFacility.name} (${facilityLat}, ${facilityLng})`);
+
+        let updatedCount = 0;
+        for (const material of materials) {
+          if (material.origin_lat && material.origin_lng) {
+            const newDistance = calculateDistance(
+              Number(material.origin_lat),
+              Number(material.origin_lng),
+              facilityLat,
+              facilityLng
+            );
+
+            if (newDistance !== Number(material.distance_km || 0)) {
+              console.log(`[calculateProductCarbonFootprint] Distance update for ${material.material_name}: ${material.distance_km || 0} km → ${newDistance} km`);
+              material.distance_km = newDistance;
+              updatedCount++;
+
+              // Persist the corrected distance back to product_materials
+              await supabase
+                .from('product_materials')
+                .update({ distance_km: newDistance })
+                .eq('id', material.id);
+            }
+          }
+        }
+
+        if (updatedCount > 0) {
+          console.log(`[calculateProductCarbonFootprint] Updated distances for ${updatedCount} materials`);
+        }
+      }
+    }
+
     // 4. Create product_lca record
     const { data: lca, error: lcaError } = await supabase
       .from('product_carbon_footprints')
@@ -117,72 +164,75 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       console.log(`[calculateProductCarbonFootprint] Processing ${facilityAllocations.length} facility allocations...`);
 
       for (const allocation of facilityAllocations) {
-        // Fetch facility emissions for the reporting period
-        const { data: emissionsData } = await supabase
-          .from('facility_emissions_aggregated')
-          .select('total_co2e, total_production_volume, volume_unit, results_payload')
-          .eq('facility_id', allocation.facilityId)
-          .lte('reporting_period_start', allocation.reportingPeriodEnd)
-          .gte('reporting_period_end', allocation.reportingPeriodStart)
-          .order('reporting_period_start', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        let facilityTotalEmissions = emissionsData?.total_co2e || 0;
+        // Calculate facility emissions from utility_data_entries
+        // This is the same data source used by the Company Emissions page (scope-1-2)
+        let facilityTotalEmissions = 0;
         let scope1Raw = 0;
         let scope2Raw = 0;
+        let totalWaterFromUtility = 0;
 
-        // Extract scope breakdown from results_payload
-        // invoke-scope1-2-calculations stores in scope_breakdown.scope1/scope2
-        // invoke-corporate-calculations may store in scope1_total/scope2_total
-        const payload = emissionsData?.results_payload || {};
-        const scopeBreakdown = payload.scope_breakdown || {};
-        scope1Raw = scopeBreakdown.scope1 || payload.scope1_total || 0;
-        scope2Raw = scopeBreakdown.scope2 || payload.scope2_total || 0;
+        const { data: utilityEntries, error: utilityError } = await supabase
+          .from('utility_data_entries')
+          .select('utility_type, quantity, unit, calculated_scope')
+          .eq('facility_id', allocation.facilityId)
+          .gte('reporting_period_start', allocation.reportingPeriodStart)
+          .lte('reporting_period_end', allocation.reportingPeriodEnd);
 
-        // FALLBACK: If facility_emissions_aggregated has no data or zero emissions,
-        // query calculated_emissions directly to sum up facility emissions
-        if (facilityTotalEmissions === 0) {
-          console.log(`[calculateProductCarbonFootprint] No aggregated data for ${allocation.facilityName}, querying calculated_emissions directly...`);
+        if (utilityError) {
+          console.warn(`[calculateProductCarbonFootprint] Failed to query utility_data_entries for ${allocation.facilityName}:`, utilityError);
+        }
 
-          // Query activity_data joined with calculated_emissions to get facility emissions
-          const { data: activityEmissions, error: activityError } = await supabase
-            .from('activity_data')
-            .select(`
-              id,
-              category,
-              calculated_emissions!inner(calculated_value_co2e)
-            `)
-            .eq('facility_id', allocation.facilityId)
-            .gte('activity_date', allocation.reportingPeriodStart)
-            .lte('activity_date', allocation.reportingPeriodEnd);
+        if (utilityEntries && utilityEntries.length > 0) {
+          console.log(`[calculateProductCarbonFootprint] Found ${utilityEntries.length} utility entries for ${allocation.facilityName}`);
 
-          if (!activityError && activityEmissions && activityEmissions.length > 0) {
-            console.log(`[calculateProductCarbonFootprint] Found ${activityEmissions.length} activity records with emissions for ${allocation.facilityName}`);
+          // Emission factors matching the Company Emissions page (DEFRA 2025)
+          const EMISSION_FACTORS: Record<string, { factor: number; scope: 'Scope 1' | 'Scope 2' }> = {
+            diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },
+            diesel_mobile: { factor: 2.68787, scope: 'Scope 1' },
+            petrol_mobile: { factor: 2.31, scope: 'Scope 1' },
+            natural_gas: { factor: 0.18293, scope: 'Scope 1' },
+            lpg: { factor: 1.55537, scope: 'Scope 1' },
+            heavy_fuel_oil: { factor: 3.17740, scope: 'Scope 1' },
+            biomass_solid: { factor: 0.01551, scope: 'Scope 1' },
+            refrigerant_leakage: { factor: 1430, scope: 'Scope 1' },
+            electricity_grid: { factor: 0.207, scope: 'Scope 2' },
+            heat_steam_purchased: { factor: 0.1662, scope: 'Scope 2' },
+          };
 
-            // Sum up emissions by scope
-            for (const activity of activityEmissions) {
-              const emissions = Array.isArray(activity.calculated_emissions)
-                ? activity.calculated_emissions.reduce((sum: number, e: any) => sum + (e.calculated_value_co2e || 0), 0)
-                : (activity.calculated_emissions as any)?.calculated_value_co2e || 0;
-
-              if (activity.category === 'Scope 1') {
-                scope1Raw += emissions;
-              } else if (activity.category === 'Scope 2') {
-                scope2Raw += emissions;
+          for (const entry of utilityEntries) {
+            const config = EMISSION_FACTORS[entry.utility_type];
+            if (!config) {
+              // Check for water utility entries
+              if (entry.utility_type === 'water' || entry.utility_type === 'water_supply') {
+                totalWaterFromUtility += Number(entry.quantity || 0);
               }
-              facilityTotalEmissions += emissions;
+              continue;
             }
 
-            console.log(`[calculateProductCarbonFootprint] Fallback emissions for ${allocation.facilityName}:`, {
-              totalEmissions: facilityTotalEmissions,
-              scope1: scope1Raw,
-              scope2: scope2Raw,
-              activityCount: activityEmissions.length,
-            });
-          } else {
-            console.log(`[calculateProductCarbonFootprint] No calculated emissions found for ${allocation.facilityName}`);
+            let co2e = Number(entry.quantity) * config.factor;
+
+            // Handle natural gas m³ → kWh conversion (10.55 kWh/m³)
+            if (entry.utility_type === 'natural_gas' && entry.unit === 'm³') {
+              co2e = Number(entry.quantity) * 10.55 * config.factor;
+            }
+
+            if (config.scope === 'Scope 1') {
+              scope1Raw += co2e;
+            } else {
+              scope2Raw += co2e;
+            }
+            facilityTotalEmissions += co2e;
           }
+
+          console.log(`[calculateProductCarbonFootprint] Utility-based emissions for ${allocation.facilityName}:`, {
+            totalEmissions: facilityTotalEmissions,
+            scope1: scope1Raw,
+            scope2: scope2Raw,
+            waterLitres: totalWaterFromUtility,
+            entryCount: utilityEntries.length,
+          });
+        } else {
+          console.warn(`[calculateProductCarbonFootprint] No utility data entries found for ${allocation.facilityName}`);
         }
 
         const attributionRatio = allocation.productionVolume / allocation.facilityTotalProduction;
@@ -204,9 +254,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           allocatedScope2: scope2Emissions,
         });
 
-        // Extract water and waste
-        const totalWater = Number(payload.total_water_consumption?.value || payload.total_water_usage || 0);
-        const totalWaste = Number(payload.total_waste_generated?.value || payload.total_waste_generated || 0);
+        // Extract water and waste from utility data
+        const totalWater = totalWaterFromUtility;
+        const totalWaste = 0; // Waste data not yet captured in utility_data_entries
         const allocatedWater = totalWater * attributionRatio;
         const allocatedWaste = totalWaste * attributionRatio;
 
