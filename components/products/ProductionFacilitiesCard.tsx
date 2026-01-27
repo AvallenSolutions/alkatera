@@ -79,27 +79,29 @@ export function ProductionFacilitiesCard({
         return;
       }
 
-      // Get latest PEI for this product
+      // Get ALL PEIs for this product to find production site allocations
       const { data: peiData } = await supabase
         .from("product_carbon_footprints")
         .select("id")
-        .eq("product_id", productId)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .eq("product_id", productId);
 
-      const peiId = peiData?.[0]?.id;
+      const peiIds = (peiData || []).map((p: any) => p.id);
 
-      // Get owned facility production site allocations
+      // Get owned facility production site allocations across all PEIs
       let ownedAllocations: Record<string, any> = {};
-      if (peiId) {
+      if (peiIds.length > 0) {
         const { data: prodSites } = await supabase
           .from("product_carbon_footprint_production_sites")
           .select("facility_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
-          .eq("product_carbon_footprint_id", peiId);
+          .in("product_carbon_footprint_id", peiIds)
+          .order("reporting_period_end", { ascending: false });
 
         if (prodSites) {
           for (const site of prodSites) {
-            ownedAllocations[site.facility_id] = site;
+            // Keep the most recent allocation per facility
+            if (!ownedAllocations[site.facility_id]) {
+              ownedAllocations[site.facility_id] = site;
+            }
           }
         }
       }
