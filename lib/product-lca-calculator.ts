@@ -2,7 +2,7 @@ import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './impact-waterfall-resolver';
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { resolveImpactSource } from './utils/data-quality-mapper';
-import { aggregateProductImpacts } from './product-lca-aggregator';
+import { aggregateProductImpacts, type FacilityEmissionsData } from './product-lca-aggregator';
 import { calculateDistance } from './utils/distance-calculator';
 
 export interface FacilityAllocationInput {
@@ -159,6 +159,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // 4a. Handle facility allocations
     const { facilityAllocations } = params;
 
+    const collectedFacilityEmissions: FacilityEmissionsData[] = [];
+
     if (facilityAllocations && facilityAllocations.length > 0) {
       // New flow: Use facility allocations provided by user
       console.log(`[calculateProductCarbonFootprint] Processing ${facilityAllocations.length} facility allocations...`);
@@ -260,10 +262,23 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         const allocatedWater = totalWater * attributionRatio;
         const allocatedWaste = totalWaste * attributionRatio;
 
+        // Collect for aggregator (passed directly, bypasses broken DB trigger)
+        const isContractManufacturer = allocation.operationalControl === 'third_party';
+        collectedFacilityEmissions.push({
+          facilityId: allocation.facilityId,
+          facilityName: allocation.facilityName,
+          isContractManufacturer,
+          allocatedEmissions,
+          scope1Emissions,
+          scope2Emissions,
+          allocatedWater,
+          allocatedWaste,
+          attributionRatio,
+        });
+
         // Route to correct table based on facility ownership
         // - Owned facilities → product_carbon_footprint_production_sites (Scope 1 & 2)
         // - Third party (contract manufacturers) → contract_manufacturer_allocations (Scope 3)
-        const isContractManufacturer = allocation.operationalControl === 'third_party';
 
         if (isContractManufacturer) {
           // Insert to contract_manufacturer_allocations table
@@ -644,7 +659,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // 8. Run aggregation to calculate totals (client-side, no edge function needed)
     console.log(`[calculateProductCarbonFootprint] Calling aggregation engine...`);
 
-    const aggregationResult = await aggregateProductImpacts(supabase, lca.id);
+    console.log(`[calculateProductCarbonFootprint] Passing ${collectedFacilityEmissions.length} facility emissions to aggregator`);
+    const aggregationResult = await aggregateProductImpacts(supabase, lca.id, collectedFacilityEmissions);
 
     if (!aggregationResult.success) {
       console.error('[calculateProductCarbonFootprint] Aggregation error:', aggregationResult.error);

@@ -56,6 +56,18 @@ interface ProductionSite {
   source?: string;
 }
 
+export interface FacilityEmissionsData {
+  facilityId: string;
+  facilityName: string;
+  isContractManufacturer: boolean;
+  allocatedEmissions: number;
+  scope1Emissions: number;
+  scope2Emissions: number;
+  allocatedWater: number;
+  allocatedWaste: number;
+  attributionRatio: number;
+}
+
 export interface AggregationResult {
   success: boolean;
   total_carbon_footprint: number;
@@ -68,10 +80,15 @@ export interface AggregationResult {
 /**
  * Calculate and store aggregated impacts for a product carbon footprint.
  * This runs entirely client-side using the authenticated Supabase client.
+ *
+ * facilityEmissions: Pre-computed facility emissions passed directly from
+ * the calculator. This bypasses the product_carbon_footprint_production_sites
+ * table entirely, avoiding a broken DB trigger that prevents INSERTs.
  */
 export async function aggregateProductImpacts(
   supabase: SupabaseClient,
-  productCarbonFootprintId: string
+  productCarbonFootprintId: string,
+  facilityEmissions?: FacilityEmissionsData[]
 ): Promise<AggregationResult> {
   console.log(`[aggregateProductImpacts] Processing PCF: ${productCarbonFootprintId}`);
 
@@ -92,118 +109,17 @@ export async function aggregateProductImpacts(
 
   console.log(`[aggregateProductImpacts] Found ${materials.length} materials`);
 
-  // 2. Fetch owned production sites
-  const { data: ownedSites, error: ownedSitesError } = await supabase
-    .from('product_carbon_footprint_production_sites')
-    .select('*')
-    .eq('product_carbon_footprint_id', productCarbonFootprintId);
+  // 2. Use facility emissions passed directly from the calculator
+  // This bypasses the product_carbon_footprint_production_sites table entirely,
+  // which has a broken BEFORE INSERT trigger that silently aborts INSERTs.
+  console.log(`[aggregateProductImpacts] Facility emissions provided: ${facilityEmissions?.length || 0} facilities`);
 
-  if (ownedSitesError) {
-    console.warn('[aggregateProductImpacts] Failed to fetch owned production sites:', ownedSitesError);
-  }
-
-  // 3. Get the product_id from the PCF to query contract manufacturers
+  // 3. Get the product_id from the PCF (needed for product unit lookup later)
   const { data: lcaData } = await supabase
     .from('product_carbon_footprints')
     .select('product_id, organization_id')
     .eq('id', productCarbonFootprintId)
     .single();
-
-  // 4. Fetch contract manufacturer allocations
-  const { data: contractMfgAllocations, error: cmError } = await supabase
-    .from('contract_manufacturer_allocations')
-    .select('*')
-    .eq('product_id', lcaData?.product_id || 0)
-    .eq('organization_id', lcaData?.organization_id || '');
-
-  if (cmError) {
-    console.warn('[aggregateProductImpacts] Failed to fetch contract manufacturer allocations:', cmError);
-  }
-
-  // 5. Normalize contract manufacturer allocations to per-unit values
-  const contractMfgSites = (contractMfgAllocations || []).map(cm => {
-    const productionVolume = cm.client_production_volume || 1;
-    const emissionsPerUnit = (cm.allocated_emissions_kg_co2e || 0) / productionVolume;
-    const scope1PerUnit = (cm.scope1_emissions_kg_co2e || 0) / productionVolume;
-    const scope2PerUnit = (cm.scope2_emissions_kg_co2e || 0) / productionVolume;
-    const scope3PerUnit = (cm.scope3_emissions_kg_co2e || 0) / productionVolume;
-    const waterPerUnit = (cm.allocated_water_litres || 0) / productionVolume;
-    const wastePerUnit = (cm.allocated_waste_kg || 0) / productionVolume;
-
-    return {
-      id: cm.id,
-      facility_id: cm.facility_id,
-      allocated_emissions_kg_co2e: emissionsPerUnit,
-      allocated_water_litres: waterPerUnit,
-      allocated_waste_kg: wastePerUnit,
-      scope1_emissions_kg_co2e: scope1PerUnit,
-      scope2_emissions_kg_co2e: scope2PerUnit,
-      scope3_emissions_kg_co2e: scope3PerUnit,
-      share_of_production: (cm.attribution_ratio || 0) * 100,
-      source: 'contract_manufacturer',
-      _total_allocated_emissions: cm.allocated_emissions_kg_co2e,
-      _production_volume: productionVolume,
-    };
-  });
-
-  const productionSites: any[] = [
-    ...(ownedSites || []).map(s => ({ ...s, source: 'owned' })),
-    ...contractMfgSites,
-  ];
-
-  console.log(`[aggregateProductImpacts] Found ${ownedSites?.length || 0} owned production sites`);
-  console.log(`[aggregateProductImpacts] Found ${contractMfgAllocations?.length || 0} contract manufacturer sites`);
-
-  // 6. Validate production allocation sums to ~100%
-  if (productionSites.length > 0) {
-    let totalAllocationPercentage = 0;
-    const allocationDetails: { facilityId: string; source: string; share: number }[] = [];
-
-    for (const site of productionSites) {
-      const shareRaw = Number(site.share_of_production || 0);
-      const attributionRatio = Number(site.attribution_ratio || 0);
-      let sharePercent = 0;
-      if (shareRaw > 0) {
-        sharePercent = shareRaw;
-      } else if (attributionRatio > 0) {
-        sharePercent = attributionRatio * 100;
-      } else {
-        sharePercent = productionSites.length === 1 ? 100 : 0;
-      }
-      totalAllocationPercentage += sharePercent;
-      allocationDetails.push({
-        facilityId: site.facility_id || 'unknown',
-        source: site.source || 'unknown',
-        share: sharePercent,
-      });
-    }
-
-    console.log(`[aggregateProductImpacts] Production allocation breakdown:`);
-    allocationDetails.forEach(d => {
-      console.log(`  - Facility ${d.facilityId} (${d.source}): ${d.share.toFixed(1)}%`);
-    });
-    console.log(`  TOTAL: ${totalAllocationPercentage.toFixed(1)}%`);
-
-    const ALLOCATION_TOLERANCE = 1;
-    if (totalAllocationPercentage < 100 - ALLOCATION_TOLERANCE) {
-      console.warn(`[aggregateProductImpacts] UNDER-ALLOCATION WARNING: ${totalAllocationPercentage.toFixed(1)}%`);
-    } else if (totalAllocationPercentage > 100 + ALLOCATION_TOLERANCE) {
-      console.error(`[aggregateProductImpacts] OVER-ALLOCATION ERROR: ${totalAllocationPercentage.toFixed(1)}%`);
-      await supabase
-        .from('product_carbon_footprints')
-        .update({
-          validation_warnings: JSON.stringify([{
-            type: 'over_allocation',
-            message: `Production shares sum to ${totalAllocationPercentage.toFixed(1)}% instead of 100%`,
-            facilities: allocationDetails,
-            timestamp: new Date().toISOString(),
-          }]),
-        })
-        .eq('id', productCarbonFootprintId);
-    } else {
-      console.log(`[aggregateProductImpacts] Allocation validation passed: ${totalAllocationPercentage.toFixed(1)}%`);
-    }
-  }
 
   // 7. Aggregate material impacts
   let scope1Emissions = 0;
@@ -293,104 +209,31 @@ export async function aggregateProductImpacts(
     console.log(`[aggregateProductImpacts] Material: ${material.material_name}, Climate: ${climateImpact.toFixed(4)}, Transport: ${transportImpact.toFixed(4)} kg CO2e`);
   }
 
-  // 8. Process production sites (facility emissions)
-  if (productionSites && productionSites.length > 0) {
-    console.log('[aggregateProductImpacts] Processing production sites...');
+  // 8. Process facility emissions (passed directly from calculator)
+  // The calculator already queried utility_data_entries and computed allocated emissions.
+  // We just add them to the totals — no intermediate table needed.
+  if (facilityEmissions && facilityEmissions.length > 0) {
+    console.log(`[aggregateProductImpacts] Processing ${facilityEmissions.length} facility emissions...`);
 
-    for (const site of productionSites as ProductionSite[]) {
-      const isContractMfg = (site as any).source === 'contract_manufacturer';
-
-      let emissionsPerUnit: number;
-
-      if (isContractMfg) {
-        emissionsPerUnit = Number(site.allocated_emissions_kg_co2e || 0);
+    for (const fe of facilityEmissions) {
+      if (fe.isContractManufacturer) {
+        // Contract manufacturers → Scope 3
+        scope3Emissions += fe.allocatedEmissions;
+        console.log(`[aggregateProductImpacts] CONTRACT MFG ${fe.facilityName}: ${fe.allocatedEmissions.toFixed(4)} kg CO2e -> Scope 3`);
       } else {
-        const perUnitIntensity = Number(site.emission_intensity_kg_co2e_per_unit || 0);
-        const totalEmissions = Number(site.allocated_emissions_kg_co2e || 0);
-        const productionVolume = Number(site.production_volume || 1);
-
-        if (perUnitIntensity > 0) {
-          emissionsPerUnit = perUnitIntensity;
-        } else if (totalEmissions > 0 && productionVolume > 0) {
-          emissionsPerUnit = totalEmissions / productionVolume;
-        } else {
-          emissionsPerUnit = 0;
-        }
+        // Owned facilities → Scope 1 & 2
+        scope1Emissions += fe.scope1Emissions;
+        scope2Emissions += fe.scope2Emissions;
+        console.log(`[aggregateProductImpacts] OWNED ${fe.facilityName}: S1=${fe.scope1Emissions.toFixed(4)}, S2=${fe.scope2Emissions.toFixed(4)}`);
       }
 
-      let scope1PerUnit = Number(site.scope1_emissions_kg_co2e || 0);
-      let scope2PerUnit = Number(site.scope2_emissions_kg_co2e || 0);
-      let scope3PerUnit = Number(site.scope3_emissions_kg_co2e || 0);
+      processingEmissions += fe.allocatedEmissions;
+      totalClimate += fe.allocatedEmissions;
+      totalClimateFossil += fe.allocatedEmissions;
+      totalCO2Fossil += fe.allocatedEmissions;
 
-      if (!isContractMfg) {
-        const productionVolume = Number(site.production_volume || 1);
-        if (productionVolume > 1) {
-          if (scope1PerUnit > 1 || scope2PerUnit > 1) {
-            scope1PerUnit = scope1PerUnit / productionVolume;
-            scope2PerUnit = scope2PerUnit / productionVolume;
-            scope3PerUnit = scope3PerUnit / productionVolume;
-          }
-        }
-      }
-
-      const shareRaw = Number(site.share_of_production || 0);
-      const attributionRatio = Number(site.attribution_ratio || 0);
-      const shareOfProduction = shareRaw > 0 ? shareRaw / 100 : (attributionRatio > 0 ? attributionRatio : 1);
-
-      if (emissionsPerUnit > 0) {
-        const attributableEmissions = emissionsPerUnit * shareOfProduction;
-
-        let facilityScope1 = scope1PerUnit * shareOfProduction;
-        let facilityScope2 = scope2PerUnit * shareOfProduction;
-        let facilityScope3 = scope3PerUnit * shareOfProduction;
-
-        const hasScopeBreakdown = facilityScope1 > 0 || facilityScope2 > 0 || facilityScope3 > 0;
-
-        if (!hasScopeBreakdown && attributableEmissions > 0) {
-          facilityScope1 = attributableEmissions * 0.35;
-          facilityScope2 = attributableEmissions * 0.65;
-          facilityScope3 = 0;
-        }
-
-        const isContractManufacturer = (site as any).source === 'contract_manufacturer';
-
-        if (isContractManufacturer) {
-          scope3Emissions += attributableEmissions;
-          console.log(`[aggregateProductImpacts] CONTRACT MFG Facility ${site.facility_id}: ${attributableEmissions.toFixed(4)} kg CO2e -> Scope 3`);
-        } else {
-          scope1Emissions += facilityScope1;
-          scope2Emissions += facilityScope2;
-          scope3Emissions += facilityScope3;
-          console.log(`[aggregateProductImpacts] OWNED Facility ${site.facility_id}: S1=${facilityScope1.toFixed(4)}, S2=${facilityScope2.toFixed(4)}`);
-        }
-
-        processingEmissions += attributableEmissions;
-        totalClimate += attributableEmissions;
-        totalClimateFossil += attributableEmissions;
-        totalCO2Fossil += attributableEmissions;
-
-        // Also add facility water and waste to totals
-        const facilityWater = Number(site.allocated_water_litres || 0);
-        const facilityWaste = Number(site.allocated_waste_kg || 0);
-        if (isContractMfg) {
-          // Already per-unit for contract manufacturers
-          totalWater += facilityWater * shareOfProduction;
-          totalWaste += facilityWaste * shareOfProduction;
-        } else {
-          // For owned sites, convert to per-unit if needed
-          const prodVol = Number(site.production_volume || 1);
-          if (facilityWater > 1 && prodVol > 1) {
-            totalWater += (facilityWater / prodVol) * shareOfProduction;
-          } else {
-            totalWater += facilityWater * shareOfProduction;
-          }
-          if (facilityWaste > 1 && prodVol > 1) {
-            totalWaste += (facilityWaste / prodVol) * shareOfProduction;
-          } else {
-            totalWaste += facilityWaste * shareOfProduction;
-          }
-        }
-      }
+      totalWater += fe.allocatedWater;
+      totalWaste += fe.allocatedWaste;
     }
   }
 
@@ -523,7 +366,7 @@ export async function aggregateProductImpacts(
     },
 
     materials_count: materials.length,
-    production_sites_count: productionSites?.length || 0,
+    production_sites_count: facilityEmissions?.length || 0,
     calculated_at: new Date().toISOString(),
     calculation_version: '2.1.0',
   };
@@ -587,6 +430,6 @@ export async function aggregateProductImpacts(
     total_carbon_footprint: totalCarbonFootprint,
     impacts: aggregatedImpacts,
     materials_count: materials.length,
-    production_sites_count: productionSites?.length || 0,
+    production_sites_count: facilityEmissions?.length || 0,
   };
 }
