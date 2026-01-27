@@ -233,24 +233,37 @@ export function useCompanyMetrics(year?: number) {
         throw new Error('No organization selected');
       }
 
-      // Fetch PEIs (Product Environmental Impacts) for the selected year
-      // Filter by updated_at to get assessments completed within the calendar year
+      // Match corporate-emissions approach: start from production logs for the year,
+      // then find the latest completed LCA for each product (regardless of LCA update date).
+      // This ensures products with older assessments but current-year production are included.
       const yearStart = `${selectedYear}-01-01`;
       const yearEnd = `${selectedYear}-12-31`;
 
+      // Step 1: Get all production logs for the year
+      const { data: productionData } = await supabase
+        .from('production_logs')
+        .select('product_id, units_produced, volume, unit, date')
+        .eq('organization_id', currentOrganization.id)
+        .gte('date', yearStart)
+        .lte('date', yearEnd);
+
+      // Get unique product IDs that had production this year
+      const producedProductIds = Array.from(
+        new Set((productionData || []).map(p => p.product_id).filter(Boolean))
+      );
+
+      // Step 2: Fetch the latest completed LCA for each product (no year filter on updated_at)
       const { data: allLcas, error: lcaError } = await supabase
         .from('product_carbon_footprints')
         .select('id, product_id, product_name, aggregated_impacts, csrd_compliant, updated_at')
         .eq('organization_id', currentOrganization.id)
         .eq('status', 'completed')
         .not('aggregated_impacts', 'is', null)
-        .gte('updated_at', yearStart)
-        .lte('updated_at', `${yearEnd}T23:59:59`)
         .order('updated_at', { ascending: false });
 
       if (lcaError) throw lcaError;
 
-      // Deduplicate to get latest per product_id
+      // Deduplicate to get latest LCA per product_id
       const latestByProduct = new Map();
       allLcas?.forEach(lca => {
         if (!latestByProduct.has(lca.product_id) ||
@@ -259,18 +272,19 @@ export function useCompanyMetrics(year?: number) {
         }
       });
 
-      const lcas = Array.from(latestByProduct.values());
+      // Include LCAs for products that had production this year,
+      // plus any LCAs updated this year (even without production logs)
+      const lcaProductIds = new Set(producedProductIds.map(String));
+      allLcas?.forEach(lca => {
+        const updatedAt = new Date(lca.updated_at);
+        if (updatedAt.getFullYear() === selectedYear) {
+          lcaProductIds.add(String(lca.product_id));
+        }
+      });
 
-      // Fetch production volumes for all products within the selected year
-      // IMPORTANT: units_produced is normalized to consumer units (e.g., bottles)
-      // This was calculated from bulk volume (hectolitres/litres) ÷ product unit size
-      const productIds = lcas.map(lca => lca.product_id).filter(id => id);
-      const { data: productionData } = await supabase
-        .from('production_logs')
-        .select('product_id, units_produced, volume, unit, date')
-        .in('product_id', productIds)
-        .gte('date', yearStart)
-        .lte('date', yearEnd);
+      const lcas = Array.from(lcaProductIds)
+        .map(pid => latestByProduct.get(Number(pid) || pid))
+        .filter(Boolean);
 
       // =========================================================================
       // CRITICAL FIX: Unit normalization validation
@@ -873,7 +887,8 @@ export function useCompanyMetrics(year?: number) {
         return;
       }
 
-      // Fetch materials from completed PEIs within the selected year
+      // Fetch materials from all completed PEIs (no year filter on updated_at,
+      // matching the corporate-emissions approach - production volume determines the year)
       const { data: materials, error } = await supabase
         .from('product_carbon_footprint_materials')
         .select(`
@@ -916,8 +931,6 @@ export function useCompanyMetrics(year?: number) {
         `)
         .eq('product_carbon_footprints.organization_id', currentOrganization.id)
         .eq('product_carbon_footprints.status', 'completed')
-        .gte('product_carbon_footprints.updated_at', yearStart)
-        .lte('product_carbon_footprints.updated_at', `${yearEnd}T23:59:59`)
         .not('impact_climate', 'is', null);
 
       if (error) {
