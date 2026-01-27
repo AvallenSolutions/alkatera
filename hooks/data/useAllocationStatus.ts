@@ -30,24 +30,52 @@ export function useAllocationStatus(productId: number | null): AllocationStatus 
       try {
         const supabase = getSupabaseBrowserClient();
 
-        const { data, error } = await supabase
+        // Fetch contract manufacturer allocations
+        const { data: cmData, error: cmError } = await supabase
           .from("contract_manufacturer_allocations")
           .select("status, is_energy_intensive_process, allocated_emissions_kg_co2e")
           .eq("product_id", productId);
 
-        if (error) throw error;
+        if (cmError) throw cmError;
 
-        const allocations = data || [];
-        const provisional = allocations.filter(
-          (a) => a.status === "provisional" || a.is_energy_intensive_process
-        );
-        const verified = allocations.filter(
-          (a) => a.status === "verified" || a.status === "approved"
-        );
-        const totalEmissions = allocations.reduce(
-          (sum, a) => sum + (a.allocated_emissions_kg_co2e || 0),
-          0
-        );
+        // Fetch owned facility allocations via production sites
+        const { data: ownedData, error: ownedError } = await supabase
+          .from("facility_product_allocation_matrix")
+          .select("has_allocations, latest_allocation")
+          .eq("product_id", productId);
+
+        if (ownedError) {
+          console.warn("Failed to fetch owned allocations:", ownedError);
+        }
+
+        const cmAllocations = cmData || [];
+        const ownedAllocations = (ownedData || []).filter((a: any) => a.has_allocations);
+
+        const provisional = [
+          ...cmAllocations.filter(
+            (a) => a.status === "provisional" || a.is_energy_intensive_process
+          ),
+          ...ownedAllocations.filter(
+            (a: any) => a.latest_allocation?.status === "provisional"
+          ),
+        ];
+        const verified = [
+          ...cmAllocations.filter(
+            (a) => a.status === "verified" || a.status === "approved"
+          ),
+          ...ownedAllocations.filter(
+            (a: any) => a.latest_allocation?.status === "verified" || a.latest_allocation?.status === "approved"
+          ),
+        ];
+        const totalEmissions =
+          cmAllocations.reduce(
+            (sum, a) => sum + (a.allocated_emissions_kg_co2e || 0),
+            0
+          ) +
+          ownedAllocations.reduce(
+            (sum: number, a: any) => sum + (a.latest_allocation?.allocated_emissions || 0),
+            0
+          );
 
         setStatus({
           hasProvisionalAllocations: provisional.length > 0,

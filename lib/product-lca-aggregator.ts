@@ -66,6 +66,7 @@ export interface FacilityEmissionsData {
   allocatedWater: number;
   allocatedWaste: number;
   attributionRatio: number;
+  productVolume: number; // units of this product produced at the facility
 }
 
 export interface AggregationResult {
@@ -210,30 +211,41 @@ export async function aggregateProductImpacts(
   }
 
   // 8. Process facility emissions (passed directly from calculator)
-  // The calculator already queried utility_data_entries and computed allocated emissions.
-  // We just add them to the totals — no intermediate table needed.
+  // The calculator passes TOTAL allocated emissions for the entire product run.
+  // Material impacts are already per-unit (per 1 functional unit of product).
+  // So we must divide facility emissions by productVolume to get per-unit values.
   if (facilityEmissions && facilityEmissions.length > 0) {
     console.log(`[aggregateProductImpacts] Processing ${facilityEmissions.length} facility emissions...`);
 
     for (const fe of facilityEmissions) {
+      // Convert total allocated emissions to per-unit
+      const units = fe.productVolume > 0 ? fe.productVolume : 1;
+      const perUnitEmissions = fe.allocatedEmissions / units;
+      const perUnitScope1 = fe.scope1Emissions / units;
+      const perUnitScope2 = fe.scope2Emissions / units;
+      const perUnitWater = fe.allocatedWater / units;
+      const perUnitWaste = fe.allocatedWaste / units;
+
+      console.log(`[aggregateProductImpacts] ${fe.facilityName}: total allocated=${fe.allocatedEmissions.toFixed(4)} kg / ${units} units = ${perUnitEmissions.toFixed(6)} kg/unit`);
+
       if (fe.isContractManufacturer) {
         // Contract manufacturers → Scope 3
-        scope3Emissions += fe.allocatedEmissions;
-        console.log(`[aggregateProductImpacts] CONTRACT MFG ${fe.facilityName}: ${fe.allocatedEmissions.toFixed(4)} kg CO2e -> Scope 3`);
+        scope3Emissions += perUnitEmissions;
+        console.log(`[aggregateProductImpacts] CONTRACT MFG ${fe.facilityName}: ${perUnitEmissions.toFixed(6)} kg CO2e/unit -> Scope 3`);
       } else {
         // Owned facilities → Scope 1 & 2
-        scope1Emissions += fe.scope1Emissions;
-        scope2Emissions += fe.scope2Emissions;
-        console.log(`[aggregateProductImpacts] OWNED ${fe.facilityName}: S1=${fe.scope1Emissions.toFixed(4)}, S2=${fe.scope2Emissions.toFixed(4)}`);
+        scope1Emissions += perUnitScope1;
+        scope2Emissions += perUnitScope2;
+        console.log(`[aggregateProductImpacts] OWNED ${fe.facilityName}: S1=${perUnitScope1.toFixed(6)}, S2=${perUnitScope2.toFixed(6)} kg CO2e/unit`);
       }
 
-      processingEmissions += fe.allocatedEmissions;
-      totalClimate += fe.allocatedEmissions;
-      totalClimateFossil += fe.allocatedEmissions;
-      totalCO2Fossil += fe.allocatedEmissions;
+      processingEmissions += perUnitEmissions;
+      totalClimate += perUnitEmissions;
+      totalClimateFossil += perUnitEmissions;
+      totalCO2Fossil += perUnitEmissions;
 
-      totalWater += fe.allocatedWater;
-      totalWaste += fe.allocatedWaste;
+      totalWater += perUnitWater;
+      totalWaste += perUnitWaste;
     }
   }
 
