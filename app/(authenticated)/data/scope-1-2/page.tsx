@@ -180,6 +180,10 @@ export default function CompanyEmissionsPage() {
     packaging_tco2e: number;
     production_volume: number;
   }>>([]);
+  const [scope3Cat1PendingProducts, setScope3Cat1PendingProducts] = useState<Array<{
+    product_name: string;
+    status: string;
+  }>>([]);
   const [scope3Cat1DataQuality, setScope3Cat1DataQuality] = useState<string>('');
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -387,30 +391,76 @@ export default function CompanyEmissionsPage() {
       });
 
       if (!productionLogs || productionLogs.length === 0) {
-        // Fallback: use products with completed LCAs and their production site volumes
-        console.log('🔍 [SCOPE 3 CAT 1] No production logs found, falling back to completed LCAs');
+        // Fallback: use products with completed PEIs in the reporting year
+        console.log('🔍 [SCOPE 3 CAT 1] No production logs found, falling back to completed PEIs');
 
-        const { data: completedLCAs, error: lcaFallbackError } = await browserSupabase
+        // Fetch all PEIs for the org to determine completed vs pending per product
+        const { data: allPEIs, error: lcaFallbackError } = await browserSupabase
           .from('product_carbon_footprints')
-          .select('id, product_id, total_ghg_emissions, aggregated_impacts, status')
+          .select('id, product_id, total_ghg_emissions, aggregated_impacts, status, updated_at')
           .eq('organization_id', currentOrganization.id)
-          .eq('status', 'completed')
           .order('created_at', { ascending: false });
 
-        if (lcaFallbackError || !completedLCAs || completedLCAs.length === 0) {
+        // Fetch all org products to identify those without completed PEIs
+        const { data: allProducts } = await browserSupabase
+          .from('products')
+          .select('id, name')
+          .eq('organization_id', currentOrganization.id);
+
+        if (lcaFallbackError || !allPEIs || allPEIs.length === 0) {
           setScope3Cat1CO2e(0);
           setScope3Cat1Breakdown([]);
-          setScope3Cat1DataQuality('No production data or completed LCAs for selected year');
+          setScope3Cat1PendingProducts([]);
+          setScope3Cat1DataQuality('No production data or completed PEIs for selected year');
           return;
         }
 
-        // Deduplicate: keep only latest LCA per product
+        // Deduplicate: keep only latest PEI per product
         const latestByProduct = new Map<number, any>();
-        for (const lca of completedLCAs) {
-          if (!latestByProduct.has(lca.product_id)) {
-            latestByProduct.set(lca.product_id, lca);
+        for (const pei of allPEIs) {
+          if (!latestByProduct.has(pei.product_id)) {
+            latestByProduct.set(pei.product_id, pei);
           }
         }
+
+        // Identify products with completed PEIs in reporting year vs those without
+        const completedProductIds = new Set<number>();
+        const pendingProducts: Array<{ product_name: string; status: string }> = [];
+
+        for (const [productId, pei] of Array.from(latestByProduct.entries())) {
+          const peiYear = pei.updated_at ? new Date(pei.updated_at).getFullYear() : null;
+          const isCompletedInYear = pei.status === 'completed' && peiYear === selectedYear;
+
+          if (isCompletedInYear) {
+            completedProductIds.add(productId);
+          } else {
+            // Find product name
+            const product = allProducts?.find((p: any) => p.id === productId);
+            if (product) {
+              const statusLabel = pei.status === 'completed'
+                ? `Completed in ${peiYear} (not in reporting year ${selectedYear})`
+                : pei.status === 'draft' ? 'PEI in draft' : `PEI ${pei.status}`;
+              pendingProducts.push({
+                product_name: (product as any).name,
+                status: statusLabel,
+              });
+            }
+          }
+        }
+
+        // Also find products with no PEI at all
+        if (allProducts) {
+          for (const product of allProducts as any[]) {
+            if (!latestByProduct.has(product.id)) {
+              pendingProducts.push({
+                product_name: product.name,
+                status: 'No PEI created',
+              });
+            }
+          }
+        }
+
+        setScope3Cat1PendingProducts(pendingProducts);
 
         let totalEmissions = 0;
         const breakdown: Array<{
@@ -420,7 +470,8 @@ export default function CompanyEmissionsPage() {
           production_volume: number;
         }> = [];
 
-        for (const [productId, lca] of Array.from(latestByProduct.entries())) {
+        for (const productId of Array.from(completedProductIds)) {
+          const lca = latestByProduct.get(productId);
           const { data: productData } = await browserSupabase
             .from('products')
             .select('name')
@@ -518,7 +569,7 @@ export default function CompanyEmissionsPage() {
 
         setScope3Cat1CO2e(totalEmissions);
         setScope3Cat1Breakdown(breakdown);
-        setScope3Cat1DataQuality(totalEmissions > 0 ? 'Tier 1: Primary LCA data (from completed product reports)' : 'No completed product LCAs found');
+        setScope3Cat1DataQuality(totalEmissions > 0 ? 'Tier 1: Primary LCA data (from completed product reports)' : 'No completed product PEIs found for selected year');
         return;
       }
 
@@ -547,9 +598,11 @@ export default function CompanyEmissionsPage() {
 
         const { data: lcaData, error: lcaError } = await browserSupabase
           .from('product_carbon_footprints')
-          .select('id, total_ghg_emissions, aggregated_impacts, status, per_unit_emissions_verified')
+          .select('id, total_ghg_emissions, aggregated_impacts, status, per_unit_emissions_verified, updated_at')
           .eq('product_id', log.product_id)
           .eq('status', 'completed')
+          .gte('updated_at', yearStart)
+          .lte('updated_at', `${selectedYear}-12-31T23:59:59.999Z`)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -640,6 +693,43 @@ export default function CompanyEmissionsPage() {
           production_volume: unitsProduced,
         });
       }
+
+      // Identify products in production logs that don't have completed PEIs in the reporting year
+      const includedProductIds = new Set(breakdown.map(b => b.product_name));
+      const pendingProducts: Array<{ product_name: string; status: string }> = [];
+      for (const log of productionLogs as any[]) {
+        const { data: prod } = await browserSupabase
+          .from('products')
+          .select('name')
+          .eq('id', log.product_id)
+          .maybeSingle();
+        if (prod && !includedProductIds.has((prod as any).name)) {
+          // Check what PEI status this product has
+          const { data: latestPEI } = await browserSupabase
+            .from('product_carbon_footprints')
+            .select('status, updated_at')
+            .eq('product_id', log.product_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const pei = latestPEI as any;
+          let statusLabel = 'No PEI created';
+          if (pei) {
+            if (pei.status === 'completed') {
+              const peiYear = new Date(pei.updated_at).getFullYear();
+              statusLabel = `Completed in ${peiYear} (not in reporting year ${selectedYear})`;
+            } else {
+              statusLabel = pei.status === 'draft' ? 'PEI in draft' : `PEI ${pei.status}`;
+            }
+          }
+          // Only add once per product name
+          if (!pendingProducts.some(p => p.product_name === (prod as any).name)) {
+            pendingProducts.push({ product_name: (prod as any).name, status: statusLabel });
+          }
+        }
+      }
+      setScope3Cat1PendingProducts(pendingProducts);
 
       setScope3Cat1CO2e(totalEmissions);
       setScope3Cat1Breakdown(breakdown);
@@ -1596,6 +1686,33 @@ export default function CompanyEmissionsPage() {
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-1">
                                   Materials: {product.materials_tco2e.toFixed(2)} | Packaging: {product.packaging_tco2e.toFixed(2)}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {scope3Cat1PendingProducts.length > 0 && (
+                      <div className="space-y-3 mt-4">
+                        <h4 className="font-semibold text-sm text-muted-foreground">Products Excluded from Calculations:</h4>
+                        <div className="space-y-2">
+                          {scope3Cat1PendingProducts.map((product, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900/50"
+                            >
+                              <div className="flex items-center gap-2 flex-1">
+                                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0" />
+                                <div>
+                                  <div className="font-medium text-sm">{product.product_name}</div>
+                                  <div className="text-xs text-muted-foreground mt-1">{product.status}</div>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                  Not included
                                 </div>
                               </div>
                             </div>
