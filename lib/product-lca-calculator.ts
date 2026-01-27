@@ -175,8 +175,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           .from('utility_data_entries')
           .select('utility_type, quantity, unit, calculated_scope')
           .eq('facility_id', allocation.facilityId)
-          .gte('reporting_period_start', allocation.reportingPeriodStart)
-          .lte('reporting_period_end', allocation.reportingPeriodEnd);
+          .lte('reporting_period_start', allocation.reportingPeriodEnd)
+          .gte('reporting_period_end', allocation.reportingPeriodStart);
 
         if (utilityError) {
           console.warn(`[calculateProductCarbonFootprint] Failed to query utility_data_entries for ${allocation.facilityName}:`, utilityError);
