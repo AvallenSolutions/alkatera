@@ -537,7 +537,7 @@ export default function DashboardPage() {
                   <h3 className="text-sm font-semibold">Log Production</h3>
                   <p className="text-xs text-muted-foreground mt-1">Track volumes to allocate impact</p>
                   <Button asChild size="sm" className="mt-2 h-8 bg-neon-lime text-black hover:bg-neon-lime/90">
-                    <Link href="/company/production-allocation">
+                    <Link href="/company/facilities">
                       Get Started <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
                   </Button>

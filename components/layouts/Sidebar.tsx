@@ -98,12 +98,6 @@ const navigationStructure: NavItem[] = [
         featureCode: 'vehicle_registry',
       },
       {
-        name: 'Production Allocation',
-        href: '/company/production-allocation/',
-        icon: Target,
-        minTier: 2, // Blossom and above
-      },
-      {
         name: 'Company Emissions',
         href: '/data/scope-1-2/',
         icon: Flame,

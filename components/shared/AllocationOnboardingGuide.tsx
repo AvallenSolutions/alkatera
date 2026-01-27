@@ -126,7 +126,7 @@ export function AllocationOnboardingGuide({
           icon: LinkIcon,
           action: {
             label: "Set Up Assignments",
-            href: "/company/production-allocation",
+            href: "/company/facilities",
           },
         },
         {
@@ -150,7 +150,7 @@ export function AllocationOnboardingGuide({
           icon: Factory,
           action: {
             label: "Start Allocating",
-            href: "/company/production-allocation",
+            href: "/company/facilities",
           },
         },
       ];

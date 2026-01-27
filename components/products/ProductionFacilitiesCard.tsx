@@ -79,27 +79,29 @@ export function ProductionFacilitiesCard({
         return;
       }
 
-      // Get latest PEI for this product
+      // Get ALL PEIs for this product to find production site allocations
       const { data: peiData } = await supabase
         .from("product_carbon_footprints")
         .select("id")
-        .eq("product_id", productId)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .eq("product_id", productId);
 
-      const peiId = peiData?.[0]?.id;
+      const peiIds = (peiData || []).map((p: any) => p.id);
 
-      // Get owned facility production site allocations
+      // Get owned facility production site allocations across all PEIs
       let ownedAllocations: Record<string, any> = {};
-      if (peiId) {
+      if (peiIds.length > 0) {
         const { data: prodSites } = await supabase
           .from("product_carbon_footprint_production_sites")
           .select("facility_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
-          .eq("product_carbon_footprint_id", peiId);
+          .in("product_carbon_footprint_id", peiIds)
+          .order("reporting_period_end", { ascending: false });
 
         if (prodSites) {
           for (const site of prodSites) {
-            ownedAllocations[site.facility_id] = site;
+            // Keep the most recent allocation per facility
+            if (!ownedAllocations[site.facility_id]) {
+              ownedAllocations[site.facility_id] = site;
+            }
           }
         }
       }
@@ -202,10 +204,10 @@ export function ProductionFacilitiesCard({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push("/company/production-allocation")}
+            onClick={() => router.push("/company/facilities")}
           >
             <Building2 className="mr-2 h-4 w-4" />
-            View Matrix
+            View Facilities
           </Button>
         </div>
       </CardHeader>
@@ -219,7 +221,7 @@ export function ProductionFacilitiesCard({
               production emissions
             </p>
             <Button
-              onClick={() => router.push("/company/production-allocation")}
+              onClick={() => router.push("/company/facilities")}
               className="bg-lime-500 hover:bg-lime-600 text-black"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -384,7 +386,7 @@ export function ProductionFacilitiesCard({
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => router.push("/company/production-allocation")}
+                onClick={() => router.push("/company/facilities")}
               >
                 Manage Facility Assignments
               </Button>

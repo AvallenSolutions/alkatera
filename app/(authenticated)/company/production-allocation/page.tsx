@@ -177,38 +177,36 @@ export default function ProductionAllocationPage() {
     const ownedAllocByFacilityProduct: Record<string, any> = {};
 
     if (productIds.length > 0) {
+      // Get ALL PEIs for all products to find production site allocations
       const { data: peis } = await supabase
         .from("product_carbon_footprints")
         .select("id, product_id")
-        .in("product_id", productIds)
-        .order("created_at", { ascending: false });
+        .in("product_id", productIds);
 
       if (peis && peis.length > 0) {
-        // Deduplicate: latest PEI per product
-        const latestPeiByProduct = new Map<number, string>();
+        const peiIds = peis.map(p => p.id);
+
+        // Build reverse lookup: pei_id -> product_id
+        const peiToProduct = new Map<string, number>();
         for (const pei of peis) {
-          if (!latestPeiByProduct.has(pei.product_id)) {
-            latestPeiByProduct.set(pei.product_id, pei.id);
-          }
+          peiToProduct.set(pei.id, pei.product_id);
         }
 
-        const peiIds = Array.from(latestPeiByProduct.values());
         const { data: prodSites } = await supabase
           .from("product_carbon_footprint_production_sites")
           .select("facility_id, product_carbon_footprint_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
-          .in("product_carbon_footprint_id", peiIds);
+          .in("product_carbon_footprint_id", peiIds)
+          .order("reporting_period_end", { ascending: false });
 
         if (prodSites) {
-          // Build reverse lookup: pei_id -> product_id
-          const peiToProduct = new Map<string, number>();
-          for (const [prodId, peiId] of Array.from(latestPeiByProduct.entries())) {
-            peiToProduct.set(peiId, prodId);
-          }
           for (const site of prodSites) {
             const prodId = peiToProduct.get(site.product_carbon_footprint_id);
             if (prodId) {
               const key = `${site.facility_id}-${prodId}`;
-              ownedAllocByFacilityProduct[key] = site;
+              // Keep most recent per facility-product pair
+              if (!ownedAllocByFacilityProduct[key]) {
+                ownedAllocByFacilityProduct[key] = site;
+              }
             }
           }
         }
