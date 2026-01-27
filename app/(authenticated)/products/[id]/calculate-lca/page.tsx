@@ -66,6 +66,17 @@ interface FacilityAllocation {
   productionVolume: string;
   productionVolumeUnit: string;
   facilityTotalProduction: string;
+  selectedSessionId?: string;
+}
+
+interface ReportingSession {
+  id: string;
+  facility_id: string;
+  reporting_period_start: string;
+  reporting_period_end: string;
+  total_production_volume: number;
+  volume_unit: string;
+  data_source_type: string;
 }
 
 const PRODUCTION_UNITS = [
@@ -90,6 +101,7 @@ export default function CalculateLCAPage() {
   const [missingCount, setMissingCount] = useState(0);
   const [linkedFacilities, setLinkedFacilities] = useState<LinkedFacility[]>([]);
   const [facilityAllocations, setFacilityAllocations] = useState<FacilityAllocation[]>([]);
+  const [reportingSessions, setReportingSessions] = useState<Record<string, ReportingSession[]>>({});
 
   useEffect(() => {
     async function loadAndValidate() {
@@ -188,20 +200,57 @@ export default function CalculateLCAPage() {
 
           setLinkedFacilities(facilities);
 
-          // Initialize allocations for each facility
+          // Fetch reporting sessions for all linked facilities
+          const facilityIds = facilities.map(f => f.facility_id);
+          const { data: sessions } = await supabase
+            .from('facility_reporting_sessions')
+            .select('id, facility_id, reporting_period_start, reporting_period_end, total_production_volume, volume_unit, data_source_type')
+            .in('facility_id', facilityIds)
+            .order('reporting_period_end', { ascending: false });
+
+          // Group sessions by facility_id
+          const sessionsByFacility: Record<string, ReportingSession[]> = {};
+          for (const session of (sessions || [])) {
+            if (!sessionsByFacility[session.facility_id]) {
+              sessionsByFacility[session.facility_id] = [];
+            }
+            sessionsByFacility[session.facility_id].push(session);
+          }
+          setReportingSessions(sessionsByFacility);
+
+          // Initialize allocations - auto-select the most recent session if available
           const defaultEndDate = new Date().toISOString().split('T')[0];
           const defaultStartDate = new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0];
 
-          setFacilityAllocations(facilities.map(f => ({
-            facilityId: f.facility_id,
-            facilityName: f.facility.name,
-            operationalControl: f.facility.operational_control,
-            reportingPeriodStart: defaultStartDate,
-            reportingPeriodEnd: defaultEndDate,
-            productionVolume: '',
-            productionVolumeUnit: 'units',
-            facilityTotalProduction: '',
-          })));
+          setFacilityAllocations(facilities.map(f => {
+            const facilitySessions = sessionsByFacility[f.facility_id] || [];
+            const latestSession = facilitySessions[0]; // Already sorted by end date desc
+
+            if (latestSession) {
+              return {
+                facilityId: f.facility_id,
+                facilityName: f.facility.name,
+                operationalControl: f.facility.operational_control,
+                reportingPeriodStart: latestSession.reporting_period_start,
+                reportingPeriodEnd: latestSession.reporting_period_end,
+                productionVolume: '',
+                productionVolumeUnit: latestSession.volume_unit || 'units',
+                facilityTotalProduction: String(latestSession.total_production_volume),
+                selectedSessionId: latestSession.id,
+              };
+            }
+
+            return {
+              facilityId: f.facility_id,
+              facilityName: f.facility.name,
+              operationalControl: f.facility.operational_control,
+              reportingPeriodStart: defaultStartDate,
+              reportingPeriodEnd: defaultEndDate,
+              productionVolume: '',
+              productionVolumeUnit: 'units',
+              facilityTotalProduction: '',
+            };
+          }));
         }
 
       } catch (error: any) {
@@ -487,29 +536,85 @@ export default function CalculateLCAPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Reporting Period Start
-                      </Label>
-                      <Input
-                        type="date"
-                        value={allocation.reportingPeriodStart}
-                        onChange={(e) => updateAllocation(allocation.facilityId, 'reportingPeriodStart', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Reporting Period End
-                      </Label>
-                      <Input
-                        type="date"
-                        value={allocation.reportingPeriodEnd}
-                        onChange={(e) => updateAllocation(allocation.facilityId, 'reportingPeriodEnd', e.target.value)}
-                      />
-                    </div>
+                  {/* Reporting Session Cards */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Reporting Period
+                    </Label>
+                    {(reportingSessions[allocation.facilityId] || []).length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {(reportingSessions[allocation.facilityId] || []).map((session) => {
+                          const isSelected = allocation.selectedSessionId === session.id;
+                          const startDate = new Date(session.reporting_period_start);
+                          const endDate = new Date(session.reporting_period_end);
+                          const formatDate = (d: Date) => d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+                          return (
+                            <button
+                              key={session.id}
+                              type="button"
+                              onClick={() => {
+                                setFacilityAllocations(prev => prev.map(a =>
+                                  a.facilityId === allocation.facilityId
+                                    ? {
+                                        ...a,
+                                        reportingPeriodStart: session.reporting_period_start,
+                                        reportingPeriodEnd: session.reporting_period_end,
+                                        facilityTotalProduction: String(session.total_production_volume),
+                                        productionVolumeUnit: session.volume_unit || 'units',
+                                        selectedSessionId: session.id,
+                                      }
+                                    : a
+                                ));
+                              }}
+                              className={`p-3 rounded-lg border text-left transition-all ${
+                                isSelected
+                                  ? 'border-green-500 bg-green-50 dark:bg-green-950/30 ring-1 ring-green-500'
+                                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-medium text-muted-foreground">
+                                  {session.data_source_type === 'Primary' ? 'Verified' : 'Estimated'}
+                                </span>
+                                {isSelected && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                )}
+                              </div>
+                              <p className="text-sm font-semibold">
+                                {formatDate(startDate)} &ndash; {formatDate(endDate)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Production: {session.total_production_volume.toLocaleString()} {session.volume_unit}
+                              </p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Start Date</Label>
+                          <Input
+                            type="date"
+                            value={allocation.reportingPeriodStart}
+                            onChange={(e) => updateAllocation(allocation.facilityId, 'reportingPeriodStart', e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">End Date</Label>
+                          <Input
+                            type="date"
+                            value={allocation.reportingPeriodEnd}
+                            onChange={(e) => updateAllocation(allocation.facilityId, 'reportingPeriodEnd', e.target.value)}
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground col-span-2">
+                          No reporting sessions found for this facility. <Link href={`/company/facilities`} className="underline">Add facility data</Link> to enable automatic period alignment.
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
