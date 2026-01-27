@@ -267,10 +267,10 @@ export function useCompanyMetrics(year?: number) {
       const productIds = lcas.map(lca => lca.product_id).filter(id => id);
       const { data: productionData } = await supabase
         .from('production_logs')
-        .select('product_id, units_produced, volume, unit, production_date')
+        .select('product_id, units_produced, volume, unit, date')
         .in('product_id', productIds)
-        .gte('production_date', yearStart)
-        .lte('production_date', yearEnd);
+        .gte('date', yearStart)
+        .lte('date', yearEnd);
 
       // =========================================================================
       // CRITICAL FIX: Unit normalization validation
@@ -934,8 +934,8 @@ export function useCompanyMetrics(year?: number) {
         .from('production_logs')
         .select('product_id, units_produced')
         .in('product_id', productIds)
-        .gte('production_date', yearStart)
-        .lte('production_date', yearEnd);
+        .gte('date', yearStart)
+        .lte('date', yearEnd);
 
       // Build production volume map (use string keys for bigint type safety)
       const productionMap = new Map<string, number>();
