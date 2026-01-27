@@ -420,7 +420,7 @@ export default function CompanyEmissionsPage() {
           production_volume: number;
         }> = [];
 
-        for (const [productId, lca] of latestByProduct) {
+        for (const [productId, lca] of Array.from(latestByProduct.entries())) {
           const { data: productData } = await browserSupabase
             .from('products')
             .select('name')
