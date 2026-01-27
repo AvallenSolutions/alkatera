@@ -244,7 +244,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         const hasVerifiedFacilityData = facilityTotalEmissions > 0;
 
         console.log(`[calculateProductCarbonFootprint] Facility ${allocation.facilityName} emissions data:`, {
-          hasAggregatedData: !!emissionsData && (emissionsData.total_co2e || 0) > 0,
+          hasUtilityData: facilityTotalEmissions > 0,
           hasVerifiedFacilityData,
           facilityTotalEmissions,
           scope1BeforeAllocation: scope1Raw,
