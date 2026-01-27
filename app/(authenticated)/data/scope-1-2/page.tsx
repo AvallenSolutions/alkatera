@@ -549,6 +549,7 @@ export default function CompanyEmissionsPage() {
           .from('product_carbon_footprints')
           .select('id, total_ghg_emissions, aggregated_impacts, status, per_unit_emissions_verified')
           .eq('product_id', log.product_id)
+          .eq('status', 'completed')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
