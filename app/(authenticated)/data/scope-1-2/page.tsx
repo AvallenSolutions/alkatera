@@ -387,9 +387,138 @@ export default function CompanyEmissionsPage() {
       });
 
       if (!productionLogs || productionLogs.length === 0) {
-        setScope3Cat1CO2e(0);
-        setScope3Cat1Breakdown([]);
-        setScope3Cat1DataQuality('No production data for selected year');
+        // Fallback: use products with completed LCAs and their production site volumes
+        console.log('🔍 [SCOPE 3 CAT 1] No production logs found, falling back to completed LCAs');
+
+        const { data: completedLCAs, error: lcaFallbackError } = await browserSupabase
+          .from('product_carbon_footprints')
+          .select('id, product_id, total_ghg_emissions, aggregated_impacts, status')
+          .eq('organization_id', currentOrganization.id)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false });
+
+        if (lcaFallbackError || !completedLCAs || completedLCAs.length === 0) {
+          setScope3Cat1CO2e(0);
+          setScope3Cat1Breakdown([]);
+          setScope3Cat1DataQuality('No production data or completed LCAs for selected year');
+          return;
+        }
+
+        // Deduplicate: keep only latest LCA per product
+        const latestByProduct = new Map<number, any>();
+        for (const lca of completedLCAs) {
+          if (!latestByProduct.has(lca.product_id)) {
+            latestByProduct.set(lca.product_id, lca);
+          }
+        }
+
+        let totalEmissions = 0;
+        const breakdown: Array<{
+          product_name: string;
+          materials_tco2e: number;
+          packaging_tco2e: number;
+          production_volume: number;
+        }> = [];
+
+        for (const [productId, lca] of latestByProduct) {
+          const { data: productData } = await browserSupabase
+            .from('products')
+            .select('name')
+            .eq('id', productId)
+            .maybeSingle();
+
+          if (!productData) continue;
+
+          // Use scope3 from aggregated_impacts to avoid double-counting facility S1/S2
+          const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+
+          if (scope3PerUnit === 0) continue;
+
+          // Get production volume from production sites
+          const { data: prodSites } = await browserSupabase
+            .from('product_carbon_footprint_production_sites')
+            .select('production_volume')
+            .eq('product_carbon_footprint_id', lca.id);
+
+          // Also check contract manufacturer allocations
+          const { data: cmAllocs } = await browserSupabase
+            .from('contract_manufacturer_allocations')
+            .select('client_production_volume')
+            .eq('product_id', productId)
+            .eq('organization_id', currentOrganization.id);
+
+          // Use the max production volume found (represents total units produced)
+          let unitsProduced = 0;
+          if (prodSites && prodSites.length > 0) {
+            unitsProduced = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
+          }
+          if (cmAllocs && cmAllocs.length > 0) {
+            const cmMax = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
+            unitsProduced = Math.max(unitsProduced, cmMax);
+          }
+
+          if (unitsProduced === 0) {
+            // Last resort: check facility reporting sessions linked to this product
+            const { data: assignments } = await browserSupabase
+              .from('facility_product_assignments')
+              .select('facility_id')
+              .eq('product_id', productId)
+              .eq('assignment_status', 'active');
+
+            if (assignments && assignments.length > 0) {
+              const { data: sessions } = await browserSupabase
+                .from('facility_reporting_sessions')
+                .select('total_production_volume')
+                .in('facility_id', assignments.map((a: any) => a.facility_id))
+                .order('reporting_period_end', { ascending: false })
+                .limit(1);
+
+              if (sessions && sessions.length > 0) {
+                unitsProduced = Number(sessions[0].total_production_volume || 0);
+              }
+            }
+          }
+
+          if (unitsProduced === 0) {
+            console.warn(`⚠️ [SCOPE 3 CAT 1] No production volume found for ${(productData as any).name}, using 1 unit`);
+            unitsProduced = 1;
+          }
+
+          const totalImpactKg = scope3PerUnit * unitsProduced;
+          const totalImpactTonnes = totalImpactKg / 1000;
+          totalEmissions += totalImpactTonnes;
+
+          // Get materials breakdown for display
+          const { data: materials } = await browserSupabase
+            .from('product_carbon_footprint_materials')
+            .select('material_type, impact_climate')
+            .eq('product_carbon_footprint_id', lca.id);
+
+          let materialsPerUnit = 0;
+          let packagingPerUnit = 0;
+          if (materials) {
+            (materials as any[]).forEach((m: any) => {
+              if (m.material_type === 'ingredient') {
+                materialsPerUnit += m.impact_climate || 0;
+              } else if (m.material_type === 'packaging') {
+                packagingPerUnit += m.impact_climate || 0;
+              }
+            });
+          }
+
+          breakdown.push({
+            product_name: (productData as any).name,
+            materials_tco2e: (materialsPerUnit * unitsProduced) / 1000,
+            packaging_tco2e: (packagingPerUnit * unitsProduced) / 1000,
+            production_volume: unitsProduced,
+          });
+
+          console.log(`✅ [SCOPE 3 CAT 1] Fallback: ${(productData as any).name}: scope3/unit=${scope3PerUnit.toFixed(4)} × ${unitsProduced} units = ${totalImpactTonnes.toFixed(4)} tCO2e`);
+        }
+
+        setScope3Cat1CO2e(totalEmissions);
+        setScope3Cat1Breakdown(breakdown);
+        setScope3Cat1DataQuality(totalEmissions > 0 ? 'Tier 1: Primary LCA data (from completed product reports)' : 'No completed product LCAs found');
         return;
       }
 
@@ -418,27 +547,30 @@ export default function CompanyEmissionsPage() {
 
         const { data: lcaData, error: lcaError } = await browserSupabase
           .from('product_carbon_footprints')
-          .select('id, total_ghg_emissions, status, per_unit_emissions_verified')
+          .select('id, total_ghg_emissions, aggregated_impacts, status, per_unit_emissions_verified')
           .eq('product_id', log.product_id)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
         const lca = lcaData as any;
+        // Use scope3 from aggregated_impacts to avoid double-counting facility S1/S2
+        const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
         console.log('🔍 [SCOPE 3 CAT 1] LCA data', {
           productId: log.product_id,
           hasLCA: !!lca,
           status: lca?.status,
           total_ghg_emissions: lca?.total_ghg_emissions,
+          scope3_per_unit: scope3PerUnit,
           per_unit_verified: lca?.per_unit_emissions_verified,
           lcaError
         });
 
-        if (lcaError || !lca || !lca.total_ghg_emissions || lca.total_ghg_emissions === 0) {
-          console.warn('⚠️ [SCOPE 3 CAT 1] Skipping product - no valid LCA emissions', {
+        if (lcaError || !lca || scope3PerUnit === 0) {
+          console.warn('⚠️ [SCOPE 3 CAT 1] Skipping product - no valid Scope 3 emissions', {
             productId: log.product_id,
             productName: product.name,
-            reason: !lca ? 'No LCA found' : !lca.total_ghg_emissions ? 'total_ghg_emissions is null/0' : 'Unknown'
+            reason: !lca ? 'No LCA found' : scope3PerUnit === 0 ? 'scope3 is 0' : 'Unknown'
           });
           continue;
         }
@@ -456,9 +588,8 @@ export default function CompanyEmissionsPage() {
           continue;
         }
 
-        // CRITICAL: Use total_ghg_emissions which includes ALL lifecycle stages
-        // (materials, production, transport, end-of-life) - matches edge function
-        const emissionsPerUnit = lca.total_ghg_emissions;
+        // Use scope3 only (excludes facility S1/S2 already counted in company Scope 1 & 2)
+        const emissionsPerUnit = scope3PerUnit;
         const totalImpactKg = emissionsPerUnit * unitsProduced;
         const totalImpactTonnes = totalImpactKg / 1000;
 
