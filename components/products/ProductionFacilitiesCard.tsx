@@ -204,10 +204,10 @@ export function ProductionFacilitiesCard({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push("/company/production-allocation")}
+            onClick={() => router.push("/company/facilities")}
           >
             <Building2 className="mr-2 h-4 w-4" />
-            View Matrix
+            View Facilities
           </Button>
         </div>
       </CardHeader>
@@ -221,7 +221,7 @@ export function ProductionFacilitiesCard({
               production emissions
             </p>
             <Button
-              onClick={() => router.push("/company/production-allocation")}
+              onClick={() => router.push("/company/facilities")}
               className="bg-lime-500 hover:bg-lime-600 text-black"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -386,7 +386,7 @@ export function ProductionFacilitiesCard({
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => router.push("/company/production-allocation")}
+                onClick={() => router.push("/company/facilities")}
               >
                 Manage Facility Assignments
               </Button>

@@ -62,7 +62,7 @@ export function GettingStartedWidget() {
           title="Log Production"
           description="Track volumes to allocate impact"
           icon={<ClipboardList className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
-          href="/company/production-allocation"
+          href="/company/facilities"
         />
       </CardContent>
     </Card>
