@@ -121,7 +121,7 @@ export default function ProductionAllocationPage() {
   };
 
   const loadAllData = async (orgId: string) => {
-    const [facilitiesRes, productsRes, matrixRes, capacityRes] = await Promise.all([
+    const [facilitiesRes, productsRes, assignmentsRes, capacityRes] = await Promise.all([
       supabase
         .from("facilities")
         .select("id, name, address_city, address_country, operational_control")
@@ -135,9 +135,10 @@ export default function ProductionAllocationPage() {
         .order("name"),
 
       supabase
-        .from("facility_product_allocation_matrix")
-        .select("*")
-        .eq("organization_id", orgId),
+        .from("facility_product_assignments")
+        .select("id, facility_id, product_id, assignment_status, is_primary_facility")
+        .eq("organization_id", orgId)
+        .eq("assignment_status", "active"),
 
       (supabase.rpc as any)("get_facility_unallocated_capacity", { p_organization_id: orgId }),
     ]);
@@ -148,8 +149,8 @@ export default function ProductionAllocationPage() {
     if (productsRes.error) {
       console.error("Error loading products:", productsRes.error);
     }
-    if (matrixRes.error) {
-      console.error("Error loading allocation matrix:", matrixRes.error);
+    if (assignmentsRes.error) {
+      console.error("Error loading assignments:", assignmentsRes.error);
     }
     if (capacityRes.error) {
       console.error("Error loading capacity data:", capacityRes.error);
@@ -157,7 +158,7 @@ export default function ProductionAllocationPage() {
 
     const facilitiesData = (facilitiesRes.data || []) as any[];
     const productsData = productsRes.data || [];
-    const matrixItems = matrixRes.data || [];
+    const assignments = assignmentsRes.data || [];
     const capacityData = capacityRes.data || [];
 
     setFacilities(facilitiesData.map(f => ({
@@ -170,19 +171,90 @@ export default function ProductionAllocationPage() {
 
     setProducts(productsData);
 
-    // Build matrix map from fresh data
+    // Build allocation lookup from direct queries
+    // 1. Get all product PEIs to find production site allocations
+    const productIds = productsData.map((p: any) => p.id);
+    const ownedAllocByFacilityProduct: Record<string, any> = {};
+
+    if (productIds.length > 0) {
+      const { data: peis } = await supabase
+        .from("product_carbon_footprints")
+        .select("id, product_id")
+        .in("product_id", productIds)
+        .order("created_at", { ascending: false });
+
+      if (peis && peis.length > 0) {
+        // Deduplicate: latest PEI per product
+        const latestPeiByProduct = new Map<number, string>();
+        for (const pei of peis) {
+          if (!latestPeiByProduct.has(pei.product_id)) {
+            latestPeiByProduct.set(pei.product_id, pei.id);
+          }
+        }
+
+        const peiIds = Array.from(latestPeiByProduct.values());
+        const { data: prodSites } = await supabase
+          .from("product_carbon_footprint_production_sites")
+          .select("facility_id, product_carbon_footprint_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
+          .in("product_carbon_footprint_id", peiIds);
+
+        if (prodSites) {
+          // Build reverse lookup: pei_id -> product_id
+          const peiToProduct = new Map<string, number>();
+          for (const [prodId, peiId] of Array.from(latestPeiByProduct.entries())) {
+            peiToProduct.set(peiId, prodId);
+          }
+          for (const site of prodSites) {
+            const prodId = peiToProduct.get(site.product_carbon_footprint_id);
+            if (prodId) {
+              const key = `${site.facility_id}-${prodId}`;
+              ownedAllocByFacilityProduct[key] = site;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Get contract manufacturer allocations
+    const { data: cmAllocs } = await supabase
+      .from("contract_manufacturer_allocations")
+      .select("facility_id, product_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
+      .eq("organization_id", orgId)
+      .order("reporting_period_end", { ascending: false });
+
+    const cmByFacilityProduct: Record<string, any> = {};
+    if (cmAllocs) {
+      for (const alloc of cmAllocs) {
+        const key = `${alloc.facility_id}-${alloc.product_id}`;
+        if (!cmByFacilityProduct[key]) {
+          cmByFacilityProduct[key] = alloc;
+        }
+      }
+    }
+
+    // Build matrix map from assignments + allocations
     const matrix = new Map<string, MatrixCell>();
-    matrixItems.forEach((item: any) => {
-      const key = `${item.facility_id}-${item.product_id}`;
+    for (const assignment of assignments) {
+      const key = `${assignment.facility_id}-${assignment.product_id}`;
+      const owned = ownedAllocByFacilityProduct[key];
+      const cm = cmByFacilityProduct[key];
+      const alloc = owned || cm;
+
       matrix.set(key, {
-        assignmentId: item.assignment_id,
-        facilityId: item.facility_id,
-        productId: item.product_id,
-        hasAllocations: item.has_allocations,
-        latestAllocation: item.latest_allocation,
-        assignmentStatus: item.assignment_status,
+        assignmentId: assignment.id,
+        facilityId: assignment.facility_id,
+        productId: assignment.product_id,
+        hasAllocations: !!alloc,
+        latestAllocation: alloc ? {
+          allocated_emissions: alloc.allocated_emissions_kg_co2e || 0,
+          reporting_period_start: alloc.reporting_period_start,
+          reporting_period_end: alloc.reporting_period_end,
+          status: alloc.status || "draft",
+          attribution_ratio: alloc.attribution_ratio || 0,
+        } : null,
+        assignmentStatus: assignment.assignment_status,
       });
-    });
+    }
     setMatrixData(matrix);
 
     // Calculate allocation health using fresh data (not stale state)

@@ -59,28 +59,94 @@ export function ProductionFacilitiesCard({
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from("facility_product_allocation_matrix")
-        .select("*")
+      // Get facility assignments for this product
+      const { data: assignments, error: assignError } = await supabase
+        .from("facility_product_assignments")
+        .select(`
+          facility_id,
+          is_primary_facility,
+          facilities!inner (
+            id, name, address_city, address_country, operational_control
+          )
+        `)
         .eq("product_id", productId)
-        .eq("organization_id", organizationId);
+        .eq("organization_id", organizationId)
+        .eq("assignment_status", "active");
 
-      if (error) throw error;
-
-      if (data) {
-        setFacilities(
-          data.map((item: any) => ({
-            facilityId: item.facility_id,
-            facilityName: item.facility_name,
-            city: item.address_city,
-            country: item.address_country,
-            operationalControl: item.operational_control,
-            primaryFacility: item.primary_facility,
-            hasAllocations: item.has_allocations,
-            latestAllocation: item.latest_allocation,
-          }))
-        );
+      if (assignError) throw assignError;
+      if (!assignments || assignments.length === 0) {
+        setFacilities([]);
+        return;
       }
+
+      // Get latest PEI for this product
+      const { data: peiData } = await supabase
+        .from("product_carbon_footprints")
+        .select("id")
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const peiId = peiData?.[0]?.id;
+
+      // Get owned facility production site allocations
+      let ownedAllocations: Record<string, any> = {};
+      if (peiId) {
+        const { data: prodSites } = await supabase
+          .from("product_carbon_footprint_production_sites")
+          .select("facility_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
+          .eq("product_carbon_footprint_id", peiId);
+
+        if (prodSites) {
+          for (const site of prodSites) {
+            ownedAllocations[site.facility_id] = site;
+          }
+        }
+      }
+
+      // Get contract manufacturer allocations
+      const { data: cmAllocations } = await supabase
+        .from("contract_manufacturer_allocations")
+        .select("facility_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
+        .eq("product_id", productId)
+        .eq("organization_id", organizationId)
+        .order("reporting_period_end", { ascending: false });
+
+      const cmByFacility: Record<string, any> = {};
+      if (cmAllocations) {
+        for (const alloc of cmAllocations) {
+          if (!cmByFacility[alloc.facility_id]) {
+            cmByFacility[alloc.facility_id] = alloc;
+          }
+        }
+      }
+
+      // Build facility list
+      const result: FacilityAssignment[] = assignments.map((a: any) => {
+        const f = a.facilities;
+        const owned = ownedAllocations[f.id];
+        const cm = cmByFacility[f.id];
+        const alloc = owned || cm;
+
+        return {
+          facilityId: f.id,
+          facilityName: f.name,
+          city: f.address_city,
+          country: f.address_country,
+          operationalControl: f.operational_control,
+          primaryFacility: a.is_primary_facility,
+          hasAllocations: !!alloc,
+          latestAllocation: alloc ? {
+            allocated_emissions: alloc.allocated_emissions_kg_co2e || 0,
+            reporting_period_start: alloc.reporting_period_start,
+            reporting_period_end: alloc.reporting_period_end,
+            status: alloc.status || "draft",
+            attribution_ratio: alloc.attribution_ratio || 0,
+          } : null,
+        };
+      });
+
+      setFacilities(result);
     } catch (error) {
       console.error("Error loading facilities:", error);
     } finally {

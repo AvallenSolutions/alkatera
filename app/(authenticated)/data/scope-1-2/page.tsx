@@ -176,6 +176,7 @@ export default function CompanyEmissionsPage() {
   const [scope3Cat1CO2e, setScope3Cat1CO2e] = useState(0);
   const [scope3Cat1Breakdown, setScope3Cat1Breakdown] = useState<Array<{
     product_name: string;
+    total_tco2e: number;
     materials_tco2e: number;
     packaging_tco2e: number;
     production_volume: number;
@@ -465,6 +466,7 @@ export default function CompanyEmissionsPage() {
         let totalEmissions = 0;
         const breakdown: Array<{
           product_name: string;
+          total_tco2e: number;
           materials_tco2e: number;
           packaging_tco2e: number;
           production_volume: number;
@@ -559,6 +561,7 @@ export default function CompanyEmissionsPage() {
 
           breakdown.push({
             product_name: (productData as any).name,
+            total_tco2e: totalImpactTonnes,
             materials_tco2e: (materialsPerUnit * unitsProduced) / 1000,
             packaging_tco2e: (packagingPerUnit * unitsProduced) / 1000,
             production_volume: unitsProduced,
@@ -576,6 +579,7 @@ export default function CompanyEmissionsPage() {
       let totalEmissions = 0;
       const breakdown: Array<{
         product_name: string;
+        total_tco2e: number;
         materials_tco2e: number;
         packaging_tco2e: number;
         production_volume: number;
@@ -688,6 +692,7 @@ export default function CompanyEmissionsPage() {
 
         breakdown.push({
           product_name: product.name,
+          total_tco2e: totalImpactTonnes,
           materials_tco2e: totalMaterialsTonnes,
           packaging_tco2e: totalPackagingTonnes,
           production_volume: unitsProduced,
@@ -1682,7 +1687,7 @@ export default function CompanyEmissionsPage() {
                               </div>
                               <div className="text-right">
                                 <div className="font-mono font-semibold text-sm">
-                                  {(product.materials_tco2e + product.packaging_tco2e).toFixed(3)} tCO2e
+                                  {product.total_tco2e.toFixed(3)} tCO2e
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-1">
                                   Materials: {product.materials_tco2e.toFixed(2)} | Packaging: {product.packaging_tco2e.toFixed(2)}
