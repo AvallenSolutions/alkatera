@@ -121,7 +121,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     monthlyPriceId: 'price_1SjQmXS6ESxgnZl2SWd2nHga',
     annualPriceId: 'price_1SrEItS6ESxgnZl2W1Tm2nBN',
     monthlyPrice: 599,
-    annualPrice: 5999, // 10 months (2 months free)
+    annualPrice: 5990, // 10 months (2 months free)
     description: 'Comprehensive sustainability management for established organisations',
     features: [
       'All methodologies (ReCiPe 2016, EF 3.1, EF 3.1 Single Score)',

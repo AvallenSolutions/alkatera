@@ -8,7 +8,7 @@
   ## Changes
   - Seed: £149/month → £99/month, £1490/year → £990/year
   - Blossom: £399/month → £249/month, £3990/year → £2490/year
-  - Canopy: £899/month → £599/month, £8990/year → £5999/year
+  - Canopy: £899/month → £599/month, £8990/year → £5990/year
 */
 
 UPDATE public.subscription_tier_limits
@@ -20,5 +20,5 @@ SET monthly_price_gbp = 249.00, annual_price_gbp = 2490.00, updated_at = now()
 WHERE tier_name = 'blossom';
 
 UPDATE public.subscription_tier_limits
-SET monthly_price_gbp = 599.00, annual_price_gbp = 5999.00, updated_at = now()
+SET monthly_price_gbp = 599.00, annual_price_gbp = 5990.00, updated_at = now()
 WHERE tier_name = 'canopy';
