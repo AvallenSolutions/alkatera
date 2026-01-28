@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
       .from('certification_evidence_links')
       .select(`
         *,
-        requirement:certification_framework_requirements(
+        requirement:framework_requirements(
           requirement_code,
           requirement_name,
-          category
+          requirement_category
         )
       `)
       .eq('organization_id', organizationId)

@@ -168,10 +168,10 @@ export async function POST(request: NextRequest) {
         framework_id: body.framework_id,
         status: body.status || 'not_started',
         target_date: body.target_date,
-        certification_date: body.certification_date,
+        certified_date: body.certification_date || body.certified_date,
         expiry_date: body.expiry_date,
-        certificate_number: body.certificate_number,
-        current_score: body.current_score,
+        certification_number: body.certificate_number || body.certification_number,
+        readiness_score: body.current_score || body.readiness_score,
         notes: body.notes,
       })
       .select()

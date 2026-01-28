@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
       .from('certification_score_history')
       .select(`
         *,
-        framework:certification_frameworks(name, code, version)
+        framework:certification_frameworks(framework_name, framework_code, framework_version)
       `)
       .eq('organization_id', organizationId)
-      .order('calculation_date', { ascending: false });
+      .order('score_date', { ascending: false });
 
     if (frameworkId) {
       query = query.eq('framework_id', frameworkId);
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       .from('organization_certifications')
       .select(`
         *,
-        framework:certification_frameworks(name, code, version, passing_score)
+        framework:certification_frameworks(framework_name, framework_code, framework_version, passing_score)
       `)
       .eq('organization_id', organizationId);
 
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       .from('certification_gap_analyses')
       .select(`
         *,
-        requirement:certification_framework_requirements(points_available, category)
+        requirement:framework_requirements(max_points, requirement_category)
       `)
       .eq('organization_id', targetOrgId)
       .eq('framework_id', body.framework_id);
@@ -145,13 +145,13 @@ export async function POST(request: NextRequest) {
       .insert({
         organization_id: targetOrgId,
         framework_id: body.framework_id,
-        calculation_date: new Date().toISOString().split('T')[0],
-        total_score: scoreBreakdown.totalScore,
+        score_date: new Date().toISOString().split('T')[0],
+        overall_score: scoreBreakdown.totalScore,
         category_scores: scoreBreakdown.categoryScores,
         requirements_met: scoreBreakdown.requirementsMet,
         requirements_partial: scoreBreakdown.requirementsPartial,
         requirements_not_met: scoreBreakdown.requirementsNotMet,
-        notes: body.notes,
+        total_requirements: scoreBreakdown.requirementsMet + scoreBreakdown.requirementsPartial + scoreBreakdown.requirementsNotMet,
       })
       .select()
       .single();
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     const { error: updateError } = await supabase
       .from('organization_certifications')
       .update({
-        current_score: scoreBreakdown.totalScore,
+        readiness_score: scoreBreakdown.totalScore,
         status: scoreBreakdown.totalScore >= passingScore ? 'ready' : 'in_progress',
         updated_at: new Date().toISOString(),
       })
@@ -196,8 +196,8 @@ function calculateScoreBreakdown(gapAnalyses: any[]) {
   let requirementsNotMet = 0;
 
   gapAnalyses.forEach(analysis => {
-    const category = analysis.requirement?.category || 'Uncategorized';
-    const pointsAvailable = analysis.requirement?.points_available || 0;
+    const category = analysis.requirement?.requirement_category || 'Uncategorized';
+    const pointsAvailable = analysis.requirement?.max_points || 0;
     const pointsAchieved = analysis.current_score || 0;
 
     if (!categoryScores[category]) {
@@ -247,7 +247,7 @@ function calculateReadinessSummary(latestScores: any[], certifications: any[]) {
   const ready = certifications.filter(c => c.status === 'ready').length;
 
   const avgScore = latestScores.length > 0
-    ? Math.round(latestScores.reduce((sum, s) => sum + (s.total_score || 0), 0) / latestScores.length)
+    ? Math.round(latestScores.reduce((sum, s) => sum + (s.overall_score || 0), 0) / latestScores.length)
     : 0;
 
   return {
