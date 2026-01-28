@@ -117,9 +117,15 @@ function transformFootprintToScope3Categories(
 
   // Map all available scope 3 category data from corporate emissions calculator
   // Categories not populated remain as 0 with 'missing' quality
+  // GHG Protocol Category Mapping:
+  // - Cat 1: Purchased goods & services (includes products, purchased_services, marketing_materials)
+  // - Cat 8: Upstream leased assets (only for actual leased asset emissions, NOT purchased services)
+  const cat1Value = (scope3Data.products || 0) + (scope3Data.purchased_services || 0) + (scope3Data.marketing_materials || scope3Data.marketing || 0);
+  const cat1HasData = cat1Value > 0;
+
   const categoryMapping: Record<number, { value: number; dataQuality: 'primary' | 'secondary' | 'estimated' | 'missing' }> = {
-    // Cat 1: Purchased Goods & Services (from product LCA Scope 3 breakdown)
-    1: { value: scope3Data.products || 0, dataQuality: scope3Data.products > 0 ? 'primary' : 'missing' },
+    // Cat 1: Purchased Goods & Services (products + purchased services + marketing materials)
+    1: { value: cat1Value, dataQuality: cat1HasData ? 'primary' : 'missing' },
     // Cat 2: Capital Goods
     2: { value: scope3Data.capital_goods || 0, dataQuality: scope3Data.capital_goods > 0 ? 'secondary' : 'missing' },
     // Cat 3: Fuel & Energy Related (WTT) - estimated as ~15% of fuel-related emissions
@@ -132,8 +138,8 @@ function transformFootprintToScope3Categories(
     6: { value: scope3Data.business_travel || 0, dataQuality: scope3Data.business_travel > 0 ? 'primary' : 'missing' },
     // Cat 7: Employee Commuting
     7: { value: scope3Data.employee_commuting || 0, dataQuality: scope3Data.employee_commuting > 0 ? 'secondary' : 'missing' },
-    // Cat 8: Upstream Leased Assets / Purchased Services (includes marketing materials)
-    8: { value: (scope3Data.purchased_services || 0) + (scope3Data.marketing_materials || scope3Data.marketing || 0), dataQuality: (scope3Data.purchased_services || scope3Data.marketing_materials || scope3Data.marketing) > 0 ? 'secondary' : 'missing' },
+    // Cat 8: Upstream Leased Assets - only for actual leased asset emissions (NOT purchased services)
+    8: { value: 0, dataQuality: 'missing' },
     // Cat 9: Downstream Transportation (logistics spend + downstream transport)
     9: { value: (scope3Data.logistics || scope3Data.downstream_logistics || 0) + (scope3Data.downstream_transport || 0), dataQuality: (scope3Data.logistics || scope3Data.downstream_logistics || scope3Data.downstream_transport) > 0 ? 'secondary' : 'missing' },
     // Cat 10: Processing of Sold Products - typically not applicable for finished goods
