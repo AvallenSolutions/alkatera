@@ -21,13 +21,13 @@ export async function GET(request: NextRequest) {
       .from('certification_gap_analyses')
       .select(`
         *,
-        framework:certification_frameworks(name, code, version),
-        requirement:certification_framework_requirements(
+        framework:certification_frameworks(framework_name, framework_code, framework_version),
+        requirement:framework_requirements(
           requirement_code,
           requirement_name,
-          category,
-          sub_category,
-          points_available
+          requirement_category,
+          subsection,
+          max_points
         )
       `)
       .eq('organization_id', organizationId)
@@ -44,11 +44,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Transform data to match UI expectations
+    const transformedData = (data || []).map((item: any) => ({
+      ...item,
+      // Map DB field names to UI field names
+      action_required: item.remediation_actions,
+      assigned_to: item.owner,
+      notes: item.current_state,
+      framework: item.framework ? {
+        name: item.framework.framework_name,
+        code: item.framework.framework_code,
+        version: item.framework.framework_version,
+      } : undefined,
+      requirement: item.requirement ? {
+        requirement_code: item.requirement.requirement_code,
+        requirement_name: item.requirement.requirement_name,
+        category: item.requirement.requirement_category,
+        sub_category: item.requirement.subsection,
+        points_available: item.requirement.max_points,
+      } : undefined,
+    }));
+
     // Calculate summary metrics
-    const summary = calculateGapSummary(data || []);
+    const summary = calculateGapSummary(transformedData);
 
     return NextResponse.json({
-      analyses: data,
+      analyses: transformedData,
       summary,
     });
   } catch (error) {
@@ -101,13 +122,14 @@ export async function POST(request: NextRequest) {
         framework_id: body.framework_id,
         requirement_id: body.requirement_id,
         compliance_status: body.compliance_status || 'not_assessed',
+        analysis_date: body.analysis_date || new Date().toISOString().split('T')[0],
         current_score: body.current_score,
         gap_description: body.gap_description,
-        action_required: body.action_required,
+        remediation_actions: body.action_required || body.remediation_actions,
         priority: body.priority,
-        assigned_to: body.assigned_to,
+        owner: body.assigned_to || body.owner,
         target_completion_date: body.target_completion_date,
-        notes: body.notes,
+        current_state: body.notes || body.current_state,
       })
       .select()
       .single();
@@ -171,11 +193,11 @@ export async function PUT(request: NextRequest) {
         compliance_status: body.compliance_status,
         current_score: body.current_score,
         gap_description: body.gap_description,
-        action_required: body.action_required,
+        remediation_actions: body.action_required || body.remediation_actions,
         priority: body.priority,
-        assigned_to: body.assigned_to,
+        owner: body.assigned_to || body.owner,
         target_completion_date: body.target_completion_date,
-        notes: body.notes,
+        current_state: body.notes || body.current_state,
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)
