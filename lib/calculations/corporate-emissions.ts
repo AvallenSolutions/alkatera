@@ -324,7 +324,7 @@ export async function calculateScope3(
         }
       }
 
-      for (const [productId, lca] of latestByProduct.entries()) {
+      for (const [productId, lca] of Array.from(latestByProduct.entries())) {
         if (lca.status !== 'completed') continue;
 
         const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
