@@ -12,9 +12,12 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  Paperclip,
+  Download,
 } from 'lucide-react';
 import { Policy, PolicyMetrics } from '@/hooks/data/usePolicies';
 import { formatDistanceToNow } from 'date-fns';
+import { getPolicyDocumentUrl } from '@/lib/governance/policies';
 
 interface PolicyDashboardProps {
   policies: Policy[];
@@ -134,6 +137,34 @@ function PolicyCard({ policy, onEdit }: { policy: Policy; onEdit?: (policy: Poli
                 </span>
               )}
             </div>
+
+            {policy.attachments && policy.attachments.length > 0 && (
+              <div className="mt-3 space-y-1">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                  <Paperclip className="h-3 w-3" />
+                  <span>Attachments ({policy.attachments.length})</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {policy.attachments.map((attachment, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7"
+                      onClick={async () => {
+                        const url = await getPolicyDocumentUrl(attachment.path);
+                        if (url) {
+                          window.open(url, '_blank');
+                        }
+                      }}
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      {attachment.name}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
