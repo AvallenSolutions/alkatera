@@ -191,14 +191,7 @@ export async function updateTicket(
 export async function fetchMessages(ticketId: string): Promise<FeedbackMessageWithSender[]> {
   const { data, error } = await supabase
     .from('feedback_messages')
-    .select(`
-      *,
-      profiles:sender_id (
-        full_name,
-        email,
-        avatar_url
-      )
-    `)
+    .select('*')
     .eq('ticket_id', ticketId)
     .order('created_at', { ascending: true });
 
@@ -207,12 +200,28 @@ export async function fetchMessages(ticketId: string): Promise<FeedbackMessageWi
     throw error;
   }
 
-  return (data || []).map((msg: any) => ({
-    ...msg,
-    sender_name: msg.profiles?.full_name,
-    sender_email: msg.profiles?.email,
-    sender_avatar_url: msg.profiles?.avatar_url,
-  }));
+  if (!data || data.length === 0) return [];
+
+  // Fetch sender profiles separately since sender_id references auth.users, not profiles
+  const senderIds = [...new Set(data.map((msg: any) => msg.sender_id))];
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, avatar_url')
+    .in('id', senderIds);
+
+  const profileMap = new Map(
+    (profiles || []).map((p: any) => [p.id, p])
+  );
+
+  return data.map((msg: any) => {
+    const profile = profileMap.get(msg.sender_id);
+    return {
+      ...msg,
+      sender_name: profile?.full_name,
+      sender_email: profile?.email,
+      sender_avatar_url: profile?.avatar_url,
+    };
+  });
 }
 
 /**
