@@ -193,8 +193,8 @@ export async function fetchUrlContent(url: string): Promise<string> {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to fetch URL content');
+      const errorData = await response.json();
+      throw new Error(errorData.error || errorData.message || 'Failed to fetch URL content');
     }
 
     const data = await response.json();
