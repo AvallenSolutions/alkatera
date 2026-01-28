@@ -154,16 +154,175 @@ function transformFootprintToScope3Categories(
     15: { value: 0, dataQuality: 'missing' },
   };
 
+  // Generate detailed entries for each category from the breakdown data
+  const generateEntriesForCategory = (categoryNum: number): Array<{
+    id: string;
+    date: string;
+    description: string;
+    emissions: number;
+    source: string;
+    dataQuality: 'primary' | 'secondary' | 'estimated';
+    metadata?: Record<string, any>;
+  }> => {
+    const entries: Array<{
+      id: string;
+      date: string;
+      description: string;
+      emissions: number;
+      source: string;
+      dataQuality: 'primary' | 'secondary' | 'estimated';
+      metadata?: Record<string, any>;
+    }> = [];
+    const today = new Date().toISOString().split('T')[0];
+
+    switch (categoryNum) {
+      case 1: // Purchased Goods & Services
+        if (scope3Data.products > 0) {
+          entries.push({
+            id: 'cat1-products',
+            date: today,
+            description: 'Product LCA Scope 3 Emissions',
+            emissions: scope3Data.products,
+            source: 'Product Carbon Footprint Assessments',
+            dataQuality: 'primary',
+            metadata: { type: 'product_lca' },
+          });
+        }
+        if (scope3Data.purchased_services > 0) {
+          entries.push({
+            id: 'cat1-services',
+            date: today,
+            description: 'Purchased Services',
+            emissions: scope3Data.purchased_services,
+            source: 'Corporate Overheads',
+            dataQuality: 'secondary',
+            metadata: { type: 'purchased_services' },
+          });
+        }
+        if ((scope3Data.marketing_materials || scope3Data.marketing) > 0) {
+          entries.push({
+            id: 'cat1-marketing',
+            date: today,
+            description: 'Marketing Materials',
+            emissions: scope3Data.marketing_materials || scope3Data.marketing,
+            source: 'Corporate Overheads',
+            dataQuality: 'secondary',
+            metadata: { type: 'marketing_materials' },
+          });
+        }
+        break;
+      case 2: // Capital Goods
+        if (scope3Data.capital_goods > 0) {
+          entries.push({
+            id: 'cat2-capital',
+            date: today,
+            description: 'Capital Goods Purchases',
+            emissions: scope3Data.capital_goods,
+            source: 'Corporate Overheads',
+            dataQuality: 'secondary',
+          });
+        }
+        break;
+      case 4: // Upstream Transportation
+        if (scope3Data.upstream_transport > 0) {
+          entries.push({
+            id: 'cat4-upstream',
+            date: today,
+            description: 'Upstream Transportation',
+            emissions: scope3Data.upstream_transport,
+            source: 'Product LCA Transport Impacts',
+            dataQuality: 'secondary',
+          });
+        }
+        break;
+      case 5: // Waste
+        if ((scope3Data.waste || scope3Data.operational_waste) > 0) {
+          entries.push({
+            id: 'cat5-waste',
+            date: today,
+            description: 'Operational Waste',
+            emissions: scope3Data.waste || scope3Data.operational_waste,
+            source: 'Corporate Overheads',
+            dataQuality: 'secondary',
+          });
+        }
+        break;
+      case 6: // Business Travel
+        if (scope3Data.business_travel > 0) {
+          entries.push({
+            id: 'cat6-travel',
+            date: today,
+            description: 'Business Travel',
+            emissions: scope3Data.business_travel,
+            source: 'Corporate Overheads / Fleet Activities',
+            dataQuality: 'primary',
+          });
+        }
+        break;
+      case 7: // Employee Commuting
+        if (scope3Data.employee_commuting > 0) {
+          entries.push({
+            id: 'cat7-commuting',
+            date: today,
+            description: 'Employee Commuting',
+            emissions: scope3Data.employee_commuting,
+            source: 'Corporate Overheads',
+            dataQuality: 'secondary',
+          });
+        }
+        break;
+      case 9: // Downstream Transportation
+        const cat9Total = (scope3Data.logistics || scope3Data.downstream_logistics || 0) + (scope3Data.downstream_transport || 0);
+        if (cat9Total > 0) {
+          if ((scope3Data.logistics || scope3Data.downstream_logistics) > 0) {
+            entries.push({
+              id: 'cat9-logistics',
+              date: today,
+              description: 'Downstream Logistics',
+              emissions: scope3Data.logistics || scope3Data.downstream_logistics,
+              source: 'Corporate Overheads',
+              dataQuality: 'secondary',
+            });
+          }
+          if (scope3Data.downstream_transport > 0) {
+            entries.push({
+              id: 'cat9-transport',
+              date: today,
+              description: 'Downstream Transportation (Product LCA)',
+              emissions: scope3Data.downstream_transport,
+              source: 'Product LCA Distribution Impacts',
+              dataQuality: 'secondary',
+            });
+          }
+        }
+        break;
+      case 11: // Use of Sold Products
+        if (scope3Data.use_phase > 0) {
+          entries.push({
+            id: 'cat11-use',
+            date: today,
+            description: 'Use Phase Emissions',
+            emissions: scope3Data.use_phase,
+            source: 'Product LCA Use Phase Impacts',
+            dataQuality: 'secondary',
+          });
+        }
+        break;
+    }
+    return entries;
+  };
+
   const categories: Scope3CategoryData[] = SCOPE3_CATEGORY_DEFINITIONS.map(def => {
     const mapping = categoryMapping[def.category];
+    const entries = generateEntriesForCategory(def.category);
     return {
       category: def.category,
       name: def.name,
       description: def.description,
       totalEmissions: mapping.value,
-      entryCount: mapping.value > 0 ? 1 : 0,
+      entryCount: entries.length,
       dataQuality: mapping.dataQuality,
-      entries: [],
+      entries,
     };
   });
 
@@ -380,7 +539,7 @@ export default function PerformancePage() {
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
     if (value < 0.1 && value > 0) return value.toExponential(1);
-    return value.toFixed(value < 10 ? 1 : 0);
+    return value.toFixed(1);
   };
 
   const togglePillar = (pillar: string) => {
