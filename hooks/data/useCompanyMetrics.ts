@@ -334,8 +334,10 @@ export function useCompanyMetrics(year?: number) {
       }
 
       // Attach production volume to each LCA
+      // Use || 1 so products without production logs still show per-unit impacts
+      // (consistent with fetchMaterialAndGHGBreakdown fallback behavior)
       lcas.forEach(lca => {
-        (lca as any).production_volume = productionMap.get(String(lca.product_id)) || 0;
+        (lca as any).production_volume = productionMap.get(String(lca.product_id)) || 1;
       });
 
       if (!lcas || lcas.length === 0) {

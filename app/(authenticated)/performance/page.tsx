@@ -276,8 +276,17 @@ export default function PerformancePage() {
   const productLcaTotalCO2 = metrics?.total_impacts.climate_change_gwp100 || 0;
   const totalCO2 = corporateTotalCO2 > 0 ? corporateTotalCO2 : productLcaTotalCO2;
   const waterConsumption = metrics?.total_impacts.water_consumption || 0;
-  const waterScarcityImpact = metrics?.total_impacts.water_scarcity_aware || 0;
+  const productLcaWaterScarcity = metrics?.total_impacts.water_scarcity_aware || 0;
   const landUse = metrics?.total_impacts.land_use || 0;
+
+  // Use facility water data as primary source for water card header,
+  // falling back to product LCA water scarcity data
+  const facilityScarcityWeighted = waterCompanyOverview?.total_scarcity_weighted_m3
+    || waterCompanyOverview?.scarcity_weighted_consumption_m3
+    || 0;
+  const waterScarcityImpact = facilityScarcityWeighted > 0
+    ? facilityScarcityWeighted
+    : productLcaWaterScarcity;
   const circularityRate = wasteMetrics?.waste_diversion_rate || metrics?.circularity_percentage || 0;
 
   const vitalityScores = useMemo(() => {
