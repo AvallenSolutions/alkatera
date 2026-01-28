@@ -274,8 +274,10 @@ export async function calculateScope3(
   // =========================================================================
   // Category 1: Purchased Goods & Services (Products)
   // =========================================================================
-  // CRITICAL: Use aggregated_impacts.breakdown.by_scope.scope3 to avoid double counting
-  // This excludes owned facility Scope 1 & 2 which are already in corporate inventory
+  // Uses the same calculation as the Company Emissions page (scope-1-2)
+  // to ensure consistent Scope 3 product emissions across all surfaces.
+  // Uses aggregated_impacts.breakdown.by_scope.scope3 to avoid double counting
+  // facility Scope 1 & 2 which are already in the corporate inventory.
 
   const { data: productionData } = await supabase
     .from('production_logs')
@@ -284,14 +286,10 @@ export async function calculateScope3(
     .gte('date', yearStart)
     .lte('date', yearEnd);
 
-  // Track which product IDs have been processed via production logs
-  const processedProductIds = new Set<string>();
-
-  if (productionData) {
+  if (productionData && productionData.length > 0) {
+    // Use production logs when available
     for (const log of productionData) {
       if (!log.units_produced || log.units_produced <= 0) continue;
-
-      processedProductIds.add(String(log.product_id));
 
       const { data: lca } = await supabase
         .from('product_carbon_footprints')
@@ -302,66 +300,87 @@ export async function calculateScope3(
         .limit(1)
         .maybeSingle();
 
-      // Extract Scope 3 portion only (excludes owned facility S1+S2)
-      // Fall back to total climate_change_gwp100 when scope breakdown is not available
-      // (this is conservative - may slightly overcount if product includes some S1/S2)
-      const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3
-        || lca?.aggregated_impacts?.climate_change_gwp100
-        || 0;
-
+      const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
       if (scope3PerUnit > 0) {
         breakdown.products += scope3PerUnit * log.units_produced;
       }
     }
-  }
+  } else {
+    // Fallback: match Company Emissions page logic exactly
+    // Get all completed PEIs, deduplicate to latest per product
+    const { data: allPEIs } = await supabase
+      .from('product_carbon_footprints')
+      .select('id, product_id, aggregated_impacts, status, updated_at')
+      .eq('organization_id', organizationId)
+      .order('created_at', { ascending: false });
 
-  // Fallback: Include completed LCAs that have no production logs for this year
-  // Get production volume from product_carbon_footprint_production_sites (same as Company Emissions page)
-  const { data: completedLcas } = await supabase
-    .from('product_carbon_footprints')
-    .select('id, product_id, aggregated_impacts')
-    .eq('organization_id', organizationId)
-    .eq('status', 'completed')
-    .not('aggregated_impacts', 'is', null);
-
-  if (completedLcas) {
-    for (const lca of completedLcas) {
-      if (processedProductIds.has(String(lca.product_id))) continue;
-
-      const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3
-        || lca.aggregated_impacts?.climate_change_gwp100
-        || 0;
-
-      if (scope3PerUnit <= 0) continue;
-
-      // Get production volume from production sites linked to this LCA
-      const { data: prodSites } = await supabase
-        .from('product_carbon_footprint_production_sites')
-        .select('production_volume')
-        .eq('product_carbon_footprint_id', lca.id);
-
-      let unitsProduced = 0;
-      if (prodSites && prodSites.length > 0) {
-        unitsProduced = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
-      }
-
-      // Also check contract manufacturer allocations
-      if (unitsProduced === 0) {
-        const { data: cmAllocs } = await supabase
-          .from('contract_manufacturer_allocations')
-          .select('client_production_volume')
-          .eq('product_id', lca.product_id)
-          .eq('organization_id', organizationId);
-
-        if (cmAllocs && cmAllocs.length > 0) {
-          unitsProduced = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
+    if (allPEIs && allPEIs.length > 0) {
+      // Deduplicate: keep only latest PEI per product
+      const latestByProduct = new Map<string, any>();
+      for (const pei of allPEIs) {
+        const pid = String(pei.product_id);
+        if (!latestByProduct.has(pid)) {
+          latestByProduct.set(pid, pei);
         }
       }
 
-      // Fall back to 1 unit if no production volume found
-      if (unitsProduced === 0) unitsProduced = 1;
+      for (const [productId, lca] of latestByProduct.entries()) {
+        if (lca.status !== 'completed') continue;
 
-      breakdown.products += scope3PerUnit * unitsProduced;
+        const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+        if (scope3PerUnit <= 0) continue;
+
+        // Get production volume from production sites (Facility Allocation)
+        const { data: prodSites } = await supabase
+          .from('product_carbon_footprint_production_sites')
+          .select('production_volume')
+          .eq('product_carbon_footprint_id', lca.id);
+
+        let unitsProduced = 0;
+        if (prodSites && prodSites.length > 0) {
+          unitsProduced = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
+        }
+
+        // Also check contract manufacturer allocations
+        if (unitsProduced === 0) {
+          const { data: cmAllocs } = await supabase
+            .from('contract_manufacturer_allocations')
+            .select('client_production_volume')
+            .eq('product_id', Number(productId) || productId)
+            .eq('organization_id', organizationId);
+
+          if (cmAllocs && cmAllocs.length > 0) {
+            const cmMax = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
+            unitsProduced = Math.max(unitsProduced, cmMax);
+          }
+        }
+
+        // Last resort: check facility reporting sessions
+        if (unitsProduced === 0) {
+          const { data: assignments } = await supabase
+            .from('facility_product_assignments')
+            .select('facility_id')
+            .eq('product_id', Number(productId) || productId)
+            .eq('assignment_status', 'active');
+
+          if (assignments && assignments.length > 0) {
+            const { data: sessions } = await supabase
+              .from('facility_reporting_sessions')
+              .select('total_production_volume')
+              .in('facility_id', assignments.map((a: any) => a.facility_id))
+              .order('reporting_period_end', { ascending: false })
+              .limit(1);
+
+            if (sessions && sessions.length > 0) {
+              unitsProduced = Number(sessions[0].total_production_volume || 0);
+            }
+          }
+        }
+
+        if (unitsProduced === 0) unitsProduced = 1;
+
+        breakdown.products += scope3PerUnit * unitsProduced;
+      }
     }
   }
 
