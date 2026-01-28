@@ -8,6 +8,7 @@ import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
 import { useSupplierEngagement } from '@/hooks/data/useSupplierEngagement';
 import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
+import { useFacilityWaterData } from '@/hooks/data/useFacilityWaterData';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { DashboardCustomiseModal } from '@/components/dashboard/DashboardCustomiseModal';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -148,6 +149,7 @@ export default function DashboardPage() {
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
   const { data: supplierData, isLoading: supplierLoading } = useSupplierEngagement();
   const { metrics: companyMetrics, loading: metricsLoading } = useCompanyMetrics();
+  const { companyOverview: waterCompanyOverview } = useFacilityWaterData(selectedYear);
 
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
@@ -157,8 +159,15 @@ export default function DashboardPage() {
   const isLoading = prefsLoading || footprintLoading || wasteLoading || supplierLoading || metricsLoading;
 
   const waterConsumption = useMemo(() => {
-    return companyMetrics?.total_impacts?.water_consumption || 0;
-  }, [companyMetrics]);
+    // Use facility scarcity-weighted water as primary source (consistent with Company Vitality)
+    const facilityScarcity = waterCompanyOverview?.total_scarcity_weighted_m3
+      || waterCompanyOverview?.scarcity_weighted_consumption_m3
+      || 0;
+    if (facilityScarcity > 0) return facilityScarcity;
+    return companyMetrics?.total_impacts?.water_scarcity_aware
+      || companyMetrics?.total_impacts?.water_consumption
+      || 0;
+  }, [companyMetrics, waterCompanyOverview]);
 
   const scores = useMemo(() => {
     // Climate: null if no emissions data
@@ -460,7 +469,11 @@ export default function DashboardPage() {
         <RAGStatusCard
           title="Water Impact"
           status={getStatusFromScore(scores.waterScore)}
-          value={waterConsumption > 0 ? waterConsumption.toFixed(0) : '--'}
+          value={waterConsumption > 0
+            ? (waterConsumption >= 1000
+              ? `${(waterConsumption / 1000).toFixed(1)}k`
+              : waterConsumption.toFixed(0))
+            : '--'}
           unit="m³"
           category="water"
           href="/performance"
