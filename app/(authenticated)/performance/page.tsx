@@ -380,7 +380,7 @@ export default function PerformancePage() {
     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
     if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
     if (value < 0.1 && value > 0) return value.toExponential(1);
-    return value.toFixed(value < 10 ? 1 : 0);
+    return value.toFixed(1);
   };
 
   const togglePillar = (pillar: string) => {
