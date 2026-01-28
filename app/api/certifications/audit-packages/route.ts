@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         .from('certification_audit_packages')
         .select(`
           *,
-          framework:certification_frameworks(name, code, version)
+          framework:certification_frameworks(framework_name, framework_code, framework_version)
         `)
         .eq('id', packageId)
         .eq('organization_id', organizationId)
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       .from('certification_audit_packages')
       .select(`
         *,
-        framework:certification_frameworks(name, code, version)
+        framework:certification_frameworks(framework_name, framework_code, framework_version)
       `)
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
@@ -110,14 +110,17 @@ export async function POST(request: NextRequest) {
         organization_id: body.organization_id || organizationId,
         framework_id: body.framework_id,
         package_name: body.package_name,
+        package_type: body.package_type,
         description: body.description,
-        audit_period_start: body.audit_period_start,
-        audit_period_end: body.audit_period_end,
+        created_date: new Date().toISOString().split('T')[0],
+        submission_deadline: body.submission_deadline || body.audit_period_end,
         status: body.status || 'draft',
-        included_evidence_ids: body.included_evidence_ids || [],
+        included_requirements: body.included_requirements || body.included_evidence_ids || [],
+        included_evidence: body.included_evidence || [],
+        executive_summary: body.executive_summary,
+        methodology: body.methodology,
         generated_documents: body.generated_documents,
-        notes: body.notes,
-        created_by: user.id,
+        review_notes: body.notes || body.review_notes,
       })
       .select()
       .single();
@@ -169,14 +172,17 @@ export async function PUT(request: NextRequest) {
       .from('certification_audit_packages')
       .update({
         package_name: body.package_name,
+        package_type: body.package_type,
         description: body.description,
-        audit_period_start: body.audit_period_start,
-        audit_period_end: body.audit_period_end,
+        submission_deadline: body.submission_deadline,
         status: body.status,
-        included_evidence_ids: body.included_evidence_ids,
+        included_requirements: body.included_requirements,
+        included_evidence: body.included_evidence,
+        executive_summary: body.executive_summary,
+        methodology: body.methodology,
         generated_documents: body.generated_documents,
         submitted_date: body.submitted_date,
-        notes: body.notes,
+        review_notes: body.notes || body.review_notes,
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)

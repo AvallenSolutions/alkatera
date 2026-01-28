@@ -8,109 +8,75 @@ import type {
 } from '../types/greenwash';
 
 // ============================================================================
-// Fetch Assessments
+// Fetch Assessments (via API route)
 // ============================================================================
 
 export async function fetchAssessments(
   organizationId: string
 ): Promise<GreenwashAssessment[]> {
-  const { data, error } = await supabase
-    .from('greenwash_assessments')
-    .select('*')
-    .eq('organization_id', organizationId)
-    .order('created_at', { ascending: false });
+  const params = new URLSearchParams({ organization_id: organizationId });
+  const response = await fetch(`/api/greenwash/assessments?${params}`);
 
-  if (error) {
-    console.error('Error fetching assessments:', error);
-    throw new Error(error.message);
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Error fetching assessments:', errorData);
+    throw new Error(errorData.error || 'Failed to fetch assessments');
   }
 
-  return data || [];
+  const data = await response.json();
+  return data.assessments || [];
 }
 
 export async function fetchAssessment(
   assessmentId: string
 ): Promise<GreenwashAssessment | null> {
-  const { data, error } = await supabase
-    .from('greenwash_assessments')
-    .select('*')
-    .eq('id', assessmentId)
-    .single();
+  const params = new URLSearchParams({ id: assessmentId });
+  const response = await fetch(`/api/greenwash/assessments?${params}`);
 
-  if (error) {
-    console.error('Error fetching assessment:', error);
-    throw new Error(error.message);
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Error fetching assessment:', errorData);
+    throw new Error(errorData.error || 'Failed to fetch assessment');
   }
 
-  return data;
+  return await response.json();
 }
 
 export async function fetchAssessmentWithClaims(
   assessmentId: string
 ): Promise<GreenwashAssessmentWithClaims | null> {
-  const { data: assessment, error: assessmentError } = await supabase
-    .from('greenwash_assessments')
-    .select('*')
-    .eq('id', assessmentId)
-    .single();
+  const params = new URLSearchParams({ id: assessmentId, include_claims: 'true' });
+  const response = await fetch(`/api/greenwash/assessments?${params}`);
 
-  if (assessmentError) {
-    console.error('Error fetching assessment:', assessmentError);
-    throw new Error(assessmentError.message);
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Error fetching assessment with claims:', errorData);
+    throw new Error(errorData.error || 'Failed to fetch assessment');
   }
 
-  if (!assessment) return null;
-
-  const { data: claims, error: claimsError } = await supabase
-    .from('greenwash_assessment_claims')
-    .select('*')
-    .eq('assessment_id', assessmentId)
-    .order('display_order', { ascending: true });
-
-  if (claimsError) {
-    console.error('Error fetching claims:', claimsError);
-    // Don't throw - return assessment without claims
-  }
-
-  return {
-    ...assessment,
-    claims: claims || [],
-  };
+  return await response.json();
 }
 
 // ============================================================================
-// Create Assessment
+// Create Assessment (via API route)
 // ============================================================================
 
 export async function createAssessment(
   input: CreateAssessmentInput
 ): Promise<GreenwashAssessment> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const response = await fetch('/api/greenwash/assessments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
 
-  if (!user) {
-    throw new Error('User not authenticated');
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Error creating assessment:', errorData);
+    throw new Error(errorData.error || 'Failed to create assessment');
   }
 
-  const { data, error } = await supabase
-    .from('greenwash_assessments')
-    .insert({
-      organization_id: input.organization_id,
-      created_by: user.id,
-      title: input.title,
-      input_type: input.input_type,
-      input_source: input.input_source || null,
-      input_content: input.content || null,
-      status: 'pending',
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error creating assessment:', error);
-    throw new Error(error.message);
-  }
-
-  return data;
+  return await response.json();
 }
 
 // ============================================================================
@@ -164,15 +130,15 @@ export async function triggerAnalysis(
 // ============================================================================
 
 export async function deleteAssessment(assessmentId: string): Promise<void> {
-  // Claims are deleted automatically via CASCADE
-  const { error } = await supabase
-    .from('greenwash_assessments')
-    .delete()
-    .eq('id', assessmentId);
+  const params = new URLSearchParams({ id: assessmentId });
+  const response = await fetch(`/api/greenwash/assessments?${params}`, {
+    method: 'DELETE',
+  });
 
-  if (error) {
-    console.error('Error deleting assessment:', error);
-    throw new Error(error.message);
+  if (!response.ok) {
+    const errorData = await response.json();
+    console.error('Error deleting assessment:', errorData);
+    throw new Error(errorData.error || 'Failed to delete assessment');
   }
 }
 
