@@ -15,15 +15,19 @@ import {
   PlusCircle,
   RefreshCw,
   ArrowLeft,
+  Upload,
+  X,
 } from 'lucide-react';
 import Link from 'next/link';
 
 import { PolicyDashboard } from '@/components/governance/PolicyDashboard';
 import { usePolicies } from '@/hooks/data/usePolicies';
+import { uploadPolicyDocument, PolicyAttachment } from '@/lib/governance/policies';
 
 function AddPolicyDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const [formData, setFormData] = useState({
     policy_name: '',
     policy_code: '',
@@ -41,14 +45,53 @@ function AddPolicyDialog({ onSuccess }: { onSuccess: () => void }) {
     csrd_requirement: '',
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments((prev) => [...prev, ...files]);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      // Get the current session to pass to API
+      // Get the current session and organization
       const { supabase } = await import('@/lib/supabaseClient');
       const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      // Get organization ID
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', session.user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!membership) {
+        throw new Error('No organization found');
+      }
+
+      // Upload attachments if any
+      const uploadedAttachments: PolicyAttachment[] = [];
+      if (attachments.length > 0) {
+        for (const file of attachments) {
+          try {
+            const attachment = await uploadPolicyDocument(membership.organization_id, file);
+            uploadedAttachments.push(attachment);
+          } catch (error) {
+            console.error('Error uploading attachment:', error);
+            throw new Error(`Failed to upload ${file.name}`);
+          }
+        }
+      }
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -62,7 +105,10 @@ function AddPolicyDialog({ onSuccess }: { onSuccess: () => void }) {
         method: 'POST',
         headers,
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          attachments: uploadedAttachments,
+        }),
       });
 
       if (!response.ok) {
@@ -87,6 +133,7 @@ function AddPolicyDialog({ onSuccess }: { onSuccess: () => void }) {
         bcorp_requirement: '',
         csrd_requirement: '',
       });
+      setAttachments([]);
       onSuccess();
     } catch (error) {
       console.error('Error creating policy:', error);
@@ -262,6 +309,59 @@ function AddPolicyDialog({ onSuccess }: { onSuccess: () => void }) {
                 />
               </div>
             )}
+
+            <div className="space-y-2">
+              <Label htmlFor="attachments">Policy Documents</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                  className="w-full"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload Documents
+                </Button>
+                <input
+                  id="file-upload"
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+              {attachments.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {attachments.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-2 bg-muted rounded-md text-sm"
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <FileText className="h-4 w-4 flex-shrink-0" />
+                        <span className="truncate">{file.name}</span>
+                        <span className="text-muted-foreground flex-shrink-0">
+                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeAttachment(index)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Supported formats: PDF, DOC, DOCX, XLS, XLSX, TXT, CSV (max 50MB each)
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

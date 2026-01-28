@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
         public_url: body.public_url,
         bcorp_requirement: body.bcorp_requirement,
         csrd_requirement: body.csrd_requirement,
+        attachments: body.attachments || [],
       })
       .select()
       .single();
@@ -153,26 +154,33 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Policy id is required' }, { status: 400 });
     }
 
+    const updateData: Record<string, any> = {
+      policy_name: body.policy_name,
+      policy_code: body.policy_code,
+      policy_type: body.policy_type,
+      description: body.description,
+      scope: body.scope,
+      owner_name: body.owner_name,
+      owner_department: body.owner_department,
+      status: body.status,
+      effective_date: body.effective_date,
+      review_date: body.review_date,
+      last_reviewed_at: body.last_reviewed_at,
+      is_public: body.is_public,
+      public_url: body.public_url,
+      bcorp_requirement: body.bcorp_requirement,
+      csrd_requirement: body.csrd_requirement,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Include attachments if provided
+    if (body.attachments !== undefined) {
+      updateData.attachments = body.attachments;
+    }
+
     const { data, error } = await supabase
       .from('governance_policies')
-      .update({
-        policy_name: body.policy_name,
-        policy_code: body.policy_code,
-        policy_type: body.policy_type,
-        description: body.description,
-        scope: body.scope,
-        owner_name: body.owner_name,
-        owner_department: body.owner_department,
-        status: body.status,
-        effective_date: body.effective_date,
-        review_date: body.review_date,
-        last_reviewed_at: body.last_reviewed_at,
-        is_public: body.is_public,
-        public_url: body.public_url,
-        bcorp_requirement: body.bcorp_requirement,
-        csrd_requirement: body.csrd_requirement,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', body.id)
       .select()
       .single();

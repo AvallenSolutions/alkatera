@@ -15,6 +15,15 @@ export interface PolicyVersion {
   created_at: string;
 }
 
+export interface PolicyAttachment {
+  path: string;
+  name: string;
+  size: number;
+  type: string;
+  url?: string;
+  uploaded_at: string;
+}
+
 export interface Policy {
   id: string;
   organization_id: string;
@@ -33,6 +42,7 @@ export interface Policy {
   public_url: string | null;
   bcorp_requirement: string | null;
   csrd_requirement: string | null;
+  attachments?: PolicyAttachment[];
   created_at: string;
   updated_at: string;
   versions?: PolicyVersion[];
