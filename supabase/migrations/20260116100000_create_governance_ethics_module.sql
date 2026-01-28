@@ -41,6 +41,9 @@ CREATE TABLE IF NOT EXISTS governance_policies (
   bcorp_requirement VARCHAR(255), -- Which B Corp requirement this supports
   csrd_requirement VARCHAR(255), -- Which CSRD/ESRS requirement this supports
 
+  -- Document attachments
+  attachments JSONB DEFAULT '[]'::jsonb,
+
   -- Metadata
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
@@ -583,6 +586,88 @@ LEFT JOIN governance_stakeholder_engagements se ON se.organization_id = p.organi
 LEFT JOIN governance_board_members b ON b.organization_id = p.organization_id
 LEFT JOIN governance_ethics_records e ON e.organization_id = p.organization_id
 GROUP BY p.organization_id;
+
+-- ============================================================================
+-- STORAGE BUCKET FOR POLICY DOCUMENTS
+-- ============================================================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'policy-documents',
+  'policy-documents',
+  false, -- Private bucket
+  52428800, -- 50MB limit
+  ARRAY[
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'text/plain',
+    'text/csv'
+  ]
+)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================================
+-- STORAGE RLS POLICIES FOR POLICY DOCUMENTS
+-- ============================================================================
+
+-- Allow organization members to upload policy documents to their org folder
+CREATE POLICY "Users can upload policy documents for their organization"
+ON storage.objects
+FOR INSERT
+TO authenticated
+WITH CHECK (
+  bucket_id = 'policy-documents' AND
+  (storage.foldername(name))[1] IN (
+    SELECT om.organization_id::text
+    FROM public.organization_members om
+    WHERE om.user_id = auth.uid()
+  )
+);
+
+-- Allow organization members to view policy documents from their org
+CREATE POLICY "Users can view policy documents from their organization"
+ON storage.objects
+FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'policy-documents' AND
+  (storage.foldername(name))[1] IN (
+    SELECT om.organization_id::text
+    FROM public.organization_members om
+    WHERE om.user_id = auth.uid()
+  )
+);
+
+-- Allow organization members to delete policy documents from their org
+CREATE POLICY "Users can delete policy documents from their organization"
+ON storage.objects
+FOR DELETE
+TO authenticated
+USING (
+  bucket_id = 'policy-documents' AND
+  (storage.foldername(name))[1] IN (
+    SELECT om.organization_id::text
+    FROM public.organization_members om
+    WHERE om.user_id = auth.uid()
+  )
+);
+
+-- Allow organization members to update policy documents from their org
+CREATE POLICY "Users can update policy documents from their organization"
+ON storage.objects
+FOR UPDATE
+TO authenticated
+USING (
+  bucket_id = 'policy-documents' AND
+  (storage.foldername(name))[1] IN (
+    SELECT om.organization_id::text
+    FROM public.organization_members om
+    WHERE om.user_id = auth.uid()
+  )
+);
 
 -- ============================================================================
 -- SEED DATA: COMMON POLICY TYPES
