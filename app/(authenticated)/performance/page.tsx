@@ -635,12 +635,6 @@ export default function PerformancePage() {
         </Alert>
       )}
 
-      {/* Performance Summary - Strengths & Improvements */}
-      <PerformanceSummary
-        strengths={strengths}
-        improvements={improvements}
-      />
-
       {/* Four Pillars - Expandable Cards */}
       <PillarGrid>
         <PillarCard
@@ -754,6 +748,12 @@ export default function PerformancePage() {
           </Button>
         </PillarCard>
       </PillarGrid>
+
+      {/* Performance Summary - Strengths & Improvements */}
+      <PerformanceSummary
+        strengths={strengths}
+        improvements={improvements}
+      />
 
       {/* Collapsible: Material Hotspots */}
       <Collapsible open={showHotspots} onOpenChange={setShowHotspots}>
