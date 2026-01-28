@@ -108,17 +108,21 @@ BEGIN
     WHEN 'price_1SjQlgS6ESxgnZl2c9QYw7QI' THEN 'blossom'
     WHEN 'price_1SjQmXS6ESxgnZl2SWd2nHga' THEN 'canopy'
     -- Production Annual prices
-    WHEN 'price_1SmfD6S6ESxgnZl2D3ELCThW' THEN 'seed'
-    WHEN 'price_1SmfE0S6ESxgnZl2rW18ZxV7' THEN 'blossom'
-    WHEN 'price_1SmfEqS6ESxgnZl2FugLcZSr' THEN 'canopy'
-    -- Test Monthly prices
+    WHEN 'price_1SrEHiS6ESxgnZl20udh9QqS' THEN 'seed'
+    WHEN 'price_1SrEIMS6ESxgnZl2catiRMIW' THEN 'blossom'
+    WHEN 'price_1SrEItS6ESxgnZl2W1Tm2nBN' THEN 'canopy'
+    -- Legacy/Test Monthly prices (for backwards compatibility)
     WHEN 'price_1SmfgF28UK4Vxpt37j13gfue' THEN 'seed'
     WHEN 'price_1SmfhK28UK4Vxpt3mAfxrggp' THEN 'blossom'
     WHEN 'price_1Smfhv28UK4Vxpt3SU2pZVrt' THEN 'canopy'
-    -- Test Annual prices
+    -- Legacy/Test Annual prices (for backwards compatibility)
     WHEN 'price_1SmfiY28UK4Vxpt3uLpyVX5H' THEN 'seed'
     WHEN 'price_1Smfj928UK4Vxpt393quRGXO' THEN 'blossom'
     WHEN 'price_1Smfjf28UK4Vxpt3gB2qvW1b' THEN 'canopy'
+    -- Legacy Production Annual prices (for backwards compatibility)
+    WHEN 'price_1SmfD6S6ESxgnZl2D3ELCThW' THEN 'seed'
+    WHEN 'price_1SmfE0S6ESxgnZl2rW18ZxV7' THEN 'blossom'
+    WHEN 'price_1SmfEqS6ESxgnZl2FugLcZSr' THEN 'canopy'
     ELSE 'seed' -- Default to seed if unknown
   END;
 
