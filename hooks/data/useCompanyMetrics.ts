@@ -334,11 +334,44 @@ export function useCompanyMetrics(year?: number) {
       }
 
       // Attach production volume to each LCA
-      // Use || 1 so products without production logs still show per-unit impacts
-      // (consistent with fetchMaterialAndGHGBreakdown fallback behavior)
-      lcas.forEach(lca => {
-        (lca as any).production_volume = productionMap.get(String(lca.product_id)) || 1;
-      });
+      // Priority: production_logs > product_carbon_footprint_production_sites > 1 unit fallback
+      for (const lca of lcas) {
+        const fromLogs = productionMap.get(String(lca.product_id)) || 0;
+        if (fromLogs > 0) {
+          (lca as any).production_volume = fromLogs;
+          continue;
+        }
+
+        // Fallback: get volume from facility allocation (production sites linked to LCA)
+        const { data: prodSites } = await supabase
+          .from('product_carbon_footprint_production_sites')
+          .select('production_volume')
+          .eq('product_carbon_footprint_id', lca.id);
+
+        let siteVolume = 0;
+        if (prodSites && prodSites.length > 0) {
+          siteVolume = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
+        }
+
+        if (siteVolume > 0) {
+          (lca as any).production_volume = siteVolume;
+          continue;
+        }
+
+        // Also check contract manufacturer allocations
+        const { data: cmAllocs } = await supabase
+          .from('contract_manufacturer_allocations')
+          .select('client_production_volume')
+          .eq('product_id', lca.product_id)
+          .eq('organization_id', currentOrganization.id);
+
+        let cmVolume = 0;
+        if (cmAllocs && cmAllocs.length > 0) {
+          cmVolume = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
+        }
+
+        (lca as any).production_volume = cmVolume > 0 ? cmVolume : 1;
+      }
 
       if (!lcas || lcas.length === 0) {
         setMetrics({
