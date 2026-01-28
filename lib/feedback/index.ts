@@ -203,7 +203,7 @@ export async function fetchMessages(ticketId: string): Promise<FeedbackMessageWi
   if (!data || data.length === 0) return [];
 
   // Fetch sender profiles separately since sender_id references auth.users, not profiles
-  const senderIds = [...new Set(data.map((msg: any) => msg.sender_id))];
+  const senderIds = Array.from(new Set(data.map((msg: any) => msg.sender_id)));
   const { data: profiles } = await supabase
     .from('profiles')
     .select('id, full_name, email, avatar_url')
