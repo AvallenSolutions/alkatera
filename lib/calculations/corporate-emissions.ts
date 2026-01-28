@@ -298,7 +298,11 @@ export async function calculateScope3(
         .maybeSingle();
 
       // Extract Scope 3 portion only (excludes owned facility S1+S2)
-      const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+      // Fall back to total climate_change_gwp100 when scope breakdown is not available
+      // (this is conservative - may slightly overcount if product includes some S1/S2)
+      const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3
+        || lca?.aggregated_impacts?.climate_change_gwp100
+        || 0;
 
       if (scope3PerUnit > 0) {
         breakdown.products += scope3PerUnit * log.units_produced;
