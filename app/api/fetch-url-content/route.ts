@@ -13,10 +13,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Normalize URL - add https:// if no protocol is provided
+    let normalizedUrl = url.trim();
+    if (!/^https?:\/\//i.test(normalizedUrl)) {
+      normalizedUrl = `https://${normalizedUrl}`;
+    }
+
     // Validate URL
     let parsedUrl: URL;
     try {
-      parsedUrl = new URL(url);
+      parsedUrl = new URL(normalizedUrl);
     } catch {
       return NextResponse.json(
         { error: 'Invalid URL format' },
@@ -25,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch main page
-    const mainContent = await fetchPageContent(url);
+    const mainContent = await fetchPageContent(normalizedUrl);
 
     if (!mainContent) {
       return NextResponse.json(
@@ -35,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
 
     let allContent = mainContent.text;
-    const visitedUrls = new Set<string>([url]);
+    const visitedUrls = new Set<string>([normalizedUrl]);
 
     // Crawl subpages if enabled
     if (crawlSubpages && mainContent.links.length > 0) {
@@ -43,7 +49,7 @@ export async function POST(request: NextRequest) {
       const subpageLinks = mainContent.links
         .filter((link) => {
           try {
-            const linkUrl = new URL(link, url);
+            const linkUrl = new URL(link, normalizedUrl);
             // Only crawl same-domain links
             return linkUrl.host === baseHost && !visitedUrls.has(linkUrl.href);
           } catch {
@@ -54,7 +60,7 @@ export async function POST(request: NextRequest) {
 
       for (const link of subpageLinks) {
         try {
-          const absoluteUrl = new URL(link, url).href;
+          const absoluteUrl = new URL(link, normalizedUrl).href;
           if (visitedUrls.has(absoluteUrl)) continue;
 
           visitedUrls.add(absoluteUrl);
@@ -72,7 +78,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       content: allContent,
       pagesAnalyzed: visitedUrls.size,
-      url: url,
+      url: normalizedUrl,
     });
   } catch (error: any) {
     console.error('Error fetching URL content:', error);
