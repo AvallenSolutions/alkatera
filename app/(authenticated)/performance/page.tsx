@@ -160,6 +160,7 @@ function transformFootprintToScope3Categories(
     date: string;
     description: string;
     emissions: number;
+    unit: string;
     source: string;
     dataQuality: 'primary' | 'secondary' | 'estimated';
     metadata?: Record<string, any>;
@@ -169,6 +170,7 @@ function transformFootprintToScope3Categories(
       date: string;
       description: string;
       emissions: number;
+      unit: string;
       source: string;
       dataQuality: 'primary' | 'secondary' | 'estimated';
       metadata?: Record<string, any>;
@@ -183,6 +185,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Product LCA Scope 3 Emissions',
             emissions: scope3Data.products,
+            unit: 'kg CO₂e',
             source: 'Product Carbon Footprint Assessments',
             dataQuality: 'primary',
             metadata: { type: 'product_lca' },
@@ -194,6 +197,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Purchased Services',
             emissions: scope3Data.purchased_services,
+            unit: 'kg CO₂e',
             source: 'Corporate Overheads',
             dataQuality: 'secondary',
             metadata: { type: 'purchased_services' },
@@ -205,6 +209,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Marketing Materials',
             emissions: scope3Data.marketing_materials || scope3Data.marketing,
+            unit: 'kg CO₂e',
             source: 'Corporate Overheads',
             dataQuality: 'secondary',
             metadata: { type: 'marketing_materials' },
@@ -218,6 +223,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Capital Goods Purchases',
             emissions: scope3Data.capital_goods,
+            unit: 'kg CO₂e',
             source: 'Corporate Overheads',
             dataQuality: 'secondary',
           });
@@ -230,6 +236,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Upstream Transportation',
             emissions: scope3Data.upstream_transport,
+            unit: 'kg CO₂e',
             source: 'Product LCA Transport Impacts',
             dataQuality: 'secondary',
           });
@@ -242,6 +249,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Operational Waste',
             emissions: scope3Data.waste || scope3Data.operational_waste,
+            unit: 'kg CO₂e',
             source: 'Corporate Overheads',
             dataQuality: 'secondary',
           });
@@ -254,6 +262,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Business Travel',
             emissions: scope3Data.business_travel,
+            unit: 'kg CO₂e',
             source: 'Corporate Overheads / Fleet Activities',
             dataQuality: 'primary',
           });
@@ -266,6 +275,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Employee Commuting',
             emissions: scope3Data.employee_commuting,
+            unit: 'kg CO₂e',
             source: 'Corporate Overheads',
             dataQuality: 'secondary',
           });
@@ -280,6 +290,7 @@ function transformFootprintToScope3Categories(
               date: today,
               description: 'Downstream Logistics',
               emissions: scope3Data.logistics || scope3Data.downstream_logistics,
+              unit: 'kg CO₂e',
               source: 'Corporate Overheads',
               dataQuality: 'secondary',
             });
@@ -290,6 +301,7 @@ function transformFootprintToScope3Categories(
               date: today,
               description: 'Downstream Transportation (Product LCA)',
               emissions: scope3Data.downstream_transport,
+              unit: 'kg CO₂e',
               source: 'Product LCA Distribution Impacts',
               dataQuality: 'secondary',
             });
@@ -303,6 +315,7 @@ function transformFootprintToScope3Categories(
             date: today,
             description: 'Use Phase Emissions',
             emissions: scope3Data.use_phase,
+            unit: 'kg CO₂e',
             source: 'Product LCA Use Phase Impacts',
             dataQuality: 'secondary',
           });
