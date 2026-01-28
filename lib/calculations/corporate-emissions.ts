@@ -284,9 +284,14 @@ export async function calculateScope3(
     .gte('date', yearStart)
     .lte('date', yearEnd);
 
+  // Track which product IDs have been processed via production logs
+  const processedProductIds = new Set<string>();
+
   if (productionData) {
     for (const log of productionData) {
       if (!log.units_produced || log.units_produced <= 0) continue;
+
+      processedProductIds.add(String(log.product_id));
 
       const { data: lca } = await supabase
         .from('product_carbon_footprints')
@@ -306,6 +311,29 @@ export async function calculateScope3(
 
       if (scope3PerUnit > 0) {
         breakdown.products += scope3PerUnit * log.units_produced;
+      }
+    }
+  }
+
+  // Fallback: Include completed LCAs that have no production logs for this year
+  // Use 1 unit as default so products still contribute to Scope 3 totals
+  const { data: completedLcas } = await supabase
+    .from('product_carbon_footprints')
+    .select('product_id, aggregated_impacts')
+    .eq('organization_id', organizationId)
+    .eq('status', 'completed')
+    .not('aggregated_impacts', 'is', null);
+
+  if (completedLcas) {
+    for (const lca of completedLcas) {
+      if (processedProductIds.has(String(lca.product_id))) continue;
+
+      const scope3PerUnit = lca.aggregated_impacts?.breakdown?.by_scope?.scope3
+        || lca.aggregated_impacts?.climate_change_gwp100
+        || 0;
+
+      if (scope3PerUnit > 0) {
+        breakdown.products += scope3PerUnit; // 1 unit fallback
       }
     }
   }
