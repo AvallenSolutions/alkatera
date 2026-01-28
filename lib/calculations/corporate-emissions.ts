@@ -316,10 +316,10 @@ export async function calculateScope3(
   }
 
   // Fallback: Include completed LCAs that have no production logs for this year
-  // Use 1 unit as default so products still contribute to Scope 3 totals
+  // Get production volume from product_carbon_footprint_production_sites (same as Company Emissions page)
   const { data: completedLcas } = await supabase
     .from('product_carbon_footprints')
-    .select('product_id, aggregated_impacts')
+    .select('id, product_id, aggregated_impacts')
     .eq('organization_id', organizationId)
     .eq('status', 'completed')
     .not('aggregated_impacts', 'is', null);
@@ -332,9 +332,36 @@ export async function calculateScope3(
         || lca.aggregated_impacts?.climate_change_gwp100
         || 0;
 
-      if (scope3PerUnit > 0) {
-        breakdown.products += scope3PerUnit; // 1 unit fallback
+      if (scope3PerUnit <= 0) continue;
+
+      // Get production volume from production sites linked to this LCA
+      const { data: prodSites } = await supabase
+        .from('product_carbon_footprint_production_sites')
+        .select('production_volume')
+        .eq('product_carbon_footprint_id', lca.id);
+
+      let unitsProduced = 0;
+      if (prodSites && prodSites.length > 0) {
+        unitsProduced = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
       }
+
+      // Also check contract manufacturer allocations
+      if (unitsProduced === 0) {
+        const { data: cmAllocs } = await supabase
+          .from('contract_manufacturer_allocations')
+          .select('client_production_volume')
+          .eq('product_id', lca.product_id)
+          .eq('organization_id', organizationId);
+
+        if (cmAllocs && cmAllocs.length > 0) {
+          unitsProduced = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
+        }
+      }
+
+      // Fall back to 1 unit if no production volume found
+      if (unitsProduced === 0) unitsProduced = 1;
+
+      breakdown.products += scope3PerUnit * unitsProduced;
     }
   }
 
