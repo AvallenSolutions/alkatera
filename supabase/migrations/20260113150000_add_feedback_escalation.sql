@@ -11,14 +11,6 @@ ADD COLUMN IF NOT EXISTS last_escalation_at TIMESTAMPTZ;
 ALTER TABLE public.feedback_tickets
 ADD COLUMN IF NOT EXISTS escalation_count INTEGER DEFAULT 0;
 
-ALTER TABLE public.feedback_tickets
-ADD COLUMN IF NOT EXISTS days_unresolved INTEGER GENERATED ALWAYS AS (
-  CASE
-    WHEN status IN ('resolved', 'closed') THEN NULL
-    ELSE EXTRACT(DAY FROM (now() - created_at))::INTEGER
-  END
-) STORED;
-
 -- ============================================================================
 -- Create Index for Finding Old Unresolved Tickets
 -- ============================================================================
