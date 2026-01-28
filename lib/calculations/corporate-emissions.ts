@@ -277,6 +277,9 @@ export async function calculateScope3(
   // CRITICAL: Use aggregated_impacts.breakdown.by_scope.scope3 to avoid double counting
   // This excludes owned facility Scope 1 & 2 which are already in corporate inventory
 
+  // Build production volume map from production_logs
+  const productionVolumeMap = new Map<number, number>();
+
   const { data: productionData } = await supabase
     .from('production_logs')
     .select('product_id, units_produced')
@@ -287,22 +290,73 @@ export async function calculateScope3(
   if (productionData) {
     for (const log of productionData) {
       if (!log.units_produced || log.units_produced <= 0) continue;
+      const current = productionVolumeMap.get(log.product_id) || 0;
+      productionVolumeMap.set(log.product_id, current + log.units_produced);
+    }
+  }
 
-      const { data: lca } = await supabase
-        .from('product_carbon_footprints')
-        .select('aggregated_impacts')
-        .eq('product_id', log.product_id)
-        .eq('status', 'completed')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  // Fallback: for products with completed LCAs but no production_logs,
+  // use production volumes from product_carbon_footprint_production_sites (entered during PEI)
+  const { data: completedLcas } = await supabase
+    .from('product_carbon_footprints')
+    .select('id, product_id')
+    .eq('organization_id', organizationId)
+    .eq('status', 'completed')
+    .order('updated_at', { ascending: false });
 
-      // Extract Scope 3 portion only (excludes owned facility S1+S2)
-      const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
-
-      if (scope3PerUnit > 0) {
-        breakdown.products += scope3PerUnit * log.units_produced;
+  if (completedLcas) {
+    // Get latest LCA per product
+    const latestLcaByProduct = new Map<number, string>();
+    completedLcas.forEach(lca => {
+      if (!latestLcaByProduct.has(lca.product_id)) {
+        latestLcaByProduct.set(lca.product_id, lca.id);
       }
+    });
+
+    // Find products without production_logs
+    const productsWithoutLogs = Array.from(latestLcaByProduct.keys())
+      .filter(pid => !productionVolumeMap.has(pid));
+
+    if (productsWithoutLogs.length > 0) {
+      const lcaIds = productsWithoutLogs.map(pid => latestLcaByProduct.get(pid)!);
+      const { data: siteData } = await supabase
+        .from('product_carbon_footprint_production_sites')
+        .select('product_carbon_footprint_id, production_volume')
+        .in('product_carbon_footprint_id', lcaIds);
+
+      if (siteData) {
+        const lcaIdToProductId = new Map<string, number>();
+        productsWithoutLogs.forEach(pid => {
+          lcaIdToProductId.set(latestLcaByProduct.get(pid)!, pid);
+        });
+
+        siteData.forEach(site => {
+          const productId = lcaIdToProductId.get(site.product_carbon_footprint_id);
+          if (productId !== undefined && Number(site.production_volume) > 0) {
+            const current = productionVolumeMap.get(productId) || 0;
+            productionVolumeMap.set(productId, current + Number(site.production_volume));
+          }
+        });
+      }
+    }
+  }
+
+  // Calculate product Scope 3 emissions using production volumes
+  for (const [productId, unitsProduced] of productionVolumeMap) {
+    const { data: lca } = await supabase
+      .from('product_carbon_footprints')
+      .select('aggregated_impacts')
+      .eq('product_id', productId)
+      .eq('status', 'completed')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Extract Scope 3 portion only (excludes owned facility S1+S2)
+    const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+
+    if (scope3PerUnit > 0) {
+      breakdown.products += scope3PerUnit * unitsProduced;
     }
   }
 

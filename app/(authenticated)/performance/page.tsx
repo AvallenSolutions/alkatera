@@ -495,7 +495,7 @@ export default function PerformancePage() {
         <PillarCard
           pillar="water"
           score={vitalityScores.water}
-          value={waterScarcityImpact > 0 ? formatValue(waterScarcityImpact) : '--'}
+          value={totalWaterImpact > 0 ? formatValue(totalWaterImpact) : (waterScarcityImpact > 0 ? formatValue(waterScarcityImpact) : '--')}
           unit="m3 world eq"
           benchmark={getBenchmarkForPillar('water')}
           expanded={expandedPillar === 'water'}

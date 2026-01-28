@@ -233,26 +233,10 @@ export function useCompanyMetrics(year?: number) {
         throw new Error('No organization selected');
       }
 
-      // Match corporate-emissions approach: start from production logs for the year,
-      // then find the latest completed LCA for each product (regardless of LCA update date).
-      // This ensures products with older assessments but current-year production are included.
       const yearStart = `${selectedYear}-01-01`;
       const yearEnd = `${selectedYear}-12-31`;
 
-      // Step 1: Get all production logs for the year
-      const { data: productionData } = await supabase
-        .from('production_logs')
-        .select('product_id, units_produced, volume, unit, date')
-        .eq('organization_id', currentOrganization.id)
-        .gte('date', yearStart)
-        .lte('date', yearEnd);
-
-      // Get unique product IDs that had production this year
-      const producedProductIds = Array.from(
-        new Set((productionData || []).map(p => p.product_id).filter(Boolean))
-      );
-
-      // Step 2: Fetch the latest completed LCA for each product (no year filter on updated_at)
+      // Step 1: Fetch ALL completed LCAs for this organization (no year filter on updated_at)
       const { data: allLcas, error: lcaError } = await supabase
         .from('product_carbon_footprints')
         .select('id, product_id, product_name, aggregated_impacts, csrd_compliant, updated_at')
@@ -272,65 +256,61 @@ export function useCompanyMetrics(year?: number) {
         }
       });
 
-      // Include LCAs for products that had production this year,
-      // plus any LCAs updated this year (even without production logs)
-      const lcaProductIds = new Set(producedProductIds.map(String));
-      allLcas?.forEach(lca => {
-        const updatedAt = new Date(lca.updated_at);
-        if (updatedAt.getFullYear() === selectedYear) {
-          lcaProductIds.add(String(lca.product_id));
-        }
-      });
+      const lcas = Array.from(latestByProduct.values());
 
-      const lcas = Array.from(lcaProductIds)
-        .map(pid => latestByProduct.get(Number(pid) || pid))
-        .filter(Boolean);
-
-      // =========================================================================
-      // CRITICAL FIX: Unit normalization validation
-      // Ensure production logs have proper units_produced calculated
-      // =========================================================================
-      // Use string keys to handle bigint type coercion from Supabase
+      // Step 2: Get production volumes from production_logs for the year
+      const productIds = lcas.map(lca => lca.product_id).filter(Boolean);
       const productionMap = new Map<string, number>();
-      const unitWarnings: string[] = [];
 
-      productionData?.forEach(prod => {
-        const unitsProduced = Number(prod.units_produced || 0);
-        const rawVolume = Number(prod.volume || 0);
+      if (productIds.length > 0) {
+        const { data: productionData } = await supabase
+          .from('production_logs')
+          .select('product_id, units_produced, volume, unit, date')
+          .in('product_id', productIds)
+          .gte('date', yearStart)
+          .lte('date', yearEnd);
 
-        // Validate units_produced is populated
-        if (unitsProduced <= 0 && rawVolume > 0) {
-          // Production log has raw volume but no normalized units
-          // This could cause incorrect calculations
-          unitWarnings.push(
-            `Product ${prod.product_id}: Production log has volume ${rawVolume} ${prod.unit} but units_produced is not calculated. ` +
-            `This may indicate missing product unit_size data.`
-          );
-          // Skip this entry to avoid using raw volume as units
-          return;
-        }
-
-        // Sanity check: units_produced should be reasonable relative to volume
-        // For beverages, typical conversion: 100 litres = ~130-200 bottles
-        if (prod.unit?.toLowerCase().includes('hectolitre') || prod.unit?.toLowerCase() === 'hl') {
-          const expectedUnitsMin = rawVolume * 100 / 1.5; // 1.5L max bottle
-          const expectedUnitsMax = rawVolume * 100 / 0.2; // 200ml min bottle
-          if (unitsProduced < expectedUnitsMin || unitsProduced > expectedUnitsMax) {
-            unitWarnings.push(
-              `Product ${prod.product_id}: Units produced (${unitsProduced}) seems inconsistent with volume (${rawVolume} hl). ` +
-              `Expected range: ${Math.round(expectedUnitsMin)} - ${Math.round(expectedUnitsMax)}`
-            );
+        productionData?.forEach(prod => {
+          const unitsProduced = Number(prod.units_produced || 0);
+          if (unitsProduced > 0) {
+            const key = String(prod.product_id);
+            const current = productionMap.get(key) || 0;
+            productionMap.set(key, current + unitsProduced);
           }
+        });
+      }
+
+      // Step 3: Fallback — for products WITHOUT production_logs, use the production
+      // volumes from product_carbon_footprint_production_sites (entered during PEI).
+      // This ensures product data shows up on company pages even before production
+      // logs are separately entered, since the PEI process captures production volumes.
+      const productsWithoutLogs = lcas.filter(
+        lca => !productionMap.has(String(lca.product_id))
+      );
+
+      if (productsWithoutLogs.length > 0) {
+        const lcaIds = productsWithoutLogs.map(lca => lca.id);
+        const { data: siteData } = await supabase
+          .from('product_carbon_footprint_production_sites')
+          .select('product_carbon_footprint_id, production_volume')
+          .in('product_carbon_footprint_id', lcaIds);
+
+        if (siteData) {
+          // Build a map from LCA id to product_id
+          const lcaIdToProductId = new Map<string, number>();
+          productsWithoutLogs.forEach(lca => {
+            lcaIdToProductId.set(lca.id, lca.product_id);
+          });
+
+          siteData.forEach(site => {
+            const productId = lcaIdToProductId.get(site.product_carbon_footprint_id);
+            if (productId !== undefined) {
+              const key = String(productId);
+              const current = productionMap.get(key) || 0;
+              productionMap.set(key, current + Number(site.production_volume || 0));
+            }
+          });
         }
-
-        const key = String(prod.product_id);
-        const current = productionMap.get(key) || 0;
-        productionMap.set(key, current + unitsProduced);
-      });
-
-      // Log warnings for visibility
-      if (unitWarnings.length > 0) {
-        console.warn('[useCompanyMetrics] Unit normalization warnings:', unitWarnings);
       }
 
       // Attach production volume to each LCA
@@ -953,10 +933,59 @@ export function useCompanyMetrics(year?: number) {
       // Build production volume map (use string keys for bigint type safety)
       const productionMap = new Map<string, number>();
       productionData?.forEach(prod => {
-        const key = String(prod.product_id);
-        const current = productionMap.get(key) || 0;
-        productionMap.set(key, current + Number(prod.units_produced || 0));
+        const units = Number(prod.units_produced || 0);
+        if (units > 0) {
+          const key = String(prod.product_id);
+          const current = productionMap.get(key) || 0;
+          productionMap.set(key, current + units);
+        }
       });
+
+      // Fallback: for products without production_logs, use PEI production sites volumes
+      const productsWithoutLogs = productIds.filter(pid => !productionMap.has(String(pid)));
+      if (productsWithoutLogs.length > 0) {
+        // Get the latest completed LCA IDs for these products
+        const { data: lcaData } = await supabase
+          .from('product_carbon_footprints')
+          .select('id, product_id')
+          .eq('organization_id', currentOrganization.id)
+          .eq('status', 'completed')
+          .in('product_id', productsWithoutLogs)
+          .order('updated_at', { ascending: false });
+
+        if (lcaData && lcaData.length > 0) {
+          // Deduplicate to get latest LCA per product
+          const latestLcaByProduct = new Map<number, string>();
+          lcaData.forEach(lca => {
+            if (!latestLcaByProduct.has(lca.product_id)) {
+              latestLcaByProduct.set(lca.product_id, lca.id);
+            }
+          });
+
+          const lcaIds = Array.from(latestLcaByProduct.values());
+          const { data: siteData } = await supabase
+            .from('product_carbon_footprint_production_sites')
+            .select('product_carbon_footprint_id, production_volume')
+            .in('product_carbon_footprint_id', lcaIds);
+
+          if (siteData) {
+            // Reverse map: LCA id -> product_id
+            const lcaIdToProductId = new Map<string, number>();
+            latestLcaByProduct.forEach((lcaId, productId) => {
+              lcaIdToProductId.set(lcaId, productId);
+            });
+
+            siteData.forEach(site => {
+              const productId = lcaIdToProductId.get(site.product_carbon_footprint_id);
+              if (productId !== undefined) {
+                const key = String(productId);
+                const current = productionMap.get(key) || 0;
+                productionMap.set(key, current + Number(site.production_volume || 0));
+              }
+            });
+          }
+        }
+      }
 
       // Aggregate materials by name, scaling by production volume
       const materialMap = new Map<string, MaterialBreakdownItem>();
