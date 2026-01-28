@@ -446,7 +446,7 @@ export default function SettingsPage() {
                   const Icon = tierIcons[tier.tier_name]
 
                   const monthlyPrice = tier.monthly_price_gbp || 0
-                  const annualPrice = monthlyPrice * 10
+                  const annualPrice = tier.annual_price_gbp || monthlyPrice * 10
                   const displayPrice = billingInterval === 'monthly' ? monthlyPrice : Math.round(annualPrice / 12)
                   const annualSavings = monthlyPrice * 12 - annualPrice
 

@@ -17,6 +17,26 @@
 */
 
 -- ============================================================================
+-- STEP 0: Ensure is_alkatera_admin column exists on profiles
+-- ============================================================================
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+    AND table_name = 'profiles'
+    AND column_name = 'is_alkatera_admin'
+  ) THEN
+    ALTER TABLE public.profiles
+      ADD COLUMN is_alkatera_admin BOOLEAN NOT NULL DEFAULT false;
+
+    COMMENT ON COLUMN public.profiles.is_alkatera_admin IS
+      'Flag indicating whether the user is an Alkatera platform administrator';
+  END IF;
+END $$;
+
+-- ============================================================================
 -- STEP 1: Create feedback_tickets table
 -- ============================================================================
 
