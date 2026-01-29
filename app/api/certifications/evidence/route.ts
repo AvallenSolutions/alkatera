@@ -18,16 +18,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
     }
 
+    // Fetch evidence without PostgREST relationship joins
     let query = supabase
       .from('certification_evidence_links')
-      .select(`
-        *,
-        requirement:framework_requirements(
-          requirement_code,
-          requirement_name,
-          requirement_category
-        )
-      `)
+      .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
 
@@ -46,8 +40,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Fetch requirement details separately
+    const reqIds = Array.from(new Set((data || []).map((d: any) => d.requirement_id)));
+    let reqMap: Record<string, any> = {};
+    if (reqIds.length > 0) {
+      const { data: reqs } = await supabase
+        .from('framework_requirements')
+        .select('id, requirement_code, requirement_name, requirement_category')
+        .in('id', reqIds);
+      reqMap = Object.fromEntries((reqs || []).map((r: any) => [r.id, r]));
+    }
+
+    // Enrich with requirement data
+    const enrichedData = (data || []).map((item: any) => ({
+      ...item,
+      requirement: reqMap[item.requirement_id] || undefined,
+    }));
+
     // Group evidence by requirement
-    const byRequirement = (data || []).reduce((acc: Record<string, any[]>, item) => {
+    const byRequirement = enrichedData.reduce((acc: Record<string, any[]>, item: any) => {
       const reqId = item.requirement_id;
       if (!acc[reqId]) {
         acc[reqId] = [];
@@ -57,9 +68,9 @@ export async function GET(request: NextRequest) {
     }, {});
 
     return NextResponse.json({
-      evidence: data,
+      evidence: enrichedData,
       byRequirement,
-      totalCount: data?.length || 0,
+      totalCount: enrichedData.length,
     });
   } catch (error) {
     console.error('Error in GET /api/certifications/evidence:', error);
