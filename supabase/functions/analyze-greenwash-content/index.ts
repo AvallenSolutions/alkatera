@@ -266,9 +266,22 @@ Deno.serve(async (req: Request) => {
       throw updateError;
     }
 
+    // Deduplicate claims by claim_text to prevent duplicates from AI output
+    const seenClaimTexts = new Set<string>();
+    const uniqueClaims = analysisResult.claims.filter((claim) => {
+      const normalized = claim.claim_text.trim().toLowerCase();
+      if (seenClaimTexts.has(normalized)) return false;
+      seenClaimTexts.add(normalized);
+      return true;
+    });
+
+    if (uniqueClaims.length < analysisResult.claims.length) {
+      console.log(`Deduplicated claims: ${analysisResult.claims.length} -> ${uniqueClaims.length}`);
+    }
+
     // Insert claims
-    if (analysisResult.claims.length > 0) {
-      const claimsToInsert = analysisResult.claims.map((claim, index) => ({
+    if (uniqueClaims.length > 0) {
+      const claimsToInsert = uniqueClaims.map((claim, index) => ({
         assessment_id: assessmentId,
         claim_text: claim.claim_text,
         claim_context: claim.claim_context || null,
@@ -299,7 +312,7 @@ Deno.serve(async (req: Request) => {
         success: true,
         assessment_id: assessmentId,
         overall_risk_level: analysisResult.overall_risk_level,
-        claims_count: analysisResult.claims.length,
+        claims_count: uniqueClaims.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

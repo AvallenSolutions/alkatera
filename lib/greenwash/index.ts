@@ -167,7 +167,7 @@ export async function fetchUrlContent(url: string): Promise<string> {
     return data.content;
   } catch (error: any) {
     console.error('Error fetching URL content:', error);
-    throw new Error(`Failed to fetch content from URL: ${error.message}`);
+    throw error;
   }
 }
 

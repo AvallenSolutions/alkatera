@@ -126,7 +126,8 @@ export default function GreenwashGuardianPage() {
     switch (activeTab) {
       case "url":
         if (!urlInput.trim()) {
-          toast.error("Please enter a URL");
+          setError("Please enter a URL to analyse");
+          toast.error("Please enter a URL to analyse");
           return;
         }
         inputSource = urlInput;
