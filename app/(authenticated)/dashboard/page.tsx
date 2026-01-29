@@ -340,6 +340,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
+      {/* TEST BANNER - Remove after confirming local dev works */}
+      <div className="bg-yellow-400 text-black text-center py-4 px-6 rounded-xl font-bold text-xl">
+        LOCAL DEV IS WORKING! This banner is served from your Mac, not the cloud.
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight">
