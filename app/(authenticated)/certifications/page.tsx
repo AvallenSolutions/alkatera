@@ -32,6 +32,7 @@ import {
   Package,
 } from 'lucide-react';
 import { CertificationReadinessHero } from '@/components/certifications/CertificationReadinessHero';
+import { EvidenceLibrary } from '@/components/certifications/EvidenceLibrary';
 import { FrameworkCard } from '@/components/certifications/FrameworkCard';
 import { useCertificationFrameworks } from '@/hooks/data/useCertificationFrameworks';
 import { useCertificationScore } from '@/hooks/data/useCertificationScore';
@@ -255,26 +256,7 @@ export default function CertificationsPage() {
 
         {/* Evidence Tab */}
         <TabsContent value="evidence">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-emerald-600" />
-                Evidence Library
-              </CardTitle>
-              <CardDescription>
-                Manage evidence documents linked to certification requirements
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center text-muted-foreground py-8">
-                <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>Evidence links will appear here once you start gap analysis.</p>
-                <p className="text-sm mt-1">
-                  Link policies, metrics, and documents to support your certification applications.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <EvidenceLibrary />
         </TabsContent>
 
         {/* Audit Packages Tab */}
