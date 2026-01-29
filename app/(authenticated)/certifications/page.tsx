@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { CertificationReadinessHero } from '@/components/certifications/CertificationReadinessHero';
 import { EvidenceLibrary } from '@/components/certifications/EvidenceLibrary';
+import { AuditPackageManager } from '@/components/certifications/AuditPackageManager';
 import { FrameworkCard } from '@/components/certifications/FrameworkCard';
 import { useCertificationFrameworks } from '@/hooks/data/useCertificationFrameworks';
 import { useCertificationScore } from '@/hooks/data/useCertificationScore';
@@ -261,26 +262,7 @@ export default function CertificationsPage() {
 
         {/* Audit Packages Tab */}
         <TabsContent value="audit-packages">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5 text-purple-600" />
-                Audit Packages
-              </CardTitle>
-              <CardDescription>
-                Create and manage audit packages for certification submissions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center text-muted-foreground py-8">
-                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No audit packages created yet.</p>
-                <p className="text-sm mt-1">
-                  When you&apos;re ready to submit for certification, create an audit package to compile all evidence.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <AuditPackageManager />
         </TabsContent>
       </Tabs>
 
