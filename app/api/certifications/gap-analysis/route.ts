@@ -17,55 +17,83 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
     }
 
-    let query = supabase
+    // Fetch gap analyses without PostgREST relationship joins
+    // (PostgREST schema cache doesn't reliably detect FK relationships for these tables)
+    let gapQuery = supabase
       .from('certification_gap_analyses')
-      .select(`
-        *,
-        framework:certification_frameworks(framework_name, framework_code, framework_version),
-        requirement:framework_requirements(
-          requirement_code,
-          requirement_name,
-          requirement_category,
-          subsection,
-          max_points
-        )
-      `)
+      .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
 
     if (frameworkId) {
-      query = query.eq('framework_id', frameworkId);
+      gapQuery = gapQuery.eq('framework_id', frameworkId);
     }
 
-    const { data, error } = await query;
+    const { data: gapData, error: gapError } = await gapQuery;
 
-    if (error) {
-      console.error('Error fetching gap analyses:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (gapError) {
+      console.error('Error fetching gap analyses:', gapError);
+      return NextResponse.json({ error: gapError.message }, { status: 500 });
     }
 
-    // Transform data to match UI expectations
-    const transformedData = (data || []).map((item: any) => ({
-      ...item,
-      // Map DB field names to UI field names
-      action_required: item.remediation_actions,
-      assigned_to: item.owner,
-      notes: item.current_state,
-      framework: item.framework ? {
-        name: item.framework.framework_name,
-        code: item.framework.framework_code,
-        version: item.framework.framework_version,
-      } : undefined,
-      requirement: item.requirement ? {
-        requirement_code: item.requirement.requirement_code,
-        requirement_name: item.requirement.requirement_name,
-        category: item.requirement.requirement_category,
-        sub_category: item.requirement.subsection,
-        points_available: item.requirement.max_points,
-      } : undefined,
-    }));
+    const analyses = gapData || [];
 
-    // Calculate summary metrics
+    // If no analyses, return early
+    if (analyses.length === 0) {
+      return NextResponse.json({
+        analyses: [],
+        summary: calculateGapSummary([]),
+      });
+    }
+
+    // Fetch related requirements separately
+    const requirementIds = Array.from(new Set(analyses.map((a: any) => a.requirement_id)));
+    const { data: requirements } = await supabase
+      .from('framework_requirements')
+      .select('id, requirement_code, requirement_name, requirement_category, subsection, max_points')
+      .in('id', requirementIds);
+
+    // Build a lookup map
+    const requirementMap = new Map(
+      (requirements || []).map((r: any) => [r.id, r])
+    );
+
+    // Fetch related frameworks separately
+    const frameworkIds = Array.from(new Set(analyses.map((a: any) => a.framework_id)));
+    const { data: frameworks } = await supabase
+      .from('certification_frameworks')
+      .select('id, framework_name, framework_code, framework_version')
+      .in('id', frameworkIds);
+
+    const frameworkMap = new Map(
+      (frameworks || []).map((f: any) => [f.id, f])
+    );
+
+    // Transform and merge data
+    const transformedData = analyses.map((item: any) => {
+      const req = requirementMap.get(item.requirement_id);
+      const fw = frameworkMap.get(item.framework_id);
+
+      return {
+        ...item,
+        action_required: item.remediation_actions,
+        assigned_to: item.owner,
+        notes: item.current_state,
+        framework: fw ? {
+          name: fw.framework_name,
+          code: fw.framework_code,
+          version: fw.framework_version,
+        } : undefined,
+        requirement: req ? {
+          requirement_code: req.requirement_code,
+          requirement_name: req.requirement_name,
+          category: req.requirement_category,
+          sub_category: req.subsection,
+          points_available: req.max_points,
+        } : undefined,
+      };
+    });
+
     const summary = calculateGapSummary(transformedData);
 
     return NextResponse.json({
@@ -86,7 +114,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
     let organizationId = user.user_metadata?.current_organization_id;
 
     if (!organizationId) {
@@ -105,15 +132,49 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    // Support batch initialization: { requirements: [...ids], framework_id, ... }
+    if (body.requirements && Array.isArray(body.requirements)) {
+      if (!body.framework_id) {
+        return NextResponse.json({ error: 'framework_id is required' }, { status: 400 });
+      }
+
+      const records = body.requirements.map((reqId: string) => ({
+        organization_id: body.organization_id || organizationId,
+        framework_id: body.framework_id,
+        requirement_id: reqId,
+        compliance_status: body.compliance_status || 'not_assessed',
+        analysis_date: new Date().toISOString().split('T')[0],
+      }));
+
+      const { data, error } = await supabase
+        .from('certification_gap_analyses')
+        .insert(records)
+        .select();
+
+      if (error) {
+        console.error('[Gap Analysis API] Batch insert error:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        return NextResponse.json({
+          error: 'Failed to initialize gap analysis',
+          details: error.message,
+          code: error.code,
+        }, { status: 500 });
+      }
+
+      return NextResponse.json({ analyses: data }, { status: 201 });
+    }
+
+    // Single record insert
     if (!body.framework_id || !body.requirement_id) {
       return NextResponse.json(
         { error: 'framework_id and requirement_id are required' },
         { status: 400 }
       );
     }
-
-    // Insert record
-    console.log('[Gap Analysis API] Attempting to insert record for org:', organizationId);
 
     const { data, error } = await supabase
       .from('certification_gap_analyses')
@@ -155,30 +216,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Bulk update gap analyses
 export async function PUT(request: NextRequest) {
   try {
     const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
     }
 
     const body = await request.json();

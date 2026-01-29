@@ -44,25 +44,46 @@ export async function GET(request: NextRequest) {
     const organizationId = searchParams.get('organization_id');
     const activeOnly = searchParams.get('active_only') === 'true';
 
-    // Get all frameworks with their requirements
+    // Get all frameworks (no PostgREST relationship joins - schema cache unreliable)
     let frameworksQuery = supabase
       .from('certification_frameworks')
-      .select(`
-        *,
-        requirements:framework_requirements(*)
-      `)
+      .select('*')
       .order('framework_name', { ascending: true });
 
     if (activeOnly) {
       frameworksQuery = frameworksQuery.eq('is_active', true);
     }
 
-    const { data: frameworks, error: frameworksError } = await frameworksQuery;
+    const { data: rawFrameworks, error: frameworksError } = await frameworksQuery;
 
     if (frameworksError) {
       console.error('Error fetching frameworks:', frameworksError);
       return NextResponse.json({ error: frameworksError.message }, { status: 500 });
     }
+
+    // Fetch requirements separately and group by framework_id
+    const fwIds = (rawFrameworks || []).map((f: any) => f.id);
+    let requirementsByFramework: Record<string, any[]> = {};
+    if (fwIds.length > 0) {
+      const { data: allReqs } = await supabase
+        .from('framework_requirements')
+        .select('*')
+        .in('framework_id', fwIds)
+        .order('order_index', { ascending: true });
+
+      (allReqs || []).forEach((req: any) => {
+        if (!requirementsByFramework[req.framework_id]) {
+          requirementsByFramework[req.framework_id] = [];
+        }
+        requirementsByFramework[req.framework_id].push(req);
+      });
+    }
+
+    // Merge requirements into frameworks
+    const frameworks = (rawFrameworks || []).map((f: any) => ({
+      ...f,
+      requirements: requirementsByFramework[f.id] || [],
+    }));
 
     // Transform frameworks to expected format
     const transformedFrameworks = (frameworks || []).map(transformFramework);

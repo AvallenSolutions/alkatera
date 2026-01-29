@@ -546,12 +546,35 @@ export default function CertificationDetailsPage() {
                 </p>
                 <Button
                   onClick={async () => {
-                    if (!framework?.requirements?.length) return;
-                    // Initialize gap analysis for all requirements
-                    for (const req of framework.requirements) {
-                      await handleUpdateGapStatus(req.id, 'not_assessed');
+                    const orgId = orgIdRef.current;
+                    const fw = frameworkRef.current;
+                    if (!orgId || !fw?.id || !fw?.requirements?.length) return;
+
+                    try {
+                      // Batch-initialize all requirements in a single request
+                      const response = await fetch('/api/certifications/gap-analysis', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          organization_id: orgId,
+                          framework_id: fw.id,
+                          requirements: fw.requirements.map((r: Requirement) => r.id),
+                          compliance_status: 'not_assessed',
+                        }),
+                      });
+
+                      if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        console.error('Gap analysis init error:', errData);
+                        throw new Error(errData.details || errData.error || 'Failed to initialize');
+                      }
+
+                      await refreshGapAnalysis();
+                      toast.success('Gap analysis initialized');
+                    } catch (error) {
+                      console.error('Error initializing gap analysis:', error);
+                      toast.error('Failed to initialize gap analysis');
                     }
-                    toast.success('Gap analysis initialized');
                   }}
                 >
                   Start Gap Analysis

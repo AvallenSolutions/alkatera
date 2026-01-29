@@ -18,14 +18,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
     }
 
-    // If specific package requested
+    // Fetch without PostgREST relationship joins
     if (packageId) {
       const { data, error } = await supabase
         .from('certification_audit_packages')
-        .select(`
-          *,
-          framework:certification_frameworks(framework_name, framework_code, framework_version)
-        `)
+        .select('*')
         .eq('id', packageId)
         .eq('organization_id', organizationId)
         .maybeSingle();
@@ -35,16 +32,23 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      // Enrich with framework data
+      if (data?.framework_id) {
+        const { data: fw } = await supabase
+          .from('certification_frameworks')
+          .select('framework_name, framework_code, framework_version')
+          .eq('id', data.framework_id)
+          .maybeSingle();
+        if (fw) (data as any).framework = fw;
+      }
+
       return NextResponse.json(data);
     }
 
     // List all packages
     let query = supabase
       .from('certification_audit_packages')
-      .select(`
-        *,
-        framework:certification_frameworks(framework_name, framework_code, framework_version)
-      `)
+      .select('*')
       .eq('organization_id', organizationId)
       .order('created_at', { ascending: false });
 
@@ -59,9 +63,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Enrich with framework data
+    const fwIds = Array.from(new Set((data || []).map((d: any) => d.framework_id)));
+    let fwMap: Record<string, any> = {};
+    if (fwIds.length > 0) {
+      const { data: fws } = await supabase
+        .from('certification_frameworks')
+        .select('id, framework_name, framework_code, framework_version')
+        .in('id', fwIds);
+      fwMap = Object.fromEntries((fws || []).map((f: any) => [f.id, f]));
+    }
+    const enrichedData = (data || []).map((d: any) => ({
+      ...d,
+      framework: fwMap[d.framework_id] || undefined,
+    }));
+
     return NextResponse.json({
-      packages: data,
-      totalCount: data?.length || 0,
+      packages: enrichedData,
+      totalCount: enrichedData.length,
     });
   } catch (error) {
     console.error('Error in GET /api/certifications/audit-packages:', error);
