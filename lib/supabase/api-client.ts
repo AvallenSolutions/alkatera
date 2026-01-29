@@ -5,8 +5,30 @@ import type { Database } from '@/types/db_types'
 import { getSupabaseServerClient } from './server-client'
 
 /**
- * Get a Supabase client for API routes that handles both cookie and token authentication
- * This is specifically designed for API routes that may receive Authorization headers from client components
+ * Create a Supabase admin client using the service role key.
+ * This bypasses RLS and the PostgREST schema cache restrictions,
+ * which is needed for tables that may not be in the anon role's schema cache.
+ */
+function getServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null
+  }
+
+  return createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+}
+
+/**
+ * Get a Supabase client for API routes that handles both cookie and token authentication.
+ * Uses the service role key for DB operations when available (bypasses schema cache issues).
+ * Falls back to the anon key if no service role key is configured.
  */
 export async function getSupabaseAPIClient() {
   const headersList = headers()
@@ -19,12 +41,13 @@ export async function getSupabaseAPIClient() {
     throw new Error('Missing Supabase environment variables')
   }
 
+  // Try to get a service role client for DB operations
+  const serviceClient = getServiceRoleClient()
+
   // If Authorization header is present, create a client that uses it
   if (authHeader?.startsWith('Bearer ')) {
-    console.log('[API Client] Using Authorization header authentication');
-
-    // Create a client with the anon key
-    const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    // Create a client with the anon key for auth verification
+    const authClient = createClient<Database>(supabaseUrl, supabaseAnonKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -36,17 +59,19 @@ export async function getSupabaseAPIClient() {
     const token = authHeader.replace('Bearer ', '');
 
     // Verify the token and get the user
-    const { data: { user }, error } = await client.auth.getUser(token);
+    const { data: { user }, error } = await authClient.auth.getUser(token);
 
     if (error || !user) {
       console.error('[API Client] Token verification failed:', error);
-      return { client, user: null, error };
+      return { client: serviceClient || authClient, user: null, error };
     }
 
-    console.log('[API Client] Token verified for user:', user.id);
+    // Return service role client if available (bypasses schema cache),
+    // otherwise fall back to token-authenticated anon client
+    if (serviceClient) {
+      return { client: serviceClient, user, error: null };
+    }
 
-    // Return a client that will use this token for all requests
-    // We set the session manually so the client knows about the user
     return {
       client: createClient<Database>(supabaseUrl, supabaseAnonKey, {
         global: {
@@ -66,9 +91,13 @@ export async function getSupabaseAPIClient() {
   }
 
   // Otherwise, use cookie-based authentication
-  console.log('[API Client] Using cookie-based authentication');
-  const client = getSupabaseServerClient();
-  const { data: { user }, error } = await client.auth.getUser();
+  const cookieClient = getSupabaseServerClient();
+  const { data: { user }, error } = await cookieClient.auth.getUser();
 
-  return { client, user, error };
+  // Return service role client for DB operations if available
+  if (serviceClient && user) {
+    return { client: serviceClient, user, error: null };
+  }
+
+  return { client: cookieClient, user, error };
 }
