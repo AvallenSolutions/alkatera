@@ -302,6 +302,15 @@ export default function CertificationDetailsPage() {
 
     const existingAnalysis = gapAnalyses.find(a => a.requirement_id === requirementId);
 
+    // Calculate score based on status and available points
+    const pointsAvailable = existingAnalysis?.requirement?.points_available
+      ?? fw.requirements?.find((r: Requirement) => r.id === requirementId)?.points_available
+      ?? 0;
+
+    let currentScore = 0;
+    if (status === 'compliant') currentScore = pointsAvailable;
+    else if (status === 'partial') currentScore = Math.round(pointsAvailable * 0.5);
+
     try {
       if (existingAnalysis) {
         const response = await fetch('/api/certifications/gap-analysis', {
@@ -310,6 +319,7 @@ export default function CertificationDetailsPage() {
           body: JSON.stringify({
             id: existingAnalysis.id,
             compliance_status: status,
+            current_score: currentScore,
           }),
         });
 
@@ -323,6 +333,7 @@ export default function CertificationDetailsPage() {
             framework_id: fw.id,
             requirement_id: requirementId,
             compliance_status: status,
+            current_score: currentScore,
           }),
         });
 
@@ -373,7 +384,12 @@ export default function CertificationDetailsPage() {
   const status = certification?.status || 'not_started';
   const config = statusConfig[status];
   const StatusIcon = config.icon;
-  const score = certification?.current_score ?? 0;
+  // Derive score from gap analysis data if available, otherwise use certification record
+  const gapPointsAchieved = gapSummary?.total_points_achieved ?? 0;
+  const gapPointsAvailable = gapSummary?.total_points_available || framework.total_points || 1;
+  const score = gapAnalyses.length > 0
+    ? Math.round((gapPointsAchieved / gapPointsAvailable) * 100)
+    : (certification?.current_score ?? 0);
   const isPassingScore = score >= framework.passing_score;
 
   return (
