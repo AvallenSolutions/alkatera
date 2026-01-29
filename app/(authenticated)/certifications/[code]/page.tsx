@@ -178,7 +178,8 @@ export default function CertificationDetailsPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentOrganization?.id, code, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOrganization?.id, code]);
 
   const fetchGapAnalysis = useCallback(async () => {
     if (!currentOrganization?.id || !framework?.id) return;
