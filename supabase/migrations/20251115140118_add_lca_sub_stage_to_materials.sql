@@ -25,7 +25,7 @@ BEGIN
       AND column_name = 'lca_sub_stage_id'
   ) THEN
     ALTER TABLE public.product_lca_materials
-      ADD COLUMN lca_sub_stage_id INTEGER;
+      ADD COLUMN lca_sub_stage_id UUID;
   END IF;
 END $$;
 
