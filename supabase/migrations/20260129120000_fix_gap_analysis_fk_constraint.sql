@@ -12,7 +12,7 @@ BEGIN
     SELECT FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'certification_framework_requirements'
   ) THEN
-    -- Copy any data from old table to new table (skip duplicates)
+    -- Copy data using only columns that exist in both tables
     INSERT INTO public.framework_requirements (
       id, framework_id, requirement_code, requirement_name,
       requirement_category, description, max_points, is_mandatory,
@@ -21,13 +21,13 @@ BEGIN
     )
     SELECT
       id, framework_id, requirement_code, requirement_name,
-      COALESCE(requirement_category, category, 'General'),
+      requirement_category,
       description,
-      COALESCE(max_points, points_available, 0),
-      COALESCE(is_mandatory, is_required, false),
+      max_points,
+      is_mandatory,
       section,
-      COALESCE(subsection, sub_category),
-      COALESCE(order_index, display_order, 0),
+      subsection,
+      order_index,
       guidance, examples,
       evidence_requirements,
       created_at, updated_at
