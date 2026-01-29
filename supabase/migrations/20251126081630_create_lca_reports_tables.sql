@@ -67,6 +67,104 @@ CREATE TABLE IF NOT EXISTS lca_reports (
   CONSTRAINT valid_dqi_score CHECK (dqi_score IS NULL OR (dqi_score >= 0 AND dqi_score <= 100))
 );
 
+-- Ensure product_id column exists (table may have been created by earlier migration without it)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'product_id'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN product_id uuid REFERENCES products(id) ON DELETE CASCADE;
+  END IF;
+END $$;
+
+-- Ensure other columns exist that earlier migration may not have
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'title'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN title text NOT NULL DEFAULT '';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'version'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN version text NOT NULL DEFAULT '1.0';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'status'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN status lca_report_status NOT NULL DEFAULT 'draft';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'dqi_score'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN dqi_score float;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'system_boundary'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN system_boundary text DEFAULT 'Cradle-to-Gate';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'functional_unit'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN functional_unit text DEFAULT '1 unit';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'assessment_period_start'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN assessment_period_start date;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'assessment_period_end'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN assessment_period_end date;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lca_reports'
+      AND column_name = 'published_at'
+  ) THEN
+    ALTER TABLE lca_reports ADD COLUMN published_at timestamptz;
+  END IF;
+END $$;
+
 -- Create index for lookups
 CREATE INDEX IF NOT EXISTS idx_lca_reports_organization_id ON lca_reports(organization_id);
 CREATE INDEX IF NOT EXISTS idx_lca_reports_product_id ON lca_reports(product_id);
