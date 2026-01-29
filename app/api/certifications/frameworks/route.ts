@@ -45,40 +45,19 @@ export async function GET(request: NextRequest) {
     const activeOnly = searchParams.get('active_only') === 'true';
 
     // Get all frameworks with their requirements
-    // Try the new table name first, fall back to old if it doesn't exist
     let frameworksQuery = supabase
       .from('certification_frameworks')
       .select(`
         *,
-        requirements:certification_framework_requirements(*)
+        requirements:framework_requirements(*)
       `)
-      .order('display_order', { ascending: true });
+      .order('framework_name', { ascending: true });
 
     if (activeOnly) {
       frameworksQuery = frameworksQuery.eq('is_active', true);
     }
 
-    let { data: frameworks, error: frameworksError } = await frameworksQuery;
-
-    // If the requirements table name is different (framework_requirements), try that
-    if (frameworksError && frameworksError.message.includes('certification_framework_requirements')) {
-      console.log('Trying alternate table name: framework_requirements');
-      frameworksQuery = supabase
-        .from('certification_frameworks')
-        .select(`
-          *,
-          requirements:framework_requirements(*)
-        `)
-        .order('display_order', { ascending: true });
-
-      if (activeOnly) {
-        frameworksQuery = frameworksQuery.eq('is_active', true);
-      }
-
-      const result = await frameworksQuery;
-      frameworks = result.data;
-      frameworksError = result.error;
-    }
+    const { data: frameworks, error: frameworksError } = await frameworksQuery;
 
     if (frameworksError) {
       console.error('Error fetching frameworks:', frameworksError);
