@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch gap analyses without PostgREST relationship joins
-    // (PostgREST schema cache doesn't reliably detect FK relationships for these tables)
     let gapQuery = supabase
       .from('certification_gap_analyses')
       .select('*')
@@ -38,7 +37,6 @@ export async function GET(request: NextRequest) {
 
     const analyses = gapData || [];
 
-    // If no analyses, return early
     if (analyses.length === 0) {
       return NextResponse.json({
         analyses: [],
@@ -53,13 +51,48 @@ export async function GET(request: NextRequest) {
       .select('id, requirement_code, requirement_name, requirement_category, subsection, max_points')
       .in('id', requirementIds);
 
-    // Build a lookup map
     const requirementMap = new Map(
       (requirements || []).map((r: any) => [r.id, r])
     );
 
+    // Filter out orphaned records (requirement_id doesn't exist in framework_requirements)
+    // and deduplicate (keep only the latest record per requirement_id)
+    const seenRequirements = new Set<string>();
+    const validAnalyses: any[] = [];
+    const orphanedIds: string[] = [];
+
+    for (const item of analyses) {
+      const req = requirementMap.get(item.requirement_id);
+      if (!req) {
+        // Orphaned record - requirement doesn't exist
+        orphanedIds.push(item.id);
+        continue;
+      }
+      if (seenRequirements.has(item.requirement_id)) {
+        // Duplicate - already have a newer record for this requirement
+        orphanedIds.push(item.id);
+        continue;
+      }
+      seenRequirements.add(item.requirement_id);
+      validAnalyses.push(item);
+    }
+
+    // Clean up orphaned/duplicate records in the background
+    if (orphanedIds.length > 0) {
+      console.log(`[Gap Analysis] Cleaning up ${orphanedIds.length} orphaned/duplicate records`);
+      supabase
+        .from('certification_gap_analyses')
+        .delete()
+        .in('id', orphanedIds)
+        .then(({ error: deleteError }) => {
+          if (deleteError) {
+            console.error('[Gap Analysis] Error cleaning up orphaned records:', deleteError);
+          }
+        });
+    }
+
     // Fetch related frameworks separately
-    const frameworkIds = Array.from(new Set(analyses.map((a: any) => a.framework_id)));
+    const frameworkIds = Array.from(new Set(validAnalyses.map((a: any) => a.framework_id)));
     const { data: frameworks } = await supabase
       .from('certification_frameworks')
       .select('id, framework_name, framework_code, framework_version')
@@ -70,7 +103,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Transform and merge data
-    const transformedData = analyses.map((item: any) => {
+    const transformedData = validAnalyses.map((item: any) => {
       const req = requirementMap.get(item.requirement_id);
       const fw = frameworkMap.get(item.framework_id);
 
@@ -132,14 +165,27 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Support batch initialization: { requirements: [...ids], framework_id, ... }
+    // Batch initialization: { requirements: [...ids], framework_id, ... }
     if (body.requirements && Array.isArray(body.requirements)) {
       if (!body.framework_id) {
         return NextResponse.json({ error: 'framework_id is required' }, { status: 400 });
       }
 
+      const targetOrgId = body.organization_id || organizationId;
+
+      // Delete any existing gap analyses for this org+framework to prevent duplicates
+      const { error: deleteError } = await supabase
+        .from('certification_gap_analyses')
+        .delete()
+        .eq('organization_id', targetOrgId)
+        .eq('framework_id', body.framework_id);
+
+      if (deleteError) {
+        console.error('[Gap Analysis API] Error clearing existing records:', deleteError);
+      }
+
       const records = body.requirements.map((reqId: string) => ({
-        organization_id: body.organization_id || organizationId,
+        organization_id: targetOrgId,
         framework_id: body.framework_id,
         requirement_id: reqId,
         compliance_status: body.compliance_status || 'not_assessed',
@@ -168,7 +214,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ analyses: data }, { status: 201 });
     }
 
-    // Single record insert
+    // Single record insert — check for existing record first
     if (!body.framework_id || !body.requirement_id) {
       return NextResponse.json(
         { error: 'framework_id and requirement_id are required' },
@@ -176,10 +222,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const targetOrgId = body.organization_id || organizationId;
+
+    // Check if a record already exists for this org+framework+requirement
+    const { data: existing } = await supabase
+      .from('certification_gap_analyses')
+      .select('id')
+      .eq('organization_id', targetOrgId)
+      .eq('framework_id', body.framework_id)
+      .eq('requirement_id', body.requirement_id)
+      .maybeSingle();
+
+    if (existing) {
+      // Update instead of creating a duplicate
+      const { data, error } = await supabase
+        .from('certification_gap_analyses')
+        .update({
+          compliance_status: body.compliance_status || 'not_assessed',
+          analysis_date: body.analysis_date || new Date().toISOString().split('T')[0],
+          current_score: body.current_score,
+          gap_description: body.gap_description,
+          remediation_actions: body.action_required || body.remediation_actions,
+          priority: body.priority,
+          owner: body.assigned_to || body.owner,
+          target_completion_date: body.target_completion_date,
+          current_state: body.notes || body.current_state,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[Gap Analysis API] Error updating existing:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json(data);
+    }
+
+    // Create new record
     const { data, error } = await supabase
       .from('certification_gap_analyses')
       .insert({
-        organization_id: body.organization_id || organizationId,
+        organization_id: targetOrgId,
         framework_id: body.framework_id,
         requirement_id: body.requirement_id,
         compliance_status: body.compliance_status || 'not_assessed',
