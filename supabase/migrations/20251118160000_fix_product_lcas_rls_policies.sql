@@ -13,8 +13,12 @@
     - Allows users to manage LCAs within their organization
 */
 
--- Drop existing policy
+-- Drop existing policies
 DROP POLICY IF EXISTS "Users can manage LCAs for their organization" ON public.product_lcas;
+DROP POLICY IF EXISTS "Users can view LCAs for their organization" ON public.product_lcas;
+DROP POLICY IF EXISTS "Users can create LCAs for their organization" ON public.product_lcas;
+DROP POLICY IF EXISTS "Users can update LCAs for their organization" ON public.product_lcas;
+DROP POLICY IF EXISTS "Users can delete LCAs for their organization" ON public.product_lcas;
 
 -- Policy for SELECT: Users can view LCAs from their organization
 CREATE POLICY "Users can view LCAs for their organization"
