@@ -43,3 +43,6 @@ next-env.d.ts
 Alkatera Marketing/
 STRIPE_PRODUCTION_KEYS.txt
 STRIPE_TEST_KEYS.txt
+
+# netlify
+.netlify

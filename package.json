@@ -13,7 +13,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "netlify:dev": "netlify dev",
+    "netlify:functions:serve": "netlify functions:serve",
+    "netlify:functions:list": "netlify functions:list",
+    "netlify:functions:create": "netlify functions:create"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -107,6 +111,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "jsdom": "^27.4.0",
+    "netlify-cli": "^23.14.0",
     "vitest": "^4.0.16"
   }
 }
