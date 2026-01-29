@@ -27,6 +27,10 @@ import {
   Search,
   Filter,
   Target,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Clock,
 } from 'lucide-react';
 
 interface GapAnalysis {
@@ -131,8 +135,66 @@ export function GapAnalysisDashboard({
     {}
   );
 
+  const [showGuide, setShowGuide] = useState(false);
+
   return (
     <div className="space-y-6">
+      {/* How to use guide */}
+      <button
+        onClick={() => setShowGuide(!showGuide)}
+        className="w-full flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-950/30 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 text-blue-600" />
+          <span className="text-sm font-medium text-blue-900 dark:text-blue-300">How to use Gap Analysis</span>
+        </div>
+        {showGuide ? (
+          <ChevronUp className="h-4 w-4 text-blue-600" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-blue-600" />
+        )}
+      </button>
+
+      {showGuide && (
+        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 text-sm space-y-4">
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">1</div>
+            <div>
+              <p className="font-medium">Review each requirement</p>
+              <p className="text-muted-foreground">Expand a category below to see its requirements. Each requirement has a description and points value.</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">2</div>
+            <div>
+              <p className="font-medium">Set the compliance status</p>
+              <p className="text-muted-foreground">Use the dropdown on the right of each requirement:</p>
+              <ul className="mt-1.5 space-y-1 text-muted-foreground">
+                <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> <strong className="text-foreground">Compliant</strong> &mdash; You fully meet this requirement</li>
+                <li className="flex items-center gap-2"><AlertCircle className="h-3.5 w-3.5 text-amber-600" /> <strong className="text-foreground">Partial</strong> &mdash; You partially meet it</li>
+                <li className="flex items-center gap-2"><AlertCircle className="h-3.5 w-3.5 text-red-600" /> <strong className="text-foreground">Non-Compliant</strong> &mdash; You don&apos;t currently meet it</li>
+                <li className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-slate-500" /> <strong className="text-foreground">Not Assessed</strong> &mdash; Not yet reviewed</li>
+                <li className="flex items-center gap-2"><MinusCircle className="h-3.5 w-3.5 text-slate-400" /> <strong className="text-foreground">N/A</strong> &mdash; Not applicable to your organisation</li>
+              </ul>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">3</div>
+            <div>
+              <p className="font-medium">Track your progress</p>
+              <p className="text-muted-foreground">The summary stats above update automatically. Use the search bar and filters to focus on specific statuses or categories.</p>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">4</div>
+            <div>
+              <p className="font-medium">Work through it at your own pace</p>
+              <p className="text-muted-foreground">Your changes save automatically. You can leave and come back at any time &mdash; your progress is preserved.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Stats */}
       {summary && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-4">

@@ -538,12 +538,57 @@ export default function CertificationDetailsPage() {
             />
           ) : (
             <Card>
-              <CardContent className="p-8 text-center">
-                <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                <h3 className="text-lg font-medium mb-2">No Gap Analysis Started</h3>
-                <p className="text-muted-foreground mb-4">
-                  Begin your gap analysis by assessing your compliance with each requirement.
-                </p>
+              <CardContent className="p-8">
+                <div className="text-center mb-8">
+                  <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">No Gap Analysis Started</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Begin your gap analysis by assessing your compliance with each requirement.
+                  </p>
+                </div>
+
+                <div className="max-w-2xl mx-auto mb-8 p-6 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <h4 className="font-semibold text-base mb-4">How Gap Analysis Works</h4>
+                  <div className="space-y-4 text-sm">
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">1</div>
+                      <div>
+                        <p className="font-medium">Click &quot;Start Gap Analysis&quot;</p>
+                        <p className="text-muted-foreground">This creates an assessment entry for every requirement in the framework, all set to &quot;Not Assessed&quot; by default.</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">2</div>
+                      <div>
+                        <p className="font-medium">Review each requirement</p>
+                        <p className="text-muted-foreground">Requirements are grouped by category. Expand each category and review the requirements one by one.</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">3</div>
+                      <div>
+                        <p className="font-medium">Set the compliance status</p>
+                        <p className="text-muted-foreground">Use the dropdown on each requirement to set its status:</p>
+                        <ul className="mt-1.5 space-y-1 text-muted-foreground">
+                          <li className="flex items-center gap-2"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> <strong className="text-foreground">Compliant</strong> &mdash; You fully meet this requirement</li>
+                          <li className="flex items-center gap-2"><AlertCircle className="h-3.5 w-3.5 text-amber-600" /> <strong className="text-foreground">Partial</strong> &mdash; You partially meet this requirement</li>
+                          <li className="flex items-center gap-2"><AlertCircle className="h-3.5 w-3.5 text-red-600" /> <strong className="text-foreground">Non-Compliant</strong> &mdash; You do not currently meet this requirement</li>
+                          <li className="flex items-center gap-2"><Clock className="h-3.5 w-3.5 text-slate-500" /> <strong className="text-foreground">Not Assessed</strong> &mdash; Not yet reviewed</li>
+                          <li className="flex items-center gap-2"><AlertCircle className="h-3.5 w-3.5 text-slate-400" /> <strong className="text-foreground">N/A</strong> &mdash; Not applicable to your organisation</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 flex items-center justify-center text-xs font-bold">4</div>
+                      <div>
+                        <p className="font-medium">Track your progress</p>
+                        <p className="text-muted-foreground">The summary stats at the top update in real time, showing your compliance rate, points achieved, and how many requirements still need assessment. Use the search and filters to focus on specific areas.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center">
                 <Button
                   onClick={async () => {
                     const orgId = orgIdRef.current;
@@ -579,6 +624,7 @@ export default function CertificationDetailsPage() {
                 >
                   Start Gap Analysis
                 </Button>
+                </div>
               </CardContent>
             </Card>
           )}
