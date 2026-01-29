@@ -440,7 +440,7 @@ export default function DashboardPage() {
                   <MiniScoreCard title="Climate" score={scores.climateScore} />
                   <MiniScoreCard title="Water" score={scores.waterScore} />
                   <MiniScoreCard title="Circularity" score={scores.circularityScore} />
-                  <MiniScoreCard title="Supply Chain" score={scores.supplierScore} />
+                  <MiniScoreCard title="Nature" score={scores.supplierScore} />
                 </div>
 
                 <div className="mt-4 flex items-center gap-3">
@@ -708,7 +708,7 @@ const pillarConfig = {
     href: '/company/facilities',
     ctaText: 'Add waste data',
   },
-  'Supply Chain': {
+  'Nature': {
     icon: Link2,
     colorClass: 'orange',
     bgColor: 'bg-orange-500/20',
