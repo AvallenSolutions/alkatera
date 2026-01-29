@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS production_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
   facility_id uuid NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
-  product_id integer NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   date date NOT NULL DEFAULT CURRENT_DATE,
   volume float NOT NULL CHECK (volume > 0),
   unit text NOT NULL DEFAULT 'Litre' CHECK (unit IN ('Litre', 'Hectolitre', 'Unit')),
