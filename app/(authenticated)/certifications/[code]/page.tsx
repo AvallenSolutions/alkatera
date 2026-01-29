@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -141,57 +141,24 @@ export default function CertificationDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [gapLoading, setGapLoading] = useState(false);
 
-  const fetchFrameworkData = useCallback(async () => {
-    if (!currentOrganization?.id) return;
+  // Use refs to store current values for use in callbacks without triggering re-renders
+  const frameworkRef = useRef<Framework | null>(null);
+  const orgIdRef = useRef<string | null>(null);
+  const hasFetchedRef = useRef(false);
 
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({
-        organization_id: currentOrganization.id,
-      });
+  // Keep refs in sync
+  orgIdRef.current = currentOrganization?.id ?? null;
 
-      const response = await fetch(`/api/certifications/frameworks?${params}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch frameworks');
-      }
-
-      const data = await response.json();
-      const matchedFramework = data.frameworks?.find(
-        (f: Framework) => f.code.toLowerCase() === code.toLowerCase()
-      );
-
-      if (!matchedFramework) {
-        toast.error('Certification framework not found');
-        router.push('/certifications');
-        return;
-      }
-
-      setFramework(matchedFramework);
-
-      const matchedCertification = data.certifications?.find(
-        (c: Certification) => c.framework_id === matchedFramework.id
-      );
-      setCertification(matchedCertification || null);
-    } catch (error) {
-      console.error('Error fetching framework:', error);
-      toast.error('Failed to load certification details');
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentOrganization?.id, code]);
-
-  const fetchGapAnalysis = useCallback(async () => {
-    if (!currentOrganization?.id || !framework?.id) return;
-
+  // Fetch gap analysis for a specific framework - standalone function using refs
+  const fetchGapAnalysisForFramework = useCallback(async (orgId: string, frameworkId: string) => {
     try {
       setGapLoading(true);
-      const params = new URLSearchParams({
-        organization_id: currentOrganization.id,
-        framework_id: framework.id,
+      const searchParams = new URLSearchParams({
+        organization_id: orgId,
+        framework_id: frameworkId,
       });
 
-      const response = await fetch(`/api/certifications/gap-analysis?${params}`);
+      const response = await fetch(`/api/certifications/gap-analysis?${searchParams}`);
       if (!response.ok) {
         throw new Error('Failed to fetch gap analysis');
       }
@@ -204,29 +171,139 @@ export default function CertificationDetailsPage() {
     } finally {
       setGapLoading(false);
     }
-  }, [currentOrganization?.id, framework?.id]);
+  }, []);
 
+  // Single effect: fetch framework data + gap analysis in sequence
   useEffect(() => {
-    fetchFrameworkData();
-  }, [fetchFrameworkData]);
+    const orgId = currentOrganization?.id;
+    if (!orgId) return;
 
-  useEffect(() => {
-    if (framework?.id) {
-      fetchGapAnalysis();
+    // Prevent duplicate fetches for same org+code combo
+    const fetchKey = `${orgId}:${code}`;
+    if (hasFetchedRef.current && frameworkRef.current) return;
+
+    let cancelled = false;
+
+    async function loadAll() {
+      try {
+        setLoading(true);
+
+        const searchParams = new URLSearchParams({ organization_id: orgId! });
+        const response = await fetch(`/api/certifications/frameworks?${searchParams}`);
+        if (!response.ok) throw new Error('Failed to fetch frameworks');
+        if (cancelled) return;
+
+        const data = await response.json();
+        const matchedFramework = data.frameworks?.find(
+          (f: Framework) => f.code.toLowerCase() === code.toLowerCase()
+        );
+
+        if (!matchedFramework) {
+          toast.error('Certification framework not found');
+          router.push('/certifications');
+          return;
+        }
+
+        frameworkRef.current = matchedFramework;
+        setFramework(matchedFramework);
+
+        const matchedCertification = data.certifications?.find(
+          (c: Certification) => c.framework_id === matchedFramework.id
+        );
+        setCertification(matchedCertification || null);
+        setLoading(false);
+
+        // Now fetch gap analysis inline - no cascading effect needed
+        if (!cancelled) {
+          await fetchGapAnalysisForFramework(orgId!, matchedFramework.id);
+        }
+
+        hasFetchedRef.current = true;
+      } catch (error) {
+        console.error('Error fetching framework:', error);
+        if (!cancelled) {
+          toast.error('Failed to load certification details');
+          setLoading(false);
+        }
+      }
     }
-  }, [framework?.id, fetchGapAnalysis]);
+
+    loadAll();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOrganization?.id, code]);
+
+  // Refresh gap analysis only (for use after status updates)
+  const refreshGapAnalysis = useCallback(async () => {
+    const orgId = orgIdRef.current;
+    const fw = frameworkRef.current;
+    if (!orgId || !fw?.id) return;
+    await fetchGapAnalysisForFramework(orgId, fw.id);
+  }, [fetchGapAnalysisForFramework]);
+
+  // Refresh everything (for the Refresh button)
+  const handleRefresh = useCallback(async () => {
+    hasFetchedRef.current = false;
+    frameworkRef.current = null;
+    setFramework(null);
+    setGapAnalyses([]);
+    setGapSummary(null);
+    // Trigger the effect by forcing a re-render - the effect will re-run
+    // because hasFetchedRef is now false
+    setLoading(true);
+
+    const orgId = orgIdRef.current;
+    if (!orgId) return;
+
+    try {
+      const searchParams = new URLSearchParams({ organization_id: orgId });
+      const response = await fetch(`/api/certifications/frameworks?${searchParams}`);
+      if (!response.ok) throw new Error('Failed to fetch frameworks');
+
+      const data = await response.json();
+      const matchedFramework = data.frameworks?.find(
+        (f: Framework) => f.code.toLowerCase() === code.toLowerCase()
+      );
+
+      if (!matchedFramework) {
+        toast.error('Certification framework not found');
+        return;
+      }
+
+      frameworkRef.current = matchedFramework;
+      setFramework(matchedFramework);
+
+      const matchedCertification = data.certifications?.find(
+        (c: Certification) => c.framework_id === matchedFramework.id
+      );
+      setCertification(matchedCertification || null);
+      setLoading(false);
+
+      await fetchGapAnalysisForFramework(orgId, matchedFramework.id);
+      hasFetchedRef.current = true;
+    } catch (error) {
+      console.error('Error refreshing:', error);
+      toast.error('Failed to refresh data');
+    } finally {
+      setLoading(false);
+    }
+  }, [code, fetchGapAnalysisForFramework]);
 
   const handleUpdateGapStatus = async (
     requirementId: string,
     status: GapAnalysis['compliance_status']
   ) => {
-    if (!currentOrganization?.id || !framework?.id) return;
+    const orgId = orgIdRef.current;
+    const fw = frameworkRef.current;
+    if (!orgId || !fw?.id) return;
 
     const existingAnalysis = gapAnalyses.find(a => a.requirement_id === requirementId);
 
     try {
       if (existingAnalysis) {
-        // Update existing
         const response = await fetch('/api/certifications/gap-analysis', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -238,13 +315,12 @@ export default function CertificationDetailsPage() {
 
         if (!response.ok) throw new Error('Failed to update');
       } else {
-        // Create new
         const response = await fetch('/api/certifications/gap-analysis', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            organization_id: currentOrganization.id,
-            framework_id: framework.id,
+            organization_id: orgId,
+            framework_id: fw.id,
             requirement_id: requirementId,
             compliance_status: status,
           }),
@@ -253,8 +329,7 @@ export default function CertificationDetailsPage() {
         if (!response.ok) throw new Error('Failed to create');
       }
 
-      // Refresh data
-      await fetchGapAnalysis();
+      await refreshGapAnalysis();
       toast.success('Status updated');
     } catch (error) {
       console.error('Error updating gap analysis:', error);
@@ -341,7 +416,7 @@ export default function CertificationDetailsPage() {
             )}
           </div>
         </div>
-        <Button variant="outline" onClick={fetchFrameworkData} disabled={loading}>
+        <Button variant="outline" onClick={handleRefresh} disabled={loading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
