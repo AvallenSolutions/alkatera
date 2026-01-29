@@ -158,12 +158,7 @@ VALUES
   ('cdp_climate', 'CDP Climate Change', 'CDP Climate Change Disclosure', 'cdp_climate', '2024', '2024',
    'CDP Climate Change questionnaire enables companies to measure and manage their environmental impacts by disclosing information about climate change risks, opportunities, and emissions.',
    'CDP', 'https://www.cdp.net/',
-   NULL, 'Climate Disclosure', 7, 0, true),
-
-  ('ecovadis', 'EcoVadis', 'EcoVadis Sustainability Rating', 'ecovadis', '2024', '2024',
-   'EcoVadis provides business sustainability ratings, assessing companies on their environmental, social, and ethical performance based on international CSR standards.',
-   'EcoVadis', 'https://ecovadis.com/',
-   45, 'Supply Chain Rating', 8, 100, true)
+   NULL, 'Climate Disclosure', 7, 0, true)
 
 ON CONFLICT (framework_code) DO UPDATE SET
   name = EXCLUDED.name,
