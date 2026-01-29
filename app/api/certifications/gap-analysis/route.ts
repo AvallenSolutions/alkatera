@@ -184,7 +184,38 @@ export async function POST(request: NextRequest) {
         console.error('[Gap Analysis API] Error clearing existing records:', deleteError);
       }
 
-      const records = body.requirements.map((reqId: string) => ({
+      // Validate that all requirement IDs exist in framework_requirements
+      const { data: validReqs, error: reqCheckError } = await supabase
+        .from('framework_requirements')
+        .select('id')
+        .in('id', body.requirements);
+
+      if (reqCheckError) {
+        console.error('[Gap Analysis API] Error validating requirements:', reqCheckError);
+        return NextResponse.json({
+          error: 'Failed to validate requirements',
+          details: reqCheckError.message,
+        }, { status: 500 });
+      }
+
+      const validReqIds = new Set((validReqs || []).map((r: any) => r.id));
+      const invalidIds = body.requirements.filter((id: string) => !validReqIds.has(id));
+
+      if (invalidIds.length > 0) {
+        console.warn(`[Gap Analysis API] ${invalidIds.length} requirement IDs not found in framework_requirements:`, invalidIds.slice(0, 5));
+      }
+
+      // Only insert records for valid requirement IDs
+      const validRequirementIds = body.requirements.filter((id: string) => validReqIds.has(id));
+
+      if (validRequirementIds.length === 0) {
+        return NextResponse.json({
+          error: 'No valid requirements found',
+          details: `None of the ${body.requirements.length} requirement IDs exist in framework_requirements. The requirements may be stored in a different table.`,
+        }, { status: 400 });
+      }
+
+      const records = validRequirementIds.map((reqId: string) => ({
         organization_id: targetOrgId,
         framework_id: body.framework_id,
         requirement_id: reqId,
@@ -203,6 +234,7 @@ export async function POST(request: NextRequest) {
           code: error.code,
           details: error.details,
           hint: error.hint,
+          sampleRequirementIds: validRequirementIds.slice(0, 3),
         });
         return NextResponse.json({
           error: 'Failed to initialize gap analysis',
