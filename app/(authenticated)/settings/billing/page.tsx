@@ -272,7 +272,17 @@ export default function BillingPage() {
       {/* Upgrade Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold">Available Plans</h2>
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h2 className="text-2xl font-bold">Available Plans</h2>
+              <Badge variant="outline" className="border-neon-lime/50 bg-neon-lime/10 text-neon-lime text-[10px] uppercase tracking-widest">
+                Founding Partner Pricing
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Lock in exclusive founding partner rates — honoured for the lifetime of your subscription.
+            </p>
+          </div>
           <Tabs value={billingInterval} onValueChange={(v) => setBillingInterval(v as BillingInterval)}>
             <TabsList>
               <TabsTrigger value="monthly">Monthly</TabsTrigger>

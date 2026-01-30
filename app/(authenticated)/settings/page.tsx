@@ -405,9 +405,14 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle>Available Plans</CardTitle>
+                  <div className="flex items-center gap-3 mb-1">
+                    <CardTitle>Available Plans</CardTitle>
+                    <Badge variant="outline" className="border-neon-lime/50 bg-neon-lime/10 text-neon-lime text-[10px] uppercase tracking-widest">
+                      Founding Partner Pricing
+                    </Badge>
+                  </div>
                   <CardDescription>
-                    Choose the plan that fits your organisation
+                    Lock in exclusive founding partner rates — honoured for the lifetime of your subscription.
                   </CardDescription>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border p-1">
