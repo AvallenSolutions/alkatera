@@ -9,7 +9,7 @@ function RosaPageContent() {
   const initialPrompt = searchParams.get('prompt') || undefined;
 
   return (
-    <div className="h-full">
+    <div className="h-full overflow-hidden">
       <RosaChat fullPage initialPrompt={initialPrompt} />
     </div>
   );

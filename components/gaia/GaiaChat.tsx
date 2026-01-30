@@ -813,11 +813,11 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-4">
+        <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-4 max-w-3xl mx-auto">
             {/* Welcome Experience */}
             {(!activeConversation || activeConversation.messages.length === 0) && (
-              <div className="flex flex-col items-center justify-center min-h-[calc(100vh-16rem)] relative overflow-hidden">
+              <div className="flex flex-col items-center justify-center py-8 relative overflow-hidden">
 
                 {/* Organic background shapes — soft botanical silhouettes */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -1198,7 +1198,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
 
             <div ref={messagesEndRef} />
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Input */}
         <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
