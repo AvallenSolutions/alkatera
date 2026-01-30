@@ -52,6 +52,7 @@ import {
   FileHeart,
   Target,
   Library,
+  Lock,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -68,6 +69,8 @@ interface NavItem {
   badge?: number
   minTier?: number // Minimum tier level required (1=Seed, 2=Blossom, 3=Canopy)
   featureCode?: string // Optional feature code requirement
+  locked?: boolean // Set dynamically when user's tier is insufficient
+  requiredTierName?: string // Display name of the required tier
 }
 
 // Navigation configuration with tier requirements
@@ -369,34 +372,23 @@ export function Sidebar({ className }: SidebarProps) {
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
   const isDevelopment = process.env.NODE_ENV === 'development'
 
-  // Filter navigation items based on tier level and feature access
+  const tierDisplayNames: Record<number, string> = { 1: 'Seed', 2: 'Blossom', 3: 'Canopy' }
+
+  // Mark navigation items as locked instead of hiding them
   const filterNavItems = (items: NavItem[]): NavItem[] => {
-    return items
-      .filter((item) => {
-        // Check tier requirement
-        if (item.minTier && tierLevel < item.minTier) {
-          return false
-        }
+    return items.map((item) => {
+      const isLocked = (item.minTier && tierLevel < item.minTier) ||
+        (item.featureCode && !hasFeature(item.featureCode as any))
+      const requiredTierName = item.minTier ? tierDisplayNames[item.minTier] : undefined
 
-        // Check feature requirement
-        if (item.featureCode && !hasFeature(item.featureCode as any)) {
-          return false
-        }
-
-        return true
-      })
-      .map((item) => ({
+      return {
         ...item,
-        // Recursively filter children
+        locked: !!isLocked,
+        requiredTierName,
+        // Recursively process children (but keep them even if locked)
         children: item.children ? filterNavItems(item.children) : undefined,
-      }))
-      .filter((item) => {
-        // Remove parent items that have no visible children
-        if (item.children && item.children.length === 0) {
-          return false
-        }
-        return true
-      })
+      }
+    })
   }
 
   // Build final navigation structure
@@ -404,30 +396,26 @@ export function Sidebar({ className }: SidebarProps) {
     // Start with base navigation
     let filteredNav = filterNavItems(navigationStructure)
 
+    // Always insert ESG sections (they'll be shown as locked if tier is insufficient)
     // Insert People & Culture after Suppliers
-    if (tierLevel >= 2) {
-      const suppliersIndex = filteredNav.findIndex(item => item.href === '/suppliers/')
-      if (suppliersIndex !== -1) {
-        filteredNav.splice(suppliersIndex + 1, 0, peopleAndCultureSection)
-      }
+    const suppliersIndex = filteredNav.findIndex(item => item.href === '/suppliers/')
+    if (suppliersIndex !== -1) {
+      const processedPeople = filterNavItems([peopleAndCultureSection])[0]
+      filteredNav.splice(suppliersIndex + 1, 0, processedPeople)
     }
 
-    // Insert Governance after People & Culture (Canopy only)
-    if (tierLevel >= 3) {
-      const peopleCultureIndex = filteredNav.findIndex(item => item.href === '/people-culture/')
-      if (peopleCultureIndex !== -1) {
-        filteredNav.splice(peopleCultureIndex + 1, 0, governanceSection)
-      }
+    // Insert Governance after People & Culture
+    const peopleCultureIndex = filteredNav.findIndex(item => item.href === '/people-culture/')
+    if (peopleCultureIndex !== -1) {
+      const processedGov = filterNavItems([governanceSection])[0]
+      filteredNav.splice(peopleCultureIndex + 1, 0, processedGov)
     }
 
-    // Insert Community Impact after People & Culture or Governance (Blossom+)
-    if (tierLevel >= 2) {
-      const insertAfter = tierLevel >= 3
-        ? filteredNav.findIndex(item => item.href === '/governance/')
-        : filteredNav.findIndex(item => item.href === '/people-culture/')
-      if (insertAfter !== -1) {
-        filteredNav.splice(insertAfter + 1, 0, communityImpactSection)
-      }
+    // Insert Community Impact after Governance
+    const govIndex = filteredNav.findIndex(item => item.href === '/governance/')
+    if (govIndex !== -1) {
+      const processedCommunity = filterNavItems([communityImpactSection])[0]
+      filteredNav.splice(govIndex + 1, 0, processedCommunity)
     }
 
     return filteredNav
@@ -509,9 +497,41 @@ export function Sidebar({ className }: SidebarProps) {
       <nav className="flex-1 space-y-1 overflow-y-auto">
         {filteredNavigation.map((item) => {
           const IconComponent = item.icon
-          const active = isActive(item.href)
+          const active = !item.locked && isActive(item.href)
           const hasChildren = item.children && item.children.length > 0
-          const expanded = isExpanded(item.name) || shouldAutoExpand(item)
+          const expanded = !item.locked && (isExpanded(item.name) || shouldAutoExpand(item))
+
+          // Locked top-level item (no children) — show greyed out with lock
+          if (item.locked && !hasChildren) {
+            return (
+              <Link
+                key={item.href}
+                href="/settings/"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
+                title={`Upgrade to ${item.requiredTierName} to unlock`}
+              >
+                <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span className="truncate flex-1">{item.name}</span>
+                <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+              </Link>
+            )
+          }
+
+          // Locked parent item with children — show collapsed with lock, click goes to settings
+          if (item.locked && hasChildren) {
+            return (
+              <Link
+                key={item.href}
+                href="/settings/"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
+                title={`Upgrade to ${item.requiredTierName} to unlock`}
+              >
+                <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span className="truncate flex-1">{item.name}</span>
+                <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+              </Link>
+            )
+          }
 
           if (hasChildren) {
             return (
