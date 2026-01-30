@@ -352,10 +352,18 @@ export function useSubscription() {
 
   const hasFeature = useCallback(
     (featureCode: FeatureCode): boolean => {
-      if (!state.usage?.features) return false;
-      return state.usage.features.includes(featureCode);
+      // Check the DB features list first
+      if (state.usage?.features?.includes(featureCode)) return true;
+      // Fallback: check if user's tier level meets the requirement for this feature
+      // This ensures higher-tier users always have access to lower-tier features
+      // even if the DB features_enabled array hasn't been updated
+      const currentLevel = state.usage?.tier?.level || 0;
+      if (currentLevel === 0) return false;
+      const requiredTier = getRequiredTierForFeature(featureCode);
+      const tierLevels: Record<TierName, TierLevel> = { seed: 1, blossom: 2, canopy: 3 };
+      return currentLevel >= tierLevels[requiredTier];
     },
-    [state.usage?.features]
+    [state.usage?.features, state.usage?.tier?.level]
   );
 
   const getTierLevel = useCallback((): TierLevel => {
