@@ -813,11 +813,17 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-4 max-w-3xl mx-auto">
+        <div className={cn(
+          "flex-1 p-4",
+          activeConversation && activeConversation.messages.length > 0 ? "overflow-y-auto" : "overflow-hidden"
+        )}>
+          <div className={cn(
+            "max-w-3xl mx-auto",
+            activeConversation && activeConversation.messages.length > 0 ? "space-y-4" : "h-full"
+          )}>
             {/* Welcome Experience */}
             {(!activeConversation || activeConversation.messages.length === 0) && (
-              <div className="flex flex-col items-center justify-center py-8 relative overflow-hidden">
+              <div className="flex flex-col items-center justify-center h-full relative overflow-hidden">
 
                 {/* Organic background shapes — soft botanical silhouettes */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -834,8 +840,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 </div>
 
                 {/* Growing stem illustration */}
-                <div className="relative mb-2">
-                  <svg width="120" height="140" viewBox="0 0 120 140" fill="none" className="mx-auto">
+                <div className="relative mb-1">
+                  <svg width="90" height="105" viewBox="0 0 120 140" fill="none" className="mx-auto">
                     {/* Main stem — grows upward */}
                     <path
                       d="M60 130 C60 100, 58 80, 60 50"
@@ -901,42 +907,42 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 </div>
 
                 {/* Name and greeting */}
-                <h2 className="text-3xl font-bold mb-2 tracking-tight">
+                <h2 className="text-2xl font-bold mb-1 tracking-tight">
                   <span className="text-foreground">Rosa</span>
                 </h2>
-                <p className="text-base text-muted-foreground/80 mb-1">
+                <p className="text-sm text-muted-foreground/80 mb-0.5">
                   Your sustainability companion
                 </p>
-                <p className="text-sm text-muted-foreground/60 mb-10 max-w-sm text-center">
+                <p className="text-xs text-muted-foreground/60 mb-6 max-w-sm text-center">
                   I can explore your data, uncover insights, and help you
                   reduce your environmental impact. Where shall we start?
                 </p>
 
                 {/* Suggestion cards — 3 columns, organic rounded shapes */}
-                <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+                <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                   <button
                     onClick={() => handleSuggestionClick('What should I focus on first?')}
-                    className="group relative rounded-2xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/[0.06] to-transparent p-5 text-left transition-all hover:border-emerald-500/30 hover:from-emerald-500/[0.12] hover:shadow-lg hover:shadow-emerald-500/[0.05] hover:-translate-y-0.5"
+                    className="group relative rounded-2xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/[0.06] to-transparent p-4 text-left transition-all hover:border-emerald-500/30 hover:from-emerald-500/[0.12] hover:shadow-lg hover:shadow-emerald-500/[0.05] hover:-translate-y-0.5"
                   >
-                    <Leaf className="h-6 w-6 text-emerald-500/70 mb-3 group-hover:text-emerald-400 transition-colors" />
+                    <Leaf className="h-5 w-5 text-emerald-500/70 mb-2 group-hover:text-emerald-400 transition-colors" />
                     <p className="text-sm font-semibold mb-1 group-hover:text-emerald-400 transition-colors">Where do I start?</p>
                     <p className="text-xs text-muted-foreground/70 leading-relaxed">Find out what to focus on first to make the biggest difference</p>
                   </button>
 
                   <button
                     onClick={() => handleSuggestionClick('What is my total carbon footprint?')}
-                    className="group relative rounded-2xl border border-teal-500/10 bg-gradient-to-b from-teal-500/[0.06] to-transparent p-5 text-left transition-all hover:border-teal-500/30 hover:from-teal-500/[0.12] hover:shadow-lg hover:shadow-teal-500/[0.05] hover:-translate-y-0.5"
+                    className="group relative rounded-2xl border border-teal-500/10 bg-gradient-to-b from-teal-500/[0.06] to-transparent p-4 text-left transition-all hover:border-teal-500/30 hover:from-teal-500/[0.12] hover:shadow-lg hover:shadow-teal-500/[0.05] hover:-translate-y-0.5"
                   >
-                    <BarChart3 className="h-6 w-6 text-teal-500/70 mb-3 group-hover:text-teal-400 transition-colors" />
+                    <BarChart3 className="h-5 w-5 text-teal-500/70 mb-2 group-hover:text-teal-400 transition-colors" />
                     <p className="text-sm font-semibold mb-1 group-hover:text-teal-400 transition-colors">My footprint</p>
                     <p className="text-xs text-muted-foreground/70 leading-relaxed">Understand your total carbon footprint and where it comes from</p>
                   </button>
 
                   <button
                     onClick={() => handleSuggestionClick('How can I reduce my carbon footprint?')}
-                    className="group relative rounded-2xl border border-green-500/10 bg-gradient-to-b from-green-500/[0.06] to-transparent p-5 text-left transition-all hover:border-green-500/30 hover:from-green-500/[0.12] hover:shadow-lg hover:shadow-green-500/[0.05] hover:-translate-y-0.5"
+                    className="group relative rounded-2xl border border-green-500/10 bg-gradient-to-b from-green-500/[0.06] to-transparent p-4 text-left transition-all hover:border-green-500/30 hover:from-green-500/[0.12] hover:shadow-lg hover:shadow-green-500/[0.05] hover:-translate-y-0.5"
                   >
-                    <ArrowRight className="h-6 w-6 text-green-500/70 mb-3 rotate-[-45deg] group-hover:text-green-400 transition-colors" />
+                    <ArrowRight className="h-5 w-5 text-green-500/70 mb-2 rotate-[-45deg] group-hover:text-green-400 transition-colors" />
                     <p className="text-sm font-semibold mb-1 group-hover:text-green-400 transition-colors">Take action</p>
                     <p className="text-xs text-muted-foreground/70 leading-relaxed">Get practical steps to reduce your environmental impact</p>
                   </button>
