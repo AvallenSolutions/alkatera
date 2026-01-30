@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Info,
   Loader2,
   RefreshCw,
   Shield,
@@ -131,6 +132,16 @@ export default function InterpretationDashboard({ pcfId }: InterpretationDashboa
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Regenerate
         </Button>
+      </div>
+
+      {/* Guide banner */}
+      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-start gap-2">
+          <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-800 dark:text-blue-200">
+            This section shows the results of your ISO 14044 interpretation analysis. <strong>Contribution analysis</strong> shows which materials matter most. <strong>Sensitivity analysis</strong> shows which inputs, if changed, would most affect results. <strong>Completeness checks</strong> verify your data covers all lifecycle stages. Review the conclusions at the bottom and edit if needed.
+          </p>
+        </div>
       </div>
 
       {/* Summary Cards */}

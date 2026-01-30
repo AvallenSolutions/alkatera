@@ -18,6 +18,7 @@ import {
 import {
   AlertCircle,
   CheckCircle2,
+  HelpCircle,
   Loader2,
   Plus,
   Save,
@@ -26,7 +27,14 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/use-toast';
+import { FIELD_HELP, SMART_DEFAULTS } from '@/lib/lca-compliance-checker';
 import type { CriticalReviewType, DataQualityRequirements } from '@/lib/types/lca';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface GoalScopeFormProps {
   pcfId: string;
@@ -142,6 +150,29 @@ export default function GoalScopeForm({ pcfId }: GoalScopeFormProps) {
     );
   };
 
+  const renderHelp = (fieldId: string) => {
+    const help = FIELD_HELP[fieldId];
+    if (!help) return null;
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help inline ml-1" />
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-sm space-y-2">
+            <p className="text-xs font-semibold">{help.what}</p>
+            <p className="text-xs text-muted-foreground">{help.why}</p>
+            <div className="pt-1 border-t">
+              <p className="text-[10px] text-muted-foreground">
+                <span className="font-semibold">Example:</span> {help.example}
+              </p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -174,25 +205,45 @@ export default function GoalScopeForm({ pcfId }: GoalScopeFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Intended Application</Label>
+            <Label className="flex items-center">Intended Application {renderHelp('intended_application')}</Label>
             <Textarea
               value={intendedApplication}
               onChange={(e) => setIntendedApplication(e.target.value)}
               placeholder="e.g., Internal product development decision-making, EPD publication, marketing claims..."
               rows={2}
             />
+            {!intendedApplication && (
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[10px] text-muted-foreground">Suggestions:</span>
+                {SMART_DEFAULTS.intended_application_suggestions.slice(0, 3).map((s) => (
+                  <Badge key={s} variant="outline" className="text-[10px] cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={() => setIntendedApplication(s)}>
+                    {s}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>Reasons for Carrying Out the Study</Label>
+            <Label className="flex items-center">Reasons for Carrying Out the Study {renderHelp('reasons_for_study')}</Label>
             <Textarea
               value={reasonsForStudy}
               onChange={(e) => setReasonsForStudy(e.target.value)}
               placeholder="e.g., CSRD reporting obligation, customer request, product improvement..."
               rows={2}
             />
+            {!reasonsForStudy && (
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[10px] text-muted-foreground">Suggestions:</span>
+                {SMART_DEFAULTS.reasons_suggestions.slice(0, 3).map((s) => (
+                  <Badge key={s} variant="outline" className="text-[10px] cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={() => setReasonsForStudy(s)}>
+                    {s}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
-            <Label>Intended Audience</Label>
+            <Label className="flex items-center">Intended Audience {renderHelp('intended_audience')}</Label>
             <div className="flex flex-wrap gap-2">
               {AUDIENCE_OPTIONS.map((option) => (
                 <Badge
@@ -268,7 +319,7 @@ export default function GoalScopeForm({ pcfId }: GoalScopeFormProps) {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Temporal Coverage</Label>
+              <Label className="flex items-center">Temporal Coverage {renderHelp('temporal_coverage')}</Label>
               <Input
                 value={dataQuality.temporal_coverage}
                 onChange={(e) => setDataQuality({ ...dataQuality, temporal_coverage: e.target.value })}
@@ -276,7 +327,7 @@ export default function GoalScopeForm({ pcfId }: GoalScopeFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Geographic Coverage</Label>
+              <Label className="flex items-center">Geographic Coverage {renderHelp('geographic_coverage')}</Label>
               <Input
                 value={dataQuality.geographic_coverage}
                 onChange={(e) => setDataQuality({ ...dataQuality, geographic_coverage: e.target.value })}
@@ -284,7 +335,7 @@ export default function GoalScopeForm({ pcfId }: GoalScopeFormProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Technological Coverage</Label>
+              <Label className="flex items-center">Technological Coverage {renderHelp('technological_coverage')}</Label>
               <Input
                 value={dataQuality.technological_coverage}
                 onChange={(e) => setDataQuality({ ...dataQuality, technological_coverage: e.target.value })}
@@ -329,7 +380,7 @@ export default function GoalScopeForm({ pcfId }: GoalScopeFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Review Type</Label>
+            <Label className="flex items-center">Review Type {renderHelp('critical_review_type')}</Label>
             <Select value={criticalReviewType} onValueChange={(v) => setCriticalReviewType(v as CriticalReviewType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>

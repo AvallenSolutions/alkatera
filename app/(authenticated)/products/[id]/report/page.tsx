@@ -15,6 +15,8 @@ import EF31ImpactCategoriesTable from '@/components/lca/EF31ImpactCategoriesTabl
 import InterpretationDashboard from '@/components/lca/InterpretationDashboard';
 import CriticalReviewPanel from '@/components/lca/CriticalReviewPanel';
 import GoalScopeForm from '@/components/lca/GoalScopeForm';
+import ComplianceTracker from '@/components/lca/ComplianceTracker';
+import ComplianceWizard from '@/components/lca/ComplianceWizard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const MOCK_LCA_REPORT = {
@@ -70,6 +72,7 @@ export default function ProductLcaReportPage() {
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
   const [methodology, setMethodology] = useState<'recipe_2016' | 'ef_31'>('recipe_2016');
   const [hasEF31Access, setHasEF31Access] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -498,6 +501,29 @@ export default function ProductLcaReportPage() {
           </div>
         </div>
       </div>
+
+      {/* ISO 14044 Compliance Tracker */}
+      {lcaData?.id && (
+        <ComplianceTracker
+          pcfId={lcaData.id}
+          lcaData={lcaData}
+          onNavigateToTab={setReportTab}
+          onOpenWizard={() => setWizardOpen(true)}
+        />
+      )}
+
+      {/* Compliance Wizard */}
+      {lcaData?.id && (
+        <ComplianceWizard
+          open={wizardOpen}
+          onOpenChange={setWizardOpen}
+          pcfId={lcaData.id}
+          onComplete={() => {
+            // Re-fetch to update tracker
+            window.location.reload();
+          }}
+        />
+      )}
 
       {/* Report Tabs */}
       <Tabs value={reportTab} onValueChange={setReportTab} className="space-y-6">

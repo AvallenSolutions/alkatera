@@ -18,6 +18,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
+  Info,
   Loader2,
   MessageSquare,
   Plus,
@@ -301,6 +302,16 @@ export default function CriticalReviewPanel({ pcfId }: CriticalReviewPanelProps)
         <Badge className={`${statusConfig.color} flex items-center gap-1`}>
           {statusConfig.icon} {statusConfig.label}
         </Badge>
+      </div>
+
+      {/* Guide banner */}
+      <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+        <div className="flex items-start gap-2">
+          <Info className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-blue-800 dark:text-blue-200">
+            The critical review process ensures your LCA meets ISO 14044 requirements. <strong>Add comments</strong> on specific report sections, <strong>address or reject</strong> each one, and then <strong>approve</strong> when all critical issues are resolved. The reviewer can then provide a formal statement.
+          </p>
+        </div>
       </div>
 
       {/* Review Info */}
