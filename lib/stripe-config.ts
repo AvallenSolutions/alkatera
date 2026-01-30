@@ -75,11 +75,13 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     annualPrice: 990, // 10 months (2 months free)
     description: 'Perfect for startups and small businesses beginning their sustainability journey',
     features: [
-      'ReCiPe 2016 methodology',
-      'GHG emissions module',
-      'Live passport analytics',
-      'Email support',
-      'Automated verification',
+      'Dashboard & Vitality Score',
+      'Carbon Footprint (GHG) per product',
+      'Product Passport',
+      'Company Emissions (Current Year)',
+      'Rosa AI Assistant (25/mo)',
+      'Greenwash Guardian (Website only)',
+      'Knowledge Bank (Read)',
     ],
     limits: {
       products: 5,
@@ -99,12 +101,14 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     annualPrice: 2490, // 10 months (2 months free)
     description: 'For growing businesses ready to expand their environmental impact tracking',
     features: [
-      'ReCiPe 2016 + EF 3.1 methodologies',
-      'GHG + Water + Waste modules',
-      'Monthly analytics reporting',
-      'PEF compliance reports',
-      'API access (5,000 calls/month)',
-      'Email support',
+      'Everything in Seed, plus:',
+      'Water, Circularity, Land Use & Resource impacts',
+      'Full Scope 3 Categories',
+      'Vehicle Registry & Supply Chain Mapping',
+      'People & Culture, Community Impact modules',
+      'B Corp & CDP tracking',
+      'Rosa AI (100/mo) & Greenwash Guardian (5 docs/mo)',
+      'Knowledge Bank (Upload & Manage)',
     ],
     limits: {
       products: 20,
@@ -124,14 +128,13 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     annualPrice: 5990, // 10 months (2 months free)
     description: 'Comprehensive sustainability management for established organisations',
     features: [
-      'All methodologies (ReCiPe 2016, EF 3.1, EF 3.1 Single Score)',
-      'All modules: GHG, Water, Waste, Biodiversity, B Corp',
-      'Sandbox analytics environment',
-      'Priority chat support',
-      'Verified data certification',
-      'Custom weighting sets',
-      'White-label reports',
-      'Unlimited API access',
+      'Everything in Blossom, plus:',
+      'Year-over-Year Comparisons',
+      'Advanced Data Quality Scoring & EF 3.1',
+      'All ESG modules including Governance & Ethics',
+      'All certifications: CSRD, EcoVadis, GRI, ISO, SBTi',
+      'Gap Analysis, Audit Packages & Verification Support',
+      'Unlimited Rosa AI & Greenwash Guardian',
     ],
     limits: {
       products: 50,

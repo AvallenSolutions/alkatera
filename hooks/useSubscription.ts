@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 
 export type FeatureCode =
+  // Legacy codes (kept for backward compat)
   | "recipe_2016"
   | "ef_31"
   | "ef_31_single_score"
@@ -26,7 +27,51 @@ export type FeatureCode =
   | "automated_verification"
   | "verified_data"
   | "vehicle_registry"
-  | "fleet_reporting";
+  | "fleet_reporting"
+  // New feature codes
+  | "dashboard_vitality"
+  | "facilities_management"
+  | "fleet_overview"
+  | "supplier_directory"
+  | "company_emissions_current"
+  | "supply_chain_mapping"
+  | "full_scope_3"
+  | "product_management"
+  | "product_passport"
+  | "carbon_footprint_ghg"
+  | "pdf_report_export"
+  | "land_use_impact"
+  | "resource_use_tracking"
+  | "year_over_year"
+  | "advanced_data_quality"
+  | "rosa_ai_25"
+  | "rosa_ai_100"
+  | "rosa_ai_unlimited"
+  | "greenwash_website"
+  | "greenwash_documents"
+  | "greenwash_unlimited"
+  | "people_fair_work"
+  | "people_diversity_inclusion"
+  | "people_wellbeing"
+  | "people_training"
+  | "governance_ethics"
+  | "community_charitable_giving"
+  | "community_volunteering"
+  | "community_local_impact"
+  | "community_impact_stories"
+  | "bcorp_tracking"
+  | "cdp_tracking"
+  | "csrd_compliance"
+  | "ecovadis_rating"
+  | "gri_standards"
+  | "iso_14001"
+  | "iso_50001"
+  | "sbti_targets"
+  | "gap_analysis"
+  | "audit_packages"
+  | "third_party_verification"
+  | "knowledge_bank_read"
+  | "knowledge_bank_manage";
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -278,6 +323,33 @@ export function useSubscription() {
     return data as LimitCheckResult;
   }, [currentOrganization?.id]);
 
+  const checkFacilityLimit = useCallback(async (): Promise<LimitCheckResult> => {
+    if (!currentOrganization?.id) {
+      return { allowed: false, reason: "No organisation selected", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
+    }
+    const { data, error } = await supabase.rpc("check_facility_limit", { p_organization_id: currentOrganization.id });
+    if (error) return { allowed: false, reason: error.message, current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
+    return data as LimitCheckResult;
+  }, [currentOrganization?.id]);
+
+  const checkSupplierLimit = useCallback(async (): Promise<LimitCheckResult> => {
+    if (!currentOrganization?.id) {
+      return { allowed: false, reason: "No organisation selected", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
+    }
+    const { data, error } = await supabase.rpc("check_supplier_limit", { p_organization_id: currentOrganization.id });
+    if (error) return { allowed: false, reason: error.message, current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
+    return data as LimitCheckResult;
+  }, [currentOrganization?.id]);
+
+  const checkTeamMemberLimit = useCallback(async (): Promise<LimitCheckResult> => {
+    if (!currentOrganization?.id) {
+      return { allowed: false, reason: "No organisation selected", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
+    }
+    const { data, error } = await supabase.rpc("check_team_member_limit", { p_organization_id: currentOrganization.id });
+    if (error) return { allowed: false, reason: error.message, current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
+    return data as LimitCheckResult;
+  }, [currentOrganization?.id]);
+
   const hasFeature = useCallback(
     (featureCode: FeatureCode): boolean => {
       if (!state.usage?.features) return false;
@@ -339,6 +411,9 @@ export function useSubscription() {
     checkProductLimit,
     checkReportLimit,
     checkLcaLimit,
+    checkFacilityLimit,
+    checkSupplierLimit,
+    checkTeamMemberLimit,
     refresh,
   };
 }
@@ -358,26 +433,40 @@ export function useFeatureGate(featureCode: FeatureCode) {
 }
 
 function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
-  const blossomFeatures: FeatureCode[] = [
-    "ef_31",
-    "ef_31_single_score",
-    "water_footprint",
-    "waste_circularity",
-    "monthly_analytics",
-    "product_comparison",
-    "vehicle_registry",
-    "fleet_reporting",
-  ];
   const canopyFeatures: FeatureCode[] = [
-    "custom_weighting",
-    "white_label",
-    "biodiversity_tracking",
-    "b_corp_assessment",
-    "sandbox_analytics",
-    "priority_chat",
-    "verified_data",
-    "pef_reports",
-    "api_access",
+    // Legacy
+    "custom_weighting", "white_label", "biodiversity_tracking", "b_corp_assessment",
+    "sandbox_analytics", "priority_chat", "verified_data", "pef_reports", "api_access",
+    // Products & LCA (Canopy only)
+    "year_over_year", "advanced_data_quality", "ef_31_single_score",
+    // AI (Canopy only)
+    "rosa_ai_unlimited", "greenwash_unlimited",
+    // ESG (Canopy only)
+    "people_wellbeing", "people_training", "governance_ethics",
+    "community_local_impact", "community_impact_stories",
+    // Certifications (Canopy only)
+    "csrd_compliance", "ecovadis_rating", "gri_standards",
+    "iso_14001", "iso_50001", "sbti_targets",
+    "gap_analysis", "audit_packages", "third_party_verification",
+  ];
+
+  const blossomFeatures: FeatureCode[] = [
+    // Legacy
+    "ef_31", "water_footprint", "waste_circularity",
+    "monthly_analytics", "product_comparison", "vehicle_registry", "fleet_reporting",
+    // Core (Blossom+)
+    "supply_chain_mapping", "full_scope_3",
+    // Products & LCA (Blossom+)
+    "land_use_impact", "resource_use_tracking",
+    // AI (Blossom+)
+    "rosa_ai_100", "greenwash_documents",
+    // ESG (Blossom+)
+    "people_fair_work", "people_diversity_inclusion",
+    "community_charitable_giving", "community_volunteering",
+    // Certifications (Blossom+)
+    "bcorp_tracking", "cdp_tracking",
+    // Resources (Blossom+)
+    "knowledge_bank_manage",
   ];
 
   if (canopyFeatures.includes(featureCode)) return "canopy";
@@ -433,6 +522,57 @@ export function useLcaLimit() {
       : 0,
     isLoading,
     checkLimit: checkLcaLimit,
+    refresh,
+  };
+}
+
+export function useFacilityLimit() {
+  const { usage, isLoading, checkFacilityLimit, refresh } = useSubscription();
+  const facilityUsage = usage?.usage?.facilities;
+
+  return {
+    currentCount: facilityUsage?.current || 0,
+    maxCount: facilityUsage?.max,
+    isUnlimited: facilityUsage?.is_unlimited || false,
+    percentage: facilityUsage?.max
+      ? Math.round(((facilityUsage?.current || 0) / facilityUsage.max) * 100)
+      : 0,
+    isLoading,
+    checkLimit: checkFacilityLimit,
+    refresh,
+  };
+}
+
+export function useSupplierLimit() {
+  const { usage, isLoading, checkSupplierLimit, refresh } = useSubscription();
+  const supplierUsage = usage?.usage?.suppliers;
+
+  return {
+    currentCount: supplierUsage?.current || 0,
+    maxCount: supplierUsage?.max,
+    isUnlimited: supplierUsage?.is_unlimited || false,
+    percentage: supplierUsage?.max
+      ? Math.round(((supplierUsage?.current || 0) / supplierUsage.max) * 100)
+      : 0,
+    isLoading,
+    checkLimit: checkSupplierLimit,
+    refresh,
+  };
+}
+
+export function useTeamMemberLimit() {
+  const { usage, isLoading, checkTeamMemberLimit, refresh } = useSubscription();
+  const teamUsage = usage?.usage?.team_members;
+
+  return {
+    currentCount: teamUsage?.current || 0,
+    maxCount: teamUsage?.max,
+    isUnlimited: teamUsage?.is_unlimited || false,
+    percentage: teamUsage?.max
+      ? Math.round(((teamUsage?.current || 0) / teamUsage.max) * 100)
+      : 0,
+    isLoading,
+    checkLimit: checkTeamMemberLimit,
     refresh,
   };
 }

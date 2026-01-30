@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -264,6 +265,14 @@ function AddCompensationDialog({ onSuccess }: { onSuccess: () => void }) {
 }
 
 export default function FairWorkPage() {
+  return (
+    <FeatureGate feature="people_fair_work">
+      <FairWorkPageContent />
+    </FeatureGate>
+  );
+}
+
+function FairWorkPageContent() {
   const { metrics, loading, refetch } = useFairWorkMetrics();
 
   if (loading) {

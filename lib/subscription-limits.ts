@@ -165,6 +165,51 @@ export async function checkReportLimit(
 }
 
 /**
+ * Check if organization can create a facility
+ */
+export async function checkFacilityLimit(organizationId: string): Promise<UsageLimitCheck> {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.rpc('check_facility_limit', {
+    p_organization_id: organizationId,
+  });
+  if (error) {
+    console.error('Error checking facility limit:', error);
+    return { allowed: false, reason: 'Failed to check facility limit', current: 0, max: 0, isUnlimited: false, tier: 'seed' };
+  }
+  return { allowed: data.allowed, reason: data.reason, current: data.current_count, max: data.max_count, isUnlimited: data.is_unlimited, tier: data.tier };
+}
+
+/**
+ * Check if organization can add a supplier
+ */
+export async function checkSupplierLimit(organizationId: string): Promise<UsageLimitCheck> {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.rpc('check_supplier_limit', {
+    p_organization_id: organizationId,
+  });
+  if (error) {
+    console.error('Error checking supplier limit:', error);
+    return { allowed: false, reason: 'Failed to check supplier limit', current: 0, max: 0, isUnlimited: false, tier: 'seed' };
+  }
+  return { allowed: data.allowed, reason: data.reason, current: data.current_count, max: data.max_count, isUnlimited: data.is_unlimited, tier: data.tier };
+}
+
+/**
+ * Check if organization can add a team member
+ */
+export async function checkTeamMemberLimit(organizationId: string): Promise<UsageLimitCheck> {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.rpc('check_team_member_limit', {
+    p_organization_id: organizationId,
+  });
+  if (error) {
+    console.error('Error checking team member limit:', error);
+    return { allowed: false, reason: 'Failed to check team member limit', current: 0, max: 0, isUnlimited: false, tier: 'seed' };
+  }
+  return { allowed: data.allowed, reason: data.reason, current: data.current_count, max: data.max_count, isUnlimited: data.is_unlimited, tier: data.tier };
+}
+
+/**
  * Check if organization has access to a specific feature
  */
 export async function checkFeatureAccess(

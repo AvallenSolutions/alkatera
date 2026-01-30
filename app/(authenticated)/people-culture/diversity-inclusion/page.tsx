@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -494,6 +495,14 @@ function AddDEIActionDialog({ onSuccess }: { onSuccess: () => void }) {
 }
 
 export default function DiversityInclusionPage() {
+  return (
+    <FeatureGate feature="people_diversity_inclusion">
+      <DiversityInclusionPageContent />
+    </FeatureGate>
+  );
+}
+
+function DiversityInclusionPageContent() {
   const { metrics, loading, refetch } = useDiversityMetrics();
 
   if (loading) {

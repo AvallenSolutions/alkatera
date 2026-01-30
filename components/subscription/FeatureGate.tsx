@@ -75,6 +75,7 @@ function LockedFeatureCard({
   className,
 }: LockedFeatureCardProps) {
   const featureNames: Record<FeatureCode, string> = {
+    // Legacy
     recipe_2016: "ReCiPe 2016 Methodology",
     ef_31: "EF 3.1 Methodology",
     ef_31_single_score: "EF 3.1 Single Score",
@@ -84,8 +85,8 @@ function LockedFeatureCard({
     product_comparison: "Product Comparison",
     white_label: "White-label Reports",
     ghg_emissions: "GHG Emissions Module",
-    water_footprint: "Water Footprint Module",
-    waste_circularity: "Waste & Circularity Module",
+    water_footprint: "Water Footprint",
+    waste_circularity: "Circularity & Waste",
     biodiversity_tracking: "Biodiversity Module",
     b_corp_assessment: "B Corp Assessment",
     live_passport: "Live Passport Analytics",
@@ -97,6 +98,55 @@ function LockedFeatureCard({
     verified_data: "Verified Data",
     vehicle_registry: "Vehicle Registry",
     fleet_reporting: "Fleet Reporting",
+    // Core Platform
+    dashboard_vitality: "Dashboard & Vitality Score",
+    facilities_management: "Facilities Management",
+    fleet_overview: "Fleet Overview",
+    supplier_directory: "Supplier Directory",
+    company_emissions_current: "Company Emissions",
+    supply_chain_mapping: "Supply Chain Network Mapping",
+    full_scope_3: "Full Scope 3 Categories",
+    // Products & LCA
+    product_management: "Product Management",
+    product_passport: "Product Passport",
+    carbon_footprint_ghg: "Carbon Footprint (GHG)",
+    pdf_report_export: "PDF Report Export",
+    land_use_impact: "Land Use Impact",
+    resource_use_tracking: "Resource Use Tracking",
+    year_over_year: "Year-over-Year Comparisons",
+    advanced_data_quality: "Advanced Data Quality Scoring",
+    // AI Tools
+    rosa_ai_25: "Rosa AI Assistant (25/mo)",
+    rosa_ai_100: "Rosa AI Assistant (100/mo)",
+    rosa_ai_unlimited: "Unlimited Rosa AI",
+    greenwash_website: "Greenwash Guardian (Website)",
+    greenwash_documents: "Greenwash Guardian (Documents)",
+    greenwash_unlimited: "Unlimited Greenwash Guardian",
+    // ESG Modules
+    people_fair_work: "Fair Work",
+    people_diversity_inclusion: "Diversity & Inclusion",
+    people_wellbeing: "Wellbeing",
+    people_training: "Training & Development",
+    governance_ethics: "Governance & Ethics",
+    community_charitable_giving: "Charitable Giving",
+    community_volunteering: "Volunteering",
+    community_local_impact: "Local Impact",
+    community_impact_stories: "Impact Stories",
+    // Certifications
+    bcorp_tracking: "B Corp Certification Tracking",
+    cdp_tracking: "CDP Climate Change Disclosure",
+    csrd_compliance: "CSRD Compliance",
+    ecovadis_rating: "EcoVadis Rating",
+    gri_standards: "GRI Standards",
+    iso_14001: "ISO 14001",
+    iso_50001: "ISO 50001",
+    sbti_targets: "SBTi Targets",
+    gap_analysis: "Gap Analysis",
+    audit_packages: "Audit Packages",
+    third_party_verification: "Third-Party Verification Support",
+    // Resources
+    knowledge_bank_read: "Knowledge Bank (Read)",
+    knowledge_bank_manage: "Knowledge Bank (Upload & Manage)",
   };
 
   const tierDisplayNames: Record<TierName, string> = {

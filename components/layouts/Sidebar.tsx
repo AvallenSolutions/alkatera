@@ -173,7 +173,7 @@ const navigationStructure: NavItem[] = [
     name: 'Certifications',
     href: '/certifications/',
     icon: Award,
-    minTier: 3, // Canopy only
+    minTier: 2, // Blossom and above (B Corp & CDP are Blossom+)
   },
   {
     name: 'Settings',
@@ -266,37 +266,37 @@ const communityImpactSection: NavItem = {
   name: 'Community Impact',
   href: '/community-impact/',
   icon: Heart,
-  minTier: 3, // Canopy only
+  minTier: 2, // Blossom and above
   children: [
     {
       name: 'Overview',
       href: '/community-impact/',
       icon: Heart,
-      minTier: 3,
+      minTier: 2,
     },
     {
       name: 'Charitable Giving',
       href: '/community-impact/charitable-giving/',
       icon: Gift,
-      minTier: 3,
+      minTier: 2,
     },
     {
       name: 'Local Impact',
       href: '/community-impact/local-impact/',
       icon: MapPin,
-      minTier: 3,
+      minTier: 2,
     },
     {
       name: 'Volunteering',
       href: '/community-impact/volunteering/',
       icon: HandHelping,
-      minTier: 3,
+      minTier: 2,
     },
     {
       name: 'Impact Stories',
       href: '/community-impact/stories/',
       icon: FileHeart,
-      minTier: 3,
+      minTier: 2,
     },
   ],
 }
@@ -420,11 +420,13 @@ export function Sidebar({ className }: SidebarProps) {
       }
     }
 
-    // Insert Community Impact after Governance (Canopy only)
-    if (tierLevel >= 3) {
-      const governanceIndex = filteredNav.findIndex(item => item.href === '/governance/')
-      if (governanceIndex !== -1) {
-        filteredNav.splice(governanceIndex + 1, 0, communityImpactSection)
+    // Insert Community Impact after People & Culture or Governance (Blossom+)
+    if (tierLevel >= 2) {
+      const insertAfter = tierLevel >= 3
+        ? filteredNav.findIndex(item => item.href === '/governance/')
+        : filteredNav.findIndex(item => item.href === '/people-culture/')
+      if (insertAfter !== -1) {
+        filteredNav.splice(insertAfter + 1, 0, communityImpactSection)
       }
     }
 
