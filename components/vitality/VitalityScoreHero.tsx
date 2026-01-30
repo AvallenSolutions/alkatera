@@ -6,13 +6,7 @@ import { VitalityRing } from './VitalityRing';
 import { Sparkline } from '@/components/shared/TrendIndicator';
 import { RefreshCw, Calendar, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { ScoreExplainer } from './ScoreExplainer';
+import { ScoreExplainer, type CalculationInputs } from './ScoreExplainer';
 
 interface VitalityScoreHeroProps {
   overallScore: number | null;
@@ -35,6 +29,12 @@ interface VitalityScoreHeroProps {
   onRefresh?: () => void;
   loading?: boolean;
   className?: string;
+  calculationInputs?: {
+    climate?: CalculationInputs;
+    water?: CalculationInputs;
+    circularity?: CalculationInputs;
+    nature?: CalculationInputs;
+  };
 }
 
 function getOverallLabel(score: number | null): { label: string; description: string } {
@@ -80,6 +80,7 @@ export function VitalityScoreHero({
   onRefresh,
   loading,
   className,
+  calculationInputs,
 }: VitalityScoreHeroProps) {
   const { label, description } = getOverallLabel(overallScore);
 
@@ -107,6 +108,14 @@ export function VitalityScoreHero({
                 scoreType="overall"
                 currentScore={overallScore}
                 benchmark={benchmarkData}
+                calculationInputs={{
+                  pillarScores: {
+                    climate: climateScore,
+                    water: waterScore,
+                    circularity: circularityScore,
+                    nature: natureScore,
+                  },
+                }}
               />
             </div>
             <p className="text-sm text-white/60 mt-1">
@@ -172,6 +181,7 @@ export function VitalityScoreHero({
                 icon="🌍"
                 color="emerald"
                 weight={30}
+                calculationInputs={calculationInputs?.climate}
               />
               <PillarScoreCard
                 pillar="Water"
@@ -179,6 +189,7 @@ export function VitalityScoreHero({
                 icon="💧"
                 color="blue"
                 weight={25}
+                calculationInputs={calculationInputs?.water}
               />
               <PillarScoreCard
                 pillar="Circularity"
@@ -186,6 +197,7 @@ export function VitalityScoreHero({
                 icon="♻️"
                 color="amber"
                 weight={25}
+                calculationInputs={calculationInputs?.circularity}
               />
               <PillarScoreCard
                 pillar="Nature"
@@ -193,19 +205,89 @@ export function VitalityScoreHero({
                 icon="🌱"
                 color="green"
                 weight={20}
+                calculationInputs={calculationInputs?.nature}
               />
             </div>
 
-            <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
-              <div className="flex items-center gap-2 text-xs text-white/60">
-                <Info className="h-3.5 w-3.5" />
-                <span>
-                  Score = Climate (30%) + Water (25%) + Circularity (25%) + Nature (20%)
-                </span>
-              </div>
-            </div>
+            <WeightedBreakdownRow
+              climateScore={climateScore}
+              waterScore={waterScore}
+              circularityScore={circularityScore}
+              natureScore={natureScore}
+              overallScore={overallScore}
+            />
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function WeightedBreakdownRow({
+  climateScore,
+  waterScore,
+  circularityScore,
+  natureScore,
+  overallScore,
+}: {
+  climateScore: number | null;
+  waterScore: number | null;
+  circularityScore: number | null;
+  natureScore: number | null;
+  overallScore: number | null;
+}) {
+  const pillars = [
+    { name: 'Climate', score: climateScore, weight: 0.30 },
+    { name: 'Water', score: waterScore, weight: 0.25 },
+    { name: 'Circularity', score: circularityScore, weight: 0.25 },
+    { name: 'Nature', score: natureScore, weight: 0.20 },
+  ];
+  const available = pillars.filter(p => p.score !== null);
+  const totalWeight = available.reduce((sum, p) => sum + p.weight, 0);
+
+  if (available.length === 0) {
+    return (
+      <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
+        <div className="flex items-center gap-2 text-xs text-white/60">
+          <Info className="h-3.5 w-3.5" />
+          <span>Add data to see your score breakdown</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
+      <div className="space-y-1.5">
+        {pillars.map((p) => {
+          if (p.score === null) {
+            return (
+              <div key={p.name} className="flex items-center justify-between text-xs">
+                <span className="text-white/40">{p.name} ({(p.weight * 100).toFixed(0)}%)</span>
+                <span className="text-white/30 italic">No data</span>
+              </div>
+            );
+          }
+          const adjustedWeight = (p.weight / totalWeight);
+          const contribution = p.score * adjustedWeight;
+          return (
+            <div key={p.name} className="flex items-center justify-between text-xs">
+              <span className="text-white/60">{p.name} ({(p.weight * 100).toFixed(0)}%)</span>
+              <span className="text-white/80 tabular-nums">
+                {p.score} x {(adjustedWeight * 100).toFixed(0)}% = <span className="text-white font-medium">{contribution.toFixed(1)}</span>
+              </span>
+            </div>
+          );
+        })}
+        <div className="flex items-center justify-between text-xs border-t border-white/10 pt-1.5 mt-1.5">
+          <span className="text-white/60 font-medium">Overall Score</span>
+          <span className="text-white font-bold tabular-nums">{overallScore ?? '—'}</span>
+        </div>
+        {available.length < 4 && (
+          <p className="text-[10px] text-white/40 mt-0.5">
+            Weights redistributed across {available.length} pillar{available.length !== 1 ? 's' : ''} with data.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -217,9 +299,17 @@ interface PillarScoreCardProps {
   icon: string;
   color: 'emerald' | 'blue' | 'amber' | 'green';
   weight: number;
+  calculationInputs?: CalculationInputs;
 }
 
-function PillarScoreCard({ pillar, score, icon, color, weight }: PillarScoreCardProps) {
+const pillarToScoreType: Record<string, 'climate' | 'water' | 'circularity' | 'nature'> = {
+  Climate: 'climate',
+  Water: 'water',
+  Circularity: 'circularity',
+  Nature: 'nature',
+};
+
+function PillarScoreCard({ pillar, score, icon, color, weight, calculationInputs }: PillarScoreCardProps) {
   const colorClasses = {
     emerald: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
     blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
@@ -233,41 +323,39 @@ function PillarScoreCard({ pillar, score, icon, color, weight }: PillarScoreCard
                      score >= 70 ? 'text-green-400' :
                      score >= 50 ? 'text-amber-400' : 'text-red-400';
 
+  const scoreType = pillarToScoreType[pillar];
+
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className={cn(
-            'p-4 rounded-xl bg-gradient-to-br border cursor-help',
-            'transition-all duration-200 hover:scale-[1.02]',
-            score === null ? noDataClasses : colorClasses[color]
-          )}>
-            <div className="flex items-center justify-between mb-2">
-              <span className={cn('text-xl', score === null && 'opacity-50')}>{icon}</span>
-              <span className="text-xs text-white/40">{weight}%</span>
-            </div>
-            <div className="text-white/80 text-sm font-medium">{pillar}</div>
-            {score === null ? (
-              <div className="text-white/40 text-sm font-medium mt-1">
-                No data
-              </div>
-            ) : (
-              <div className={cn('text-2xl font-bold tabular-nums', scoreColor)}>
-                {score}
-                <span className="text-sm text-white/40">/100</span>
-              </div>
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          {score === null ? (
-            <p>Add data to calculate {pillar.toLowerCase()} score</p>
-          ) : (
-            <p>{pillar} contributes {weight}% to overall score</p>
+    <div className={cn(
+      'p-4 rounded-xl bg-gradient-to-br border',
+      'transition-all duration-200 hover:scale-[1.02]',
+      score === null ? noDataClasses : colorClasses[color]
+    )}>
+      <div className="flex items-center justify-between mb-2">
+        <span className={cn('text-xl', score === null && 'opacity-50')}>{icon}</span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs text-white/40">{weight}%</span>
+          {scoreType && (
+            <ScoreExplainer
+              scoreType={scoreType}
+              currentScore={score}
+              calculationInputs={calculationInputs}
+            />
           )}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+        </div>
+      </div>
+      <div className="text-white/80 text-sm font-medium">{pillar}</div>
+      {score === null ? (
+        <div className="text-white/40 text-sm font-medium mt-1">
+          No data
+        </div>
+      ) : (
+        <div className={cn('text-2xl font-bold tabular-nums', scoreColor)}>
+          {score}
+          <span className="text-sm text-white/40">/100</span>
+        </div>
+      )}
+    </div>
   );
 }
 
