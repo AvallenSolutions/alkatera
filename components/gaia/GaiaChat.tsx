@@ -544,7 +544,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   return (
     <div className={cn(
       'flex bg-background',
-      fullPage ? 'h-[calc(100vh-4rem)]' : 'h-[600px] rounded-lg border'
+      fullPage ? 'h-full' : 'h-[600px] rounded-lg border'
     )}>
       {/* Sidebar - Conversation History */}
       {showSidebar && (
