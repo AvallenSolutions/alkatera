@@ -193,8 +193,13 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
 
       <div className="relative z-10 max-w-7xl mx-auto">
         <div className="text-center mb-20">
-          <h2 className="font-mono text-[#ccff00] text-sm tracking-[0.2em] uppercase mb-4">Invest in Future</h2>
-          <h3 className="font-serif text-4xl md:text-6xl">Choose your impact scale.</h3>
+          <div className="inline-block mb-6 px-5 py-2 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
+            <span className="font-mono text-[#ccff00] text-xs tracking-widest uppercase">Founding Partner Pricing — Limited Availability</span>
+          </div>
+          <h3 className="font-serif text-4xl md:text-6xl mb-4">Choose your impact scale.</h3>
+          <p className="text-white/50 text-lg max-w-2xl mx-auto leading-relaxed">
+            Lock in exclusive founding partner rates. These prices are available for a limited time only and will be honoured for the lifetime of your subscription.
+          </p>
         </div>
 
         {/* Pricing Cards */}
