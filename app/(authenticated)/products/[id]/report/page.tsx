@@ -12,6 +12,10 @@ import { supabase } from '@/lib/supabaseClient';
 import MethodologyToggle from '@/components/lca/MethodologyToggle';
 import EF31SingleScoreCard from '@/components/lca/EF31SingleScoreCard';
 import EF31ImpactCategoriesTable from '@/components/lca/EF31ImpactCategoriesTable';
+import InterpretationDashboard from '@/components/lca/InterpretationDashboard';
+import CriticalReviewPanel from '@/components/lca/CriticalReviewPanel';
+import GoalScopeForm from '@/components/lca/GoalScopeForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const MOCK_LCA_REPORT = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -59,6 +63,7 @@ export default function ProductLcaReportPage() {
 
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [reportTab, setReportTab] = useState('impact');
   const [lcaData, setLcaData] = useState<any>(null);
   const [productData, setProductData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -494,6 +499,40 @@ export default function ProductLcaReportPage() {
         </div>
       </div>
 
+      {/* Report Tabs */}
+      <Tabs value={reportTab} onValueChange={setReportTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+          <TabsTrigger value="impact">Impact Assessment</TabsTrigger>
+          <TabsTrigger value="interpretation">Interpretation</TabsTrigger>
+          <TabsTrigger value="goal-scope">Goal & Scope</TabsTrigger>
+          <TabsTrigger value="review">Critical Review</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="interpretation">
+          {lcaData?.id ? (
+            <InterpretationDashboard pcfId={lcaData.id} />
+          ) : (
+            <p className="text-sm text-muted-foreground py-8 text-center">No LCA data available. Run a calculation first.</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="goal-scope">
+          {lcaData?.id ? (
+            <GoalScopeForm pcfId={lcaData.id} />
+          ) : (
+            <p className="text-sm text-muted-foreground py-8 text-center">No LCA data available. Run a calculation first.</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="review">
+          {lcaData?.id ? (
+            <CriticalReviewPanel pcfId={lcaData.id} />
+          ) : (
+            <p className="text-sm text-muted-foreground py-8 text-center">No LCA data available. Run a calculation first.</p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="impact">
       {/* Impact Cards Grid */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -1127,6 +1166,8 @@ export default function ProductLcaReportPage() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

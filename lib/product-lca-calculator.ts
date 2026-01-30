@@ -3,6 +3,7 @@ import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './imp
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { resolveImpactSource } from './utils/data-quality-mapper';
 import { aggregateProductImpacts, type FacilityEmissionsData } from './product-lca-aggregator';
+import { generateLcaInterpretation } from './lca-interpretation-engine';
 import { calculateDistance } from './utils/distance-calculator';
 
 export interface FacilityAllocationInput {
@@ -694,6 +695,22 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     console.log(`[calculateProductCarbonFootprint] ✓ Calculation complete for LCA: ${lca.id}`);
+
+    // 9. Auto-generate Life Cycle Interpretation (ISO 14044 Section 4.5)
+    try {
+      console.log(`[calculateProductCarbonFootprint] Generating Life Cycle Interpretation...`);
+      const interpretationResult = await generateLcaInterpretation(supabase, {
+        productCarbonFootprintId: lca.id,
+        organizationId: product.organization_id,
+      });
+      if (interpretationResult.success) {
+        console.log(`[calculateProductCarbonFootprint] ✓ Interpretation generated successfully`);
+      } else {
+        console.warn(`[calculateProductCarbonFootprint] ⚠ Interpretation generation failed: ${interpretationResult.error}`);
+      }
+    } catch (interpError: any) {
+      console.warn(`[calculateProductCarbonFootprint] ⚠ Non-critical: Interpretation generation error: ${interpError.message}`);
+    }
 
     return {
       success: true,
