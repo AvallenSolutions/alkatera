@@ -23,6 +23,14 @@ export interface IndustryBenchmark {
  * Maps product category groups (from product-categories.ts) to benchmark data.
  * Individual categories within a group share the same benchmark unless overridden.
  */
+export const PRODUCT_TYPE_OPTIONS = [
+  { value: 'Spirits', label: 'Spirits' },
+  { value: 'Beer & Cider', label: 'Beer & Cider' },
+  { value: 'Wine', label: 'Wine' },
+  { value: 'Ready-to-Drink & Cocktails', label: 'Ready-to-Drink & Cocktails' },
+  { value: 'Non-Alcoholic', label: 'Non-Alcoholic' },
+] as const;
+
 const GROUP_BENCHMARKS: Record<string, IndustryBenchmark> = {
   Spirits: {
     kgCO2ePerLitre: 3.0,
@@ -197,6 +205,27 @@ export function getBenchmarkForOrganisation(
     benchmark: getBenchmarkForCategory(dominant),
     dominantCategory: dominant,
   };
+}
+
+/**
+ * Get the industry benchmark for an organisation based on its configured product type.
+ * Falls back to the product-category inference method if product_type is not set.
+ */
+export function getBenchmarkForProductType(
+  productType: string | null | undefined,
+  productCategories?: (string | null | undefined)[]
+): { benchmark: IndustryBenchmark; dominantCategory: string | null } {
+  // If org has an explicit product type, use it directly
+  if (productType && GROUP_BENCHMARKS[productType]) {
+    return { benchmark: GROUP_BENCHMARKS[productType], dominantCategory: productType };
+  }
+
+  // Fall back to inference from product categories
+  if (productCategories && productCategories.length > 0) {
+    return getBenchmarkForOrganisation(productCategories);
+  }
+
+  return { benchmark: DEFAULT_BENCHMARK, dominantCategory: null };
 }
 
 /**

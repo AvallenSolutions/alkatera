@@ -9,6 +9,7 @@ const corsHeaders = {
 
 interface CreateOrganizationRequest {
   name: string;
+  product_type?: string | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -53,7 +54,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { name }: CreateOrganizationRequest = await req.json();
+    const { name, product_type }: CreateOrganizationRequest = await req.json();
 
     if (!name || name.trim().length === 0) {
       return new Response(
@@ -71,12 +72,17 @@ Deno.serve(async (req: Request) => {
       .replace(/^-+|-+$/g, "")
       .substring(0, 50);
 
+    const insertPayload: Record<string, any> = {
+      name: name.trim(),
+      slug: `${slug}-${Date.now().toString(36)}`,
+    };
+    if (product_type) {
+      insertPayload.product_type = product_type;
+    }
+
     const { data: orgData, error: orgError } = await supabaseAdmin
       .from("organizations")
-      .insert({
-        name: name.trim(),
-        slug: `${slug}-${Date.now().toString(36)}`,
-      })
+      .insert(insertPayload)
       .select()
       .single();
 

@@ -42,7 +42,7 @@ import type {
 } from '@/hooks/data/useScope3GranularData';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
-import { getBenchmarkForOrganisation } from '@/lib/industry-benchmarks';
+import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
@@ -479,8 +479,8 @@ export default function PerformancePage() {
   }, [currentOrganization?.id]);
 
   const { benchmark: industryBenchmarkData, dominantCategory } = useMemo(
-    () => getBenchmarkForOrganisation(productCategories),
-    [productCategories]
+    () => getBenchmarkForProductType(currentOrganization?.product_type, productCategories),
+    [currentOrganization?.product_type, productCategories]
   );
 
   const estimatedLitresPerProduct = 50000;

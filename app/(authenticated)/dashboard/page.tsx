@@ -34,7 +34,7 @@ import {
 import Link from 'next/link';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
-import { getBenchmarkForOrganisation } from '@/lib/industry-benchmarks';
+import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
 import { RAGStatusCard, RAGStatusCardGrid } from '@/components/dashboard/RAGStatusCard';
 import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
@@ -142,8 +142,8 @@ export default function DashboardPage() {
   }, [currentOrganization?.id]);
 
   const { benchmark: industryBenchmarkData, dominantCategory } = useMemo(
-    () => getBenchmarkForOrganisation(productCategories),
-    [productCategories]
+    () => getBenchmarkForProductType(currentOrganization?.product_type, productCategories),
+    [currentOrganization?.product_type, productCategories]
   );
 
   const isLoading = prefsLoading || footprintLoading || wasteLoading || supplierLoading || metricsLoading;

@@ -10,10 +10,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { PRODUCT_TYPE_OPTIONS } from '@/lib/industry-benchmarks'
 import { Building2, Loader2 } from 'lucide-react'
 
 export default function CreateOrganizationPage() {
   const [organizationName, setOrganizationName] = useState('')
+  const [productType, setProductType] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingAccess, setIsCheckingAccess] = useState(true)
   const router = useRouter()
@@ -95,7 +98,7 @@ export default function CreateOrganizationPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ name: organizationName }),
+        body: JSON.stringify({ name: organizationName, product_type: productType || null }),
       })
 
       const result = await response.json()
@@ -169,6 +172,26 @@ export default function CreateOrganizationPage() {
                 className="h-11"
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="productType" className="text-sm font-medium">
+                What type of products do you primarily produce?
+              </Label>
+              <Select value={productType} onValueChange={setProductType} disabled={isLoading}>
+                <SelectTrigger id="productType" className="h-11">
+                  <SelectValue placeholder="Select product type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUCT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This determines the industry benchmarks used for your sustainability score. You can change this later in settings.
+              </p>
             </div>
             <Button
               type="submit"

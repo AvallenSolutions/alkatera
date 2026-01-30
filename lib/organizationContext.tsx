@@ -20,6 +20,7 @@ export interface Organization {
   description?: string | null
   address_lat?: number | null
   address_lng?: number | null
+  product_type?: string | null
 }
 
 interface OrganizationMember {
