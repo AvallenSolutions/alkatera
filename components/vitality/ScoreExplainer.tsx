@@ -1,7 +1,8 @@
 "use client";
 
 import React from 'react';
-import { Info, TrendingUp, Target, Award } from 'lucide-react';
+import { Info, TrendingUp, Target, Award, Calculator, ArrowUpRight, Bot } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -13,6 +14,29 @@ import { Badge } from '@/components/ui/badge';
 
 type ScoreType = 'overall' | 'climate' | 'water' | 'circularity' | 'nature';
 
+export interface CalculationInputs {
+  // Climate
+  totalEmissions?: number;
+  emissionsIntensity?: number;
+  industryBenchmark?: number;
+  intensityRatio?: number;
+  // Water
+  waterRiskLevel?: 'high' | 'medium' | 'low';
+  waterConsumption?: number;
+  // Circularity
+  circularityRate?: number;
+  // Nature
+  biodiversityRisk?: 'high' | 'medium' | 'low';
+  landUse?: number;
+  // Overall
+  pillarScores?: {
+    climate: number | null;
+    water: number | null;
+    circularity: number | null;
+    nature: number | null;
+  };
+}
+
 interface ScoreExplainerProps {
   scoreType: ScoreType;
   currentScore: number | null;
@@ -22,6 +46,7 @@ interface ScoreExplainerProps {
     category_name?: string;
     top_performer?: number;
   };
+  calculationInputs?: CalculationInputs;
   className?: string;
 }
 
@@ -96,17 +121,244 @@ const scoreTypeConfig: Record<ScoreType, {
   },
 };
 
+function getImprovementGuidance(scoreType: ScoreType, currentScore: number | null, inputs?: CalculationInputs): string | null {
+  if (currentScore === null) return null;
+
+  const config = scoreTypeConfig[scoreType];
+  // Find the next band above current score
+  const sortedBands = [...config.bands].sort((a, b) => a.min - b.min);
+  const nextBand = sortedBands.find(band => band.min > currentScore);
+
+  if (!nextBand) return 'You are in the highest score band. Maintain your current practices to stay at the top.';
+
+  switch (scoreType) {
+    case 'climate': {
+      const ratio = inputs?.intensityRatio;
+      if (ratio !== undefined) {
+        if (nextBand.min >= 85) return `Reduce your emissions intensity ratio below 0.70x the industry benchmark to reach "${nextBand.label}" (currently ${ratio.toFixed(2)}x).`;
+        if (nextBand.min >= 70) return `Reduce your emissions intensity ratio below 0.85x the industry benchmark to reach "${nextBand.label}" (currently ${ratio.toFixed(2)}x).`;
+        if (nextBand.min >= 50) return `Reduce your emissions intensity ratio to 1.0x or below the industry benchmark to reach "${nextBand.label}" (currently ${ratio.toFixed(2)}x).`;
+      }
+      return `Reduce your emissions intensity to reach "${nextBand.label}" (score ${nextBand.min}+).`;
+    }
+    case 'water':
+      if (inputs?.waterRiskLevel === 'high') return `Move operations to lower water stress areas or implement water recycling to reach "${nextBand.label}".`;
+      if (inputs?.waterRiskLevel === 'medium') return `Reducing water risk from Medium to Low would increase your score from 60 to 85.`;
+      return `Improve your water risk assessment to reach "${nextBand.label}" (score ${nextBand.min}+).`;
+    case 'circularity':
+      if (inputs?.circularityRate !== undefined) {
+        const targetRate = nextBand.min >= 95 ? 80 : nextBand.min >= 80 ? 60 : nextBand.min >= 60 ? 40 : 20;
+        return `Increase your waste diversion rate from ${inputs.circularityRate.toFixed(0)}% to ${targetRate}%+ to reach "${nextBand.label}".`;
+      }
+      return `Increase your waste diversion rate to reach "${nextBand.label}" (score ${nextBand.min}+).`;
+    case 'nature':
+      if (inputs?.biodiversityRisk === 'high') return `Reduce biodiversity risk through sustainable sourcing practices to reach "${nextBand.label}".`;
+      if (inputs?.biodiversityRisk === 'medium') return `Reducing biodiversity risk from Medium to Low would increase your score from 55 to 80.`;
+      return `Improve your land use and biodiversity impact to reach "${nextBand.label}" (score ${nextBand.min}+).`;
+    case 'overall': {
+      // Find the weakest pillar
+      if (inputs?.pillarScores) {
+        const pillars = [
+          { name: 'Climate', score: inputs.pillarScores.climate, weight: 30 },
+          { name: 'Water', score: inputs.pillarScores.water, weight: 25 },
+          { name: 'Circularity', score: inputs.pillarScores.circularity, weight: 25 },
+          { name: 'Nature', score: inputs.pillarScores.nature, weight: 20 },
+        ];
+        const nullPillars = pillars.filter(p => p.score === null);
+        if (nullPillars.length > 0) {
+          return `Add data for ${nullPillars.map(p => p.name).join(', ')} to get a more complete score. Missing pillars mean available weights are redistributed.`;
+        }
+        const weakest = pillars
+          .filter(p => p.score !== null)
+          .sort((a, b) => (a.score || 0) - (b.score || 0))[0];
+        if (weakest) {
+          return `Focus on improving your ${weakest.name} score (${weakest.score}) for the biggest impact on your overall score.`;
+        }
+      }
+      return `Improve your weakest pillar to increase your overall score to ${nextBand.min}+ ("${nextBand.label}").`;
+    }
+    default:
+      return null;
+  }
+}
+
+function buildRosaPrompt(scoreType: ScoreType, currentScore: number | null, inputs?: CalculationInputs): string {
+  const parts: string[] = [];
+
+  if (scoreType === 'overall' && inputs?.pillarScores) {
+    const ps = inputs.pillarScores;
+    parts.push(`Explain my Company Vitality Score of ${currentScore ?? 'N/A'}.`);
+    parts.push(`My pillar scores are: Climate ${ps.climate ?? 'no data'}, Water ${ps.water ?? 'no data'}, Circularity ${ps.circularity ?? 'no data'}, Nature ${ps.nature ?? 'no data'}.`);
+    parts.push('The weights are Climate 30%, Water 25%, Circularity 25%, Nature 20%.');
+  } else if (scoreType === 'climate') {
+    parts.push(`Explain my Climate Score of ${currentScore ?? 'N/A'}.`);
+    if (inputs?.totalEmissions) parts.push(`My total emissions are ${(inputs.totalEmissions / 1000).toFixed(1)} tCO2e.`);
+    if (inputs?.intensityRatio !== undefined) parts.push(`My emissions intensity ratio vs industry benchmark is ${inputs.intensityRatio.toFixed(2)}x.`);
+  } else if (scoreType === 'water') {
+    parts.push(`Explain my Water Score of ${currentScore ?? 'N/A'}.`);
+    if (inputs?.waterRiskLevel) parts.push(`My water risk level is ${inputs.waterRiskLevel}.`);
+    if (inputs?.waterConsumption) parts.push(`My water consumption is ${inputs.waterConsumption.toFixed(0)} m3.`);
+  } else if (scoreType === 'circularity') {
+    parts.push(`Explain my Circularity Score of ${currentScore ?? 'N/A'}.`);
+    if (inputs?.circularityRate !== undefined) parts.push(`My waste diversion rate is ${inputs.circularityRate.toFixed(0)}%.`);
+  } else if (scoreType === 'nature') {
+    parts.push(`Explain my Nature Score of ${currentScore ?? 'N/A'}.`);
+    if (inputs?.biodiversityRisk) parts.push(`My biodiversity risk level is ${inputs.biodiversityRisk}.`);
+    if (inputs?.landUse) parts.push(`My land use is ${inputs.landUse.toFixed(0)} m2 crop eq.`);
+  }
+
+  parts.push('What does this score mean, and what specific actions should I take to improve it?');
+  return parts.join(' ');
+}
+
+function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inputs: CalculationInputs }) {
+  if (scoreType === 'overall' && inputs.pillarScores) {
+    const ps = inputs.pillarScores;
+    const pillars = [
+      { name: 'Climate', score: ps.climate, weight: 0.30 },
+      { name: 'Water', score: ps.water, weight: 0.25 },
+      { name: 'Circularity', score: ps.circularity, weight: 0.25 },
+      { name: 'Nature', score: ps.nature, weight: 0.20 },
+    ];
+    const available = pillars.filter(p => p.score !== null);
+    const totalWeight = available.reduce((sum, p) => sum + p.weight, 0);
+
+    return (
+      <div className="space-y-1.5">
+        {pillars.map((p) => {
+          const adjustedWeight = p.score !== null ? ((p.weight / totalWeight) * 100).toFixed(0) : null;
+          const contribution = p.score !== null ? ((p.score * p.weight / totalWeight)).toFixed(1) : null;
+          return (
+            <div key={p.name} className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{p.name} ({(p.weight * 100).toFixed(0)}%)</span>
+              {p.score !== null ? (
+                <span className="font-medium tabular-nums">
+                  {p.score} x {adjustedWeight}% = <span className="text-foreground">{contribution} pts</span>
+                </span>
+              ) : (
+                <span className="text-muted-foreground italic">No data</span>
+              )}
+            </div>
+          );
+        })}
+        {available.length < 4 && (
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Weights redistributed across {available.length} available pillar{available.length !== 1 ? 's' : ''}.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (scoreType === 'climate') {
+    return (
+      <div className="space-y-1.5">
+        {inputs.totalEmissions !== undefined && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Total emissions</span>
+            <span className="font-medium tabular-nums">{(inputs.totalEmissions / 1000).toFixed(1)} tCO2e</span>
+          </div>
+        )}
+        {inputs.emissionsIntensity !== undefined && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Emissions intensity</span>
+            <span className="font-medium tabular-nums">{inputs.emissionsIntensity.toFixed(1)} kgCO2e/product</span>
+          </div>
+        )}
+        {inputs.industryBenchmark !== undefined && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Industry benchmark</span>
+            <span className="font-medium tabular-nums">{inputs.industryBenchmark.toFixed(1)} kgCO2e/product</span>
+          </div>
+        )}
+        {inputs.intensityRatio !== undefined && (
+          <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+            <span className="text-muted-foreground">Intensity ratio</span>
+            <span className="font-medium tabular-nums">{inputs.intensityRatio.toFixed(2)}x benchmark</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (scoreType === 'water') {
+    return (
+      <div className="space-y-1.5">
+        {inputs.waterRiskLevel && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Water risk level</span>
+            <Badge variant="outline" className="text-[10px] h-5 capitalize">{inputs.waterRiskLevel}</Badge>
+          </div>
+        )}
+        {inputs.waterConsumption !== undefined && inputs.waterConsumption > 0 && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Water consumption</span>
+            <span className="font-medium tabular-nums">
+              {inputs.waterConsumption >= 1000
+                ? `${(inputs.waterConsumption / 1000).toFixed(1)}k`
+                : inputs.waterConsumption.toFixed(0)} m3
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (scoreType === 'circularity') {
+    return (
+      <div className="space-y-1.5">
+        {inputs.circularityRate !== undefined && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Waste diversion rate</span>
+            <span className="font-medium tabular-nums">{inputs.circularityRate.toFixed(0)}%</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (scoreType === 'nature') {
+    return (
+      <div className="space-y-1.5">
+        {inputs.biodiversityRisk && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Biodiversity risk</span>
+            <Badge variant="outline" className="text-[10px] h-5 capitalize">{inputs.biodiversityRisk}</Badge>
+          </div>
+        )}
+        {inputs.landUse !== undefined && inputs.landUse > 0 && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Land use impact</span>
+            <span className="font-medium tabular-nums">{inputs.landUse.toFixed(0)} m2 crop eq</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function ScoreExplainer({
   scoreType,
   currentScore,
   benchmark,
+  calculationInputs,
   className,
 }: ScoreExplainerProps) {
+  const router = useRouter();
   const config = scoreTypeConfig[scoreType];
   const hasData = currentScore !== null;
   const currentBand = hasData
     ? config.bands.find(band => currentScore >= band.min) || config.bands[config.bands.length - 1]
     : null;
+
+  const improvementGuidance = getImprovementGuidance(scoreType, currentScore, calculationInputs);
+
+  const handleAskRosa = () => {
+    const prompt = buildRosaPrompt(scoreType, currentScore, calculationInputs);
+    router.push(`/rosa?prompt=${encodeURIComponent(prompt)}`);
+  };
 
   return (
     <Popover>
@@ -120,7 +372,7 @@ export function ScoreExplainer({
           <span className="sr-only">Score information</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 p-0" align="start" side="bottom">
+      <PopoverContent className="w-96 p-0 max-h-[80vh] overflow-y-auto" align="start" side="bottom">
         <div className="p-4 space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -171,6 +423,32 @@ export function ScoreExplainer({
               </div>
             </div>
           </div>
+
+          {calculationInputs && hasData && (
+            <div className="border-t pt-3">
+              <div className="flex items-start gap-2 mb-2">
+                <Calculator className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium mb-2">Your Calculation</p>
+                  <CalculationBreakdown scoreType={scoreType} inputs={calculationInputs} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {improvementGuidance && hasData && (
+            <div className="border-t pt-3">
+              <div className="flex items-start gap-2">
+                <ArrowUpRight className="h-4 w-4 mt-0.5 text-emerald-500" />
+                <div>
+                  <p className="text-sm font-medium">How to Improve</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {improvementGuidance}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {benchmark && (benchmark.platform_average || benchmark.category_average) && (
             <div className="border-t pt-3">
@@ -247,6 +525,18 @@ export function ScoreExplainer({
             <p className="text-xs text-muted-foreground">
               <span className="font-medium">Methodology:</span> {config.methodology}
             </p>
+          </div>
+
+          <div className="border-t pt-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-2 text-xs"
+              onClick={handleAskRosa}
+            >
+              <Bot className="h-3.5 w-3.5" />
+              Ask Rosa to explain this score
+            </Button>
           </div>
         </div>
       </PopoverContent>

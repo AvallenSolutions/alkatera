@@ -490,6 +490,30 @@ export default function PerformancePage() {
     });
   }, [totalCO2, waterConsumption, metrics, wasteMetrics, circularityRate, landUse, natureMetrics]);
 
+  const emissionsIntensity = totalCO2 / (metrics?.total_products_assessed || 1);
+  const industryBenchmarkPerProduct = 50000 / (metrics?.total_products_assessed || 1);
+  const intensityRatio = industryBenchmarkPerProduct > 0 ? emissionsIntensity / industryBenchmarkPerProduct : 0;
+
+  const scoreCalculationInputs = useMemo(() => ({
+    climate: {
+      totalEmissions: totalCO2,
+      emissionsIntensity,
+      industryBenchmark: industryBenchmarkPerProduct,
+      intensityRatio,
+    },
+    water: {
+      waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
+      waterConsumption,
+    },
+    circularity: {
+      circularityRate,
+    },
+    nature: {
+      biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
+      landUse,
+    },
+  }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, metrics, waterConsumption, circularityRate, natureMetrics, landUse]);
+
   const { strengths, improvements } = useMemo(() => {
     return generateStrengthsAndImprovements(
       metrics,
@@ -590,6 +614,7 @@ export default function PerformancePage() {
         }
         onRefresh={refetch}
         loading={loading}
+        calculationInputs={scoreCalculationInputs}
       />
 
       {/* Action Bar */}

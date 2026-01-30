@@ -176,6 +176,30 @@ export default function DashboardPage() {
     natureScore: vitalityScores.nature,
   }), [vitalityScores]);
 
+  const emissionsIntensity = totalCO2 / (companyMetrics?.total_products_assessed || 1);
+  const industryBenchmarkPerProduct = 50000 / (companyMetrics?.total_products_assessed || 1);
+  const intensityRatio = industryBenchmarkPerProduct > 0 ? emissionsIntensity / industryBenchmarkPerProduct : 0;
+
+  const scoreCalculationInputs = useMemo(() => ({
+    climate: {
+      totalEmissions: totalCO2,
+      emissionsIntensity,
+      industryBenchmark: industryBenchmarkPerProduct,
+      intensityRatio,
+    },
+    water: {
+      waterRiskLevel: companyMetrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
+      waterConsumption,
+    },
+    circularity: {
+      circularityRate,
+    },
+    nature: {
+      biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
+      landUse,
+    },
+  }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, companyMetrics, waterConsumption, circularityRate, natureMetrics, landUse]);
+
   const scopeBreakdown = useMemo(() => {
     if (!footprint?.breakdown) return { scope1: 0, scope2: 0, scope3: 0 };
     const total = footprint.total_emissions || 1;
@@ -323,6 +347,7 @@ export default function DashboardPage() {
         }
         onRefresh={handleRefresh}
         loading={isLoading}
+        calculationInputs={scoreCalculationInputs}
       />
 
       <RAGStatusCardGrid>

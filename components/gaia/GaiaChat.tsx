@@ -140,9 +140,10 @@ function renderMessageContent(content: string): React.ReactNode {
 
 interface RosaChatProps {
   fullPage?: boolean;
+  initialPrompt?: string;
 }
 
-export function RosaChat({ fullPage = false }: RosaChatProps) {
+export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   const { currentOrganization } = useOrganization();
   const { user } = useAuth();
   const router = useRouter();
@@ -193,6 +194,18 @@ export function RosaChat({ fullPage = false }: RosaChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeConversation?.messages, streamingContent]);
+
+  // Handle initial prompt from URL or prop - pre-fill the input
+  const initialPromptAppliedRef = useRef(false);
+  useEffect(() => {
+    if (initialPromptAppliedRef.current) return;
+    if (initialPrompt && currentOrganization?.id) {
+      initialPromptAppliedRef.current = true;
+      setInput(initialPrompt);
+      // Focus the input so user can just press Enter
+      setTimeout(() => inputRef.current?.focus(), 300);
+    }
+  }, [initialPrompt, currentOrganization?.id]);
 
   async function loadConversations() {
     if (!currentOrganization?.id) return;
