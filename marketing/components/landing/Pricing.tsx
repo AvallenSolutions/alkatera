@@ -1,6 +1,7 @@
 'use client';
 
-import { Flower2, Trees } from 'lucide-react';
+import React, { useState } from 'react';
+import { Flower2, Trees, Check, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const SeedIcon = ({ className, size = 24 }: { className?: string, size?: number }) => (
@@ -25,50 +26,161 @@ interface PricingProps {
   onOpenContact: () => void;
 }
 
+type FeatureValue = boolean | string;
+
+interface FeatureRow {
+  name: string;
+  seed: FeatureValue;
+  blossom: FeatureValue;
+  canopy: FeatureValue;
+}
+
+interface FeatureSection {
+  title: string;
+  rows: FeatureRow[];
+}
+
+const featureSections: FeatureSection[] = [
+  {
+    title: "Core Platform",
+    rows: [
+      { name: "Dashboard & Vitality Score", seed: true, blossom: true, canopy: true },
+      { name: "Facilities Management", seed: true, blossom: true, canopy: true },
+      { name: "Fleet Overview & Activity Log", seed: true, blossom: true, canopy: true },
+      { name: "Supplier Directory", seed: true, blossom: true, canopy: true },
+      { name: "Vehicle Registry", seed: false, blossom: true, canopy: true },
+      { name: "Supply Chain Network Mapping", seed: false, blossom: true, canopy: true },
+      { name: "Company Emissions (Current Year)", seed: true, blossom: true, canopy: true },
+      { name: "Full Scope 3 Categories", seed: false, blossom: true, canopy: true },
+    ]
+  },
+  {
+    title: "Products & LCA",
+    rows: [
+      { name: "Product Management", seed: true, blossom: true, canopy: true },
+      { name: "Product Passport", seed: true, blossom: true, canopy: true },
+      { name: "Carbon Footprint (GHG)", seed: true, blossom: true, canopy: true },
+      { name: "PDF Report Export", seed: true, blossom: true, canopy: true },
+      { name: "Water Footprint", seed: false, blossom: true, canopy: true },
+      { name: "Circularity & Waste", seed: false, blossom: true, canopy: true },
+      { name: "Land Use Impact", seed: false, blossom: true, canopy: true },
+      { name: "Resource Use Tracking", seed: false, blossom: true, canopy: true },
+      { name: "Year-over-Year Comparisons", seed: false, blossom: false, canopy: true },
+      { name: "Advanced Data Quality Scoring", seed: false, blossom: false, canopy: true },
+      { name: "EF 3.1 Single Score", seed: false, blossom: false, canopy: true },
+    ]
+  },
+  {
+    title: "AI-Powered Tools",
+    rows: [
+      { name: "Rosa AI Assistant", seed: "25/mo", blossom: "100/mo", canopy: "Unlimited" },
+      { name: "Greenwash Guardian", seed: "Website only", blossom: "Website + 5 docs", canopy: "Unlimited" },
+    ]
+  },
+  {
+    title: "ESG Modules",
+    rows: [
+      { name: "People & Culture: Fair Work", seed: false, blossom: true, canopy: true },
+      { name: "People & Culture: Diversity & Inclusion", seed: false, blossom: true, canopy: true },
+      { name: "People & Culture: Wellbeing", seed: false, blossom: false, canopy: true },
+      { name: "People & Culture: Training & Development", seed: false, blossom: false, canopy: true },
+      { name: "Governance & Ethics", seed: false, blossom: false, canopy: true },
+      { name: "Community Impact: Charitable Giving", seed: false, blossom: true, canopy: true },
+      { name: "Community Impact: Volunteering", seed: false, blossom: true, canopy: true },
+      { name: "Community Impact: Local Impact", seed: false, blossom: false, canopy: true },
+      { name: "Community Impact: Impact Stories", seed: false, blossom: false, canopy: true },
+    ]
+  },
+  {
+    title: "Certifications & Compliance",
+    rows: [
+      { name: "B Corp Certification Tracking", seed: false, blossom: true, canopy: true },
+      { name: "CDP Climate Change Disclosure", seed: false, blossom: true, canopy: true },
+      { name: "CSRD Compliance", seed: false, blossom: false, canopy: true },
+      { name: "EcoVadis Rating", seed: false, blossom: false, canopy: true },
+      { name: "GRI Standards", seed: false, blossom: false, canopy: true },
+      { name: "ISO 14001", seed: false, blossom: false, canopy: true },
+      { name: "ISO 50001", seed: false, blossom: false, canopy: true },
+      { name: "SBTi Targets", seed: false, blossom: false, canopy: true },
+      { name: "Gap Analysis", seed: false, blossom: false, canopy: true },
+      { name: "Audit Packages", seed: false, blossom: false, canopy: true },
+      { name: "Third-Party Verification Support", seed: false, blossom: false, canopy: true },
+    ]
+  },
+  {
+    title: "Resources",
+    rows: [
+      { name: "Knowledge Bank (Read)", seed: true, blossom: true, canopy: true },
+      { name: "Knowledge Bank (Upload & Manage)", seed: false, blossom: true, canopy: true },
+    ]
+  },
+];
+
+const FeatureCell = ({ value }: { value: FeatureValue }) => {
+  if (typeof value === 'string') {
+    return <span className="text-xs text-white/70 font-mono">{value}</span>;
+  }
+  if (value) {
+    return <Check size={16} className="text-[#ccff00]" />;
+  }
+  return <Minus size={14} className="text-white/15" />;
+};
+
 export const LandingPricing = ({ onOpenContact }: PricingProps) => {
+  const [showMatrix, setShowMatrix] = useState(false);
+
   const tiers = [
     {
       name: "Seed",
+      price: "£99",
       tagline: "For boutique brands establishing their sustainability foundations.",
       icon: SeedIcon,
-      capacity: "5 Products | 1 Facility | 1 User",
+      limits: ["5 Products", "5 LCA Calculations", "1 Team Member", "1 Facility", "5 Suppliers", "10 Reports/mo"],
       features: [
-        "Operational Footprinting: Automated tracking for Scope 1, 2, and essential Scope 3 (Carbon & Water).",
-        "Supply Chain Visibility: Foundational upstream mapping to identify high-impact hotspots in your value chain.",
-        "B Corp Alignment: Data structured specifically to simplify the environmental section of your B Corp Assessment.",
-        "Unlimited Reporting: Generate as many standard audit-ready reports as your business needs for retail and investor tenders."
+        "Dashboard & Vitality Score",
+        "Carbon Footprint (GHG) per product",
+        "Product Passport",
+        "Company Emissions (Current Year)",
+        "Rosa AI Assistant (25/mo)",
+        "Greenwash Guardian (Website only)",
+        "Knowledge Bank (Read)",
       ],
       buttonText: "Select Plan",
       highlight: false
     },
     {
       name: "Blossom",
+      price: "£249",
       tagline: "For scaling brands ready to turn impact into a strategic advantage.",
       icon: Flower2,
-      capacity: "20 Products | 3 Facilities | 5 Users",
+      limits: ["20 Products", "20 LCA Calculations", "5 Team Members", "3 Facilities", "25 Suppliers", "50 Reports/mo"],
       features: [
         "Everything in Seed, plus:",
-        "Full Product Environmental Impact: Cradle-to-gate impact analysis for every SKU in your portfolio.",
-        "Customisable Sustainability Reporting: Design and export bespoke reports tailored to your brand's specific aesthetic and stakeholder needs.",
-        "B Corp Performance Hub: Strategic tools to track and improve your score over time, moving from compliance to leadership.",
-        "'What-If' Scenario Modelling: Test packaging and recipe changes in a digital sandbox before committing to production.",
-        "Anti-Greenwash 'Claim Check': Verify your marketing claims against live data to ensure total regulatory safety."
+        "Water, Circularity, Land Use & Resource impacts",
+        "Full Scope 3 Categories",
+        "Vehicle Registry & Supply Chain Mapping",
+        "People & Culture, Community Impact modules",
+        "B Corp & CDP tracking",
+        "Rosa AI (100/mo) & Greenwash Guardian (5 docs/mo)",
+        "Knowledge Bank (Upload & Manage)",
       ],
       buttonText: "Start Now",
       highlight: true
     },
     {
       name: "Canopy",
+      price: "£599",
       tagline: "Comprehensive ecosystem management for established organisations.",
       icon: Trees,
-      capacity: "50 Products | 8 Facilities | 10 Users",
+      limits: ["50 Products", "50 LCA Calculations", "10 Team Members", "8 Facilities", "100 Suppliers", "200 Reports/mo"],
       features: [
         "Everything in Blossom, plus:",
-        "Advanced Supply Chain Engagement: Tools to gather primary data directly from growers and suppliers for 100% precision.",
-        "Land & Biodiversity Mapping: Measure your impact on soil health and local ecosystems beyond just carbon.",
-        "Strategic Goal Setting: Define and track SMART environmental targets across your entire multi-brand portfolio.",
-        "Human-in-the-Loop: Priority access to our experts for strategy validation and complex data verification.",
-        "System Integration: Full API connectivity to your existing ERP, accounting, and operational software."
+        "Year-over-Year Comparisons",
+        "Advanced Data Quality Scoring & EF 3.1",
+        "All ESG modules including Governance & Ethics",
+        "All certifications: CSRD, EcoVadis, GRI, ISO, SBTi",
+        "Gap Analysis, Audit Packages & Verification Support",
+        "Unlimited Rosa AI & Greenwash Guardian",
       ],
       buttonText: "Contact Sales",
       highlight: false
@@ -85,6 +197,7 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
           <h3 className="font-serif text-4xl md:text-6xl">Choose your impact scale.</h3>
         </div>
 
+        {/* Pricing Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
           {tiers.map((tier, idx) => (
             <div
@@ -102,19 +215,33 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
                 </div>
               )}
 
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-4">
                 <h4 className={cn("font-serif text-3xl", tier.highlight ? "text-[#ccff00]" : "text-white")}>
                   {tier.name}
                 </h4>
                 <tier.icon className={tier.highlight ? "text-[#ccff00]" : "text-gray-500"} />
               </div>
 
-              <div className="mb-8">
-                <p className="text-white font-medium text-sm mb-2">{tier.tagline}</p>
-                <p className="font-mono text-[10px] uppercase tracking-wider text-[#ccff00]/80">Capacity: {tier.capacity}</p>
+              <div className="mb-6">
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className={cn("font-serif text-4xl", tier.highlight ? "text-[#ccff00]" : "text-white")}>
+                    {tier.price}
+                  </span>
+                  <span className="text-white/40 text-sm">/month</span>
+                </div>
+                <p className="text-white/60 text-sm leading-relaxed">{tier.tagline}</p>
               </div>
 
-              <ul className="space-y-4 mb-12 flex-1">
+              {/* Limits */}
+              <div className="grid grid-cols-2 gap-2 mb-8 p-4 bg-white/5 rounded">
+                {tier.limits.map((limit, lIdx) => (
+                  <div key={lIdx} className="font-mono text-[10px] uppercase tracking-wider text-white/50">
+                    {limit}
+                  </div>
+                ))}
+              </div>
+
+              <ul className="space-y-3 mb-12 flex-1">
                 {tier.features.map((feat, fIdx) => (
                   <li key={fIdx} className="flex items-start gap-3 text-sm group/item">
                     <div className={cn(
@@ -146,6 +273,51 @@ export const LandingPricing = ({ onOpenContact }: PricingProps) => {
             </div>
           ))}
         </div>
+
+        {/* Feature Matrix Toggle */}
+        <div className="mt-16 text-center">
+          <button
+            onClick={() => setShowMatrix(!showMatrix)}
+            className="font-mono text-xs uppercase tracking-widest text-white/40 hover:text-[#ccff00] transition-colors border border-white/10 hover:border-[#ccff00]/30 px-8 py-3"
+          >
+            {showMatrix ? "Hide" : "View"} Full Feature Comparison
+          </button>
+        </div>
+
+        {/* Full Feature Matrix */}
+        {showMatrix && (
+          <div className="mt-12 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left py-4 pr-4 text-white/40 font-mono text-xs uppercase tracking-wider w-1/2">Feature</th>
+                  <th className="text-center py-4 px-4 text-white/40 font-mono text-xs uppercase tracking-wider">Seed</th>
+                  <th className="text-center py-4 px-4 text-[#ccff00]/60 font-mono text-xs uppercase tracking-wider">Blossom</th>
+                  <th className="text-center py-4 px-4 text-white/40 font-mono text-xs uppercase tracking-wider">Canopy</th>
+                </tr>
+              </thead>
+              <tbody>
+                {featureSections.map((section, sIdx) => (
+                  <React.Fragment key={sIdx}>
+                    <tr>
+                      <td colSpan={4} className="pt-8 pb-3">
+                        <span className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.2em]">{section.title}</span>
+                      </td>
+                    </tr>
+                    {section.rows.map((row, rIdx) => (
+                      <tr key={rIdx} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                        <td className="py-3 pr-4 text-white/70">{row.name}</td>
+                        <td className="py-3 px-4 text-center"><div className="flex justify-center"><FeatureCell value={row.seed} /></div></td>
+                        <td className="py-3 px-4 text-center bg-[#ccff00]/[0.02]"><div className="flex justify-center"><FeatureCell value={row.blossom} /></div></td>
+                        <td className="py-3 px-4 text-center"><div className="flex justify-center"><FeatureCell value={row.canopy} /></div></td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </section>
   );
