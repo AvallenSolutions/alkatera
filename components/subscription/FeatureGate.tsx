@@ -567,88 +567,93 @@ function LockedFeaturePage({
   const highlights = tierHighlights[requiredTier] || [];
 
   return (
-    <div className={cn("flex flex-col items-center px-4 py-12 max-w-2xl mx-auto", className)}>
-      {/* Lock icon and category */}
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 border border-border">
-        <Lock className="h-7 w-7 text-muted-foreground" />
+    <div className={cn("flex h-full flex-col items-center justify-center px-6 py-8 max-w-4xl mx-auto", className)}>
+      {/* Header */}
+      <div className="mb-6 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 border border-border">
+          <Lock className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div>
+          {category && (
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {category}
+            </span>
+          )}
+          <h2 className="text-xl font-semibold leading-tight">{name}</h2>
+        </div>
       </div>
 
-      {category && (
-        <span className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {category}
-        </span>
-      )}
-
-      {/* Feature name and description */}
-      <h2 className="mb-3 text-2xl font-semibold text-center">{name}</h2>
-      <p className="mb-8 text-sm text-muted-foreground text-center max-w-lg leading-relaxed">
+      <p className="mb-6 text-sm text-muted-foreground text-center max-w-lg leading-relaxed">
         {description}
       </p>
 
-      {/* Benefits */}
-      {benefits.length > 0 && (
-        <div className="mb-8 w-full max-w-md rounded-lg border border-border bg-card p-6">
-          <h3 className="mb-4 text-sm font-semibold flex items-center gap-2">
-            <IconComponent className="h-4 w-4 text-neon-lime" />
-            What you get with {name}
-          </h3>
-          <ul className="space-y-3">
-            {benefits.map((benefit, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm">
-                <Check className="h-4 w-4 mt-0.5 flex-shrink-0 text-neon-lime" />
-                <span className="text-muted-foreground">{benefit}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Upgrade card */}
-      <div className="w-full max-w-md rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold">
-              Upgrade to {tierDisplayNames[requiredTier]}
+      {/* Two cards side by side */}
+      <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Benefits card */}
+        {benefits.length > 0 && (
+          <div className="rounded-lg border border-border bg-card p-5 flex flex-col">
+            <h3 className="mb-3 text-sm font-semibold flex items-center gap-2">
+              <IconComponent className="h-4 w-4 text-neon-lime" />
+              What you get with {name}
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              From &pound;{tierPrices[requiredTier]}/month
-            </p>
-          </div>
-          <Sparkles className="h-5 w-5 text-neon-lime" />
-        </div>
-
-        {/* What else you unlock */}
-        {highlights.length > 0 && (
-          <div className="mb-5">
-            <p className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-              Everything you unlock with {tierDisplayNames[requiredTier]}
-            </p>
-            <ul className="space-y-2">
-              {highlights.map((highlight, i) => (
+            <ul className="space-y-2.5 flex-1">
+              {benefits.map((benefit, i) => (
                 <li key={i} className="flex items-start gap-2.5 text-sm">
                   <Check className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-neon-lime" />
-                  <span className="text-foreground/80">{highlight}</span>
+                  <span className="text-muted-foreground">{benefit}</span>
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        <Link href="/settings/">
-          <Button className="w-full gap-2" size="default">
-            <Sparkles className="h-4 w-4" />
-            Upgrade to {tierDisplayNames[requiredTier]}
-            <ArrowRight className="h-4 w-4" />
-          </Button>
-        </Link>
+        {/* Upgrade card */}
+        <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-5 flex flex-col">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-base font-semibold">
+                Upgrade to {tierDisplayNames[requiredTier]}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                From &pound;{tierPrices[requiredTier]}/month
+              </p>
+            </div>
+            <Sparkles className="h-5 w-5 text-neon-lime" />
+          </div>
 
-        <p className="mt-3 text-center text-xs text-muted-foreground">
-          You&apos;re currently on the{" "}
-          <span className="font-medium text-foreground">
-            {tierDisplayNames[currentTier]}
-          </span>{" "}
-          plan
-        </p>
+          {/* What else you unlock */}
+          {highlights.length > 0 && (
+            <div className="mb-4 flex-1">
+              <p className="text-xs font-medium text-muted-foreground mb-2.5 uppercase tracking-wider">
+                Everything you unlock
+              </p>
+              <ul className="space-y-1.5">
+                {highlights.map((highlight, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <Check className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-neon-lime" />
+                    <span className="text-foreground/80">{highlight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <Link href="/settings/">
+            <Button className="w-full gap-2" size="default">
+              <Sparkles className="h-4 w-4" />
+              Upgrade to {tierDisplayNames[requiredTier]}
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+
+          <p className="mt-2.5 text-center text-xs text-muted-foreground">
+            You&apos;re currently on the{" "}
+            <span className="font-medium text-foreground">
+              {tierDisplayNames[currentTier]}
+            </span>{" "}
+            plan
+          </p>
+        </div>
       </div>
     </div>
   );
