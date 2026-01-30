@@ -23,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
+import { PRODUCT_TYPE_OPTIONS } from "@/lib/industry-benchmarks";
 import Link from "next/link";
 
 const COMPANY_SIZES = [
@@ -64,6 +65,7 @@ interface OrganizationData {
   company_size: string | null;
   billing_email: string | null;
   tax_id: string | null;
+  product_type: string | null;
 }
 
 export default function CompanyOverviewPage() {
@@ -86,6 +88,7 @@ export default function CompanyOverviewPage() {
   const [companySize, setCompanySize] = useState("");
   const [billingEmail, setBillingEmail] = useState("");
   const [taxId, setTaxId] = useState("");
+  const [productType, setProductType] = useState("");
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -119,6 +122,7 @@ export default function CompanyOverviewPage() {
       setCompanySize(orgInfo.company_size || "");
       setBillingEmail(orgInfo.billing_email || "");
       setTaxId(orgInfo.tax_id || "");
+      setProductType(orgInfo.product_type || "");
     } catch (error) {
       console.error("Error fetching organization data:", error);
       toast.error("Failed to load organization details");
@@ -153,6 +157,7 @@ export default function CompanyOverviewPage() {
         founding_year: foundingYear ? parseInt(foundingYear) : null,
         company_size: companySize || null,
         billing_email: billingEmail.trim() || null,
+        product_type: productType || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -297,6 +302,25 @@ export default function CompanyOverviewPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="product-type">Primary Product Type</Label>
+              <Select value={productType} onValueChange={setProductType} disabled={isSaving}>
+                <SelectTrigger id="product-type">
+                  <SelectValue placeholder="Select product type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRODUCT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Determines the industry benchmarks used for your sustainability score
+              </p>
             </div>
 
             <div className="space-y-2">

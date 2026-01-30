@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +42,8 @@ import type {
 } from '@/hooks/data/useScope3GranularData';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
+import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
+import { fetchProducts } from '@/lib/products';
 import { PillarCard, PillarGrid, PerformanceSummary } from '@/components/vitality/PillarCard';
 import { CarbonDeepDive } from '@/components/vitality/CarbonDeepDive';
 import { WaterDeepDive } from '@/components/vitality/WaterDeepDive';
@@ -467,8 +469,26 @@ export default function PerformancePage() {
     : productLcaWaterScarcity;
   const circularityRate = wasteMetrics?.waste_diversion_rate || metrics?.circularity_percentage || 0;
 
+  // Fetch product categories for industry benchmark lookup
+  const [productCategories, setProductCategories] = useState<(string | null)[]>([]);
+  useEffect(() => {
+    if (!currentOrganization?.id) return;
+    fetchProducts(currentOrganization.id).then(products => {
+      setProductCategories(products.map(p => p.product_category ?? null));
+    }).catch(() => {});
+  }, [currentOrganization?.id]);
+
+  const { benchmark: industryBenchmarkData, dominantCategory } = useMemo(
+    () => getBenchmarkForProductType(currentOrganization?.product_type, productCategories),
+    [currentOrganization?.product_type, productCategories]
+  );
+
+  const estimatedLitresPerProduct = 50000;
+  const industryBenchmarkTotal = industryBenchmarkData.kgCO2ePerLitre * estimatedLitresPerProduct
+    * (metrics?.total_products_assessed || 1);
+
   const vitalityScores = useMemo(() => {
-    const industryBenchmark = 50000;
+    const numProducts = metrics?.total_products_assessed || 1;
     // Check if we have actual product data (not just zeros)
     const hasProductData = metrics?.total_products_assessed !== undefined &&
                            metrics.total_products_assessed > 0;
@@ -477,8 +497,8 @@ export default function PerformancePage() {
 
     return calculateVitalityScores({
       totalEmissions: totalCO2,
-      emissionsIntensity: totalCO2 / (metrics?.total_products_assessed || 1),
-      industryBenchmark: industryBenchmark / (metrics?.total_products_assessed || 1),
+      emissionsIntensity: totalCO2 / numProducts,
+      industryBenchmark: industryBenchmarkTotal / numProducts,
       waterConsumption,
       waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
       recyclingRate: wasteMetrics?.circularity_rate,
@@ -488,7 +508,37 @@ export default function PerformancePage() {
       hasProductData,
       hasWasteData,
     });
-  }, [totalCO2, waterConsumption, metrics, wasteMetrics, circularityRate, landUse, natureMetrics]);
+  }, [totalCO2, waterConsumption, metrics, wasteMetrics, circularityRate, landUse, natureMetrics, industryBenchmarkTotal]);
+
+  const emissionsIntensity = totalCO2 / (metrics?.total_products_assessed || 1);
+  const industryBenchmarkPerProduct = industryBenchmarkTotal / (metrics?.total_products_assessed || 1);
+  const intensityRatio = industryBenchmarkPerProduct > 0 ? emissionsIntensity / industryBenchmarkPerProduct : 0;
+
+  const scoreCalculationInputs = useMemo(() => ({
+    climate: {
+      totalEmissions: totalCO2,
+      emissionsIntensity,
+      industryBenchmark: industryBenchmarkPerProduct,
+      intensityRatio,
+      benchmarkSource: {
+        name: industryBenchmarkData.sourceName,
+        url: industryBenchmarkData.sourceUrl,
+        year: industryBenchmarkData.sourceYear,
+        category: dominantCategory ?? undefined,
+      },
+    },
+    water: {
+      waterRiskLevel: metrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
+      waterConsumption,
+    },
+    circularity: {
+      circularityRate,
+    },
+    nature: {
+      biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
+      landUse,
+    },
+  }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, metrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
 
   const { strengths, improvements } = useMemo(() => {
     return generateStrengthsAndImprovements(
@@ -590,6 +640,7 @@ export default function PerformancePage() {
         }
         onRefresh={refetch}
         loading={loading}
+        calculationInputs={scoreCalculationInputs}
       />
 
       {/* Action Bar */}

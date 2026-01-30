@@ -17,8 +17,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Download, Upload, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
-// import { downloadTemplateAsCSV, createGoogleSheetsTemplate } from '@/lib/bulk-import/template-generator';
-// import { getConfidenceLevel } from '@/lib/bulk-import/material-matcher';
+import { downloadTemplateAsXLSX } from '@/lib/bulk-import/template-generator';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -55,8 +54,7 @@ export default function ImportPage() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleDownloadTemplate = () => {
-    // downloadTemplateAsCSV();
-    toast.info('Template download feature coming soon.');
+    downloadTemplateAsXLSX();
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {

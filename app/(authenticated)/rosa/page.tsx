@@ -1,11 +1,24 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { RosaChat } from '@/components/gaia';
+
+function RosaPageContent() {
+  const searchParams = useSearchParams();
+  const initialPrompt = searchParams.get('prompt') || undefined;
+
+  return (
+    <div className="h-full">
+      <RosaChat fullPage initialPrompt={initialPrompt} />
+    </div>
+  );
+}
 
 export default function RosaPage() {
   return (
-    <div className="h-full">
-      <RosaChat fullPage />
-    </div>
+    <Suspense fallback={<div className="h-full" />}>
+      <RosaPageContent />
+    </Suspense>
   );
 }

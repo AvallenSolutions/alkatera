@@ -1,19 +1,20 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 export const LandingTrustedBy = () => {
   const brands = [
-    { name: "Avallen Calvados", url: "https://avallenspirits.com" },
-    { name: "Everleaf", url: "https://www.everleafdrinks.com" },
-    { name: "Three Spirit", url: "https://threespiritdrinks.com" },
-    { name: "Takamaka Rum", url: "https://www.takamakarum.com" },
-    { name: "Black Lines", url: "https://blacklinesdrinks.com" },
-    { name: "FABRIC", url: "https://drinkfabric.com" }
+    { name: "Avallen Calvados", url: "https://avallenspirits.com", logo: "/logos/avallen.svg" },
+    { name: "Everleaf", url: "https://www.everleafdrinks.com", logo: "/logos/everleaf.svg" },
+    { name: "Three Spirit", url: "https://threespiritdrinks.com", logo: "/logos/three-spirit.svg" },
+    { name: "Takamaka Rum", url: "https://www.takamakarum.com", logo: "/logos/takamaka.svg" },
+    { name: "Black Lines", url: "https://blacklinesdrinks.com", logo: "/logos/black-lines.svg" },
+    { name: "FABRIC", url: "https://drinkfabric.com", logo: "/logos/fabric.svg" }
   ];
 
   return (
-    <section className="py-32 bg-[#050505] border-y border-white/10 overflow-hidden relative">
+    <section className="py-16 bg-[#050505] border-y border-white/10 overflow-hidden relative">
       <div className="max-w-7xl mx-auto px-6 mb-12 flex items-end justify-between">
         <h3 className="font-mono text-[#ccff00] text-sm tracking-[0.2em] uppercase">
           Trusted by Industry Pioneers
@@ -36,9 +37,22 @@ export const LandingTrustedBy = () => {
                 href={brand.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-serif text-3xl md:text-5xl text-white/20 hover:text-[#ccff00] transition-colors duration-500 px-6 md:px-12 whitespace-nowrap italic"
+                className="flex items-center px-6 md:px-12 opacity-20 hover:opacity-100 transition-opacity duration-500"
               >
-                {brand.name}
+                {brand.logo ? (
+                  <Image
+                    src={brand.logo}
+                    alt={brand.name}
+                    width={360}
+                    height={120}
+                    className="h-[72px] md:h-[120px] w-auto max-w-[270px] md:max-w-[360px] object-contain"
+                    unoptimized
+                  />
+                ) : (
+                  <span className="font-serif text-3xl md:text-5xl text-white whitespace-nowrap italic">
+                    {brand.name}
+                  </span>
+                )}
               </a>
               <span className="text-white/10 text-xl md:text-3xl">✦</span>
             </div>
