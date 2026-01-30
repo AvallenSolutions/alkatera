@@ -763,11 +763,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             <ChevronLeft className={cn('h-4 w-4 transition-transform', !showSidebar && 'rotate-180')} />
           </Button>
 
-          <div className="relative h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 p-[2px] shadow-sm shadow-emerald-500/20">
-            <div className="h-full w-full rounded-full overflow-hidden">
-              <Image src={ROSA_PHOTO_URL} alt="Rosa" width={40} height={40} className="h-full w-full object-cover" />
-            </div>
-            <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 border-2 border-background" />
+          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+            <Leaf className="h-5 w-5 text-white" />
           </div>
 
           <div>
@@ -818,109 +815,148 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
         {/* Messages */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4 max-w-3xl mx-auto">
-            {/* Welcome Message */}
+            {/* Welcome Experience */}
             {(!activeConversation || activeConversation.messages.length === 0) && (
-              <div className="flex flex-col items-center justify-center min-h-[calc(100vh-16rem)]">
-                {/* Rosa avatar with animated glow */}
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-500/30 to-teal-500/30 blur-xl animate-pulse scale-150" />
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-emerald-400/20 to-teal-400/20 blur-2xl animate-[pulse_3s_ease-in-out_infinite] scale-[2]" />
-                  <div className="relative h-24 w-24 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 p-[3px] shadow-lg shadow-emerald-500/25">
-                    <div className="h-full w-full rounded-full overflow-hidden">
-                      <Image
-                        src={ROSA_PHOTO_URL}
-                        alt="Rosa"
-                        width={96}
-                        height={96}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </div>
-                  {/* Online indicator */}
-                  <div className="absolute bottom-1 right-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-background shadow-sm">
-                    <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-75" />
-                  </div>
+              <div className="flex flex-col items-center justify-center min-h-[calc(100vh-16rem)] relative overflow-hidden">
+
+                {/* Organic background shapes — soft botanical silhouettes */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  {/* Floating seed particles */}
+                  <div className="absolute top-[10%] left-[15%] w-1.5 h-1.5 rounded-full bg-emerald-500/20 animate-[float_6s_ease-in-out_infinite]" />
+                  <div className="absolute top-[25%] right-[20%] w-1 h-1 rounded-full bg-teal-500/25 animate-[float_8s_ease-in-out_1s_infinite]" />
+                  <div className="absolute top-[60%] left-[10%] w-2 h-2 rounded-full bg-emerald-400/15 animate-[float_7s_ease-in-out_2s_infinite]" />
+                  <div className="absolute top-[40%] right-[12%] w-1.5 h-1.5 rounded-full bg-green-500/20 animate-[float_9s_ease-in-out_0.5s_infinite]" />
+                  <div className="absolute top-[75%] right-[30%] w-1 h-1 rounded-full bg-teal-400/20 animate-[float_5s_ease-in-out_3s_infinite]" />
+
+                  {/* Large organic gradient blobs */}
+                  <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-emerald-500/[0.03] blur-3xl" />
+                  <div className="absolute -bottom-32 -left-20 w-80 h-80 rounded-full bg-teal-500/[0.04] blur-3xl" />
                 </div>
 
-                {/* Greeting */}
-                <h2 className="text-2xl font-bold mb-1 bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-                  Hey there, I&apos;m Rosa
+                {/* Growing stem illustration */}
+                <div className="relative mb-2">
+                  <svg width="120" height="140" viewBox="0 0 120 140" fill="none" className="mx-auto">
+                    {/* Main stem — grows upward */}
+                    <path
+                      d="M60 130 C60 100, 58 80, 60 50"
+                      stroke="url(#stemGrad)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      className="animate-[grow_2s_ease-out_forwards]"
+                      style={{ strokeDasharray: 80, strokeDashoffset: 0 }}
+                    />
+                    {/* Left leaf */}
+                    <path
+                      d="M58 85 C45 75, 28 78, 22 65 C28 62, 42 60, 56 80"
+                      fill="url(#leafGrad1)"
+                      className="opacity-80 animate-[sway_4s_ease-in-out_infinite]"
+                      style={{ transformOrigin: '58px 85px' }}
+                    />
+                    {/* Right leaf */}
+                    <path
+                      d="M62 70 C75 60, 92 63, 98 50 C92 47, 78 45, 64 65"
+                      fill="url(#leafGrad2)"
+                      className="opacity-80 animate-[sway_5s_ease-in-out_0.5s_infinite_reverse]"
+                      style={{ transformOrigin: '62px 70px' }}
+                    />
+                    {/* Top unfurling leaf / bud */}
+                    <path
+                      d="M60 50 C52 38, 42 30, 35 18 C42 20, 52 28, 58 42"
+                      fill="url(#leafGrad3)"
+                      className="opacity-90 animate-[sway_6s_ease-in-out_1s_infinite]"
+                      style={{ transformOrigin: '60px 50px' }}
+                    />
+                    <path
+                      d="M60 50 C68 38, 78 30, 85 18 C78 20, 68 28, 62 42"
+                      fill="url(#leafGrad3)"
+                      className="opacity-70 animate-[sway_6s_ease-in-out_1.5s_infinite_reverse]"
+                      style={{ transformOrigin: '60px 50px' }}
+                    />
+                    {/* Small budding leaves */}
+                    <circle cx="60" cy="48" r="4" fill="url(#budGrad)" className="animate-pulse" />
+
+                    <defs>
+                      <linearGradient id="stemGrad" x1="60" y1="130" x2="60" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#065f46" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </linearGradient>
+                      <linearGradient id="leafGrad1" x1="22" y1="85" x2="58" y2="65" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#059669" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.9" />
+                      </linearGradient>
+                      <linearGradient id="leafGrad2" x1="98" y1="70" x2="62" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#0d9488" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.9" />
+                      </linearGradient>
+                      <linearGradient id="leafGrad3" x1="35" y1="18" x2="60" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#34d399" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.8" />
+                      </linearGradient>
+                      <radialGradient id="budGrad" cx="0.5" cy="0.5" r="0.5">
+                        <stop offset="0%" stopColor="#6ee7b7" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </radialGradient>
+                    </defs>
+                  </svg>
+                </div>
+
+                {/* Name and greeting */}
+                <h2 className="text-3xl font-bold mb-2 tracking-tight">
+                  <span className="text-foreground">Rosa</span>
                 </h2>
-                <p className="text-sm text-muted-foreground mb-8 max-w-md text-center leading-relaxed">
-                  Your sustainability companion. I know your data inside out — ask me anything
-                  about your emissions, products, facilities, or how to improve your impact.
+                <p className="text-base text-muted-foreground/80 mb-1">
+                  Your sustainability companion
+                </p>
+                <p className="text-sm text-muted-foreground/60 mb-10 max-w-sm text-center">
+                  I can explore your data, uncover insights, and help you
+                  reduce your environmental impact. Where shall we start?
                 </p>
 
-                {/* Categorised suggestion grid */}
-                <div className="w-full max-w-2xl grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-                  {/* Getting Started */}
+                {/* Suggestion cards — 3 columns, organic rounded shapes */}
+                <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
                   <button
                     onClick={() => handleSuggestionClick('What should I focus on first?')}
-                    className="group flex items-start gap-3 rounded-xl border border-border bg-card/50 p-4 text-left transition-all hover:border-emerald-500/50 hover:bg-emerald-500/5 hover:shadow-md hover:shadow-emerald-500/5"
+                    className="group relative rounded-2xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/[0.06] to-transparent p-5 text-left transition-all hover:border-emerald-500/30 hover:from-emerald-500/[0.12] hover:shadow-lg hover:shadow-emerald-500/[0.05] hover:-translate-y-0.5"
                   >
-                    <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center group-hover:from-emerald-500/30 group-hover:to-teal-500/30 transition-colors">
-                      <Leaf className="h-4 w-4 text-emerald-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium group-hover:text-emerald-400 transition-colors">Get started</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">What should I focus on first?</p>
-                    </div>
+                    <Leaf className="h-6 w-6 text-emerald-500/70 mb-3 group-hover:text-emerald-400 transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-emerald-400 transition-colors">Where do I start?</p>
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed">Find out what to focus on first to make the biggest difference</p>
                   </button>
 
-                  {/* Understand Impact */}
                   <button
                     onClick={() => handleSuggestionClick('What is my total carbon footprint?')}
-                    className="group flex items-start gap-3 rounded-xl border border-border bg-card/50 p-4 text-left transition-all hover:border-emerald-500/50 hover:bg-emerald-500/5 hover:shadow-md hover:shadow-emerald-500/5"
+                    className="group relative rounded-2xl border border-teal-500/10 bg-gradient-to-b from-teal-500/[0.06] to-transparent p-5 text-left transition-all hover:border-teal-500/30 hover:from-teal-500/[0.12] hover:shadow-lg hover:shadow-teal-500/[0.05] hover:-translate-y-0.5"
                   >
-                    <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center group-hover:from-teal-500/30 group-hover:to-cyan-500/30 transition-colors">
-                      <BarChart3 className="h-4 w-4 text-teal-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium group-hover:text-teal-400 transition-colors">Understand my impact</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">What is my total carbon footprint?</p>
-                    </div>
+                    <BarChart3 className="h-6 w-6 text-teal-500/70 mb-3 group-hover:text-teal-400 transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-teal-400 transition-colors">My footprint</p>
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed">Understand your total carbon footprint and where it comes from</p>
                   </button>
 
-                  {/* Improve Score */}
                   <button
-                    onClick={() => handleSuggestionClick('How can I improve my Vitality Score?')}
-                    className="group flex items-start gap-3 rounded-xl border border-border bg-card/50 p-4 text-left transition-all hover:border-emerald-500/50 hover:bg-emerald-500/5 hover:shadow-md hover:shadow-emerald-500/5"
+                    onClick={() => handleSuggestionClick('How can I reduce my carbon footprint?')}
+                    className="group relative rounded-2xl border border-green-500/10 bg-gradient-to-b from-green-500/[0.06] to-transparent p-5 text-left transition-all hover:border-green-500/30 hover:from-green-500/[0.12] hover:shadow-lg hover:shadow-green-500/[0.05] hover:-translate-y-0.5"
                   >
-                    <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-gradient-to-br from-emerald-500/20 to-green-500/20 flex items-center justify-center group-hover:from-emerald-500/30 group-hover:to-green-500/30 transition-colors">
-                      <ArrowRight className="h-4 w-4 text-emerald-500 rotate-[-45deg]" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium group-hover:text-emerald-400 transition-colors">Improve my score</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">How can I improve my Vitality Score?</p>
-                    </div>
-                  </button>
-
-                  {/* Explore Data */}
-                  <button
-                    onClick={() => handleSuggestionClick('Show me my emissions breakdown by scope')}
-                    className="group flex items-start gap-3 rounded-xl border border-border bg-card/50 p-4 text-left transition-all hover:border-emerald-500/50 hover:bg-emerald-500/5 hover:shadow-md hover:shadow-emerald-500/5"
-                  >
-                    <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center group-hover:from-cyan-500/30 group-hover:to-blue-500/30 transition-colors">
-                      <PieChart className="h-4 w-4 text-cyan-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium group-hover:text-cyan-400 transition-colors">Explore my data</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Show me my emissions breakdown by scope</p>
-                    </div>
+                    <ArrowRight className="h-6 w-6 text-green-500/70 mb-3 rotate-[-45deg] group-hover:text-green-400 transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-green-400 transition-colors">Take action</p>
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed">Get practical steps to reduce your environmental impact</p>
                   </button>
                 </div>
 
-                {/* Quick actions row */}
-                <div className="flex flex-wrap justify-center gap-2">
-                  {ROSA_SUGGESTED_QUESTIONS.slice(0, 6).filter(sq =>
-                    !['What should I focus on first?', 'What is my total carbon footprint?', 'How can I improve my Vitality Score?', 'Show me my emissions breakdown by scope'].includes(sq.question)
-                  ).map((sq, i) => (
+                {/* More questions — organic pill buttons */}
+                <div className="flex flex-wrap justify-center gap-2 max-w-xl">
+                  {[
+                    'Show me my emissions breakdown by scope',
+                    'Which products have the highest impact?',
+                    'How can I improve my Vitality Score?',
+                    'Help me add my first product',
+                    'Which facilities use the most water?',
+                  ].map((q, i) => (
                     <button
                       key={i}
-                      onClick={() => handleSuggestionClick(sq.question)}
-                      className="text-xs px-3 py-1.5 rounded-full border border-border/60 text-muted-foreground hover:border-emerald-500/50 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all"
+                      onClick={() => handleSuggestionClick(q)}
+                      className="text-xs px-4 py-2 rounded-full bg-muted/40 text-muted-foreground/70 hover:bg-emerald-500/10 hover:text-emerald-400 border border-transparent hover:border-emerald-500/20 transition-all"
                     >
-                      {sq.question}
+                      {q}
                     </button>
                   ))}
                 </div>
@@ -937,10 +973,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 )}
               >
                 {message.role === 'assistant' && (
-                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 p-[2px]">
-                    <div className="h-full w-full rounded-full overflow-hidden">
-                      <Image src={ROSA_PHOTO_URL} alt="Rosa" width={32} height={32} className="h-full w-full object-cover" />
-                    </div>
+                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                    <Leaf className="h-4 w-4 text-white" />
                   </div>
                 )}
 
@@ -1126,10 +1160,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             {/* Loading indicator (before streaming starts) */}
             {isSending && !isStreaming && (
               <div className="flex gap-3">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 p-[2px]">
-                  <div className="h-full w-full rounded-full overflow-hidden">
-                    <Image src={ROSA_PHOTO_URL} alt="Rosa" width={32} height={32} className="h-full w-full object-cover" />
-                  </div>
+                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
+                  <Leaf className="h-4 w-4 text-white" />
                 </div>
                 <Card className="bg-card">
                   <CardContent className="p-3">
