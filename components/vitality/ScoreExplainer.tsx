@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Info, TrendingUp, Target, Award, Calculator, ArrowUpRight, Bot } from 'lucide-react';
+import { Info, TrendingUp, Target, Award, Calculator, ArrowUpRight, Bot, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,12 @@ export interface CalculationInputs {
   emissionsIntensity?: number;
   industryBenchmark?: number;
   intensityRatio?: number;
+  benchmarkSource?: {
+    name: string;
+    url: string;
+    year: number;
+    category?: string;
+  };
   // Water
   waterRiskLevel?: 'high' | 'medium' | 'low';
   waterConsumption?: number;
@@ -269,6 +275,22 @@ function CalculationBreakdown({ scoreType, inputs }: { scoreType: ScoreType; inp
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Industry benchmark</span>
             <span className="font-medium tabular-nums">{inputs.industryBenchmark.toFixed(1)} kgCO2e/product</span>
+          </div>
+        )}
+        {inputs.benchmarkSource && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">
+              {inputs.benchmarkSource.category ? `Source (${inputs.benchmarkSource.category})` : 'Source'}
+            </span>
+            <a
+              href={inputs.benchmarkSource.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1 max-w-[180px] truncate"
+            >
+              {inputs.benchmarkSource.name} ({inputs.benchmarkSource.year})
+              <ExternalLink className="h-3 w-3 flex-shrink-0" />
+            </a>
           </div>
         )}
         {inputs.intensityRatio !== undefined && (

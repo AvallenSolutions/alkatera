@@ -34,6 +34,8 @@ import {
 import Link from 'next/link';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
+import { getBenchmarkForOrganisation } from '@/lib/industry-benchmarks';
+import { fetchProducts } from '@/lib/products';
 import { RAGStatusCard, RAGStatusCardGrid } from '@/components/dashboard/RAGStatusCard';
 import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
 
@@ -130,6 +132,20 @@ export default function DashboardPage() {
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Fetch product categories for industry benchmark lookup
+  const [productCategories, setProductCategories] = useState<(string | null)[]>([]);
+  useEffect(() => {
+    if (!currentOrganization?.id) return;
+    fetchProducts(currentOrganization.id).then(products => {
+      setProductCategories(products.map(p => p.product_category ?? null));
+    }).catch(() => {});
+  }, [currentOrganization?.id]);
+
+  const { benchmark: industryBenchmarkData, dominantCategory } = useMemo(
+    () => getBenchmarkForOrganisation(productCategories),
+    [productCategories]
+  );
+
   const isLoading = prefsLoading || footprintLoading || wasteLoading || supplierLoading || metricsLoading;
 
   const waterConsumption = useMemo(() => {
@@ -147,16 +163,22 @@ export default function DashboardPage() {
   const landUse = companyMetrics?.total_impacts?.land_use || 0;
   const circularityRate = wasteMetrics?.waste_diversion_rate || companyMetrics?.circularity_percentage || 0;
 
+  // Estimate total industry benchmark from category-specific per-litre data.
+  // Assumes ~50,000 litres production volume per product assessed (calibration constant).
+  const estimatedLitresPerProduct = 50000;
+  const industryBenchmarkTotal = industryBenchmarkData.kgCO2ePerLitre * estimatedLitresPerProduct
+    * (companyMetrics?.total_products_assessed || 1);
+
   const vitalityScores = useMemo(() => {
-    const industryBenchmark = 50000;
+    const numProducts = companyMetrics?.total_products_assessed || 1;
     const hasProductData = companyMetrics?.total_products_assessed !== undefined &&
                            companyMetrics.total_products_assessed > 0;
     const hasWasteData = wasteMetrics !== null && wasteMetrics !== undefined;
 
     return calculateVitalityScores({
       totalEmissions: totalCO2,
-      emissionsIntensity: totalCO2 / (companyMetrics?.total_products_assessed || 1),
-      industryBenchmark: industryBenchmark / (companyMetrics?.total_products_assessed || 1),
+      emissionsIntensity: totalCO2 / numProducts,
+      industryBenchmark: industryBenchmarkTotal / numProducts,
       waterConsumption: waterConsumption,
       waterRiskLevel: companyMetrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
       recyclingRate: wasteMetrics?.circularity_rate,
@@ -166,7 +188,7 @@ export default function DashboardPage() {
       hasProductData,
       hasWasteData,
     });
-  }, [totalCO2, waterConsumption, companyMetrics, wasteMetrics, circularityRate, landUse, natureMetrics]);
+  }, [totalCO2, waterConsumption, companyMetrics, wasteMetrics, circularityRate, landUse, natureMetrics, industryBenchmarkTotal]);
 
   // Keep scores object for RAG status cards
   const scores = useMemo(() => ({
@@ -177,7 +199,7 @@ export default function DashboardPage() {
   }), [vitalityScores]);
 
   const emissionsIntensity = totalCO2 / (companyMetrics?.total_products_assessed || 1);
-  const industryBenchmarkPerProduct = 50000 / (companyMetrics?.total_products_assessed || 1);
+  const industryBenchmarkPerProduct = industryBenchmarkTotal / (companyMetrics?.total_products_assessed || 1);
   const intensityRatio = industryBenchmarkPerProduct > 0 ? emissionsIntensity / industryBenchmarkPerProduct : 0;
 
   const scoreCalculationInputs = useMemo(() => ({
@@ -186,6 +208,12 @@ export default function DashboardPage() {
       emissionsIntensity,
       industryBenchmark: industryBenchmarkPerProduct,
       intensityRatio,
+      benchmarkSource: {
+        name: industryBenchmarkData.sourceName,
+        url: industryBenchmarkData.sourceUrl,
+        year: industryBenchmarkData.sourceYear,
+        category: dominantCategory ?? undefined,
+      },
     },
     water: {
       waterRiskLevel: companyMetrics?.water_risk_level as 'high' | 'medium' | 'low' | undefined,
@@ -198,7 +226,7 @@ export default function DashboardPage() {
       biodiversityRisk: deriveBiodiversityRisk(natureMetrics),
       landUse,
     },
-  }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, companyMetrics, waterConsumption, circularityRate, natureMetrics, landUse]);
+  }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, companyMetrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
 
   const scopeBreakdown = useMemo(() => {
     if (!footprint?.breakdown) return { scope1: 0, scope2: 0, scope3: 0 };
