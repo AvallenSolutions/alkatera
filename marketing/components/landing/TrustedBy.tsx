@@ -1,15 +1,16 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 export const LandingTrustedBy = () => {
   const brands = [
-    { name: "Avallen Calvados", url: "https://avallenspirits.com" },
-    { name: "Everleaf", url: "https://www.everleafdrinks.com" },
-    { name: "Three Spirit", url: "https://threespiritdrinks.com" },
-    { name: "Takamaka Rum", url: "https://www.takamakarum.com" },
-    { name: "Black Lines", url: "https://blacklinesdrinks.com" },
-    { name: "FABRIC", url: "https://drinkfabric.com" }
+    { name: "Avallen Calvados", url: "https://avallenspirits.com", logo: null },
+    { name: "Everleaf", url: "https://www.everleafdrinks.com", logo: "/logos/everleaf.svg" },
+    { name: "Three Spirit", url: "https://threespiritdrinks.com", logo: "/logos/three-spirit.svg" },
+    { name: "Takamaka Rum", url: "https://www.takamakarum.com", logo: "/logos/takamaka.svg" },
+    { name: "Black Lines", url: "https://blacklinesdrinks.com", logo: "/logos/black-lines.svg" },
+    { name: "FABRIC", url: "https://drinkfabric.com", logo: "/logos/fabric.svg" }
   ];
 
   return (
@@ -36,9 +37,22 @@ export const LandingTrustedBy = () => {
                 href={brand.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-serif text-3xl md:text-5xl text-white/20 hover:text-[#ccff00] transition-colors duration-500 px-6 md:px-12 whitespace-nowrap italic"
+                className="flex items-center px-6 md:px-12 opacity-20 hover:opacity-100 transition-opacity duration-500"
               >
-                {brand.name}
+                {brand.logo ? (
+                  <Image
+                    src={brand.logo}
+                    alt={brand.name}
+                    width={160}
+                    height={60}
+                    className="h-10 md:h-14 w-auto"
+                    unoptimized
+                  />
+                ) : (
+                  <span className="font-serif text-3xl md:text-5xl text-white whitespace-nowrap italic">
+                    {brand.name}
+                  </span>
+                )}
               </a>
               <span className="text-white/10 text-xl md:text-3xl">✦</span>
             </div>
