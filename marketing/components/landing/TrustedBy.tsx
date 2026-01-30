@@ -14,7 +14,7 @@ export const LandingTrustedBy = () => {
   ];
 
   return (
-    <section className="py-32 bg-[#050505] border-y border-white/10 overflow-hidden relative">
+    <section className="py-16 bg-[#050505] border-y border-white/10 overflow-hidden relative">
       <div className="max-w-7xl mx-auto px-6 mb-12 flex items-end justify-between">
         <h3 className="font-mono text-[#ccff00] text-sm tracking-[0.2em] uppercase">
           Trusted by Industry Pioneers
