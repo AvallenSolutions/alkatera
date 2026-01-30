@@ -5,7 +5,7 @@ import Image from 'next/image';
 
 export const LandingTrustedBy = () => {
   const brands = [
-    { name: "Avallen Calvados", url: "https://avallenspirits.com", logo: null },
+    { name: "Avallen Calvados", url: "https://avallenspirits.com", logo: "/logos/avallen.svg" },
     { name: "Everleaf", url: "https://www.everleafdrinks.com", logo: "/logos/everleaf.svg" },
     { name: "Three Spirit", url: "https://threespiritdrinks.com", logo: "/logos/three-spirit.svg" },
     { name: "Takamaka Rum", url: "https://www.takamakarum.com", logo: "/logos/takamaka.svg" },
@@ -43,9 +43,9 @@ export const LandingTrustedBy = () => {
                   <Image
                     src={brand.logo}
                     alt={brand.name}
-                    width={160}
-                    height={60}
-                    className="h-10 md:h-14 w-auto"
+                    width={240}
+                    height={80}
+                    className="h-12 md:h-20 w-auto max-w-[180px] md:max-w-[240px] object-contain"
                     unoptimized
                   />
                 ) : (
