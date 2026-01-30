@@ -122,7 +122,6 @@ SET features_enabled = jsonb_build_array(
   'bcorp_tracking',
   'cdp_tracking',
   'csrd_compliance',
-  'ecovadis_rating',
   'gri_standards',
   'iso_14001',
   'iso_50001',

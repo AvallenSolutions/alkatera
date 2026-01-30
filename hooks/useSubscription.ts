@@ -62,7 +62,6 @@ export type FeatureCode =
   | "bcorp_tracking"
   | "cdp_tracking"
   | "csrd_compliance"
-  | "ecovadis_rating"
   | "gri_standards"
   | "iso_14001"
   | "iso_50001"
@@ -453,7 +452,7 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "people_wellbeing", "people_training", "governance_ethics",
     "community_local_impact", "community_impact_stories",
     // Certifications (Canopy only)
-    "csrd_compliance", "ecovadis_rating", "gri_standards",
+    "csrd_compliance", "gri_standards",
     "iso_14001", "iso_50001", "sbti_targets",
     "gap_analysis", "audit_packages", "third_party_verification",
   ];

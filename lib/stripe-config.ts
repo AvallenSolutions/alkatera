@@ -132,7 +132,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
       'Year-over-Year Comparisons',
       'Advanced Data Quality Scoring & EF 3.1',
       'All ESG modules including Governance & Ethics',
-      'All certifications: CSRD, EcoVadis, GRI, ISO, SBTi',
+      'All certifications: CSRD, GRI, ISO, SBTi',
       'Gap Analysis, Audit Packages & Verification Support',
       'Unlimited Rosa AI & Greenwash Guardian',
     ],

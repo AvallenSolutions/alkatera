@@ -248,19 +248,6 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Shield,
     category: "Certifications",
   },
-  ecovadis_rating: {
-    name: "EcoVadis Rating",
-    description:
-      "Improve your EcoVadis sustainability rating with targeted tracking across environment, labour, ethics, and procurement.",
-    benefits: [
-      "Track performance across all EcoVadis themes",
-      "Identify improvement opportunities for rating uplift",
-      "Document management systems and policies",
-      "Monitor corrective actions and progress",
-    ],
-    icon: Award,
-    category: "Certifications",
-  },
   gri_standards: {
     name: "GRI Standards",
     description:
@@ -491,7 +478,6 @@ const featureNames: Record<FeatureCode, string> = {
   bcorp_tracking: "B Corp Certification Tracking",
   cdp_tracking: "CDP Climate Change Disclosure",
   csrd_compliance: "CSRD Compliance",
-  ecovadis_rating: "EcoVadis Rating",
   gri_standards: "GRI Standards",
   iso_14001: "ISO 14001",
   iso_50001: "ISO 50001",
@@ -532,7 +518,7 @@ const tierHighlights: Record<TierName, string[]> = {
     "Year-over-Year Comparisons",
     "Advanced Data Quality Scoring & EF 3.1",
     "Governance & Ethics module",
-    "All certifications: CSRD, EcoVadis, GRI, ISO, SBTi",
+    "All certifications: CSRD, GRI, ISO, SBTi",
     "Gap Analysis, Audit Packages & Verification Support",
     "Unlimited Rosa AI & Greenwash Guardian",
     "Up to 50 products, 10 team members, 8 facilities",
