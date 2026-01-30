@@ -43,9 +43,9 @@ export const LandingTrustedBy = () => {
                   <Image
                     src={brand.logo}
                     alt={brand.name}
-                    width={240}
-                    height={80}
-                    className="h-12 md:h-20 w-auto max-w-[180px] md:max-w-[240px] object-contain"
+                    width={360}
+                    height={120}
+                    className="h-[72px] md:h-[120px] w-auto max-w-[270px] md:max-w-[360px] object-contain"
                     unoptimized
                   />
                 ) : (
