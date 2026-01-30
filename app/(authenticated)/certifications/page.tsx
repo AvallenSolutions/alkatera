@@ -39,7 +39,7 @@ import { useCertificationScore } from '@/hooks/data/useCertificationScore';
 export default function CertificationsPage() {
   const { frameworks, certifications, loading, startCertification, refetch } =
     useCertificationFrameworks(true);
-  const { readinessSummary, loading: scoreLoading } = useCertificationScore();
+  const { readinessSummary, loading: scoreLoading, refetch: refetchScores } = useCertificationScore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -106,8 +106,8 @@ export default function CertificationsPage() {
             Track and manage your sustainability certifications
           </p>
         </div>
-        <Button variant="outline" onClick={refetch} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+        <Button variant="outline" onClick={() => { refetch(); refetchScores(); }} disabled={loading || scoreLoading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading || scoreLoading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
