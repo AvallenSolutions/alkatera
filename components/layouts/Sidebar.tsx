@@ -506,7 +506,7 @@ export function Sidebar({ className }: SidebarProps) {
             return (
               <Link
                 key={item.href}
-                href="/settings/"
+                href={item.href}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
                 title={`Upgrade to ${item.requiredTierName} to unlock`}
               >
@@ -517,12 +517,12 @@ export function Sidebar({ className }: SidebarProps) {
             )
           }
 
-          // Locked parent item with children — show collapsed with lock, click goes to settings
+          // Locked parent item with children — show collapsed with lock, click goes to feature page
           if (item.locked && hasChildren) {
             return (
               <Link
                 key={item.href}
-                href="/settings/"
+                href={item.href}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
                 title={`Upgrade to ${item.requiredTierName} to unlock`}
               >
