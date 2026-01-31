@@ -341,6 +341,23 @@ Deno.serve(async (req: Request) => {
       throw new Error('User does not have access to this organization');
     }
 
+    // Check subscription-based Rosa query limit
+    const { data: queryLimitCheck } = await supabase
+      .rpc('check_rosa_query_limit', { p_organization_id: organization_id });
+
+    if (queryLimitCheck && !queryLimitCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: queryLimitCheck.reason || 'Monthly Rosa AI query limit reached. Please upgrade your plan.',
+          limitReached: true,
+          current_count: queryLimitCheck.current_count,
+          max_count: queryLimitCheck.max_count,
+          resets_at: queryLimitCheck.resets_at,
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 10) {
       console.error('GEMINI_API_KEY not configured properly');
       return new Response(
@@ -399,6 +416,9 @@ Deno.serve(async (req: Request) => {
         role: 'user',
         content: sanitizedMessage,
       });
+
+    // Increment Rosa query count for this organization
+    await supabase.rpc('increment_rosa_query_count', { p_organization_id: organization_id, p_user_id: user.id });
 
     // Fetch conversation history
     const { data: history } = await supabase

@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import {
   getConversations,
   getArchivedConversations,
@@ -146,8 +147,13 @@ interface RosaChatProps {
 export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   const { currentOrganization } = useOrganization();
   const { user } = useAuth();
+  const { hasFeature } = useSubscription();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Determine Rosa AI query limit based on tier features
+  const isRosaUnlimited = hasFeature('rosa_ai_unlimited');
+  const rosaMaxQueries = isRosaUnlimited ? null : hasFeature('rosa_ai_100') ? 100 : 25;
   const [conversations, setConversations] = useState<RosaConversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<RosaConversationWithMessages | null>(null);
   const [input, setInput] = useState('');
@@ -557,6 +563,13 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
               <Plus className="h-4 w-4 mr-2" />
               New Chat
             </Button>
+
+            {/* Query usage indicator */}
+            {!isRosaUnlimited && rosaMaxQueries && (
+              <p className="text-xs text-muted-foreground text-center">
+                {rosaMaxQueries} queries/month on your plan
+              </p>
+            )}
 
             {/* Search input */}
             <div className="relative">

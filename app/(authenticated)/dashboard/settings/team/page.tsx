@@ -33,7 +33,8 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { UserPlus, Loader2, Users, Trash2, AlertCircle } from 'lucide-react'
+import { UserPlus, Loader2, Users, Trash2, AlertCircle, Lock } from 'lucide-react'
+import { useTeamMemberLimit } from '@/hooks/useSubscription'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -70,6 +71,8 @@ function TeamManagementContent() {
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
+  const { currentCount, maxCount, isUnlimited, checkLimit } = useTeamMemberLimit()
+  const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount
 
   const isAdmin = userRole === 'owner' || userRole === 'admin'
 
@@ -115,6 +118,18 @@ function TeamManagementContent() {
     setIsInviting(true)
 
     try {
+      // Server-side limit check before inviting
+      const limitResult = await checkLimit()
+      if (!limitResult.allowed) {
+        toast({
+          title: 'Team member limit reached',
+          description: limitResult.reason || 'Please upgrade your plan to invite more members.',
+          variant: 'destructive',
+        })
+        setIsInviting(false)
+        return
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
 
       if (!session) {
@@ -246,9 +261,9 @@ function TeamManagementContent() {
           {isAdmin && (
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Invite Member
+                <Button disabled={atLimit}>
+                  {atLimit ? <Lock className="mr-2 h-4 w-4" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                  {atLimit ? 'Limit Reached' : 'Invite Member'}
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px]">
@@ -315,6 +330,18 @@ function TeamManagementContent() {
           )}
         </CardHeader>
         <CardContent>
+          {atLimit && (
+            <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4 mb-4">
+              <Lock className="h-5 w-5 text-destructive shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-destructive">Team member limit reached</p>
+                <p className="text-xs text-muted-foreground">
+                  You&apos;ve used {currentCount} of {maxCount} team members on your current plan.{' '}
+                  <a href="/dashboard/settings" className="underline text-primary">Upgrade</a> to add more.
+                </p>
+              </div>
+            </div>
+          )}
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="h-8 w-8 animate-spin text-slate-500" />

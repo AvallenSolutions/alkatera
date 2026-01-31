@@ -23,11 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Building2, Users, FileCheck, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Building2, Users, FileCheck, ArrowRight, ArrowLeft, Check, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { COUNTRIES } from "@/lib/countries";
 import { LocationPicker, type LocationData } from "@/components/shared/LocationPicker";
+import { useFacilityLimit } from "@/hooks/useSubscription";
+import { UsageMeterCompact } from "@/components/subscription";
 
 interface AddFacilityWizardProps {
   open: boolean;
@@ -75,6 +77,8 @@ export function AddFacilityWizard({
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { currentCount, maxCount, isUnlimited, isLoading: isLoadingLimit, checkLimit } = useFacilityLimit();
+  const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount;
 
   const [operationalControl, setOperationalControl] = useState<'owned' | 'third_party' | null>(null);
   const [facilityName, setFacilityName] = useState('');
@@ -173,6 +177,14 @@ export function AddFacilityWizard({
 
     try {
       setIsSubmitting(true);
+
+      // Server-side limit check before creation
+      const limitResult = await checkLimit();
+      if (!limitResult.allowed) {
+        toast.error(limitResult.reason || 'Facility limit reached. Please upgrade your plan.');
+        setIsSubmitting(false);
+        return;
+      }
 
       const { data: facility, error: facilityError } = await supabase
         .from('facilities')
@@ -473,6 +485,23 @@ export function AddFacilityWizard({
           </DialogDescription>
         </DialogHeader>
 
+        {atLimit && (
+          <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <Lock className="h-5 w-5 text-destructive shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-destructive">Facility limit reached</p>
+              <p className="text-xs text-muted-foreground">
+                You&apos;ve used {currentCount} of {maxCount} facilities on your current plan.{" "}
+                <a href="/dashboard/settings" className="underline text-primary">Upgrade</a> to add more.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!atLimit && !isUnlimited && maxCount != null && (
+          <UsageMeterCompact current={currentCount} max={maxCount} />
+        )}
+
         <div className="py-6">
           {renderStep()}
         </div>
@@ -494,8 +523,8 @@ export function AddFacilityWizard({
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Facility & Enter Data'}
+              <Button onClick={handleSubmit} disabled={isSubmitting || atLimit}>
+                {atLimit ? 'Limit Reached' : isSubmitting ? 'Creating...' : 'Create Facility & Enter Data'}
               </Button>
             )}
           </div>

@@ -85,6 +85,23 @@ export const Footer = () => {
           </form>
         </div>
       </div>
+
+      <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p className="text-gray-600 font-mono text-xs">
+          Avallen Solutions Ltd trading as Alkatera
+        </p>
+        <div className="flex items-center gap-6 text-gray-500 font-mono text-xs">
+          <Link href="/terms" className="hover:text-white transition-colors">
+            Terms &amp; Conditions
+          </Link>
+          <Link href="/privacy" className="hover:text-white transition-colors">
+            Privacy Policy
+          </Link>
+          <Link href="/cookies" className="hover:text-white transition-colors">
+            Cookie Policy
+          </Link>
+        </div>
+      </div>
     </footer>
   );
 };
