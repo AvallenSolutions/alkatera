@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Mail, User, Building2, Send, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -108,6 +109,8 @@ const InputField = ({
 };
 
 export default function ContactPage() {
+  const searchParams = useSearchParams();
+  const tier = searchParams.get('tier');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [company, setCompany] = useState('');
@@ -132,6 +135,7 @@ export default function ContactPage() {
           email,
           company,
           subscribe,
+          ...(tier && { interest: tier }),
         }),
       });
 
@@ -188,9 +192,13 @@ export default function ContactPage() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.6 }}
               >
-                <h1 className="text-3xl md:text-4xl font-serif text-white mb-2">Connect with Us</h1>
+                <h1 className="text-3xl md:text-4xl font-serif text-white mb-2">
+                  {tier ? `Get Started with ${tier}` : 'Connect with Us'}
+                </h1>
                 <p className="text-gray-500 font-mono text-sm mb-12 uppercase tracking-widest">
-                  Ready to scale your impact? Let&apos;s talk.
+                  {tier
+                    ? `Tell us about your organisation and we'll get you set up.`
+                    : `Ready to scale your impact? Let's talk.`}
                 </p>
 
                 <form onSubmit={handleSubmit}>

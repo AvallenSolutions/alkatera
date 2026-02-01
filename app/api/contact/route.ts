@@ -6,7 +6,7 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, name, company, subscribe } = body;
+    const { email, name, company, subscribe, interest } = body;
 
     // Validate required fields
     if (!email || !name) {
@@ -29,10 +29,12 @@ export async function POST(request: NextRequest) {
 
     try {
       await resend.emails.send({
-        from: 'AlkaTera Contact <noreply@mail.alkatera.com>',
+        from: 'AlkaTera <sayhello@mail.alkatera.com>',
         to: ['hello@alkatera.com'],
         replyTo: email,
-        subject: `New Contact Form Submission from ${name}`,
+        subject: interest
+          ? `New ${interest} Plan Inquiry from ${name}`
+          : `New Contact Form Submission from ${name}`,
         html: `
           <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
             <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
@@ -51,6 +53,10 @@ export async function POST(request: NextRequest) {
                 <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Company</td>
                 <td style="padding: 10px 0; color: #fff; font-size: 14px;">${company || 'Not provided'}</td>
               </tr>
+              ${interest ? `<tr>
+                <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Interest</td>
+                <td style="padding: 10px 0; color: #ccff00; font-size: 14px; font-weight: bold;">${interest} Plan</td>
+              </tr>` : ''}
               <tr>
                 <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Mailing List</td>
                 <td style="padding: 10px 0; color: #fff; font-size: 14px;">${subscribe ? 'Yes — opted in' : 'No'}</td>

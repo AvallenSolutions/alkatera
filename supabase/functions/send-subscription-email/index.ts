@@ -488,7 +488,7 @@ async function sendViaResend(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "AlkaTera <billing@alkatera.com>",
+      from: "AlkaTera <sayhello@mail.alkatera.com>",
       to: email.to,
       subject: email.subject,
       html: email.html,
