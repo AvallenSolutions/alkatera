@@ -3,6 +3,8 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/db_types';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Get Subscription History
  *
