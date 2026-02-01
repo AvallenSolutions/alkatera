@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,14 @@ import { useCertificationFrameworks } from '@/hooks/data/useCertificationFramewo
 import { useCertificationScore } from '@/hooks/data/useCertificationScore';
 
 export default function CertificationsPage() {
+  return (
+    <FeatureGate feature="bcorp_tracking">
+      <CertificationsPageContent />
+    </FeatureGate>
+  );
+}
+
+function CertificationsPageContent() {
   const { frameworks, certifications, loading, startCertification, refetch } =
     useCertificationFrameworks(true);
   const { readinessSummary, loading: scoreLoading, refetch: refetchScores } = useCertificationScore();

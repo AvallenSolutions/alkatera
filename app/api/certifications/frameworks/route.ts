@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
     let frameworksQuery = supabase
       .from('certification_frameworks')
       .select('*')
+      .neq('framework_code', 'ecovadis')
       .order('framework_name', { ascending: true });
 
     if (activeOnly) {

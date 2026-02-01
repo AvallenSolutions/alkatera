@@ -15,6 +15,8 @@ import {
   Play,
 } from 'lucide-react';
 import Link from 'next/link';
+import { Lock } from 'lucide-react';
+import { useSubscription, type FeatureCode } from '@/hooks/useSubscription';
 
 interface Framework {
   id: string;
@@ -78,7 +80,20 @@ const categoryColors: Record<string, string> = {
   'Reporting': 'bg-amber-500',
 };
 
+// Maps framework codes to their required feature codes
+const frameworkFeatureMap: Record<string, string> = {
+  csrd: 'csrd_compliance',
+  gri: 'gri_standards',
+  iso14001: 'iso_14001',
+  iso50001: 'iso_50001',
+  sbti: 'sbti_targets',
+};
+
 export function FrameworkCard({ framework, certification, onStart }: FrameworkCardProps) {
+  const { hasFeature } = useSubscription();
+  const requiredFeature = frameworkFeatureMap[framework.code.toLowerCase()] as FeatureCode | undefined;
+  const isLocked = requiredFeature ? !hasFeature(requiredFeature) : false;
+
   const status = certification?.status || 'not_started';
   const config = statusConfig[status];
   const StatusIcon = config.icon;
@@ -86,7 +101,7 @@ export function FrameworkCard({ framework, certification, onStart }: FrameworkCa
   const isPassingScore = score >= framework.passing_score;
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className={`hover:shadow-md transition-shadow ${isLocked ? 'opacity-75' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-2">
@@ -95,10 +110,17 @@ export function FrameworkCard({ framework, certification, onStart }: FrameworkCa
             </Badge>
             <Badge variant="outline">{framework.version}</Badge>
           </div>
-          <Badge className={config.color}>
-            <StatusIcon className="h-3 w-3 mr-1" />
-            {config.label}
-          </Badge>
+          {isLocked ? (
+            <Badge variant="outline" className="border-amber-500 text-amber-600">
+              <Lock className="h-3 w-3 mr-1" />
+              Canopy
+            </Badge>
+          ) : (
+            <Badge className={config.color}>
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {config.label}
+            </Badge>
+          )}
         </div>
         <CardTitle className="text-lg mt-2">{framework.name}</CardTitle>
         <CardDescription className="line-clamp-2">{framework.description}</CardDescription>
@@ -138,7 +160,14 @@ export function FrameworkCard({ framework, certification, onStart }: FrameworkCa
 
         {/* Actions */}
         <div className="flex items-center gap-2 pt-2">
-          {status === 'not_started' ? (
+          {isLocked ? (
+            <Link href="/dashboard/settings" className="w-full">
+              <Button variant="outline" className="w-full text-amber-600 border-amber-300 hover:bg-amber-50">
+                <Lock className="h-4 w-4 mr-2" />
+                Upgrade to Canopy
+              </Button>
+            </Link>
+          ) : status === 'not_started' ? (
             <Button
               variant="default"
               className="w-full"

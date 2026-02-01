@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,14 @@ interface ImpactStory {
 }
 
 export default function ImpactStoriesPage() {
+  return (
+    <FeatureGate feature="community_impact_stories">
+      <ImpactStoriesPageContent />
+    </FeatureGate>
+  );
+}
+
+function ImpactStoriesPageContent() {
   const { currentOrganization } = useOrganization();
   const [stories, setStories] = useState<ImpactStory[]>([]);
   const [loading, setLoading] = useState(true);

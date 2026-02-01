@@ -81,6 +81,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
     }
 
+    // For non-URL input types, check document limit
+    if (body.input_type && body.input_type !== 'url') {
+      const { data: limitCheck } = await supabase
+        .rpc('check_greenwash_doc_limit', { p_organization_id: body.organization_id });
+
+      if (limitCheck && !limitCheck.allowed) {
+        return NextResponse.json({
+          error: limitCheck.reason || 'Document analysis limit reached. Please upgrade your plan.',
+          limitReached: true,
+          current_count: limitCheck.current_count,
+          max_count: limitCheck.max_count,
+        }, { status: 429 });
+      }
+    }
+
     const { data, error } = await supabase
       .from('greenwash_assessments')
       .insert({
@@ -98,6 +113,14 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating assessment:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Increment document count for non-URL types
+    if (body.input_type && body.input_type !== 'url') {
+      await supabase.rpc('increment_greenwash_doc_count', {
+        p_organization_id: body.organization_id,
+        p_user_id: user.id,
+      });
     }
 
     return NextResponse.json(data, { status: 201 });

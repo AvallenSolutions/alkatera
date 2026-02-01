@@ -152,6 +152,35 @@ const config: Config = {
             opacity: '1',
           },
         },
+        float: {
+          '0%, 100%': {
+            transform: 'translateY(0px) translateX(0px)',
+            opacity: '0.3',
+          },
+          '25%': {
+            transform: 'translateY(-12px) translateX(4px)',
+            opacity: '0.6',
+          },
+          '50%': {
+            transform: 'translateY(-6px) translateX(-3px)',
+            opacity: '0.4',
+          },
+          '75%': {
+            transform: 'translateY(-18px) translateX(2px)',
+            opacity: '0.5',
+          },
+        },
+        sway: {
+          '0%, 100%': {
+            transform: 'rotate(0deg)',
+          },
+          '25%': {
+            transform: 'rotate(2deg)',
+          },
+          '75%': {
+            transform: 'rotate(-2deg)',
+          },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -159,6 +188,8 @@ const config: Config = {
         'glow-pulse': 'glow-pulse 2s ease-in-out infinite',
         'slide-in-right': 'slide-in-right 0.3s ease-out',
         'fade-in-up': 'fade-in-up 0.4s ease-out',
+        float: 'float 6s ease-in-out infinite',
+        sway: 'sway 4s ease-in-out infinite',
       },
     },
   },

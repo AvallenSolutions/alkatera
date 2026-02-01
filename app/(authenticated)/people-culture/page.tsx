@@ -23,6 +23,7 @@ import { DiversityDashboard } from '@/components/people-culture/DiversityDashboa
 import { TrainingDashboard } from '@/components/people-culture/TrainingDashboard';
 import { WellbeingDashboard } from '@/components/people-culture/WellbeingDashboard';
 
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { usePeopleCultureScore } from '@/hooks/data/usePeopleCultureScore';
 import { useFairWorkMetrics } from '@/hooks/data/useFairWorkMetrics';
 import { useDiversityMetrics } from '@/hooks/data/useDiversityMetrics';
@@ -77,6 +78,14 @@ function QuickActionCard({
 }
 
 export default function PeopleCulturePage() {
+  return (
+    <FeatureGate feature="people_fair_work">
+      <PeopleCulturePageContent />
+    </FeatureGate>
+  );
+}
+
+function PeopleCulturePageContent() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isRecalculating, setIsRecalculating] = useState(false);
 

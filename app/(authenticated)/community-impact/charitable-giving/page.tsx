@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,14 @@ interface Donation {
 }
 
 export default function CharitableGivingPage() {
+  return (
+    <FeatureGate feature="community_charitable_giving">
+      <CharitableGivingPageContent />
+    </FeatureGate>
+  );
+}
+
+function CharitableGivingPageContent() {
   const { currentOrganization } = useOrganization();
   const [donations, setDonations] = useState<Donation[]>([]);
   const [loading, setLoading] = useState(true);

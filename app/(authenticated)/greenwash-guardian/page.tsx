@@ -22,8 +22,10 @@ import {
   ArrowRight,
   Info,
   List,
+  Lock,
 } from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
+import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import Link from "next/link";
 import {
@@ -40,6 +42,10 @@ type TabType = InputType | "bulk";
 export default function GreenwashGuardianPage() {
   const router = useRouter();
   const { currentOrganization } = useOrganization();
+
+  const { hasFeature } = useSubscription();
+  const canAnalyzeDocuments = hasFeature('greenwash_documents');
+  const isGreenwashUnlimited = hasFeature('greenwash_unlimited');
 
   const [activeTab, setActiveTab] = useState<TabType>("url");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -324,26 +330,42 @@ export default function GreenwashGuardianPage() {
                 </TabsTrigger>
                 <TabsTrigger
                   value="document"
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
+                  disabled={!canAnalyzeDocuments}
+                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400 disabled:opacity-50"
                 >
-                  <FileText className="h-4 w-4 mr-2" />
+                  {!canAnalyzeDocuments ? <Lock className="h-4 w-4 mr-2" /> : <FileText className="h-4 w-4 mr-2" />}
                   Document
                 </TabsTrigger>
                 <TabsTrigger
                   value="text"
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
+                  disabled={!canAnalyzeDocuments}
+                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400 disabled:opacity-50"
                 >
-                  <MessageSquare className="h-4 w-4 mr-2" />
+                  {!canAnalyzeDocuments ? <Lock className="h-4 w-4 mr-2" /> : <MessageSquare className="h-4 w-4 mr-2" />}
                   Text
                 </TabsTrigger>
                 <TabsTrigger
                   value="social_media"
-                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400"
+                  disabled={!canAnalyzeDocuments}
+                  className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-slate-400 disabled:opacity-50"
                 >
-                  <Share2 className="h-4 w-4 mr-2" />
+                  {!canAnalyzeDocuments ? <Lock className="h-4 w-4 mr-2" /> : <Share2 className="h-4 w-4 mr-2" />}
                   Social
                 </TabsTrigger>
               </TabsList>
+
+              {!canAnalyzeDocuments && (
+                <p className="text-xs text-amber-400/80 mt-2">
+                  Document, text and social media analysis requires a Blossom or Canopy plan.{" "}
+                  <Link href="/dashboard/settings" className="underline">Upgrade</Link>
+                </p>
+              )}
+
+              {canAnalyzeDocuments && !isGreenwashUnlimited && (
+                <p className="text-xs text-slate-400 mt-2">
+                  5 document analyses per month on your plan.
+                </p>
+              )}
 
               <TabsContent value="url" className="space-y-4 mt-4">
                 <div className="space-y-2">

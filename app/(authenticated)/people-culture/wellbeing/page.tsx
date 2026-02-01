@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -353,6 +354,14 @@ function CreateSurveyDialog({ onSuccess }: { onSuccess: () => void }) {
 }
 
 export default function WellbeingPage() {
+  return (
+    <FeatureGate feature="people_wellbeing">
+      <WellbeingPageContent />
+    </FeatureGate>
+  );
+}
+
+function WellbeingPageContent() {
   const { metrics, loading, refetch } = useWellbeingMetrics();
 
   if (loading) {

@@ -325,16 +325,18 @@ async function aggregateReportData(
     emissions: { scope1: 0, scope2: 0, scope3: 0, total: 0, year: reportYear },
     emissionsTrends: [],
     products: [],
+    facilities: [],
+    standards: [],
     dataAvailability: {
       hasOrganization: false,
       hasEmissions: false,
       hasProducts: false,
+      hasFacilities: false,
     },
   };
 
   try {
     console.log('[Data] Fetching organization info...');
-    // Fetch organization info
     const { data: org, error: orgError } = await supabaseClient
       .from('organizations')
       .select('name, industry_sector, description')
@@ -356,17 +358,19 @@ async function aggregateReportData(
   if (sections.includes('scope-1-2-3')) {
     try {
       console.log('[Data] Fetching emissions data for year:', reportYear);
-      // Query corporate reports for the year
-      const { data: corporateReport, error: reportError } = await supabaseClient
+
+      const yearStart = `${reportYear}-01-01`;
+      const yearEnd = `${reportYear}-12-31`;
+
+      // First try corporate_reports table
+      const { data: corporateReport } = await supabaseClient
         .from('corporate_reports')
         .select('*')
         .eq('organization_id', organizationId)
         .eq('year', reportYear)
         .maybeSingle();
 
-      if (reportError) {
-        console.log('[Data] Corporate reports query error:', reportError.message);
-      } else if (corporateReport) {
+      if (corporateReport && corporateReport.total_emissions > 0) {
         data.emissions = {
           scope1: corporateReport.breakdown_json?.scope1 || 0,
           scope2: corporateReport.breakdown_json?.scope2 || 0,
@@ -375,9 +379,139 @@ async function aggregateReportData(
           year: reportYear,
         };
         data.dataAvailability.hasEmissions = true;
-        console.log('[Data] Emissions loaded:', data.emissions.total, 'tCO2e');
+        console.log('[Data] Emissions loaded from corporate_reports:', data.emissions.total, 'tCO2e');
       } else {
-        console.log('[Data] No emissions data for year:', reportYear);
+        // Fallback: Calculate from utility_data_entries + fleet + overheads (same as dashboard)
+        console.log('[Data] No corporate_reports data, calculating from facility data...');
+
+        // Emission factors matching corporate-emissions.ts
+        const UTILITY_FACTORS: Record<string, { factor: number; scope: string }> = {
+          diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },
+          diesel_mobile: { factor: 2.68787, scope: 'Scope 1' },
+          petrol_mobile: { factor: 2.31, scope: 'Scope 1' },
+          natural_gas: { factor: 0.18293, scope: 'Scope 1' },
+          lpg: { factor: 1.55537, scope: 'Scope 1' },
+          heavy_fuel_oil: { factor: 3.17740, scope: 'Scope 1' },
+          biomass_solid: { factor: 0.01551, scope: 'Scope 1' },
+          refrigerant_leakage: { factor: 1430, scope: 'Scope 1' },
+          electricity_grid: { factor: 0.207, scope: 'Scope 2' },
+          heat_steam_purchased: { factor: 0.1662, scope: 'Scope 2' },
+        };
+
+        // Get all facilities
+        const { data: facilities } = await supabaseClient
+          .from('facilities')
+          .select('id, name')
+          .eq('organization_id', organizationId);
+
+        const facilityIds = facilities?.map((f: any) => f.id) || [];
+
+        let scope1 = 0;
+        let scope2 = 0;
+        let scope3 = 0;
+
+        // Scope 1 & 2 from utility data
+        if (facilityIds.length > 0) {
+          const { data: utilityData } = await supabaseClient
+            .from('utility_data_entries')
+            .select('quantity, unit, utility_type, facility_id')
+            .in('facility_id', facilityIds)
+            .gte('reporting_period_start', yearStart)
+            .lte('reporting_period_end', yearEnd);
+
+          if (utilityData) {
+            for (const entry of utilityData) {
+              const e = entry as any;
+              const config = UTILITY_FACTORS[e.utility_type];
+              if (!config) continue;
+
+              let co2e = e.quantity * config.factor;
+              if (e.utility_type === 'natural_gas' && e.unit === 'm³') {
+                co2e = e.quantity * 10.55 * config.factor;
+              }
+
+              if (config.scope === 'Scope 1') scope1 += co2e;
+              else scope2 += co2e;
+            }
+          }
+        }
+
+        // Fleet emissions
+        const { data: fleetS1 } = await supabaseClient
+          .from('fleet_activities')
+          .select('emissions_tco2e')
+          .eq('organization_id', organizationId)
+          .eq('scope', 'Scope 1')
+          .gte('reporting_period_start', yearStart)
+          .lte('reporting_period_end', yearEnd);
+        if (fleetS1) fleetS1.forEach((f: any) => { scope1 += (f.emissions_tco2e || 0) * 1000; });
+
+        const { data: fleetS2 } = await supabaseClient
+          .from('fleet_activities')
+          .select('emissions_tco2e')
+          .eq('organization_id', organizationId)
+          .eq('scope', 'Scope 2')
+          .gte('reporting_period_start', yearStart)
+          .lte('reporting_period_end', yearEnd);
+        if (fleetS2) fleetS2.forEach((f: any) => { scope2 += (f.emissions_tco2e || 0) * 1000; });
+
+        // Scope 3 from corporate overheads
+        const { data: corpReport } = await supabaseClient
+          .from('corporate_reports')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('year', reportYear)
+          .maybeSingle();
+
+        if (corpReport?.id) {
+          const { data: overheads } = await supabaseClient
+            .from('corporate_overheads')
+            .select('computed_co2e')
+            .eq('report_id', corpReport.id);
+          if (overheads) overheads.forEach((o: any) => { scope3 += (o.computed_co2e || 0); });
+        }
+
+        // Scope 3 from product LCAs via production logs
+        const { data: prodLogs } = await supabaseClient
+          .from('production_logs')
+          .select('product_id, quantity_produced')
+          .eq('organization_id', organizationId)
+          .gte('production_date', yearStart)
+          .lte('production_date', yearEnd);
+
+        if (prodLogs && prodLogs.length > 0) {
+          const productIds = [...new Set(prodLogs.map((p: any) => p.product_id))];
+          const { data: pcfs } = await supabaseClient
+            .from('product_carbon_footprints')
+            .select('product_id, aggregated_impacts')
+            .in('product_id', productIds)
+            .eq('status', 'completed');
+
+          if (pcfs) {
+            const pcfMap = new Map();
+            pcfs.forEach((p: any) => pcfMap.set(p.product_id, p));
+
+            for (const log of prodLogs) {
+              const l = log as any;
+              const pcf = pcfMap.get(l.product_id);
+              if (pcf?.aggregated_impacts?.breakdown?.by_scope?.scope3) {
+                scope3 += pcf.aggregated_impacts.breakdown.by_scope.scope3 * (l.quantity_produced || 0);
+              }
+            }
+          }
+        }
+
+        // Convert from kg to tonnes
+        const scope1T = scope1 / 1000;
+        const scope2T = scope2 / 1000;
+        const scope3T = scope3 / 1000;
+        const totalT = scope1T + scope2T + scope3T;
+
+        if (totalT > 0) {
+          data.emissions = { scope1: scope1T, scope2: scope2T, scope3: scope3T, total: totalT, year: reportYear };
+          data.dataAvailability.hasEmissions = true;
+          console.log('[Data] Emissions calculated from facility data:', totalT, 'tCO2e');
+        }
       }
 
       // Fetch multi-year data if enabled
@@ -401,7 +535,6 @@ async function aggregateReportData(
             total: r.total_emissions || 0,
           }));
 
-          // Calculate year-over-year changes
           if (data.emissionsTrends.length > 1) {
             for (let i = 1; i < data.emissionsTrends.length; i++) {
               const current = data.emissionsTrends[i];
@@ -419,6 +552,64 @@ async function aggregateReportData(
     }
   }
 
+  // Fetch facility data
+  try {
+    console.log('[Data] Fetching facility data...');
+    const yearStart = `${reportYear}-01-01`;
+    const yearEnd = `${reportYear}-12-31`;
+
+    const { data: facilities } = await supabaseClient
+      .from('facilities')
+      .select('id, name, facility_type, city, country')
+      .eq('organization_id', organizationId);
+
+    if (facilities && facilities.length > 0) {
+      const facilityIds = facilities.map((f: any) => f.id);
+
+      // Get aggregated emissions per facility
+      const { data: facilityEmissions } = await supabaseClient
+        .from('facility_emissions_aggregated')
+        .select('facility_id, total_co2e, units_produced')
+        .in('facility_id', facilityIds)
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      // Get utility data per facility for breakdown
+      const { data: utilityData } = await supabaseClient
+        .from('utility_data_entries')
+        .select('facility_id, quantity, utility_type')
+        .in('facility_id', facilityIds)
+        .gte('reporting_period_start', yearStart)
+        .lte('reporting_period_end', yearEnd);
+
+      const emissionsMap = new Map<string, number>();
+      const unitsMap = new Map<string, number>();
+      const utilityCountMap = new Map<string, number>();
+
+      facilityEmissions?.forEach((fe: any) => {
+        emissionsMap.set(fe.facility_id, (emissionsMap.get(fe.facility_id) || 0) + (fe.total_co2e || 0));
+        unitsMap.set(fe.facility_id, (unitsMap.get(fe.facility_id) || 0) + (fe.units_produced || 0));
+      });
+
+      utilityData?.forEach((ud: any) => {
+        utilityCountMap.set(ud.facility_id, (utilityCountMap.get(ud.facility_id) || 0) + 1);
+      });
+
+      data.facilities = facilities.map((f: any) => ({
+        name: f.name,
+        type: f.facility_type || 'Production',
+        location: [f.city, f.country].filter(Boolean).join(', ') || 'Not specified',
+        totalEmissions: emissionsMap.get(f.id) || 0,
+        unitsProduced: unitsMap.get(f.id) || 0,
+        hasData: (emissionsMap.get(f.id) || 0) > 0 || (utilityCountMap.get(f.id) || 0) > 0,
+      }));
+      data.dataAvailability.hasFacilities = facilities.length > 0;
+      console.log('[Data] Facilities loaded:', data.facilities.length);
+    }
+  } catch (error) {
+    console.error('[Data] Exception fetching facilities:', error);
+  }
+
   // Fetch product data if section is included
   if (sections.includes('product-footprints')) {
     try {
@@ -433,10 +624,10 @@ async function aggregateReportData(
       if (productsError) {
         console.log('[Data] Product LCAs query error:', productsError.message);
       } else if (products && products.length > 0) {
-        data.products = products.map((p: { product_name: string; functional_unit: string; aggregated_impacts?: { climate_change?: number } }) => ({
+        data.products = products.map((p: { product_name: string; functional_unit: string; aggregated_impacts?: { climate_change_gwp100?: number; climate_change?: number } }) => ({
           name: p.product_name,
           functionalUnit: p.functional_unit,
-          climateImpact: p.aggregated_impacts?.climate_change || 0,
+          climateImpact: p.aggregated_impacts?.climate_change_gwp100 || p.aggregated_impacts?.climate_change || 0,
         }));
         data.dataAvailability.hasProducts = true;
         console.log('[Data] Products loaded:', data.products.length);
@@ -445,6 +636,34 @@ async function aggregateReportData(
       }
     } catch (error) {
       console.error('[Data] Exception fetching products:', error);
+    }
+  }
+
+  // Populate standards compliance status
+  if (sections.includes('methodology') || true) {
+    data.standards = [];
+
+    // Check if we have emissions data (needed for GHG Protocol, CSRD)
+    const hasScope123 = data.dataAvailability.hasEmissions;
+    const hasProducts = data.dataAvailability.hasProducts;
+    const hasFacilities = data.dataAvailability.hasFacilities;
+
+    // Evaluate each standard based on available data
+    if (hasScope123) {
+      data.standards.push({ code: 'ghg-protocol', name: 'GHG Protocol Corporate Standard', status: 'Aligned', detail: 'Scope 1, 2 & 3 emissions reported' });
+      data.standards.push({ code: 'csrd', name: 'CSRD (ESRS E1)', status: 'Partial', detail: hasProducts ? 'GHG emissions and product footprints reported' : 'GHG emissions reported; product footprints pending' });
+    } else {
+      data.standards.push({ code: 'ghg-protocol', name: 'GHG Protocol Corporate Standard', status: 'In Progress', detail: 'Emissions data collection underway' });
+      data.standards.push({ code: 'csrd', name: 'CSRD (ESRS E1)', status: 'In Progress', detail: 'Data collection in progress' });
+    }
+
+    if (hasProducts) {
+      data.standards.push({ code: 'iso-14067', name: 'ISO 14067 Carbon Footprint of Products', status: 'Aligned', detail: `${data.products.length} product LCAs completed` });
+      data.standards.push({ code: 'iso-14044', name: 'ISO 14044 Life Cycle Assessment', status: 'Aligned', detail: 'LCA methodology applied to product assessments' });
+    }
+
+    if (hasFacilities) {
+      data.standards.push({ code: 'iso-14064', name: 'ISO 14064-1 GHG Inventories', status: hasScope123 ? 'Aligned' : 'Partial', detail: `${data.facilities.length} facilities reporting` });
     }
   }
 

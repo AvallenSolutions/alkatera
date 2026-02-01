@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useOrganization } from '@/lib/organizationContext';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { useCommunityImpactScore } from '@/hooks/data/useCommunityImpactScore';
 
 function PageSkeleton() {
@@ -379,6 +380,14 @@ function QuickActionCard({
 }
 
 export default function CommunityImpactPage() {
+  return (
+    <FeatureGate feature="community_charitable_giving">
+      <CommunityImpactPageContent />
+    </FeatureGate>
+  );
+}
+
+function CommunityImpactPageContent() {
   const { currentOrganization } = useOrganization();
   const [activeTab, setActiveTab] = useState('overview');
   const [isRecalculating, setIsRecalculating] = useState(false);

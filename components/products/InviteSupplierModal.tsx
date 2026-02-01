@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Mail, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Mail, CheckCircle2, AlertCircle, Lock } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { useSupplierLimit } from "@/hooks/useSubscription";
 
 interface InviteSupplierModalProps {
   open: boolean;
@@ -41,6 +42,8 @@ export function InviteSupplierModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { currentCount, maxCount, isUnlimited, checkLimit } = useSupplierLimit();
+  const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount;
 
   const handleClose = () => {
     setSupplierEmail("");
@@ -72,6 +75,13 @@ export function InviteSupplierModal({
     setIsSubmitting(true);
 
     try {
+      // Server-side limit check before inviting
+      const limitResult = await checkLimit();
+      if (!limitResult.allowed) {
+        setError(limitResult.reason || 'Supplier limit reached. Please upgrade your plan.');
+        setIsSubmitting(false);
+        return;
+      }
       const supabase = getSupabaseBrowserClient();
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -131,6 +141,19 @@ export function InviteSupplierModal({
             <strong>{materialName}</strong>
           </DialogDescription>
         </DialogHeader>
+
+        {atLimit && (
+          <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <Lock className="h-5 w-5 text-destructive shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-destructive">Supplier limit reached</p>
+              <p className="text-xs text-muted-foreground">
+                You&apos;ve used {currentCount} of {maxCount} suppliers on your current plan.{" "}
+                <a href="/dashboard/settings" className="underline text-primary">Upgrade</a> to add more.
+              </p>
+            </div>
+          </div>
+        )}
 
         {success ? (
           <div className="py-8 flex flex-col items-center justify-center gap-4">
@@ -227,7 +250,7 @@ export function InviteSupplierModal({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || atLimit}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

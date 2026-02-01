@@ -4,6 +4,9 @@ import {
   checkLCALimit,
   checkReportLimit,
   checkFeatureAccess,
+  checkFacilityLimit,
+  checkSupplierLimit,
+  checkTeamMemberLimit,
 } from '@/lib/subscription-limits';
 
 /**
@@ -111,6 +114,54 @@ export async function enforceReportLimit(
     );
   }
 
+  return null;
+}
+
+/**
+ * Enforce facility creation limit
+ */
+export async function enforceFacilityLimit(
+  organizationId: string
+): Promise<NextResponse | null> {
+  const check = await checkFacilityLimit(organizationId);
+  if (!check.allowed) {
+    return NextResponse.json(
+      { error: 'Facility limit reached', message: check.reason, limit: { current: check.current, max: check.max, tier: check.tier }, upgrade_required: true },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
+/**
+ * Enforce supplier creation limit
+ */
+export async function enforceSupplierLimit(
+  organizationId: string
+): Promise<NextResponse | null> {
+  const check = await checkSupplierLimit(organizationId);
+  if (!check.allowed) {
+    return NextResponse.json(
+      { error: 'Supplier limit reached', message: check.reason, limit: { current: check.current, max: check.max, tier: check.tier }, upgrade_required: true },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
+/**
+ * Enforce team member limit
+ */
+export async function enforceTeamMemberLimit(
+  organizationId: string
+): Promise<NextResponse | null> {
+  const check = await checkTeamMemberLimit(organizationId);
+  if (!check.allowed) {
+    return NextResponse.json(
+      { error: 'Team member limit reached', message: check.reason, limit: { current: check.current, max: check.max, tier: check.tier }, upgrade_required: true },
+      { status: 403 }
+    );
+  }
   return null;
 }
 

@@ -382,3 +382,189 @@ export interface CreatePcfPayload {
 
 /** @deprecated Use CreatePcfPayload instead */
 export type CreateLcaPayload = CreatePcfPayload;
+
+// ============================================================================
+// ISO 14044 Compliance Types
+// ============================================================================
+
+/**
+ * Impact categories tracked across the platform
+ */
+export type ImpactCategoryCode = 'climate' | 'water' | 'land' | 'waste' | 'terrestrial_ecotoxicity' | 'freshwater_eutrophication' | 'terrestrial_acidification' | 'fossil_resource_scarcity';
+
+/**
+ * Goal & Scope Definition enhancements (ISO 14044 Section 4.2)
+ */
+export interface GoalAndScopeEnhancements {
+  intended_application: string;
+  reasons_for_study: string;
+  intended_audience: string[];
+  is_comparative_assertion: boolean;
+  assumptions_limitations: string[];
+  data_quality_requirements: DataQualityRequirements;
+  critical_review_type: CriticalReviewType;
+  critical_review_justification?: string;
+}
+
+export interface DataQualityRequirements {
+  temporal_coverage: string;
+  geographic_coverage: string;
+  technological_coverage: string;
+  precision: 'high' | 'medium' | 'low';
+  completeness: number;
+}
+
+export type CriticalReviewType = 'none' | 'internal' | 'external_expert' | 'external_panel';
+
+/**
+ * Contribution Analysis (ISO 14044 Section 4.5.2)
+ */
+export interface ContributionAnalysis {
+  impact_category: ImpactCategoryCode;
+  total_impact: number;
+  unit: string;
+  contributions: MaterialContribution[];
+  significant_issues: string[];
+}
+
+export interface MaterialContribution {
+  material: string;
+  material_type: string;
+  stage: string;
+  absolute_value: number;
+  percentage_contribution: number;
+  is_significant: boolean;
+  is_dominant: boolean;
+}
+
+/**
+ * Sensitivity Analysis (ISO 14044 Section 4.5.3)
+ */
+export interface SensitivityAnalysis {
+  parameter: string;
+  material_name?: string;
+  baseline_result: number;
+  variation_range: { min: number; max: number };
+  result_range: { min: number; max: number };
+  sensitivity_ratio: number;
+  is_highly_sensitive: boolean;
+}
+
+/**
+ * Completeness Check (ISO 14044 Section 4.5.3)
+ */
+export interface CompletenessCheck {
+  overall_score: number;
+  stages: {
+    stage: string;
+    has_data: boolean;
+    data_coverage_pct: number;
+    missing_data_flags: string[];
+  }[];
+}
+
+/**
+ * Consistency Check (ISO 14044 Section 4.5.3)
+ */
+export interface ConsistencyCheck {
+  methodology_consistent: boolean;
+  temporal_consistency: {
+    reference_year: number;
+    data_years: { material: string; year: number | null }[];
+    issues: string[];
+  };
+  geographic_consistency: {
+    primary_region: string;
+    material_regions: { material: string; region: string }[];
+    issues: string[];
+  };
+  issues: string[];
+}
+
+/**
+ * Full Life Cycle Interpretation result (ISO 14044 Section 4.5)
+ */
+export interface LcaInterpretationResult {
+  id: string;
+  product_carbon_footprint_id: string;
+  organization_id: string;
+
+  contribution_analysis: Record<ImpactCategoryCode, ContributionAnalysis>;
+  significant_issues: string[];
+
+  completeness_score: number;
+  missing_data_flags: Record<string, string[]>;
+  data_coverage_by_stage: Record<string, number>;
+
+  sensitivity_results: SensitivityAnalysis[];
+  highly_sensitive_parameters: string[];
+
+  consistency_issues: string[];
+  methodology_consistent: boolean;
+  temporal_consistency: Record<string, any>;
+  geographic_consistency: Record<string, any>;
+
+  key_findings: string[];
+  limitations: string[];
+  recommendations: string[];
+  uncertainty_statement: string;
+
+  mass_balance_input_kg: number;
+  mass_balance_output_kg: number;
+  mass_balance_variance_pct: number;
+  mass_balance_valid: boolean;
+
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Critical Review (ISO 14044 Section 6)
+ */
+export type ReviewStatus = 'pending' | 'in_progress' | 'revision_required' | 'approved' | 'published';
+
+export interface CriticalReview {
+  id: string;
+  product_carbon_footprint_id: string;
+  organization_id: string;
+  review_type: CriticalReviewType;
+  status: ReviewStatus;
+  reviewers: CriticalReviewer[];
+  review_start_date: string | null;
+  review_end_date: string | null;
+  reviewer_statement: string | null;
+  is_approved: boolean;
+  comments?: ReviewComment[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CriticalReviewer {
+  id: string;
+  review_id: string;
+  name: string;
+  email: string;
+  organisation: string;
+  qualifications: string[];
+  reviewer_type: 'internal' | 'external_expert' | 'panel_chair' | 'panel_member';
+  independence_declared: boolean;
+  conflict_of_interest_statement?: string;
+}
+
+export interface ReviewComment {
+  id: string;
+  review_id: string;
+  reviewer_id: string | null;
+  section: string;
+  comment: string;
+  severity: 'minor' | 'major' | 'critical';
+  status: 'open' | 'addressed' | 'rejected';
+  response: string | null;
+  responded_at: string | null;
+  created_at: string;
+}
+
+/**
+ * PCF status including review workflow states
+ */
+export type PcfStatus = 'draft' | 'pending' | 'completed' | 'failed' | 'ready_for_review' | 'under_review' | 'revision_required' | 'approved' | 'published';

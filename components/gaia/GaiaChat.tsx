@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import {
   getConversations,
   getArchivedConversations,
@@ -146,8 +147,13 @@ interface RosaChatProps {
 export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   const { currentOrganization } = useOrganization();
   const { user } = useAuth();
+  const { hasFeature } = useSubscription();
   const router = useRouter();
   const pathname = usePathname();
+
+  // Determine Rosa AI query limit based on tier features
+  const isRosaUnlimited = hasFeature('rosa_ai_unlimited');
+  const rosaMaxQueries = isRosaUnlimited ? null : hasFeature('rosa_ai_100') ? 100 : 25;
   const [conversations, setConversations] = useState<RosaConversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<RosaConversationWithMessages | null>(null);
   const [input, setInput] = useState('');
@@ -544,7 +550,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   return (
     <div className={cn(
       'flex bg-background',
-      fullPage ? 'h-[calc(100vh-4rem)]' : 'h-[600px] rounded-lg border'
+      fullPage ? 'h-full' : 'h-[600px] rounded-lg border'
     )}>
       {/* Sidebar - Conversation History */}
       {showSidebar && (
@@ -557,6 +563,13 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
               <Plus className="h-4 w-4 mr-2" />
               New Chat
             </Button>
+
+            {/* Query usage indicator */}
+            {!isRosaUnlimited && rosaMaxQueries && (
+              <p className="text-xs text-muted-foreground text-center">
+                {rosaMaxQueries} queries/month on your plan
+              </p>
+            )}
 
             {/* Search input */}
             <div className="relative">
@@ -770,7 +783,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
           <div>
             <h2 className="font-semibold">Rosa</h2>
             <p className="text-xs text-muted-foreground">
-              Your sustainability guide
+              Your sustainability companion
             </p>
           </div>
 
@@ -813,34 +826,157 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4 max-w-3xl mx-auto">
-            {/* Welcome Message */}
+        <div className={cn(
+          "flex-1 p-4",
+          activeConversation && activeConversation.messages.length > 0 ? "overflow-y-auto" : "overflow-hidden"
+        )}>
+          <div className={cn(
+            "max-w-3xl mx-auto",
+            activeConversation && activeConversation.messages.length > 0 ? "space-y-4" : "h-full"
+          )}>
+            {/* Welcome Experience */}
             {(!activeConversation || activeConversation.messages.length === 0) && (
-              <div className="text-center py-8">
-                <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                  <Leaf className="h-8 w-8 text-white" />
+              <div className="flex flex-col items-center justify-center h-full relative overflow-hidden">
+
+                {/* Organic background shapes — soft botanical silhouettes */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                  {/* Floating seed particles */}
+                  <div className="absolute top-[10%] left-[15%] w-1.5 h-1.5 rounded-full bg-emerald-500/20 animate-[float_6s_ease-in-out_infinite]" />
+                  <div className="absolute top-[25%] right-[20%] w-1 h-1 rounded-full bg-teal-500/25 animate-[float_8s_ease-in-out_1s_infinite]" />
+                  <div className="absolute top-[60%] left-[10%] w-2 h-2 rounded-full bg-emerald-400/15 animate-[float_7s_ease-in-out_2s_infinite]" />
+                  <div className="absolute top-[40%] right-[12%] w-1.5 h-1.5 rounded-full bg-green-500/20 animate-[float_9s_ease-in-out_0.5s_infinite]" />
+                  <div className="absolute top-[75%] right-[30%] w-1 h-1 rounded-full bg-teal-400/20 animate-[float_5s_ease-in-out_3s_infinite]" />
+
+                  {/* Large organic gradient blobs */}
+                  <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-emerald-500/[0.03] blur-3xl" />
+                  <div className="absolute -bottom-32 -left-20 w-80 h-80 rounded-full bg-teal-500/[0.04] blur-3xl" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">
-                  Hello! I&apos;m Rosa
-                </h3>
-                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  I&apos;m your sustainability guide. I can help you navigate the platform,
-                  enter data, understand your environmental impacts, and answer
-                  questions about your sustainability metrics.
+
+                {/* Growing stem illustration */}
+                <div className="relative mb-1">
+                  <svg width="90" height="105" viewBox="0 0 120 140" fill="none" className="mx-auto">
+                    {/* Main stem — grows upward */}
+                    <path
+                      d="M60 130 C60 100, 58 80, 60 50"
+                      stroke="url(#stemGrad)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      className="animate-[grow_2s_ease-out_forwards]"
+                      style={{ strokeDasharray: 80, strokeDashoffset: 0 }}
+                    />
+                    {/* Left leaf */}
+                    <path
+                      d="M58 85 C45 75, 28 78, 22 65 C28 62, 42 60, 56 80"
+                      fill="url(#leafGrad1)"
+                      className="opacity-80 animate-[sway_4s_ease-in-out_infinite]"
+                      style={{ transformOrigin: '58px 85px' }}
+                    />
+                    {/* Right leaf */}
+                    <path
+                      d="M62 70 C75 60, 92 63, 98 50 C92 47, 78 45, 64 65"
+                      fill="url(#leafGrad2)"
+                      className="opacity-80 animate-[sway_5s_ease-in-out_0.5s_infinite_reverse]"
+                      style={{ transformOrigin: '62px 70px' }}
+                    />
+                    {/* Top unfurling leaf / bud */}
+                    <path
+                      d="M60 50 C52 38, 42 30, 35 18 C42 20, 52 28, 58 42"
+                      fill="url(#leafGrad3)"
+                      className="opacity-90 animate-[sway_6s_ease-in-out_1s_infinite]"
+                      style={{ transformOrigin: '60px 50px' }}
+                    />
+                    <path
+                      d="M60 50 C68 38, 78 30, 85 18 C78 20, 68 28, 62 42"
+                      fill="url(#leafGrad3)"
+                      className="opacity-70 animate-[sway_6s_ease-in-out_1.5s_infinite_reverse]"
+                      style={{ transformOrigin: '60px 50px' }}
+                    />
+                    {/* Small budding leaves */}
+                    <circle cx="60" cy="48" r="4" fill="url(#budGrad)" className="animate-pulse" />
+
+                    <defs>
+                      <linearGradient id="stemGrad" x1="60" y1="130" x2="60" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#065f46" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </linearGradient>
+                      <linearGradient id="leafGrad1" x1="22" y1="85" x2="58" y2="65" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#059669" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.9" />
+                      </linearGradient>
+                      <linearGradient id="leafGrad2" x1="98" y1="70" x2="62" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#0d9488" stopOpacity="0.6" />
+                        <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.9" />
+                      </linearGradient>
+                      <linearGradient id="leafGrad3" x1="35" y1="18" x2="60" y2="50" gradientUnits="userSpaceOnUse">
+                        <stop offset="0%" stopColor="#34d399" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.8" />
+                      </linearGradient>
+                      <radialGradient id="budGrad" cx="0.5" cy="0.5" r="0.5">
+                        <stop offset="0%" stopColor="#6ee7b7" />
+                        <stop offset="100%" stopColor="#10b981" />
+                      </radialGradient>
+                    </defs>
+                  </svg>
+                </div>
+
+                {/* Name and greeting */}
+                <h2 className="text-2xl font-bold mb-1 tracking-tight">
+                  <span className="text-foreground">Rosa</span>
+                </h2>
+                <p className="text-sm text-muted-foreground/80 mb-0.5">
+                  Your sustainability companion
+                </p>
+                <p className="text-xs text-muted-foreground/60 mb-6 max-w-sm text-center">
+                  I can explore your data, uncover insights, and help you
+                  reduce your environmental impact. Where shall we start?
                 </p>
 
-                <div className="flex flex-wrap justify-center gap-2">
-                  {ROSA_SUGGESTED_QUESTIONS.slice(0, 4).map((sq, i) => (
-                    <Button
+                {/* Suggestion cards — 3 columns, organic rounded shapes */}
+                <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  <button
+                    onClick={() => handleSuggestionClick('What should I focus on first?')}
+                    className="group relative rounded-2xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/[0.06] to-transparent p-4 text-left transition-all hover:border-emerald-500/30 hover:from-emerald-500/[0.12] hover:shadow-lg hover:shadow-emerald-500/[0.05] hover:-translate-y-0.5"
+                  >
+                    <Leaf className="h-5 w-5 text-emerald-500/70 mb-2 group-hover:text-emerald-400 transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-emerald-400 transition-colors">Where do I start?</p>
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed">Find out what to focus on first to make the biggest difference</p>
+                  </button>
+
+                  <button
+                    onClick={() => handleSuggestionClick('What is my total carbon footprint?')}
+                    className="group relative rounded-2xl border border-teal-500/10 bg-gradient-to-b from-teal-500/[0.06] to-transparent p-4 text-left transition-all hover:border-teal-500/30 hover:from-teal-500/[0.12] hover:shadow-lg hover:shadow-teal-500/[0.05] hover:-translate-y-0.5"
+                  >
+                    <BarChart3 className="h-5 w-5 text-teal-500/70 mb-2 group-hover:text-teal-400 transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-teal-400 transition-colors">My footprint</p>
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed">Understand your total carbon footprint and where it comes from</p>
+                  </button>
+
+                  <button
+                    onClick={() => handleSuggestionClick('How can I reduce my carbon footprint?')}
+                    className="group relative rounded-2xl border border-green-500/10 bg-gradient-to-b from-green-500/[0.06] to-transparent p-4 text-left transition-all hover:border-green-500/30 hover:from-green-500/[0.12] hover:shadow-lg hover:shadow-green-500/[0.05] hover:-translate-y-0.5"
+                  >
+                    <ArrowRight className="h-5 w-5 text-green-500/70 mb-2 rotate-[-45deg] group-hover:text-green-400 transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-green-400 transition-colors">Take action</p>
+                    <p className="text-xs text-muted-foreground/70 leading-relaxed">Get practical steps to reduce your environmental impact</p>
+                  </button>
+                </div>
+
+                {/* More questions — organic pill buttons */}
+                <div className="flex flex-wrap justify-center gap-2 max-w-xl">
+                  {[
+                    'Show me my emissions breakdown by scope',
+                    'Which products have the highest impact?',
+                    'How can I improve my Vitality Score?',
+                    'Help me add my first product',
+                    'Which facilities use the most water?',
+                  ].map((q, i) => (
+                    <button
                       key={i}
-                      variant="outline"
-                      size="sm"
-                      className="text-xs"
-                      onClick={() => handleSuggestionClick(sq.question)}
+                      onClick={() => handleSuggestionClick(q)}
+                      className="text-xs px-4 py-2 rounded-full bg-muted/40 text-muted-foreground/70 hover:bg-emerald-500/10 hover:text-emerald-400 border border-transparent hover:border-emerald-500/20 transition-all"
                     >
-                      {sq.question}
-                    </Button>
+                      {q}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -1081,29 +1217,32 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
 
             <div ref={messagesEndRef} />
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Input */}
-        <div className="p-4 border-t">
+        <div className="p-4 border-t bg-background/80 backdrop-blur-sm">
           <div className="flex gap-2 max-w-3xl mx-auto">
-            <Input
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask Rosa about your sustainability data..."
-              disabled={isSending || isStreaming}
-              className="flex-1"
-            />
+            <div className="flex-1 relative">
+              <Input
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Ask Rosa anything..."
+                disabled={isSending || isStreaming}
+                className="pr-4 rounded-xl border-border/60 focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-colors"
+              />
+            </div>
             <Button
               onClick={handleSend}
               disabled={!input.trim() || isSending || isStreaming}
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+              size="icon"
+              className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-shadow h-10 w-10"
             >
               {isSending || isStreaming ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

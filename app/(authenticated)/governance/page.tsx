@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -75,6 +76,14 @@ function QuickActionCard({
 }
 
 export default function GovernancePage() {
+  return (
+    <FeatureGate feature="governance_ethics">
+      <GovernancePageContent />
+    </FeatureGate>
+  );
+}
+
+function GovernancePageContent() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isRecalculating, setIsRecalculating] = useState(false);
 

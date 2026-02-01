@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,14 @@ interface VolunteerActivity {
 }
 
 export default function VolunteeringPage() {
+  return (
+    <FeatureGate feature="community_volunteering">
+      <VolunteeringPageContent />
+    </FeatureGate>
+  );
+}
+
+function VolunteeringPageContent() {
   const { currentOrganization } = useOrganization();
   const [activities, setActivities] = useState<VolunteerActivity[]>([]);
   const [loading, setLoading] = useState(true);

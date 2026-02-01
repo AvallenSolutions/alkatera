@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,14 @@ interface LocalImpactData {
 }
 
 export default function LocalImpactPage() {
+  return (
+    <FeatureGate feature="community_local_impact">
+      <LocalImpactPageContent />
+    </FeatureGate>
+  );
+}
+
+function LocalImpactPageContent() {
   const { currentOrganization } = useOrganization();
   const [data, setData] = useState<LocalImpactData[]>([]);
   const [loading, setLoading] = useState(true);

@@ -24,6 +24,8 @@ import {
 import { useOrganization } from '@/lib/organizationContext';
 import { GapAnalysisDashboard } from '@/components/certifications/GapAnalysisDashboard';
 import { toast } from 'sonner';
+import { FeatureGate } from '@/components/subscription/FeatureGate';
+import type { FeatureCode } from '@/hooks/useSubscription';
 
 interface Framework {
   id: string;
@@ -128,7 +130,35 @@ const categoryColors: Record<string, string> = {
   'Reporting': 'bg-amber-500',
 };
 
+// Maps framework codes to their required feature codes (Canopy-only frameworks)
+const canopyFrameworkFeatures: Record<string, string> = {
+  csrd: 'csrd_compliance',
+  gri: 'gri_standards',
+  iso14001: 'iso_14001',
+  iso50001: 'iso_50001',
+  sbti: 'sbti_targets',
+};
+
 export default function CertificationDetailsPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { currentOrganization } = useOrganization();
+  const code = params.code as string;
+  const requiredFeature = canopyFrameworkFeatures[code?.toLowerCase()] as FeatureCode | undefined;
+
+  // Gate Canopy-only frameworks
+  if (requiredFeature) {
+    return (
+      <FeatureGate feature={requiredFeature}>
+        <CertificationDetailsContent />
+      </FeatureGate>
+    );
+  }
+
+  return <CertificationDetailsContent />;
+}
+
+function CertificationDetailsContent() {
   const params = useParams();
   const router = useRouter();
   const { currentOrganization } = useOrganization();
