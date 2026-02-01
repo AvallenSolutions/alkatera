@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, X, Image as ImageIcon } from 'lucide-react';
-import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
+import type { ReportConfig } from '@/types/report-builder';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 interface BrandingPanelProps {

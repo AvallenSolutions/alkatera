@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InfoIcon } from 'lucide-react';
-import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
+import type { ReportConfig } from '@/types/report-builder';
 
 interface DataSelectionPanelProps {
   config: ReportConfig;

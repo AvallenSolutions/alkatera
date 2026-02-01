@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
-import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
+import type { ReportConfig, ReportDefaults } from '@/types/report-builder';
 
 interface GenerateReportResponse {
   success: boolean;
@@ -15,32 +15,79 @@ export function useReportBuilder() {
   const supabase = getSupabaseBrowserClient();
   const { currentOrganization } = useOrganization();
 
+  /**
+   * Load saved report defaults from org context
+   */
+  const loadDefaults = (org: any): Partial<ReportConfig> | null => {
+    if (!org?.report_defaults) return null;
+    const defaults = org.report_defaults as ReportDefaults;
+    const partial: Partial<ReportConfig> = {};
+
+    if (defaults.branding) {
+      partial.branding = {
+        logo: defaults.branding.logo ?? null,
+        primaryColor: defaults.branding.primaryColor ?? '#2563eb',
+        secondaryColor: defaults.branding.secondaryColor ?? '#10b981',
+      };
+    }
+    if (defaults.audience) {
+      partial.audience = defaults.audience;
+    }
+    if (defaults.standards && defaults.standards.length > 0) {
+      partial.standards = defaults.standards;
+    }
+
+    return Object.keys(partial).length > 0 ? partial : null;
+  };
+
+  /**
+   * Save branding, audience, standards as org defaults
+   */
+  const saveDefaults = async (orgId: string, config: ReportConfig): Promise<boolean> => {
+    try {
+      const defaults: ReportDefaults = {
+        branding: config.branding,
+        audience: config.audience,
+        standards: config.standards,
+      };
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({ report_defaults: defaults })
+        .eq('id', orgId);
+
+      if (error) {
+        console.error('Failed to save defaults:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Save defaults error:', error);
+      return false;
+    }
+  };
+
+  /**
+   * Generate report — creates DB record, calls edge function, returns reportId immediately
+   * for progress tracking. Edge function runs async.
+   */
   const generateReport = async (config: ReportConfig): Promise<GenerateReportResponse> => {
     setLoading(true);
 
     try {
-      // 1. Get current user and organization
       const { data: { user }, error: userError } = await supabase.auth.getUser();
 
       if (userError || !user) {
         throw new Error('User not authenticated');
       }
 
-      // Use organization from context
       if (!currentOrganization) {
         throw new Error('No active organization found');
       }
 
       const organizationId = currentOrganization.id;
 
-      // 2. Create report record in database
-      console.log('🔵 Creating report record with:', {
-        organization_id: organizationId,
-        created_by: user.id,
-        report_name: config.reportName,
-        report_year: config.reportYear,
-      });
-
+      // Create report record
       const { data: reportRecord, error: insertError } = await supabase
         .from('generated_reports')
         .insert({
@@ -66,7 +113,7 @@ export function useReportBuilder() {
         .single();
 
       if (insertError) {
-        console.error('❌ Insert error details:', insertError);
+        console.error('Insert error:', insertError);
         throw new Error(`Failed to create report record: ${insertError.message}`);
       }
 
@@ -74,47 +121,38 @@ export function useReportBuilder() {
         throw new Error('Failed to create report record: No data returned');
       }
 
-      console.log('✅ Report record created:', reportRecord.id);
-
-      // 3. Call edge function using supabase.functions.invoke()
-      console.log('🔵 Calling edge function with report_config_id:', reportRecord.id);
-
-      const { data, error: functionError } = await supabase.functions.invoke(
-        'generate-sustainability-report',
-        {
-          body: {
-            report_config_id: reportRecord.id,
-          },
+      // Return reportId immediately for progress tracking
+      // Edge function runs async — progress updates via Realtime
+      supabase.functions.invoke('generate-sustainability-report', {
+        body: { report_config_id: reportRecord.id },
+      }).then(async ({ data, error: functionError }) => {
+        if (functionError) {
+          console.error('Edge function error:', functionError);
+          await supabase
+            .from('generated_reports')
+            .update({
+              status: 'failed',
+              error_message: functionError.message || 'Unknown error',
+            })
+            .eq('id', reportRecord.id);
         }
-      );
-
-      console.log('📡 Edge function response:', { data, error: functionError });
-
-      if (functionError) {
-        console.error('❌ Edge function error:', functionError);
-
-        // Update report status to failed
+      }).catch(async (err) => {
+        console.error('Edge function call failed:', err);
         await supabase
           .from('generated_reports')
           .update({
             status: 'failed',
-            error_message: functionError.message || 'Unknown error',
+            error_message: err?.message || 'Edge function invocation failed',
           })
           .eq('id', reportRecord.id);
+      });
 
-        throw new Error(`Edge function failed: ${functionError.message}`);
-      }
-
-      const result = data;
-
-      if (!result.success) {
-        throw new Error(result.error || 'Report generation failed');
-      }
+      // Auto-save defaults after generation
+      saveDefaults(organizationId, config).catch(() => {});
 
       return {
         success: true,
-        report_id: result.report_id,
-        document_url: result.document_url,
+        report_id: reportRecord.id,
       };
     } catch (error) {
       console.error('Report generation error:', error);
@@ -129,6 +167,8 @@ export function useReportBuilder() {
 
   return {
     generateReport,
+    saveDefaults,
+    loadDefaults,
     loading,
   };
 }

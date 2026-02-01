@@ -29,7 +29,7 @@ import {
   Search,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
+import type { ReportConfig } from '@/types/report-builder';
 import { useToast } from '@/hooks/use-toast';
 
 interface TemplateLibraryProps {

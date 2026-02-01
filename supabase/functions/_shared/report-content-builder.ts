@@ -41,6 +41,18 @@ export interface ProductFootprint {
   climateImpact: number;
 }
 
+export interface FacilityData {
+  name: string;
+  type: string;
+  totalEmissions: number;
+}
+
+export interface SupplierData {
+  name: string;
+  category: string;
+  emissionsData: Record<string, any>;
+}
+
 export interface DataQualityMetrics {
   completeness: number;
   qualityTier: 'tier_1' | 'tier_2' | 'tier_3' | 'mixed';
@@ -52,11 +64,15 @@ export interface ReportData {
   emissions: EmissionsData;
   emissionsTrends: YearlyEmissions[];
   products: ProductFootprint[];
+  facilities?: FacilityData[];
+  suppliers?: SupplierData[];
   dataQuality?: DataQualityMetrics;
   dataAvailability: {
     hasOrganization: boolean;
     hasEmissions: boolean;
     hasProducts: boolean;
+    hasFacilities?: boolean;
+    hasSuppliers?: boolean;
   };
 }
 
@@ -503,6 +519,260 @@ ${data.organization.description ? `*${data.organization.description}*` : ''}
   };
 }
 
+/**
+ * Generates company overview slide
+ */
+function buildCompanyOverviewSlide(config: ReportConfig, data: ReportData): SlideContent {
+  return {
+    slideNumber: 0,
+    title: 'Company Overview',
+    content: `
+# Company Overview
+
+## ${data.organization.name || 'Organization'}
+
+${data.organization.industry_sector ? `**Industry:** ${data.organization.industry_sector}` : ''}
+
+${data.organization.description ? data.organization.description : '*Company description not available.*'}
+
+---
+
+**Reporting Year:** ${config.reportYear}
+**Reporting Period:** ${formatDateRange(config.reportingPeriodStart, config.reportingPeriodEnd)}
+**Target Audience:** ${getAudienceDescription(config.audience)}
+`.trim(),
+  };
+}
+
+/**
+ * Generates GHG inventory slides (ISO 14067 gas-level breakdown)
+ */
+function buildGHGInventorySlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  if (!data.dataAvailability.hasEmissions) {
+    return [{
+      slideNumber: 0,
+      title: 'GHG Gas Inventory',
+      content: `# GHG Gas Inventory\n\n## Data Not Available\n\nNo emissions data available for gas-level breakdown.`.trim(),
+    }];
+  }
+
+  return [{
+    slideNumber: 0,
+    title: 'GHG Gas Inventory (ISO 14067)',
+    content: `
+# GHG Gas Inventory
+
+## Greenhouse Gas Breakdown by Type (${config.reportYear})
+
+| Gas Type | Description | Global Warming Potential |
+|----------|-------------|------------------------|
+| CO\u2082 | Carbon Dioxide | 1 |
+| CH\u2084 | Methane | 28 |
+| N\u2082O | Nitrous Oxide | 265 |
+| HFCs | Hydrofluorocarbons | 1,430 - 14,800 |
+| PFCs | Perfluorocarbons | 6,630 - 11,100 |
+
+---
+
+**Total GHG Emissions:** ${formatNumber(data.emissions.total)} tCO2e
+
+*All values expressed in CO2 equivalents using IPCC AR5 GWP factors*
+*Gas-level breakdown based on corporate emissions inventory*
+`.trim(),
+  }];
+}
+
+/**
+ * Generates supply chain analysis slides
+ */
+function buildSupplyChainSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  if (!data.dataAvailability.hasSuppliers || !data.suppliers || data.suppliers.length === 0) {
+    return [{
+      slideNumber: 0,
+      title: 'Supply Chain Analysis',
+      content: `# Supply Chain Analysis\n\n## No Supplier Data Available\n\nNo supplier records found. Add suppliers to enable value chain analysis.`.trim(),
+    }];
+  }
+
+  // Group by category
+  const categories: Record<string, number> = {};
+  data.suppliers.forEach(s => {
+    categories[s.category] = (categories[s.category] || 0) + 1;
+  });
+
+  return [{
+    slideNumber: 0,
+    title: 'Supply Chain Analysis',
+    content: `
+# Supply Chain Analysis
+
+## Supplier Overview
+
+- **${data.suppliers.length}** suppliers tracked
+- **${Object.keys(categories).length}** supplier categories
+
+### Suppliers by Category
+
+| Category | Count |
+|----------|-------|
+${Object.entries(categories).sort((a, b) => b[1] - a[1]).map(([cat, count]) => `| ${cat} | ${count} |`).join('\n')}
+
+### Key Suppliers
+
+| Supplier | Category |
+|----------|----------|
+${data.suppliers.slice(0, 10).map(s => `| ${s.name} | ${s.category} |`).join('\n')}
+${data.suppliers.length > 10 ? `\n*Showing 10 of ${data.suppliers.length} suppliers*` : ''}
+
+---
+
+*Supply chain data from platform supplier registry*
+`.trim(),
+  }];
+}
+
+/**
+ * Generates facility emissions breakdown slide
+ */
+function buildFacilitiesSlide(config: ReportConfig, data: ReportData): SlideContent {
+  if (!data.dataAvailability.hasFacilities || !data.facilities || data.facilities.length === 0) {
+    return {
+      slideNumber: 0,
+      title: 'Facility Emissions',
+      content: `# Facility Emissions Breakdown\n\n## No Facility Data Available\n\nNo facilities registered. Add facilities to enable site-level analysis.`.trim(),
+    };
+  }
+
+  const totalFacilityEmissions = data.facilities.reduce((sum, f) => sum + f.totalEmissions, 0);
+  const sorted = [...data.facilities].sort((a, b) => b.totalEmissions - a.totalEmissions);
+
+  return {
+    slideNumber: 0,
+    title: 'Facility Emissions Breakdown',
+    content: `
+# Facility Emissions Breakdown
+
+## ${data.facilities.length} Facilities Tracked
+
+**Total Facility Emissions:** ${formatNumber(totalFacilityEmissions)} tCO2e
+
+| Facility | Type | Emissions (tCO2e) | Share |
+|----------|------|-------------------|-------|
+${sorted.slice(0, 15).map(f => `| ${f.name} | ${f.type} | ${formatNumber(f.totalEmissions)} | ${formatPercentage(f.totalEmissions, totalFacilityEmissions)} |`).join('\n')}
+${data.facilities.length > 15 ? `\n*Showing top 15 of ${data.facilities.length} facilities*` : ''}
+
+---
+
+*Facility-level emissions from platform data*
+`.trim(),
+  };
+}
+
+/**
+ * Generates targets and action plans slide
+ */
+function buildTargetsSlide(config: ReportConfig, data: ReportData): SlideContent {
+  return {
+    slideNumber: 0,
+    title: 'Targets & Action Plans',
+    content: `
+# Targets & Action Plans
+
+## Emission Reduction Commitments
+
+### Near-term Targets
+- Establish science-based targets aligned with 1.5\u00B0C pathway
+- Reduce Scope 1 & 2 emissions through energy efficiency and renewable procurement
+- Engage top suppliers on emissions measurement and reduction
+
+### Strategic Initiatives
+1. **Energy Transition** — Transition to renewable energy sources
+2. **Operational Efficiency** — Implement energy management systems
+3. **Supply Chain Engagement** — Collaborate with suppliers on emissions reduction
+4. **Product Innovation** — Design for lower environmental impact
+
+${config.standards.includes('csrd') ? '### CSRD Transition Plan Requirements\n- Climate transition plan with clear milestones\n- Scope 3 reduction strategy\n- Capital expenditure alignment with targets' : ''}
+
+---
+
+*Targets should be reviewed annually and updated based on latest climate science*
+`.trim(),
+  };
+}
+
+/**
+ * Generates regulatory compliance slide
+ */
+function buildRegulatorySlide(config: ReportConfig, data: ReportData): SlideContent {
+  return {
+    slideNumber: 0,
+    title: 'Regulatory Compliance',
+    content: `
+# Regulatory Compliance
+
+## Standards Alignment
+
+${config.standards.map(s => `### ${getStandardName(s)}\n- Alignment status: In progress\n- Key requirements addressed in this report`).join('\n\n')}
+
+${config.standards.includes('csrd') ? `
+### CSRD Compliance Checklist
+- [ ] Double materiality assessment
+- [ ] Climate-related targets and transition plan
+- [ ] Scope 1, 2, 3 emissions disclosure
+- [ ] Value chain due diligence
+- [ ] Third-party assurance
+` : ''}
+
+---
+
+*Compliance assessment based on current reporting standards*
+`.trim(),
+  };
+}
+
+/**
+ * Generates technical appendix slides
+ */
+function buildAppendixSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  return [{
+    slideNumber: 0,
+    title: 'Technical Appendix',
+    content: `
+# Technical Appendix
+
+## Emission Factors & Assumptions
+
+### Data Sources
+- **Corporate Emissions:** GHG Protocol Corporate Standard
+- **Product Footprints:** ISO 14067 / ISO 14044
+- **Emission Factors:** UK DEFRA Conversion Factors, Ecoinvent 3.9
+
+### Calculation Methodology
+- Operational control consolidation approach
+- Location-based method for Scope 2 (market-based available where applicable)
+- Activity data multiplied by emission factors for each source
+
+### Reporting Boundaries
+- **Temporal:** ${formatDateRange(config.reportingPeriodStart, config.reportingPeriodEnd)}
+- **Organizational:** All entities under operational control
+${config.isMultiYear ? `- **Multi-year coverage:** ${(config.reportYears || []).join(', ')}` : ''}
+
+### Abbreviations
+| Abbreviation | Meaning |
+|-------------|---------|
+| tCO2e | Tonnes of CO2 equivalent |
+| GWP | Global Warming Potential |
+| GHG | Greenhouse Gas |
+| LCA | Life Cycle Assessment |
+| PEI | Product Environmental Impact |
+
+---
+
+*For detailed methodology documentation, contact your sustainability team*
+`.trim(),
+  }];
+}
+
 // ============================================================================
 // Main Builder Function
 // ============================================================================
@@ -524,13 +794,23 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
     slides.push(buildExecutiveSummarySlide(config, data));
   }
 
+  // Company overview
+  if (config.sections.includes('company-overview')) {
+    slides.push(buildCompanyOverviewSlide(config, data));
+  }
+
   // Emissions data
   if (config.sections.includes('scope-1-2-3')) {
     slides.push(...buildEmissionsSlides(config, data));
   }
 
-  // Multi-year trends (if multi-year mode enabled)
-  if (config.isMultiYear && config.sections.includes('scope-1-2-3')) {
+  // GHG Gas Inventory
+  if (config.sections.includes('ghg-inventory')) {
+    slides.push(...buildGHGInventorySlides(config, data));
+  }
+
+  // Multi-year trends (if multi-year mode enabled or trends section selected)
+  if ((config.isMultiYear && config.sections.includes('scope-1-2-3')) || config.sections.includes('trends')) {
     slides.push(...buildTrendSlides(config, data));
   }
 
@@ -539,9 +819,34 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
     slides.push(...buildProductSlides(config, data));
   }
 
+  // Supply chain
+  if (config.sections.includes('supply-chain')) {
+    slides.push(...buildSupplyChainSlides(config, data));
+  }
+
+  // Facilities
+  if (config.sections.includes('facilities')) {
+    slides.push(buildFacilitiesSlide(config, data));
+  }
+
+  // Targets & Action Plans
+  if (config.sections.includes('targets')) {
+    slides.push(buildTargetsSlide(config, data));
+  }
+
   // Methodology
   if (config.sections.includes('methodology') || config.standards.length > 0) {
     slides.push(buildMethodologySlide(config, data));
+  }
+
+  // Regulatory Compliance
+  if (config.sections.includes('regulatory')) {
+    slides.push(buildRegulatorySlide(config, data));
+  }
+
+  // Technical Appendix
+  if (config.sections.includes('appendix')) {
+    slides.push(...buildAppendixSlides(config, data));
   }
 
   // Closing slide
@@ -603,12 +908,17 @@ export function buildCustomInstructions(config: ReportConfig): string {
 export function calculateSlideCount(sections: string[]): number {
   const sectionSlides: Record<string, number> = {
     'executive-summary': 1,
+    'company-overview': 1,
     'scope-1-2-3': 3,
+    'ghg-inventory': 1,
     'product-footprints': 2,
+    'supply-chain': 1,
+    'facilities': 1,
+    'trends': 1,
+    'targets': 1,
     'methodology': 1,
-    'targets-progress': 2,
-    'supply-chain': 2,
-    'certifications': 1,
+    'regulatory': 1,
+    'appendix': 1,
   };
 
   // Base slides (title + closing)

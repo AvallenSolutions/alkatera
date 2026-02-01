@@ -21,6 +21,7 @@ export interface Organization {
   address_lat?: number | null
   address_lng?: number | null
   product_type?: string | null
+  report_defaults?: Record<string, any> | null
 }
 
 interface OrganizationMember {
