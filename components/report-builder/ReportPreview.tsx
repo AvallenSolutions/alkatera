@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle2, FileText, Calendar, Users, Award, Palette } from 'lucide-react';
-import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
+import type { ReportConfig } from '@/types/report-builder';
 import { format } from 'date-fns';
 
 interface ReportPreviewProps {

@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CalendarIcon, TrendingUp, Info } from 'lucide-react';
 import { format } from 'date-fns';
-import { ReportConfig } from '@/app/(authenticated)/reports/builder/page';
+import type { ReportConfig } from '@/types/report-builder';
 
 interface BasicConfigFormProps {
   config: ReportConfig;
