@@ -60,6 +60,12 @@ Deno.serve(async (req: Request) => {
 
     console.log('[Auth] User authenticated:', user.id);
 
+    // Create a service role client for DB writes (bypasses RLS)
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
     // 2. Parse request
     const body = await req.json();
     report_config_id = body.report_config_id;
@@ -118,11 +124,11 @@ Deno.serve(async (req: Request) => {
       format: reportConfig.output_format,
     });
 
-    // 4. Update status to 'generating'
-    console.log('[Status] Updating status to generating...');
-    await supabaseClient
+    // 4. Update status to 'aggregating_data'
+    console.log('[Status] Updating status to aggregating_data...');
+    await serviceClient
       .from('generated_reports')
-      .update({ status: 'generating' })
+      .update({ status: 'aggregating_data' })
       .eq('id', report_config_id);
 
     // 5. Aggregate data with multi-year support
@@ -141,6 +147,12 @@ Deno.serve(async (req: Request) => {
       hasEmissions: !!aggregatedData.emissions?.total,
       productCount: aggregatedData.products?.length || 0,
     });
+
+    // 6. Update status to 'building_content'
+    await serviceClient
+      .from('generated_reports')
+      .update({ status: 'building_content' })
+      .eq('id', report_config_id);
 
     // 6. Build structured content (DETERMINISTIC - no LLM interpretation)
     console.log('[Content] Building structured report content...');
@@ -171,6 +183,12 @@ Deno.serve(async (req: Request) => {
       slideCount,
     });
 
+    // 7. Update status to 'generating_document'
+    await serviceClient
+      .from('generated_reports')
+      .update({ status: 'generating_document' })
+      .eq('id', report_config_id);
+
     // 7. Call SlideSpeak API
     const slideSpeakClient = createSlideSpeakClient();
 
@@ -180,17 +198,11 @@ Deno.serve(async (req: Request) => {
       // Return mock data for testing without SlideSpeak
       const mockDocumentUrl = 'https://example.com/mock-sustainability-report.pptx';
 
-      await supabaseClient
+      await serviceClient
         .from('generated_reports')
         .update({
           status: 'completed',
-          api_request_payload: JSON.stringify({
-            content: structuredContent,
-            customInstructions,
-            slideCount,
-          }),
           document_url: mockDocumentUrl,
-          data_snapshot: aggregatedData,
           generated_at: new Date().toISOString(),
         })
         .eq('id', report_config_id);
@@ -243,23 +255,19 @@ Deno.serve(async (req: Request) => {
 
     console.log('[SlideSpeak] Generation complete, download URL:', documentUrl);
 
-    // 8. Update report with success
-    await supabaseClient
+    // 8. Update report with success (using service role to bypass RLS)
+    const { error: updateError } = await serviceClient
       .from('generated_reports')
       .update({
         status: 'completed',
-        api_request_payload: JSON.stringify({
-          content: structuredContent,
-          customInstructions,
-          slideCount,
-          template: templateId,
-          taskId: slideSpeakResult.taskId,
-        }),
         document_url: documentUrl,
-        data_snapshot: aggregatedData,
         generated_at: new Date().toISOString(),
       })
       .eq('id', report_config_id);
+
+    if (updateError) {
+      console.error('[DB] Failed to update report status to completed:', updateError);
+    }
 
     return new Response(
       JSON.stringify({
@@ -277,22 +285,18 @@ Deno.serve(async (req: Request) => {
     // Try to update report status to failed
     if (report_config_id) {
       try {
-        const authHeader = req.headers.get('Authorization');
-        if (authHeader) {
-          const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-            { global: { headers: { Authorization: authHeader } } }
-          );
+        const errorServiceClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        );
 
-          await supabaseClient
-            .from('generated_reports')
-            .update({
-              status: 'failed',
-              error_message: (error as Error).message,
-            })
-            .eq('id', report_config_id);
-        }
+        await errorServiceClient
+          .from('generated_reports')
+          .update({
+            status: 'failed',
+            error_message: (error as Error).message,
+          })
+          .eq('id', report_config_id);
       } catch (updateError) {
         console.error('[Error] Failed to update report status:', updateError);
       }
@@ -326,12 +330,14 @@ async function aggregateReportData(
     emissionsTrends: [],
     products: [],
     facilities: [],
+    suppliers: [],
     standards: [],
     dataAvailability: {
       hasOrganization: false,
       hasEmissions: false,
       hasProducts: false,
       hasFacilities: false,
+      hasSuppliers: false,
     },
   };
 
@@ -422,15 +428,15 @@ async function aggregateReportData(
           if (utilityData) {
             for (const entry of utilityData) {
               const e = entry as any;
-              const config = UTILITY_FACTORS[e.utility_type];
-              if (!config) continue;
+              const emConfig = UTILITY_FACTORS[e.utility_type];
+              if (!emConfig) continue;
 
-              let co2e = e.quantity * config.factor;
+              let co2e = e.quantity * emConfig.factor;
               if (e.utility_type === 'natural_gas' && e.unit === 'm³') {
-                co2e = e.quantity * 10.55 * config.factor;
+                co2e = e.quantity * 10.55 * emConfig.factor;
               }
 
-              if (config.scope === 'Scope 1') scope1 += co2e;
+              if (emConfig.scope === 'Scope 1') scope1 += co2e;
               else scope2 += co2e;
             }
           }
@@ -616,26 +622,64 @@ async function aggregateReportData(
       console.log('[Data] Fetching product LCA data...');
       const { data: products, error: productsError } = await supabaseClient
         .from('product_carbon_footprints')
-        .select('product_name, functional_unit, aggregated_impacts')
+        .select('product_name, functional_unit, total_ghg_emissions, aggregated_impacts, reference_year')
         .eq('organization_id', organizationId)
         .eq('status', 'completed')
-        .limit(20);
+        .order('created_at', { ascending: false })
+        .limit(50);
 
       if (productsError) {
         console.log('[Data] Product LCAs query error:', productsError.message);
       } else if (products && products.length > 0) {
-        data.products = products.map((p: { product_name: string; functional_unit: string; aggregated_impacts?: { climate_change_gwp100?: number; climate_change?: number } }) => ({
+        // Deduplicate: keep only the latest LCA per product name
+        const seenProducts = new Map<string, typeof products[0]>();
+        for (const p of products) {
+          if (!seenProducts.has(p.product_name)) {
+            seenProducts.set(p.product_name, p);
+          }
+        }
+        data.products = Array.from(seenProducts.values()).map((p: any) => ({
           name: p.product_name,
           functionalUnit: p.functional_unit,
-          climateImpact: p.aggregated_impacts?.climate_change_gwp100 || p.aggregated_impacts?.climate_change || 0,
+          // Use total_ghg_emissions first, fall back to aggregated_impacts with gwp100 fix
+          climateImpact: p.total_ghg_emissions || p.aggregated_impacts?.climate_change_gwp100 || p.aggregated_impacts?.climate_change || 0,
+          referenceYear: p.reference_year,
         }));
         data.dataAvailability.hasProducts = true;
-        console.log('[Data] Products loaded:', data.products.length);
+        console.log('[Data] Products loaded (deduplicated):', data.products.length);
       } else {
         console.log('[Data] No completed product LCAs found');
       }
     } catch (error) {
       console.error('[Data] Exception fetching products:', error);
+    }
+  }
+
+  // Fetch suppliers data if section is included
+  if (sections.includes('supply-chain')) {
+    try {
+      console.log('[Data] Fetching suppliers data...');
+      const { data: suppliers, error: suppliersError } = await supabaseClient
+        .from('suppliers')
+        .select('name, industry_sector, country, annual_spend, spend_currency')
+        .eq('organization_id', organizationId)
+        .limit(50);
+
+      if (suppliersError) {
+        console.log('[Data] Suppliers query error:', suppliersError.message);
+      } else if (suppliers && suppliers.length > 0) {
+        data.suppliers = suppliers.map((s: any) => ({
+          name: s.name,
+          category: s.industry_sector || 'Uncategorized',
+          country: s.country || 'Unknown',
+          annualSpend: s.annual_spend || 0,
+          spendCurrency: s.spend_currency || 'GBP',
+        }));
+        data.dataAvailability.hasSuppliers = true;
+        console.log('[Data] Suppliers loaded:', data.suppliers.length);
+      }
+    } catch (error) {
+      console.error('[Data] Exception fetching suppliers:', error);
     }
   }
 
