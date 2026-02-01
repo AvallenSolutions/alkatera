@@ -4,6 +4,8 @@ import { cookies } from 'next/headers';
 import { stripe } from '@/lib/stripe-config';
 import type { Database } from '@/types/db_types';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * Get Payment Method Details
  *

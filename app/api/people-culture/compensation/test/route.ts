@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/people-culture/compensation/test
  * Test endpoint to diagnose authentication and RLS issues
