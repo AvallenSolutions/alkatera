@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import { Logo } from './Logo';
@@ -12,16 +12,26 @@ interface NavigationProps {
 
 export const Navigation = ({ onOpenContact }: NavigationProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > window.innerHeight);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const navItems = [
     { label: 'Platform', href: '/platform' },
     { label: 'Manifesto', href: '/manifesto' },
     { label: 'Impact', href: '/impact' },
     { label: 'Knowledge', href: '/knowledge' },
+    { label: 'Login', href: '/login' },
   ];
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-6 flex justify-between items-center text-white">
+    <nav className={`fixed top-0 left-0 right-0 z-50 px-6 py-6 flex justify-between items-center text-white transition-colors duration-300 ${scrolled ? 'bg-black' : 'bg-transparent'}`}>
       <div className="z-50">
         <Link href="/">
           <Logo />
@@ -39,7 +49,7 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
           </Link>
         ))}
         <Link
-          href="/contact"
+          href="/getaccess"
           className="border border-white px-6 py-2 rounded-full hover:bg-white hover:text-black transition-colors duration-300"
         >
           Get Access
@@ -75,7 +85,7 @@ export const Navigation = ({ onOpenContact }: NavigationProps) => {
               </Link>
             ))}
             <Link
-              href="/contact"
+              href="/getaccess"
               onClick={() => setIsOpen(false)}
               className="mt-8 text-[#ccff00] font-mono uppercase tracking-widest border border-[#ccff00] px-8 py-4 rounded-full"
             >

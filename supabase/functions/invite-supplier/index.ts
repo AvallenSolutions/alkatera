@@ -213,33 +213,78 @@ Deno.serve(async (req: Request) => {
     const invitationUrl = `${siteUrl}/supplier-onboarding?token=${invitation.invitation_token}`;
 
     const emailSubject = `Invitation to join ${product.name} supply chain on Alkatera`;
-    const emailBody = `
-Dear ${supplierName || 'Supplier'},
+    const supplierDisplayName = supplierName || 'Supplier';
 
-You have been invited to join the Alkatera platform to provide verified product data for ${materialName}.
+    const emailHtml = `
+      <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
+        <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
+          <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Supplier Invitation</h1>
+        </div>
+        <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+          Dear ${supplierDisplayName},
+        </p>
+        <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
+          You have been invited to join the Alkatera platform to provide verified product data for <strong style="color: #fff;">${materialName}</strong>.
+        </p>
+        ${personalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${personalMessage}</p></div>` : ''}
+        <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+          <tr>
+            <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 100px;">Product</td>
+            <td style="padding: 10px 0; color: #fff; font-size: 14px;">${product.name}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Material</td>
+            <td style="padding: 10px 0; color: #fff; font-size: 14px;">${materialName} (${materialType})</td>
+          </tr>
+        </table>
+        <div style="margin: 30px 0; text-align: center;">
+          <a href="${invitationUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Complete Your Profile</a>
+        </div>
+        <p style="color: #666; font-size: 12px; line-height: 1.6;">
+          This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: none;">hello@alkatera.com</a>
+        </p>
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+          The Alkatera Team
+        </div>
+      </div>
+    `;
 
-${personalMessage ? `\n${personalMessage}\n` : ''}
-Product: ${product.name}
-Material: ${materialName} (${materialType})
+    // Send invitation email via Resend
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    let emailSent = false;
 
-Please click the link below to complete your supplier profile and upload your product details:
-${invitationUrl}
+    if (resendApiKey) {
+      try {
+        const resendResponse = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: "AlkaTera <noreply@alkatera.com>",
+            to: [supplierEmail],
+            cc: ["hello@alkatera.com"],
+            reply_to: "hello@alkatera.com",
+            subject: emailSubject,
+            html: emailHtml,
+          }),
+        });
 
-This invitation will expire in 30 days.
-
-If you have any questions, please contact hello@alkatera.com
-
-Best regards,
-The Alkatera Team
-    `.trim();
-
-    console.log("=== SUPPLIER INVITATION EMAIL ===");
-    console.log("To:", supplierEmail);
-    console.log("CC:", "hello@alkatera.com");
-    console.log("Subject:", emailSubject);
-    console.log("Body:", emailBody);
-    console.log("Invitation URL:", invitationUrl);
-    console.log("==================================\n");
+        if (resendResponse.ok) {
+          const resendData = await resendResponse.json();
+          console.log("Supplier invitation email sent successfully:", resendData);
+          emailSent = true;
+        } else {
+          const errorText = await resendResponse.text();
+          console.error("Resend API error:", resendResponse.status, errorText);
+        }
+      } catch (emailError) {
+        console.error("Failed to send invitation email:", emailError);
+      }
+    } else {
+      console.warn("RESEND_API_KEY not configured — email not sent");
+    }
 
     return new Response(
       JSON.stringify({
@@ -251,7 +296,7 @@ The Alkatera Team
           invitation_url: invitationUrl,
           expires_at: invitation.expires_at,
         },
-        note: "Email sending integration pending - invitation details logged to console"
+        email_sent: emailSent,
       }),
       {
         status: 200,

@@ -3,11 +3,73 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
+import { Eye, EyeOff, ArrowRight, Lock, Mail, User, AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
+import { clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+function cn(...inputs: (string | undefined | null | false)[]) {
+  return twMerge(clsx(inputs))
+}
+
+const InputField = ({
+  type,
+  label,
+  icon: Icon,
+  value,
+  onChange,
+  disabled,
+}: {
+  type: string
+  label: string
+  icon: React.ElementType
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  disabled?: boolean
+}) => {
+  const [isFocused, setIsFocused] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+
+  const inputType = type === "password" ? (showPassword ? "text" : "password") : type
+
+  return (
+    <div className="relative group mb-8">
+      <label
+        className={cn(
+          "absolute left-8 transition-all duration-300 pointer-events-none font-mono text-xs tracking-widest uppercase",
+          isFocused || value
+            ? "-top-3 text-[#ccff00] text-[10px]"
+            : "top-3 text-gray-500"
+        )}
+      >
+        {label}
+      </label>
+
+      <div className="absolute left-0 top-3 text-gray-500 group-focus-within:text-[#ccff00] transition-colors">
+        <Icon size={18} />
+      </div>
+
+      <input
+        type={inputType}
+        value={value}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        disabled={disabled}
+        className="w-full bg-transparent border-b border-gray-800 py-3 pl-8 pr-10 text-white placeholder-transparent focus:outline-none focus:border-[#ccff00] transition-colors font-sans text-lg disabled:opacity-50"
+      />
+
+      {type === "password" && (
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-0 top-3 text-gray-500 hover:text-white transition-colors"
+        >
+          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+        </button>
+      )}
+    </div>
+  )
+}
 
 export function SignupForm() {
   const router = useRouter()
@@ -128,88 +190,75 @@ export function SignupForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
+    <form onSubmit={handleSubmit}>
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-2 mb-6 p-3 border border-red-900/50 bg-red-950/30 text-red-400 text-sm font-mono">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
       )}
 
       {success && (
-        <Alert>
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>
-            Account created successfully! Redirecting...
-          </AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-2 mb-6 p-3 border border-green-900/50 bg-green-950/30 text-green-400 text-sm font-mono">
+          <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>Account created successfully! Redirecting...</span>
+        </div>
       )}
 
-      <div className="space-y-2">
-        <Label htmlFor="fullName">Full Name</Label>
-        <Input
-          id="fullName"
-          type="text"
-          placeholder="John Smith"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          disabled={loading}
-          required
-        />
-      </div>
+      <InputField
+        type="text"
+        label="Full Name"
+        icon={User}
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+        disabled={loading}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="email">Email Address</Label>
-        <Input
-          id="email"
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={loading}
-          required
-        />
-      </div>
+      <InputField
+        type="email"
+        label="Email Address"
+        icon={Mail}
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        disabled={loading}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <Input
-          id="password"
-          type="password"
-          placeholder="••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={loading}
-          required
-        />
-        <p className="text-xs text-muted-foreground">
-          Must be at least 8 characters with uppercase, lowercase, and number
-        </p>
-      </div>
+      <InputField
+        type="password"
+        label="Password"
+        icon={Lock}
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        disabled={loading}
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm Password</Label>
-        <Input
-          id="confirmPassword"
-          type="password"
-          placeholder="••••••••"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={loading}
-          required
-        />
-      </div>
+      <p className="-mt-6 mb-8 text-xs text-gray-600 font-mono pl-8">
+        Min 8 chars with uppercase, lowercase, and number
+      </p>
 
-      <Button type="submit" className="w-full" disabled={loading}>
+      <InputField
+        type="password"
+        label="Confirm Password"
+        icon={Lock}
+        value={confirmPassword}
+        onChange={(e) => setConfirmPassword(e.target.value)}
+        disabled={loading}
+      />
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full bg-[#ccff00] text-black font-bold py-4 flex items-center justify-between px-6 hover:bg-white transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed group"
+      >
+        <span className="font-mono uppercase tracking-widest">
+          {loading ? "Creating account..." : "Create Account"}
+        </span>
         {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Creating account...
-          </>
+          <Loader2 className="h-5 w-5 animate-spin" />
         ) : (
-          "Create Account"
+          <ArrowRight className="group-hover:translate-x-1 transition-transform" />
         )}
-      </Button>
+      </button>
     </form>
   )
 }
