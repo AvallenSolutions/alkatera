@@ -71,7 +71,7 @@ const InputField = ({
   )
 }
 
-export function LoginForm() {
+export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -144,8 +144,9 @@ export function LoginForm() {
           email: data.user.email,
         })
 
-        console.log('🚀 LoginForm: Redirecting to dashboard...')
-        router.push('/dashboard')
+        const destination = redirectTo || '/dashboard'
+        console.log(`🚀 LoginForm: Redirecting to ${destination}...`)
+        router.push(destination)
       } else {
         console.error('❌ LoginForm: Sign-in failed - no user or session')
         setError("Sign-in failed. Please check your credentials and try again.")

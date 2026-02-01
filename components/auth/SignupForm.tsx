@@ -71,7 +71,7 @@ const InputField = ({
   )
 }
 
-export function SignupForm() {
+export function SignupForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -170,9 +170,10 @@ export function SignupForm() {
 
         setSuccess(true)
         setTimeout(async () => {
-          console.log('🚀 SignupForm: Redirecting to create organization...')
+          const destination = redirectTo || "/create-organization"
+          console.log(`🚀 SignupForm: Redirecting to ${destination}...`)
           await new Promise(resolve => setTimeout(resolve, 100))
-          router.push("/create-organization")
+          router.push(destination)
           router.refresh()
         }, 2000)
       } else {

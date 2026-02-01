@@ -1,5 +1,10 @@
+'use client'
+
+import { useSearchParams } from "next/navigation"
 import { AuthForm } from "@/components/auth/AuthForm"
 
 export default function LoginPage() {
-  return <AuthForm />
+  const searchParams = useSearchParams()
+  const tier = searchParams.get('tier')
+  return <AuthForm tier={tier} />
 }

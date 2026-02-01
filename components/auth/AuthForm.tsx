@@ -71,8 +71,12 @@ const BiomeVisual = () => {
   )
 }
 
-export function AuthForm() {
-  const [mode, setMode] = useState<"login" | "signup">("login")
+interface AuthFormProps {
+  tier?: string | null
+}
+
+export function AuthForm({ tier }: AuthFormProps) {
+  const [mode, setMode] = useState<"login" | "signup">(tier ? "signup" : "login")
 
   return (
     <div className="flex min-h-screen w-full bg-[#050505]">
@@ -108,13 +112,22 @@ export function AuthForm() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
+            {tier && (
+              <div className="inline-block mb-4 px-4 py-1.5 border border-[#ccff00]/30 bg-[#ccff00]/5 rounded-full">
+                <span className="font-mono text-[#ccff00] text-[10px] tracking-widest uppercase">
+                  {tier} Plan Selected
+                </span>
+              </div>
+            )}
             <h1 className="text-3xl md:text-4xl font-serif text-white mb-2">
-              {mode === "login" ? "Welcome Back" : "Create an Account"}
+              {mode === "login"
+                ? tier ? `Sign in to activate ${tier}` : "Welcome Back"
+                : tier ? `Sign up to start ${tier}` : "Create an Account"}
             </h1>
             <p className="text-gray-500 font-mono text-sm mb-12">
               {mode === "login"
-                ? "Enter your credentials to access the platform."
-                : "Sign up to get started with AlkaTera."}
+                ? tier ? "Sign in and you'll be taken to complete your subscription." : "Enter your credentials to access the platform."
+                : tier ? "Create your account, then complete your subscription." : "Sign up to get started with AlkaTera."}
             </p>
 
             {/* Google SSO */}
@@ -154,7 +167,11 @@ export function AuthForm() {
             </div>
 
             {/* Auth Forms */}
-            {mode === "login" ? <LoginForm /> : <SignupForm />}
+            {mode === "login" ? (
+              <LoginForm redirectTo={tier ? `/settings?tier=${tier}` : undefined} />
+            ) : (
+              <SignupForm redirectTo={tier ? `/settings?tier=${tier}` : undefined} />
+            )}
 
             {/* Forgot password & mode toggle */}
             <div className="mt-8 space-y-4">
