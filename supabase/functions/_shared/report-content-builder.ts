@@ -41,16 +41,26 @@ export interface ProductFootprint {
   climateImpact: number;
 }
 
-export interface FacilityData {
+export interface FacilityInfo {
   name: string;
   type: string;
+  location: string;
   totalEmissions: number;
+  unitsProduced: number;
+  hasData: boolean;
 }
 
 export interface SupplierData {
   name: string;
   category: string;
   emissionsData: Record<string, any>;
+}
+
+export interface StandardStatus {
+  code: string;
+  name: string;
+  status: string;
+  detail: string;
 }
 
 export interface DataQualityMetrics {
@@ -64,14 +74,15 @@ export interface ReportData {
   emissions: EmissionsData;
   emissionsTrends: YearlyEmissions[];
   products: ProductFootprint[];
-  facilities?: FacilityData[];
+  facilities: FacilityInfo[];
   suppliers?: SupplierData[];
+  standards: StandardStatus[];
   dataQuality?: DataQualityMetrics;
   dataAvailability: {
     hasOrganization: boolean;
     hasEmissions: boolean;
     hasProducts: boolean;
-    hasFacilities?: boolean;
+    hasFacilities: boolean;
     hasSuppliers?: boolean;
   };
 }
@@ -292,7 +303,7 @@ Please ensure corporate emissions data is entered for the reporting period.
     return slides;
   }
 
-  // Main emissions overview
+  // Main emissions overview with scope details combined
   slides.push({
     slideNumber: 0,
     title: 'GHG Emissions Overview',
@@ -305,48 +316,23 @@ Please ensure corporate emissions data is entered for the reporting period.
 
 | Scope | Description | Emissions (tCO2e) | Percentage |
 |-------|-------------|-------------------|------------|
-| **Scope 1** | Direct emissions from owned/controlled sources | ${formatNumber(data.emissions.scope1)} | ${formatPercentage(data.emissions.scope1, data.emissions.total)} |
-| **Scope 2** | Indirect emissions from purchased energy | ${formatNumber(data.emissions.scope2)} | ${formatPercentage(data.emissions.scope2, data.emissions.total)} |
-| **Scope 3** | All other indirect emissions in value chain | ${formatNumber(data.emissions.scope3)} | ${formatPercentage(data.emissions.scope3, data.emissions.total)} |
+| **Scope 1** | Direct emissions (combustion, process, fugitive) | ${formatNumber(data.emissions.scope1)} | ${formatPercentage(data.emissions.scope1, data.emissions.total)} |
+| **Scope 2** | Purchased energy (electricity, heat, steam) | ${formatNumber(data.emissions.scope2)} | ${formatPercentage(data.emissions.scope2, data.emissions.total)} |
+| **Scope 3** | Value chain (upstream & downstream) | ${formatNumber(data.emissions.scope3)} | ${formatPercentage(data.emissions.scope3, data.emissions.total)} |
 | **Total** | | **${formatNumber(data.emissions.total)}** | **100%** |
 
 ---
 
-*Data sourced from corporate emissions inventory*
+**Scope 1** includes stationary combustion (boilers, furnaces), mobile combustion (company vehicles), process and fugitive emissions.
+**Scope 2** covers purchased electricity, heat and steam consumed by the organization.
+**Scope 3** encompasses all indirect value chain emissions including purchased goods, transport, waste and end-of-life.
+
+*Data sourced from facility utility records, fleet activity data, and corporate overhead reports*
 `.trim(),
   });
 
-  // Scope breakdown details
-  slides.push({
-    slideNumber: 0,
-    title: 'Emissions Scope Details',
-    content: `
-# Emissions Scope Details
-
-## Scope 1: Direct Emissions
-**${formatNumber(data.emissions.scope1)} tCO2e** (${formatPercentage(data.emissions.scope1, data.emissions.total)})
-
-Direct GHG emissions from sources owned or controlled by the organization, including:
-- Stationary combustion (boilers, furnaces)
-- Mobile combustion (company vehicles)
-- Process emissions
-- Fugitive emissions
-
----
-
-## Scope 2: Indirect Energy Emissions
-**${formatNumber(data.emissions.scope2)} tCO2e** (${formatPercentage(data.emissions.scope2, data.emissions.total)})
-
-Indirect GHG emissions from the generation of purchased energy consumed by the organization.
-
----
-
-## Scope 3: Value Chain Emissions
-**${formatNumber(data.emissions.scope3)} tCO2e** (${formatPercentage(data.emissions.scope3, data.emissions.total)})
-
-All other indirect emissions occurring in the value chain, both upstream and downstream.
-`.trim(),
-  });
+  // Scope breakdown details - combined into one slide with the overview above
+  // (Previously was a separate slide causing split content across slides 11 & 12)
 
   return slides;
 }
@@ -446,20 +432,72 @@ ${data.products.length > 10 ? `\n*Showing top 10 of ${data.products.length} prod
 }
 
 /**
- * Generates methodology slide
+ * Generates facility emissions slide
+ */
+function buildFacilitySlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  const slides: SlideContent[] = [];
+
+  if (!data.facilities || data.facilities.length === 0) {
+    return slides;
+  }
+
+  const facilitiesWithData = data.facilities.filter(f => f.hasData);
+  const facilitiesWithoutData = data.facilities.filter(f => !f.hasData);
+
+  slides.push({
+    slideNumber: 0,
+    title: 'Facility Emissions',
+    content: `
+# Facility Emissions
+
+## ${data.facilities.length} Facilities Reporting
+
+| Facility | Type | Location | Emissions (kg CO2e) | Units Produced |
+|----------|------|----------|---------------------|----------------|
+${data.facilities.map(f => `| ${f.name} | ${f.type} | ${f.location} | ${f.totalEmissions > 0 ? formatNumber(f.totalEmissions) : (f.hasData ? 'Data recorded' : 'No data')} | ${f.unitsProduced > 0 ? formatNumber(f.unitsProduced, 0) : '-'} |`).join('\n')}
+
+---
+
+${facilitiesWithData.length > 0 ? `**${facilitiesWithData.length}** facilit${facilitiesWithData.length === 1 ? 'y' : 'ies'} with recorded emissions data.` : ''}
+${facilitiesWithoutData.length > 0 ? `**${facilitiesWithoutData.length}** facilit${facilitiesWithoutData.length === 1 ? 'y' : 'ies'} awaiting data entry.` : ''}
+
+*Facility emissions based on utility data entries and aggregated calculations*
+`.trim(),
+  });
+
+  return slides;
+}
+
+/**
+ * Generates methodology slide with actual compliance status
  */
 function buildMethodologySlide(config: ReportConfig, data: ReportData): SlideContent {
+  // Use actual standards status if available, otherwise fall back to listing
+  const hasStandardsStatus = data.standards && data.standards.length > 0;
+
+  const standardsSection = hasStandardsStatus
+    ? `
+## Standards Compliance
+
+| Standard | Status | Detail |
+|----------|--------|--------|
+${data.standards.map(s => `| **${s.name}** | ${s.status} | ${s.detail} |`).join('\n')}
+`
+    : `
+## Reporting Framework
+
+This sustainability report has been prepared in alignment with:
+
+${config.standards.map(s => `- **${getStandardName(s)}**`).join('\n')}
+`;
+
   return {
     slideNumber: 0,
     title: 'Methodology & Standards',
     content: `
 # Methodology & Standards
 
-## Reporting Framework
-
-This sustainability report has been prepared in alignment with:
-
-${config.standards.map(s => `- **${getStandardName(s)}**`).join('\n')}
+${standardsSection}
 
 ---
 
@@ -485,7 +523,7 @@ ${data.dataQuality ? `
 - **Completeness:** ${data.dataQuality.completeness}%
 - **Quality Tier:** ${data.dataQuality.qualityTier.replace('_', ' ').toUpperCase()}
 - **Confidence Score:** ${data.dataQuality.confidenceScore}%
-` : '*Data quality metrics not available*'}
+` : '*Data quality assessment available via product-level DQI scores*'}
 `.trim(),
   };
 }
@@ -632,7 +670,7 @@ ${data.suppliers.length > 10 ? `\n*Showing 10 of ${data.suppliers.length} suppli
 }
 
 /**
- * Generates facility emissions breakdown slide
+ * Generates facility emissions breakdown slide (legacy section-based)
  */
 function buildFacilitiesSlide(config: ReportConfig, data: ReportData): SlideContent {
   if (!data.dataAvailability.hasFacilities || !data.facilities || data.facilities.length === 0) {
@@ -804,6 +842,11 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
     slides.push(...buildEmissionsSlides(config, data));
   }
 
+  // Facility emissions (always include if facilities exist)
+  if (data.facilities && data.facilities.length > 0) {
+    slides.push(...buildFacilitySlides(config, data));
+  }
+
   // GHG Gas Inventory
   if (config.sections.includes('ghg-inventory')) {
     slides.push(...buildGHGInventorySlides(config, data));
@@ -824,7 +867,7 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
     slides.push(...buildSupplyChainSlides(config, data));
   }
 
-  // Facilities
+  // Facilities (legacy section-based)
   if (config.sections.includes('facilities')) {
     slides.push(buildFacilitiesSlide(config, data));
   }
