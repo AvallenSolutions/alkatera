@@ -152,11 +152,8 @@ export function useSubscription() {
 
   const fetchSubscriptionData = useCallback(async () => {
     if (!currentOrganization?.id) {
-      setState((prev) => ({
-        ...prev,
-        usage: null,
-        isLoading: false,
-      }));
+      // Keep isLoading true until we have an org to fetch for,
+      // so the payment gate doesn't redirect prematurely
       return;
     }
 
