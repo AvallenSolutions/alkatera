@@ -104,7 +104,10 @@ export default function CompleteSubscriptionPage() {
   }, [isOrgLoading, currentOrganization, hasShownToast])
 
   async function handleSelectPlan(tierName: string) {
+    console.log('[CompleteSubscription] handleSelectPlan called:', { tierName, currentOrganization: currentOrganization?.id, billingInterval })
+
     if (!currentOrganization) {
+      console.error('[CompleteSubscription] No current organization!')
       toast.error('No organisation found. Please try again.')
       router.push('/create-organization')
       return
@@ -119,6 +122,7 @@ export default function CompleteSubscriptionPage() {
     setProcessingTier(tierName)
 
     try {
+      console.log('[CompleteSubscription] Creating checkout session...')
       const response = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

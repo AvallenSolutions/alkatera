@@ -4,6 +4,7 @@ import { Inter, Lora, JetBrains_Mono, Playfair_Display } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { OrganizationProvider } from '@/lib/organizationContext';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ThemeProvider } from 'next-themes';
 import { GoogleAnalytics } from '@/components/GoogleAnalytics';
 
@@ -99,6 +100,7 @@ export default function RootLayout({
             <OrganizationProvider>
               {children}
               <Toaster />
+              <SonnerToaster />
             </OrganizationProvider>
           </AuthProvider>
         </ThemeProvider>
