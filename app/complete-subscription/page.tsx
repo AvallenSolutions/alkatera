@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
-import { createClient } from '@/lib/supabase/client'
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client'
 import Image from 'next/image'
 
 type BillingInterval = 'monthly' | 'annual'
@@ -103,7 +103,7 @@ function CompleteSubscriptionContent() {
     if (!isPaymentSuccess || !currentOrganization?.id) return
 
     const orgId = currentOrganization.id
-    const supabase = createClient()
+    const supabase = getSupabaseBrowserClient()
     let pollCount = 0
     const maxPolls = 30 // 30 seconds max
 
