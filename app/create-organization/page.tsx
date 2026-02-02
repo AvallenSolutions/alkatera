@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PRODUCT_TYPE_OPTIONS } from '@/lib/industry-benchmarks'
 import { Building2, Loader2 } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
 
 export default function CreateOrganizationPage() {
   const [organizationName, setOrganizationName] = useState('')
@@ -140,31 +142,48 @@ export default function CreateOrganizationPage() {
   // Show loading while checking for existing access
   if (isCheckingAccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-slate-600" />
-          <p className="text-sm text-muted-foreground">Checking access...</p>
+      <div className="relative min-h-screen flex items-center justify-center p-4">
+        <Image src="/images/starry-night-bg3.jpg" alt="Starry night sky" fill className="object-cover" priority quality={85} />
+        <div className="absolute inset-0 bg-black/70" />
+        <div className="relative z-10 flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-[#ccff00]" />
+          <p className="text-sm text-white/50">Checking access...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-16 h-16 bg-slate-900 rounded-2xl flex items-center justify-center">
-            <Building2 className="w-8 h-8 text-white" />
+    <div className="relative min-h-screen flex flex-col items-center justify-center p-4">
+      <Image src="/images/starry-night-bg3.jpg" alt="Starry night sky" fill className="object-cover" priority quality={85} />
+      <div className="absolute inset-0 bg-black/70" />
+
+      <div className="relative z-10 w-full max-w-md space-y-6">
+        {/* Logo */}
+        <Link href="/" className="flex justify-center">
+          <img
+            src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
+            alt="alkatera"
+            className="h-10 md:h-14 w-auto object-contain mix-blend-screen brightness-125 contrast-150"
+            style={{ mixBlendMode: 'screen' }}
+          />
+        </Link>
+
+        {/* Glassmorphism Card */}
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-8 space-y-6">
+          <div className="text-center space-y-3">
+            <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 rounded-2xl flex items-center justify-center">
+              <Building2 className="w-8 h-8 text-[#ccff00]" />
+            </div>
+            <h1 className="text-2xl font-serif text-white">Create Your Company Account</h1>
+            <p className="text-white/50 text-sm">
+              Get started by creating an organisation for your team
+            </p>
           </div>
-          <CardTitle className="text-2xl font-semibold">Create Your Company Account</CardTitle>
-          <CardDescription className="text-base">
-            Get started by creating an organisation for your team
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="organizationName" className="text-sm font-medium">
+              <Label htmlFor="organizationName" className="text-sm font-medium text-white/70">
                 Company Name
               </Label>
               <Input
@@ -174,16 +193,16 @@ export default function CreateOrganizationPage() {
                 value={organizationName}
                 onChange={(e) => setOrganizationName(e.target.value)}
                 disabled={isLoading}
-                className="h-11"
+                className="h-11 bg-white/5 border-white/10 text-white placeholder:text-white/30"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="productType" className="text-sm font-medium">
+              <Label htmlFor="productType" className="text-sm font-medium text-white/70">
                 What type of products do you primarily produce?
               </Label>
               <Select value={productType} onValueChange={setProductType} disabled={isLoading}>
-                <SelectTrigger id="productType" className="h-11">
+                <SelectTrigger id="productType" className="h-11 bg-white/5 border-white/10 text-white">
                   <SelectValue placeholder="Select product type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -194,13 +213,13 @@ export default function CreateOrganizationPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-white/40">
                 This determines the industry benchmarks used for your sustainability score. You can change this later in settings.
               </p>
             </div>
             <Button
               type="submit"
-              className="w-full h-11 text-base font-medium"
+              className="w-full h-11 text-base font-medium bg-[#ccff00] text-black hover:bg-[#ccff00]/90 rounded-xl"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -213,8 +232,30 @@ export default function CreateOrganizationPage() {
               )}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+
+      {/* Photo credit */}
+      <div className="relative z-10 mt-8 text-center text-[10px] text-white/20">
+        Photo by{' '}
+        <a
+          href="https://unsplash.com/@graddes"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-white/40"
+        >
+          Graddess
+        </a>
+        {' '}on{' '}
+        <a
+          href="https://unsplash.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-white/40"
+        >
+          Unsplash
+        </a>
+      </div>
     </div>
   )
 }

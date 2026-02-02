@@ -155,8 +155,8 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      success_url: `${baseUrl}/settings?success=true&tier=${tier}`,
-      cancel_url: `${baseUrl}/settings?canceled=true`,
+      success_url: `${baseUrl}/complete-subscription?success=true&tier=${tier}`,
+      cancel_url: `${baseUrl}/complete-subscription?canceled=true`,
       metadata: {
         organizationId: org.id,
         tier,
