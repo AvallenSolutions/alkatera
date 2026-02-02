@@ -75,6 +75,7 @@ Deno.serve(async (req: Request) => {
     const insertPayload: Record<string, any> = {
       name: name.trim(),
       slug: `${slug}-${Date.now().toString(36)}`,
+      subscription_status: 'pending',
     };
     if (product_type) {
       insertPayload.product_type = product_type;
