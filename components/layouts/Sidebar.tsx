@@ -701,7 +701,7 @@ export function Sidebar({ className }: SidebarProps) {
             )}
 
             {/* Alkatera Admin Only Links */}
-            {isAlkateraAdmin && (
+            {(isAlkateraAdmin || isDevelopment) && (
               <>
                 <Link
                   href="/admin/platform/"
@@ -787,8 +787,8 @@ export function Sidebar({ className }: SidebarProps) {
           </div>
         )}
 
-        {/* Development Section - Admin Only */}
-        {isAlkateraAdmin && (
+        {/* Development Section - Admin or Dev Mode */}
+        {(isAlkateraAdmin || isDevelopment) && (
         <div className="pt-4 mt-4 border-t border-border">
           <div className="px-3 mb-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
