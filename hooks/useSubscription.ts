@@ -407,7 +407,7 @@ export function useSubscription() {
     tierName: state.usage?.tier?.name || "seed",
     tierLevel: state.usage?.tier?.level || 1,
     tierDisplayName: state.usage?.tier?.display_name || "Seed",
-    subscriptionStatus: state.usage?.tier?.status || "active",
+    subscriptionStatus: state.usage?.tier?.status || "pending",
     hasFeature,
     getTierLevel,
     isAtLeastTier,

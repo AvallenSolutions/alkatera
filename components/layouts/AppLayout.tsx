@@ -56,15 +56,15 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
     }
   }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router])
 
-  // Payment gate: redirect to settings if no active subscription
+  // Payment gate: redirect to complete-subscription if no active subscription
   useEffect(() => {
     if (!authLoading && !isOrganizationLoading && !subscriptionLoading && user && currentOrganization) {
-      const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization')
+      const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization') || pathname?.startsWith('/complete-subscription') || pathname?.startsWith('/contact')
       if (isAllowedPage) return
 
       if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
-        console.log('🚫 AppLayout: No active subscription, redirecting to settings')
-        router.push('/settings?payment_required=true')
+        console.log('🚫 AppLayout: No active subscription, redirecting to complete-subscription')
+        router.push('/complete-subscription')
       }
     }
   }, [user, authLoading, isOrganizationLoading, subscriptionLoading, currentOrganization, subscriptionStatus, pathname, router])
