@@ -214,6 +214,15 @@ function CompleteSubscriptionContent() {
     }
   }
 
+  const [showContinueButton, setShowContinueButton] = useState(false)
+
+  // Show continue button after 10 seconds
+  useEffect(() => {
+    if (!isPaymentSuccess) return
+    const timer = setTimeout(() => setShowContinueButton(true), 10000)
+    return () => clearTimeout(timer)
+  }, [isPaymentSuccess])
+
   // Show success/processing state after payment
   if (isPaymentSuccess) {
     return (
@@ -238,6 +247,17 @@ function CompleteSubscriptionContent() {
             </p>
             <Loader2 className="h-8 w-8 animate-spin text-neon-lime" />
             <p className="text-sm text-slate-500">This should only take a moment.</p>
+            {showContinueButton && (
+              <button
+                onClick={async () => {
+                  if (mutate) await mutate()
+                  router.push('/dashboard')
+                }}
+                className="mt-4 px-8 py-3 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 transition-all"
+              >
+                Continue to Dashboard
+              </button>
+            )}
           </div>
         </div>
       </div>
