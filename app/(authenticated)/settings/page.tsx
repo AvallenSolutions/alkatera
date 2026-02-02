@@ -70,10 +70,18 @@ export default function SettingsPage() {
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
       toast.success('Subscription activated successfully!')
-      router.replace('/settings')
+      router.replace('/dashboard')
     }
     if (searchParams.get('canceled') === 'true') {
-      toast.info('Checkout cancelled')
+      toast.info('Checkout cancelled — please select a plan to continue')
+      router.replace('/settings')
+    }
+    if (searchParams.get('payment_required') === 'true') {
+      toast.info('Please complete your subscription to access the platform')
+      router.replace('/settings')
+    }
+    if (searchParams.get('complete_subscription') === 'true') {
+      toast.info('Organisation created! Now select a plan to get started.')
       router.replace('/settings')
     }
   }, [searchParams, router])
@@ -263,6 +271,24 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Subscription Required Banner */}
+      {subscriptionStatus !== 'active' && subscriptionStatus !== 'trial' && (
+        <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-2">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                Subscription Required
+              </h3>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                Please select a plan below to access the Alkatera platform.
+                Choose from Seed or Blossom to get started, or contact us for Canopy.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Grace Period Banner */}
       {organizationData?.grace_period_end && (
         <GracePeriodBanner
@@ -581,6 +607,14 @@ export default function SettingsPage() {
                       {isCurrent ? (
                         <Button variant="outline" className="w-full mt-auto" disabled>
                           Current Plan
+                        </Button>
+                      ) : tier.tier_name === 'canopy' ? (
+                        <Button
+                          variant="outline"
+                          className="w-full mt-auto"
+                          onClick={() => router.push('/contact?tier=Canopy')}
+                        >
+                          Contact Sales
                         </Button>
                       ) : (
                         <Button

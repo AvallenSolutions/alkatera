@@ -701,7 +701,7 @@ export function Sidebar({ className }: SidebarProps) {
             )}
 
             {/* Alkatera Admin Only Links */}
-            {(isAlkateraAdmin || isDevelopment) && (
+            {isAlkateraAdmin && (
               <>
                 <Link
                   href="/admin/platform/"
@@ -717,9 +717,6 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/platform/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Platform Dashboard</span>
-                  {isDevelopment && !isAlkateraAdmin && (
-                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
-                  )}
                 </Link>
 
                 <Link
@@ -736,9 +733,6 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/suppliers/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Platform Suppliers</span>
-                  {isDevelopment && !isAlkateraAdmin && (
-                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
-                  )}
                 </Link>
 
                 <Link
@@ -755,9 +749,6 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/blog/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Blog CMS</span>
-                  {isDevelopment && !isAlkateraAdmin && (
-                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
-                  )}
                 </Link>
 
                 <Link
@@ -774,9 +765,6 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/feedback/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">User Feedback</span>
-                  {isDevelopment && !isAlkateraAdmin && (
-                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
-                  )}
                 </Link>
 
                 <Link
@@ -793,16 +781,14 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/rosa/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Rosa Admin</span>
-                  {isDevelopment && !isAlkateraAdmin && (
-                    <span className="text-xs text-muted-foreground ml-auto">[Dev]</span>
-                  )}
                 </Link>
               </>
             )}
           </div>
         )}
 
-        {/* Development Section */}
+        {/* Development Section - Admin Only */}
+        {isAlkateraAdmin && (
         <div className="pt-4 mt-4 border-t border-border">
           <div className="px-3 mb-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -833,6 +819,7 @@ export function Sidebar({ className }: SidebarProps) {
             )
           })}
         </div>
+        )}
       </nav>
 
       {/* Subscription Status Footer */}

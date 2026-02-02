@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { useOrganization } from '@/lib/organizationContext'
+import { useSubscription } from '@/hooks/useSubscription'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { Loader2 } from 'lucide-react'
@@ -18,6 +19,8 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const { currentOrganization, isLoading: isOrganizationLoading } = useOrganization()
+  const { subscriptionStatus, isLoading: subscriptionLoading } = useSubscription()
+  const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -52,6 +55,19 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
       router.push('/create-organization')
     }
   }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router])
+
+  // Payment gate: redirect to settings if no active subscription
+  useEffect(() => {
+    if (!authLoading && !isOrganizationLoading && !subscriptionLoading && user && currentOrganization) {
+      const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization')
+      if (isAllowedPage) return
+
+      if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
+        console.log('🚫 AppLayout: No active subscription, redirecting to settings')
+        router.push('/settings?payment_required=true')
+      }
+    }
+  }, [user, authLoading, isOrganizationLoading, subscriptionLoading, currentOrganization, subscriptionStatus, pathname, router])
 
   if (authLoading || isOrganizationLoading) {
     console.log('⏳ AppLayout: Loading...', { authLoading, isOrganizationLoading })

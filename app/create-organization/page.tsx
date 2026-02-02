@@ -118,7 +118,7 @@ export default function CreateOrganizationPage() {
         description: 'Your organisation has been created successfully.',
       })
 
-      router.push('/dashboard')
+      router.push('/settings?complete_subscription=true')
       router.refresh()
     } catch (error) {
       console.error('Error creating organisation:', error)
