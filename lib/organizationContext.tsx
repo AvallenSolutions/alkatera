@@ -22,6 +22,7 @@ export interface Organization {
   address_lng?: number | null
   product_type?: string | null
   report_defaults?: Record<string, any> | null
+  subscription_status?: string | null
 }
 
 interface OrganizationMember {
