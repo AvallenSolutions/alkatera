@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
+import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
 
 type BillingInterval = 'monthly' | 'annual'
@@ -99,8 +100,10 @@ function CompleteSubscriptionContent() {
 
   // Poll for subscription activation after successful payment
   useEffect(() => {
-    if (!isPaymentSuccess || !currentOrganization) return
+    if (!isPaymentSuccess || !currentOrganization?.id) return
 
+    const orgId = currentOrganization.id
+    const supabase = createClient()
     let pollCount = 0
     const maxPolls = 30 // 30 seconds max
 
@@ -108,13 +111,20 @@ function CompleteSubscriptionContent() {
       pollCount++
       console.log(`[CompleteSubscription] Polling for active subscription... (${pollCount}/${maxPolls})`)
 
-      // Re-fetch org data
-      if (mutate) await mutate()
+      // Query Supabase directly for fresh status
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('subscription_status')
+        .eq('id', orgId)
+        .single()
 
-      // Check if subscription is now active
-      const status = currentOrganization?.subscription_status
+      console.log(`[CompleteSubscription] Poll result:`, data?.subscription_status, error?.message)
+
+      const status = data?.subscription_status
       if (status === 'active' || status === 'trial') {
         clearInterval(pollInterval)
+        // Refresh org context so dashboard has fresh data
+        if (mutate) await mutate()
         toast.success('Subscription activated successfully!', {
           description: `Welcome to the ${tierParam || ''} plan.`,
         })
@@ -124,15 +134,18 @@ function CompleteSubscriptionContent() {
 
       if (pollCount >= maxPolls) {
         clearInterval(pollInterval)
+        // Refresh org context before redirecting
+        if (mutate) await mutate()
         toast.success('Payment received!', {
           description: 'Your subscription is being set up. You can access your dashboard shortly.',
         })
         router.push('/dashboard')
       }
-    }, 1000)
+    }, 2000) // Poll every 2s to give webhook time
 
     return () => clearInterval(pollInterval)
-  }, [isPaymentSuccess, currentOrganization, mutate, router, tierParam])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaymentSuccess, currentOrganization?.id])
 
   // Show canceled toast
   useEffect(() => {
