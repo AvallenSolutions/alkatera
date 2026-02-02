@@ -33,8 +33,13 @@ export default function CreateOrganizationPage() {
       }
 
       // If they already have an organization from context, redirect
+      // But if subscription is pending, let them go to complete-subscription
       if (currentOrganization) {
-        router.push('/dashboard')
+        if (currentOrganization.subscription_status === 'pending') {
+          router.push('/complete-subscription')
+        } else {
+          router.push('/dashboard')
+        }
         return
       }
 
@@ -118,7 +123,7 @@ export default function CreateOrganizationPage() {
         description: 'Your organisation has been created successfully.',
       })
 
-      router.push('/settings?complete_subscription=true')
+      router.push('/complete-subscription')
       router.refresh()
     } catch (error) {
       console.error('Error creating organisation:', error)

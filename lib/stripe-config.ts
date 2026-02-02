@@ -69,8 +69,8 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
   seed: {
     tier: 'seed',
     displayName: 'Seed',
-    monthlyPriceId: 'price_1SjQkLS6ESxgnZl2F62rcpVd',
-    annualPriceId: 'price_1SrEHiS6ESxgnZl20udh9QqS',
+    monthlyPriceId: 'price_1SwKOlS6ESxgnZl2csSxr8kG',
+    annualPriceId: 'price_1SwKPkS6ESxgnZl2OtMzqMQy',
     monthlyPrice: 99,
     annualPrice: 990, // 10 months (2 months free)
     description: 'Perfect for startups and small businesses beginning their sustainability journey',
