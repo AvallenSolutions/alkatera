@@ -6,6 +6,7 @@ import { Flower2, Trees, Check, Minus } from 'lucide-react';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 // --- Seed Icon ---
 const SeedIcon = ({ className, size = 24 }: { className?: string; size?: number }) => (
@@ -131,7 +132,8 @@ const FeatureCell = ({ value }: { value: FeatureValue }) => {
 const tiers = [
   {
     name: "Seed",
-    price: "£99",
+    monthly: { original: 199, founder: 99, saving: 100 },
+    annual: { original: 1990, founder: 990, saving: 1000 },
     tagline: "For boutique brands establishing their sustainability foundations.",
     icon: SeedIcon,
     limits: ["5 Products", "5 LCA Calculations", "1 Team Member", "1 Facility", "5 Suppliers", "10 Reports/mo"],
@@ -149,7 +151,8 @@ const tiers = [
   },
   {
     name: "Blossom",
-    price: "£249",
+    monthly: { original: 399, founder: 249, saving: 150 },
+    annual: { original: 3990, founder: 2490, saving: 1500 },
     tagline: "For scaling brands ready to turn impact into a strategic advantage.",
     icon: Flower2,
     limits: ["20 Products", "20 LCA Calculations", "5 Team Members", "3 Facilities", "25 Suppliers", "50 Reports/mo"],
@@ -168,7 +171,8 @@ const tiers = [
   },
   {
     name: "Canopy",
-    price: "£599",
+    monthly: { original: 899, founder: 599, saving: 300 },
+    annual: { original: 8990, founder: 5990, saving: 3000 },
     tagline: "Comprehensive ecosystem management for established organisations.",
     icon: Trees,
     limits: ["50 Products", "50 LCA Calculations", "10 Team Members", "8 Facilities", "100 Suppliers", "200 Reports/mo"],
@@ -188,32 +192,26 @@ const tiers = [
 
 export default function GetAccessPage() {
   const [showMatrix, setShowMatrix] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'annual'>('monthly');
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="relative min-h-screen text-white">
+      {/* Full-page background */}
+      <Image
+        src="/images/starry-night-bg2.jpg"
+        alt="Starry night sky"
+        fill
+        className="object-cover"
+        priority
+        quality={85}
+      />
+      <div className="absolute inset-0 bg-black/70" />
+
+      <div className="relative z-10">
       <Navigation />
 
       {/* Hero Section */}
-      <section className="relative min-h-[60vh] w-full overflow-hidden flex items-center justify-center pt-32 pb-16">
-        {/* Background Image */}
-        <div className="absolute inset-0 z-0">
-          <img
-            src="https://images.unsplash.com/photo-1615634260167-c8cdede054de?q=80&w=2574&auto=format&fit=crop"
-            alt=""
-            className="w-full h-full object-cover opacity-30 mix-blend-luminosity"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/80 to-[#050505]" />
-        </div>
-
-        {/* Grid Overlay */}
-        <div
-          className="absolute inset-0 opacity-20 z-0"
-          style={{
-            backgroundImage:
-              'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
-          }}
-        />
+      <section className="relative w-full overflow-hidden flex items-center justify-center pt-24 pb-8">
 
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -230,14 +228,38 @@ export default function GetAccessPage() {
             Choose your impact scale.
           </h1>
           <p className="text-white/50 text-lg max-w-2xl mx-auto leading-relaxed">
-            Lock in exclusive founding partner rates. These prices are available for a limited time
-            only and will be honoured for the lifetime of your subscription.
+            Lock in exclusive founding partner rates. These prices are available for a limited time only.
           </p>
+          {/* Billing Toggle */}
+          <div className="mt-8 flex items-center justify-center gap-3">
+            <button
+              onClick={() => setBillingInterval('monthly')}
+              className={cn(
+                "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
+                billingInterval === 'monthly'
+                  ? "bg-[#ccff00] text-black font-bold"
+                  : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
+              )}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingInterval('annual')}
+              className={cn(
+                "font-mono text-xs uppercase tracking-widest px-5 py-2.5 rounded-full transition-all",
+                billingInterval === 'annual'
+                  ? "bg-[#ccff00] text-black font-bold"
+                  : "border border-white/20 text-white/50 hover:text-white hover:border-white/40"
+              )}
+            >
+              Annual
+            </button>
+          </div>
         </motion.div>
       </section>
 
       {/* Pricing Cards */}
-      <section className="relative px-6 md:px-20 pb-20 overflow-hidden">
+      <section className="relative px-6 md:px-20 pb-10 overflow-hidden">
         {/* Radial glow */}
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#ccff00]/5 via-transparent to-transparent pointer-events-none" />
 
@@ -251,14 +273,14 @@ export default function GetAccessPage() {
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: idx * 0.15 }}
                 className={cn(
-                  "border p-8 flex flex-col transition-all duration-500 group relative",
+                  "border p-8 flex flex-col transition-all duration-500 group relative rounded-2xl backdrop-blur-md",
                   tier.highlight
                     ? "border-[#ccff00] bg-[#ccff00]/5 md:-translate-y-4 shadow-[0_20px_50px_rgba(204,255,0,0.1)]"
                     : "border-white/10 bg-white/5 hover:border-white/30"
                 )}
               >
                 {tier.highlight && (
-                  <div className="absolute top-0 right-0 bg-[#ccff00] text-black text-[10px] font-bold uppercase px-3 py-1 tracking-widest">
+                  <div className="absolute top-0 right-0 bg-[#ccff00] text-black text-[10px] font-bold uppercase px-3 py-1 tracking-widest rounded-tr-2xl rounded-bl-xl">
                     Recommended
                   </div>
                 )}
@@ -276,16 +298,26 @@ export default function GetAccessPage() {
                 </div>
 
                 <div className="mb-6">
-                  <div className="flex items-baseline gap-1 mb-2">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <span className="text-white/40 text-lg line-through font-serif">
+                      £{billingInterval === 'monthly' ? tier.monthly.original : tier.annual.original.toLocaleString()}
+                    </span>
                     <span
                       className={cn(
                         "font-serif text-4xl",
                         tier.highlight ? "text-[#ccff00]" : "text-white"
                       )}
                     >
-                      {tier.price}
+                      £{billingInterval === 'monthly' ? tier.monthly.founder : tier.annual.founder.toLocaleString()}
                     </span>
-                    <span className="text-white/40 text-sm">/month</span>
+                    <span className="text-white/40 text-sm">/{billingInterval === 'monthly' ? 'mo' : 'yr'}</span>
+                  </div>
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ccff00]/10 rounded-full mb-3">
+                    <span className="font-mono text-[#ccff00] text-[10px] tracking-wider uppercase font-bold">
+                      Save £{billingInterval === 'monthly'
+                        ? tier.monthly.saving
+                        : tier.annual.saving.toLocaleString()}{billingInterval === 'monthly' ? '/mo' : '/yr'}
+                    </span>
                   </div>
                   <p className="text-white/60 text-sm leading-relaxed">{tier.tagline}</p>
                 </div>
@@ -332,7 +364,7 @@ export default function GetAccessPage() {
                 <a
                   href={tier.name === 'Canopy' ? `/contact?tier=${tier.name}` : `/getaccess/signup?tier=${tier.name}`}
                   className={cn(
-                    "w-full py-5 font-mono uppercase text-xs tracking-widest font-bold transition-all duration-300 text-center block",
+                    "w-full py-5 font-mono uppercase text-xs tracking-widest font-bold transition-all duration-300 text-center block rounded-xl",
                     tier.highlight
                       ? "bg-[#ccff00] text-black hover:opacity-90 hover:scale-[1.02]"
                       : "border border-white/20 hover:bg-white hover:text-black"
@@ -421,7 +453,30 @@ export default function GetAccessPage() {
         </div>
       </section>
 
+      {/* Photo credit */}
+      <div className="text-center pb-4 text-[10px] text-white/20">
+        Photo by{' '}
+        <a
+          href="https://unsplash.com/@ventiviews"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-white/40"
+        >
+          Venti Views
+        </a>
+        {' '}on{' '}
+        <a
+          href="https://unsplash.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-white/40"
+        >
+          Unsplash
+        </a>
+      </div>
+
       <Footer />
+      </div>
     </div>
   );
 }
