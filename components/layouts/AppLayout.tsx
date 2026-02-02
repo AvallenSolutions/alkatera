@@ -9,6 +9,7 @@ import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -56,12 +57,25 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
     }
   }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router])
 
-  // Payment gate: redirect to complete-subscription if no active subscription
+  // Payment gate: redirect based on subscription status
   useEffect(() => {
     if (!authLoading && !isOrganizationLoading && !subscriptionLoading && user && currentOrganization) {
-      const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization') || pathname?.startsWith('/complete-subscription') || pathname?.startsWith('/contact')
+      const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization') || pathname?.startsWith('/complete-subscription') || pathname?.startsWith('/contact') || pathname?.startsWith('/suspended')
       if (isAllowedPage) return
 
+      // past_due: allow access (grace period) - banner will show warning
+      if (subscriptionStatus === 'past_due') {
+        return
+      }
+
+      // suspended: redirect to suspended page
+      if (subscriptionStatus === 'suspended') {
+        console.log('🚫 AppLayout: Subscription suspended, redirecting to /suspended')
+        router.push('/suspended')
+        return
+      }
+
+      // pending, cancelled, or unknown: redirect to complete-subscription
       if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
         console.log('🚫 AppLayout: No active subscription, redirecting to complete-subscription')
         router.push('/complete-subscription')
@@ -115,6 +129,9 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
         />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+          {subscriptionStatus === 'past_due' && currentOrganization && (
+            <PaymentWarningBanner organizationId={currentOrganization.id} />
+          )}
           <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
             {children}
           </div>

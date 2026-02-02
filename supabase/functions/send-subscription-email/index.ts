@@ -19,7 +19,9 @@ type EmailEventType =
   | "payment_succeeded"
   | "payment_method_updated"
   | "subscription_cancelled"
-  | "subscription_reactivated";
+  | "subscription_reactivated"
+  | "subscription_suspended"
+  | "annual_renewal_reminder";
 
 interface EmailRequest {
   organizationId: string;
@@ -338,11 +340,12 @@ function buildEmailContent(
             </div>
             <div class="content">
               <p>Hi ${safeName},</p>
-              <p>We were unable to process your payment. Your subscription has been temporarily suspended.</p>
+              <p>We were unable to process your subscription payment.</p>
               <div class="danger-box">
-                <strong>Please update your payment method</strong>
-                <p style="margin: 8px 0 0 0;">To continue using AlkaTera without interruption, please update your payment information.</p>
+                <strong>You have 7 days to update your payment method</strong>
+                <p style="margin: 8px 0 0 0;">Your account will remain fully accessible during this grace period. If payment is not resolved within 7 days${metadata.gracePeriodEnd ? ` (by ${new Date(metadata.gracePeriodEnd).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })})` : ''}, your account will be suspended.</p>
               </div>
+              <p>Your data will always be kept safe, but you won't be able to access the platform until payment is resolved.</p>
               <a href="${settingsUrl}" class="button">Update Payment Method</a>
               <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">If you believe this is an error, please contact your bank or our support team.</p>
             </div>
@@ -446,6 +449,62 @@ function buildEmailContent(
               <p>Great news! Your AlkaTera subscription has been reactivated.</p>
               <p>All your features and data are available again. Thank you for continuing to use AlkaTera for your sustainability tracking.</p>
               <a href="${siteUrl}/dashboard" class="button">Go to Dashboard</a>
+            </div>
+            <div class="footer">
+              <p>AlkaTera - Sustainability Platform</p>
+            </div>
+          </div>
+        `,
+      };
+
+    case "subscription_suspended":
+      return {
+        subject: `Account Suspended - Action Required - AlkaTera`,
+        html: `
+          ${baseStyles}
+          <div class="container">
+            <div class="header header-danger">
+              <h2 style="margin: 0;">Account Suspended</h2>
+            </div>
+            <div class="content">
+              <p>Hi ${safeName},</p>
+              <p>Your AlkaTera account has been suspended because your payment could not be processed and the 7-day grace period has expired.</p>
+              <div class="danger-box">
+                <strong>Your data is safe</strong>
+                <p style="margin: 8px 0 0 0;">All your products, LCAs, reports and organisation data are kept intact. Once you update your payment method, access will be restored immediately.</p>
+              </div>
+              <a href="${settingsUrl}" class="button">Update Payment Method</a>
+              <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">If you believe this is an error, please contact our support team at support@alkatera.com.</p>
+            </div>
+            <div class="footer">
+              <p>AlkaTera - Sustainability Platform</p>
+            </div>
+          </div>
+        `,
+      };
+
+    case "annual_renewal_reminder":
+      return {
+        subject: `Upcoming Annual Renewal - AlkaTera`,
+        html: `
+          ${baseStyles}
+          <div class="container">
+            <div class="header">
+              <h2 style="margin: 0;">Annual Subscription Renewal</h2>
+            </div>
+            <div class="content">
+              <p>Hi ${safeName},</p>
+              <p>This is a friendly reminder that your annual AlkaTera subscription will renew soon.</p>
+              <div class="info-box">
+                <strong>Renewal Details</strong>
+                <p style="margin: 8px 0 0 0;">
+                  <strong>Plan:</strong> ${formatTierName(metadata.tier || 'seed')}<br/>
+                  <strong>Amount:</strong> &pound;${metadata.amount ? (metadata.amount / 100).toFixed(2) : 'N/A'}<br/>
+                  <strong>Renewal Date:</strong> ${metadata.renewalDate ? new Date(metadata.renewalDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'Within 7 days'}
+                </p>
+              </div>
+              <p>If you'd like to make any changes to your subscription or payment method before renewal, you can do so from your billing settings.</p>
+              <a href="${settingsUrl}" class="button">Manage Subscription</a>
             </div>
             <div class="footer">
               <p>AlkaTera - Sustainability Platform</p>

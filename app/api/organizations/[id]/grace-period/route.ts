@@ -45,7 +45,7 @@ export async function GET(
     // Get organization's grace period data
     const { data: org, error: orgError } = await supabase
       .from('organizations')
-      .select('grace_period_end, grace_period_resource_type, subscription_tier')
+      .select('grace_period_end, grace_period_started_at, subscription_tier, subscription_status')
       .eq('id', organizationId)
       .single();
 
@@ -55,52 +55,13 @@ export async function GET(
 
     // If no grace period, return null
     if (!org.grace_period_end) {
-      return NextResponse.json({ gracePeriodEnd: null });
-    }
-
-    // Get current usage for the resource type
-    const { data: usage, error: usageError } = await supabase.rpc('get_organization_usage', {
-      p_organization_id: organizationId,
-    });
-
-    if (usageError) {
-      console.error('Error fetching usage:', usageError);
-    }
-
-    // Get the limit for the resource type from the current tier
-    const { data: limits } = await supabase
-      .from('subscription_tier_limits')
-      .select('*')
-      .eq('tier_name', org.subscription_tier)
-      .single();
-
-    const resourceType = org.grace_period_resource_type || 'items';
-    let currentUsage = 0;
-    let limit = 0;
-
-    if (usage?.usage && resourceType) {
-      const resourceData = usage.usage[resourceType];
-      if (resourceData) {
-        currentUsage = resourceData.current || 0;
-      }
-    }
-
-    if (limits) {
-      const limitMap: Record<string, number | null> = {
-        facilities: limits.max_facilities,
-        products: limits.max_products,
-        team_members: limits.max_team_members,
-        lcas: limits.max_lcas,
-        suppliers: limits.max_suppliers,
-      };
-      limit = limitMap[resourceType] || 0;
+      return NextResponse.json({ grace_period_end: null, subscription_status: org.subscription_status });
     }
 
     return NextResponse.json({
-      gracePeriodEnd: org.grace_period_end,
-      resourceType,
-      currentUsage,
-      limit,
+      grace_period_end: org.grace_period_end,
+      grace_period_started_at: org.grace_period_started_at,
+      subscription_status: org.subscription_status,
       daysRemaining: Math.max(
         0,
         Math.ceil(

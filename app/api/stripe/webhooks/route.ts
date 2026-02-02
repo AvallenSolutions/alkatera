@@ -379,13 +379,15 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const previousTier = org.subscription_tier;
   const previousStatus = org.subscription_status;
 
-  // Downgrade to seed (free) tier
+  // Downgrade to seed (free) tier, clear grace period, keep all data
   const { error } = await getSupabaseAdmin()
     .from('organizations')
     .update({
       subscription_tier: 'seed',
       subscription_status: 'cancelled',
       stripe_subscription_id: null,
+      grace_period_end: null,
+      grace_period_started_at: null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', org.id);
@@ -420,7 +422,6 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   console.log('Invoice payment failed:', invoice.id);
 
   // Extract subscription ID from invoice
-  // In Stripe API, subscription can be a string ID or an expanded object
   const invoiceData = invoice as any;
   const subscriptionId = typeof invoiceData.subscription === 'string'
     ? invoiceData.subscription
@@ -432,7 +433,7 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   // Find organization by subscription ID
   const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
-    .select('id, name, billing_email, subscription_tier, subscription_status')
+    .select('id, name, billing_email, subscription_tier, subscription_status, grace_period_end')
     .eq('stripe_subscription_id', subscriptionId)
     .single();
 
@@ -443,33 +444,35 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   const previousStatus = org.subscription_status;
 
-  // Update subscription status to suspended
+  // If already past_due (retry), don't reset the grace period
+  if (org.subscription_status === 'past_due' || org.subscription_status === 'suspended') {
+    console.log(`Organization ${org.id} already ${org.subscription_status}, skipping duplicate payment_failed`);
+    return;
+  }
+
+  // Start 7-day grace period — set to past_due, not suspended
+  const gracePeriodEnd = new Date();
+  gracePeriodEnd.setDate(gracePeriodEnd.getDate() + 7);
+
   const { error } = await getSupabaseAdmin()
     .from('organizations')
     .update({
-      subscription_status: 'suspended',
+      subscription_status: 'past_due',
+      grace_period_started_at: new Date().toISOString(),
+      grace_period_end: gracePeriodEnd.toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', org.id);
 
   if (error) {
-    console.error('Error suspending organization:', error);
+    console.error('Error setting organization to past_due:', error);
   } else {
-    console.log(`Organization ${org.id} suspended due to payment failure`);
-
-    // Log the payment failure
-    await getSupabaseAdmin().rpc('log_subscription_change', {
-      p_organization_id: org.id,
-      p_event_type: 'payment_failed',
-      p_previous_status: previousStatus,
-      p_new_status: 'suspended',
-      p_stripe_invoice_id: invoice.id,
-      p_metadata: JSON.stringify({ amount_due: invoice.amount_due }),
-    });
+    console.log(`Organization ${org.id} set to past_due with grace period ending ${gracePeriodEnd.toISOString()}`);
 
     // Send email notification about payment failure
     await sendSubscriptionEmail(org.id, 'payment_failed', {
       amount: invoice.amount_due,
+      gracePeriodEnd: gracePeriodEnd.toISOString(),
     });
   }
 }
@@ -502,14 +505,16 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     return;
   }
 
-  const wasSuspended = org.subscription_status === 'suspended';
+  const wasInactive = org.subscription_status === 'suspended' || org.subscription_status === 'past_due';
 
-  // If organization was suspended, reactivate it
-  if (wasSuspended) {
+  // If organization was suspended or past_due, reactivate it
+  if (wasInactive) {
     const { error } = await getSupabaseAdmin()
       .from('organizations')
       .update({
         subscription_status: 'active',
+        grace_period_end: null,
+        grace_period_started_at: null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', org.id);
@@ -517,17 +522,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     if (error) {
       console.error('Error reactivating organization:', error);
     } else {
-      console.log(`Organization ${org.id} reactivated after successful payment`);
-
-      // Log the reactivation
-      await getSupabaseAdmin().rpc('log_subscription_change', {
-        p_organization_id: org.id,
-        p_event_type: 'reactivation',
-        p_previous_status: 'suspended',
-        p_new_status: 'active',
-        p_stripe_invoice_id: invoice.id,
-        p_amount_charged: invoice.amount_paid ? invoice.amount_paid / 100 : null,
-      });
+      console.log(`Organization ${org.id} reactivated after successful payment (was ${org.subscription_status})`);
 
       // Send email notification about reactivation
       await sendSubscriptionEmail(org.id, 'subscription_reactivated', {
@@ -536,15 +531,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       });
     }
   } else {
-    // Log successful payment for non-suspended orgs
-    await getSupabaseAdmin().rpc('log_subscription_change', {
-      p_organization_id: org.id,
-      p_event_type: 'payment_succeeded',
-      p_stripe_invoice_id: invoice.id,
-      p_amount_charged: invoice.amount_paid ? invoice.amount_paid / 100 : null,
-    });
-
-    // Send payment receipt email
+    // Send payment receipt email for active orgs
     await sendSubscriptionEmail(org.id, 'payment_succeeded', {
       amount: invoice.amount_paid,
       wasReactivated: false,
