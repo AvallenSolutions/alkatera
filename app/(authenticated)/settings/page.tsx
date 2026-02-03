@@ -45,7 +45,10 @@ interface SubscriptionHistoryEntry {
 export default function SettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { currentOrganization } = useOrganization()
+  const { currentOrganization, userRole } = useOrganization()
+
+  // Check if user is an admin (owner or admin)
+  const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
   const {
     usage,
     tierName,
@@ -271,8 +274,8 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Subscription Required Banner */}
-      {subscriptionStatus !== 'active' && subscriptionStatus !== 'trial' && (
+      {/* Subscription Required Banner - only shown to admins */}
+      {isOrgAdmin && subscriptionStatus !== 'active' && subscriptionStatus !== 'trial' && (
         <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-2">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
@@ -289,8 +292,8 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Grace Period Banner */}
-      {organizationData?.grace_period_end && (
+      {/* Grace Period Banner - only shown to admins */}
+      {isOrgAdmin && organizationData?.grace_period_end && (
         <GracePeriodBanner
           gracePeriodEnd={organizationData.grace_period_end}
           resourceType={organizationData.grace_period_resource_type || 'items'}
@@ -327,18 +330,26 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="subscription" className="space-y-4">
+      <Tabs defaultValue={isOrgAdmin ? "subscription" : "profile"} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="subscription">Subscription</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
+          {isOrgAdmin && (
+            <>
+              <TabsTrigger value="subscription">Subscription</TabsTrigger>
+              <TabsTrigger value="billing">Billing</TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+          {isOrgAdmin && (
+            <>
+              <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+            </>
+          )}
           <TabsTrigger value="organisation">Organisation</TabsTrigger>
           <TabsTrigger value="support">Support</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="subscription" className="space-y-6">
+        {isOrgAdmin && <TabsContent value="subscription" className="space-y-6">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -632,9 +643,9 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
-        <TabsContent value="billing" className="space-y-4">
+        {isOrgAdmin && <TabsContent value="billing" className="space-y-4">
           <div className="grid gap-6 md:grid-cols-2">
             <Card>
               <CardHeader>
@@ -950,7 +961,7 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
         <TabsContent value="profile" className="space-y-4">
           <Card>
@@ -971,7 +982,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="team" className="space-y-4">
+        {isOrgAdmin && <TabsContent value="team" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -988,9 +999,9 @@ export default function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
-        <TabsContent value="suppliers" className="space-y-4">
+        {isOrgAdmin && <TabsContent value="suppliers" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -1015,7 +1026,7 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent>}
 
         <TabsContent value="organisation" className="space-y-4">
           <Card>
