@@ -144,33 +144,36 @@ export function AdvisorManagement() {
     setIsInviting(true);
 
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
         throw new Error('Not authenticated');
       }
 
-      // Create the invitation
-      const { data, error } = await supabase
-        .from('advisor_invitations')
-        .insert({
-          organization_id: currentOrganization.id,
-          advisor_email: inviteeEmail.trim().toLowerCase(),
-          invited_by: userData.user.id,
-          access_notes: accessNotes.trim() || null,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === '23505') {
-          throw new Error('An invitation has already been sent to this email address');
+      // Call the invite-advisor Edge Function to create invitation and send email
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/invite-advisor`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${sessionData.session.access_token}`,
+          },
+          body: JSON.stringify({
+            email: inviteeEmail.trim(),
+            accessNotes: accessNotes.trim() || undefined,
+          }),
         }
-        throw error;
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send invitation');
       }
 
       toast({
         title: 'Invitation Sent',
-        description: `Advisor invitation sent to ${inviteeEmail}. They will need to accept it to gain access.`,
+        description: `Advisor invitation email sent to ${inviteeEmail}. They will need to accept it to gain access.`,
       });
 
       setIsDialogOpen(false);
