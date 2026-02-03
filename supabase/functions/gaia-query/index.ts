@@ -984,11 +984,13 @@ async function fetchOrganizationContext(
 
     // Fetch product LCA data directly by organization
     // Single source of truth: aggregated_impacts.climate_change_gwp100 for carbon footprint
-    const { data: lcaData, count: lcaCount, error: lcaError } = await supabase
+    // Order by updated_at descending so we can deduplicate to latest LCA per product
+    const { data: lcaData, error: lcaError } = await supabase
       .from('product_carbon_footprints')
-      .select('id, product_name, functional_unit, status, aggregated_impacts', { count: 'exact' })
+      .select('id, product_id, product_name, functional_unit, status, aggregated_impacts, updated_at')
       .eq('organization_id', organizationId)
-      .eq('status', 'completed');
+      .eq('status', 'completed')
+      .order('updated_at', { ascending: false });
 
     if (lcaError) {
       console.error('[Rosa] Error fetching LCA data:', lcaError);
@@ -997,15 +999,24 @@ async function fetchOrganizationContext(
     }
 
     if (lcaData && lcaData.length > 0) {
+      // Deduplicate: keep only the latest LCA per product_id
+      const latestLcaByProduct = new Map<number, typeof lcaData[0]>();
+      for (const lca of lcaData) {
+        if (!latestLcaByProduct.has(lca.product_id)) {
+          latestLcaByProduct.set(lca.product_id, lca);
+        }
+      }
+      const uniqueLcas = Array.from(latestLcaByProduct.values());
+
       contextParts.push(`\n### Product Carbon Footprints (LCA)`);
-      contextParts.push(`- Completed LCAs: ${lcaData.length}`);
+      contextParts.push(`- Products with completed LCAs: ${uniqueLcas.length}`);
 
       // Calculate totals from aggregated_impacts
       let totalCarbonFootprint = 0;
       let totalWaterFootprint = 0;
       const productFootprints: string[] = [];
 
-      for (const lca of lcaData.slice(0, 5)) {
+      for (const lca of uniqueLcas) {
         const impacts = lca.aggregated_impacts as Record<string, unknown> | null;
         // Use climate_change_gwp100 which is the correct field used by the UI
         const carbonFootprint = impacts?.climate_change_gwp100 as number || 0;
@@ -1025,7 +1036,7 @@ async function fetchOrganizationContext(
       }
 
       if (totalCarbonFootprint > 0) {
-        const avgCarbonFootprint = totalCarbonFootprint / lcaData.length;
+        const avgCarbonFootprint = totalCarbonFootprint / uniqueLcas.length;
         contextParts.push(`- Average Product Carbon Footprint: ${avgCarbonFootprint.toFixed(3)} kg CO2e`);
         contextParts.push(`- Total Carbon Footprint (all products): ${totalCarbonFootprint.toFixed(3)} kg CO2e`);
       }
@@ -1034,7 +1045,7 @@ async function fetchOrganizationContext(
         contextParts.push(`- Total Water Footprint: ${totalWaterFootprint.toFixed(2)} L`);
       }
 
-      dataSources.push({ table: 'product_carbon_footprints', description: 'Product LCA calculations', recordCount: lcaCount || 0 });
+      dataSources.push({ table: 'product_carbon_footprints', description: 'Product LCA calculations', recordCount: uniqueLcas.length });
     }
 
     // Fetch vitality scores
