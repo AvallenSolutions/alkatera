@@ -179,8 +179,8 @@ Deno.serve(async (req: Request) => {
     console.log(`Scope 1 Total (with fleet): ${scope1Total} kgCO2e`);
     console.log(`Scope 2 Total (with fleet): ${scope2Total} kgCO2e`);
 
-    // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA total impacts
-    // CRITICAL: Use total_ghg_emissions (full lifecycle) NOT just materials breakdown
+    // Step 2: Scope 3 (Products) - Query production logs and multiply by LCA Scope 3 impacts
+    // CRITICAL: Use aggregated_impacts.breakdown.by_scope.scope3 to avoid double-counting facility emissions
     const { data: productionLogs, error: productionError } = await supabase
       .from("production_logs")
       .select("product_id, units_produced, date")

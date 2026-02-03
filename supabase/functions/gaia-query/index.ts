@@ -982,10 +982,11 @@ async function fetchOrganizationContext(
       contextParts.push(`- To add products: Go to Products in the sidebar and click "Add New Product"`);
     }
 
-    // Fetch product LCA data directly by organization (correct column: total_ghg_emissions)
+    // Fetch product LCA data directly by organization
+    // Single source of truth: aggregated_impacts.climate_change_gwp100 for carbon footprint
     const { data: lcaData, count: lcaCount, error: lcaError } = await supabase
       .from('product_carbon_footprints')
-      .select('id, product_name, total_ghg_emissions, functional_unit, status, aggregated_impacts', { count: 'exact' })
+      .select('id, product_name, functional_unit, status, aggregated_impacts', { count: 'exact' })
       .eq('organization_id', organizationId)
       .eq('status', 'completed');
 

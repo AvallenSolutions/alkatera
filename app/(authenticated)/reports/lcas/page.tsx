@@ -60,13 +60,10 @@ export default function LcasPage() {
         return;
       }
 
-      // Transform the data using total_ghg_emissions from product_lcas
+      // Transform the data - single source of truth: aggregated_impacts.climate_change_gwp100
       const transformedReports: LCAReport[] = lcas.map((lca: any) => {
-        // Get total GHG emissions from aggregated_impacts JSONB field
-        const totalCO2e = lca.aggregated_impacts?.total_carbon_footprint ||
-                          lca.aggregated_impacts?.total_climate ||
-                          lca.total_ghg_emissions ||
-                          0;
+        // Get total GHG emissions from aggregated_impacts JSONB field (single source of truth)
+        const totalCO2e = lca.aggregated_impacts?.climate_change_gwp100 || 0;
 
         // Calculate DQI score based on status and data completeness
         let dqiScore = 50;

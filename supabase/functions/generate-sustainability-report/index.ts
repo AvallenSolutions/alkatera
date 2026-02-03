@@ -622,7 +622,7 @@ async function aggregateReportData(
       console.log('[Data] Fetching product LCA data...');
       const { data: products, error: productsError } = await supabaseClient
         .from('product_carbon_footprints')
-        .select('product_name, functional_unit, total_ghg_emissions, aggregated_impacts, reference_year')
+        .select('product_name, functional_unit, aggregated_impacts, reference_year')
         .eq('organization_id', organizationId)
         .eq('status', 'completed')
         .order('created_at', { ascending: false })
@@ -641,8 +641,8 @@ async function aggregateReportData(
         data.products = Array.from(seenProducts.values()).map((p: any) => ({
           name: p.product_name,
           functionalUnit: p.functional_unit,
-          // Use total_ghg_emissions first, fall back to aggregated_impacts with gwp100 fix
-          climateImpact: p.total_ghg_emissions || p.aggregated_impacts?.climate_change_gwp100 || p.aggregated_impacts?.climate_change || 0,
+          // Single source of truth: aggregated_impacts.climate_change_gwp100
+          climateImpact: p.aggregated_impacts?.climate_change_gwp100 || 0,
           referenceYear: p.reference_year,
         }));
         data.dataAvailability.hasProducts = true;

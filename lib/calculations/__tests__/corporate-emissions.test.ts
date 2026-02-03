@@ -260,7 +260,7 @@ describe('calculateScope3', () => {
 
   it('should use breakdown.by_scope.scope3 to avoid double counting', async () => {
     // This test verifies the critical fix: using scope3 breakdown
-    // instead of total_ghg_emissions which would include facility S1+S2
+    // instead of the total climate_change_gwp100 which would include facility S1+S2
     const mockSupabase = createMockSupabase({
       production_logs: {
         data: [{ product_id: 'prod-1', units_produced: 100 }],
@@ -269,7 +269,7 @@ describe('calculateScope3', () => {
       product_carbon_footprints: {
         data: {
           aggregated_impacts: {
-            total_ghg_emissions: 10, // 10 kgCO2e total (includes S1+S2)
+            climate_change_gwp100: 10, // 10 kgCO2e total (includes S1+S2)
             breakdown: {
               by_scope: {
                 scope1: 1,
@@ -626,7 +626,7 @@ describe('Edge Cases', () => {
         product_carbon_footprints: {
           data: {
             aggregated_impacts: {
-              total_ghg_emissions: 10,
+              climate_change_gwp100: 10,
               // No breakdown.by_scope
             },
           },
@@ -713,7 +713,7 @@ describe('Edge Cases', () => {
 describe('Double Counting Prevention', () => {
   it('should NOT include facility emissions in Scope 3 products', async () => {
     // Scenario: A product LCA shows:
-    // - total_ghg_emissions: 15 kgCO2e (includes 5 kg from owned facility)
+    // - climate_change_gwp100: 15 kgCO2e (includes 5 kg from owned facility)
     // - breakdown.by_scope.scope1: 2 kgCO2e (facility combustion)
     // - breakdown.by_scope.scope2: 3 kgCO2e (facility electricity)
     // - breakdown.by_scope.scope3: 10 kgCO2e (supply chain only)
@@ -729,7 +729,7 @@ describe('Double Counting Prevention', () => {
       product_carbon_footprints: {
         data: {
           aggregated_impacts: {
-            total_ghg_emissions: 15,
+            climate_change_gwp100: 15,
             breakdown: {
               by_scope: {
                 scope1: 2,

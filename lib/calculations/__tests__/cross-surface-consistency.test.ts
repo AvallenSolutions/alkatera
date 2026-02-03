@@ -46,7 +46,7 @@ const createRealisticMock = () => {
             return {
               data: {
                 aggregated_impacts: {
-                  total_ghg_emissions: 2.832,
+                  climate_change_gwp100: 2.832, // Single source of truth for total carbon footprint
                   breakdown: {
                     by_scope: {
                       scope1: 0.15,  // Facility combustion allocated to product
@@ -282,7 +282,7 @@ describe('Cross-Surface Consistency', () => {
     // NOT: 10000 units * 2.832 kgCO2e (total which includes S1+S2)
     expect(scope3.products).toBe(25820); // 10000 * 2.582
 
-    // If it was incorrectly using total_ghg_emissions, it would be 28320
+    // If it was incorrectly using climate_change_gwp100 total, it would be 28320
     expect(scope3.products).not.toBe(28320);
   });
 
@@ -387,7 +387,7 @@ describe('Regression Tests', () => {
     // This tests the original bug: Test Calvados showing
     // 2.832 kgCO2eq on product page vs 2.75 kg on passport
     //
-    // The fix ensures both use total_ghg_emissions from aggregated_impacts
+    // The fix ensures both use climate_change_gwp100 from aggregated_impacts
     // and the breakdown comes from by_lifecycle_stage (not by_category)
 
     const mockSupabase = createRealisticMock();
@@ -402,14 +402,14 @@ describe('Regression Tests', () => {
       .limit(1)
       .maybeSingle();
 
-    expect(productLCA.data.aggregated_impacts.total_ghg_emissions).toBe(2.832);
+    expect(productLCA.data.aggregated_impacts.climate_change_gwp100).toBe(2.832);
     expect(productLCA.data.aggregated_impacts.breakdown.by_lifecycle_stage).toBeDefined();
   });
 
   it('REGRESSION: Corporate Scope 3 should NOT include facility S1/S2 from products', async () => {
     // This tests the double-counting fix
     // Corporate Scope 3 must use breakdown.by_scope.scope3 from product LCAs
-    // NOT total_ghg_emissions which includes facility emissions
+    // NOT climate_change_gwp100 which includes facility emissions
 
     const mockSupabase = createRealisticMock();
 

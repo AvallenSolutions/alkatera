@@ -397,11 +397,12 @@ export async function aggregateProductImpacts(
   console.log(`[aggregateProductImpacts] RESULT: ${totalCarbonFootprint.toFixed(4)} kg CO2e per ${productData?.functional_unit || 'unit'}`);
 
   // 12. Update the PCF record
+  // Note: aggregated_impacts.climate_change_gwp100 is the single source of truth for carbon footprint
+  // total_ghg_emissions column is deprecated and will be removed in a future migration
   const { error: updateError } = await supabase
     .from('product_carbon_footprints')
     .update({
       aggregated_impacts: aggregatedImpacts,
-      total_ghg_emissions: totalCarbonFootprint,
       per_unit_emissions_verified: true,
       bulk_volume_per_functional_unit: bulkVolumePerUnit,
       volume_unit: 'L',

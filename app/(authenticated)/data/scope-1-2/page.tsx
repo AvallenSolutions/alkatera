@@ -398,7 +398,7 @@ export default function CompanyEmissionsPage() {
         // Fetch all PEIs for the org to determine completed vs pending per product
         const { data: allPEIs, error: lcaFallbackError } = await browserSupabase
           .from('product_carbon_footprints')
-          .select('id, product_id, total_ghg_emissions, aggregated_impacts, status, updated_at')
+          .select('id, product_id, aggregated_impacts, status, updated_at')
           .eq('organization_id', currentOrganization.id)
           .order('created_at', { ascending: false });
 
@@ -602,7 +602,7 @@ export default function CompanyEmissionsPage() {
 
         const { data: lcaData, error: lcaError } = await browserSupabase
           .from('product_carbon_footprints')
-          .select('id, total_ghg_emissions, aggregated_impacts, status, per_unit_emissions_verified, updated_at')
+          .select('id, aggregated_impacts, status, per_unit_emissions_verified, updated_at')
           .eq('product_id', log.product_id)
           .eq('status', 'completed')
           .gte('updated_at', yearStart)
@@ -614,11 +614,13 @@ export default function CompanyEmissionsPage() {
         const lca = lcaData as any;
         // Use scope3 from aggregated_impacts to avoid double-counting facility S1/S2
         const scope3PerUnit = lca?.aggregated_impacts?.breakdown?.by_scope?.scope3 || 0;
+        // Single source of truth: climate_change_gwp100 from aggregated_impacts
+        const totalGhgPerUnit = lca?.aggregated_impacts?.climate_change_gwp100 || 0;
         console.log('🔍 [SCOPE 3 CAT 1] LCA data', {
           productId: log.product_id,
           hasLCA: !!lca,
           status: lca?.status,
-          total_ghg_emissions: lca?.total_ghg_emissions,
+          climate_change_gwp100: totalGhgPerUnit,
           scope3_per_unit: scope3PerUnit,
           per_unit_verified: lca?.per_unit_emissions_verified,
           lcaError
@@ -843,14 +845,16 @@ export default function CompanyEmissionsPage() {
 
           const { data: lca } = await browserSupabase
             .from('product_carbon_footprints')
-            .select('total_ghg_emissions')
+            .select('aggregated_impacts')
             .eq('product_id', log.product_id)
             .eq('status', 'completed')
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (lca && lca.total_ghg_emissions) {
+          // Single source of truth: climate_change_gwp100 from aggregated_impacts
+          const carbonFootprint = (lca?.aggregated_impacts as any)?.climate_change_gwp100 || 0;
+          if (lca && carbonFootprint > 0) {
             const volumeInLitres = log.unit === 'Hectolitre' ? log.volume * 100 : log.volume;
 
             let productSizeInLitres = product.unit_size_value || 1;
@@ -859,7 +863,7 @@ export default function CompanyEmissionsPage() {
             }
 
             const numberOfUnits = volumeInLitres / productSizeInLitres;
-            const totalImpact = lca.total_ghg_emissions * numberOfUnits;
+            const totalImpact = carbonFootprint * numberOfUnits;
             total += totalImpact;
           }
         }
@@ -939,7 +943,6 @@ export default function CompanyEmissionsPage() {
     }
   }, [currentOrganization?.id, selectedYear]);
 
-
   const handleGenerateReport = async () => {
     if (!report || !currentOrganization?.id) return;
 
@@ -1015,6 +1018,56 @@ export default function CompanyEmissionsPage() {
   const calculatedScope3OverheadsCO2e = overheads
     .filter((o) => scope3OverheadCategories.includes(o.category))
     .reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
+
+  // Persist calculated emissions to corporate_reports for Rosa AI to read
+  useEffect(() => {
+    const persistEmissions = async () => {
+      if (!report?.id || !currentOrganization?.id) return;
+
+      // Calculate total emissions (matching the display logic)
+      const totalEmissionsTonnes =
+        (scope1CO2e / 1000) +       // Scope 1 in tonnes
+        fleetCO2e +                  // Fleet already in tonnes
+        (scope2CO2e / 1000) +       // Scope 2 in tonnes
+        scope3Cat1CO2e +            // Scope 3 Cat 1 (products) in tonnes
+        (calculatedScope3OverheadsCO2e / 1000); // Scope 3 overheads in tonnes
+
+      // Only persist if we have actual data
+      if (totalEmissionsTonnes <= 0) return;
+
+      const breakdownJson = {
+        scope1: scope1CO2e / 1000,           // in tonnes
+        scope2: scope2CO2e / 1000,           // in tonnes
+        fleet: fleetCO2e,                     // already in tonnes
+        scope3: {
+          products: scope3Cat1CO2e,          // in tonnes
+          products_breakdown: scope3Cat1Breakdown,
+          overheads: calculatedScope3OverheadsCO2e / 1000, // in tonnes
+          total: scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000),
+        },
+        total: totalEmissionsTonnes,
+        calculated_at: new Date().toISOString(),
+      };
+
+      try {
+        const browserSupabase = getSupabaseBrowserClient();
+        await browserSupabase
+          .from('corporate_reports')
+          .update({
+            total_emissions: totalEmissionsTonnes,
+            breakdown_json: breakdownJson,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', report.id);
+      } catch (error) {
+        console.error('Error persisting emissions to corporate_reports:', error);
+      }
+    };
+
+    // Debounce to avoid too many updates
+    const timeoutId = setTimeout(persistEmissions, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetCO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, scope3Cat1Breakdown]);
 
   return (
     <div className="space-y-6">

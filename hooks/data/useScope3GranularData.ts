@@ -180,18 +180,21 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
         for (const log of productionLogs) {
           const { data: lca } = await supabase
             .from('product_carbon_footprints')
-            .select('id, total_ghg_emissions, status')
+            .select('id, aggregated_impacts, status')
             .eq('product_id', log.product_id)
             .eq('status', 'completed')
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (lca && lca.total_ghg_emissions > 0) {
+          // Extract carbon footprint from aggregated_impacts (single source of truth)
+          const emissionsPerUnit = (lca?.aggregated_impacts as any)?.climate_change_gwp100 || 0;
+
+          if (lca && emissionsPerUnit > 0) {
             const unitsProduced = log.units_produced || 0;
             if (unitsProduced <= 0) continue;
 
-            const totalEmissions = lca.total_ghg_emissions * unitsProduced;
+            const totalEmissions = emissionsPerUnit * unitsProduced;
             cat1Total += totalEmissions;
 
             const { data: materials } = await supabase
@@ -228,7 +231,7 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
               productName: productInfo?.name || 'Unknown Product',
               sku: productInfo?.sku,
               unitsProduced,
-              emissionsPerUnit: lca.total_ghg_emissions,
+              emissionsPerUnit,
               totalEmissions,
               materials: ingredientsList,
               packaging: packagingList,
