@@ -779,6 +779,7 @@ async function handleStreamingResponse(
 }
 
 // Fetch organization data context with comprehensive data gathering
+// Uses new Rosa RPC functions for comprehensive data access
 async function fetchOrganizationContext(
   supabase: ReturnType<typeof createClient>,
   organizationId: string
@@ -787,6 +788,9 @@ async function fetchOrganizationContext(
   const contextParts: string[] = [];
 
   console.log(`[Rosa] Fetching context for organization: ${organizationId}`);
+
+  // Get current year for date-based queries
+  const currentYear = new Date().getFullYear();
 
   try {
     // Fetch organization
@@ -1002,8 +1006,9 @@ async function fetchOrganizationContext(
 
       for (const lca of lcaData.slice(0, 5)) {
         const impacts = lca.aggregated_impacts as Record<string, unknown> | null;
-        const carbonFootprint = impacts?.total_carbon_footprint as number || Number(lca.total_ghg_emissions) || 0;
-        const waterFootprint = impacts?.total_water as number || 0;
+        // Use climate_change_gwp100 which is the correct field used by the UI
+        const carbonFootprint = impacts?.climate_change_gwp100 as number || 0;
+        const waterFootprint = impacts?.water_scarcity_aware as number || impacts?.water_consumption as number || 0;
 
         totalCarbonFootprint += carbonFootprint;
         totalWaterFootprint += waterFootprint;
@@ -1136,7 +1141,6 @@ async function fetchOrganizationContext(
     }
 
     // Fetch authoritative corporate emissions using the RPC function
-    const currentYear = new Date().getFullYear();
     const { data: corporateEmissions, error: emissionsError } = await supabase
       .rpc('calculate_gaia_corporate_emissions', {
         p_organization_id: organizationId,
@@ -1186,6 +1190,388 @@ async function fetchOrganizationContext(
       contextParts.push(`  - Product LCAs for Scope 3`);
       contextParts.push(`  - Corporate overheads (business travel, commuting) for Scope 3`);
       contextParts.push(`- View emissions: Go to Company > Company Emissions`);
+    }
+
+    // ============================================================
+    // NEW: Fetch comprehensive data using Rosa RPC functions
+    // ============================================================
+
+    // Fetch emissions by period (for time-based queries)
+    const { data: emissionsByPeriod, error: emissionsPeriodError } = await supabase
+      .rpc('rosa_get_emissions_by_period', {
+        p_organization_id: organizationId,
+        p_start_date: `${currentYear}-01-01`,
+        p_end_date: `${currentYear}-12-31`
+      });
+
+    if (emissionsPeriodError) {
+      console.error('[Rosa] Error fetching emissions by period:', emissionsPeriodError);
+    }
+
+    if (emissionsByPeriod && emissionsByPeriod.length > 0) {
+      contextParts.push(`\n### Emissions by Period (${currentYear})`);
+      contextParts.push(`*Detailed breakdown by month and category for time-based queries*`);
+
+      // Group by category for summary
+      const categoryTotals: Record<string, number> = {};
+      emissionsByPeriod.forEach((row: { category: string; total_emissions_kg: number }) => {
+        const cat = row.category || 'uncategorized';
+        categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(row.total_emissions_kg || 0);
+      });
+
+      Object.entries(categoryTotals).forEach(([cat, total]) => {
+        if (total > 0) {
+          contextParts.push(`- ${cat}: ${(total / 1000).toFixed(2)} tCO2e`);
+        }
+      });
+
+      dataSources.push({
+        table: 'rosa_get_emissions_by_period',
+        description: 'Monthly emissions by category',
+        recordCount: emissionsByPeriod.length
+      });
+    }
+
+    // Fetch facility metrics (for facility-level queries)
+    const { data: facilityMetrics, error: facilityMetricsError } = await supabase
+      .rpc('rosa_get_facility_metrics', {
+        p_organization_id: organizationId
+      });
+
+    if (facilityMetricsError) {
+      console.error('[Rosa] Error fetching facility metrics:', facilityMetricsError);
+    }
+
+    if (facilityMetrics && facilityMetrics.length > 0) {
+      contextParts.push(`\n### Facility Environmental Metrics`);
+      contextParts.push(`*Detailed metrics per facility for comparisons*`);
+
+      facilityMetrics.forEach((f: {
+        facility_name: string;
+        facility_type: string;
+        total_emissions_kg: number;
+        electricity_kwh: number;
+        gas_kwh: number;
+        water_m3: number;
+      }) => {
+        contextParts.push(`\n**${f.facility_name}** (${f.facility_type || 'Unknown type'})`);
+        if (f.total_emissions_kg > 0) contextParts.push(`  - Total Emissions: ${(f.total_emissions_kg / 1000).toFixed(2)} tCO2e`);
+        if (f.electricity_kwh > 0) contextParts.push(`  - Electricity: ${f.electricity_kwh.toLocaleString()} kWh`);
+        if (f.gas_kwh > 0) contextParts.push(`  - Gas: ${f.gas_kwh.toLocaleString()} kWh`);
+        if (f.water_m3 > 0) contextParts.push(`  - Water: ${f.water_m3.toLocaleString()} m³`);
+      });
+
+      dataSources.push({
+        table: 'rosa_get_facility_metrics',
+        description: 'Facility environmental metrics',
+        recordCount: facilityMetrics.length
+      });
+    }
+
+    // Fetch product footprint detail (for product-level queries)
+    const { data: productFootprints, error: productFootprintsError } = await supabase
+      .rpc('rosa_get_product_footprint_detail', {
+        p_organization_id: organizationId
+      });
+
+    if (productFootprintsError) {
+      console.error('[Rosa] Error fetching product footprints:', productFootprintsError);
+    }
+
+    if (productFootprints && productFootprints.length > 0) {
+      contextParts.push(`\n### Product Carbon Footprint Detail`);
+      contextParts.push(`*Detailed product LCA breakdown*`);
+
+      productFootprints.slice(0, 10).forEach((p: {
+        product_name: string;
+        total_carbon_kg: number;
+        scope3_upstream_kg: number;
+        ingredients_kg: number;
+        packaging_kg: number;
+        transport_kg: number;
+        water_litres: number;
+        functional_unit: string;
+      }) => {
+        contextParts.push(`\n**${p.product_name}** (per ${p.functional_unit || 'unit'})`);
+        contextParts.push(`  - Total Carbon: ${p.total_carbon_kg?.toFixed(3) || 0} kg CO2e`);
+        if (p.scope3_upstream_kg > 0) contextParts.push(`  - Scope 3 Upstream: ${p.scope3_upstream_kg.toFixed(3)} kg CO2e`);
+        if (p.ingredients_kg > 0) contextParts.push(`  - Ingredients: ${p.ingredients_kg.toFixed(3)} kg CO2e`);
+        if (p.packaging_kg > 0) contextParts.push(`  - Packaging: ${p.packaging_kg.toFixed(3)} kg CO2e`);
+        if (p.transport_kg > 0) contextParts.push(`  - Transport: ${p.transport_kg.toFixed(3)} kg CO2e`);
+        if (p.water_litres > 0) contextParts.push(`  - Water: ${p.water_litres.toFixed(2)} L`);
+      });
+
+      if (productFootprints.length > 10) {
+        contextParts.push(`\n*... and ${productFootprints.length - 10} more products*`);
+      }
+
+      dataSources.push({
+        table: 'rosa_get_product_footprint_detail',
+        description: 'Product LCA detail',
+        recordCount: productFootprints.length
+      });
+    }
+
+    // Fetch water metrics
+    const { data: waterMetrics, error: waterMetricsError } = await supabase
+      .rpc('rosa_get_water_metrics', {
+        p_organization_id: organizationId
+      });
+
+    if (waterMetricsError) {
+      console.error('[Rosa] Error fetching water metrics:', waterMetricsError);
+    }
+
+    if (waterMetrics && waterMetrics.length > 0) {
+      contextParts.push(`\n### Water Metrics by Facility`);
+
+      let totalWater = 0;
+      let totalWeightedScarcity = 0;
+
+      waterMetrics.forEach((w: {
+        facility_name: string;
+        total_water_m3: number;
+        aware_scarcity_factor: number;
+        water_stress_adjusted_m3: number;
+      }) => {
+        totalWater += Number(w.total_water_m3 || 0);
+        const stressAdjusted = Number(w.water_stress_adjusted_m3 || 0);
+        totalWeightedScarcity += stressAdjusted;
+
+        contextParts.push(`- **${w.facility_name}**: ${w.total_water_m3?.toLocaleString() || 0} m³`);
+        if (w.aware_scarcity_factor && w.aware_scarcity_factor > 1) {
+          contextParts.push(`    AWARE Scarcity Factor: ${w.aware_scarcity_factor.toFixed(2)} (Water-stressed area)`);
+          contextParts.push(`    Stress-adjusted: ${stressAdjusted.toLocaleString()} m³-eq`);
+        }
+      });
+
+      contextParts.push(`\n**Total Water Consumption: ${totalWater.toLocaleString()} m³**`);
+      if (totalWeightedScarcity > totalWater) {
+        contextParts.push(`**Water Stress-Adjusted Total: ${totalWeightedScarcity.toLocaleString()} m³-eq**`);
+      }
+
+      dataSources.push({
+        table: 'rosa_get_water_metrics',
+        description: 'Water consumption by facility',
+        recordCount: waterMetrics.length
+      });
+    }
+
+    // Fetch waste metrics
+    const { data: wasteMetrics, error: wasteMetricsError } = await supabase
+      .rpc('rosa_get_waste_metrics', {
+        p_organization_id: organizationId
+      });
+
+    if (wasteMetricsError) {
+      console.error('[Rosa] Error fetching waste metrics:', wasteMetricsError);
+    }
+
+    if (wasteMetrics && wasteMetrics.length > 0) {
+      contextParts.push(`\n### Waste & Circularity Metrics`);
+
+      let totalWaste = 0;
+      let totalRecycled = 0;
+      let totalLandfill = 0;
+
+      wasteMetrics.forEach((w: {
+        facility_name: string;
+        waste_type: string;
+        total_waste_kg: number;
+        recycled_kg: number;
+        landfill_kg: number;
+        diversion_rate: number;
+      }) => {
+        totalWaste += Number(w.total_waste_kg || 0);
+        totalRecycled += Number(w.recycled_kg || 0);
+        totalLandfill += Number(w.landfill_kg || 0);
+
+        contextParts.push(`- **${w.facility_name}** (${w.waste_type || 'General'}): ${w.total_waste_kg?.toLocaleString() || 0} kg`);
+        if (w.diversion_rate !== undefined) {
+          contextParts.push(`    Diversion Rate: ${(w.diversion_rate * 100).toFixed(1)}%`);
+        }
+      });
+
+      contextParts.push(`\n**Total Waste: ${totalWaste.toLocaleString()} kg**`);
+      contextParts.push(`**Recycled: ${totalRecycled.toLocaleString()} kg**`);
+      contextParts.push(`**Landfill: ${totalLandfill.toLocaleString()} kg**`);
+      if (totalWaste > 0) {
+        const overallDiversion = ((totalWaste - totalLandfill) / totalWaste) * 100;
+        contextParts.push(`**Overall Diversion Rate: ${overallDiversion.toFixed(1)}%**`);
+      }
+
+      dataSources.push({
+        table: 'rosa_get_waste_metrics',
+        description: 'Waste and circularity metrics',
+        recordCount: wasteMetrics.length
+      });
+    }
+
+    // Fetch supplier summary
+    const { data: supplierSummary, error: supplierSummaryError } = await supabase
+      .rpc('rosa_get_supplier_summary', {
+        p_organization_id: organizationId
+      });
+
+    if (supplierSummaryError) {
+      console.error('[Rosa] Error fetching supplier summary:', supplierSummaryError);
+    }
+
+    if (supplierSummary && supplierSummary.length > 0) {
+      contextParts.push(`\n### Supplier Emissions Summary`);
+      contextParts.push(`*Emissions contribution by supplier category*`);
+
+      supplierSummary.forEach((s: {
+        category: string;
+        supplier_count: number;
+        engaged_count: number;
+        total_emissions_kg: number;
+        total_spend: number;
+      }) => {
+        const engagementRate = s.supplier_count > 0 ? (s.engaged_count / s.supplier_count * 100).toFixed(0) : 0;
+        contextParts.push(`- **${s.category}**: ${s.supplier_count} suppliers (${engagementRate}% engaged)`);
+        if (s.total_emissions_kg > 0) {
+          contextParts.push(`    Estimated Emissions: ${(s.total_emissions_kg / 1000).toFixed(2)} tCO2e`);
+        }
+        if (s.total_spend > 0) {
+          contextParts.push(`    Total Spend: £${s.total_spend.toLocaleString()}`);
+        }
+      });
+
+      dataSources.push({
+        table: 'rosa_get_supplier_summary',
+        description: 'Supplier summary by category',
+        recordCount: supplierSummary.length
+      });
+    }
+
+    // Fetch People & Culture metrics
+    const { data: peopleMetrics, error: peopleMetricsError } = await supabase
+      .rpc('rosa_get_people_culture_metrics', {
+        p_organization_id: organizationId
+      });
+
+    if (peopleMetricsError) {
+      console.error('[Rosa] Error fetching people metrics:', peopleMetricsError);
+    }
+
+    if (peopleMetrics) {
+      const pm = peopleMetrics;
+      contextParts.push(`\n### People & Culture Metrics`);
+
+      if (pm.total_employees) contextParts.push(`- Total Employees: ${pm.total_employees}`);
+      if (pm.diversity_score !== undefined) contextParts.push(`- Diversity Score: ${pm.diversity_score}/100`);
+      if (pm.wellbeing_score !== undefined) contextParts.push(`- Wellbeing Score: ${pm.wellbeing_score}/100`);
+      if (pm.training_hours_per_employee !== undefined) contextParts.push(`- Training Hours/Employee: ${pm.training_hours_per_employee}`);
+      if (pm.sustainability_training_completion !== undefined) contextParts.push(`- Sustainability Training: ${pm.sustainability_training_completion}% complete`);
+      if (pm.employee_engagement_score !== undefined) contextParts.push(`- Employee Engagement: ${pm.employee_engagement_score}/100`);
+      if (pm.remote_work_percentage !== undefined) contextParts.push(`- Remote Work: ${pm.remote_work_percentage}%`);
+
+      dataSources.push({
+        table: 'rosa_get_people_culture_metrics',
+        description: 'People and culture metrics',
+        recordCount: 1
+      });
+    }
+
+    // Fetch Governance metrics
+    const { data: governanceMetrics, error: governanceMetricsError } = await supabase
+      .rpc('rosa_get_governance_metrics', {
+        p_organization_id: organizationId
+      });
+
+    if (governanceMetricsError) {
+      console.error('[Rosa] Error fetching governance metrics:', governanceMetricsError);
+    }
+
+    if (governanceMetrics) {
+      const gm = governanceMetrics;
+      contextParts.push(`\n### Governance Metrics`);
+
+      if (gm.policies_count !== undefined) contextParts.push(`- Policies in Place: ${gm.policies_count}`);
+      if (gm.policies_reviewed_count !== undefined) contextParts.push(`- Policies Reviewed This Year: ${gm.policies_reviewed_count}`);
+      if (gm.board_sustainability_oversight !== undefined) {
+        contextParts.push(`- Board Sustainability Oversight: ${gm.board_sustainability_oversight ? 'Yes' : 'No'}`);
+      }
+      if (gm.sustainability_committee !== undefined) {
+        contextParts.push(`- Sustainability Committee: ${gm.sustainability_committee ? 'Yes' : 'No'}`);
+      }
+      if (gm.targets_set !== undefined) contextParts.push(`- Sustainability Targets Set: ${gm.targets_set}`);
+      if (gm.targets_on_track !== undefined) contextParts.push(`- Targets On Track: ${gm.targets_on_track}`);
+      if (gm.certifications) {
+        const certs = gm.certifications as string[];
+        if (certs.length > 0) contextParts.push(`- Certifications: ${certs.join(', ')}`);
+      }
+
+      dataSources.push({
+        table: 'rosa_get_governance_metrics',
+        description: 'Governance metrics',
+        recordCount: 1
+      });
+    }
+
+    // Fetch Community Impact metrics
+    const { data: communityMetrics, error: communityMetricsError } = await supabase
+      .rpc('rosa_get_community_impact_metrics', {
+        p_organization_id: organizationId
+      });
+
+    if (communityMetricsError) {
+      console.error('[Rosa] Error fetching community metrics:', communityMetricsError);
+    }
+
+    if (communityMetrics) {
+      const cm = communityMetrics;
+      contextParts.push(`\n### Community Impact Metrics`);
+
+      if (cm.charitable_donations !== undefined) contextParts.push(`- Charitable Donations: £${cm.charitable_donations.toLocaleString()}`);
+      if (cm.volunteer_hours !== undefined) contextParts.push(`- Volunteer Hours: ${cm.volunteer_hours.toLocaleString()}`);
+      if (cm.local_sourcing_percentage !== undefined) contextParts.push(`- Local Sourcing: ${cm.local_sourcing_percentage}%`);
+      if (cm.community_programs_count !== undefined) contextParts.push(`- Community Programs: ${cm.community_programs_count}`);
+      if (cm.beneficiaries_reached !== undefined) contextParts.push(`- Beneficiaries Reached: ${cm.beneficiaries_reached.toLocaleString()}`);
+      if (cm.local_employment_percentage !== undefined) contextParts.push(`- Local Employment: ${cm.local_employment_percentage}%`);
+
+      dataSources.push({
+        table: 'rosa_get_community_impact_metrics',
+        description: 'Community impact metrics',
+        recordCount: 1
+      });
+    }
+
+    // Fetch Vitality Scores (comprehensive)
+    const { data: vitalityScores, error: vitalityScoresError } = await supabase
+      .rpc('rosa_get_vitality_scores', {
+        p_organization_id: organizationId
+      });
+
+    if (vitalityScoresError) {
+      console.error('[Rosa] Error fetching vitality scores:', vitalityScoresError);
+    }
+
+    if (vitalityScores && vitalityScores.length > 0) {
+      contextParts.push(`\n### Vitality Score History`);
+      contextParts.push(`*Tracking sustainability performance over time*`);
+
+      vitalityScores.slice(0, 6).forEach((v: {
+        calculated_at: string;
+        overall_score: number;
+        climate_score: number;
+        water_score: number;
+        circularity_score: number;
+        nature_score: number;
+      }) => {
+        const date = new Date(v.calculated_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+        contextParts.push(`\n**${date}**`);
+        contextParts.push(`  - Overall: ${v.overall_score}/100`);
+        contextParts.push(`  - Climate: ${v.climate_score}/100, Water: ${v.water_score}/100`);
+        contextParts.push(`  - Circularity: ${v.circularity_score}/100, Nature: ${v.nature_score}/100`);
+      });
+
+      dataSources.push({
+        table: 'rosa_get_vitality_scores',
+        description: 'Vitality score history',
+        recordCount: vitalityScores.length
+      });
     }
 
     // Add summary section
