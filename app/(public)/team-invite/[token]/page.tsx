@@ -287,8 +287,8 @@ export default function TeamInvitePage() {
     return (
       <div className="relative min-h-screen text-white">
         <Image
-          src="/images/vineyard-autumn.jpg"
-          alt="Autumn vineyard"
+          src="/images/agave.jpg"
+          alt="Agave plants"
           fill
           className="object-cover"
           priority
@@ -317,8 +317,8 @@ export default function TeamInvitePage() {
     return (
       <div className="relative min-h-screen text-white">
         <Image
-          src="/images/vineyard-autumn.jpg"
-          alt="Autumn vineyard"
+          src="/images/agave.jpg"
+          alt="Agave plants"
           fill
           className="object-cover"
           priority
@@ -371,8 +371,8 @@ export default function TeamInvitePage() {
     return (
       <div className="relative min-h-screen text-white">
         <Image
-          src="/images/vineyard-autumn.jpg"
-          alt="Autumn vineyard"
+          src="/images/agave.jpg"
+          alt="Agave plants"
           fill
           className="object-cover"
           priority
@@ -663,12 +663,12 @@ export default function TeamInvitePage() {
         <div className="absolute bottom-4 text-center text-[10px] text-white/20">
           Photo by{' '}
           <a
-            href="https://unsplash.com/@mathieuodin"
+            href="https://unsplash.com/@maranthi"
             target="_blank"
             rel="noopener noreferrer"
             className="underline hover:text-white/40"
           >
-            Mathieu Odin
+            Stephan Hinni
           </a>
           {' '}on{' '}
           <a
