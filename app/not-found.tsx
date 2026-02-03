@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Leaf, Search, Globe, Wind } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const SUSTAINABILITY_FACTS = [
   {
@@ -32,7 +33,7 @@ export default function NotFound() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050505] text-white overflow-hidden flex flex-col items-center justify-center p-6" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
+    <div className="relative min-h-screen w-full text-white overflow-hidden flex flex-col items-center justify-center p-6" style={{ fontFamily: "'Instrument Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
 
@@ -47,11 +48,16 @@ export default function NotFound() {
         }
       `}</style>
 
-      {/* Background Ambience */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-[#ccff00]/5 blur-[120px] rounded-full animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#ccff00]/5 blur-[120px] rounded-full" />
-      </div>
+      {/* Full-page background */}
+      <Image
+        src="/images/404.jpg"
+        alt="404 background"
+        fill
+        className="object-cover"
+        priority
+        quality={85}
+      />
+      <div className="absolute inset-0 bg-black/60" />
 
       <div className="relative z-10 max-w-4xl w-full flex flex-col items-center text-center">
 
@@ -175,6 +181,28 @@ export default function NotFound() {
           <span className="text-[10px] font-mono uppercase tracking-[0.5em]">AlkaTera Ecosystem</span>
           <div className="w-12 h-[1px] bg-white" />
         </motion.div>
+      </div>
+
+      {/* Photo credit */}
+      <div className="absolute bottom-4 text-center text-[10px] text-white/20 z-10">
+        Photo by{' '}
+        <a
+          href="https://unsplash.com/@imkaravisual"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-white/40"
+        >
+          Imkara Visual
+        </a>
+        {' '}on{' '}
+        <a
+          href="https://unsplash.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline hover:text-white/40"
+        >
+          Unsplash
+        </a>
       </div>
     </div>
   );

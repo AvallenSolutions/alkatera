@@ -3,78 +3,13 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabaseClient"
-import { Eye, EyeOff, ArrowRight, Lock, Mail, AlertCircle, Loader2 } from "lucide-react"
-import { clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs))
-}
-
-const InputField = ({
-  type,
-  label,
-  icon: Icon,
-  value,
-  onChange,
-  disabled,
-}: {
-  type: string
-  label: string
-  icon: React.ElementType
-  value: string
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  disabled?: boolean
-}) => {
-  const [isFocused, setIsFocused] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
-
-  const inputType = type === "password" ? (showPassword ? "text" : "password") : type
-
-  return (
-    <div className="relative group mb-8">
-      <label
-        className={cn(
-          "absolute left-8 transition-all duration-300 pointer-events-none font-mono text-xs tracking-widest uppercase",
-          isFocused || value
-            ? "-top-3 text-[#ccff00] text-[10px]"
-            : "top-3 text-gray-500"
-        )}
-      >
-        {label}
-      </label>
-
-      <div className="absolute left-0 top-3 text-gray-500 group-focus-within:text-[#ccff00] transition-colors">
-        <Icon size={18} />
-      </div>
-
-      <input
-        type={inputType}
-        value={value}
-        onChange={onChange}
-        onFocus={() => setIsFocused(true)}
-        onBlur={() => setIsFocused(false)}
-        disabled={disabled}
-        className="w-full bg-transparent border-b border-gray-800 py-3 pl-8 pr-10 text-white placeholder-transparent focus:outline-none focus:border-[#ccff00] transition-colors font-sans text-lg disabled:opacity-50"
-      />
-
-      {type === "password" && (
-        <button
-          type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-0 top-3 text-gray-500 hover:text-white transition-colors"
-        >
-          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-        </button>
-      )}
-    </div>
-  )
-}
+import { Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 
 export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -162,44 +97,67 @@ export function LoginForm({ redirectTo }: { redirectTo?: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="flex items-start gap-2 mb-6 p-3 border border-red-900/50 bg-red-950/30 text-red-400 text-sm font-mono">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>{error}</span>
+        <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-300">{error}</p>
         </div>
       )}
 
-      <InputField
-        type="email"
-        label="Email Address"
-        icon={Mail}
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        disabled={loading}
-      />
+      <div className="space-y-2">
+        <label htmlFor="email" className="block text-sm font-medium text-white/60">
+          Email Address
+        </label>
+        <input
+          id="email"
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading}
+          required
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+      </div>
 
-      <InputField
-        type="password"
-        label="Password"
-        icon={Lock}
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        disabled={loading}
-      />
+      <div className="space-y-2">
+        <label htmlFor="password" className="block text-sm font-medium text-white/60">
+          Password
+        </label>
+        <div className="relative">
+          <input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            required
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed pr-12"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+          >
+            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        </div>
+      </div>
 
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-[#ccff00] text-black font-bold py-4 flex items-center justify-between px-6 hover:bg-white transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed group"
+        className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
-        <span className="font-mono uppercase tracking-widest">
-          {loading ? "Authenticating..." : "Sign In"}
-        </span>
         {loading ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Authenticating...
+          </span>
         ) : (
-          <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+          "Sign In"
         )}
       </button>
     </form>

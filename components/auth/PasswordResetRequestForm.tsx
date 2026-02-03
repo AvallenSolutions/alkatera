@@ -1,11 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Loader2, CheckCircle2 } from "lucide-react"
 
 export function PasswordResetRequestForm() {
@@ -37,15 +32,17 @@ export function PasswordResetRequestForm() {
     setLoading(true)
 
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/update-password`,
+      // Use custom API route that sends branded emails via Resend
+      const response = await fetch('/api/auth/password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
       })
 
-      // For security, always show success message regardless of whether email exists
-      // This prevents email enumeration attacks
-      if (resetError) {
-        // Log the actual error for debugging but don't expose it to users
-        console.error('Password reset error:', resetError.message)
+      if (!response.ok) {
+        throw new Error('Failed to send reset email')
       }
 
       // Always show success to prevent revealing if email exists in system
@@ -61,26 +58,28 @@ export function PasswordResetRequestForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 w-full max-w-md">
+    <form onSubmit={handleSubmit} className="space-y-4 w-full">
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
+          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-300">{error}</p>
+        </div>
       )}
 
       {success && (
-        <Alert>
-          <CheckCircle2 className="h-4 w-4" />
-          <AlertDescription>
+        <div className="flex items-start gap-3 p-4 bg-[#ccff00]/10 border border-[#ccff00]/20 rounded-xl">
+          <CheckCircle2 className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-white/80">
             If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and spam folder.
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
       )}
 
       <div className="space-y-2">
-        <Label htmlFor="email">Email Address</Label>
-        <Input
+        <label htmlFor="email" className="block text-sm font-medium text-white/60">
+          Email Address
+        </label>
+        <input
           id="email"
           type="email"
           placeholder="you@example.com"
@@ -88,22 +87,24 @@ export function PasswordResetRequestForm() {
           onChange={(e) => setEmail(e.target.value)}
           disabled={loading}
           required
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder:text-white/20 focus:outline-none focus:ring-2 focus:ring-[#ccff00]/50 focus:border-[#ccff00]/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         />
-        <p className="text-xs text-muted-foreground">
-          Enter the email address associated with your account
-        </p>
       </div>
 
-      <Button type="submit" className="w-full" disabled={loading}>
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-4 bg-[#ccff00] text-black font-mono uppercase text-xs tracking-widest font-bold rounded-xl hover:opacity-90 hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+      >
         {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          <span className="flex items-center justify-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
             Sending reset email...
-          </>
+          </span>
         ) : (
           "Send Reset Email"
         )}
-      </Button>
+      </button>
     </form>
   )
 }

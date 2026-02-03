@@ -107,6 +107,10 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  /* Override body background for pages with full-page backgrounds */
+  body:has([data-auth-page]) {
+    background: transparent !important;
+  }
 }
 
 @layer utilities {
@@ -118,6 +122,12 @@
   }
   .font-data {
     font-family: var(--font-data);
+  }
+
+  /* Override for auth pages with custom backgrounds */
+  body.auth-transparent-bg {
+    background: transparent !important;
+    background-color: transparent !important;
   }
 
   /* Neon glow effects for dark mode */
