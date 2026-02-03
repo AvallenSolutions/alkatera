@@ -214,7 +214,7 @@ function buildEmailContent(
               <a href="${ticketUrl}" class="button">View Ticket</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -240,7 +240,7 @@ function buildEmailContent(
               <a href="${ticketUrl}" class="button">View Ticket</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -257,12 +257,12 @@ function buildEmailContent(
             </div>
             <div class="content">
               <h3>${safeTitle}</h3>
-              <p>The AlkaTera support team has replied to your ticket:</p>
+              <p>The alkatera support team has replied to your ticket:</p>
               ${safeMessageContent ? `<blockquote>${safeMessageContent}</blockquote>` : ''}
               <a href="${ticketUrl}" class="button">View Conversation</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -286,7 +286,7 @@ function buildEmailContent(
               <a href="${ticketUrl}" class="button">View Ticket</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -307,7 +307,7 @@ function buildEmailContent(
               <a href="${ticketUrl}" class="button">View Ticket</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -326,7 +326,7 @@ async function sendViaResend(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "AlkaTera <sayhello@mail.alkatera.com>",
+      from: "alkatera <sayhello@mail.alkatera.com>",
       to: email.to,
       subject: email.subject,
       html: email.html,

@@ -181,7 +181,7 @@ function buildEmailContent(
   switch (eventType) {
     case "plan_upgraded":
       return {
-        subject: `Plan Upgraded to ${formatTierName(metadata.newTier)} - AlkaTera`,
+        subject: `Plan Upgraded to ${formatTierName(metadata.newTier)} - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -205,7 +205,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button">View Your Subscription</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -213,7 +213,7 @@ function buildEmailContent(
 
     case "plan_downgraded":
       return {
-        subject: `Plan Changed to ${formatTierName(metadata.newTier)} - AlkaTera`,
+        subject: `Plan Changed to ${formatTierName(metadata.newTier)} - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -238,7 +238,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button">View Your Subscription</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -246,7 +246,7 @@ function buildEmailContent(
 
     case "grace_period_started":
       return {
-        subject: `Action Required: Reduce Your ${formatResourceType(org.grace_period_resource_type || 'items')} - AlkaTera`,
+        subject: `Action Required: Reduce Your ${formatResourceType(org.grace_period_resource_type || 'items')} - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -269,7 +269,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button button-warning">Manage Your Usage</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -277,7 +277,7 @@ function buildEmailContent(
 
     case "grace_period_warning":
       return {
-        subject: `⚠️ 3 Days Left: Reduce Your ${formatResourceType(org.grace_period_resource_type || 'items')} - AlkaTera`,
+        subject: `⚠️ 3 Days Left: Reduce Your ${formatResourceType(org.grace_period_resource_type || 'items')} - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -298,7 +298,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button button-warning">Take Action Now</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -306,7 +306,7 @@ function buildEmailContent(
 
     case "grace_period_expired":
       return {
-        subject: `Items Removed: Grace Period Expired - AlkaTera`,
+        subject: `Items Removed: Grace Period Expired - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -323,7 +323,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button">View Your Account</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -331,7 +331,7 @@ function buildEmailContent(
 
     case "payment_failed":
       return {
-        subject: `⚠️ Payment Failed - Action Required - AlkaTera`,
+        subject: `⚠️ Payment Failed - Action Required - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -350,7 +350,7 @@ function buildEmailContent(
               <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">If you believe this is an error, please contact your bank or our support team.</p>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -358,7 +358,7 @@ function buildEmailContent(
 
     case "payment_succeeded":
       return {
-        subject: `Payment Received - AlkaTera`,
+        subject: `Payment Received - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -379,7 +379,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button">View Billing Details</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -387,7 +387,7 @@ function buildEmailContent(
 
     case "payment_method_updated":
       return {
-        subject: `Payment Method Updated - AlkaTera`,
+        subject: `Payment Method Updated - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -406,7 +406,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button">View Billing Details</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -414,7 +414,7 @@ function buildEmailContent(
 
     case "subscription_cancelled":
       return {
-        subject: `Subscription Cancelled - AlkaTera`,
+        subject: `Subscription Cancelled - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -423,13 +423,13 @@ function buildEmailContent(
             </div>
             <div class="content">
               <p>Hi ${safeName},</p>
-              <p>Your AlkaTera subscription has been cancelled.</p>
+              <p>Your alkatera subscription has been cancelled.</p>
               <p>Your account has been downgraded to the Seed (free) tier. You still have access to basic features, but some advanced functionality may be limited.</p>
               <p>We're sorry to see you go! If you change your mind, you can upgrade again at any time.</p>
               <a href="${settingsUrl}" class="button">Resubscribe</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -437,7 +437,7 @@ function buildEmailContent(
 
     case "subscription_reactivated":
       return {
-        subject: `Welcome Back! Subscription Reactivated - AlkaTera`,
+        subject: `Welcome Back! Subscription Reactivated - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -446,12 +446,12 @@ function buildEmailContent(
             </div>
             <div class="content">
               <p>Hi ${safeName},</p>
-              <p>Great news! Your AlkaTera subscription has been reactivated.</p>
-              <p>All your features and data are available again. Thank you for continuing to use AlkaTera for your sustainability tracking.</p>
+              <p>Great news! Your alkatera subscription has been reactivated.</p>
+              <p>All your features and data are available again. Thank you for continuing to use alkatera for your sustainability tracking.</p>
               <a href="${siteUrl}/dashboard" class="button">Go to Dashboard</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -459,7 +459,7 @@ function buildEmailContent(
 
     case "subscription_suspended":
       return {
-        subject: `Account Suspended - Action Required - AlkaTera`,
+        subject: `Account Suspended - Action Required - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -468,7 +468,7 @@ function buildEmailContent(
             </div>
             <div class="content">
               <p>Hi ${safeName},</p>
-              <p>Your AlkaTera account has been suspended because your payment could not be processed and the 7-day grace period has expired.</p>
+              <p>Your alkatera account has been suspended because your payment could not be processed and the 7-day grace period has expired.</p>
               <div class="danger-box">
                 <strong>Your data is safe</strong>
                 <p style="margin: 8px 0 0 0;">All your products, LCAs, reports and organisation data are kept intact. Once you update your payment method, access will be restored immediately.</p>
@@ -477,7 +477,7 @@ function buildEmailContent(
               <p style="margin-top: 20px; font-size: 14px; color: #6b7280;">If you believe this is an error, please contact our support team at support@alkatera.com.</p>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -485,7 +485,7 @@ function buildEmailContent(
 
     case "annual_renewal_reminder":
       return {
-        subject: `Upcoming Annual Renewal - AlkaTera`,
+        subject: `Upcoming Annual Renewal - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -494,7 +494,7 @@ function buildEmailContent(
             </div>
             <div class="content">
               <p>Hi ${safeName},</p>
-              <p>This is a friendly reminder that your annual AlkaTera subscription will renew soon.</p>
+              <p>This is a friendly reminder that your annual alkatera subscription will renew soon.</p>
               <div class="info-box">
                 <strong>Renewal Details</strong>
                 <p style="margin: 8px 0 0 0;">
@@ -507,7 +507,7 @@ function buildEmailContent(
               <a href="${settingsUrl}" class="button">Manage Subscription</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -515,7 +515,7 @@ function buildEmailContent(
 
     default:
       return {
-        subject: `Subscription Update - AlkaTera`,
+        subject: `Subscription Update - alkatera`,
         html: `
           ${baseStyles}
           <div class="container">
@@ -524,11 +524,11 @@ function buildEmailContent(
             </div>
             <div class="content">
               <p>Hi ${safeName},</p>
-              <p>There's been an update to your AlkaTera subscription.</p>
+              <p>There's been an update to your alkatera subscription.</p>
               <a href="${settingsUrl}" class="button">View Details</a>
             </div>
             <div class="footer">
-              <p>AlkaTera - Sustainability Platform</p>
+              <p>alka<strong>tera</strong> - Sustainability Platform</p>
             </div>
           </div>
         `,
@@ -547,7 +547,7 @@ async function sendViaResend(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "AlkaTera <sayhello@mail.alkatera.com>",
+      from: "alkatera <sayhello@mail.alkatera.com>",
       to: email.to,
       subject: email.subject,
       html: email.html,

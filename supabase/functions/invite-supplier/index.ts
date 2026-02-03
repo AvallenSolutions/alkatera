@@ -212,19 +212,21 @@ Deno.serve(async (req: Request) => {
 
     const invitationUrl = `${siteUrl}/supplier-onboarding?token=${invitation.invitation_token}`;
 
-    const emailSubject = `Invitation to join ${product.name} supply chain on Alkatera`;
+    const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
+    const emailSubject = `Invitation to join ${product.name} supply chain on alkatera`;
     const supplierDisplayName = supplierName || 'Supplier';
 
     const emailHtml = `
       <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
-        <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px;">
+        <div style="border-bottom: 1px solid #333; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
+          <img src="${logoUrl}" alt="alkatera" width="160" height="auto" style="display: block; margin: 0 auto 16px auto;" />
           <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Supplier Invitation</h1>
         </div>
         <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
           Dear ${supplierDisplayName},
         </p>
         <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-          You have been invited to join the Alkatera platform to provide verified product data for <strong style="color: #fff;">${materialName}</strong>.
+          You have been invited to join the alka<strong style="color: #fff;">tera</strong> platform to provide verified product data for <strong style="color: #fff;">${materialName}</strong>.
         </p>
         ${personalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${personalMessage}</p></div>` : ''}
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -244,7 +246,7 @@ Deno.serve(async (req: Request) => {
           This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: none;">hello@alkatera.com</a>
         </p>
         <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #333; color: #555; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
-          The Alkatera Team
+          The alka<strong>tera</strong> Team
         </div>
       </div>
     `;
@@ -262,7 +264,7 @@ Deno.serve(async (req: Request) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "AlkaTera <sayhello@mail.alkatera.com>",
+            from: "alkatera <sayhello@mail.alkatera.com>",
             to: [supplierEmail],
             cc: ["sayhello@mail.alkatera.com"],
             reply_to: "hello@alkatera.com",

@@ -27,6 +27,7 @@ function escapeHtml(text: string): string {
 
 function buildInviteEmail(inviteLink: string, organizationName: string, roleName: string, siteUrl: string): string {
   const roleDisplay = roleName === 'admin' ? 'Admin' : 'Team Member';
+  const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
 
   return `
     <!DOCTYPE html>
@@ -34,7 +35,7 @@ function buildInviteEmail(inviteLink: string, organizationName: string, roleName
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>You've Been Invited to AlkaTera</title>
+      <title>You've Been Invited to alka​tera</title>
     </head>
     <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; background-color: #f5f5f5;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
@@ -44,8 +45,8 @@ function buildInviteEmail(inviteLink: string, organizationName: string, roleName
               <!-- Header -->
               <tr>
                 <td style="background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%); padding: 30px 40px; border-radius: 12px 12px 0 0; text-align: center;">
-                  <h1 style="margin: 0; color: #ccff00; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">alkatera</h1>
-                  <p style="margin: 8px 0 0 0; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Sustainability, Distilled</p>
+                  <img src="${logoUrl}" alt="alkatera" width="180" height="auto" style="display: block; margin: 0 auto 12px auto;" />
+                  <p style="margin: 0; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Sustainability, Distilled</p>
                 </td>
               </tr>
 
@@ -54,9 +55,9 @@ function buildInviteEmail(inviteLink: string, organizationName: string, roleName
                 <td style="background-color: #ffffff; padding: 40px; border-left: 1px solid #e5e5e5; border-right: 1px solid #e5e5e5;">
                   <h2 style="margin: 0 0 20px 0; color: #1a1a1a; font-size: 24px; font-weight: 600;">You've Been Invited!</h2>
 
-                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">You've been invited to join <strong>${escapeHtml(organizationName)}</strong> on AlkaTera as a <strong>${roleDisplay}</strong>.</p>
+                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">You've been invited to join <strong>${escapeHtml(organizationName)}</strong> on alka<strong>tera</strong> as a <strong>${roleDisplay}</strong>.</p>
 
-                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">AlkaTera is a sustainability platform that helps organisations measure, manage, and report on their environmental impact.</p>
+                  <p style="margin: 0 0 20px 0; color: #4a4a4a; font-size: 16px;">alka<strong>tera</strong> is a sustainability platform that helps organisations measure, manage, and report on their environmental impact.</p>
 
                   <!-- Button -->
                   <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
@@ -80,7 +81,7 @@ function buildInviteEmail(inviteLink: string, organizationName: string, roleName
               <!-- Footer -->
               <tr>
                 <td style="background-color: #1a1a1a; padding: 30px 40px; border-radius: 0 0 12px 12px; text-align: center;">
-                  <p style="margin: 0 0 10px 0; color: #888; font-size: 14px;">AlkaTera - Sustainability Platform</p>
+                  <p style="margin: 0 0 10px 0; color: #888; font-size: 14px;">alka<strong style="color: #888;">tera</strong> - Sustainability Platform</p>
                   <p style="margin: 0; color: #666; font-size: 12px;">
                     <a href="${siteUrl}" style="color: #ccff00; text-decoration: none;">www.alkatera.com</a>
                   </p>
@@ -376,9 +377,9 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'AlkaTera <sayhello@mail.alkatera.com>',
+        from: 'alkatera <sayhello@mail.alkatera.com>',
         to: normalizedEmail,
-        subject: `You've been invited to join ${organizationName} on AlkaTera`,
+        subject: `You've been invited to join ${organizationName} on alkatera`,
         html: emailHtml,
       }),
     });
