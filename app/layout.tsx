@@ -42,6 +42,9 @@ export const metadata: Metadata = {
   authors: [{ name: 'Alkatera' }],
   creator: 'Alkatera',
   publisher: 'Alkatera',
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     type: 'website',
     locale: 'en_GB',
@@ -78,6 +81,64 @@ export const metadata: Metadata = {
   },
 };
 
+// JSON-LD structured data for SEO
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://alkatera.com/#organization",
+      "name": "Alkatera",
+      "legalName": "Avallen Solutions Ltd trading as Alkatera",
+      "url": "https://alkatera.com",
+      "logo": "https://alkatera.com/logo.png",
+      "email": "hello@alkatera.com",
+      "description": "Sustainability SaaS platform for the drinks industry. Generates Life Cycle Assessments, carbon footprint analysis, and compliance reporting for breweries, distilleries, and wineries.",
+      "sameAs": [
+        "https://www.linkedin.com/company/alkatera"
+      ],
+      "foundingDate": "2025"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://alkatera.com/#software",
+      "name": "Alkatera",
+      "alternateName": ["AlkaTera"],
+      "description": "The all-in-one sustainability operating system for drinks brands. Automates impact data collection, ensures regulatory compliance (CSRD, GRI, ISO 14067), and enables strategic sustainability planning.",
+      "url": "https://alkatera.com",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "creator": { "@id": "https://alkatera.com/#organization" },
+      "offers": {
+        "@type": "AggregateOffer",
+        "lowPrice": "99",
+        "highPrice": "599",
+        "priceCurrency": "GBP",
+        "offerCount": "3"
+      },
+      "featureList": [
+        "Life Cycle Assessment (LCA) calculations",
+        "Carbon footprint per product",
+        "Water stewardship (AWARE Protocol)",
+        "Greenwash Guardian compliance scanning",
+        "B-Corp certification tracking",
+        "CSRD, GRI, ISO 14067 reporting",
+        "Supply chain mapping",
+        "Rosa AI sustainability assistant"
+      ],
+      "keywords": "sustainability, LCA, carbon footprint, drinks industry, brewery, distillery, winery, ESG, B-Corp, GHG Protocol, ISO 14067, CSRD, carbon accounting"
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://alkatera.com/#website",
+      "url": "https://alkatera.com",
+      "name": "Alkatera",
+      "description": "Sustainability, Distilled.",
+      "publisher": { "@id": "https://alkatera.com/#organization" }
+    }
+  ]
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -87,6 +148,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="alternate" type="text/plain" title="LLM-friendly content" href="/llms.txt" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       </head>
       <GoogleAnalytics />
       <body className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} font-body`}>
