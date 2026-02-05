@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { filterDrinksRelevantProcesses, searchWithAliases } from '@/lib/openlca/drinks-process-filter';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ const OPENLCA_API_KEY = process.env.OPENLCA_API_KEY;
 
 // Cache the process list in memory to avoid fetching 23k+ processes on every search
 let cachedProcesses: any[] | null = null;
+let cachedFilteredProcesses: any[] | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -58,8 +60,9 @@ async function getOpenLCAProcesses(): Promise<any[]> {
 
     const result = await response.json();
     cachedProcesses = Array.isArray(result) ? result : [];
+    cachedFilteredProcesses = filterDrinksRelevantProcesses(cachedProcesses);
     cacheTimestamp = Date.now();
-    console.log(`[OpenLCA] Cached ${cachedProcesses.length} processes`);
+    console.log(`[OpenLCA] Cached ${cachedProcesses.length} processes, filtered to ${cachedFilteredProcesses.length} drinks-relevant`);
 
     return cachedProcesses;
   } catch (error) {
@@ -69,23 +72,17 @@ async function getOpenLCAProcesses(): Promise<any[]> {
 }
 
 async function searchOpenLCAProcesses(query: string): Promise<SearchResult[]> {
-  const processes = await getOpenLCAProcesses();
+  // Ensure processes are loaded and filtered
+  await getOpenLCAProcesses();
 
-  if (processes.length === 0) {
+  if (!cachedFilteredProcesses || cachedFilteredProcesses.length === 0) {
     return [];
   }
 
-  const queryLower = query.toLowerCase();
-  const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+  // Use alias-boosted search against the drinks-filtered process list
+  const rankedProcesses = searchWithAliases(query, cachedFilteredProcesses);
 
-  // Filter processes by name containing the query
-  const filteredProcesses = processes.filter((process: any) => {
-    const name = process.name?.toLowerCase() || '';
-    // Match if all query words appear in the name
-    return queryWords.every(word => name.includes(word));
-  });
-
-  return filteredProcesses.slice(0, 30).map((process: any) => {
+  return rankedProcesses.slice(0, 30).map((process: any) => {
     // Extract geography from process name or location
     const location = process.location || '';
     const name = process.name || 'Unnamed Process';
