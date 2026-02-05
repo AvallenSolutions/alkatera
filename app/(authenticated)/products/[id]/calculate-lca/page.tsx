@@ -23,6 +23,7 @@ import {
   MapPin,
   Calendar
 } from "lucide-react";
+import { OperationOverlay, type OperationStep } from "@/components/ui/operation-progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -94,7 +95,11 @@ export default function CalculateLCAPage() {
   const productId = params.id as string;
 
   const [loading, setLoading] = useState(true);
+  const [loadingStep, setLoadingStep] = useState('');
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [calculating, setCalculating] = useState(false);
+  const [calcSteps, setCalcSteps] = useState<OperationStep[]>([]);
+  const [calcProgress, setCalcProgress] = useState(0);
   const [product, setProduct] = useState<any>(null);
   const [materials, setMaterials] = useState<MaterialWithValidation[]>([]);
   const [canCalculate, setCanCalculate] = useState(false);
@@ -109,6 +114,8 @@ export default function CalculateLCAPage() {
 
       try {
         setLoading(true);
+        setLoadingStep('Fetching product data...');
+        setLoadingProgress(10);
 
         // Fetch product
         const { data: productData, error: productError } = await supabase
@@ -124,6 +131,9 @@ export default function CalculateLCAPage() {
         }
 
         setProduct(productData);
+
+        setLoadingStep('Loading materials...');
+        setLoadingProgress(25);
 
         // Fetch materials
         const { data: materialsData, error: materialsError } = await supabase
@@ -150,10 +160,17 @@ export default function CalculateLCAPage() {
         })));
         console.log('[Calculate-LCA] Organization ID:', productData.organization_id);
 
+        setLoadingStep('Validating emission factors...');
+        setLoadingProgress(40);
+
         // Validate each material - pass organizationId to enable OpenLCA lookups
         const validation = await validateMaterialsBeforeCalculation(
           materialsData as ProductMaterial[],
-          productData.organization_id
+          productData.organization_id,
+          (index, total, name) => {
+            setLoadingStep(`Validating material ${index} of ${total}: ${name}...`);
+            setLoadingProgress(40 + Math.round((index / total) * 30));
+          }
         );
 
         const materialsWithStatus: MaterialWithValidation[] = materialsData.map((mat) => {
@@ -185,6 +202,9 @@ export default function CalculateLCAPage() {
         setMaterials(materialsWithStatus);
         setCanCalculate(validation.valid);
         setMissingCount(validation.missingData.length);
+
+        setLoadingStep('Loading facility data...');
+        setLoadingProgress(75);
 
         // Fetch linked facilities
         const { data: facilitiesData, error: facilitiesError } = await supabase
@@ -299,10 +319,16 @@ export default function CalculateLCAPage() {
     }
 
     setCalculating(true);
+    setCalcSteps([
+      { label: 'Loading product data', status: 'active' },
+      { label: `Resolving impact factors for ${materials.length} materials`, status: 'pending' },
+      { label: 'Processing facility allocations', status: 'pending' },
+      { label: 'Aggregating lifecycle impacts', status: 'pending' },
+      { label: 'Generating interpretation report', status: 'pending' },
+    ]);
+    setCalcProgress(0);
 
     try {
-      toast.info('Starting LCA calculation...');
-
       // Prepare facility allocations if available
       const validAllocations = facilityAllocations
         .filter(a => a.productionVolume && a.facilityTotalProduction)
@@ -322,19 +348,46 @@ export default function CalculateLCAPage() {
         functionalUnit: `1 ${product.unit || 'unit'} of ${product.name}`,
         systemBoundary: 'cradle-to-gate',
         referenceYear: new Date().getFullYear(),
-        facilityAllocations: validAllocations.length > 0 ? validAllocations : undefined
+        facilityAllocations: validAllocations.length > 0 ? validAllocations : undefined,
+        onProgress: (step, percent) => {
+          setCalcProgress(percent);
+          // Map progress messages to step states
+          setCalcSteps(prev => prev.map((s, i) => {
+            if (percent >= 90) {
+              return { ...s, status: i <= 4 ? (i < 4 ? 'completed' : 'active') : 'pending' };
+            } else if (percent >= 75) {
+              return { ...s, status: i <= 3 ? (i < 3 ? 'completed' : 'active') : 'pending' };
+            } else if (percent >= 50) {
+              return { ...s, status: i <= 2 ? (i < 2 ? 'completed' : 'active') : 'pending' };
+            } else if (percent >= 20) {
+              return { ...s, status: i <= 1 ? (i < 1 ? 'completed' : 'active') : 'pending' };
+            } else {
+              return { ...s, status: i === 0 ? 'active' : 'pending' };
+            }
+          }));
+        },
       });
 
       if (!result.success) {
         throw new Error(result.error || 'Calculation failed');
       }
 
+      setCalcSteps(prev => prev.map(s => ({ ...s, status: 'completed' as const })));
+      setCalcProgress(100);
+
       toast.success('LCA calculation completed successfully');
+
+      // Brief pause to show completion state before navigating
+      await new Promise(resolve => setTimeout(resolve, 500));
       router.push(`/products/${productId}/report`);
 
     } catch (error: any) {
       console.error('Calculation error:', error);
       toast.error(error.message || 'Failed to calculate impact');
+      setCalcSteps(prev => {
+        const activeIdx = prev.findIndex(s => s.status === 'active');
+        return prev.map((s, i) => i === activeIdx ? { ...s, status: 'error' as const } : s);
+      });
     } finally {
       setCalculating(false);
     }
@@ -373,7 +426,23 @@ export default function CalculateLCAPage() {
     facilityAllocations.some(a => !a.productionVolume || !a.facilityTotalProduction);
 
   if (loading) {
-    return <PageLoader message="Validating materials..." />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-full max-w-sm space-y-4 p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-lime-500" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{loadingStep || 'Loading...'}</p>
+            <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-lime-500 transition-all duration-500 ease-out rounded-full"
+                style={{ width: `${loadingProgress}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">{loadingProgress}%</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -758,6 +827,15 @@ export default function CalculateLCAPage() {
           )}
         </Button>
       </div>
+
+      {/* Calculation progress overlay */}
+      <OperationOverlay
+        open={calculating}
+        title="Calculating Product Carbon Footprint"
+        steps={calcSteps}
+        progress={calcProgress}
+        message="ISO 14067 compliant lifecycle assessment"
+      />
     </div>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, AlertCircle, FileBarChart, Settings, FileText, Info, Calculator, Factory, Globe } from "lucide-react";
@@ -14,6 +15,10 @@ import { SpecificationTab } from "@/components/products/SpecificationTab";
 import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
+import { RecipeEditorPanel } from "@/components/products/RecipeEditorPanel";
+import { CalculateLCASheet } from "@/components/products/CalculateLCASheet";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
 import { useProductData } from "@/hooks/data/useProductData";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -23,27 +28,77 @@ import { toast } from "sonner";
 export default function ProductDashboardPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const productId = params.id as string;
 
   const { product, ingredients, packaging, lcaReports, isHealthy, loading, error, refetch } = useProductData(productId);
   const { currentOrganization } = useOrganization();
 
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview");
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showRecipeEditor, setShowRecipeEditor] = useState(false);
+  const [recipeInitialTab, setRecipeInitialTab] = useState<string>("ingredients");
+  const [showCalculateSheet, setShowCalculateSheet] = useState(false);
+  const [recipeEditorDirty, setRecipeEditorDirty] = useState(false);
+  const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
 
-  const handleCalculate = async () => {
+  // 5.1 URL State Sync: Open sheets from URL params on mount
+  useEffect(() => {
+    const editorParam = searchParams.get('editor');
+    const calculateParam = searchParams.get('calculate');
+
+    if (editorParam === 'ingredients' || editorParam === 'packaging') {
+      setRecipeInitialTab(editorParam);
+      setShowRecipeEditor(true);
+    }
+    if (calculateParam === 'true') {
+      setShowCalculateSheet(true);
+    }
+  }, []); // Only run on mount
+
+  // Update URL when sheets open/close (shallow — no navigation)
+  const updateUrlParams = useCallback((key: string, value: string | null) => {
+    const url = new URL(window.location.href);
+    if (value) {
+      url.searchParams.set(key, value);
+    } else {
+      url.searchParams.delete(key);
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
+
+  const openRecipeEditor = useCallback((tab: string) => {
+    setRecipeInitialTab(tab);
+    setShowRecipeEditor(true);
+    updateUrlParams('editor', tab);
+  }, [updateUrlParams]);
+
+  const closeRecipeEditor = useCallback((force = false) => {
+    if (!force && recipeEditorDirty) {
+      setShowUnsavedWarning(true);
+      return;
+    }
+    setShowRecipeEditor(false);
+    setRecipeEditorDirty(false);
+    updateUrlParams('editor', null);
+  }, [updateUrlParams, recipeEditorDirty]);
+
+  const openCalculateSheet = useCallback(() => {
+    setShowCalculateSheet(true);
+    updateUrlParams('calculate', 'true');
+  }, [updateUrlParams]);
+
+  const closeCalculateSheet = useCallback(() => {
+    setShowCalculateSheet(false);
+    updateUrlParams('calculate', null);
+  }, [updateUrlParams]);
+
+  const handleCalculate = () => {
     if (!isHealthy) {
       toast.error("Please add ingredients and packaging before calculating");
       return;
     }
-
-    try {
-      toast.info("Redirecting to impact calculator...");
-      router.push(`/products/${productId}/calculate-lca`);
-    } catch (error) {
-      console.error("Calculate error:", error);
-      toast.error("Failed to navigate to calculator");
-    }
+    openCalculateSheet();
   };
 
   const handleArchive = async () => {
@@ -100,7 +155,35 @@ export default function ProductDashboardPage() {
   };
 
   if (loading) {
-    return <PageLoader message="Loading product dashboard..." />;
+    return (
+      <div className="min-h-screen bg-[#09090b] relative overflow-hidden">
+        <div className="relative z-10">
+          {/* Skeleton header */}
+          <div className="container mx-auto px-6 pt-8 pb-4">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-16 w-16 rounded-xl bg-white/5" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-7 w-64 bg-white/5" />
+                <Skeleton className="h-4 w-40 bg-white/5" />
+              </div>
+            </div>
+          </div>
+          {/* Skeleton content */}
+          <div className="container mx-auto px-6 py-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-10 w-36 bg-white/5" />
+              <Skeleton className="h-10 w-56 bg-white/5" />
+            </div>
+            <Skeleton className="h-10 w-full max-w-4xl bg-white/5" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Skeleton className="h-64 bg-white/5 rounded-xl" />
+              <Skeleton className="h-64 bg-white/5 rounded-xl" />
+            </div>
+            <Skeleton className="h-48 bg-white/5 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error || !product) {
@@ -230,6 +313,8 @@ export default function ProductDashboardPage() {
               productId={productId}
               ingredients={ingredients}
               packaging={packaging}
+              onManageIngredients={() => openRecipeEditor("ingredients")}
+              onManagePackaging={() => openRecipeEditor("packaging")}
             />
           </TabsContent>
 
@@ -281,6 +366,75 @@ export default function ProductDashboardPage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Recipe Editor Sheet */}
+      <Sheet open={showRecipeEditor} onOpenChange={(open) => { if (!open) closeRecipeEditor(); else setShowRecipeEditor(true); }}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-4xl overflow-y-auto"
+          preventClose
+        >
+          <SheetHeader className="mb-4">
+            <SheetTitle>Edit Recipe - {product.name}</SheetTitle>
+            <SheetDescription>
+              Add and manage ingredients and packaging for this product
+            </SheetDescription>
+          </SheetHeader>
+          <RecipeEditorPanel
+            productId={productId}
+            organizationId={currentOrganization?.id || ''}
+            onSaveComplete={() => {
+              refetch();
+            }}
+            onDirtyChange={setRecipeEditorDirty}
+            compact={true}
+            initialTab={recipeInitialTab}
+          />
+        </SheetContent>
+      </Sheet>
+
+      {/* Unsaved Changes Warning */}
+      <AlertDialog open={showUnsavedWarning} onOpenChange={setShowUnsavedWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to your recipe. Are you sure you want to close without saving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowUnsavedWarning(false);
+                closeRecipeEditor(true);
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Discard Changes
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Calculate LCA Sheet */}
+      <CalculateLCASheet
+        productId={productId}
+        productName={product.name}
+        open={showCalculateSheet}
+        onOpenChange={(open) => { if (!open) closeCalculateSheet(); else setShowCalculateSheet(true); }}
+        onCalculationComplete={() => {
+          closeCalculateSheet();
+          refetch();
+          setActiveTab("overview");
+          toast.success("Carbon footprint calculated!", {
+            action: {
+              label: "View Full Report",
+              onClick: () => router.push(`/products/${productId}/report`),
+            },
+          });
+        }}
+      />
     </div>
   );
 }

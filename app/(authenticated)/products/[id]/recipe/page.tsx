@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +50,7 @@ interface ProductionFacility {
 export default function ProductRecipePage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const productId = params.id as string;
   const { currentOrganization } = useOrganization();
 
@@ -57,7 +58,7 @@ export default function ProductRecipePage() {
   const [productionFacilities, setProductionFacilities] = useState<ProductionFacility[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview");
   const [showOpenLCAConfig, setShowOpenLCAConfig] = useState(false);
   const [showBOMImport, setShowBOMImport] = useState(false);
 
@@ -564,6 +565,7 @@ export default function ProductRecipePage() {
     }
 
     setSaving(true);
+    toast.info(`Saving ${validForms.length} ingredient${validForms.length === 1 ? '' : 's'}...`, { id: "save-ingredients" });
     try {
       console.log('Step 1: Deleting existing ingredients...');
       // Delete existing ingredients
@@ -650,13 +652,13 @@ export default function ProductRecipePage() {
       console.log('Step 2: Insert successful, data:', insertedData);
       console.log('=== SAVE INGREDIENTS SUCCESS ===');
 
-      toast.success(`${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`);
+      toast.success(`${validForms.length} ingredient${validForms.length === 1 ? '' : 's'} saved successfully`, { id: "save-ingredients" });
       await fetchProductData();
     } catch (error: any) {
       console.error("=== SAVE INGREDIENTS ERROR ===");
       console.error("Error object:", error);
       console.error("Error stack:", error.stack);
-      toast.error(error.message || "Failed to save ingredients");
+      toast.error(error.message || "Failed to save ingredients", { id: "save-ingredients" });
     } finally {
       setSaving(false);
     }
@@ -734,6 +736,7 @@ export default function ProductRecipePage() {
     }
 
     setSaving(true);
+    toast.info(`Saving ${validForms.length} packaging item${validForms.length === 1 ? '' : 's'}...`, { id: "save-packaging" });
     try {
       // Separate existing items (have DB IDs) from new items (have temp- prefix)
       const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
@@ -917,7 +920,7 @@ export default function ProductRecipePage() {
       }
 
       // Show success toast
-      toast.success(`✓ ${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`);
+      toast.success(`${validForms.length} packaging item${validForms.length === 1 ? '' : 's'} saved successfully`, { id: "save-packaging" });
 
       // Refetch product data
       console.log('Refetching product data...');
@@ -928,7 +931,7 @@ export default function ProductRecipePage() {
       console.error("Error object:", error);
       console.error("Error message:", error.message);
       console.error("Error details:", error);
-      toast.error(`Failed to save packaging: ${error.message || 'Unknown error'}`);
+      toast.error(`Failed to save packaging: ${error.message || 'Unknown error'}`, { id: "save-packaging" });
     } finally {
       setSaving(false);
     }
@@ -966,7 +969,7 @@ export default function ProductRecipePage() {
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/products">
+        <Link href={`/products/${productId}`}>
           <Button variant="outline" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>

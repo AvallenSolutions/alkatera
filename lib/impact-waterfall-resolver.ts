@@ -771,7 +771,8 @@ export async function resolveImpactFactors(
 
 export async function validateMaterialsBeforeCalculation(
   materials: ProductMaterial[],
-  organizationId?: string
+  organizationId?: string,
+  onProgress?: (materialIndex: number, totalMaterials: number, materialName: string) => void
 ): Promise<{
   valid: boolean;
   missingData: Array<{ material: ProductMaterial; error: string }>;
@@ -780,7 +781,9 @@ export async function validateMaterialsBeforeCalculation(
   const missingData: Array<{ material: ProductMaterial; error: string }> = [];
   const validMaterials: Array<{ material: ProductMaterial; resolved: WaterfallResult }> = [];
 
-  for (const material of materials) {
+  for (let i = 0; i < materials.length; i++) {
+    const material = materials[i];
+    onProgress?.(i + 1, materials.length, material.material_name);
     try {
       const quantityKg = normalizeToKg(material.quantity, material.unit);
       const resolved = await resolveImpactFactors(material, quantityKg, organizationId);

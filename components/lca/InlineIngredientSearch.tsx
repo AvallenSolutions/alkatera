@@ -80,7 +80,10 @@ export function InlineIngredientSearch({
   const [error, setError] = useState<string | null>(null);
   const [sourceCounts, setSourceCounts] = useState<SearchResponse['sources'] | null>(null);
   const [openLCAEnabled, setOpenLCAEnabled] = useState(false);
+  const [searchDuration, setSearchDuration] = useState(0);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchStartRef = useRef<number>(0);
+  const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -109,6 +112,11 @@ export function InlineIngredientSearch({
 
     setIsSearching(true);
     setError(null);
+    setSearchDuration(0);
+    searchStartRef.current = Date.now();
+    durationIntervalRef.current = setInterval(() => {
+      setSearchDuration(Math.floor((Date.now() - searchStartRef.current) / 1000));
+    }, 1000);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -142,6 +150,11 @@ export function InlineIngredientSearch({
       setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);
     } finally {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+        durationIntervalRef.current = null;
+      }
+      setSearchDuration(0);
       setIsSearching(false);
     }
   };
@@ -338,6 +351,19 @@ export function InlineIngredientSearch({
           </div>
         )}
       </div>
+
+      {isSearching && (
+        <div className="mt-1.5 text-xs text-muted-foreground flex items-center gap-1.5 animate-in fade-in duration-300">
+          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+          <span>
+            {searchDuration < 3
+              ? 'Searching suppliers and databases...'
+              : searchDuration < 10
+                ? 'Searching ecoinvent database (first search takes longer)...'
+                : 'Loading ecoinvent process library. This only happens once per session...'}
+          </span>
+        </div>
+      )}
 
       {error && (
         <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">

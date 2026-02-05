@@ -11,9 +11,11 @@ interface SpecificationTabProps {
   productId: string;
   ingredients: ProductIngredient[];
   packaging: ProductPackaging[];
+  onManageIngredients?: () => void;
+  onManagePackaging?: () => void;
 }
 
-export function SpecificationTab({ productId, ingredients, packaging }: SpecificationTabProps) {
+export function SpecificationTab({ productId, ingredients, packaging, onManageIngredients, onManagePackaging }: SpecificationTabProps) {
   // Calculate total ingredient weight
   const totalIngredientWeight = ingredients.reduce((sum, ing) => {
     const weight = ing.unit === 'kg' ? ing.quantity : ing.quantity / 1000;
@@ -120,12 +122,22 @@ export function SpecificationTab({ productId, ingredients, packaging }: Specific
           )}
 
           {/* Action Button */}
-          <Link href={`/products/${productId}/recipe?tab=ingredients`}>
-            <Button className={`w-full ${ingredients.length === 0 ? 'bg-green-500 hover:bg-green-600 text-white' : 'backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white'}`}>
+          {onManageIngredients ? (
+            <Button
+              onClick={onManageIngredients}
+              className={`w-full ${ingredients.length === 0 ? 'bg-green-500 hover:bg-green-600 text-white' : 'backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white'}`}
+            >
               {ingredients.length === 0 ? 'Add Ingredients' : 'Manage Ingredients'}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
-          </Link>
+          ) : (
+            <Link href={`/products/${productId}/recipe?tab=ingredients`}>
+              <Button className={`w-full ${ingredients.length === 0 ? 'bg-green-500 hover:bg-green-600 text-white' : 'backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white'}`}>
+                {ingredients.length === 0 ? 'Add Ingredients' : 'Manage Ingredients'}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          )}
         </CardContent>
       </Card>
 
@@ -203,12 +215,22 @@ export function SpecificationTab({ productId, ingredients, packaging }: Specific
           )}
 
           {/* Action Button */}
-          <Link href={`/products/${productId}/recipe?tab=packaging`}>
-            <Button className={`w-full ${packaging.length === 0 ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white'}`}>
+          {onManagePackaging ? (
+            <Button
+              onClick={onManagePackaging}
+              className={`w-full ${packaging.length === 0 ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white'}`}
+            >
               {packaging.length === 0 ? 'Add Packaging' : 'Manage Packaging'}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
-          </Link>
+          ) : (
+            <Link href={`/products/${productId}/recipe?tab=packaging`}>
+              <Button className={`w-full ${packaging.length === 0 ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white'}`}>
+                {packaging.length === 0 ? 'Add Packaging' : 'Manage Packaging'}
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </Link>
+          )}
         </CardContent>
       </Card>
     </div>

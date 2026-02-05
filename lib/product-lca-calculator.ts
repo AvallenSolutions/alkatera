@@ -23,6 +23,7 @@ export interface CalculatePCFParams {
   systemBoundary?: 'cradle-to-gate' | 'cradle-to-grave';
   referenceYear?: number;
   facilityAllocations?: FacilityAllocationInput[];
+  onProgress?: (step: string, percent: number) => void;
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -45,10 +46,11 @@ export type CalculateLCAResult = CalculatePCFResult;
  */
 export async function calculateProductCarbonFootprint(params: CalculatePCFParams): Promise<CalculatePCFResult> {
   const supabase = getSupabaseBrowserClient();
-  const { productId, functionalUnit, systemBoundary, referenceYear } = params;
+  const { productId, functionalUnit, systemBoundary, referenceYear, onProgress } = params;
 
   try {
     console.log(`[calculateProductCarbonFootprint] Starting calculation for product: ${productId}`);
+    onProgress?.('Loading product data...', 5);
 
     // 1. Get user and organization
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -84,6 +86,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     console.log(`[calculateProductCarbonFootprint] Found ${materials.length} materials to process`);
+    onProgress?.(`Resolving impact factors for ${materials.length} materials...`, 20);
 
     // 3b. Recalculate distances based on current production facilities
     // Distances are stored at ingredient creation time and become stale when facilities change
@@ -156,6 +159,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     console.log(`[calculateProductCarbonFootprint] Created LCA record: ${lca.id}`);
+    onProgress?.('Processing facility allocations...', 50);
 
     // 4a. Handle facility allocations
     const { facilityAllocations } = params;
@@ -690,6 +694,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     // 8. Run aggregation to calculate totals (client-side, no edge function needed)
+    onProgress?.('Aggregating lifecycle impacts...', 75);
     console.log(`[calculateProductCarbonFootprint] Calling aggregation engine...`);
 
     console.log(`[calculateProductCarbonFootprint] Passing ${collectedFacilityEmissions.length} facility emissions to aggregator`);
@@ -704,6 +709,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     // 9. Auto-generate Life Cycle Interpretation (ISO 14044 Section 4.5)
     try {
+      onProgress?.('Generating life cycle interpretation...', 90);
       console.log(`[calculateProductCarbonFootprint] Generating Life Cycle Interpretation...`);
       const interpretationResult = await generateLcaInterpretation(supabase, {
         productCarbonFootprintId: lca.id,
@@ -717,6 +723,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     } catch (interpError: any) {
       console.warn(`[calculateProductCarbonFootprint] ⚠ Non-critical: Interpretation generation error: ${interpError.message}`);
     }
+
+    onProgress?.('Calculation complete', 100);
 
     return {
       success: true,

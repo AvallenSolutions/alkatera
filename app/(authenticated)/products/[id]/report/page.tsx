@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, Share2, Eye, Leaf, Droplets, Recycle, MapPin, ThermometerSun, Cloud, Activity, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Info, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ArrowLeft, Download, Share2, Eye, Leaf, Droplets, Recycle, MapPin, ThermometerSun, Cloud, Activity, FileText, CheckCircle2, AlertCircle, ChevronDown, ChevronUp, Info, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabaseClient';
@@ -347,12 +347,20 @@ export default function ProductLcaReportPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <Link href={`/products/${productId}`}>
-        <Button variant="ghost" size="sm" className="gap-2 mb-4">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Product
-        </Button>
-      </Link>
+      <div className="flex items-center gap-2 mb-4">
+        <Link href={`/products/${productId}`}>
+          <Button variant="ghost" size="sm" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Product
+          </Button>
+        </Link>
+        <Link href={`/products/${productId}?calculate=true`}>
+          <Button variant="outline" size="sm" className="gap-2">
+            <RefreshCw className="h-4 w-4" />
+            Recalculate
+          </Button>
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
