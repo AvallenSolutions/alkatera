@@ -183,7 +183,13 @@ export function IngredientFormCard({
     carbon_intensity?: number;
     location?: string;
   }) => {
-    onUpdate(ingredient.tempId, {
+    console.log('[IngredientFormCard] handleSearchSelect received:', {
+      name: selection.name,
+      data_source: selection.data_source,
+      data_source_id: selection.data_source_id,
+    });
+
+    const updates = {
       name: selection.name,
       data_source: selection.data_source,
       data_source_id: selection.data_source_id,
@@ -192,7 +198,10 @@ export function IngredientFormCard({
       unit: selection.unit,
       carbon_intensity: selection.carbon_intensity,
       location: selection.location,
-    });
+    };
+
+    console.log('[IngredientFormCard] Calling onUpdate with:', updates);
+    onUpdate(ingredient.tempId, updates);
   };
 
   return (

@@ -476,9 +476,15 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         const quantityKg = normalizeToKg(material.quantity, material.unit);
 
         console.log(`[calculateProductCarbonFootprint] Processing material: ${material.material_name} (${quantityKg} kg)`);
+        console.log(`[calculateProductCarbonFootprint] Material OpenLCA data:`, {
+          data_source: material.data_source,
+          data_source_id: material.data_source_id,
+          organization_id: product.organization_id,
+        });
 
         // Apply waterfall logic to get impact factors
-        const resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg);
+        // Pass organization ID to enable OpenLCA lookups (Priority 2.5)
+        const resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id);
 
         // Calculate transport emissions if transport data is available
         let transportEmissions = 0;

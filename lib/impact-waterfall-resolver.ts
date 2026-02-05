@@ -1,5 +1,6 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { DEFAULT_AWARE_FACTOR, getAwareFactorValue } from './calculations/water-risk';
+// OpenLCA calculations now happen server-side via /api/openlca/calculate
 
 export type MaterialCategoryType =
   | 'SCOPE_1_2_ENERGY'
@@ -16,6 +17,7 @@ export interface ProductMaterial {
   quantity: string | number;
   unit: string;
   data_source?: string;
+  data_source_id?: string; // OpenLCA process UUID when data_source='openlca'
   supplier_product_id?: string;
   packaging_category?: string;
   origin_country?: string;
@@ -290,11 +292,17 @@ function detectMaterialCategory(material: ProductMaterial): MaterialCategoryType
  * Implements ISO 14044/14067 compliant data resolution prioritizing:
  * 1. Supplier verified data (all sources)
  * 2. DEFRA GWP + Ecoinvent non-GWP hybrid (for energy/transport/commuting)
+ * 2.5. OpenLCA live calculation (for materials linked to ecoInvent processes)
  * 3. Full Ecoinvent/staging factors (for manufacturing materials)
+ *
+ * @param material - The product material to resolve impacts for
+ * @param quantity_kg - Quantity in kilograms
+ * @param organizationId - Optional organization ID for OpenLCA config lookup
  */
 export async function resolveImpactFactors(
   material: ProductMaterial,
-  quantity_kg: number
+  quantity_kg: number,
+  organizationId?: string
 ): Promise<WaterfallResult> {
   const supabase = getSupabaseBrowserClient();
   const category = detectMaterialCategory(material);
@@ -509,6 +517,105 @@ export async function resolveImpactFactors(
   }
 
   // ===========================================================
+  // PRIORITY 2.5: OPENLCA LIVE CALCULATION
+  // (For materials linked to ecoInvent processes via OpenLCA)
+  // Higher priority than staging - uses real ecoInvent 3.12 data
+  // Calls server-side API to access OpenLCA IPC server
+  // ===========================================================
+  // Debug: Log what we received from product_materials
+  const willAttemptOpenLCA = material.data_source === 'openlca' && !!material.data_source_id && !!organizationId;
+  console.log(`[Waterfall] Priority 2.5 check for ${material.material_name}:`, {
+    data_source: material.data_source,
+    data_source_type: typeof material.data_source,
+    data_source_id: material.data_source_id,
+    data_source_id_type: typeof material.data_source_id,
+    organizationId: organizationId,
+    organizationId_type: typeof organizationId,
+    will_attempt_openlca: willAttemptOpenLCA,
+    check_data_source: material.data_source === 'openlca',
+    check_data_source_id: !!material.data_source_id,
+    check_organizationId: !!organizationId,
+  });
+
+  if (material.data_source === 'openlca' && material.data_source_id && organizationId) {
+    console.log(`[Waterfall] Attempting Priority 2.5 (OpenLCA) for: ${material.material_name}`);
+
+    try {
+      // Get auth token for API call
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        // Call server-side OpenLCA calculation API
+        const response = await fetch('/api/openlca/calculate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            processId: material.data_source_id,
+            quantity: quantity_kg,
+            organizationId: organizationId,
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+
+          if (result.success && result.impacts) {
+            console.log(`[Waterfall] ✓ Priority 2.5 SUCCESS: OpenLCA calculation for ${material.material_name}`);
+            console.log(`[Waterfall] Climate impact: ${result.impacts.impact_climate?.toFixed(4)} kg CO2e`);
+
+            // Build WaterfallResult from API response
+            return {
+              impact_climate: result.impacts.impact_climate || 0,
+              impact_climate_fossil: result.impacts.impact_climate_fossil || 0,
+              impact_climate_biogenic: result.impacts.impact_climate_biogenic || 0,
+              impact_climate_dluc: result.impacts.impact_climate_dluc || 0,
+              impact_water: result.impacts.impact_water || 0,
+              impact_water_scarcity: (result.impacts.impact_water || 0) * awareFactor,
+              impact_land: result.impacts.impact_land || 0,
+              impact_waste: result.impacts.impact_waste || 0,
+              impact_ozone_depletion: result.impacts.impact_ozone_depletion || 0,
+              impact_photochemical_ozone_formation: result.impacts.impact_photochemical_ozone_formation || 0,
+              impact_ionising_radiation: result.impacts.impact_ionising_radiation || 0,
+              impact_particulate_matter: result.impacts.impact_particulate_matter || 0,
+              impact_human_toxicity_carcinogenic: 0,
+              impact_human_toxicity_non_carcinogenic: 0,
+              impact_terrestrial_ecotoxicity: result.impacts.impact_terrestrial_ecotoxicity || 0,
+              impact_freshwater_ecotoxicity: result.impacts.impact_freshwater_ecotoxicity || 0,
+              impact_marine_ecotoxicity: result.impacts.impact_marine_ecotoxicity || 0,
+              impact_freshwater_eutrophication: result.impacts.impact_freshwater_eutrophication || 0,
+              impact_marine_eutrophication: result.impacts.impact_marine_eutrophication || 0,
+              impact_terrestrial_acidification: result.impacts.impact_terrestrial_acidification || 0,
+              impact_mineral_resource_scarcity: result.impacts.impact_mineral_resource_scarcity || 0,
+              impact_fossil_resource_scarcity: result.impacts.impact_fossil_resource_scarcity || 0,
+              data_priority: 2,
+              data_quality_tag: 'Secondary_Modelled',
+              data_quality_grade: 'HIGH',
+              source_reference: result.source || `OpenLCA: ${result.processName} (${result.geography}) via ecoInvent 3.12`,
+              confidence_score: 85,
+              methodology: 'ReCiPe 2016 Midpoint (H) / ecoInvent 3.12',
+              gwp_data_source: 'OpenLCA/ecoInvent',
+              non_gwp_data_source: 'OpenLCA/ecoInvent',
+              gwp_reference_id: material.data_source_id,
+              non_gwp_reference_id: material.data_source_id,
+              is_hybrid_source: false,
+              category_type: category,
+            };
+          }
+        } else {
+          const errorData = await response.json().catch(() => ({}));
+          console.warn(`[Waterfall] OpenLCA API error:`, errorData.error || response.statusText);
+        }
+      }
+    } catch (error: any) {
+      console.warn(`[Waterfall] Priority 2.5 (OpenLCA) failed for ${material.material_name}:`, error.message);
+      // Fall through to Priority 3
+    }
+  }
+
+  // ===========================================================
   // PRIORITY 3: FULL ECOINVENT/STAGING FACTORS
   // (For all categories as fallback, or primary for manufacturing materials)
   // ===========================================================
@@ -663,7 +770,8 @@ export async function resolveImpactFactors(
 }
 
 export async function validateMaterialsBeforeCalculation(
-  materials: ProductMaterial[]
+  materials: ProductMaterial[],
+  organizationId?: string
 ): Promise<{
   valid: boolean;
   missingData: Array<{ material: ProductMaterial; error: string }>;
@@ -675,7 +783,7 @@ export async function validateMaterialsBeforeCalculation(
   for (const material of materials) {
     try {
       const quantityKg = normalizeToKg(material.quantity, material.unit);
-      const resolved = await resolveImpactFactors(material, quantityKg);
+      const resolved = await resolveImpactFactors(material, quantityKg, organizationId);
       validMaterials.push({ material, resolved });
     } catch (error: any) {
       missingData.push({

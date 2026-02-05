@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { DataSource } from "@/lib/types/lca";
 
@@ -21,6 +21,8 @@ interface SearchResult {
   land_factor?: number;
   waste_factor?: number;
   source?: string;
+  source_type?: 'primary' | 'staging' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
+  data_quality?: 'verified' | 'calculated' | 'estimated';
   metadata?: any;
   supplier_name?: string;
   recycled_content_pct?: number;
@@ -29,11 +31,14 @@ interface SearchResult {
 
 interface SearchResponse {
   results: SearchResult[];
-  cached: boolean;
-  source: string;
-  waterfall_stage: number;
-  mock?: boolean;
-  note?: string;
+  total_found: number;
+  sources: {
+    primary: number;
+    staging: number;
+    ecoinvent_proxy: number;
+    ecoinvent_live: number;
+  };
+  openlca_enabled: boolean;
 }
 
 interface InlineIngredientSearchProps {
@@ -69,8 +74,8 @@ export function InlineIngredientSearch({
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [waterfallStage, setWaterfallStage] = useState<number | null>(null);
-  const [dataSource, setDataSource] = useState<string | null>(null);
+  const [sourceCounts, setSourceCounts] = useState<SearchResponse['sources'] | null>(null);
+  const [openLCAEnabled, setOpenLCAEnabled] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -124,13 +129,10 @@ export function InlineIngredientSearch({
 
       const data: SearchResponse = await response.json();
       setResults(data.results || []);
-      setWaterfallStage(data.waterfall_stage);
-      setDataSource(data.source);
+      setSourceCounts(data.sources);
+      setOpenLCAEnabled(data.openlca_enabled);
       setShowResults(true);
 
-      if (data.mock) {
-        setError("Using mock data. Configure OpenLCA server for real results.");
-      }
     } catch (err) {
       console.error("Search error:", err);
       setError(err instanceof Error ? err.message : "Search failed");
@@ -154,79 +156,139 @@ export function InlineIngredientSearch({
   };
 
   const handleResultSelect = (result: SearchResult) => {
+    console.log('[InlineSearch] Selected result:', {
+      id: result.id,
+      source_type: result.source_type,
+      name: result.name,
+    });
+
+    // Map source_type to DataSource
     const dataSourceType: DataSource =
+      result.source_type === 'primary' ? 'supplier' :
+      result.source_type === 'staging' ? 'staging' :
+      result.source_type === 'ecoinvent_proxy' ? 'ecoinvent' :
+      result.source_type === 'ecoinvent_live' ? 'openlca' :
+      result.source_type === 'defra' ? 'defra' :
+      // Fallback to old logic
       result.processType === 'STAGING_FACTOR' ? 'staging' :
       result.processType === 'ECOINVENT_PROXY' ? 'ecoinvent' :
       result.supplier_name ? 'supplier' :
       'openlca';
 
-    onSelect({
+    const selectedData = {
       name: result.name,
       data_source: dataSourceType,
       data_source_id: result.id,
-      supplier_product_id: result.processType === 'supplier' ? result.id : undefined,
-      supplier_name: result.supplier_name,
+      supplier_product_id: result.source_type === 'primary' ? result.id : undefined,
+      supplier_name: result.metadata?.supplier_name || result.supplier_name,
       unit: result.unit || 'kg',
       carbon_intensity: result.co2_factor,
       location: result.location,
-      recycled_content_pct: result.recycled_content_pct,
+      recycled_content_pct: result.recycled_content_pct || result.metadata?.recycled_content_pct,
       packaging_components: result.packaging_components,
+    };
+
+    console.log('[InlineSearch] Calling onSelect with:', {
+      data_source: selectedData.data_source,
+      data_source_id: selectedData.data_source_id,
+      name: selectedData.name,
     });
+
+    onSelect(selectedData);
 
     setQuery(result.name);
     setShowResults(false);
   };
 
-  const getWaterfallBadge = (stage: number) => {
-    switch (stage) {
-      case 0:
+  const getSourceBadge = (result: SearchResult) => {
+    const sourceType = result.source_type;
+    const source = result.source || '';
+
+    switch (sourceType) {
+      case 'primary':
         return (
-          <Badge className="bg-emerald-600 text-white text-xs">
-            <Shield className="h-3 w-3 mr-1" />
-            Verified Supplier Data
-          </Badge>
-        );
-      case 1:
-        return (
-          <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 text-xs">
+          <Badge className="bg-emerald-600 text-white text-xs shrink-0">
             <CheckCircle2 className="h-3 w-3 mr-1" />
-            Primary Verified
+            Primary
           </Badge>
         );
-      case 2:
+      case 'staging':
         return (
-          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 text-xs">
-            <Layers className="h-3 w-3 mr-1" />
-            Regional Standard
-          </Badge>
-        );
-      case 3:
-      case 4:
-        return (
-          <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100 text-xs">
+          <Badge className="bg-blue-600 text-white text-xs shrink-0">
             <Database className="h-3 w-3 mr-1" />
-            Secondary Modelled
+            Internal
+          </Badge>
+        );
+      case 'ecoinvent_proxy':
+        return (
+          <Badge className="bg-purple-600 text-white text-xs shrink-0">
+            <Layers className="h-3 w-3 mr-1" />
+            ecoInvent
+          </Badge>
+        );
+      case 'ecoinvent_live':
+        return (
+          <Badge className="bg-green-600 text-white text-xs shrink-0">
+            <Leaf className="h-3 w-3 mr-1" />
+            ecoInvent Live
+          </Badge>
+        );
+      case 'defra':
+        return (
+          <Badge className="bg-orange-600 text-white text-xs shrink-0">
+            <Shield className="h-3 w-3 mr-1" />
+            DEFRA
           </Badge>
         );
       default:
-        return null;
+        // Fallback based on source string
+        if (source.toLowerCase().includes('primary') || source.toLowerCase().includes('verified')) {
+          return (
+            <Badge className="bg-emerald-600 text-white text-xs shrink-0">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Primary
+            </Badge>
+          );
+        }
+        if (source.toLowerCase().includes('ecoinvent')) {
+          return (
+            <Badge className="bg-green-600 text-white text-xs shrink-0">
+              <Leaf className="h-3 w-3 mr-1" />
+              ecoInvent
+            </Badge>
+          );
+        }
+        return (
+          <Badge variant="secondary" className="text-xs shrink-0">
+            <Database className="h-3 w-3 mr-1" />
+            Secondary
+          </Badge>
+        );
     }
   };
 
   const getResultIcon = (result: SearchResult) => {
-    if (result.processType === 'SUPPLIER_PRODUCT') {
-      return <Shield className="h-4 w-4 text-emerald-600" />;
+    switch (result.source_type) {
+      case 'primary':
+        return <Shield className="h-4 w-4 text-emerald-600 shrink-0" />;
+      case 'staging':
+        return <Database className="h-4 w-4 text-blue-600 shrink-0" />;
+      case 'ecoinvent_proxy':
+        return <Layers className="h-4 w-4 text-purple-600 shrink-0" />;
+      case 'ecoinvent_live':
+        return <Leaf className="h-4 w-4 text-green-600 shrink-0" />;
+      case 'defra':
+        return <Building2 className="h-4 w-4 text-orange-600 shrink-0" />;
+      default:
+        // Fallback
+        if (result.processType === 'SUPPLIER_PRODUCT') {
+          return <Shield className="h-4 w-4 text-emerald-600 shrink-0" />;
+        }
+        if (result.supplier_name) {
+          return <Building2 className="h-4 w-4 text-green-600 shrink-0" />;
+        }
+        return <Database className="h-4 w-4 text-slate-600 shrink-0" />;
     }
-    if (result.supplier_name) {
-      return <Building2 className="h-4 w-4 text-green-600" />;
-    }
-    if (result.processType === 'STAGING_FACTOR') {
-      return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-    }
-    if (result.processType === 'ECOINVENT_PROXY') {
-      return <Layers className="h-4 w-4 text-blue-600" />;
-    }
-    return <Database className="h-4 w-4 text-slate-600" />;
   };
 
   return (
@@ -255,17 +317,34 @@ export function InlineIngredientSearch({
       {showResults && results.length > 0 && (
         <Card className="absolute z-50 mt-1 w-full max-h-96 overflow-y-auto shadow-lg">
           <div className="p-2 space-y-1">
-            {waterfallStage && (
-              <div className="px-2 py-1.5 border-b flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  Found {results.length} result{results.length !== 1 ? 's' : ''}
-                </span>
-                {getWaterfallBadge(waterfallStage)}
+            {/* Summary header */}
+            <div className="px-2 py-1.5 border-b flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs text-muted-foreground">
+                Found {results.length} result{results.length !== 1 ? 's' : ''}
+              </span>
+              <div className="flex flex-wrap gap-1">
+                {sourceCounts?.primary && sourceCounts.primary > 0 && (
+                  <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                    {sourceCounts.primary} Primary
+                  </Badge>
+                )}
+                {sourceCounts?.ecoinvent_live && sourceCounts.ecoinvent_live > 0 && (
+                  <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
+                    {sourceCounts.ecoinvent_live} ecoInvent
+                  </Badge>
+                )}
+                {sourceCounts?.staging && sourceCounts.staging > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {sourceCounts.staging} Internal
+                  </Badge>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Results list */}
             {results.map((result) => (
               <Button
-                key={result.id}
+                key={`${result.source_type}-${result.id}`}
                 variant="ghost"
                 className="w-full justify-start text-left h-auto py-3 px-3 hover:bg-accent"
                 onClick={() => handleResultSelect(result)}
@@ -273,7 +352,10 @@ export function InlineIngredientSearch({
                 <div className="flex items-start gap-3 w-full">
                   {getResultIcon(result)}
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{result.name}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm truncate">{result.name}</span>
+                      {getSourceBadge(result)}
+                    </div>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       {result.unit && (
                         <span className="text-xs text-muted-foreground">
@@ -285,20 +367,26 @@ export function InlineIngredientSearch({
                           {result.location}
                         </span>
                       )}
-                      {result.supplier_name && (
+                      {result.metadata?.supplier_name && (
                         <Badge variant="outline" className="text-xs">
-                          {result.supplier_name}
+                          {result.metadata.supplier_name}
                         </Badge>
                       )}
-                      {result.recycled_content_pct && result.recycled_content_pct > 0 && (
+                      {(result.recycled_content_pct || result.metadata?.recycled_content_pct) &&
+                       (result.recycled_content_pct || result.metadata?.recycled_content_pct) > 0 && (
                         <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100 text-xs">
-                          {result.recycled_content_pct}% recycled
+                          {result.recycled_content_pct || result.metadata?.recycled_content_pct}% recycled
                         </Badge>
                       )}
                     </div>
                     {result.co2_factor && (
                       <div className="text-xs text-muted-foreground mt-1">
                         {result.co2_factor.toFixed(3)} kg CO₂e/{result.unit || 'kg'}
+                      </div>
+                    )}
+                    {result.source_type === 'ecoinvent_live' && result.metadata?.system_model && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {result.metadata.system_model} system model
                       </div>
                     )}
                   </div>
@@ -313,6 +401,11 @@ export function InlineIngredientSearch({
         <Card className="absolute z-50 mt-1 w-full shadow-lg">
           <div className="p-4 text-center text-sm text-muted-foreground">
             No results found for &quot;{query}&quot;
+            {!openLCAEnabled && (
+              <div className="mt-2 text-xs text-amber-600">
+                OpenLCA is not connected. Configure it in Settings to search ecoInvent.
+              </div>
+            )}
           </div>
         </Card>
       )}

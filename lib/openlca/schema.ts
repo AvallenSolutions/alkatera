@@ -443,11 +443,13 @@ export interface SimpleResult {
 
 /**
  * Impact Result
+ * Note: OpenLCA 2.x returns 'amount', older versions used 'value'
  */
 export interface ImpactResult {
-  '@type': 'ImpactResult';
-  impactCategory: Ref;
-  value: number;
+  '@type'?: 'ImpactResult';
+  impactCategory?: Ref;
+  amount?: number; // OpenLCA 2.x
+  value?: number;  // Legacy
 }
 
 /**

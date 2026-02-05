@@ -1,6 +1,9 @@
 /**
  * OpenLCA IPC Client
  * Wrapper around JSON-RPC 2.0 protocol for OpenLCA server communication
+ *
+ * Compatible with OpenLCA 2.x IPC API
+ * Reference: https://greendelta.github.io/openLCA-ApiDoc/
  */
 
 import {
@@ -18,6 +21,7 @@ import {
   Flow,
   ResultRef,
   ImpactCategory,
+  ImpactResult,
 } from './schema';
 
 export class OpenLCAClient {
@@ -88,7 +92,7 @@ export class OpenLCAClient {
    * Get a specific entity by type and ID
    */
   async get<T>(type: string, id: string): Promise<T> {
-    return this.request<T>('get', {
+    return this.request<T>('data/get', {
       '@type': type,
       '@id': id,
     });
@@ -119,7 +123,7 @@ export class OpenLCAClient {
    * Get all processes (use with caution - can be large)
    */
   async getAllProcesses(): Promise<Ref[]> {
-    return this.request<Ref[]>('get/descriptors', {
+    return this.request<Ref[]>('data/get/descriptors', {
       '@type': 'Process',
     });
   }
@@ -128,7 +132,7 @@ export class OpenLCAClient {
    * Get all flows
    */
   async getAllFlows(): Promise<Ref[]> {
-    return this.request<Ref[]>('get/descriptors', {
+    return this.request<Ref[]>('data/get/descriptors', {
       '@type': 'Flow',
     });
   }
@@ -137,7 +141,7 @@ export class OpenLCAClient {
    * Get all impact methods
    */
   async getAllImpactMethods(): Promise<Ref[]> {
-    return this.request<Ref[]>('get/descriptors', {
+    return this.request<Ref[]>('data/get/descriptors', {
       '@type': 'ImpactMethod',
     });
   }
@@ -183,17 +187,58 @@ export class OpenLCAClient {
   }
 
   /**
-   * Calculate a product system
+   * Calculate a product system (OpenLCA 2.x API)
+   * Returns a result reference that must be disposed after use
    */
   async calculate(setup: CalculationSetup): Promise<ResultRef> {
-    return this.request<ResultRef>('calculate', setup);
+    // OpenLCA 2.x uses 'result/calculate' method
+    return this.request<ResultRef>('result/calculate', setup);
+  }
+
+  /**
+   * Wait for calculation result to be ready (async calculations)
+   * OpenLCA 2.x calculations are async and need polling
+   */
+  async waitForResult(resultId: string, timeoutMs: number = 60000): Promise<void> {
+    const start = Date.now();
+    const pollInterval = 1000; // Poll every 1 second (calculations take 10-30s)
+
+    while (Date.now() - start < timeoutMs) {
+      try {
+        // OpenLCA 2.x returns { isReady: boolean, isScheduled: boolean }
+        const state = await this.request<{ isReady?: boolean; isScheduled?: boolean; error?: string }>('result/state', {
+          '@id': resultId,
+        });
+
+        if (state.error) {
+          throw new Error(`Calculation failed: ${state.error}`);
+        }
+
+        // Check isReady (not ready) - this is the OpenLCA 2.x API response format
+        if (state.isReady) {
+          return;
+        }
+
+        console.log(`[OpenLCA] Waiting for calculation... (${Math.round((Date.now() - start) / 1000)}s)`);
+      } catch (error: any) {
+        // If state endpoint doesn't exist, assume result is ready (older API)
+        if (error.message?.includes('method not found')) {
+          return;
+        }
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+
+    throw new Error(`Calculation timed out after ${timeoutMs}ms`);
   }
 
   /**
    * Get simple calculation results
    */
   async getSimpleResult(resultId: string): Promise<SimpleResult> {
-    return this.request<SimpleResult>('get/result', {
+    return this.request<SimpleResult>('result/state', {
       '@id': resultId,
     });
   }
@@ -202,7 +247,7 @@ export class OpenLCAClient {
    * Get contribution analysis results
    */
   async getContributionResult(resultId: string): Promise<ContributionResult> {
-    return this.request<ContributionResult>('get/result', {
+    return this.request<ContributionResult>('result/state', {
       '@id': resultId,
     });
   }
@@ -214,30 +259,51 @@ export class OpenLCAClient {
     resultId: string,
     impactCategory: Ref
   ): Promise<UpstreamTree> {
-    return this.request<UpstreamTree>('get/upstream_tree', {
-      resultId,
+    return this.request<UpstreamTree>('result/upstream-tree-of', {
+      '@id': resultId,
       impactCategory,
     });
   }
 
   /**
-   * Get total impact results for all categories
+   * Get total impact results for all categories (OpenLCA 2.x API)
    */
-  async getTotalImpacts(resultId: string): Promise<Array<{
-    impactCategory: Ref;
+  async getTotalImpacts(resultId: string): Promise<ImpactResult[]> {
+    return this.request<ImpactResult[]>('result/total-impacts', {
+      '@id': resultId,
+    });
+  }
+
+  /**
+   * Get total elementary flows (inventory results)
+   */
+  async getTotalFlows(resultId: string): Promise<Array<{
+    flow: Ref;
     value: number;
+    isInput: boolean;
   }>> {
-    const result = await this.getSimpleResult(resultId);
-    return result.impactResults || [];
+    return this.request<Array<{
+      flow: Ref;
+      value: number;
+      isInput: boolean;
+    }>>('result/total-flows', {
+      '@id': resultId,
+    });
   }
 
   /**
    * Dispose of calculation result (free server memory)
+   * IMPORTANT: Always call this after getting results to prevent memory leaks
    */
   async dispose(resultId: string): Promise<void> {
-    await this.request<void>('dispose', {
-      '@id': resultId,
-    });
+    try {
+      await this.request<void>('result/dispose', {
+        '@id': resultId,
+      });
+    } catch (error) {
+      // Ignore dispose errors - result might already be disposed
+      console.warn('Failed to dispose result:', error);
+    }
   }
 
   /**
@@ -245,11 +311,12 @@ export class OpenLCAClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      await this.request<Ref[]>('get/descriptors', {
-        '@type': 'Process',
+      await this.request<Ref[]>('data/get/descriptors', {
+        '@type': 'ImpactMethod',
       });
       return true;
     } catch (error) {
+      console.warn('[OpenLCA] Health check failed:', error);
       return false;
     }
   }
@@ -293,10 +360,87 @@ export class OpenLCAClient {
    */
   async findImpactMethod(name: string): Promise<Ref | null> {
     const methods = await this.getAllImpactMethods();
-    const match = methods.find((m) =>
+
+    // Prefer exact match first
+    const exactMatch = methods.find((m) => m.name === name);
+    if (exactMatch) return exactMatch;
+
+    // Then try midpoint matches before endpoint (midpoint gives kg CO2-eq, endpoint gives DALY/species.yr)
+    const midpointMatch = methods.find((m) =>
+      m.name?.toLowerCase().includes(name.toLowerCase()) &&
+      m.name?.toLowerCase().includes('midpoint')
+    );
+    if (midpointMatch) return midpointMatch;
+
+    // Fall back to any includes match
+    const anyMatch = methods.find((m) =>
       m.name?.toLowerCase().includes(name.toLowerCase())
     );
-    return match || null;
+    return anyMatch || null;
+  }
+
+  /**
+   * Calculate impacts for a process directly (convenience method)
+   * Handles the full flow: create product system, calculate, get results, dispose
+   *
+   * @param processId - UUID of the process to calculate
+   * @param impactMethodName - Name of impact method (e.g., 'ReCiPe 2016', 'IPCC 2021')
+   * @param amount - Amount to calculate (default: 1)
+   * @returns Impact results array
+   */
+  async calculateProcess(
+    processId: string,
+    impactMethodName: string,
+    amount: number = 1
+  ): Promise<ImpactResult[]> {
+    let resultId: string | null = null;
+
+    try {
+      // Find impact method
+      const impactMethod = await this.findImpactMethod(impactMethodName);
+      if (!impactMethod) {
+        throw new Error(`Impact method not found: ${impactMethodName}`);
+      }
+
+      // OpenLCA 2.x: Calculate directly from process using 'target' parameter
+      // This avoids needing to create a product system first
+      const setup = {
+        target: {
+          '@type': 'Process',
+          '@id': processId,
+        },
+        impactMethod: {
+          '@type': 'ImpactMethod',
+          '@id': impactMethod['@id'],
+        },
+        amount,
+      };
+
+      // Run calculation (cast to unknown first to satisfy TypeScript)
+      const resultRef = await this.calculate(setup as unknown as CalculationSetup);
+      resultId = resultRef['@id'];
+
+      // Wait for result to be ready
+      await this.waitForResult(resultId);
+
+      // Get impacts
+      const impacts = await this.getTotalImpacts(resultId);
+
+      return impacts;
+    } finally {
+      // Always dispose result to free memory
+      if (resultId) {
+        await this.dispose(resultId);
+      }
+    }
+  }
+
+  /**
+   * Get process count for a quick health check
+   */
+  async getProcessCount(): Promise<number> {
+    const processes = await this.getAllProcesses();
+    return processes.length;
   }
 }
 

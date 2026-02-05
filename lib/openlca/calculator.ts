@@ -186,9 +186,9 @@ export class OpenLCACalculator {
     const impacts = await this.client.getTotalImpacts(resultRef['@id']);
 
     const totalImpacts = impacts.map((impact) => ({
-      category: impact.impactCategory.name || 'Unknown',
-      value: impact.value,
-      unit: impact.impactCategory.description || '',
+      category: impact.impactCategory?.name || 'Unknown',
+      value: impact.amount ?? impact.value ?? 0,
+      unit: impact.impactCategory?.description || '',
     }));
 
     let hotspots: LCAResult['hotspots'] = undefined;
@@ -200,7 +200,7 @@ export class OpenLCACalculator {
       console.log('Extracting hotspot analysis...');
       hotspots = await this.extractHotspots(
         resultRef['@id'],
-        impacts.map((i) => i.impactCategory)
+        impacts.map((i) => i.impactCategory).filter((c): c is Ref => c !== undefined)
       );
     }
 

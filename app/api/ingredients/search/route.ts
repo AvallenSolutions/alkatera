@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 
 export const dynamic = 'force-dynamic';
 
-interface OpenLCASearchResult {
+interface SearchResult {
   id: string;
   name: string;
   category: string;
   unit?: string;
   processType?: string;
   location?: string;
-}
-
-interface CachedResult {
-  search_term: string;
-  results: OpenLCASearchResult[];
-  created_at: string;
+  co2_factor?: number;
+  water_factor?: number;
+  land_factor?: number;
+  waste_factor?: number;
+  source: string;
+  source_type: 'primary' | 'staging' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
+  data_quality?: 'verified' | 'calculated' | 'estimated';
+  metadata?: Record<string, any>;
 }
 
 interface JsonRpcRequest {
@@ -36,114 +37,107 @@ interface JsonRpcResponse {
   };
 }
 
-const CACHE_TTL_HOURS = 24;
 const OPENLCA_SERVER_URL = process.env.OPENLCA_SERVER_URL;
 const OPENLCA_SERVER_ENABLED = process.env.OPENLCA_SERVER_ENABLED === 'true';
 
-async function searchOpenLCAProcesses(query: string): Promise<OpenLCASearchResult[]> {
-  if (!OPENLCA_SERVER_URL || !OPENLCA_SERVER_ENABLED) {
-    console.warn('⚠️ OpenLCA server not configured. Set OPENLCA_SERVER_URL and OPENLCA_SERVER_ENABLED=true');
-    console.warn('Returning mock data for development purposes.');
+// Cache the process list in memory to avoid fetching 23k+ processes on every search
+let cachedProcesses: any[] | null = null;
+let cacheTimestamp: number = 0;
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
-    return [
-      {
-        id: `mock-${query.toLowerCase()}-1`,
-        name: `${query} - Organic Production`,
-        category: 'Food/Agriculture',
-        unit: 'kg',
-        processType: 'UNIT_PROCESS',
-        location: 'GB',
-      },
-      {
-        id: `mock-${query.toLowerCase()}-2`,
-        name: `${query} - Conventional Production`,
-        category: 'Food/Agriculture',
-        unit: 'kg',
-        processType: 'UNIT_PROCESS',
-        location: 'EU',
-      },
-      {
-        id: `mock-${query.toLowerCase()}-3`,
-        name: `${query} - Processing`,
-        category: 'Food/Manufacturing',
-        unit: 'kg',
-        processType: 'UNIT_PROCESS',
-        location: 'GB',
-      },
-    ];
+async function getOpenLCAProcesses(): Promise<any[]> {
+  // Return cached processes if still valid
+  if (cachedProcesses && Date.now() - cacheTimestamp < CACHE_DURATION_MS) {
+    return cachedProcesses;
+  }
+
+  if (!OPENLCA_SERVER_URL || !OPENLCA_SERVER_ENABLED) {
+    return [];
   }
 
   const rpcRequest: JsonRpcRequest = {
     jsonrpc: "2.0",
     id: 1,
-    method: "search/processes",
+    method: "data/get/descriptors",
     params: {
-      query: query,
-      pageSize: 20,
+      "@type": "Process",
     }
   };
 
   try {
-    const response = await fetch(`${OPENLCA_SERVER_URL}/data`, {
+    const response = await fetch(OPENLCA_SERVER_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(rpcRequest),
     });
 
     if (!response.ok) {
-      console.error('OpenLCA server error:', response.status, response.statusText);
-      throw new Error(`OpenLCA server returned ${response.status}`);
+      console.error('OpenLCA server error:', response.status);
+      return [];
     }
 
     const rpcResponse: JsonRpcResponse = await response.json();
 
-    if (rpcResponse.error) {
-      console.error('OpenLCA JSON-RPC error:', rpcResponse.error);
-      throw new Error(`OpenLCA error: ${rpcResponse.error.message}`);
-    }
-
-    if (!rpcResponse.result) {
+    if (rpcResponse.error || !rpcResponse.result) {
       return [];
     }
 
-    const processes = Array.isArray(rpcResponse.result) ? rpcResponse.result : [];
+    cachedProcesses = Array.isArray(rpcResponse.result) ? rpcResponse.result : [];
+    cacheTimestamp = Date.now();
+    console.log(`[OpenLCA] Cached ${cachedProcesses.length} processes`);
 
-    return processes.map((process: any) => ({
-      id: process['@id'] || process.id,
-      name: process.name || 'Unnamed Process',
-      category: process.category || 'Uncategorized',
-      unit: extractUnitFromProcess(process),
-      processType: process.processType || 'UNIT_PROCESS',
-      location: process.location?.code || process.location || '',
-    })).slice(0, 50);
-
+    return cachedProcesses;
   } catch (error) {
-    console.error('Error fetching from OpenLCA server:', error);
-    throw error;
+    console.error('Error fetching OpenLCA processes:', error);
+    return [];
   }
 }
 
-function extractUnitFromProcess(process: any): string {
-  if (process.referenceFlow?.unit?.name) {
-    return process.referenceFlow.unit.name;
+async function searchOpenLCAProcesses(query: string): Promise<SearchResult[]> {
+  const processes = await getOpenLCAProcesses();
+
+  if (processes.length === 0) {
+    return [];
   }
 
-  if (process.quantitativeReference?.unit?.name) {
-    return process.quantitativeReference.unit.name;
-  }
+  const queryLower = query.toLowerCase();
+  const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
 
-  if (process.exchanges && Array.isArray(process.exchanges)) {
-    const refExchange = process.exchanges.find((ex: any) =>
-      ex.isQuantitativeReference || ex.quantitativeReference
-    );
-    if (refExchange?.unit?.name) {
-      return refExchange.unit.name;
-    }
-  }
+  // Filter processes by name containing the query
+  const filteredProcesses = processes.filter((process: any) => {
+    const name = process.name?.toLowerCase() || '';
+    // Match if all query words appear in the name
+    return queryWords.every(word => name.includes(word));
+  });
 
-  return 'kg';
+  return filteredProcesses.slice(0, 30).map((process: any) => {
+    // Extract geography from process name or location
+    const location = process.location || '';
+    const name = process.name || 'Unnamed Process';
+
+    // Determine system model from name
+    let systemModel = 'unknown';
+    if (name.includes('Cutoff')) systemModel = 'Cutoff';
+    else if (name.includes('APOS')) systemModel = 'APOS';
+    else if (name.includes('Consequential')) systemModel = 'Consequential';
+
+    return {
+      id: process['@id'] || process.id,
+      name: name,
+      category: process.category || 'Uncategorized',
+      unit: 'kg',
+      processType: process.processType || 'LCI_RESULT',
+      location: location,
+      source: `ecoInvent 3.12 (${systemModel})`,
+      source_type: 'ecoinvent_live' as const,
+      data_quality: 'calculated' as const,
+      metadata: {
+        openlca_id: process['@id'],
+        system_model: systemModel,
+        flow_type: process.flowType,
+      },
+    };
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -205,198 +199,170 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ========================================
-    // WATERFALL STAGE 0: VERIFIED SUPPLIER PRODUCTS (Primary Data)
-    // ========================================
-    if (organizationId) {
-      const { data: supplierProducts, error: supplierError } = await supabase
-        .from('supplier_products')
-        .select(`
-          id,
-          name,
-          category,
-          unit,
-          carbon_intensity,
-          product_code,
-          verified_at,
-          recycled_content_pct,
-          water_factor,
-          land_factor,
-          waste_factor,
-          packaging_components,
-          suppliers!inner(
-            name
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .eq('is_verified', true)
-        .ilike('name', `%${normalizedQuery}%`)
-        .order('name')
-        .limit(20);
+    // Collect results from ALL sources in parallel
+    const allResults: SearchResult[] = [];
 
-      if (!supplierError && supplierProducts && supplierProducts.length > 0) {
-        const formattedResults = supplierProducts.map((product: any) => ({
+    // Run all searches in parallel for better performance
+    const [
+      supplierResults,
+      stagingResults,
+      ecoinventProxyResults,
+      openLCAResults,
+    ] = await Promise.all([
+      // SOURCE 1: Verified Supplier Products (Primary Data)
+      organizationId ? (async () => {
+        const { data: supplierProducts, error } = await supabase
+          .from('supplier_products')
+          .select(`
+            id, name, category, unit, carbon_intensity, product_code,
+            verified_at, recycled_content_pct, water_factor, land_factor, waste_factor,
+            suppliers!inner(name)
+          `)
+          .eq('organization_id', organizationId)
+          .eq('is_active', true)
+          .eq('is_verified', true)
+          .ilike('name', `%${normalizedQuery}%`)
+          .order('name')
+          .limit(10);
+
+        if (error || !supplierProducts) return [];
+
+        return supplierProducts.map((product: any): SearchResult => ({
           id: product.id,
           name: product.name,
           category: product.category || 'Supplier Product',
           unit: product.unit,
           processType: 'SUPPLIER_PRODUCT',
-          location: 'Verified Supplier',
+          location: product.suppliers?.name || 'Verified Supplier',
           co2_factor: product.carbon_intensity,
           water_factor: product.water_factor,
           land_factor: product.land_factor,
           waste_factor: product.waste_factor,
-          recycled_content_pct: product.recycled_content_pct,
-          packaging_components: product.packaging_components,
-          supplier_name: product.suppliers?.name || 'Unknown Supplier',
-          product_code: product.product_code,
-          verified_at: product.verified_at,
-          source: 'Verified Supplier Data',
+          source: 'Primary Verified',
+          source_type: 'primary',
+          data_quality: 'verified',
+          metadata: {
+            supplier_name: product.suppliers?.name,
+            product_code: product.product_code,
+            verified_at: product.verified_at,
+            recycled_content_pct: product.recycled_content_pct,
+          },
         }));
+      })() : Promise.resolve([]),
 
-        return NextResponse.json({
-          results: formattedResults,
-          cached: false,
-          source: 'supplier_products_verified',
-          waterfall_stage: 0,
-          note: 'Using verified primary supplier data (highest quality)',
-          has_primary_data: true,
-        });
-      }
-    }
+      // SOURCE 2: Staging Emission Factors
+      (async () => {
+        const { data: stagingFactors, error } = await supabase
+          .from('staging_emission_factors')
+          .select('*')
+          .ilike('name', `%${normalizedQuery}%`)
+          .in('category', ['Ingredient', 'Packaging'])
+          .order('name')
+          .limit(10);
 
-    // ========================================
-    // WATERFALL STAGE 1: STAGING_EMISSION_FACTORS
-    // ========================================
-    const { data: stagingFactors, error: stagingError } = await supabase
-      .from('staging_emission_factors')
-      .select('*')
-      .ilike('name', `%${normalizedQuery}%`)
-      .in('category', ['Ingredient', 'Packaging'])
-      .order('name');
+        if (error || !stagingFactors) return [];
 
-    if (!stagingError && stagingFactors && stagingFactors.length > 0) {
-      const formattedResults = stagingFactors.map((factor) => ({
-        id: factor.id,
-        name: factor.name,
-        category: factor.category,
-        unit: factor.reference_unit,
-        processType: 'STAGING_FACTOR',
-        location: 'Internal',
-        co2_factor: factor.co2_factor,
-        water_factor: factor.water_factor,
-        land_factor: factor.land_factor,
-        waste_factor: factor.waste_factor,
-        source: factor.source,
-        metadata: factor.metadata,
-      }));
+        return stagingFactors.map((factor: any): SearchResult => ({
+          id: factor.id,
+          name: factor.name,
+          category: factor.category,
+          unit: factor.reference_unit,
+          processType: 'STAGING_FACTOR',
+          location: 'Internal Library',
+          co2_factor: factor.co2_factor,
+          water_factor: factor.water_factor,
+          land_factor: factor.land_factor,
+          waste_factor: factor.waste_factor,
+          source: factor.source || 'Internal',
+          source_type: 'staging',
+          data_quality: 'calculated',
+          metadata: factor.metadata,
+        }));
+      })(),
 
-      return NextResponse.json({
-        results: formattedResults,
-        cached: false,
-        source: 'staging_emission_factors',
-        waterfall_stage: 1,
-        note: 'Using local staging library (highest priority)',
-      });
-    }
+      // SOURCE 3: Ecoinvent Material Proxies (pre-calculated)
+      (async () => {
+        const { data: proxies, error } = await supabase
+          .from('ecoinvent_material_proxies')
+          .select('*')
+          .or(`material_name.ilike.%${normalizedQuery}%,ecoinvent_process_name.ilike.%${normalizedQuery}%`)
+          .order('material_name')
+          .limit(10);
 
-    // ========================================
-    // WATERFALL STAGE 2: ECOINVENT PROXIES
-    // ========================================
-    const { data: ecoinventProxies, error: ecoinventError } = await supabase
-      .from('ecoinvent_material_proxies')
-      .select('*')
-      .or(`material_name.ilike.%${normalizedQuery}%,ecoinvent_process_name.ilike.%${normalizedQuery}%`)
-      .order('material_name');
+        if (error || !proxies) return [];
 
-    if (!ecoinventError && ecoinventProxies && ecoinventProxies.length > 0) {
-      const formattedResults = ecoinventProxies.map((proxy) => ({
-        id: proxy.id,
-        name: proxy.material_name,
-        category: proxy.material_category,
-        unit: proxy.reference_unit,
-        processType: 'ECOINVENT_PROXY',
-        location: proxy.geography || 'Global',
-        co2_factor: proxy.impact_climate,
-        water_factor: proxy.impact_water,
-        land_factor: proxy.impact_land,
-        waste_factor: proxy.impact_waste,
-        source: `Ecoinvent ${proxy.ecoinvent_version}`,
-        metadata: {
-          lcia_method: proxy.lcia_method,
-          system_model: proxy.system_model,
-          data_quality_score: proxy.data_quality_score,
-        },
-      }));
+        return proxies.map((proxy: any): SearchResult => ({
+          id: proxy.id,
+          name: proxy.material_name,
+          category: proxy.material_category,
+          unit: proxy.reference_unit,
+          processType: 'ECOINVENT_PROXY',
+          location: proxy.geography || 'Global',
+          co2_factor: proxy.impact_climate,
+          water_factor: proxy.impact_water,
+          land_factor: proxy.impact_land,
+          waste_factor: proxy.impact_waste,
+          source: `ecoInvent ${proxy.ecoinvent_version} (cached)`,
+          source_type: 'ecoinvent_proxy',
+          data_quality: 'calculated',
+          metadata: {
+            lcia_method: proxy.lcia_method,
+            system_model: proxy.system_model,
+            ecoinvent_process_name: proxy.ecoinvent_process_name,
+          },
+        }));
+      })(),
 
-      return NextResponse.json({
-        results: formattedResults,
-        cached: false,
-        source: 'ecoinvent_material_proxies',
-        waterfall_stage: 2,
-        note: 'Using Ecoinvent material proxies',
-      });
-    }
+      // SOURCE 4: Live OpenLCA Search
+      searchOpenLCAProcesses(query),
+    ]);
 
-    // ========================================
-    // WATERFALL STAGE 3: CACHE CHECK
-    // ========================================
-    const { data: cacheResult } = await supabase
-      .from('openlca_process_cache')
-      .select('results, created_at')
-      .eq('search_term', normalizedQuery)
-      .gte('created_at', new Date(Date.now() - CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString())
-      .maybeSingle();
+    // Combine all results
+    allResults.push(...supplierResults);
+    allResults.push(...stagingResults);
+    allResults.push(...ecoinventProxyResults);
+    allResults.push(...openLCAResults);
 
-    if (cacheResult && cacheResult.results) {
-      return NextResponse.json({
-        results: cacheResult.results,
-        cached: true,
-        source: 'cache',
-        waterfall_stage: 3,
-      });
-    }
+    // Sort results: Primary first, then by relevance (exact matches first)
+    const sortOrder: Record<string, number> = {
+      'primary': 0,
+      'staging': 1,
+      'ecoinvent_proxy': 2,
+      'ecoinvent_live': 3,
+      'defra': 4,
+    };
 
-    // ========================================
-    // WATERFALL STAGE 4: OPENLCA SERVER
-    // ========================================
-    const results = await searchOpenLCAProcesses(query);
+    allResults.sort((a, b) => {
+      // First sort by source type priority
+      const priorityDiff = sortOrder[a.source_type] - sortOrder[b.source_type];
+      if (priorityDiff !== 0) return priorityDiff;
 
-    await supabase
-      .from('openlca_process_cache')
-      .insert({
-        search_term: normalizedQuery,
-        results: results,
-      })
-      .select();
+      // Then by name match quality (exact match first)
+      const aExact = a.name.toLowerCase().includes(normalizedQuery);
+      const bExact = b.name.toLowerCase().includes(normalizedQuery);
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
 
-    await supabase.rpc('cleanup_openlca_cache');
+      // Then alphabetically
+      return a.name.localeCompare(b.name);
+    });
 
     return NextResponse.json({
-      results: results,
-      cached: false,
-      source: OPENLCA_SERVER_ENABLED ? 'openlca_server' : 'mock_data',
-      waterfall_stage: 4,
-      mock: !OPENLCA_SERVER_ENABLED,
-      serverUrl: OPENLCA_SERVER_ENABLED ? OPENLCA_SERVER_URL : undefined,
+      results: allResults.slice(0, 50), // Limit total results
+      total_found: allResults.length,
+      sources: {
+        primary: supplierResults.length,
+        staging: stagingResults.length,
+        ecoinvent_proxy: ecoinventProxyResults.length,
+        ecoinvent_live: openLCAResults.length,
+      },
+      openlca_enabled: OPENLCA_SERVER_ENABLED,
     });
 
   } catch (error) {
-    console.error('Error in OpenLCA search API:', error);
+    console.error('Error in ingredient search API:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    const isFetchError = errorMessage.includes('fetch') || errorMessage.includes('ECONNREFUSED');
-
-    if (isFetchError) {
-      return NextResponse.json(
-        {
-          error: 'OpenLCA server unreachable. Check OPENLCA_SERVER_URL configuration.',
-          details: errorMessage,
-        },
-        { status: 503 }
-      );
-    }
 
     return NextResponse.json(
       { error: errorMessage },

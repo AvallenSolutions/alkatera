@@ -16,6 +16,9 @@ BEGIN
   END IF;
 END $$;
 
+-- Update old 'generating' status to 'generating_document' before adding constraint
+UPDATE generated_reports SET status = 'generating_document' WHERE status = 'generating';
+
 ALTER TABLE generated_reports ADD CONSTRAINT generated_reports_status_check
   CHECK (status = ANY(ARRAY[
     'pending', 'aggregating_data', 'building_content',

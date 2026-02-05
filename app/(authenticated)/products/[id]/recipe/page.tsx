@@ -593,10 +593,22 @@ export default function ProductRecipePage() {
           is_organic_certified: form.is_organic_certified || false,
         };
 
+        // Debug logging for OpenLCA data flow
+        console.log('[Recipe Save] Form data before OpenLCA check:', {
+          material_name: form.name,
+          data_source: form.data_source,
+          data_source_id: form.data_source_id,
+          has_data_source: !!form.data_source,
+          has_data_source_id: !!form.data_source_id,
+        });
+
         // Only include data_source if it's a valid value with required fields
         if (form.data_source === 'openlca' && form.data_source_id) {
+          console.log('[Recipe Save] ✅ OpenLCA data will be saved:', form.data_source_id);
           materialData.data_source = 'openlca';
           materialData.data_source_id = form.data_source_id;
+        } else if (form.data_source === 'openlca') {
+          console.error('[Recipe Save] ❌ OpenLCA selected but NO data_source_id!');
         } else if (form.data_source === 'supplier' && form.supplier_product_id) {
           materialData.data_source = 'supplier';
           materialData.supplier_product_id = form.supplier_product_id;

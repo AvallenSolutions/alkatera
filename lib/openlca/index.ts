@@ -1,16 +1,28 @@
 /**
  * OpenLCA Integration Module
  * Complete toolkit for automated LCA calculations with Ecoinvent database
+ *
+ * Key Components:
+ * - OpenLCAClient: JSON-RPC 2.0 client for OpenLCA IPC server
+ * - OpenLCACalculator: High-level calculation orchestration
+ * - RecipeBuilder: Convert drink recipes to OpenLCA processes
+ * - ImpactFactorResolver: Resolve impacts from OpenLCA for waterfall resolver
  */
 
 export * from './schema';
 export * from './client';
 export * from './recipe-builder';
 export * from './calculator';
+export * from './impact-factor-resolver';
 
 export { OpenLCAClient, createOpenLCAClient } from './client';
 export { RecipeBuilder, convertMaterialsToRecipe } from './recipe-builder';
 export { OpenLCACalculator } from './calculator';
+export {
+  resolveOpenLCAImpacts,
+  isOpenLCAEnabled,
+  getOpenLCAConfig,
+} from './impact-factor-resolver';
 
 export type {
   DrinkRecipe,
@@ -26,3 +38,8 @@ export type {
   GHGBreakdown,
   ImpactMethodConfig,
 } from './calculator';
+
+export type {
+  OpenLCAResolverConfig,
+  OpenLCAImpactData,
+} from './impact-factor-resolver';

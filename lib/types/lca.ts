@@ -123,7 +123,7 @@ export interface PackagingMaterialComponent {
 
 export type LabelPrintingType = 'digital' | 'offset' | 'flexographic' | 'gravure' | 'screen' | 'letterpress' | 'other';
 
-export type DataSource = 'openlca' | 'supplier' | 'primary' | 'staging' | 'ecoinvent';
+export type DataSource = 'openlca' | 'supplier' | 'primary' | 'staging' | 'ecoinvent' | 'defra';
 
 export type ImpactSourceType = 'primary_verified' | 'secondary_modelled' | 'hybrid_proxy';
 

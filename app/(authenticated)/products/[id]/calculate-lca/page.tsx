@@ -141,8 +141,20 @@ export default function CalculateLCAPage() {
           return;
         }
 
-        // Validate each material
-        const validation = await validateMaterialsBeforeCalculation(materialsData as ProductMaterial[]);
+        // Debug: Log raw materials data from database
+        console.log('[Calculate-LCA] Raw materials from database:', materialsData.map(m => ({
+          id: m.id,
+          material_name: m.material_name,
+          data_source: m.data_source,
+          data_source_id: m.data_source_id,
+        })));
+        console.log('[Calculate-LCA] Organization ID:', productData.organization_id);
+
+        // Validate each material - pass organizationId to enable OpenLCA lookups
+        const validation = await validateMaterialsBeforeCalculation(
+          materialsData as ProductMaterial[],
+          productData.organization_id
+        );
 
         const materialsWithStatus: MaterialWithValidation[] = materialsData.map((mat) => {
           const validMaterial = validation.validMaterials.find((v) => v.material.id === mat.id);
