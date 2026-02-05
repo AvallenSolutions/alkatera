@@ -1,14 +1,14 @@
 /**
- * OpenLCA IPC Client
- * Wrapper around JSON-RPC 2.0 protocol for OpenLCA server communication
+ * OpenLCA REST API Client
+ * Wrapper around gdt-server REST API for OpenLCA server communication
  *
- * Compatible with OpenLCA 2.x IPC API
- * Reference: https://greendelta.github.io/openLCA-ApiDoc/
+ * Compatible with OpenLCA 2.x gdt-server
+ * Reference: https://github.com/GreenDelta/gdt-server
+ *
+ * Migrated from JSON-RPC 2.0 to REST API for cloud deployment
  */
 
 import {
-  JsonRpcRequest,
-  JsonRpcResponse,
   Process,
   ProductSystem,
   ImpactMethod,
@@ -24,133 +24,237 @@ import {
   ImpactResult,
 } from './schema';
 
+/**
+ * Configuration for retry behavior
+ */
+interface RetryConfig {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 8000,
+};
+
 export class OpenLCAClient {
   private baseUrl: string;
-  private requestId = 1;
+  private apiKey?: string;
+  private retryConfig: RetryConfig;
 
-  constructor(serverUrl: string) {
+  constructor(serverUrl: string, apiKey?: string, retryConfig?: Partial<RetryConfig>) {
     this.baseUrl = serverUrl.endsWith('/') ? serverUrl : `${serverUrl}/`;
+    this.apiKey = apiKey;
+    this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+  }
+
+  // ============================================================
+  // HTTP helpers (REST API)
+  // ============================================================
+
+  /**
+   * Build headers including API key if configured
+   */
+  private getHeaders(contentType?: string): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (this.apiKey) {
+      headers['X-API-Key'] = this.apiKey;
+    }
+    if (contentType) {
+      headers['Content-Type'] = contentType;
+    }
+    return headers;
   }
 
   /**
-   * Send JSON-RPC request to OpenLCA server
+   * Execute a fetch request with retry logic and timeout
    */
-  private async request<T>(method: string, params?: Record<string, any>): Promise<T> {
-    const request: JsonRpcRequest = {
-      jsonrpc: '2.0',
-      id: this.requestId++,
-      method,
-      params,
-    };
+  private async fetchWithRetry<T>(
+    url: string,
+    options: RequestInit,
+    timeoutMs: number = 30000
+  ): Promise<T> {
+    let lastError: Error | null = null;
 
-    const response = await fetch(`${this.baseUrl}data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
+    for (let attempt = 0; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (!response.ok) {
-      throw new Error(`OpenLCA server error: ${response.status} ${response.statusText}`);
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => 'Unknown error');
+          throw new Error(`OpenLCA server error: ${response.status} ${response.statusText} - ${errorText}`);
+        }
+
+        // Handle empty responses (e.g., dispose)
+        const text = await response.text();
+        if (!text || text.trim() === '') {
+          return undefined as T;
+        }
+
+        return JSON.parse(text) as T;
+      } catch (error: any) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Don't retry on 4xx client errors (except 429 rate limit)
+        if (error.message?.includes('40') && !error.message?.includes('429')) {
+          throw lastError;
+        }
+
+        // Don't retry on abort (timeout)
+        if (error.name === 'AbortError') {
+          throw new Error(`OpenLCA request timed out after ${timeoutMs}ms`);
+        }
+
+        if (attempt < this.retryConfig.maxRetries) {
+          const delay = Math.min(
+            this.retryConfig.baseDelayMs * Math.pow(2, attempt),
+            this.retryConfig.maxDelayMs
+          );
+          console.warn(
+            `[OpenLCA] Request failed (attempt ${attempt + 1}/${this.retryConfig.maxRetries + 1}), retrying in ${delay}ms...`,
+            lastError.message
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
     }
 
-    const jsonResponse: JsonRpcResponse<T> = await response.json();
-
-    if (jsonResponse.error) {
-      throw new Error(`OpenLCA error: ${jsonResponse.error.message}`);
-    }
-
-    if (jsonResponse.result === undefined) {
-      throw new Error('OpenLCA returned no result');
-    }
-
-    return jsonResponse.result;
+    throw lastError || new Error('OpenLCA request failed after all retries');
   }
+
+  /**
+   * Send GET request to OpenLCA REST API
+   */
+  private async get<T>(path: string, timeoutMs: number = 30000): Promise<T> {
+    return this.fetchWithRetry<T>(
+      `${this.baseUrl}${path}`,
+      {
+        method: 'GET',
+        headers: this.getHeaders(),
+      },
+      timeoutMs
+    );
+  }
+
+  /**
+   * Send POST request to OpenLCA REST API
+   */
+  private async post<T>(path: string, body?: any, timeoutMs: number = 300000): Promise<T> {
+    return this.fetchWithRetry<T>(
+      `${this.baseUrl}${path}`,
+      {
+        method: 'POST',
+        headers: this.getHeaders('application/json'),
+        body: body ? JSON.stringify(body) : undefined,
+      },
+      timeoutMs
+    );
+  }
+
+  /**
+   * Send PUT request to OpenLCA REST API
+   */
+  private async put<T>(path: string, body: any, timeoutMs: number = 30000): Promise<T> {
+    return this.fetchWithRetry<T>(
+      `${this.baseUrl}${path}`,
+      {
+        method: 'PUT',
+        headers: this.getHeaders('application/json'),
+        body: JSON.stringify(body),
+      },
+      timeoutMs
+    );
+  }
+
+  // ============================================================
+  // Search methods
+  // ============================================================
 
   /**
    * Search for processes in the database
+   * Note: gdt-server REST API doesn't have a dedicated search endpoint,
+   * so we fetch all processes and filter client-side (results are cached
+   * at the API route level with a 5-minute TTL)
    */
   async searchProcesses(query: string, pageSize: number = 50): Promise<Ref[]> {
-    return this.request<Ref[]>('search/processes', {
-      query,
-      pageSize,
-    });
+    const allProcesses = await this.getAllProcesses();
+    const lowerQuery = query.toLowerCase();
+    return allProcesses
+      .filter((p) => p.name?.toLowerCase().includes(lowerQuery))
+      .slice(0, pageSize);
   }
 
   /**
    * Search for flows in the database
    */
   async searchFlows(query: string, pageSize: number = 50): Promise<Ref[]> {
-    return this.request<Ref[]>('search/flows', {
-      query,
-      pageSize,
-    });
+    const allFlows = await this.getAllFlows();
+    const lowerQuery = query.toLowerCase();
+    return allFlows
+      .filter((f) => f.name?.toLowerCase().includes(lowerQuery))
+      .slice(0, pageSize);
   }
 
-  /**
-   * Get a specific entity by type and ID
-   */
-  async get<T>(type: string, id: string): Promise<T> {
-    return this.request<T>('data/get', {
-      '@type': type,
-      '@id': id,
-    });
-  }
+  // ============================================================
+  // Data retrieval methods
+  // ============================================================
 
   /**
    * Get a process by ID
    */
   async getProcess(id: string): Promise<Process> {
-    return this.get<Process>('Process', id);
+    return this.get<Process>(`data/processes/${id}`);
   }
 
   /**
    * Get a flow by ID
    */
   async getFlow(id: string): Promise<Flow> {
-    return this.get<Flow>('Flow', id);
+    return this.get<Flow>(`data/flows/${id}`);
   }
 
   /**
    * Get an impact method by ID
    */
   async getImpactMethod(id: string): Promise<ImpactMethod> {
-    return this.get<ImpactMethod>('ImpactMethod', id);
+    return this.get<ImpactMethod>(`data/impact-methods/${id}`);
   }
 
   /**
-   * Get all processes (use with caution - can be large)
+   * Get all process descriptors (use with caution - can be large: 23k+ for ecoinvent)
    */
   async getAllProcesses(): Promise<Ref[]> {
-    return this.request<Ref[]>('data/get/descriptors', {
-      '@type': 'Process',
-    });
+    return this.get<Ref[]>('data/processes', 60000);
   }
 
   /**
-   * Get all flows
+   * Get all flow descriptors
    */
   async getAllFlows(): Promise<Ref[]> {
-    return this.request<Ref[]>('data/get/descriptors', {
-      '@type': 'Flow',
-    });
+    return this.get<Ref[]>('data/flows', 60000);
   }
 
   /**
-   * Get all impact methods
+   * Get all impact method descriptors
    */
   async getAllImpactMethods(): Promise<Ref[]> {
-    return this.request<Ref[]>('data/get/descriptors', {
-      '@type': 'ImpactMethod',
-    });
+    return this.get<Ref[]>('data/impact-methods', 30000);
   }
 
   /**
    * Create or update a process
    */
   async putProcess(process: Process): Promise<Ref> {
-    return this.request<Ref>('put', process);
+    return this.put<Ref>('data/processes', process);
   }
 
   /**
@@ -161,7 +265,10 @@ export class OpenLCAClient {
     config?: LinkingConfig
   ): Promise<Ref> {
     const params: any = {
-      processId,
+      process: {
+        '@type': 'Process',
+        '@id': processId,
+      },
     };
 
     if (config) {
@@ -176,23 +283,26 @@ export class OpenLCAClient {
       }
     }
 
-    return this.request<Ref>('create/product_system', params);
+    return this.post<Ref>('data/create-system', params);
   }
 
   /**
    * Get a product system by ID
    */
   async getProductSystem(id: string): Promise<ProductSystem> {
-    return this.get<ProductSystem>('ProductSystem', id);
+    return this.get<ProductSystem>(`data/product-systems/${id}`);
   }
 
+  // ============================================================
+  // Calculation methods
+  // ============================================================
+
   /**
-   * Calculate a product system (OpenLCA 2.x API)
-   * Returns a result reference that must be disposed after use
+   * Start an LCA calculation (async - returns immediately)
+   * Returns a result reference that must be polled and then disposed after use
    */
   async calculate(setup: CalculationSetup): Promise<ResultRef> {
-    // OpenLCA 2.x uses 'result/calculate' method
-    return this.request<ResultRef>('result/calculate', setup);
+    return this.post<ResultRef>('result/calculate', setup, 300000);
   }
 
   /**
@@ -205,25 +315,25 @@ export class OpenLCAClient {
 
     while (Date.now() - start < timeoutMs) {
       try {
-        // OpenLCA 2.x returns { isReady: boolean, isScheduled: boolean }
-        const state = await this.request<{ isReady?: boolean; isScheduled?: boolean; error?: string }>('result/state', {
-          '@id': resultId,
-        });
+        // gdt-server REST API: GET /result/{id}/state
+        const state = await this.get<{ isReady?: boolean; isScheduled?: boolean; error?: string }>(
+          `result/${resultId}/state`,
+          10000
+        );
 
         if (state.error) {
           throw new Error(`Calculation failed: ${state.error}`);
         }
 
-        // Check isReady (not ready) - this is the OpenLCA 2.x API response format
         if (state.isReady) {
           return;
         }
 
         console.log(`[OpenLCA] Waiting for calculation... (${Math.round((Date.now() - start) / 1000)}s)`);
       } catch (error: any) {
-        // If state endpoint doesn't exist, assume result is ready (older API)
-        if (error.message?.includes('method not found')) {
-          return;
+        // If state endpoint returns an error, the calculation may have failed
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+          throw new Error(`Calculation result ${resultId} not found - it may have been disposed or failed`);
         }
         throw error;
       }
@@ -238,18 +348,14 @@ export class OpenLCAClient {
    * Get simple calculation results
    */
   async getSimpleResult(resultId: string): Promise<SimpleResult> {
-    return this.request<SimpleResult>('result/state', {
-      '@id': resultId,
-    });
+    return this.get<SimpleResult>(`result/${resultId}/state`);
   }
 
   /**
    * Get contribution analysis results
    */
   async getContributionResult(resultId: string): Promise<ContributionResult> {
-    return this.request<ContributionResult>('result/state', {
-      '@id': resultId,
-    });
+    return this.get<ContributionResult>(`result/${resultId}/state`);
   }
 
   /**
@@ -259,19 +365,16 @@ export class OpenLCAClient {
     resultId: string,
     impactCategory: Ref
   ): Promise<UpstreamTree> {
-    return this.request<UpstreamTree>('result/upstream-tree-of', {
-      '@id': resultId,
-      impactCategory,
-    });
+    return this.get<UpstreamTree>(
+      `result/${resultId}/upstream-impacts-of/${impactCategory['@id']}`
+    );
   }
 
   /**
    * Get total impact results for all categories (OpenLCA 2.x API)
    */
   async getTotalImpacts(resultId: string): Promise<ImpactResult[]> {
-    return this.request<ImpactResult[]>('result/total-impacts', {
-      '@id': resultId,
-    });
+    return this.get<ImpactResult[]>(`result/${resultId}/total-impacts`);
   }
 
   /**
@@ -282,13 +385,11 @@ export class OpenLCAClient {
     value: number;
     isInput: boolean;
   }>> {
-    return this.request<Array<{
+    return this.get<Array<{
       flow: Ref;
       value: number;
       isInput: boolean;
-    }>>('result/total-flows', {
-      '@id': resultId,
-    });
+    }>>(`result/${resultId}/total-flows`);
   }
 
   /**
@@ -297,23 +398,23 @@ export class OpenLCAClient {
    */
   async dispose(resultId: string): Promise<void> {
     try {
-      await this.request<void>('result/dispose', {
-        '@id': resultId,
-      });
+      await this.post<void>(`result/${resultId}/dispose`);
     } catch (error) {
       // Ignore dispose errors - result might already be disposed
       console.warn('Failed to dispose result:', error);
     }
   }
 
+  // ============================================================
+  // Health & version
+  // ============================================================
+
   /**
    * Health check - verify server is reachable
    */
   async healthCheck(): Promise<boolean> {
     try {
-      await this.request<Ref[]>('data/get/descriptors', {
-        '@type': 'ImpactMethod',
-      });
+      await this.get<any>('api/version', 10000);
       return true;
     } catch (error) {
       console.warn('[OpenLCA] Health check failed:', error);
@@ -326,12 +427,18 @@ export class OpenLCAClient {
    */
   async getVersion(): Promise<string> {
     try {
-      const response = await fetch(`${this.baseUrl}version`);
+      const response = await fetch(`${this.baseUrl}api/version`, {
+        headers: this.getHeaders(),
+      });
       return await response.text();
     } catch {
       return 'unknown';
     }
   }
+
+  // ============================================================
+  // Convenience methods
+  // ============================================================
 
   /**
    * Find process by name and location
@@ -381,7 +488,7 @@ export class OpenLCAClient {
 
   /**
    * Calculate impacts for a process directly (convenience method)
-   * Handles the full flow: create product system, calculate, get results, dispose
+   * Handles the full flow: calculate, wait, get results, dispose
    *
    * @param processId - UUID of the process to calculate
    * @param impactMethodName - Name of impact method (e.g., 'ReCiPe 2016', 'IPCC 2021')
@@ -450,10 +557,11 @@ export class OpenLCAClient {
 export function createOpenLCAClient(): OpenLCAClient | null {
   const serverUrl = process.env.OPENLCA_SERVER_URL;
   const enabled = process.env.OPENLCA_SERVER_ENABLED === 'true';
+  const apiKey = process.env.OPENLCA_API_KEY;
 
   if (!serverUrl || !enabled) {
     return null;
   }
 
-  return new OpenLCAClient(serverUrl);
+  return new OpenLCAClient(serverUrl, apiKey);
 }

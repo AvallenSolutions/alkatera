@@ -165,17 +165,16 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    const openLcaResponse = await fetch(`${config.server_url}/data`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'health',
-        params: {},
-      }),
+    // gdt-server REST API: health check via GET /api/version
+    const apiKey = Deno.env.get('OPENLCA_API_KEY');
+    const healthHeaders: Record<string, string> = {};
+    if (apiKey) {
+      healthHeaders['X-API-Key'] = apiKey;
+    }
+
+    const openLcaResponse = await fetch(`${config.server_url}/api/version`, {
+      method: 'GET',
+      headers: healthHeaders,
     });
 
     if (!openLcaResponse.ok) {

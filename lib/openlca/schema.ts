@@ -2,7 +2,8 @@
  * OpenLCA Schema TypeScript Definitions
  * Based on https://greendelta.github.io/olca-schema/
  *
- * Comprehensive type definitions for programmatic LCA with OpenLCA IPC API
+ * Comprehensive type definitions for programmatic LCA with OpenLCA gdt-server REST API
+ * Reference: https://github.com/GreenDelta/gdt-server
  */
 
 /**
@@ -14,30 +15,6 @@ export interface Ref {
   name?: string;
   description?: string;
   category?: string;
-}
-
-/**
- * JSON-RPC 2.0 Request Structure
- */
-export interface JsonRpcRequest {
-  jsonrpc: '2.0';
-  id: number | string;
-  method: string;
-  params?: Record<string, any>;
-}
-
-/**
- * JSON-RPC 2.0 Response Structure
- */
-export interface JsonRpcResponse<T = any> {
-  jsonrpc: '2.0';
-  id: number | string;
-  result?: T;
-  error?: {
-    code: number;
-    message: string;
-    data?: any;
-  };
 }
 
 /**

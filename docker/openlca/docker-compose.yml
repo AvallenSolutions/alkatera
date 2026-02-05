@@ -1,0 +1,43 @@
+services:
+  openlca:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openlca-server
+    environment:
+      - JAVA_MAX_RAM_PERCENTAGE=80
+    mem_limit: 10500m
+    mem_reservation: 8g
+    volumes:
+      - ./data:/app/data
+    networks:
+      - openlca-internal
+    restart: unless-stopped
+    # Health check is defined in Dockerfile, but can be overridden here
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s  # ecoinvent 3.12 takes ~60-90s to load into memory
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: openlca-nginx
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    networks:
+      - openlca-internal
+    depends_on:
+      openlca:
+        condition: service_healthy
+    restart: unless-stopped
+
+networks:
+  openlca-internal:
+    driver: bridge

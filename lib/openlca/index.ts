@@ -3,7 +3,7 @@
  * Complete toolkit for automated LCA calculations with Ecoinvent database
  *
  * Key Components:
- * - OpenLCAClient: JSON-RPC 2.0 client for OpenLCA IPC server
+ * - OpenLCAClient: REST API client for OpenLCA gdt-server
  * - OpenLCACalculator: High-level calculation orchestration
  * - RecipeBuilder: Convert drink recipes to OpenLCA processes
  * - ImpactFactorResolver: Resolve impacts from OpenLCA for waterfall resolver

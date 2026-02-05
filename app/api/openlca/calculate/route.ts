@@ -158,8 +158,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`[OpenLCA API] Cache MISS, querying OpenLCA server at ${OPENLCA_SERVER_URL}`);
 
-    // Create OpenLCA client
-    const client = new OpenLCAClient(OPENLCA_SERVER_URL);
+    // Create OpenLCA client with API key for authenticated access
+    const OPENLCA_API_KEY = process.env.OPENLCA_API_KEY;
+    const client = new OpenLCAClient(OPENLCA_SERVER_URL, OPENLCA_API_KEY);
 
     // Health check
     const isHealthy = await client.healthCheck();

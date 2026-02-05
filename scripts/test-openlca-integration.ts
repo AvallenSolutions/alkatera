@@ -1,23 +1,32 @@
 /**
- * Test script for OpenLCA integration
+ * Test script for OpenLCA integration (REST API via gdt-server)
  * Run with: npx tsx scripts/test-openlca-integration.ts
+ *
+ * Environment variables:
+ *   OPENLCA_SERVER_URL - URL of the OpenLCA server (default: http://localhost:8080)
+ *   OPENLCA_API_KEY    - API key for authenticated access (optional for local dev)
  */
 
 import { OpenLCAClient } from '../lib/openlca/client';
 
 async function main() {
   const serverUrl = process.env.OPENLCA_SERVER_URL || 'http://localhost:8080';
+  const apiKey = process.env.OPENLCA_API_KEY;
 
-  console.log('🔬 Testing OpenLCA Integration');
+  console.log('🔬 Testing OpenLCA Integration (REST API)');
   console.log('================================');
   console.log(`Server URL: ${serverUrl}`);
+  console.log(`API Key: ${apiKey ? '✅ Configured' : '⚠️ Not set (OK for local dev)'}`);
   console.log('');
 
-  const client = new OpenLCAClient(serverUrl);
+  const client = new OpenLCAClient(serverUrl, apiKey);
 
-  // Test 1: Health check
-  console.log('1️⃣ Testing server connection...');
+  // Test 1: Health check via /api/version
+  console.log('1️⃣  Testing server connection...');
   try {
+    const version = await client.getVersion();
+    console.log(`   ✅ Server version: ${version}`);
+
     const processCount = await client.getProcessCount();
     console.log(`   ✅ Connected! Found ${processCount.toLocaleString()} processes`);
   } catch (error) {
@@ -26,7 +35,7 @@ async function main() {
   }
 
   // Test 2: Search for processes
-  console.log('\n2️⃣ Searching for "wheat grain" processes...');
+  console.log('\n2️⃣  Searching for "wheat grain" processes...');
   try {
     const processes = await client.getAllProcesses();
     const wheatProcesses = processes.filter(p =>
@@ -45,7 +54,7 @@ async function main() {
   }
 
   // Test 3: Get impact methods
-  console.log('\n3️⃣ Getting impact methods...');
+  console.log('\n3️⃣  Getting impact methods...');
   try {
     const methods = await client.getAllImpactMethods();
     const recipeMethod = methods.find(m =>
@@ -65,7 +74,7 @@ async function main() {
   }
 
   // Test 4: Run a calculation
-  console.log('\n4️⃣ Running test calculation for wheat grain...');
+  console.log('\n4️⃣  Running test calculation for wheat grain...');
   try {
     const processes = await client.getAllProcesses();
     const wheatProcess = processes.find(p =>
@@ -101,17 +110,42 @@ async function main() {
 
       console.log('\n   Key impacts (per kg):');
       if (climateImpact) {
-        console.log(`   🌡️  Climate Change: ${climateImpact.amount?.toFixed(4)} ${climateImpact.impactCategory?.refUnit}`);
+        const refUnit = (climateImpact.impactCategory as any)?.refUnit || (climateImpact.impactCategory as any)?.referenceUnitName || '';
+        console.log(`   🌡️  Climate Change: ${climateImpact.amount?.toFixed(4)} ${refUnit}`);
       }
       if (landImpact) {
-        console.log(`   🌍 Land Use: ${landImpact.amount?.toFixed(4)} ${landImpact.impactCategory?.refUnit}`);
+        const refUnit = (landImpact.impactCategory as any)?.refUnit || (landImpact.impactCategory as any)?.referenceUnitName || '';
+        console.log(`   🌍 Land Use: ${landImpact.amount?.toFixed(4)} ${refUnit}`);
       }
       if (waterImpact) {
-        console.log(`   💧 Water Use: ${waterImpact.amount?.toFixed(4)} ${waterImpact.impactCategory?.refUnit}`);
+        const refUnit = (waterImpact.impactCategory as any)?.refUnit || (waterImpact.impactCategory as any)?.referenceUnitName || '';
+        console.log(`   💧 Water Use: ${waterImpact.amount?.toFixed(4)} ${refUnit}`);
       }
     }
   } catch (error) {
     console.log(`   ❌ Calculation failed: ${error}`);
+  }
+
+  // Test 5: Security check (if API key is set)
+  if (apiKey) {
+    console.log('\n5️⃣  Testing security...');
+    try {
+      const unauthClient = new OpenLCAClient(serverUrl); // No API key
+      const isHealthy = await unauthClient.healthCheck();
+      if (isHealthy) {
+        console.log('   ⚠️ Server is accessible WITHOUT API key (version endpoint is public - this is expected)');
+      }
+
+      // Try to fetch processes without auth
+      try {
+        await unauthClient.getAllProcesses();
+        console.log('   ⚠️ WARNING: Processes accessible without API key - check Nginx config');
+      } catch {
+        console.log('   ✅ Processes correctly blocked without API key');
+      }
+    } catch (error) {
+      console.log(`   ✅ Unauthenticated request correctly blocked`);
+    }
   }
 
   console.log('\n================================');

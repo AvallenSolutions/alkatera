@@ -19,26 +19,9 @@ interface SearchResult {
   metadata?: Record<string, any>;
 }
 
-interface JsonRpcRequest {
-  jsonrpc: string;
-  id: number;
-  method: string;
-  params: Record<string, any>;
-}
-
-interface JsonRpcResponse {
-  jsonrpc: string;
-  id: number;
-  result?: any;
-  error?: {
-    code: number;
-    message: string;
-    data?: any;
-  };
-}
-
 const OPENLCA_SERVER_URL = process.env.OPENLCA_SERVER_URL;
 const OPENLCA_SERVER_ENABLED = process.env.OPENLCA_SERVER_ENABLED === 'true';
+const OPENLCA_API_KEY = process.env.OPENLCA_API_KEY;
 
 // Cache the process list in memory to avoid fetching 23k+ processes on every search
 let cachedProcesses: any[] | null = null;
@@ -55,20 +38,17 @@ async function getOpenLCAProcesses(): Promise<any[]> {
     return [];
   }
 
-  const rpcRequest: JsonRpcRequest = {
-    jsonrpc: "2.0",
-    id: 1,
-    method: "data/get/descriptors",
-    params: {
-      "@type": "Process",
-    }
-  };
-
   try {
-    const response = await fetch(OPENLCA_SERVER_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rpcRequest),
+    const headers: Record<string, string> = {};
+    if (OPENLCA_API_KEY) {
+      headers['X-API-Key'] = OPENLCA_API_KEY;
+    }
+
+    // gdt-server REST API: GET /data/processes returns all process descriptors
+    const serverUrl = OPENLCA_SERVER_URL.endsWith('/') ? OPENLCA_SERVER_URL : `${OPENLCA_SERVER_URL}/`;
+    const response = await fetch(`${serverUrl}data/processes`, {
+      method: 'GET',
+      headers,
     });
 
     if (!response.ok) {
@@ -76,13 +56,8 @@ async function getOpenLCAProcesses(): Promise<any[]> {
       return [];
     }
 
-    const rpcResponse: JsonRpcResponse = await response.json();
-
-    if (rpcResponse.error || !rpcResponse.result) {
-      return [];
-    }
-
-    cachedProcesses = Array.isArray(rpcResponse.result) ? rpcResponse.result : [];
+    const result = await response.json();
+    cachedProcesses = Array.isArray(result) ? result : [];
     cacheTimestamp = Date.now();
     console.log(`[OpenLCA] Cached ${cachedProcesses.length} processes`);
 

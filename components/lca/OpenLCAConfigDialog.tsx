@@ -88,19 +88,21 @@ export function OpenLCAConfigDialog({
     setTestResult(null);
 
     try {
-      const response = await fetch(`${config.serverUrl}/data`, {
+      // Route test connection through server-side API
+      // The browser cannot directly reach the cloud OpenLCA server (API key + TLS)
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        throw new Error("Not authenticated - please sign in again");
+      }
+
+      const response = await fetch("/api/openlca/test-connection", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "get/descriptors",
-          params: {
-            "@type": "Process",
-          },
-        }),
       });
 
       if (!response.ok) {
@@ -109,15 +111,9 @@ export function OpenLCAConfigDialog({
 
       const data = await response.json();
 
-      if (data.error) {
-        throw new Error(data.error.message || "Unknown error");
-      }
-
       setTestResult({
-        success: true,
-        message: `Successfully connected! Found ${
-          Array.isArray(data.result) ? data.result.length : 0
-        } processes.`,
+        success: data.success,
+        message: data.message,
       });
     } catch (error) {
       setTestResult({
@@ -195,7 +191,7 @@ export function OpenLCAConfigDialog({
             OpenLCA Server Configuration
           </DialogTitle>
           <DialogDescription>
-            Configure connection to your local OpenLCA instance with Ecoinvent database.
+            Configure connection to your OpenLCA server with Ecoinvent database.
             This enables access to comprehensive LCA data for materials and processes.
           </DialogDescription>
         </DialogHeader>
@@ -204,18 +200,9 @@ export function OpenLCAConfigDialog({
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              <strong>Setup Required:</strong> You need to have OpenLCA installed locally
-              with the Ecoinvent 3.9+ database imported and the IPC server running.
-              Visit{" "}
-              <a
-                href="https://www.openlca.org"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline font-medium"
-              >
-                openlca.org
-              </a>{" "}
-              to download.
+              <strong>Cloud Integration:</strong> Alkatera connects to a secure OpenLCA
+              server powered by Ecoinvent 3.12 for comprehensive LCA data.
+              The connection is managed server-side with API key authentication.
             </AlertDescription>
           </Alert>
 
@@ -224,7 +211,7 @@ export function OpenLCAConfigDialog({
               <div className="space-y-0.5">
                 <Label htmlFor="enabled">Enable OpenLCA Integration</Label>
                 <p className="text-xs text-muted-foreground">
-                  Connect to local OpenLCA server for Ecoinvent data
+                  Connect to OpenLCA server for Ecoinvent data
                 </p>
               </div>
               <Switch
