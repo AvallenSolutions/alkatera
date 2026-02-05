@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, BookOpen, FlaskConical, Info } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { DataSource } from "@/lib/types/lca";
 
@@ -21,8 +21,11 @@ interface SearchResult {
   land_factor?: number;
   waste_factor?: number;
   source?: string;
-  source_type?: 'primary' | 'staging' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
+  source_type?: 'primary' | 'staging' | 'global_library' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
   data_quality?: 'verified' | 'calculated' | 'estimated';
+  data_quality_grade?: 'HIGH' | 'MEDIUM' | 'LOW';
+  uncertainty_percent?: number;
+  source_citation?: string;
   metadata?: any;
   supplier_name?: string;
   recycled_content_pct?: number;
@@ -35,6 +38,7 @@ interface SearchResponse {
   sources: {
     primary: number;
     staging: number;
+    global_library: number;
     ecoinvent_proxy: number;
     ecoinvent_live: number;
   };
@@ -166,6 +170,7 @@ export function InlineIngredientSearch({
     const dataSourceType: DataSource =
       result.source_type === 'primary' ? 'supplier' :
       result.source_type === 'staging' ? 'staging' :
+      result.source_type === 'global_library' ? 'staging' : // Global library stored in staging table
       result.source_type === 'ecoinvent_proxy' ? 'ecoinvent' :
       result.source_type === 'ecoinvent_live' ? 'openlca' :
       result.source_type === 'defra' ? 'defra' :
@@ -212,6 +217,31 @@ export function InlineIngredientSearch({
             Primary
           </Badge>
         );
+      case 'global_library': {
+        const grade = result.data_quality_grade || result.metadata?.data_quality_grade;
+        if (grade === 'HIGH') {
+          return (
+            <Badge className="bg-emerald-600 text-white text-xs shrink-0">
+              <BookOpen className="h-3 w-3 mr-1" />
+              Peer-Reviewed
+            </Badge>
+          );
+        }
+        if (grade === 'MEDIUM') {
+          return (
+            <Badge className="bg-amber-600 text-white text-xs shrink-0">
+              <FlaskConical className="h-3 w-3 mr-1" />
+              Literature-Based
+            </Badge>
+          );
+        }
+        return (
+          <Badge className="bg-slate-500 text-white text-xs shrink-0">
+            <Info className="h-3 w-3 mr-1" />
+            Proxy Estimate
+          </Badge>
+        );
+      }
       case 'staging':
         return (
           <Badge className="bg-blue-600 text-white text-xs shrink-0">
@@ -271,6 +301,8 @@ export function InlineIngredientSearch({
     switch (result.source_type) {
       case 'primary':
         return <Shield className="h-4 w-4 text-emerald-600 shrink-0" />;
+      case 'global_library':
+        return <BookOpen className="h-4 w-4 text-amber-600 shrink-0" />;
       case 'staging':
         return <Database className="h-4 w-4 text-blue-600 shrink-0" />;
       case 'ecoinvent_proxy':
@@ -333,6 +365,11 @@ export function InlineIngredientSearch({
                     {sourceCounts.ecoinvent_live} ecoInvent
                   </Badge>
                 )}
+                {sourceCounts?.global_library && sourceCounts.global_library > 0 && (
+                  <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                    {sourceCounts.global_library} Library
+                  </Badge>
+                )}
                 {sourceCounts?.staging && sourceCounts.staging > 0 && (
                   <Badge variant="outline" className="text-xs">
                     {sourceCounts.staging} Internal
@@ -382,6 +419,16 @@ export function InlineIngredientSearch({
                     {result.co2_factor && (
                       <div className="text-xs text-muted-foreground mt-1">
                         {result.co2_factor.toFixed(3)} kg CO₂e/{result.unit || 'kg'}
+                        {result.source_type === 'global_library' && (result.uncertainty_percent || result.metadata?.uncertainty_percent) && (
+                          <span className="text-muted-foreground/70 ml-1">
+                            ±{result.uncertainty_percent || result.metadata?.uncertainty_percent}%
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {result.source_type === 'global_library' && result.source_citation && (
+                      <div className="text-xs text-muted-foreground/70 mt-0.5 truncate max-w-full" title={result.source_citation}>
+                        Source: {result.source_citation.length > 80 ? result.source_citation.slice(0, 80) + '...' : result.source_citation}
                       </div>
                     )}
                     {result.source_type === 'ecoinvent_live' && result.metadata?.system_model && (

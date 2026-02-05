@@ -139,6 +139,12 @@ const navigationStructure: NavItem[] = [
         minTier: 1,
       },
       {
+        name: 'Data Sources',
+        href: '/data/sources/',
+        icon: BookOpen,
+        minTier: 1,
+      },
+      {
         name: 'Reports',
         href: '/reports/',
         icon: FileText,

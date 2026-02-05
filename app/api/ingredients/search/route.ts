@@ -15,8 +15,11 @@ interface SearchResult {
   land_factor?: number;
   waste_factor?: number;
   source: string;
-  source_type: 'primary' | 'staging' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
+  source_type: 'primary' | 'staging' | 'global_library' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
   data_quality?: 'verified' | 'calculated' | 'estimated';
+  data_quality_grade?: 'HIGH' | 'MEDIUM' | 'LOW';
+  uncertainty_percent?: number;
+  source_citation?: string;
   metadata?: Record<string, any>;
 }
 
@@ -222,7 +225,7 @@ export async function GET(request: NextRequest) {
         }));
       })() : Promise.resolve([]),
 
-      // SOURCE 2: Staging Emission Factors
+      // SOURCE 2: Staging Emission Factors (includes Global Drinks Factor Library)
       (async () => {
         const { data: stagingFactors, error } = await supabase
           .from('staging_emission_factors')
@@ -230,26 +233,45 @@ export async function GET(request: NextRequest) {
           .ilike('name', `%${normalizedQuery}%`)
           .in('category', ['Ingredient', 'Packaging'])
           .order('name')
-          .limit(10);
+          .limit(15);
 
         if (error || !stagingFactors) return [];
 
-        return stagingFactors.map((factor: any): SearchResult => ({
-          id: factor.id,
-          name: factor.name,
-          category: factor.category,
-          unit: factor.reference_unit,
-          processType: 'STAGING_FACTOR',
-          location: 'Internal Library',
-          co2_factor: factor.co2_factor,
-          water_factor: factor.water_factor,
-          land_factor: factor.land_factor,
-          waste_factor: factor.waste_factor,
-          source: factor.source || 'Internal',
-          source_type: 'staging',
-          data_quality: 'calculated',
-          metadata: factor.metadata,
-        }));
+        return stagingFactors.map((factor: any): SearchResult => {
+          // Distinguish global library factors (organization_id IS NULL + has data_quality_grade)
+          const isGlobalLibrary = !factor.organization_id && factor.metadata?.data_quality_grade;
+          const qualityGrade = factor.metadata?.data_quality_grade as 'HIGH' | 'MEDIUM' | 'LOW' | undefined;
+
+          return {
+            id: factor.id,
+            name: factor.name,
+            category: factor.category,
+            unit: factor.reference_unit,
+            processType: 'STAGING_FACTOR',
+            location: isGlobalLibrary
+              ? factor.geographic_scope || 'Global'
+              : 'Internal Library',
+            co2_factor: factor.co2_factor,
+            water_factor: factor.water_factor,
+            land_factor: factor.land_factor,
+            waste_factor: factor.waste_factor,
+            source: factor.source || 'Internal',
+            source_type: isGlobalLibrary ? 'global_library' : 'staging',
+            data_quality: qualityGrade === 'HIGH' ? 'verified'
+              : qualityGrade === 'MEDIUM' ? 'calculated'
+              : qualityGrade === 'LOW' ? 'estimated'
+              : 'calculated',
+            data_quality_grade: qualityGrade,
+            uncertainty_percent: factor.uncertainty_percent,
+            source_citation: factor.source,
+            metadata: {
+              ...factor.metadata,
+              uncertainty_percent: factor.uncertainty_percent,
+              geographic_scope: factor.geographic_scope,
+              temporal_coverage: factor.temporal_coverage,
+            },
+          };
+        });
       })(),
 
       // SOURCE 3: Ecoinvent Material Proxies (pre-calculated)
@@ -299,9 +321,10 @@ export async function GET(request: NextRequest) {
     const sortOrder: Record<string, number> = {
       'primary': 0,
       'staging': 1,
-      'ecoinvent_proxy': 2,
-      'ecoinvent_live': 3,
-      'defra': 4,
+      'global_library': 2,
+      'ecoinvent_proxy': 3,
+      'ecoinvent_live': 4,
+      'defra': 5,
     };
 
     allResults.sort((a, b) => {
@@ -319,12 +342,17 @@ export async function GET(request: NextRequest) {
       return a.name.localeCompare(b.name);
     });
 
+    // Separate global library from org-specific staging counts
+    const globalLibraryCount = stagingResults.filter(r => r.source_type === 'global_library').length;
+    const orgStagingCount = stagingResults.filter(r => r.source_type === 'staging').length;
+
     return NextResponse.json({
       results: allResults.slice(0, 50), // Limit total results
       total_found: allResults.length,
       sources: {
         primary: supplierResults.length,
-        staging: stagingResults.length,
+        staging: orgStagingCount,
+        global_library: globalLibraryCount,
         ecoinvent_proxy: ecoinventProxyResults.length,
         ecoinvent_live: openLCAResults.length,
       },
