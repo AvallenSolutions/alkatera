@@ -17,7 +17,9 @@ import CriticalReviewPanel from '@/components/lca/CriticalReviewPanel';
 import GoalScopeForm from '@/components/lca/GoalScopeForm';
 import ComplianceTracker from '@/components/lca/ComplianceTracker';
 import ComplianceWizard from '@/components/lca/ComplianceWizard';
+import { PdfPreviewDialog } from '@/components/lca/PdfPreviewDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { generateEnhancedLcaPdf } from '@/lib/enhanced-pdf-generator';
 
 const MOCK_LCA_REPORT = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -73,6 +75,7 @@ export default function ProductLcaReportPage() {
   const [methodology, setMethodology] = useState<'recipe_2016' | 'ef_31'>('recipe_2016');
   const [hasEF31Access, setHasEF31Access] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -267,27 +270,86 @@ export default function ProductLcaReportPage() {
       return;
     }
 
-    try {
-      setIsGeneratingPdf(true);
+    // Open the new PDF preview dialog
+    setPdfPreviewOpen(true);
+  };
 
-      // Open the beautiful PDF report page
-      const pdfUrl = `/lca-report/${lcaData.id}`;
-      window.open(pdfUrl, '_blank');
+  // Generate PDF blob for preview dialog
+  const generatePdfBlob = async (): Promise<Blob> => {
+    // Prepare data for enhanced PDF generator
+    const pdfData = {
+      productName: displayProductName,
+      version: displayVersion,
+      assessmentPeriod: displayPeriod,
+      publishedDate: lcaData?.updated_at || new Date().toISOString(),
+      functionalUnit: displayFunctionalUnit,
+      systemBoundary: displayBoundary,
+      metrics: {
+        climate_change_gwp100: impacts?.climate_change_gwp100 || 0,
+        water_consumption: impacts?.water_consumption || 0,
+        land_use: impacts?.land_use || 0,
+        circularity_percentage: circularityPercentage || 0,
+      },
+      dataQuality: {
+        averageConfidence: displayDqi,
+        rating: displayDqi >= 80 ? 'Excellent' : displayDqi >= 60 ? 'Good' : 'Fair',
+        highQualityCount: lcaData?.materials?.filter((m: any) => m.quality_grade === 'high').length || 0,
+        mediumQualityCount: lcaData?.materials?.filter((m: any) => m.quality_grade === 'medium').length || 0,
+        lowQualityCount: lcaData?.materials?.filter((m: any) => m.quality_grade === 'low' || !m.quality_grade).length || 0,
+        totalMaterialsCount: lcaData?.materials?.length || 1,
+      },
+      dataProvenance: {
+        hybridSourcesCount: lcaData?.materials?.filter((m: any) => m.data_source === 'hybrid').length || 0,
+        defraGwpCount: lcaData?.materials?.filter((m: any) => m.data_source === 'defra').length || 0,
+        supplierVerifiedCount: lcaData?.materials?.filter((m: any) => m.data_source === 'supplier_epd').length || 0,
+        ecoinventOnlyCount: lcaData?.materials?.filter((m: any) => m.data_source === 'ecoinvent' || m.data_source === 'openlca').length || 0,
+        methodologySummary: 'Hybrid methodology combining UK regulatory data (DEFRA 2025) with comprehensive environmental impact data (Ecoinvent 3.12).',
+      },
+      ghgBreakdown: breakdown?.by_ghg ? {
+        co2Fossil: breakdown.by_ghg.co2_fossil || 0,
+        co2Biogenic: breakdown.by_ghg.co2_biogenic || 0,
+        co2Dluc: breakdown.by_ghg.co2_dluc || 0,
+      } : undefined,
+      complianceFramework: {
+        standards: ['ISO 14044:2006', 'ISO 14067:2018', 'GHG Protocol'],
+        certifications: [],
+      },
+    };
 
-      toast({
-        title: 'Report Opened',
-        description: 'Use your browser\'s print function (Cmd+P / Ctrl+P) to save as PDF',
-      });
-    } catch (error) {
-      console.error('Error opening PDF:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to open PDF report. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsGeneratingPdf(false);
-    }
+    // Generate PDF using jsPDF (returns void but saves file)
+    // We need to create a blob version instead
+    const { jsPDF } = await import('jspdf');
+    await import('jspdf-autotable');
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    // Simplified PDF generation for preview
+    doc.setFontSize(24);
+    doc.text('LCA Report', 20, 30);
+    doc.setFontSize(16);
+    doc.text(displayProductName, 20, 45);
+    doc.setFontSize(12);
+    doc.text(`Version: ${displayVersion}`, 20, 60);
+    doc.text(`Carbon Footprint: ${(impacts?.climate_change_gwp100 || 0).toFixed(3)} kg CO₂e`, 20, 75);
+    doc.text(`Data Quality: ${displayDqi}%`, 20, 90);
+    doc.text(`Functional Unit: ${displayFunctionalUnit}`, 20, 105);
+    doc.text(`System Boundary: ${displayBoundary}`, 20, 120);
+
+    return doc.output('blob');
+  };
+
+  const handleOpenPrintablePage = () => {
+    if (!lcaData) return;
+    const pdfUrl = `/lca-report/${lcaData.id}`;
+    window.open(pdfUrl, '_blank');
+    toast({
+      title: 'Report Opened',
+      description: 'Use your browser\'s print function (Cmd+P / Ctrl+P) to save as PDF',
+    });
   };
 
   const displayTitle = lcaData ? `${lcaData.reference_year || new Date().getFullYear()} Product Impact Assessment` : MOCK_LCA_REPORT.title;
@@ -502,6 +564,10 @@ export default function ProductLcaReportPage() {
               <Download className="h-4 w-4" />
               {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
             </Button>
+            <Button variant="outline" className="gap-2" onClick={handleOpenPrintablePage}>
+              <FileText className="h-4 w-4" />
+              View Full Report
+            </Button>
             <Button variant="outline" className="gap-2">
               <Share2 className="h-4 w-4" />
               Share
@@ -516,11 +582,14 @@ export default function ProductLcaReportPage() {
           pcfId={lcaData.id}
           lcaData={lcaData}
           onNavigateToTab={setReportTab}
-          onOpenWizard={() => setWizardOpen(true)}
+          onOpenWizard={() => {
+            // Navigate to the enhanced full-page wizard
+            window.location.href = `/products/${productId}/compliance-wizard`;
+          }}
         />
       )}
 
-      {/* Compliance Wizard */}
+      {/* Legacy Compliance Wizard (Modal) - kept for quick edits */}
       {lcaData?.id && (
         <ComplianceWizard
           open={wizardOpen}
@@ -530,6 +599,17 @@ export default function ProductLcaReportPage() {
             // Re-fetch to update tracker
             window.location.reload();
           }}
+        />
+      )}
+
+      {/* PDF Preview Dialog */}
+      {lcaData?.id && (
+        <PdfPreviewDialog
+          open={pdfPreviewOpen}
+          onOpenChange={setPdfPreviewOpen}
+          pcfId={lcaData.id}
+          productName={displayProductName}
+          onGeneratePdf={generatePdfBlob}
         />
       )}
 
