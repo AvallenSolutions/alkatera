@@ -73,6 +73,19 @@ export interface WaterfallResult {
   non_gwp_reference_id?: string;
   is_hybrid_source: boolean;
 
+  // ISO 14044 Pedigree Matrix (1-5 scale, 1=best)
+  pedigree_reliability?: number;
+  pedigree_completeness?: number;
+  pedigree_temporal?: number;
+  pedigree_geographical?: number;
+  pedigree_technological?: number;
+  pedigree_dqi_score?: number;      // Computed 0-100 score
+
+  // Uncertainty tracking (ISO 14044 Section 4.5.3.3)
+  uncertainty_percent?: number;      // % uncertainty on value
+  data_collection_year?: number;     // For temporal representativeness
+  geographic_scope?: string;         // ISO country code or GLO
+
   // Optional IDs
   supplier_lca_id?: string;
   category_type: MaterialCategoryType;
@@ -685,14 +698,25 @@ export async function resolveImpactFactors(
       impact_fossil_resource_scarcity: 0,
       data_priority: 3,
       data_quality_tag: hasFossilBiogenicSplit ? 'Secondary_Modelled' : 'Secondary_Estimated',
-      data_quality_grade: 'MEDIUM',
+      data_quality_grade: extractQualityGrade(stagingFactor),
       source_reference: `Staging: ${stagingFactor.name} (${stagingFactor.source || 'Internal'})`,
-      confidence_score: hasFossilBiogenicSplit ? 75 : 70,
-      methodology: 'ReCiPe 2016 Midpoint (H) / Ecoinvent 3.12',
+      confidence_score: stagingFactor.confidence_score ?? (hasFossilBiogenicSplit ? 75 : 70),
+      methodology: stagingFactor.gwp_methodology || 'ReCiPe 2016 Midpoint (H) / Ecoinvent 3.12',
       gwp_data_source: stagingFactor.source || 'Staging Factors',
       non_gwp_data_source: stagingFactor.source || 'Staging Factors',
       gwp_reference_id: stagingFactor.id?.toString(),
       is_hybrid_source: false,
+      // ISO 14044 Pedigree Matrix data
+      pedigree_reliability: stagingFactor.pedigree_reliability ?? 3,
+      pedigree_completeness: stagingFactor.pedigree_completeness ?? 3,
+      pedigree_temporal: stagingFactor.pedigree_temporal ?? 3,
+      pedigree_geographical: stagingFactor.pedigree_geographical ?? 3,
+      pedigree_technological: stagingFactor.pedigree_technological ?? 3,
+      pedigree_dqi_score: stagingFactor.pedigree_dqi_score ?? 70,
+      // Uncertainty tracking
+      uncertainty_percent: stagingFactor.uncertainty_percent ?? 25,
+      data_collection_year: stagingFactor.data_collection_year ?? null,
+      geographic_scope: stagingFactor.geographic_scope || 'GLO',
       category_type: category,
     };
   }
@@ -763,9 +787,13 @@ export async function resolveImpactFactors(
   }
 
   // ===========================================================
-  // NO DATA FOUND
+  // NO DATA FOUND — Log the miss for data strategy intelligence
   // ===========================================================
   console.error(`[Waterfall] ✗ NO DATA FOUND for: ${material.material_name}`);
+
+  // Fire-and-forget: log this miss to the factor requests table
+  logFactorMiss(material, organizationId).catch(() => {});
+
   throw new Error(`No emission factor found for material: ${material.material_name}. Please add emission data or select a different material.`);
 }
 
@@ -801,4 +829,53 @@ export async function validateMaterialsBeforeCalculation(
     missingData,
     validMaterials
   };
+}
+
+/**
+ * Extract quality grade from staging factor metadata
+ * Falls back to MEDIUM if not specified
+ */
+function extractQualityGrade(factor: any): 'HIGH' | 'MEDIUM' | 'LOW' {
+  const grade = factor.metadata?.data_quality_grade;
+  if (grade === 'HIGH' || grade === 'MEDIUM' || grade === 'LOW') {
+    return grade;
+  }
+  // Infer from confidence score if available
+  if (factor.confidence_score) {
+    if (factor.confidence_score >= 85) return 'HIGH';
+    if (factor.confidence_score >= 65) return 'MEDIUM';
+    return 'LOW';
+  }
+  return 'MEDIUM';
+}
+
+/**
+ * Fire-and-forget logging of materials that have no emission factor data.
+ * Used by the data strategy to prioritise which factors to add next.
+ */
+async function logFactorMiss(
+  material: ProductMaterial,
+  organizationId?: string,
+): Promise<void> {
+  try {
+    const supabase = getSupabaseBrowserClient();
+    await supabase.rpc('log_emission_factor_request', {
+      p_search_query: material.material_name,
+      p_material_name: material.material_name,
+      p_material_type: material.material_type || null,
+      p_context: 'calculation_failure',
+      p_organization_id: organizationId || null,
+      p_source_page: '/products/calculate-lca',
+      p_product_id: material.product_id ? parseInt(String(material.product_id)) : null,
+      p_metadata: JSON.stringify({
+        data_source: material.data_source || null,
+        data_source_id: material.data_source_id || null,
+        unit: material.unit,
+        origin_country: material.origin_country || null,
+      }),
+    });
+  } catch (err) {
+    // Silently fail — this is telemetry, not critical path
+    console.warn('[Waterfall] Failed to log factor miss:', err);
+  }
 }
