@@ -42,6 +42,7 @@ export interface PcfComplianceData {
   data_quality_requirements?: any | null;
   critical_review_type?: string | null;
   critical_review_justification?: string | null;
+  cutoff_criteria?: string | null;  // ISO 14044 4.2.3.3.2
   // Core LCA fields
   functional_unit?: string | null;
   system_boundary?: string | null;
@@ -63,6 +64,23 @@ export interface PcfComplianceData {
     is_approved?: boolean | null;
     reviewers?: any[] | null;
     reviewer_statement?: string | null;
+  } | null;
+  // ISO 14044 Data Quality Assessment (from lib/data-quality-assessment.ts)
+  dataQualityAssessment?: {
+    overallDqi?: number;                    // 0-100 pedigree-based score
+    overallConfidence?: 'HIGH' | 'MEDIUM' | 'LOW';
+    weightedUncertainty?: number;           // Propagated uncertainty %
+    temporalCoverage?: {
+      staleMaterialCount?: number;
+      staleImpactShare?: number;            // % of impact using >3yr old data
+    };
+    qualityFlags?: Array<{
+      severity: 'critical' | 'warning' | 'info';
+      code: string;
+      message: string;
+    }>;
+    isoCompliant?: boolean;
+    complianceGaps?: string[];
   } | null;
 }
 
@@ -119,6 +137,13 @@ export function evaluateCompliance(data: PcfComplianceData): ComplianceResult {
       required: true,
     },
     {
+      id: 'cutoff_criteria',
+      label: 'Cut-off criteria documented',
+      hint: 'ISO 14044 4.2.3.3.2: Document which flows are excluded and the materiality threshold (e.g., "flows <1% excluded")',
+      complete: !!data.cutoff_criteria?.trim(),
+      required: true,
+    },
+    {
       id: 'assumptions',
       label: 'Assumptions & limitations documented',
       hint: 'List at least one assumption or limitation of this study (e.g., "Transport distances estimated")',
@@ -137,6 +162,7 @@ export function evaluateCompliance(data: PcfComplianceData): ComplianceResult {
 
   // 3. Data Quality (ISO 14044 Section 4.2.3.6)
   const dqr = data.data_quality_requirements || {};
+  const dqa = data.dataQualityAssessment || {};
   const dataQualityItems: ComplianceItem[] = [
     {
       id: 'temporal_coverage',
@@ -172,6 +198,27 @@ export function evaluateCompliance(data: PcfComplianceData): ComplianceResult {
       hint: 'What percentage of relevant data flows are covered? Aim for 95%+ for ISO compliance',
       complete: (dqr.completeness || 0) > 0,
       required: false,
+    },
+    {
+      id: 'pedigree_matrix',
+      label: 'Pedigree Matrix assessment',
+      hint: 'ISO 14044: 5-dimensional data quality scoring (reliability, completeness, temporal, geographic, technological)',
+      complete: (dqa.overallDqi || 0) >= 60,
+      required: true,
+    },
+    {
+      id: 'uncertainty_analysis',
+      label: 'Uncertainty quantified',
+      hint: 'ISO 14044 4.5.3.3: Propagated uncertainty through all materials (<40% recommended)',
+      complete: (dqa.weightedUncertainty || 100) <= 50,
+      required: true,
+    },
+    {
+      id: 'temporal_representativeness',
+      label: 'Data temporally representative',
+      hint: 'Less than 20% of impact should use data >3 years old',
+      complete: (dqa.temporalCoverage?.staleImpactShare || 100) <= 20,
+      required: true,
     },
   ];
   sections.push(buildSection('data_quality', 'Data Quality', '4.2.3.6', 'Document the quality and coverage of your data sources', dataQualityItems));
@@ -404,6 +451,26 @@ export const FIELD_HELP: Record<string, { what: string; why: string; example: st
     why: 'Documents the rationale for the review approach selected.',
     example: 'External expert review selected as the study will be published as an EPD but does not make comparative assertions.',
   },
+  cutoff_criteria: {
+    what: 'What flows are excluded from the study and why?',
+    why: 'ISO 14044 Section 4.2.3.3.2 requires documenting which processes or flows are excluded based on materiality thresholds.',
+    example: 'Flows contributing <1% of total mass and <1% of total environmental impact are excluded. Capital goods excluded per ISO 14067 Clause 6.3.5.',
+  },
+  pedigree_matrix: {
+    what: 'Has the 5-dimensional data quality matrix been assessed?',
+    why: 'ISO 14044 Section 4.2.3.6 requires systematic assessment of reliability, completeness, temporal, geographic, and technological representativeness.',
+    example: 'Overall DQI of 75% based on weighted pedigree scores: Reliability 2.3, Completeness 2.8, Temporal 2.1, Geographic 3.0, Technological 2.5.',
+  },
+  uncertainty_analysis: {
+    what: 'Has uncertainty been quantified and propagated through the model?',
+    why: 'ISO 14044 Section 4.5.3.3 requires uncertainty analysis in interpretation. Propagated uncertainty helps assess result reliability.',
+    example: 'Overall uncertainty ±28% (95% CI) propagated from material-level uncertainties using root-sum-of-squares.',
+  },
+  temporal_representativeness: {
+    what: 'Is the data temporally representative of current conditions?',
+    why: 'Using outdated data reduces result accuracy. ISO 14044 recommends data <3 years old for most applications.',
+    example: 'Average data age 2.1 years. 12% of impact uses data >3 years old (glass packaging factors from 2021 LCA).',
+  },
 };
 
 // Smart defaults that can be pre-populated
@@ -430,5 +497,12 @@ export const SMART_DEFAULTS = {
     'Environmental Product Declaration (EPD) registration',
     'Regulatory compliance with upcoming packaging regulations',
     'Supply chain transparency and Scope 3 reporting',
+  ],
+  cutoff_criteria_suggestions: [
+    'Flows contributing <1% of total mass and <1% of total environmental impact excluded per ISO 14044 Section 4.2.3.3.2',
+    'Capital goods excluded per ISO 14067 Clause 6.3.5 and PAS 2050 Clause 6.2.4',
+    'Administrative and office activities excluded (<0.1% contribution)',
+    'Human labour excluded per standard LCA practice',
+    'Packaging of raw material inputs included; tertiary transport packaging excluded',
   ],
 };
