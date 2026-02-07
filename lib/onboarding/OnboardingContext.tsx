@@ -50,70 +50,87 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
   const { currentOrganization } = useOrganization()
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const hasFetchedRef = useRef(false)
 
-  // Load onboarding state from the API
-  const fetchState = useCallback(async () => {
-    if (!currentOrganization) return
+  // Track which org ID we've loaded state for to avoid re-fetching on every render
+  const loadedOrgIdRef = useRef<string | null>(null)
+  // Track the org ID for saves so the callback doesn't need currentOrganization in deps
+  const orgIdRef = useRef<string | null>(null)
+  // Guard against saving while a fetch is in flight
+  const isFetchingRef = useRef(false)
+  // Counter to ignore stale fetch responses
+  const fetchGenerationRef = useRef(0)
 
-    try {
-      const res = await fetch(`/api/onboarding?organizationId=${currentOrganization.id}`)
-      if (res.ok) {
-        const data = await res.json()
-        if (data.state) {
-          setState(data.state)
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch onboarding state:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentOrganization])
-
-  // Save onboarding state to the API (debounced)
-  const saveState = useCallback(async (newState: OnboardingState) => {
-    if (!currentOrganization) return
-
-    // Clear any pending save
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-
-    // Debounce saves by 500ms
-    saveTimeoutRef.current = setTimeout(async () => {
-      try {
-        await fetch('/api/onboarding', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            organizationId: currentOrganization.id,
-            state: newState,
-          }),
-        })
-      } catch (err) {
-        console.error('Failed to save onboarding state:', err)
-      }
-    }, 500)
-  }, [currentOrganization])
-
-  // Fetch state when organization changes
+  // Keep orgIdRef current
   useEffect(() => {
-    if (currentOrganization && !hasFetchedRef.current) {
-      hasFetchedRef.current = true
-      fetchState()
-    }
-  }, [currentOrganization, fetchState])
-
-  // Reset fetch flag when organization changes
-  useEffect(() => {
-    hasFetchedRef.current = false
+    orgIdRef.current = currentOrganization?.id ?? null
   }, [currentOrganization?.id])
 
+  // Save onboarding state to the API — fires immediately, no debounce.
+  // Uses orgIdRef so it doesn't depend on currentOrganization (avoids
+  // re-creating the callback on every org reference change).
+  const saveState = useCallback(async (newState: OnboardingState) => {
+    const orgId = orgIdRef.current
+    if (!orgId) return
+    // Don't save while we're still loading initial state
+    if (isFetchingRef.current) return
+
+    try {
+      await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: orgId,
+          state: newState,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to save onboarding state:', err)
+    }
+  }, []) // stable — no deps
+
+  // Fetch state from the API for a given org ID
+  useEffect(() => {
+    const orgId = currentOrganization?.id
+    if (!orgId) {
+      setIsLoading(false)
+      return
+    }
+
+    // Only fetch once per org ID
+    if (loadedOrgIdRef.current === orgId) return
+    loadedOrgIdRef.current = orgId
+
+    const generation = ++fetchGenerationRef.current
+    isFetchingRef.current = true
+
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/onboarding?organizationId=${orgId}`)
+        // If the org changed while we were fetching, discard the result
+        if (generation !== fetchGenerationRef.current) return
+
+        if (res.ok) {
+          const data = await res.json()
+          if (data.state) {
+            setState(data.state)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch onboarding state:', err)
+      } finally {
+        if (generation === fetchGenerationRef.current) {
+          isFetchingRef.current = false
+          setIsLoading(false)
+        }
+      }
+    })()
+  }, [currentOrganization?.id])
+
+  // Helper: update state in memory and persist immediately
   const updateState = useCallback((updater: (prev: OnboardingState) => OnboardingState) => {
     setState(prev => {
       const next = updater(prev)
+      // Fire-and-forget save
       saveState(next)
       return next
     })
@@ -155,10 +172,14 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [updateState])
 
   const skipStep = useCallback(() => {
-    const config = getStepConfig(state.currentStep)
-    if (!config.skippable) return
-    nextStep()
-  }, [state.currentStep, nextStep])
+    updateState(prev => {
+      const config = getStepConfig(prev.currentStep)
+      if (!config.skippable) return prev
+      const next = getNextStep(prev.currentStep)
+      if (!next) return prev
+      return { ...prev, currentStep: next }
+    })
+  }, [updateState])
 
   const updatePersonalization = useCallback((data: Partial<PersonalizationData>) => {
     updateState(prev => ({
