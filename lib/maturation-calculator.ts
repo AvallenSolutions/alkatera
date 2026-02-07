@@ -1,0 +1,140 @@
+/**
+ * Maturation Impact Calculator
+ *
+ * Calculates the environmental impact of spirit/wine maturation (barrel aging).
+ *
+ * Three impact categories:
+ *   1. Barrel allocation — manufacturing CO2e (cut-off: new barrel = full burden)
+ *   2. Angel's share   — ethanol evaporation as NMVOC → photochemical ozone formation
+ *   3. Warehouse energy — kWh-based CO2e via grid emission factors
+ *
+ * Methodology references:
+ *   - SWA (2006) Life Cycle Assessment of Scotch Whisky
+ *   - Pettersson (2016) LCA of Swedish single malt whisky
+ *   - ISO 14044 cut-off allocation for multi-use barrels
+ *   - DEFRA 2025 UK conversion factors for grid electricity
+ */
+
+import type {
+  MaturationProfile,
+  MaturationImpactResult,
+  EnergySource,
+} from './types/maturation';
+
+import {
+  BARREL_CO2E_DEFAULTS,
+} from './types/maturation';
+
+// ---------------------------------------------------------------------------
+// Grid emission factors (kg CO2e per kWh) — DEFRA 2025
+// ---------------------------------------------------------------------------
+
+const GRID_EMISSION_FACTORS: Record<EnergySource, number> = {
+  grid_electricity: 0.207,  // UK DEFRA 2025 average
+  natural_gas: 0.183,       // DEFRA 2025 natural gas
+  renewable: 0.0,           // Zero operational emissions
+  mixed: 0.120,             // Approximate 50% renewable blend
+};
+
+// Angel's share ethanol assumptions
+const DEFAULT_ABV = 0.63;        // Typical cask-strength fill ABV (63%)
+const ETHANOL_DENSITY = 0.789;   // kg/L at 20°C
+const ETHANOL_POCP = 0.40;      // Photochemical Ozone Creation Potential (kg NMVOC eq / kg ethanol)
+
+// Reconditioning CO2e for reused barrels (kg per barrel)
+const REUSED_BARREL_CO2E = 0.5;
+
+// ---------------------------------------------------------------------------
+// Main calculator
+// ---------------------------------------------------------------------------
+
+export function calculateMaturationImpacts(
+  profile: MaturationProfile
+): MaturationImpactResult {
+  const agingYears = profile.aging_duration_months / 12;
+  const totalFillVolume = profile.fill_volume_litres * profile.number_of_barrels;
+
+  // ---- 1. BARREL ALLOCATION (Cut-off method) ----
+  let barrelCO2ePerBarrel: number;
+
+  if (profile.barrel_use_number === 1) {
+    // New barrel: full manufacturing burden
+    barrelCO2ePerBarrel = profile.barrel_co2e_new
+      ?? BARREL_CO2E_DEFAULTS[profile.barrel_type]
+      ?? 40;
+  } else {
+    // Reused barrel (cut-off): only reconditioning/cleaning
+    barrelCO2ePerBarrel = REUSED_BARREL_CO2E;
+  }
+
+  const barrelTotalCO2e = barrelCO2ePerBarrel * profile.number_of_barrels;
+  const barrelCO2ePerLitre = barrelTotalCO2e / totalFillVolume;
+
+  // ---- 2. ANGEL'S SHARE ----
+  // Compound volume loss: V_out = V_in × (1 - rate)^years
+  const annualLossRate = profile.angel_share_percent_per_year / 100;
+  const retentionFactor = Math.pow(1 - annualLossRate, agingYears);
+  const outputVolume = totalFillVolume * retentionFactor;
+  const volumeLoss = totalFillVolume - outputVolume;
+  const totalLossPercent = (1 - retentionFactor) * 100;
+
+  // Ethanol lost as VOC (NMVOC emission, NOT direct GHG)
+  // Assume cask-strength ABV, ethanol density 0.789 kg/L
+  const ethanolLostLitres = volumeLoss * DEFAULT_ABV;
+  const ethanolLostKg = ethanolLostLitres * ETHANOL_DENSITY;
+
+  // POCP characterization: ethanol → photochemical ozone formation
+  const vocKg = ethanolLostKg;
+  const photochemicalOzone = ethanolLostKg * ETHANOL_POCP;
+
+  // ---- 3. WAREHOUSE ENERGY ----
+  const warehouseKwhTotal =
+    profile.warehouse_energy_kwh_per_barrel_year *
+    profile.number_of_barrels *
+    agingYears;
+
+  const gridFactor = GRID_EMISSION_FACTORS[profile.warehouse_energy_source] ?? 0.207;
+  const warehouseCO2eTotal = warehouseKwhTotal * gridFactor;
+  const warehouseCO2ePerLitre = outputVolume > 0 ? warehouseCO2eTotal / outputVolume : 0;
+
+  // ---- 4. TOTALS ----
+  // Angel's share is NMVOC → photochemical ozone, NOT counted in climate GWP
+  const totalMaturationCO2e = barrelTotalCO2e + warehouseCO2eTotal;
+  const totalPerLitreOutput = outputVolume > 0 ? totalMaturationCO2e / outputVolume : 0;
+
+  return {
+    barrel_co2e_per_litre: barrelCO2ePerLitre,
+    barrel_total_co2e: barrelTotalCO2e,
+
+    angel_share_volume_loss_litres: volumeLoss,
+    angel_share_loss_percent_total: totalLossPercent,
+    angel_share_voc_kg: vocKg,
+    angel_share_photochemical_ozone: photochemicalOzone,
+
+    warehouse_co2e_total: warehouseCO2eTotal,
+    warehouse_co2e_per_litre: warehouseCO2ePerLitre,
+
+    output_volume_litres: outputVolume,
+    volume_loss_factor: retentionFactor,
+
+    total_maturation_co2e: totalMaturationCO2e,
+    total_maturation_co2e_per_litre_output: totalPerLitreOutput,
+
+    methodology_notes: buildMethodologyNotes(profile, agingYears),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function buildMethodologyNotes(profile: MaturationProfile, agingYears: number): string {
+  const parts = [
+    'Cut-off allocation (ISO 14044).',
+    `Barrel: ${profile.barrel_type} (use #${profile.barrel_use_number}).`,
+    `Aging: ${profile.aging_duration_months} months (${agingYears.toFixed(1)} years).`,
+    `Angel's share: ${profile.angel_share_percent_per_year}%/yr (${profile.climate_zone}).`,
+    `Warehouse: ${profile.warehouse_energy_kwh_per_barrel_year} kWh/barrel/yr (${profile.warehouse_energy_source}).`,
+  ];
+  return parts.join(' ');
+}
