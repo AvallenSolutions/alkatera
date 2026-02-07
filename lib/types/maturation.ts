@@ -55,6 +55,10 @@ export interface MaturationProfile {
   // Allocation method
   allocation_method: AllocationMethod;
 
+  // Optional: exact bottle count for per-unit allocation (single-cask bottlings)
+  // When null, per-bottle allocation is derived from output_volume ÷ product bottle size
+  bottles_produced: number | null;
+
   notes: string | null;
   created_at: string;
   updated_at: string;

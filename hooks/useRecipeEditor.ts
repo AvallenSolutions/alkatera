@@ -619,6 +619,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         warehouse_energy_kwh_per_barrel_year: profile.warehouse_energy_kwh_per_barrel_year,
         warehouse_energy_source: profile.warehouse_energy_source,
         allocation_method: profile.allocation_method,
+        bottles_produced: profile.bottles_produced || null,
         notes: profile.notes || null,
       };
 

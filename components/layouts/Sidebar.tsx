@@ -53,6 +53,7 @@ import {
   Target,
   Library,
   Lock,
+  Database,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -355,6 +356,11 @@ const developmentStructure: NavItem[] = [
     name: 'Verification Tests',
     href: '/dev/docs/verification-tests/',
     icon: FlaskConical,
+  },
+  {
+    name: 'Maturation Tests',
+    href: '/dev/docs/maturation-tests/',
+    icon: TestTube,
   },
   {
     name: 'UI Documentation',
@@ -787,6 +793,22 @@ export function Sidebar({ className }: SidebarProps) {
                     isActive('/admin/rosa/') ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate">Rosa Admin</span>
+                </Link>
+
+                <Link
+                  href="/admin/factors/"
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                    isActive('/admin/factors/')
+                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                      : 'text-sidebar-foreground hover:bg-secondary/50'
+                  )}
+                >
+                  <Database className={cn(
+                    'h-4 w-4 flex-shrink-0 transition-colors',
+                    isActive('/admin/factors/') ? 'text-neon-lime' : ''
+                  )} />
+                  <span className="truncate">Emission Factors</span>
                 </Link>
               </>
             )}

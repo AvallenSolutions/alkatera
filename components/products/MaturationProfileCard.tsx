@@ -41,6 +41,7 @@ export interface MaturationFormData {
   warehouse_energy_kwh_per_barrel_year: number;
   warehouse_energy_source: EnergySource;
   allocation_method: 'cut_off' | 'avoided_burden';
+  bottles_produced: number | null;
   notes: string | null;
 }
 
@@ -66,6 +67,7 @@ const DEFAULT_FORM: MaturationFormData = {
   warehouse_energy_kwh_per_barrel_year: 15,
   warehouse_energy_source: 'grid_electricity',
   allocation_method: 'cut_off',
+  bottles_produced: null,
   notes: null,
 };
 
@@ -92,6 +94,7 @@ export function MaturationProfileCard({
         warehouse_energy_kwh_per_barrel_year: profile.warehouse_energy_kwh_per_barrel_year,
         warehouse_energy_source: profile.warehouse_energy_source,
         allocation_method: profile.allocation_method,
+        bottles_produced: profile.bottles_produced ?? null,
         notes: profile.notes,
       };
     }
@@ -269,6 +272,21 @@ export function MaturationProfileCard({
                 onChange={(e) => update({ number_of_barrels: parseInt(e.target.value) || 1 })}
               />
             </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium">Bottles Produced <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input
+                type="number"
+                min={1}
+                placeholder="Auto from volume"
+                value={form.bottles_produced ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  update({ bottles_produced: val ? parseInt(val) || null : null });
+                }}
+              />
+              <p className="text-[10px] text-muted-foreground">Leave blank to derive from output volume ÷ bottle size. Set for single-cask bottlings.</p>
+            </div>
           </div>
 
           {/* Aging Parameters */}
@@ -361,6 +379,12 @@ export function MaturationProfileCard({
                   <span className="font-mono">{impactPreview.angel_share_loss_percent_total.toFixed(1)}% ({impactPreview.angel_share_volume_loss_litres.toFixed(1)} L)</span>
                   <span>Output Volume:</span>
                   <span className="font-mono">{impactPreview.output_volume_litres.toFixed(1)} L</span>
+                  <span>Est. Bottles:</span>
+                  <span className="font-mono">
+                    {form.bottles_produced
+                      ? `${form.bottles_produced} (user set)`
+                      : `~${Math.floor(impactPreview.output_volume_litres / 0.7)} (from 70cl)`}
+                  </span>
                   <span>VOC Emissions:</span>
                   <span className="font-mono">{impactPreview.angel_share_voc_kg.toFixed(2)} kg NMVOC</span>
                 </div>
