@@ -3,6 +3,11 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -28,9 +33,13 @@ import {
   ExternalLink,
   Info,
   Shield,
+  MessageSquarePlus,
+  Loader2,
+  Send,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { PageLoader } from '@/components/ui/page-loader';
+import { toast } from 'sonner';
 
 interface EmissionFactor {
   id: string;
@@ -512,6 +521,135 @@ export default function DataSourcesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Request a Factor */}
+      <RequestFactorForm />
     </div>
+  );
+}
+
+function RequestFactorForm() {
+  const [materialName, setMaterialName] = useState('');
+  const [materialType, setMaterialType] = useState('ingredient');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!materialName.trim()) {
+      toast.error('Please enter a material or ingredient name');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const token = session?.session?.access_token;
+      if (!token) {
+        toast.error('Please sign in to submit a request');
+        return;
+      }
+
+      const response = await fetch('/api/data/factor-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          material_name: materialName.trim(),
+          material_type: materialType,
+          notes: notes.trim() || undefined,
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+
+      setSubmitted(true);
+      setMaterialName('');
+      setNotes('');
+      toast.success('Request submitted! Our team will review and prioritise this.');
+
+      // Reset submitted state after 5 seconds
+      setTimeout(() => setSubmitted(false), 5000);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to submit request');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Card className="border-dashed border-2">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessageSquarePlus className="h-5 w-5" />
+          Request a New Emission Factor
+        </CardTitle>
+        <CardDescription>
+          Can&apos;t find the data you need? Tell us what&apos;s missing and we&apos;ll prioritise it for our next library update.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {submitted ? (
+          <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800 dark:text-green-200">
+              Thank you! Your request has been submitted. We prioritise based on how many organisations need the same data.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="space-y-1.5 md:col-span-1">
+              <Label htmlFor="req-name" className="text-sm">Material / Ingredient Name</Label>
+              <Input
+                id="req-name"
+                placeholder="e.g. Saffron, Cardamom, Shrink wrap"
+                value={materialName}
+                onChange={(e) => setMaterialName(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="req-type" className="text-sm">Type</Label>
+              <Select value={materialType} onValueChange={setMaterialType} disabled={submitting}>
+                <SelectTrigger id="req-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ingredient">Ingredient</SelectItem>
+                  <SelectItem value="packaging">Packaging</SelectItem>
+                  <SelectItem value="process">Process</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="req-notes" className="text-sm">Notes (optional)</Label>
+              <Textarea
+                id="req-notes"
+                placeholder="Any context that helps us find the right data..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                disabled={submitting}
+                rows={1}
+                className="min-h-[36px] resize-none"
+              />
+            </div>
+            <div>
+              <Button type="submit" disabled={submitting || !materialName.trim()} className="w-full">
+                {submitting ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
+                ) : (
+                  <><Send className="h-4 w-4 mr-2" />Submit Request</>
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </CardContent>
+    </Card>
   );
 }

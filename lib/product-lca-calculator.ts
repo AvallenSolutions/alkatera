@@ -602,13 +602,33 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       console.log(`[calculateProductCarbonFootprint] Processing maturation profile (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months)...`);
       const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile);
 
-      // Inject barrel allocation as a synthetic material
+      // --- Per-bottle allocation ---
+      // Regular materials are already per-functional-unit (per bottle). Maturation
+      // impacts must be normalized the same way so the aggregator sums correctly.
+      const bottleSizeLitres = product.unit_size_unit === 'ml'
+        ? Number(product.unit_size_value) / 1000.0
+        : Number(product.unit_size_value || 0.75); // fallback 750ml
+
+      // Use user-specified bottle count if set, otherwise derive from output volume
+      const totalBottles = maturationProfile.bottles_produced
+        ? Number(maturationProfile.bottles_produced)
+        : (matResult.output_volume_litres > 0 && bottleSizeLitres > 0)
+          ? matResult.output_volume_litres / bottleSizeLitres
+          : 1;
+
+      const barrelPerBottle = totalBottles > 0 ? matResult.barrel_total_co2e / totalBottles : 0;
+      const warehousePerBottle = totalBottles > 0 ? matResult.warehouse_co2e_total / totalBottles : 0;
+      const vocPerBottle = totalBottles > 0 ? matResult.angel_share_photochemical_ozone / totalBottles : 0;
+
+      console.log(`[calculateProductCarbonFootprint] Maturation per-bottle: ${totalBottles.toFixed(0)} bottles from ${matResult.output_volume_litres.toFixed(1)}L (${(bottleSizeLitres * 1000).toFixed(0)}ml/bottle), barrel=${barrelPerBottle.toFixed(4)}/bottle, warehouse=${warehousePerBottle.toFixed(4)}/bottle`);
+
+      // Inject barrel allocation as a synthetic material (per-bottle)
       lcaMaterialsWithImpacts.push({
         product_carbon_footprint_id: lca.id,
         name: '[Maturation] Oak Barrel Allocation',
         material_name: '[Maturation] Oak Barrel Allocation',
         material_type: 'ingredient',
-        quantity: matResult.output_volume_litres,
+        quantity: bottleSizeLitres,
         unit: 'L',
         unit_name: 'L',
         packaging_category: null,
@@ -626,9 +646,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         origin_lat: null,
         origin_lng: null,
         origin_country_code: null,
-        impact_climate: matResult.barrel_total_co2e,
-        impact_climate_fossil: matResult.barrel_total_co2e * 0.95,
-        impact_climate_biogenic: matResult.barrel_total_co2e * 0.05,
+        impact_climate: barrelPerBottle,
+        impact_climate_fossil: barrelPerBottle * 0.95,
+        impact_climate_biogenic: barrelPerBottle * 0.05,
         impact_climate_dluc: 0,
         ch4_kg: 0,
         ch4_fossil_kg: 0,
@@ -642,26 +662,26 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         impact_freshwater_eutrophication: 0,
         impact_terrestrial_acidification: 0,
         impact_fossil_resource_scarcity: 0,
-        impact_photochemical_ozone_formation: matResult.angel_share_photochemical_ozone,
+        impact_photochemical_ozone_formation: vocPerBottle,
         data_priority: 3,
         data_quality_tag: 'Secondary_Estimated',
         supplier_lca_id: null,
         confidence_score: 60,
         methodology: 'Cut-off allocation / Literature estimates',
-        source_reference: matResult.methodology_notes,
+        source_reference: `Barrel allocation: ${matResult.barrel_total_co2e.toFixed(1)} kg total ÷ ${totalBottles.toFixed(0)} bottles = ${barrelPerBottle.toFixed(4)} kg/bottle (${(bottleSizeLitres * 1000).toFixed(0)}ml, ${matResult.output_volume_litres.toFixed(1)}L output). ${matResult.methodology_notes}`,
         impact_source: 'secondary_modelled',
         impact_reference_id: null,
       });
 
-      // Inject warehouse energy as a synthetic material
+      // Inject warehouse energy as a synthetic material (per-bottle)
       lcaMaterialsWithImpacts.push({
         product_carbon_footprint_id: lca.id,
         name: '[Maturation] Warehouse Energy',
         material_name: '[Maturation] Warehouse Energy',
         material_type: 'ingredient',
-        quantity: matResult.warehouse_co2e_total > 0 ? maturationProfile.aging_duration_months / 12 : 0,
-        unit: 'years',
-        unit_name: 'years',
+        quantity: bottleSizeLitres,
+        unit: 'L',
+        unit_name: 'L',
         packaging_category: null,
         origin_country: null,
         country_of_origin: null,
@@ -677,8 +697,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         origin_lat: null,
         origin_lng: null,
         origin_country_code: null,
-        impact_climate: matResult.warehouse_co2e_total,
-        impact_climate_fossil: matResult.warehouse_co2e_total,
+        impact_climate: warehousePerBottle,
+        impact_climate_fossil: warehousePerBottle,
         impact_climate_biogenic: 0,
         impact_climate_dluc: 0,
         ch4_kg: 0,
@@ -698,12 +718,12 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         supplier_lca_id: null,
         confidence_score: 55,
         methodology: 'DEFRA 2025 grid factors',
-        source_reference: `Warehouse energy: ${maturationProfile.warehouse_energy_kwh_per_barrel_year} kWh/barrel/yr (${maturationProfile.warehouse_energy_source})`,
+        source_reference: `Warehouse energy: ${matResult.warehouse_co2e_total.toFixed(1)} kg total ÷ ${totalBottles.toFixed(0)} bottles = ${warehousePerBottle.toFixed(4)} kg/bottle. ${maturationProfile.warehouse_energy_kwh_per_barrel_year} kWh/barrel/yr (${maturationProfile.warehouse_energy_source})`,
         impact_source: 'secondary_modelled',
         impact_reference_id: null,
       });
 
-      console.log(`[calculateProductCarbonFootprint] ✓ Maturation impacts: barrel=${matResult.barrel_total_co2e.toFixed(3)} kg CO2e, warehouse=${matResult.warehouse_co2e_total.toFixed(3)} kg CO2e, angel's share=${matResult.angel_share_loss_percent_total.toFixed(1)}% volume loss, VOC=${matResult.angel_share_voc_kg.toFixed(3)} kg`);
+      console.log(`[calculateProductCarbonFootprint] ✓ Maturation impacts (per-bottle): barrel=${barrelPerBottle.toFixed(4)} kg CO2e, warehouse=${warehousePerBottle.toFixed(4)} kg CO2e, angel's share=${matResult.angel_share_loss_percent_total.toFixed(1)}% volume loss, VOC=${vocPerBottle.toFixed(4)} kg/bottle`);
     }
 
     // 6. Insert all materials with impact values into product_lca_materials

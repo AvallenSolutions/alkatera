@@ -346,6 +346,28 @@ export async function GET(request: NextRequest) {
     const globalLibraryCount = stagingResults.filter(r => r.source_type === 'global_library').length;
     const orgStagingCount = stagingResults.filter(r => r.source_type === 'staging').length;
 
+    // Log search misses for data strategy intelligence (fire-and-forget)
+    if (allResults.length === 0) {
+      void supabase.rpc('log_emission_factor_request', {
+        p_search_query: query,
+        p_material_name: query,
+        p_material_type: null,
+        p_context: 'search_miss',
+        p_organization_id: organizationId || null,
+        p_requested_by: user?.user?.id || null,
+        p_source_page: '/ingredients/search',
+        p_product_id: null,
+        p_metadata: JSON.stringify({
+          sources_checked: {
+            supplier: supplierResults.length,
+            staging: stagingResults.length,
+            ecoinvent_proxy: ecoinventProxyResults.length,
+            ecoinvent_live: openLCAResults.length,
+          },
+        }),
+      }); // Fire-and-forget
+    }
+
     return NextResponse.json({
       results: allResults.slice(0, 50), // Limit total results
       total_found: allResults.length,
