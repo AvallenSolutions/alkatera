@@ -2,6 +2,9 @@
 -- These are required for complete LCA calculations on wine products
 -- Sources: DEFRA 2024, ecoinvent 3.12, peer-reviewed literature
 
+-- Ensure confidence_score column exists (added by 20260207 migration, may not be present locally)
+ALTER TABLE staging_emission_factors ADD COLUMN IF NOT EXISTS confidence_score numeric;
+
 -- ================================================
 -- Foil Capsule (aluminium, wine bottle closure)
 -- Source: ecoinvent 3.12 (aluminium foil production) + DEFRA 2024 (aluminium processing)
