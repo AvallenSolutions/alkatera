@@ -60,16 +60,18 @@ export function OnboardingWizard() {
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Onboarding wizard">
-      {/* Full-screen background image + dark overlay */}
-      <Image
-        src="/images/starry-night-bg3.jpg"
-        alt=""
-        fill
-        className="object-cover"
-        priority
-        quality={85}
-      />
-      <div className="absolute inset-0 bg-black/70" />
+      {/* Full-screen background image + dark overlay — fixed so they stay during scroll */}
+      <div className="fixed inset-0 z-0">
+        <Image
+          src="/images/starry-night-bg3.jpg"
+          alt=""
+          fill
+          className="object-cover"
+          priority
+          quality={85}
+        />
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
 
       {/* Top bar - glassmorphic, hidden on welcome */}
       {!isWelcome && (
