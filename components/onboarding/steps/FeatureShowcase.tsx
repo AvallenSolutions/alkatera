@@ -74,10 +74,10 @@ export function FeatureShowcase() {
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center space-y-2">
           <div className="text-3xl">&#128640;</div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-serif font-bold text-white">
             You&apos;ve Unlocked New Capabilities!
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/50">
             Now that you have your foundation set, you can:
           </p>
         </div>
@@ -86,12 +86,12 @@ export function FeatureShowcase() {
           {FEATURES.map(feature => (
             <div
               key={feature.title}
-              className="flex items-start gap-3 p-3 rounded-xl bg-card/50 border border-border/50"
+              className="flex items-start gap-3 p-3 rounded-xl bg-white/5 backdrop-blur-md border border-white/10"
             >
               <CheckCircle2 className={`w-5 h-5 ${feature.color} flex-shrink-0 mt-0.5`} />
               <div>
-                <p className="text-sm font-medium text-foreground">{feature.title}</p>
-                <p className="text-xs text-muted-foreground">{feature.description}</p>
+                <p className="text-sm font-medium text-white">{feature.title}</p>
+                <p className="text-xs text-white/40">{feature.description}</p>
               </div>
             </div>
           ))}

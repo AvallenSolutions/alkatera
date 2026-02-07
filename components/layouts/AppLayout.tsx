@@ -19,6 +19,18 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, requireOrganization = true }: AppLayoutProps) {
+  // OnboardingProvider wraps everything so it never remounts during
+  // auth / org / subscription state transitions.
+  return (
+    <OnboardingProvider>
+      <AppLayoutInner requireOrganization={requireOrganization}>
+        {children}
+      </AppLayoutInner>
+    </OnboardingProvider>
+  )
+}
+
+function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
   const { currentOrganization, isLoading: isOrganizationLoading } = useOrganization()
@@ -106,7 +118,7 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   }
 
   return (
-    <OnboardingProvider>
+    <>
       <OnboardingWizard />
       <div className="flex h-screen overflow-hidden bg-background">
         {isMobileMenuOpen && (
@@ -142,6 +154,6 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
           </main>
         </div>
       </div>
-    </OnboardingProvider>
+    </>
   )
 }

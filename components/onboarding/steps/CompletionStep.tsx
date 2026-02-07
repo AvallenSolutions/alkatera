@@ -49,16 +49,16 @@ export function CompletionStep() {
       <div className="w-full max-w-md space-y-6">
         <div className="space-y-3">
           <div className="text-4xl">&#127881; &#127942; &#127881;</div>
-          <h2 className="text-3xl font-serif font-bold text-foreground">
+          <h2 className="text-3xl font-serif font-bold text-white">
             Congratulations!
           </h2>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-white/60">
             You&apos;ve Completed Onboarding!
           </p>
         </div>
 
         {/* Achievement badge */}
-        <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-[#ccff00]/30 to-emerald-400/30 flex items-center justify-center border border-[#ccff00]/30">
+        <div className="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-[#ccff00]/30 to-emerald-400/30 backdrop-blur-md flex items-center justify-center border border-[#ccff00]/30">
           <Trophy className="w-10 h-10 text-[#ccff00]" />
         </div>
         <p className="text-sm font-medium text-[#ccff00]">
@@ -66,19 +66,19 @@ export function CompletionStep() {
         </p>
 
         {/* What you accomplished */}
-        <div className="bg-card border border-border rounded-xl p-4 space-y-2 text-left">
-          <p className="text-sm font-medium text-foreground mb-3">You&apos;ve successfully:</p>
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 space-y-2 text-left">
+          <p className="text-sm font-medium text-white mb-3">You&apos;ve successfully:</p>
           {achievements.map(item => (
             <div key={item} className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-[#ccff00] flex-shrink-0" />
-              <span className="text-sm text-foreground">{item}</span>
+              <span className="text-sm text-white">{item}</span>
             </div>
           ))}
         </div>
 
         {/* What's next */}
         <div className="space-y-3">
-          <p className="text-sm font-medium text-foreground">What&apos;s next?</p>
+          <p className="text-sm font-medium text-white">What&apos;s next?</p>
           <div className="grid grid-cols-2 gap-2">
             {quickActions.map(action => (
               <button
@@ -87,10 +87,10 @@ export function CompletionStep() {
                   completeOnboarding()
                   router.push(action.href)
                 }}
-                className="flex items-center gap-2 p-3 rounded-xl border border-border bg-card/50 hover:bg-card hover:border-muted-foreground/30 transition-all text-left"
+                className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all text-left"
               >
                 <action.icon className="w-4 h-4 text-[#ccff00] flex-shrink-0" />
-                <span className="text-xs text-foreground">{action.label}</span>
+                <span className="text-xs text-white">{action.label}</span>
               </button>
             ))}
           </div>

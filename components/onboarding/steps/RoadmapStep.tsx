@@ -70,10 +70,10 @@ export function RoadmapStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center space-y-2">
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-serif font-bold text-white">
             Your Personalised Sustainability Roadmap
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/60">
             Based on your role ({roleLabel}), category ({beverageLabel}){sizeLabel ? `, and size (${sizeLabel})` : ''}:
           </p>
         </div>
@@ -83,14 +83,14 @@ export function RoadmapStep() {
             <div
               key={phase.title}
               className={cn(
-                'rounded-xl border p-4 transition-all',
+                'rounded-xl border p-4 transition-all backdrop-blur-md',
                 phase.status === 'current'
                   ? 'border-[#ccff00]/50 bg-[#ccff00]/5'
-                  : 'border-border bg-card/50 opacity-70'
+                  : 'border-white/10 bg-white/5 opacity-70'
               )}
             >
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-medium text-sm text-foreground">
+                <h4 className="font-medium text-sm text-white">
                   {phase.title}
                 </h4>
                 {phase.status === 'current' && (
@@ -99,7 +99,7 @@ export function RoadmapStep() {
                   </span>
                 )}
                 {phase.status === 'locked' && phase.unlockAt && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <span className="text-xs text-white/50 flex items-center gap-1">
                     <Lock className="w-3 h-3" />
                     Unlock at {phase.unlockAt}
                   </span>
@@ -107,7 +107,7 @@ export function RoadmapStep() {
               </div>
               <div className="space-y-1.5">
                 {phase.items.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div key={i} className="flex items-center gap-2 text-sm text-white/60">
                     {phase.status === 'completed' ? (
                       <CheckCircle2 className="w-4 h-4 text-[#ccff00] flex-shrink-0" />
                     ) : (
@@ -125,7 +125,7 @@ export function RoadmapStep() {
         </div>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground">
+          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>

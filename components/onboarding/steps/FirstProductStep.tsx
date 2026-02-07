@@ -80,21 +80,21 @@ export function FirstProductStep() {
   if (saved) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in zoom-in duration-500 text-center space-y-6">
-        <div className="w-20 h-20 rounded-2xl bg-[#ccff00]/20 flex items-center justify-center">
+        <div className="w-20 h-20 rounded-2xl bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 flex items-center justify-center">
           <Package className="w-10 h-10 text-[#ccff00]" />
         </div>
-        <h3 className="text-2xl font-serif font-bold text-foreground">
+        <h3 className="text-2xl font-serif font-bold text-white">
           Awesome! You added your first product to Alkatera!
         </h3>
-        <div className="bg-card border border-border rounded-xl p-4 max-w-sm w-full">
-          <p className="font-medium text-foreground">{productName}</p>
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 max-w-sm w-full">
+          <p className="font-medium text-white">{productName}</p>
           {category && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-white/50">
               {category}{subCategory ? ` → ${subCategory}` : ''}
             </p>
           )}
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-white/30">
           Next: You&apos;ll complete the full product details (ingredients & packaging) later in the journey.
         </p>
       </div>
@@ -105,30 +105,31 @@ export function FirstProductStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-2">
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-serif font-bold text-white">
             Quick Challenge: Add Your First Product
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/50">
             This takes ~60 seconds. Let&apos;s start simple. Just one product.
           </p>
         </div>
 
-        <div className="space-y-4">
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="onb-product-name">Product Name</Label>
+            <Label htmlFor="onb-product-name" className="text-sm font-medium text-white/70">Product Name</Label>
             <Input
               id="onb-product-name"
               placeholder='e.g., "Oxford Rye Whisky 50cl"'
               value={productName}
               onChange={e => setProductName(e.target.value)}
               disabled={isSaving}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Category</Label>
+            <Label className="text-sm font-medium text-white/70">Category</Label>
             <Select value={category} onValueChange={val => { setCategory(val); setSubCategory('') }} disabled={isSaving}>
-              <SelectTrigger>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -141,9 +142,9 @@ export function FirstProductStep() {
 
           {category && SUB_CATEGORY_MAP[category] && (
             <div className="space-y-2 animate-in fade-in duration-200">
-              <Label>Sub-category</Label>
+              <Label className="text-sm font-medium text-white/70">Sub-category</Label>
               <Select value={subCategory} onValueChange={setSubCategory} disabled={isSaving}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
                   <SelectValue placeholder="Select sub-category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,7 +157,7 @@ export function FirstProductStep() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="onb-product-desc">Description (optional)</Label>
+            <Label htmlFor="onb-product-desc" className="text-sm font-medium text-white/70">Description (optional)</Label>
             <Textarea
               id="onb-product-desc"
               placeholder="Award-winning rye whisky aged 5 years"
@@ -164,21 +165,22 @@ export function FirstProductStep() {
               onChange={e => setDescription(e.target.value)}
               rows={2}
               disabled={isSaving}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-white/30 text-center">
           You&apos;ll add ingredients and packaging details later. For now, let&apos;s just get your product in!
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground">
+          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip for now
             </Button>

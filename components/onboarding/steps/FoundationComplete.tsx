@@ -29,33 +29,33 @@ export function FoundationComplete() {
       <div className="w-full max-w-md space-y-6">
         <div className="space-y-3">
           <div className="text-4xl">&#127881;</div>
-          <h3 className="text-2xl font-serif font-bold text-foreground">
+          <h3 className="text-2xl font-serif font-bold text-white">
             Your Foundation is Set!
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/50">
             Great progress! Here&apos;s what you&apos;ve accomplished:
           </p>
         </div>
 
-        <div className="bg-card border border-border rounded-xl p-4 space-y-3 text-left">
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-4 space-y-3 text-left">
           {completedItems.map((item) => (
             <div key={item.label} className="flex items-center gap-3">
               <item.icon className="w-5 h-5 text-[#ccff00] flex-shrink-0" />
-              <span className="text-sm text-foreground">{item.label}</span>
+              <span className="text-sm text-white">{item.label}</span>
             </div>
           ))}
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Progress</span>
-            <span className="font-medium text-foreground">75%</span>
+            <span className="text-white/50">Progress</span>
+            <span className="font-medium text-white">75%</span>
           </div>
           <Progress value={75} indicatorColor="lime" />
         </div>
 
-        <div className="bg-emerald-400/5 border border-emerald-400/20 rounded-xl p-4">
-          <p className="text-sm text-foreground">
+        <div className="bg-emerald-400/5 backdrop-blur-md border border-emerald-400/20 rounded-xl p-4">
+          <p className="text-sm text-white">
             <span className="font-medium text-emerald-400">Next up:</span>{' '}
             Discover the powerful features that will help you on your sustainability journey.
           </p>

@@ -17,27 +17,27 @@ export function MeetRosa() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 px-4 animate-in slide-in-from-right duration-500">
       {/* Rosa avatar */}
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 flex items-center justify-center border border-emerald-400/30">
+      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 backdrop-blur-md flex items-center justify-center border border-emerald-400/30">
         <Bot className="w-10 h-10 text-emerald-400" />
       </div>
 
       <div className="space-y-4 max-w-md">
-        <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
+        <h2 className="text-2xl md:text-3xl font-serif font-bold text-white">
           Meet Rosa, Your Sustainability Guide
         </h2>
-        <p className="text-muted-foreground">
+        <p className="text-white/60">
           &quot;Hi! I&apos;m Rosa, your sustainability guide. I&apos;ll be here to help you throughout Alkatera.&quot;
         </p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-white/40">
           Think of me as your co-pilot. I can:
         </p>
       </div>
 
-      <div className="space-y-3 text-left max-w-sm w-full">
+      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-3 text-left max-w-sm w-full">
         {capabilities.map((capability) => (
           <div
             key={capability}
-            className="flex items-center gap-3 text-sm text-foreground"
+            className="flex items-center gap-3 text-sm text-white"
           >
             <CheckCircle2 className="w-5 h-5 text-[#ccff00] flex-shrink-0" />
             <span>{capability}</span>
@@ -45,7 +45,7 @@ export function MeetRosa() {
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground max-w-sm">
+      <p className="text-xs text-white/30 max-w-sm">
         You can always ask Rosa for help by clicking her icon in the sidebar.
       </p>
 
@@ -53,7 +53,7 @@ export function MeetRosa() {
         <Button
           variant="ghost"
           onClick={previousStep}
-          className="text-muted-foreground"
+          className="text-white/40 hover:text-white hover:bg-white/10"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
