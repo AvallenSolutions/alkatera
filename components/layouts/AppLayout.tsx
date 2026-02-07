@@ -10,6 +10,8 @@ import { Header } from './Header'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
+import { OnboardingProvider } from '@/lib/onboarding'
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -104,39 +106,42 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-          onClick={() => {
-            console.log('🖱️ Mobile overlay clicked, closing menu')
-            setIsMobileMenuOpen(false)
-          }}
-        />
-      )}
-
-      <Sidebar
-        className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0',
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+    <OnboardingProvider>
+      <OnboardingWizard />
+      <div className="flex h-screen overflow-hidden bg-background">
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+            onClick={() => {
+              console.log('🖱️ Mobile overlay clicked, closing menu')
+              setIsMobileMenuOpen(false)
+            }}
+          />
         )}
-      />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Header
-          onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          isMobileMenuOpen={isMobileMenuOpen}
+        <Sidebar
+          className={cn(
+            'fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0',
+            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          )}
         />
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
-          {subscriptionStatus === 'past_due' && currentOrganization && (
-            <PaymentWarningBanner organizationId={currentOrganization.id} />
-          )}
-          <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
-            {children}
-          </div>
-        </main>
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Header
+            onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            isMobileMenuOpen={isMobileMenuOpen}
+          />
+
+          <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+            {subscriptionStatus === 'past_due' && currentOrganization && (
+              <PaymentWarningBanner organizationId={currentOrganization.id} />
+            )}
+            <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
+              {children}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </OnboardingProvider>
   )
 }
