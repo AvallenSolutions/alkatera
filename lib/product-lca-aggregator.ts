@@ -186,6 +186,8 @@ export async function aggregateProductImpacts(
 
     if (materialType === 'packaging' || materialType === 'packaging_material') {
       packagingEmissions += climateImpact;
+    } else if (material.material_name?.startsWith('[Maturation]')) {
+      processingEmissions += climateImpact;
     } else {
       rawMaterialsEmissions += climateImpact;
     }

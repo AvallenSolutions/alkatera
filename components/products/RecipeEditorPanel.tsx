@@ -15,15 +15,18 @@ import {
   Sparkles,
   Settings,
   Upload,
+  Wine,
 } from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard } from "@/components/products/PackagingFormCard";
 import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
+import { MaturationProfileCard } from "@/components/products/MaturationProfileCard";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
+import type { MaturationFormData } from "@/components/products/MaturationProfileCard";
 
 interface RecipeEditorPanelProps {
   productId: string;
@@ -55,8 +58,10 @@ export function RecipeEditorPanel({
     isDirty,
     ingredientForms,
     packagingForms,
+    maturationProfile,
     ingredientCount,
     packagingCount,
+    hasMaturationProfile,
     totalItems,
     fetchProductData,
     updateIngredient,
@@ -68,6 +73,8 @@ export function RecipeEditorPanel({
     addPackagingWithType,
     saveIngredients,
     savePackaging,
+    saveMaturation,
+    removeMaturation,
   } = useRecipeEditor(productId, organizationId);
 
   // Notify parent of dirty state changes
@@ -82,6 +89,20 @@ export function RecipeEditorPanel({
 
   const handleSavePackaging = async () => {
     await savePackaging();
+    onSaveComplete?.();
+  };
+
+  const handleSaveMaturation = async (formData: MaturationFormData) => {
+    await saveMaturation({
+      ...formData,
+      product_id: parseInt(productId),
+      organization_id: organizationId,
+    } as any);
+    onSaveComplete?.();
+  };
+
+  const handleRemoveMaturation = async () => {
+    await removeMaturation();
     onSaveComplete?.();
   };
 
@@ -152,7 +173,7 @@ export function RecipeEditorPanel({
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={compact ? "grid w-full grid-cols-2" : "grid w-full grid-cols-3"}>
+        <TabsList className={compact ? "grid w-full grid-cols-3" : "grid w-full grid-cols-4"}>
           {!compact && (
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Info className="h-4 w-4 pointer-events-none" />
@@ -166,6 +187,11 @@ export function RecipeEditorPanel({
           <TabsTrigger value="packaging" className="flex items-center gap-2">
             <Box className="h-4 w-4 pointer-events-none" />
             <span>Packaging ({packagingCount})</span>
+          </TabsTrigger>
+          <TabsTrigger value="maturation" className="flex items-center gap-2">
+            <Wine className="h-4 w-4 pointer-events-none" />
+            <span>Maturation</span>
+            {hasMaturationProfile && <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">1</Badge>}
           </TabsTrigger>
         </TabsList>
 
@@ -384,6 +410,17 @@ export function RecipeEditorPanel({
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="maturation" className="space-y-4">
+          <MaturationProfileCard
+            profile={maturationProfile}
+            organizationId={organizationId}
+            productId={productId}
+            onSave={handleSaveMaturation}
+            onRemove={handleRemoveMaturation}
+            saving={saving}
+          />
         </TabsContent>
       </Tabs>
 

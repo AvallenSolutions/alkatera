@@ -5,6 +5,8 @@ import { resolveImpactSource } from './utils/data-quality-mapper';
 import { aggregateProductImpacts, type FacilityEmissionsData } from './product-lca-aggregator';
 import { generateLcaInterpretation } from './lca-interpretation-engine';
 import { calculateDistance } from './utils/distance-calculator';
+import { calculateMaturationImpacts } from './maturation-calculator';
+import type { MaturationProfile } from './types/maturation';
 
 export interface FacilityAllocationInput {
   facilityId: string;
@@ -587,6 +589,121 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         throw new Error(`Missing emission data for material "${material.material_name}". ${error.message}`);
       }
+    }
+
+    // 5b. Check for maturation profile and calculate maturation impacts
+    const { data: maturationProfile } = await supabase
+      .from('maturation_profiles')
+      .select('*')
+      .eq('product_id', parseInt(productId))
+      .maybeSingle();
+
+    if (maturationProfile) {
+      console.log(`[calculateProductCarbonFootprint] Processing maturation profile (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months)...`);
+      const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile);
+
+      // Inject barrel allocation as a synthetic material
+      lcaMaterialsWithImpacts.push({
+        product_carbon_footprint_id: lca.id,
+        name: '[Maturation] Oak Barrel Allocation',
+        material_name: '[Maturation] Oak Barrel Allocation',
+        material_type: 'ingredient',
+        quantity: matResult.output_volume_litres,
+        unit: 'L',
+        unit_name: 'L',
+        packaging_category: null,
+        origin_country: null,
+        country_of_origin: null,
+        is_organic: false,
+        is_organic_certified: false,
+        supplier_product_id: null,
+        data_source: null,
+        data_source_id: null,
+        transport_mode: null,
+        distance_km: null,
+        impact_transport: 0,
+        origin_address: null,
+        origin_lat: null,
+        origin_lng: null,
+        origin_country_code: null,
+        impact_climate: matResult.barrel_total_co2e,
+        impact_climate_fossil: matResult.barrel_total_co2e * 0.95,
+        impact_climate_biogenic: matResult.barrel_total_co2e * 0.05,
+        impact_climate_dluc: 0,
+        ch4_kg: 0,
+        ch4_fossil_kg: 0,
+        ch4_biogenic_kg: 0,
+        n2o_kg: 0,
+        impact_water: 0,
+        impact_water_scarcity: 0,
+        impact_land: 0,
+        impact_waste: 0,
+        impact_terrestrial_ecotoxicity: 0,
+        impact_freshwater_eutrophication: 0,
+        impact_terrestrial_acidification: 0,
+        impact_fossil_resource_scarcity: 0,
+        impact_photochemical_ozone_formation: matResult.angel_share_photochemical_ozone,
+        data_priority: 3,
+        data_quality_tag: 'Secondary_Estimated',
+        supplier_lca_id: null,
+        confidence_score: 60,
+        methodology: 'Cut-off allocation / Literature estimates',
+        source_reference: matResult.methodology_notes,
+        impact_source: 'secondary_modelled',
+        impact_reference_id: null,
+      });
+
+      // Inject warehouse energy as a synthetic material
+      lcaMaterialsWithImpacts.push({
+        product_carbon_footprint_id: lca.id,
+        name: '[Maturation] Warehouse Energy',
+        material_name: '[Maturation] Warehouse Energy',
+        material_type: 'ingredient',
+        quantity: matResult.warehouse_co2e_total > 0 ? maturationProfile.aging_duration_months / 12 : 0,
+        unit: 'years',
+        unit_name: 'years',
+        packaging_category: null,
+        origin_country: null,
+        country_of_origin: null,
+        is_organic: false,
+        is_organic_certified: false,
+        supplier_product_id: null,
+        data_source: null,
+        data_source_id: null,
+        transport_mode: null,
+        distance_km: null,
+        impact_transport: 0,
+        origin_address: null,
+        origin_lat: null,
+        origin_lng: null,
+        origin_country_code: null,
+        impact_climate: matResult.warehouse_co2e_total,
+        impact_climate_fossil: matResult.warehouse_co2e_total,
+        impact_climate_biogenic: 0,
+        impact_climate_dluc: 0,
+        ch4_kg: 0,
+        ch4_fossil_kg: 0,
+        ch4_biogenic_kg: 0,
+        n2o_kg: 0,
+        impact_water: 0,
+        impact_water_scarcity: 0,
+        impact_land: 0,
+        impact_waste: 0,
+        impact_terrestrial_ecotoxicity: 0,
+        impact_freshwater_eutrophication: 0,
+        impact_terrestrial_acidification: 0,
+        impact_fossil_resource_scarcity: 0,
+        data_priority: 3,
+        data_quality_tag: 'Secondary_Estimated',
+        supplier_lca_id: null,
+        confidence_score: 55,
+        methodology: 'DEFRA 2025 grid factors',
+        source_reference: `Warehouse energy: ${maturationProfile.warehouse_energy_kwh_per_barrel_year} kWh/barrel/yr (${maturationProfile.warehouse_energy_source})`,
+        impact_source: 'secondary_modelled',
+        impact_reference_id: null,
+      });
+
+      console.log(`[calculateProductCarbonFootprint] ✓ Maturation impacts: barrel=${matResult.barrel_total_co2e.toFixed(3)} kg CO2e, warehouse=${matResult.warehouse_co2e_total.toFixed(3)} kg CO2e, angel's share=${matResult.angel_share_loss_percent_total.toFixed(1)}% volume loss, VOC=${matResult.angel_share_voc_kg.toFixed(3)} kg`);
     }
 
     // 6. Insert all materials with impact values into product_lca_materials

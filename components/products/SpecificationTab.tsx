@@ -1,11 +1,19 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Leaf, Package, ArrowRight, Building2, Database } from "lucide-react";
+import { Leaf, Package, ArrowRight, Building2, Database, Wine } from "lucide-react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabaseClient";
 import type { ProductIngredient, ProductPackaging } from "@/hooks/data/useProductData";
+import type { MaturationProfile } from "@/lib/types/maturation";
+import {
+  BARREL_TYPE_LABELS,
+  CLIMATE_ZONE_LABELS,
+} from "@/lib/types/maturation";
+import { calculateMaturationImpacts } from "@/lib/maturation-calculator";
 
 interface SpecificationTabProps {
   productId: string;
@@ -16,6 +24,24 @@ interface SpecificationTabProps {
 }
 
 export function SpecificationTab({ productId, ingredients, packaging, onManageIngredients, onManagePackaging }: SpecificationTabProps) {
+  const [maturationProfile, setMaturationProfile] = useState<MaturationProfile | null>(null);
+
+  useEffect(() => {
+    async function fetchMaturation() {
+      const { data } = await supabase
+        .from("maturation_profiles")
+        .select("*")
+        .eq("product_id", productId)
+        .maybeSingle();
+      setMaturationProfile(data as MaturationProfile | null);
+    }
+    fetchMaturation();
+  }, [productId]);
+
+  const maturationImpacts = maturationProfile
+    ? calculateMaturationImpacts(maturationProfile)
+    : null;
+
   // Calculate total ingredient weight
   const totalIngredientWeight = ingredients.reduce((sum, ing) => {
     const weight = ing.unit === 'kg' ? ing.quantity : ing.quantity / 1000;
@@ -233,6 +259,68 @@ export function SpecificationTab({ productId, ingredients, packaging, onManageIn
           )}
         </CardContent>
       </Card>
+
+      {/* Maturation Summary Card (only shown if profile exists) */}
+      {maturationProfile && maturationImpacts && (
+        <Card className="backdrop-blur-xl bg-white/5 border border-white/10 border-l-4 border-l-amber-500 shadow-xl hover:bg-white/10 transition-all md:col-span-2">
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-amber-500/80 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/20">
+                  <Wine className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-white">Maturation</CardTitle>
+                  <CardDescription className="text-slate-400">Barrel aging profile</CardDescription>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-amber-500/20 border-amber-500/30 text-amber-400">
+                {(maturationProfile.aging_duration_months / 12).toFixed(1)} years
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-xs text-slate-400 mb-1">Barrel Type</div>
+                <div className="text-sm font-medium text-white">
+                  {BARREL_TYPE_LABELS[maturationProfile.barrel_type] || maturationProfile.barrel_type}
+                </div>
+                <div className="text-xs text-slate-500">
+                  {maturationProfile.barrel_use_number === 1 ? 'New barrel' : `${maturationProfile.barrel_use_number}${maturationProfile.barrel_use_number === 2 ? 'nd' : 'rd+'} fill`}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 mb-1">Climate Zone</div>
+                <div className="text-sm font-medium text-white">
+                  {CLIMATE_ZONE_LABELS[maturationProfile.climate_zone] || maturationProfile.climate_zone}
+                </div>
+                <div className="text-xs text-slate-500">
+                  Angel&apos;s share: {maturationProfile.angel_share_percent_per_year}%/yr
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 mb-1">Volume Loss</div>
+                <div className="text-sm font-medium text-amber-400">
+                  {maturationImpacts.angel_share_loss_percent_total.toFixed(1)}%
+                </div>
+                <div className="text-xs text-slate-500">
+                  {maturationImpacts.angel_share_volume_loss_litres.toFixed(1)} L lost
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-slate-400 mb-1">Maturation CO2e</div>
+                <div className="text-sm font-medium text-white">
+                  {maturationImpacts.total_maturation_co2e.toFixed(2)} kg
+                </div>
+                <div className="text-xs text-slate-500">
+                  {maturationImpacts.total_maturation_co2e_per_litre_output.toFixed(3)} kg/L output
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
 import type { PackagingCategory } from "@/lib/types/lca";
+import type { MaturationProfile } from "@/lib/types/maturation";
 
 interface Product {
   id: string;
@@ -91,6 +92,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   const [packagingForms, setPackagingForms] = useState<PackagingFormData[]>([
     createDefaultPackaging(),
   ]);
+
+  // Maturation profile state
+  const [maturationProfile, setMaturationProfile] = useState<MaturationProfile | null>(null);
+  const savedMaturationSnapshot = useRef<string>('');
+  const [maturationDirty, setMaturationDirty] = useState(false);
 
   const fetchProductData = useCallback(async () => {
     if (!productId || !organizationId) return;
@@ -262,6 +268,17 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         setPackagingForms(defaultPkg);
         savedPackagingSnapshot.current = formFingerprint(defaultPkg);
       }
+
+      // Load maturation profile (optional — only for spirits/wine)
+      const { data: matProfile } = await supabase
+        .from("maturation_profiles")
+        .select("*")
+        .eq("product_id", productId)
+        .maybeSingle();
+
+      setMaturationProfile(matProfile as MaturationProfile | null);
+      savedMaturationSnapshot.current = matProfile ? JSON.stringify(matProfile) : '';
+      setMaturationDirty(false);
     } catch (error: any) {
       console.error("Error fetching product data:", error);
       toast.error("Failed to load product data");
@@ -571,12 +588,100 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     }
   };
 
+  // Maturation CRUD
+  const updateMaturationProfile = (updates: Partial<MaturationProfile>) => {
+    setMaturationProfile(prev => prev ? { ...prev, ...updates } : null);
+    setMaturationDirty(true);
+  };
+
+  const saveMaturation = async (profile: Omit<MaturationProfile, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!organizationId) {
+      toast.error("No organization selected");
+      return;
+    }
+
+    setSaving(true);
+    toast.info("Saving maturation profile...", { id: "save-maturation" });
+
+    try {
+      const payload = {
+        product_id: parseInt(productId),
+        organization_id: organizationId,
+        barrel_type: profile.barrel_type,
+        barrel_volume_litres: profile.barrel_volume_litres,
+        barrel_use_number: profile.barrel_use_number,
+        barrel_co2e_new: profile.barrel_co2e_new || null,
+        aging_duration_months: profile.aging_duration_months,
+        angel_share_percent_per_year: profile.angel_share_percent_per_year,
+        climate_zone: profile.climate_zone,
+        fill_volume_litres: profile.fill_volume_litres,
+        number_of_barrels: profile.number_of_barrels,
+        warehouse_energy_kwh_per_barrel_year: profile.warehouse_energy_kwh_per_barrel_year,
+        warehouse_energy_source: profile.warehouse_energy_source,
+        allocation_method: profile.allocation_method,
+        notes: profile.notes || null,
+      };
+
+      // Upsert: if profile exists, update; otherwise insert
+      if (maturationProfile?.id) {
+        const { error } = await supabase
+          .from("maturation_profiles")
+          .update(payload)
+          .eq("id", maturationProfile.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("maturation_profiles")
+          .insert(payload);
+        if (error) throw error;
+      }
+
+      toast.success("Maturation profile saved", { id: "save-maturation" });
+      setMaturationDirty(false);
+      await fetchProductData();
+    } catch (error: any) {
+      console.error("Save maturation error:", error);
+      toast.error(error.message || "Failed to save maturation profile", { id: "save-maturation" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeMaturation = async () => {
+    if (!maturationProfile?.id) {
+      setMaturationProfile(null);
+      setMaturationDirty(false);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from("maturation_profiles")
+        .delete()
+        .eq("id", maturationProfile.id);
+
+      if (error) throw error;
+
+      setMaturationProfile(null);
+      setMaturationDirty(false);
+      toast.success("Maturation profile removed");
+      await fetchProductData();
+    } catch (error: any) {
+      console.error("Remove maturation error:", error);
+      toast.error(error.message || "Failed to remove maturation profile");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const ingredientCount = ingredientForms.filter(f => f.name && f.amount).length;
   const packagingCount = packagingForms.filter(f => f.name && f.amount && f.packaging_category).length;
 
   // Dirty state: compare current forms against last-saved snapshot
   const isDirty = formFingerprint(ingredientForms) !== savedIngredientSnapshot.current ||
-    formFingerprint(packagingForms) !== savedPackagingSnapshot.current;
+    formFingerprint(packagingForms) !== savedPackagingSnapshot.current ||
+    maturationDirty;
 
   return {
     product,
@@ -586,8 +691,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     isDirty,
     ingredientForms,
     packagingForms,
+    maturationProfile,
     ingredientCount,
     packagingCount,
+    hasMaturationProfile: !!maturationProfile,
     totalItems: ingredientCount + packagingCount,
     fetchProductData,
     updateIngredient,
@@ -599,5 +706,8 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     addPackagingWithType,
     saveIngredients,
     savePackaging,
+    updateMaturationProfile,
+    saveMaturation,
+    removeMaturation,
   };
 }
