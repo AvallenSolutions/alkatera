@@ -34,6 +34,7 @@ interface CarbonBreakdown {
   packaging: number;
   transport: number;
   endOfLife?: number;
+  usePhase?: number;
 }
 
 interface ProductHeroImpactProps {
@@ -61,6 +62,7 @@ const LAYER_COLORS = {
   packaging: { fill: '#f97316', glow: 'rgba(249, 115, 22, 0.4)', label: 'Packaging' },
   transport: { fill: '#06b6d4', glow: 'rgba(6, 182, 212, 0.4)', label: 'Transport' },
   endOfLife: { fill: '#6b7280', glow: 'rgba(107, 114, 128, 0.4)', label: 'End of Life' },
+  usePhase: { fill: '#ec4899', glow: 'rgba(236, 72, 153, 0.4)', label: 'Use Phase' },
 };
 
 function BottleVisualization({
@@ -70,7 +72,7 @@ function BottleVisualization({
   breakdown: CarbonBreakdown;
   className?: string;
 }) {
-  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0);
+  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0) + (breakdown.usePhase || 0);
 
   const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
 
@@ -155,7 +157,7 @@ function CanVisualization({
   breakdown: CarbonBreakdown;
   className?: string;
 }) {
-  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0);
+  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0) + (breakdown.usePhase || 0);
 
   const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
 
@@ -241,7 +243,7 @@ function KegVisualization({
   breakdown: CarbonBreakdown;
   className?: string;
 }) {
-  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0);
+  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0) + (breakdown.usePhase || 0);
 
   const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
 
@@ -535,23 +537,37 @@ export function ProductHeroImpact({
             </TooltipProvider>
           </div>
           <div className="flex flex-wrap gap-4">
-            {Object.entries(carbonBreakdown).map(([key, value]) => {
-              if (key === 'endOfLife' && !value) return null;
-              const config = LAYER_COLORS[key as keyof typeof LAYER_COLORS];
-              const total = Object.values(carbonBreakdown).reduce((sum, v) => sum + (v || 0), 0);
-              const percentage = total > 0 ? (value / total) * 100 : 0;
-
-              return (
-                <div key={key} className="flex items-center gap-2">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: config.fill }}
-                  />
-                  <span className="text-sm text-white/70">{config.label}</span>
-                  <span className="text-sm font-medium text-white">{percentage.toFixed(0)}%</span>
-                </div>
+            {(() => {
+              const entries = Object.entries(carbonBreakdown).filter(
+                ([key, value]) => !((key === 'endOfLife' || key === 'usePhase') && !value)
               );
-            })}
+              const total = Object.values(carbonBreakdown).reduce((sum, v) => sum + (v || 0), 0);
+              const rawPcts = entries.map(([, value]) => total > 0 ? ((value || 0) / total) * 100 : 0);
+
+              // Largest Remainder Method for integer percentages summing to 100
+              const floored = rawPcts.map(v => Math.floor(v));
+              const remainders = rawPcts.map((v, i) => v - floored[i]);
+              let diff = 100 - floored.reduce((a, b) => a + b, 0);
+              const indices = rawPcts.map((_, i) => i).sort((a, b) => remainders[b] - remainders[a]);
+              const adjusted = [...floored];
+              for (let i = 0; i < diff && i < indices.length; i++) {
+                adjusted[indices[i]] += 1;
+              }
+
+              return entries.map(([key], idx) => {
+                const config = LAYER_COLORS[key as keyof typeof LAYER_COLORS];
+                return (
+                  <div key={key} className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: config.fill }}
+                    />
+                    <span className="text-sm text-white/70">{config.label}</span>
+                    <span className="text-sm font-medium text-white">{adjusted[idx]}%</span>
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
       </div>

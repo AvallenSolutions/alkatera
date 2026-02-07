@@ -242,6 +242,31 @@ interface SimpleBreakdownTableProps {
   className?: string;
 }
 
+/**
+ * Largest Remainder Method: ensures percentages sum to exactly the target (e.g. 100.0%).
+ * Rounds down all values, then distributes the remaining difference to items with the
+ * largest fractional remainders.
+ */
+function largestRemainderRound(values: number[], decimals: number = 1, target: number = 100): number[] {
+  const factor = Math.pow(10, decimals);
+  const floored = values.map(v => Math.floor(v * factor) / factor);
+  const remainders = values.map((v, i) => v * factor - Math.floor(v * factor));
+  const currentSum = floored.reduce((a, b) => a + b, 0);
+  const step = 1 / factor;
+  let diff = Math.round((target - currentSum) * factor);
+
+  // Sort indices by remainder descending to distribute rounding
+  const indices = values.map((_, i) => i).sort((a, b) => remainders[b] - remainders[a]);
+
+  const result = [...floored];
+  for (let i = 0; i < Math.abs(diff) && i < indices.length; i++) {
+    result[indices[i]] += diff > 0 ? step : -step;
+  }
+
+  // Clean up floating point artifacts
+  return result.map(v => Math.round(v * factor) / factor);
+}
+
 export function SimpleBreakdownTable({
   data,
   sortBy = 'value',
@@ -256,10 +281,18 @@ export function SimpleBreakdownTable({
 
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
+  // Calculate raw percentages and apply Largest Remainder Method
+  const rawPercentages = sortedData.map(item =>
+    item.percentage ?? (total > 0 ? (item.value / total) * 100 : 0)
+  );
+  const adjustedPercentages = showPercentages && total > 0
+    ? largestRemainderRound(rawPercentages, 1, 100)
+    : rawPercentages;
+
   return (
     <div className={cn('space-y-2', className)}>
       {sortedData.map((item, index) => {
-        const percentage = item.percentage ?? (total > 0 ? (item.value / total) * 100 : 0);
+        const percentage = adjustedPercentages[index];
 
         return (
           <div key={index} className="flex items-center gap-3">

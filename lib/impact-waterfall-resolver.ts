@@ -634,13 +634,49 @@ export async function resolveImpactFactors(
   // ===========================================================
   console.log(`[Waterfall] Checking Priority 3 (Full Ecoinvent/Staging) for: ${material.material_name}`);
 
-  // Try staging_emission_factors first
-  const { data: stagingFactor } = await supabase
+  // Try staging_emission_factors — first exact match, then partial match
+  let { data: stagingFactor } = await supabase
     .from('staging_emission_factors')
     .select('*')
     .ilike('name', material.material_name)
     .limit(1)
     .maybeSingle();
+
+  // If no exact match, try partial/fuzzy match with wildcards
+  if (!stagingFactor) {
+    const { data: fuzzyMatch } = await supabase
+      .from('staging_emission_factors')
+      .select('*')
+      .ilike('name', `%${material.material_name}%`)
+      .limit(1)
+      .maybeSingle();
+    stagingFactor = fuzzyMatch;
+  }
+
+  // If still no match, try matching individual keywords from the material name
+  if (!stagingFactor) {
+    // Extract key terms: remove common words, try the most specific term first
+    const keywords = material.material_name
+      .replace(/\b(the|a|an|of|for|with|and|or|in|on|at|to|from)\b/gi, '')
+      .split(/[\s,()-]+/)
+      .filter((w: string) => w.length > 2)
+      .sort((a: string, b: string) => b.length - a.length);
+
+    for (const keyword of keywords) {
+      const { data: keywordMatch } = await supabase
+        .from('staging_emission_factors')
+        .select('*')
+        .ilike('name', `%${keyword}%`)
+        .ilike('category', material.material_type === 'packaging' ? 'Packaging' : 'Ingredient')
+        .limit(1)
+        .maybeSingle();
+      if (keywordMatch) {
+        stagingFactor = keywordMatch;
+        console.log(`[Waterfall] Fuzzy keyword match: "${keyword}" → ${keywordMatch.name}`);
+        break;
+      }
+    }
+  }
 
   if (stagingFactor && stagingFactor.co2_factor) {
     console.log(`[Waterfall] ✓ Priority 3 SUCCESS: Using staging factor for ${material.material_name}`);

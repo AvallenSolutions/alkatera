@@ -248,39 +248,30 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
     setSaving(true);
     try {
       const currentAssignedIds = assignments.map((a) => a.facility_id);
-      const toAdd = selectedFacilityIds.filter((id) => !currentAssignedIds.includes(id));
-      const toRemove = currentAssignedIds.filter((id) => !selectedFacilityIds.includes(id));
 
-      if (toAdd.length > 0) {
-        const { error: insertError } = await supabase
-          .from("facility_product_assignments")
-          .insert(
-            toAdd.map((facilityId, index) => ({
-              organization_id: organizationId,
-              facility_id: facilityId,
-              product_id: productId,
-              is_primary_facility: index === 0 && assignments.length === 0,
-              assignment_status: "active",
-            }))
-          );
-        if (insertError) throw insertError;
-      }
+      const response = await fetch("/api/facility-assignments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          productId,
+          selectedFacilityIds,
+          currentAssignedIds,
+        }),
+      });
 
-      if (toRemove.length > 0) {
-        const { error: updateError } = await supabase
-          .from("facility_product_assignments")
-          .update({ assignment_status: "archived" })
-          .eq("product_id", productId)
-          .in("facility_id", toRemove);
-        if (updateError) throw updateError;
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to save facility assignments");
       }
 
       toast.success("Facilities updated");
       setDialogOpen(false);
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving facility assignments:", error);
-      toast.error("Failed to update facilities");
+      toast.error(error.message || "Failed to update facilities");
     } finally {
       setSaving(false);
     }
@@ -293,13 +284,13 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
         .update({ assignment_status: "archived" })
         .eq("id", assignmentId);
 
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Database error");
 
       toast.success("Facility removed");
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error removing facility:", error);
-      toast.error("Failed to remove facility");
+      toast.error(error.message || "Failed to remove facility");
     }
   };
 
