@@ -58,8 +58,10 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
     const packagingTotal = stages.packaging_stage || 0;
     const processingTotal = stages.processing || 0;
     const transportationTotal = stages.distribution || 0;
+    const endOfLifeTotal = stages.end_of_life || 0;
+    const usePhaseTotal = stages.use_phase || 0;
 
-    const total = rawMaterialsTotal + packagingTotal + processingTotal + transportationTotal;
+    const total = rawMaterialsTotal + packagingTotal + processingTotal + transportationTotal + endOfLifeTotal + usePhaseTotal;
     if (total === 0) return null;
 
     return {
@@ -67,6 +69,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
       packaging: packagingTotal,
       processing: processingTotal,
       transport: transportationTotal,
+      endOfLife: endOfLifeTotal,
+      usePhase: usePhaseTotal,
     };
   };
 
@@ -240,6 +244,8 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
               { name: 'Processing', value: breakdown.processing, unit: 'kg CO₂e' },
               { name: 'Packaging', value: breakdown.packaging, unit: 'kg CO₂e' },
               { name: 'Transport', value: breakdown.transport, unit: 'kg CO₂e' },
+              ...(breakdown.endOfLife ? [{ name: 'End of Life', value: breakdown.endOfLife, unit: 'kg CO₂e' }] : []),
+              ...(breakdown.usePhase ? [{ name: 'Use Phase', value: breakdown.usePhase, unit: 'kg CO₂e' }] : []),
             ]}
             showPercentages
           />
@@ -363,7 +369,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                 <div className="text-left">
                   <h3 className="font-semibold text-white">Supply Chain Network</h3>
                   <p className="text-sm text-slate-400">
-                    {1 + ingredients.filter(i => i.origin_lat && i.origin_lng).length + packaging.filter(p => p.origin_lat && p.origin_lng).length} locations mapped
+                    {1 + ingredients.filter(i => i.origin_lat && i.origin_lng).length + packaging.filter(p => p.origin_lat && p.origin_lng).length} supply chain origins
                   </p>
                 </div>
               </div>

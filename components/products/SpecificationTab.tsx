@@ -99,7 +99,9 @@ export function SpecificationTab({ productId, ingredients, packaging, onManageIn
               <div className="flex items-baseline justify-between pb-3 border-b border-white/10">
                 <span className="text-sm text-slate-400">Total Net Weight</span>
                 <span className="text-2xl font-bold text-white">
-                  {totalIngredientWeight.toFixed(2)} <span className="text-base font-normal text-slate-400">kg</span>
+                  {totalIngredientWeight < 0.01
+                    ? <>{(totalIngredientWeight * 1000).toFixed(1)} <span className="text-base font-normal text-slate-400">g</span></>
+                    : <>{totalIngredientWeight.toFixed(2)} <span className="text-base font-normal text-slate-400">kg</span></>}
                 </span>
               </div>
 
@@ -129,7 +131,9 @@ export function SpecificationTab({ productId, ingredients, packaging, onManageIn
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium text-white">
-                          {weight.toFixed(2)} kg
+                          {weight < 0.01
+                            ? `${(weight * 1000).toFixed(1)} g`
+                            : `${weight.toFixed(2)} kg`}
                         </div>
                         <div className="text-xs text-slate-400">
                           {percentage.toFixed(1)}%
