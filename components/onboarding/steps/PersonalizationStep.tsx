@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useOnboarding, type UserRole, type BeverageType, type CompanySize, type PrimaryGoal } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -109,10 +108,10 @@ export function PersonalizationStep() {
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/60">
             Let&apos;s personalise your experience
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-white/40">
             (4 quick questions) &mdash; {subStep + 1}/4
           </p>
           {/* Sub-step progress dots */}
@@ -121,12 +120,12 @@ export function PersonalizationStep() {
               <div
                 key={i}
                 className={cn(
-                  'w-2 h-2 rounded-full transition-all duration-300',
+                  'h-2 rounded-full transition-all duration-300',
                   i === subStep
                     ? 'bg-[#ccff00] w-6'
                     : i < subStep
-                    ? 'bg-[#ccff00]/50'
-                    : 'bg-muted'
+                    ? 'bg-[#ccff00]/50 w-2'
+                    : 'bg-white/15 w-2'
                 )}
               />
             ))}
@@ -135,8 +134,8 @@ export function PersonalizationStep() {
 
         {/* Question 1: Role */}
         {subStep === 0 && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300">
-            <h3 className="text-xl font-serif font-bold text-foreground text-center">
+          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+            <h3 className="text-xl font-serif font-bold text-white text-center">
               What&apos;s your role?
             </h3>
             <div className="space-y-2">
@@ -147,8 +146,8 @@ export function PersonalizationStep() {
                   className={cn(
                     'w-full text-left px-4 py-3 rounded-xl border transition-all',
                     role === opt.value
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-foreground'
-                      : 'border-border bg-card hover:border-muted-foreground/30 text-foreground'
+                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
+                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80'
                   )}
                 >
                   {opt.label}
@@ -159,11 +158,11 @@ export function PersonalizationStep() {
                   placeholder="Please specify..."
                   value={roleOther}
                   onChange={e => setRoleOther(e.target.value)}
-                  className="mt-2"
+                  className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
                 />
               )}
             </div>
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-xs text-white/30 text-center">
               We&apos;ll prioritise the features and data most relevant to you.
             </p>
           </div>
@@ -171,11 +170,11 @@ export function PersonalizationStep() {
 
         {/* Question 2: Beverage type */}
         {subStep === 1 && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300">
-            <h3 className="text-xl font-serif font-bold text-foreground text-center">
+          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+            <h3 className="text-xl font-serif font-bold text-white text-center">
               What do you produce?
             </h3>
-            <p className="text-sm text-muted-foreground text-center">
+            <p className="text-sm text-white/50 text-center">
               Select all that apply:
             </p>
             <div className="space-y-2">
@@ -186,8 +185,8 @@ export function PersonalizationStep() {
                   className={cn(
                     'w-full text-left px-4 py-3 rounded-xl border transition-all',
                     beverageTypes.includes(opt.value)
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-foreground'
-                      : 'border-border bg-card hover:border-muted-foreground/30 text-foreground'
+                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
+                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80'
                   )}
                 >
                   {opt.label}
@@ -198,11 +197,11 @@ export function PersonalizationStep() {
                   placeholder="Please specify..."
                   value={beverageTypeOther}
                   onChange={e => setBeverageTypeOther(e.target.value)}
-                  className="mt-2"
+                  className="mt-2 bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
                 />
               )}
             </div>
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-xs text-white/30 text-center">
               Helps us show relevant benchmarks.
             </p>
           </div>
@@ -210,8 +209,8 @@ export function PersonalizationStep() {
 
         {/* Question 3: Company size */}
         {subStep === 2 && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300">
-            <h3 className="text-xl font-serif font-bold text-foreground text-center">
+          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+            <h3 className="text-xl font-serif font-bold text-white text-center">
               Company size?
             </h3>
             <div className="space-y-2">
@@ -222,15 +221,15 @@ export function PersonalizationStep() {
                   className={cn(
                     'w-full text-left px-4 py-3 rounded-xl border transition-all',
                     companySize === opt.value
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-foreground'
-                      : 'border-border bg-card hover:border-muted-foreground/30 text-foreground'
+                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
+                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80'
                   )}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-xs text-white/30 text-center">
               Determines data complexity.
             </p>
           </div>
@@ -238,11 +237,11 @@ export function PersonalizationStep() {
 
         {/* Question 4: Primary goal */}
         {subStep === 3 && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-300">
-            <h3 className="text-xl font-serif font-bold text-foreground text-center">
+          <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+            <h3 className="text-xl font-serif font-bold text-white text-center">
               Your primary goal?
             </h3>
-            <p className="text-sm text-muted-foreground text-center">
+            <p className="text-sm text-white/50 text-center">
               Select up to 2:
             </p>
             <div className="space-y-2">
@@ -253,8 +252,8 @@ export function PersonalizationStep() {
                   className={cn(
                     'w-full text-left px-4 py-3 rounded-xl border transition-all',
                     primaryGoals.includes(opt.value)
-                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-foreground'
-                      : 'border-border bg-card hover:border-muted-foreground/30 text-foreground',
+                      ? 'border-[#ccff00] bg-[#ccff00]/10 text-white'
+                      : 'border-white/10 bg-white/5 hover:border-white/20 text-white/80',
                     primaryGoals.length >= 2 && !primaryGoals.includes(opt.value)
                       ? 'opacity-50 cursor-not-allowed'
                       : ''
@@ -265,7 +264,7 @@ export function PersonalizationStep() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-xs text-white/30 text-center">
               We&apos;ll prioritise your key features.
             </p>
           </div>
@@ -273,7 +272,7 @@ export function PersonalizationStep() {
 
         {/* Navigation */}
         <div className="flex items-center justify-between pt-4">
-          <Button variant="ghost" onClick={handleBack} className="text-muted-foreground">
+          <Button variant="ghost" onClick={handleBack} className="text-white/40 hover:text-white hover:bg-white/10">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>

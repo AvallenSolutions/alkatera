@@ -66,17 +66,17 @@ export function CompanyBasics() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 rounded-2xl flex items-center justify-center">
+          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
             <Building2 className="w-8 h-8 text-[#ccff00]" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-serif font-bold text-white">
             Let&apos;s add your company details
           </h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="onb-company-name" className="text-sm font-medium">
+            <Label htmlFor="onb-company-name" className="text-sm font-medium text-white/70">
               Company Name
             </Label>
             <Input
@@ -85,11 +85,12 @@ export function CompanyBasics() {
               value={companyName}
               onChange={e => setCompanyName(e.target.value)}
               disabled={isSaving}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="onb-address" className="text-sm font-medium">
+            <Label htmlFor="onb-address" className="text-sm font-medium text-white/70">
               Headquarters Address
             </Label>
             <Input
@@ -98,24 +99,25 @@ export function CompanyBasics() {
               value={address}
               onChange={e => setAddress(e.target.value)}
               disabled={isSaving}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/30">
               Used for location-based emission factors and regulations.
             </p>
           </div>
         </div>
 
-        <p className="text-xs text-muted-foreground text-center">
+        <p className="text-xs text-white/30 text-center">
           Seeing your branding makes this feel like YOUR platform. You can add a logo later in Settings.
         </p>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground">
+          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>

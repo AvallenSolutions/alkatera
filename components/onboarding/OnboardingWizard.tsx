@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useOnboarding, ONBOARDING_STEPS, PHASE_CONFIG, getStepConfig } from '@/lib/onboarding'
 import type { OnboardingPhase } from '@/lib/onboarding'
 import { Progress } from '@/components/ui/progress'
@@ -52,18 +53,27 @@ export function OnboardingWizard() {
   const currentPhase = currentStepConfig.phase
   const phaseConfig = PHASE_CONFIG[currentPhase]
 
-  // Determine unique phases for the phase indicator
   const phases: OnboardingPhase[] = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features']
 
-  // Hide chrome on welcome screen for immersive feel
   const isWelcome = state.currentStep === 'welcome-screen'
   const isCompletion = state.currentStep === 'completion'
 
   return (
-    <div className="fixed inset-0 z-[60] bg-background overflow-y-auto" role="dialog" aria-label="Onboarding wizard">
-      {/* Top bar - hidden on welcome */}
+    <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Onboarding wizard">
+      {/* Full-screen background image + dark overlay */}
+      <Image
+        src="/images/starry-night-bg3.jpg"
+        alt=""
+        fill
+        className="object-cover"
+        priority
+        quality={85}
+      />
+      <div className="absolute inset-0 bg-black/70" />
+
+      {/* Top bar - glassmorphic, hidden on welcome */}
       {!isWelcome && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-4 py-3">
+        <div className="sticky top-0 z-10 bg-black/40 backdrop-blur-md border-b border-white/10 px-4 py-3">
           <div className="max-w-2xl mx-auto">
             {/* Phase indicators */}
             <div className="flex items-center justify-between mb-3">
@@ -83,14 +93,14 @@ export function OnboardingWizard() {
                         isActive
                           ? 'bg-[#ccff00]/10 text-[#ccff00] font-medium'
                           : isPast || isComplete
-                          ? 'text-muted-foreground/70'
-                          : 'text-muted-foreground/40'
+                          ? 'text-white/50'
+                          : 'text-white/25'
                       )}
                     >
                       <div
                         className={cn(
                           'w-2 h-2 rounded-full',
-                          isActive ? 'bg-[#ccff00]' : isPast || isComplete ? 'bg-muted-foreground/50' : 'bg-muted'
+                          isActive ? 'bg-[#ccff00]' : isPast || isComplete ? 'bg-white/40' : 'bg-white/15'
                         )}
                       />
                       <span className="hidden sm:inline">{pConfig.label}</span>
@@ -99,13 +109,12 @@ export function OnboardingWizard() {
                 })}
               </div>
 
-              {/* Dismiss button */}
               {!isCompletion && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={dismissOnboarding}
-                  className="text-muted-foreground hover:text-foreground -mr-2"
+                  className="text-white/40 hover:text-white hover:bg-white/10 -mr-2"
                   aria-label="Skip onboarding"
                 >
                   <X className="w-4 h-4" />
@@ -114,12 +123,12 @@ export function OnboardingWizard() {
             </div>
 
             {/* Progress bar */}
-            <Progress value={progress} indicatorColor="lime" className="h-1" />
+            <Progress value={progress} indicatorColor="lime" className="h-1 bg-white/10" />
             <div className="flex items-center justify-between mt-1">
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-white/40">
                 {currentStepConfig.title} &mdash; {phaseConfig.duration}
               </p>
-              <p className="text-xs text-muted-foreground">{progress}%</p>
+              <p className="text-xs text-white/40">{progress}%</p>
             </div>
           </div>
         </div>
@@ -132,7 +141,7 @@ export function OnboardingWizard() {
             variant="ghost"
             size="sm"
             onClick={dismissOnboarding}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-white/40 hover:text-white hover:bg-white/10"
             aria-label="Skip onboarding"
           >
             <X className="w-4 h-4 mr-1" />
@@ -142,7 +151,7 @@ export function OnboardingWizard() {
       )}
 
       {/* Step content */}
-      <div className="max-w-2xl mx-auto py-8 px-4">
+      <div className="relative z-[1] max-w-2xl mx-auto py-8 px-4">
         {CurrentStepComponent ? <CurrentStepComponent /> : null}
       </div>
     </div>

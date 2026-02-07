@@ -33,10 +33,10 @@ export function CoreMetricsStep() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4 animate-in fade-in duration-300">
       <div className="w-full max-w-lg space-y-6">
         <div className="text-center space-y-2">
-          <h3 className="text-xl font-serif font-bold text-foreground">
+          <h3 className="text-xl font-serif font-bold text-white">
             What Will You Track?
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/50">
             For drinks producers, these are the essential metrics to track. We&apos;ll start with these core areas:
           </p>
         </div>
@@ -46,13 +46,13 @@ export function CoreMetricsStep() {
           <p className="text-xs font-medium text-[#ccff00] uppercase tracking-wider mb-2">
             Core Metrics (Pre-selected)
           </p>
-          <div className="bg-card/50 border border-border rounded-xl p-3 space-y-2">
+          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-3 space-y-2">
             {CORE_METRICS.map(metric => (
               <div key={metric.name} className="flex items-start gap-3 py-1">
                 <CheckSquare className="w-5 h-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-foreground">{metric.name}</p>
-                  <p className="text-xs text-muted-foreground">{metric.description}</p>
+                  <p className="text-sm font-medium text-white">{metric.name}</p>
+                  <p className="text-xs text-white/50">{metric.description}</p>
                 </div>
               </div>
             ))}
@@ -61,16 +61,16 @@ export function CoreMetricsStep() {
 
         {/* Additional metrics */}
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <p className="text-xs font-medium text-white/50 uppercase tracking-wider mb-2">
             Additional (Add later as you grow)
           </p>
-          <div className="bg-card/30 border border-border/50 rounded-xl p-3 space-y-2 opacity-60">
+          <div className="bg-white/[0.03] backdrop-blur-md border border-white/[0.07] rounded-xl p-3 space-y-2 opacity-60">
             {ADDITIONAL_METRICS.map(metric => (
               <div key={metric.name} className="flex items-start gap-3 py-1">
-                <Square className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <Square className="w-5 h-5 text-white/30 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm text-muted-foreground">{metric.name}</p>
-                  <p className="text-xs text-muted-foreground/60">{metric.description}</p>
+                  <p className="text-sm text-white/30">{metric.name}</p>
+                  <p className="text-xs text-white/20">{metric.description}</p>
                 </div>
               </div>
             ))}
@@ -78,12 +78,12 @@ export function CoreMetricsStep() {
         </div>
 
         <div className="flex items-center justify-between pt-2">
-          <Button variant="ghost" onClick={previousStep} className="text-muted-foreground">
+          <Button variant="ghost" onClick={previousStep} className="text-white/40 hover:text-white hover:bg-white/10">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={skipStep} className="text-muted-foreground text-sm">
+            <Button variant="ghost" onClick={skipStep} className="text-white/40 hover:text-white hover:bg-white/10 text-sm">
               <SkipForward className="w-4 h-4 mr-1" />
               Skip
             </Button>
