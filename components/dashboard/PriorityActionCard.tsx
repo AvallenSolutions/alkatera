@@ -15,6 +15,8 @@ import {
   Users,
   Factory,
   Truck,
+  Package,
+  ClipboardList,
   type LucideIcon
 } from 'lucide-react';
 import Link from 'next/link';
@@ -28,7 +30,7 @@ interface PriorityAction {
   description?: string;
   impact?: string;
   impactValue?: string;
-  category: 'climate' | 'water' | 'waste' | 'nature' | 'energy' | 'suppliers' | 'facilities' | 'transport';
+  category: 'climate' | 'water' | 'waste' | 'nature' | 'energy' | 'suppliers' | 'facilities' | 'transport' | 'setup' | 'products';
   href?: string;
   dismissible?: boolean;
 }
@@ -81,6 +83,8 @@ const categoryIcons: Record<string, LucideIcon> = {
   suppliers: Users,
   facilities: Factory,
   transport: Truck,
+  setup: ClipboardList,
+  products: Package,
 };
 
 export function PriorityActionCard({
@@ -230,16 +234,100 @@ export function PriorityActionsList({
   );
 }
 
+/**
+ * Generates context-aware priority actions.
+ *
+ * Phase 1 — Setup: When the user hasn't completed basic setup (no facilities,
+ *   products, suppliers, or team), show setup-oriented actions that guide them
+ *   through getting the platform populated with data.
+ *
+ * Phase 2 — Data improvement: Once data exists, show actionable sustainability
+ *   insights based on actual emissions breakdown, water risk, waste metrics, etc.
+ */
 export function generatePriorityActions(data: {
+  // Setup progress
+  hasFacilities?: boolean;
+  hasProducts?: boolean;
+  hasSuppliers?: boolean;
+  hasTeamMembers?: boolean;
+  facilitiesCount?: number;
+  productsCount?: number;
+  // Emissions data (only meaningful when data exists)
   scope1Percentage?: number;
   scope2Percentage?: number;
   scope3Percentage?: number;
+  totalEmissions?: number;
   topMaterialHotspot?: { name: string; percentage: number };
   waterRiskFacilities?: number;
   circularityRate?: number;
   supplierEngagementRate?: number;
+  hasWasteData?: boolean;
 }): PriorityAction[] {
   const actions: PriorityAction[] = [];
+
+  const hasAnyEmissionsData = (data.totalEmissions ?? 0) > 0;
+
+  // ── Phase 1: Setup actions ──────────────────────────────────────────────
+  // Shown when the user hasn't yet populated basic data. These are the most
+  // important actions for a new user — they unlock all other features.
+
+  if (!data.hasFacilities) {
+    actions.push({
+      id: 'setup-facilities',
+      priority: 'high',
+      title: 'Add your first facility',
+      description: 'Facilities are the foundation of your carbon footprint. Add your brewery, distillery, or winery to start tracking.',
+      impactValue: 'Unlocks emissions tracking',
+      category: 'facilities',
+      href: '/company/facilities',
+      dismissible: false,
+    });
+  }
+
+  if (!data.hasProducts) {
+    actions.push({
+      id: 'setup-products',
+      priority: data.hasFacilities ? 'high' : 'medium',
+      title: 'Add your first product',
+      description: 'Create a product to calculate its lifecycle environmental impact and compare to industry benchmarks.',
+      impactValue: 'Unlocks product LCA',
+      category: 'products',
+      href: '/products/new',
+      dismissible: false,
+    });
+  }
+
+  if (data.hasFacilities && data.hasProducts && !data.hasSuppliers) {
+    actions.push({
+      id: 'setup-suppliers',
+      priority: 'medium',
+      title: 'Add your key suppliers',
+      description: 'Track your supply chain impact by adding the companies you source from.',
+      impactValue: 'Unlocks Scope 3 tracking',
+      category: 'suppliers',
+      href: '/suppliers',
+    });
+  }
+
+  if (data.hasFacilities && data.hasProducts && !data.hasTeamMembers) {
+    actions.push({
+      id: 'setup-team',
+      priority: 'low',
+      title: 'Invite a team member',
+      description: 'Sustainability works best as a team effort. Invite colleagues to collaborate.',
+      impactValue: 'Better data coverage',
+      category: 'suppliers',
+      href: '/dashboard/settings/team',
+    });
+  }
+
+  // If we're still in pure setup mode (no emissions data), return setup actions only
+  if (!hasAnyEmissionsData) {
+    return actions;
+  }
+
+  // ── Phase 2: Data-driven improvement actions ───────────────────────────
+  // Only shown once the user has real data to act on.
 
   if (data.scope2Percentage && data.scope2Percentage > 15) {
     actions.push({
@@ -289,13 +377,14 @@ export function generatePriorityActions(data: {
     });
   }
 
-  if (data.circularityRate !== undefined && data.circularityRate < 50) {
+  // Only show circularity action if we have actual waste data — not just a zero default
+  if (data.hasWasteData && data.circularityRate !== undefined && data.circularityRate < 50) {
     actions.push({
       id: 'circularity',
       priority: data.circularityRate < 30 ? 'high' : 'medium',
       title: 'Increase packaging recyclability',
       description: `Current circularity rate: ${data.circularityRate.toFixed(0)}%`,
-      impactValue: `Target: 80%+ circularity`,
+      impactValue: 'Target: 80%+ circularity',
       category: 'waste',
       href: '/products',
     });
@@ -321,6 +410,18 @@ export function generatePriorityActions(data: {
       description: `Scope 3 is ${data.scope3Percentage.toFixed(0)}% of total emissions`,
       impactValue: 'Long-term impact',
       category: 'suppliers',
+      href: '/reports/company-footprint',
+    });
+  }
+
+  // If user has data but no data-driven actions fired (everything looks good!), give a positive nudge
+  if (actions.length === 0) {
+    actions.push({
+      id: 'all-good',
+      priority: 'low',
+      title: 'Looking good! Review your full report',
+      description: 'No urgent actions detected. Explore your company footprint report for deeper insights.',
+      category: 'climate',
       href: '/reports/company-footprint',
     });
   }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bot, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { Dog, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useOnboarding } from '@/lib/onboarding'
 import { GUIDE_STEPS, getVisibleSteps, type GuideStep } from '@/lib/dashboard-guide'
@@ -155,7 +155,7 @@ function RosaCard({
       {/* Header */}
       <div className="flex items-center gap-3 mb-3">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 border border-emerald-400/30 flex items-center justify-center flex-shrink-0">
-          <Bot className="w-5 h-5 text-emerald-400" />
+          <Dog className="w-5 h-5 text-emerald-400" />
         </div>
         <div>
           <p className="text-emerald-400 font-medium text-sm">Rosa</p>
@@ -564,13 +564,13 @@ export function DashboardGuide() {
 export function DashboardGuideTrigger() {
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="sm"
       onClick={() => window.dispatchEvent(new Event('dashboard-guide:start'))}
-      className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+      className="gap-2 border-[#ccff00]/30 text-[#ccff00] hover:bg-[#ccff00]/10 hover:text-[#ccff00] hover:border-[#ccff00]/50"
       title="Take a guided tour of your dashboard"
     >
-      <Bot className="h-3.5 w-3.5" />
+      <Dog className="h-4 w-4" />
       Take a tour
     </Button>
   )

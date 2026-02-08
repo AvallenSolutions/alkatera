@@ -4,7 +4,7 @@ import { useOnboarding } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
 import {
   ArrowRight,
-  Bot,
+  Dog,
   Calculator,
   ShieldCheck,
   BarChart3,
@@ -17,7 +17,7 @@ import {
 
 const FEATURES = [
   {
-    icon: Bot,
+    icon: Dog,
     title: 'Ask Rosa for insights',
     description: '"What\'s my biggest emission source?"',
     color: 'text-emerald-400',

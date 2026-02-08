@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { useOrganization } from '@/lib/organizationContext';
 import { useDashboardPreferences } from '@/hooks/data/useDashboardPreferences';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
@@ -24,8 +23,6 @@ import {
 import {
   Settings2,
   RefreshCw,
-  Upload,
-  Download,
 } from 'lucide-react';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
@@ -116,7 +113,6 @@ function getStatusFromScore(score: number | null): 'good' | 'warning' | 'critica
 const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { currentOrganization } = useOrganization();
   const { enabledWidgets, loading: prefsLoading, error: prefsError, refetch } = useDashboardPreferences();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -248,13 +244,23 @@ export default function DashboardPage() {
       supplierEngagementRate = (engaged / total) * 100;
     }
     return generatePriorityActions({
+      // Setup progress
+      hasFacilities: setupProgress.hasFacilities,
+      hasProducts: setupProgress.hasProducts,
+      hasSuppliers: setupProgress.hasSuppliers,
+      hasTeamMembers: setupProgress.hasTeamMembers,
+      facilitiesCount: setupProgress.facilitiesCount,
+      productsCount: setupProgress.productsCount,
+      // Emissions & performance data
+      totalEmissions: footprint?.total_emissions,
       scope1Percentage: scopeBreakdown.scope1Pct,
       scope2Percentage: scopeBreakdown.scope2Pct,
       scope3Percentage: scopeBreakdown.scope3Pct,
       circularityRate: wasteMetrics?.waste_diversion_rate,
+      hasWasteData: wasteMetrics !== null && wasteMetrics !== undefined,
       supplierEngagementRate,
     });
-  }, [scopeBreakdown, wasteMetrics, supplierData]);
+  }, [scopeBreakdown, wasteMetrics, supplierData, footprint, setupProgress]);
 
   const carbonTrend = useMemo(() => {
     if (!footprint?.total_emissions || !previousYearFootprint?.total_emissions) {
@@ -340,21 +346,6 @@ export default function DashboardPage() {
               </option>
             ))}
           </select>
-          <Button
-            variant="outline"
-            onClick={() => router.push('/reports')}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Export Report
-          </Button>
-          <Button
-            onClick={() => router.push('/products/import')}
-            className="gap-2 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-          >
-            <Upload className="h-4 w-4" />
-            Import Products
-          </Button>
           <DashboardGuideTrigger />
           <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh dashboard">
             <RefreshCw className="h-4 w-4" />
@@ -548,11 +539,17 @@ export default function DashboardPage() {
         {/* Secondary Content Area - Sidebar Widgets */}
         <div className="lg:col-span-4 space-y-6">
           {isWidgetEnabled('quick-actions') && <div data-guide="quick-actions"><InlineErrorBoundary><QuickActionsWidget /></InlineErrorBoundary></div>}
-          {isWidgetEnabled('supplier-engagement') && <InlineErrorBoundary><SupplierEngagementWidget /></InlineErrorBoundary>}
           {isWidgetEnabled('recent-activity') && <InlineErrorBoundary><RecentActivityWidget /></InlineErrorBoundary>}
-          {isWidgetEnabled('water-risk') && <InlineErrorBoundary><WaterRiskWidget /></InlineErrorBoundary>}
         </div>
       </div>
+
+      {/* Full-width bottom row — Supplier + Water widgets side by side */}
+      {(isWidgetEnabled('supplier-engagement') || isWidgetEnabled('water-risk')) && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {isWidgetEnabled('supplier-engagement') && <InlineErrorBoundary><SupplierEngagementWidget /></InlineErrorBoundary>}
+          {isWidgetEnabled('water-risk') && <InlineErrorBoundary><WaterRiskWidget /></InlineErrorBoundary>}
+        </div>
+      )}
 
       <Suspense fallback={null}>
         <DashboardGuide />

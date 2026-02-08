@@ -35,8 +35,8 @@ interface OnboardingContextType {
   skipStep: () => void
   /** Update personalization data */
   updatePersonalization: (data: Partial<PersonalizationData>) => void
-  /** Complete the entire onboarding */
-  completeOnboarding: () => void
+  /** Complete the entire onboarding (awaitable — waits for persistence) */
+  completeOnboarding: () => Promise<void>
   /** Dismiss onboarding without completing */
   dismissOnboarding: () => void
   /** Mark the post-onboarding dashboard guide as completed */
@@ -78,12 +78,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   // Save onboarding state to the API — fires immediately, no debounce.
   // Uses orgIdRef so it doesn't depend on currentOrganization (avoids
   // re-creating the callback on every org reference change).
-  const saveState = useCallback(async (newState: OnboardingState) => {
+  // Returns true on success, false on failure.
+  const saveState = useCallback(async (newState: OnboardingState): Promise<boolean> => {
     const orgId = orgIdRef.current
-    if (!orgId) return
+    if (!orgId) return false
 
     try {
-      await fetch('/api/onboarding', {
+      const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,8 +92,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
           state: newState,
         }),
       })
+      return res.ok
     } catch (err) {
       console.error('Failed to save onboarding state:', err)
+      return false
     }
   }, []) // stable — no deps
 
@@ -216,17 +219,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
-  const completeOnboarding = useCallback(() => {
-    updateState(prev => ({
-      ...prev,
+  const completeOnboarding = useCallback(async () => {
+    const completedState: OnboardingState = {
+      ...state,
       completed: true,
       completedAt: new Date().toISOString(),
-      currentStep: 'completion',
-      completedSteps: prev.completedSteps.includes('completion')
-        ? prev.completedSteps
-        : [...prev.completedSteps, 'completion'],
-    }))
-  }, [updateState])
+      currentStep: 'completion' as OnboardingStep,
+      completedSteps: state.completedSteps.includes('completion')
+        ? state.completedSteps
+        : [...state.completedSteps, 'completion'],
+    }
+    setState(completedState)
+    // Await the save so callers can wait for persistence before navigating
+    await saveState(completedState)
+  }, [state, saveState])
 
   const dismissOnboarding = useCallback(() => {
     sessionDismissedRef.current = true

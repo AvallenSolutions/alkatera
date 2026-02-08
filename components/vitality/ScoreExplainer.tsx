@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Info, TrendingUp, Target, Award, Calculator, ArrowUpRight, Bot, ExternalLink } from 'lucide-react';
+import { Info, TrendingUp, Target, Award, Calculator, ArrowUpRight, Dog, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -556,7 +556,7 @@ export function ScoreExplainer({
               className="w-full gap-2 text-xs"
               onClick={handleAskRosa}
             >
-              <Bot className="h-3.5 w-3.5" />
+              <Dog className="h-3.5 w-3.5" />
               Ask Rosa to explain this score
             </Button>
           </div>

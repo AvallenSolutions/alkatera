@@ -7,7 +7,7 @@ import {
   BarChart3,
   Target,
   TrendingUp,
-  Bot,
+  Dog,
   CheckCircle2,
   Trophy,
 } from 'lucide-react'
@@ -32,8 +32,8 @@ export function CompletionStep() {
   }
   achievements.push('Unlocked advanced features')
 
-  const handleGoToDashboard = () => {
-    completeOnboarding()
+  const handleGoToDashboard = async () => {
+    await completeOnboarding()
     router.push('/dashboard?guide=1')
   }
 
@@ -41,7 +41,7 @@ export function CompletionStep() {
     { label: 'Explore your dashboard', icon: BarChart3, href: '/dashboard?guide=1' },
     { label: 'Set reduction targets', icon: Target, href: '/targets' },
     { label: 'Compare to industry', icon: TrendingUp, href: '/benchmarking' },
-    { label: 'Ask Rosa a question', icon: Bot, href: '/rosa' },
+    { label: 'Ask Rosa a question', icon: Dog, href: '/rosa' },
   ]
 
   return (
@@ -83,8 +83,8 @@ export function CompletionStep() {
             {quickActions.map(action => (
               <button
                 key={action.label}
-                onClick={() => {
-                  completeOnboarding()
+                onClick={async () => {
+                  await completeOnboarding()
                   router.push(action.href)
                 }}
                 className="flex items-center gap-2 p-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all text-left"

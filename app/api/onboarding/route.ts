@@ -94,6 +94,40 @@ export async function GET(request: NextRequest) {
     }
 
     if (!data) {
+      // No onboarding record exists yet. Check if this org already has real
+      // data (e.g. the user signed up before the onboarding wizard was deployed,
+      // or completed onboarding but the save was lost). If so, treat them as
+      // completed so they aren't forced through the wizard again.
+      const { count: productCount } = await supabase
+        .from('products')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+
+      const { count: facilityCount } = await supabase
+        .from('facilities')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+
+      if ((productCount ?? 0) > 0 || (facilityCount ?? 0) > 0) {
+        // Org already has data — mark onboarding as completed and persist it
+        const completedState = {
+          ...INITIAL_ONBOARDING_STATE,
+          completed: true,
+          completedAt: new Date().toISOString(),
+          currentStep: 'completion' as const,
+        }
+        // Persist so this check only runs once
+        await supabase.from('onboarding_state').upsert(
+          {
+            organization_id: organizationId,
+            state: completedState,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'organization_id' }
+        )
+        return NextResponse.json({ state: completedState })
+      }
+
       return NextResponse.json({
         state: { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() },
       })

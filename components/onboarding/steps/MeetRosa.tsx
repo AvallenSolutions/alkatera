@@ -2,7 +2,7 @@
 
 import { useOnboarding } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
-import { Bot, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { Dog, CheckCircle2, ArrowLeft } from 'lucide-react'
 
 export function MeetRosa() {
   const { completeStep, previousStep } = useOnboarding()
@@ -18,7 +18,7 @@ export function MeetRosa() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 px-4 animate-in slide-in-from-right duration-500">
       {/* Rosa avatar */}
       <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-400/20 to-cyan-400/20 backdrop-blur-md flex items-center justify-center border border-emerald-400/30">
-        <Bot className="w-10 h-10 text-emerald-400" />
+        <Dog className="w-10 h-10 text-emerald-400" />
       </div>
 
       <div className="space-y-4 max-w-md">

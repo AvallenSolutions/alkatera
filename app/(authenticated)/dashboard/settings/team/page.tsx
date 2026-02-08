@@ -33,7 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { UserPlus, Loader2, Users, Trash2, AlertCircle, Lock } from 'lucide-react'
+import { UserPlus, Loader2, Users, Trash2, AlertCircle, Lock, Mail, Clock, XCircle } from 'lucide-react'
 import { useTeamMemberLimit } from '@/hooks/useSubscription'
 import {
   AlertDialog,
@@ -56,6 +56,14 @@ interface TeamMember {
   role: string
 }
 
+interface TeamInvitation {
+  id: string
+  email: string
+  status: 'pending' | 'accepted' | 'expired' | 'cancelled'
+  invited_at: string
+  expires_at: string
+}
+
 export default function TeamManagementPage() {
   return <TeamManagementContent />
 }
@@ -68,6 +76,7 @@ function TeamManagementContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [inviteeEmail, setInviteeEmail] = useState('')
   const [inviteeRole, setInviteeRole] = useState<'company_admin' | 'company_user'>('company_user')
+  const [invitations, setInvitations] = useState<TeamInvitation[]>([])
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const { toast } = useToast()
@@ -98,6 +107,25 @@ function TeamManagementContent() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchInvitations = async () => {
+    if (!currentOrganization) return
+
+    try {
+      const { data, error } = await supabase
+        .from('team_invitations')
+        .select('id, email, status, invited_at, expires_at')
+        .eq('organization_id', currentOrganization.id)
+        .in('status', ['pending', 'expired'])
+        .order('invited_at', { ascending: false })
+
+      if (error) throw error
+
+      setInvitations((data as TeamInvitation[]) || [])
+    } catch (_) {
+      // Non-fatal: invitations section is supplementary
     }
   }
 
@@ -165,6 +193,7 @@ function TeamManagementContent() {
       setInviteeEmail('')
       setInviteeRole('company_user')
       fetchMembers()
+      fetchInvitations()
     } catch (error) {
       console.error('Error inviting member:', error)
       toast({
@@ -235,6 +264,7 @@ function TeamManagementContent() {
 
   useEffect(() => {
     fetchMembers()
+    fetchInvitations()
   }, [currentOrganization])
 
   if (!currentOrganization) {
@@ -395,6 +425,64 @@ function TeamManagementContent() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pending Invitations */}
+      {isAdmin && invitations.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Pending Invitations
+            </CardTitle>
+            <CardDescription>
+              Invitations that have been sent but not yet accepted
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Sent</TableHead>
+                    <TableHead>Expires</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invitations.map((invite) => {
+                    const isExpired = invite.status === 'expired' || new Date(invite.expires_at) < new Date()
+                    return (
+                      <TableRow key={invite.id}>
+                        <TableCell className="font-medium">{invite.email}</TableCell>
+                        <TableCell>
+                          {isExpired ? (
+                            <Badge variant="destructive" className="gap-1">
+                              <XCircle className="h-3 w-3" />
+                              Expired
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="gap-1 text-amber-500 border-amber-500/30">
+                              <Clock className="h-3 w-3" />
+                              Pending
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(invite.invited_at).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(invite.expires_at).toLocaleDateString()}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog open={!!memberToDelete} onOpenChange={() => setMemberToDelete(null)}>
         <AlertDialogContent>

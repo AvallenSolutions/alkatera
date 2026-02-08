@@ -40,7 +40,7 @@ import {
   FileEdit,
   Leaf,
   MessageSquare,
-  Bot,
+  Dog,
   Heart,
   UserCheck,
   Scale,
@@ -176,7 +176,7 @@ const navigationStructure: NavItem[] = [
   {
     name: 'Rosa',
     href: '/rosa/',
-    icon: Bot,
+    icon: Dog,
     minTier: 2, // Blossom and above
   },
   {
@@ -789,7 +789,7 @@ export function Sidebar({ className }: SidebarProps) {
                       : 'text-sidebar-foreground hover:bg-secondary/50'
                   )}
                 >
-                  <Bot className={cn(
+                  <Dog className={cn(
                     'h-4 w-4 flex-shrink-0 transition-colors',
                     isActive('/admin/rosa/') ? 'text-neon-lime' : ''
                   )} />

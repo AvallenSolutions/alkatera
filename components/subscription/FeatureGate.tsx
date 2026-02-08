@@ -12,7 +12,7 @@ import {
   BarChart3,
   Shield,
   Award,
-  Bot,
+  Dog,
   FileText,
   Heart,
   Scale,
@@ -311,7 +311,7 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
       "Analyse environmental data and trends",
       "Generate insights from your sustainability data",
     ],
-    icon: Bot,
+    icon: Dog,
     category: "AI Tools",
   },
   rosa_ai_unlimited: {
@@ -324,7 +324,7 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
       "Advanced multi-document analysis",
       "Custom AI insights for your industry",
     ],
-    icon: Bot,
+    icon: Dog,
     category: "AI Tools",
   },
   greenwash_documents: {
