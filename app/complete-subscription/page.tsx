@@ -80,7 +80,7 @@ const tiers = [
       "Gap Analysis, Audit Packages & Verification Support",
       "Unlimited Rosa AI & Greenwash Guardian",
     ],
-    buttonText: "Contact Sales",
+    buttonText: "Get Started",
     highlight: false,
   },
 ]
@@ -171,11 +171,6 @@ function CompleteSubscriptionContent() {
       console.error('[CompleteSubscription] No current organization!')
       toast.error('No organisation found. Please try again.')
       router.push('/create-organization')
-      return
-    }
-
-    if (tierName === 'canopy') {
-      router.push('/contact?tier=Canopy')
       return
     }
 
