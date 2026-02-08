@@ -30,10 +30,10 @@ export function ImageUpload({
       setIsUploading(true);
       setError(null);
 
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+      // Validate file type - SVG excluded due to XSS risk (can contain JavaScript)
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       if (!allowedTypes.includes(file.type)) {
-        throw new Error('Invalid file type. Please upload a valid image file.');
+        throw new Error('Invalid file type. Please upload JPEG, PNG, GIF, or WebP images.');
       }
 
       // Validate file size (10MB)
@@ -174,7 +174,7 @@ export function ImageUpload({
               <Upload className="w-8 h-8 text-gray-400" />
               <p className="text-sm text-gray-400">{description}</p>
               <p className="text-xs text-gray-500">
-                JPEG, PNG, GIF, WebP, or SVG
+                JPEG, PNG, GIF, or WebP
               </p>
             </div>
           )}

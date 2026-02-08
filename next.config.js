@@ -2,11 +2,12 @@
 const nextConfig = {
   images: { unoptimized: true },
   compiler: {
-    removeConsole: false,
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
+  poweredByHeader: false,
 };
 
 module.exports = nextConfig;

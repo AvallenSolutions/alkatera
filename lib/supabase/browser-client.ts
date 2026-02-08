@@ -35,12 +35,7 @@ export function getSupabaseBrowserClient() {
 
   const inIframe = isInIframe()
 
-  console.log('✅ Supabase browser client initialising:', {
-    url: supabaseUrl,
-    hasAnonKey: !!supabaseAnonKey,
-    inIframe,
-    storage: inIframe ? 'localStorage' : 'cookies',
-  })
+  // Supabase browser client initialised
 
   client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {

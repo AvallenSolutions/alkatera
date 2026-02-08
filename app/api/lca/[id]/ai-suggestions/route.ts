@@ -9,6 +9,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import {
   generateSuggestion,
   getStaticFallback,
@@ -46,26 +48,48 @@ export async function POST(
   try {
     const { id: pcfId } = await params;
 
-    // Get auth token
+    // Authenticate via Bearer token OR cookies
     const authHeader = request.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const token = authHeader.split(' ')[1];
+    let supabase;
+    let user;
 
-    // Initialize Supabase client
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: { headers: { Authorization: `Bearer ${token}` } },
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          global: { headers: { Authorization: `Bearer ${token}` } },
+        }
+      );
+      const { data, error: authError } = await supabase.auth.getUser();
+      if (authError || !data.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
-    );
-
-    // Verify user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      user = data.user;
+    } else {
+      // Fall back to cookie-based auth
+      const cookieStore = cookies();
+      supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+          cookies: {
+            get(name: string) { return cookieStore.get(name)?.value },
+            set(name: string, value: string, options: CookieOptions) {
+              try { cookieStore.set({ name, value, ...options }) } catch {}
+            },
+            remove(name: string, options: CookieOptions) {
+              try { cookieStore.set({ name, value: '', ...options }) } catch {}
+            },
+          },
+        }
+      );
+      const { data, error: authError } = await supabase.auth.getUser();
+      if (authError || !data.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      user = data.user;
     }
 
     // Parse request body
@@ -242,26 +266,44 @@ export async function GET(
 ) {
   const { id: pcfId } = await params;
 
-  // Get auth token
+  // Authenticate via Bearer token OR cookies
   const authHeader = request.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const token = authHeader.split(' ')[1];
+  let user;
 
-  // Initialize Supabase client
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { headers: { Authorization: `Bearer ${token}` } },
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    );
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError || !data.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-  );
-
-  // Verify user
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    user = data.user;
+  } else {
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) { return cookieStore.get(name)?.value },
+          set(name: string, value: string, options: CookieOptions) {
+            try { cookieStore.set({ name, value, ...options }) } catch {}
+          },
+          remove(name: string, options: CookieOptions) {
+            try { cookieStore.set({ name, value: '', ...options }) } catch {}
+          },
+        },
+      }
+    );
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError || !data.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    user = data.user;
   }
 
   // Check rate limit status

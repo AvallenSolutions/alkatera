@@ -62,8 +62,8 @@ export async function getSupabaseAPIClient() {
     const { data: { user }, error } = await authClient.auth.getUser(token);
 
     if (error || !user) {
-      console.error('[API Client] Token verification failed:', error);
-      return { client: serviceClient || authClient, user: null, error };
+      // Never return a service role client on auth failure
+      return { client: authClient, user: null, error };
     }
 
     // Return service role client if available (bypasses schema cache),

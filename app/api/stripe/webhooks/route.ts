@@ -55,22 +55,11 @@ function getSupabaseAdmin() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('========================================');
-  console.log('Stripe Webhook Request Received');
-  console.log('========================================');
-  console.log('URL:', request.url);
-  console.log('Method:', request.method);
-  console.log('Headers:', Object.fromEntries(request.headers.entries()));
-
   try {
     const body = await request.text();
     const signature = request.headers.get('stripe-signature');
 
-    console.log('Body length:', body.length);
-    console.log('Has signature:', !!signature);
-
     if (!signature) {
-      console.error('Missing stripe-signature header');
       return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
     }
 
@@ -78,9 +67,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const webhookSecret = getWebhookSecret();
-      console.log('Using webhook secret (first 8 chars):', webhookSecret.substring(0, 8) + '...');
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-      console.log('Signature verification successful');
     } catch (err: any) {
       console.error('Webhook signature verification failed:', err.message);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
@@ -114,16 +101,11 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
-    console.log('Event processed successfully');
-    console.log('========================================');
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error('========================================');
-    console.error('Error processing webhook:', error);
-    console.error('Stack:', error.stack);
-    console.error('========================================');
+    console.error('Webhook processing error:', error.message);
     return NextResponse.json(
-      { error: error.message || 'Webhook processing failed' },
+      { error: 'Webhook processing failed' },
       { status: 500 }
     );
   }

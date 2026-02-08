@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { timingSafeEqual } from 'crypto';
 import type { Database } from '@/types/db_types';
 
 /**
@@ -11,22 +12,39 @@ import type { Database } from '@/types/db_types';
  * 1. Send 3-day warning emails for expiring grace periods
  * 2. Process expired grace periods and auto-delete excess items
  *
- * Authentication: Requires CRON_SECRET header or service role key
+ * Authentication: Requires CRON_SECRET header
  */
+
+/** Constant-time string comparison to prevent timing attacks */
+function safeCompare(a: string, b: string): boolean {
+  try {
+    const bufA = Buffer.from(a)
+    const bufB = Buffer.from(b)
+    if (bufA.length !== bufB.length) {
+      // Compare anyway to avoid timing leak on length difference
+      timingSafeEqual(bufA, bufA)
+      return false
+    }
+    return timingSafeEqual(bufA, bufB)
+  } catch {
+    return false
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify cron authentication
+    // Verify cron authentication using constant-time comparison
     const cronSecret = request.headers.get('x-cron-secret');
     const authHeader = request.headers.get('authorization');
 
     const validCronSecret = process.env.CRON_SECRET;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    const isValidCron = cronSecret && validCronSecret && cronSecret === validCronSecret;
-    const isServiceRole = authHeader?.includes(serviceRoleKey || '');
+    // Check x-cron-secret header (timing-safe)
+    const isValidCronHeader = !!(cronSecret && validCronSecret && safeCompare(cronSecret, validCronSecret));
+    // Check Authorization: Bearer <CRON_SECRET> (timing-safe, exact match)
+    const isValidBearerAuth = !!(authHeader && validCronSecret && safeCompare(authHeader, `Bearer ${validCronSecret}`));
 
-    if (!isValidCron && !isServiceRole) {
+    if (!isValidCronHeader && !isValidBearerAuth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

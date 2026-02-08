@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { INITIAL_ONBOARDING_STATE } from '@/lib/onboarding/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -7,6 +9,57 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 function getServiceClient() {
   return createClient(supabaseUrl, supabaseServiceKey)
+}
+
+/** Authenticate the request and verify org membership */
+async function authenticateAndAuthorize(organizationId: string) {
+  const cookieStore = cookies()
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+
+  const authClient = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get(name: string) {
+        return cookieStore.get(name)?.value
+      },
+      set(name: string, value: string, options: CookieOptions) {
+        try { cookieStore.set({ name, value, ...options }) } catch {}
+      },
+      remove(name: string, options: CookieOptions) {
+        try { cookieStore.set({ name, value: '', ...options }) } catch {}
+      },
+    },
+  })
+
+  const { data: { user }, error } = await authClient.auth.getUser()
+  if (error || !user) {
+    return { user: null, authorized: false }
+  }
+
+  // Verify user belongs to this organization
+  const serviceClient = getServiceClient()
+  const { data: membership } = await serviceClient
+    .from('organization_members')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!membership) {
+    // Also check advisor access
+    const { data: advisorAccess } = await serviceClient
+      .from('advisor_organization_access')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('advisor_user_id', user.id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (!advisorAccess) {
+      return { user, authorized: false }
+    }
+  }
+
+  return { user, authorized: true }
 }
 
 /** GET /api/onboarding?organizationId=xxx - Fetch onboarding state */
@@ -17,8 +70,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'organizationId is required' }, { status: 400 })
   }
 
-  // Auth check
-  const authHeader = request.headers.get('cookie')
+  // Authenticate and verify org membership
+  const { user, authorized } = await authenticateAndAuthorize(organizationId)
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!authorized) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 })
+  }
+
   const supabase = getServiceClient()
 
   try {
@@ -34,7 +94,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (!data) {
-      // No onboarding state yet - return initial state
       return NextResponse.json({
         state: { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() },
       })
@@ -58,6 +117,15 @@ export async function POST(request: NextRequest) {
         { error: 'organizationId and state are required' },
         { status: 400 }
       )
+    }
+
+    // Authenticate and verify org membership
+    const { user, authorized } = await authenticateAndAuthorize(organizationId)
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!authorized) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
     const supabase = getServiceClient()

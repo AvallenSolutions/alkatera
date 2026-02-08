@@ -1,8 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import * as cheerio from 'cheerio';
+
+// SSRF protection: block private/internal IP ranges
+const BLOCKED_HOSTS = [
+  /^localhost$/i,
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^0\./,
+  /^\[::1\]$/,
+  /^\[fc/i,
+  /^\[fd/i,
+  /^\[fe80/i,
+];
+
+function isBlockedHost(hostname: string): boolean {
+  return BLOCKED_HOSTS.some(pattern => pattern.test(hostname));
+}
+
+async function authenticateRequest(): Promise<{ authenticated: boolean }> {
+  try {
+    const cookieStore = cookies();
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+    const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+      cookies: {
+        get(name: string) { return cookieStore.get(name)?.value },
+        set(name: string, value: string, options: CookieOptions) {
+          try { cookieStore.set({ name, value, ...options }) } catch {}
+        },
+        remove(name: string, options: CookieOptions) {
+          try { cookieStore.set({ name, value: '', ...options }) } catch {}
+        },
+      },
+    });
+
+    const { data: { user }, error } = await supabase.auth.getUser();
+    return { authenticated: !error && !!user };
+  } catch {
+    return { authenticated: false };
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const { authenticated } = await authenticateRequest();
+    if (!authenticated) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { url, platform, crawlSubpages = true, maxPages = 10 } = body;
 
@@ -26,6 +78,22 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: 'Invalid URL format' },
+        { status: 400 }
+      );
+    }
+
+    // Only allow http/https protocols
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      return NextResponse.json(
+        { error: 'Only HTTP and HTTPS URLs are allowed' },
+        { status: 400 }
+      );
+    }
+
+    // SSRF protection: block internal/private IP ranges
+    if (isBlockedHost(parsedUrl.hostname)) {
+      return NextResponse.json(
+        { error: 'Access to internal addresses is not allowed' },
         { status: 400 }
       );
     }
@@ -70,7 +138,7 @@ export async function POST(request: NextRequest) {
             allContent += `\n\n--- Page: ${absoluteUrl} ---\n\n${subContent.text}`;
           }
         } catch (error) {
-          console.error(`Error fetching subpage ${link}:`, error);
+          // Skip failed subpages silently
         }
       }
     }
@@ -81,9 +149,8 @@ export async function POST(request: NextRequest) {
       url: normalizedUrl,
     });
   } catch (error: any) {
-    console.error('Error fetching URL content:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch URL content' },
+      { error: 'Failed to fetch URL content' },
       { status: 500 }
     );
   }
@@ -91,6 +158,9 @@ export async function POST(request: NextRequest) {
 
 async function fetchPageContent(url: string): Promise<{ text: string; links: string[] } | null> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; GreenwashGuardian/1.0; +https://alkatera.com)',
@@ -98,10 +168,12 @@ async function fetchPageContent(url: string): Promise<{ text: string; links: str
         'Accept-Language': 'en-US,en;q=0.5',
       },
       redirect: 'follow',
+      signal: controller.signal,
     });
 
+    clearTimeout(timeout);
+
     if (!response.ok) {
-      console.error(`Failed to fetch ${url}: ${response.status}`);
       return null;
     }
 
@@ -183,7 +255,6 @@ async function fetchPageContent(url: string): Promise<{ text: string; links: str
       links: Array.from(new Set(links)), // Deduplicate
     };
   } catch (error) {
-    console.error(`Error fetching page ${url}:`, error);
     return null;
   }
 }

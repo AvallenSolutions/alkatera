@@ -114,7 +114,17 @@ function renderMessageContent(content: string): React.ReactNode {
               // If image fails to load, show the URL as a link instead
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
-              target.parentElement!.innerHTML = `<a href="${imageUrl}" target="_blank" rel="noopener noreferrer" class="text-blue-500 hover:underline break-all">${imageUrl}</a>`;
+              // Safe DOM manipulation instead of innerHTML to prevent XSS
+              const parent = target.parentElement;
+              if (parent) {
+                const link = document.createElement('a');
+                link.href = imageUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.className = 'text-blue-500 hover:underline break-all';
+                link.textContent = imageUrl;
+                parent.appendChild(link);
+              }
             }}
           />
         </a>

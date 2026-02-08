@@ -6,6 +6,7 @@ import { Clock, Calendar, User, Tag, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { SocialShare } from '@/components/blog/SocialShare';
+import sanitizeHtml from 'sanitize-html';
 
 interface BlogPost {
   id: string;
@@ -259,7 +260,19 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
                 prose-li:marker:text-[#ccff00] prose-li:leading-relaxed
                 prose-hr:border-white/10 prose-hr:my-12
                 first:prose-p:text-xl first:prose-p:leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: post.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content, {
+                allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'iframe', 'video', 'source', 'h1', 'h2']),
+                allowedAttributes: {
+                  ...sanitizeHtml.defaults.allowedAttributes,
+                  img: ['src', 'alt', 'width', 'height', 'class', 'loading'],
+                  iframe: ['src', 'width', 'height', 'allow', 'allowfullscreen', 'frameborder', 'title', 'class'],
+                  video: ['src', 'controls', 'poster', 'class', 'width', 'height'],
+                  source: ['src', 'type'],
+                  a: ['href', 'target', 'rel', 'class'],
+                  '*': ['class', 'id', 'style'],
+                },
+                allowedIframeHostnames: ['www.youtube.com', 'youtube.com', 'player.vimeo.com'],
+              }) }}
             />
           )}
 
