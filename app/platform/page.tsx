@@ -3,7 +3,7 @@ import { PlatformPageClient } from '@/marketing/components/PlatformPageClient';
 
 export const metadata: Metadata = {
   title: 'Platform | Alkatera',
-  description: 'The ecological intelligence engine for drinks brands. Analyse, calculate, and strategise your environmental impact with precision.',
+  description: 'The single sustainability platform purpose-built for the drinks industry. Measure beyond carbon, defend against greenwashing, achieve B Corp, and turn ESG data into competitive advantage.',
   alternates: {
     canonical: '/platform',
   },
