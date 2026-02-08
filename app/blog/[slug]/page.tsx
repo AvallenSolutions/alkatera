@@ -119,7 +119,27 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
   const publishedDate = post.published_at ? new Date(post.published_at) : null;
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="min-h-screen bg-[#050505] text-white relative">
+      {/* Fixed background layer */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <img
+          src="https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=2832&auto=format&fit=crop"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-luminosity"
+        />
+        <div className="absolute inset-0 bg-[#050505]/80" />
+        <div className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: 'linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)',
+            backgroundSize: '80px 80px'
+          }}
+        />
+        {/* Static gradient blobs */}
+        <div className="absolute top-[20%] left-[10%] w-[500px] h-[500px] bg-[#ccff00] rounded-full opacity-[0.07] blur-[100px]" />
+        <div className="absolute bottom-[10%] right-[15%] w-[600px] h-[600px] bg-[#00ccff] rounded-full opacity-[0.07] blur-[100px]" />
+      </div>
+
+      <div className="relative z-10">
       <Navigation />
 
       <main className="pt-32 pb-20">
@@ -308,6 +328,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
       </main>
 
       <Footer />
+      </div>
     </div>
   );
 }
