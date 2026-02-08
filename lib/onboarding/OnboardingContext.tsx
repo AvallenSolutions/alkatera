@@ -68,14 +68,17 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     orgIdRef.current = currentOrganization?.id ?? null
   }, [currentOrganization?.id])
 
+  // Queue of state updates that arrived while a fetch was in-flight.
+  // When the fetch completes we merge these on top of the server state
+  // so nothing the user did during loading is lost.
+  const pendingUpdatesRef = useRef<Array<(prev: OnboardingState) => OnboardingState>>([])
+
   // Save onboarding state to the API — fires immediately, no debounce.
   // Uses orgIdRef so it doesn't depend on currentOrganization (avoids
   // re-creating the callback on every org reference change).
   const saveState = useCallback(async (newState: OnboardingState) => {
     const orgId = orgIdRef.current
     if (!orgId) return
-    // Don't save while we're still loading initial state
-    if (isFetchingRef.current) return
 
     try {
       await fetch('/api/onboarding', {
@@ -95,7 +98,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const orgId = currentOrganization?.id
     if (!orgId) {
-      setIsLoading(false)
+      // Don't set isLoading to false here — wait for the org to load
       return
     }
 
@@ -105,6 +108,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
     const generation = ++fetchGenerationRef.current
     isFetchingRef.current = true
+    setIsLoading(true)
 
     ;(async () => {
       try {
@@ -115,7 +119,18 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         if (res.ok) {
           const data = await res.json()
           if (data.state) {
-            setState(data.state)
+            // Replay any updates the user made while we were fetching
+            let merged = data.state as OnboardingState
+            const pending = pendingUpdatesRef.current
+            pendingUpdatesRef.current = []
+            for (const updater of pending) {
+              merged = updater(merged)
+            }
+            setState(merged)
+            // If there were pending updates, persist the merged state
+            if (pending.length > 0) {
+              saveState(merged)
+            }
           }
         }
       } catch (err) {
@@ -127,14 +142,22 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         }
       }
     })()
-  }, [currentOrganization?.id])
+  }, [currentOrganization?.id, saveState])
 
-  // Helper: update state in memory and persist immediately
+  // Helper: update state in memory and persist immediately.
+  // If a fetch is in-flight, queue the updater so it can be replayed
+  // on top of the server state when the fetch completes.
   const updateState = useCallback((updater: (prev: OnboardingState) => OnboardingState) => {
+    if (isFetchingRef.current) {
+      pendingUpdatesRef.current.push(updater)
+    }
     setState(prev => {
       const next = updater(prev)
-      // Fire-and-forget save
-      saveState(next)
+      // Only persist immediately if we're not mid-fetch;
+      // otherwise the fetch-complete handler will persist the merged result.
+      if (!isFetchingRef.current) {
+        saveState(next)
+      }
       return next
     })
   }, [saveState])
