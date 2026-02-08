@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 
@@ -128,7 +128,8 @@ export function useFacilityWaterData(year?: number) {
   // Use provided year or default to current year
   const selectedYear = year || new Date().getFullYear();
 
-  const supabase = getSupabaseBrowserClient();
+  // Singleton — stable reference across renders
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
 
   const fetchWaterData = useCallback(async () => {
     if (!currentOrganization?.id) {

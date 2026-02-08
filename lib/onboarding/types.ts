@@ -133,6 +133,8 @@ export interface OnboardingState {
   startedAt?: string
   /** Timestamp when onboarding was completed */
   completedAt?: string
+  /** Whether the post-onboarding dashboard guide has been completed */
+  dashboardGuideCompleted?: boolean
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {
@@ -141,6 +143,7 @@ export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   currentStep: 'welcome-screen',
   completedSteps: [],
   personalization: {},
+  dashboardGuideCompleted: false,
 }
 
 export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {

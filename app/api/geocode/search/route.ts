@@ -81,8 +81,6 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
 
     // Log for debugging
-    console.log(`[Geocode] Search for "${query}" returned ${data.length} results`);
-
     // Filter and transform results
     const results = data.map((result: any) => ({
       place_id: result.place_id,

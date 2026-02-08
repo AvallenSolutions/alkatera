@@ -4,7 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
-import { Droplet, AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { Droplet, AlertTriangle, CheckCircle, Info, Leaf, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 const riskColors = {
   high: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -109,9 +111,19 @@ export function WaterRiskWidget() {
         )}
 
         {facilityWaterRisks.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-2">
-            Add facilities to assess water risk by location
-          </p>
+          <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+              <Leaf className="h-5 w-5 text-emerald-400" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-3">
+              I can assess water scarcity risk for each of your facilities. Add one and I&apos;ll map out your risk landscape.
+            </p>
+            <Button asChild size="sm" className="bg-neon-lime text-black hover:bg-neon-lime/90">
+              <Link href="/company/facilities">
+                Add a Facility <ArrowRight className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
+          </div>
         )}
 
         <div className="pt-2 border-t">

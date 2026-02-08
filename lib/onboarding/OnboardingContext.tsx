@@ -39,6 +39,8 @@ interface OnboardingContextType {
   completeOnboarding: () => void
   /** Dismiss onboarding without completing */
   dismissOnboarding: () => void
+  /** Mark the post-onboarding dashboard guide as completed */
+  markGuideCompleted: () => void
   /** Reset onboarding (for testing) */
   resetOnboarding: () => void
 }
@@ -234,6 +236,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const markGuideCompleted = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      dashboardGuideCompleted: true,
+    }))
+  }, [updateState])
+
   const resetOnboarding = useCallback(() => {
     sessionDismissedRef.current = false
     const fresh = { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() }
@@ -259,6 +268,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         updatePersonalization,
         completeOnboarding,
         dismissOnboarding,
+        markGuideCompleted,
         resetOnboarding,
       }}
     >

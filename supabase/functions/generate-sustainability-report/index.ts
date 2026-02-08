@@ -31,8 +31,6 @@ Deno.serve(async (req: Request) => {
   let report_config_id: string | undefined;
 
   try {
-    console.log('[Sustainability Report] Starting report generation...');
-
     // 1. Authenticate user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -57,9 +55,6 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    console.log('[Auth] User authenticated:', user.id);
-
     // Create a service role client for DB writes (bypasses RLS)
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -77,9 +72,6 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    console.log('[Config] Fetching report configuration:', report_config_id);
-
     // 3. Fetch report configuration
     const { data: reportConfig, error: configError } = await supabaseClient
       .from('generated_reports')
@@ -117,22 +109,13 @@ Deno.serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    console.log('[Config] Report configuration loaded:', {
-      org: reportConfig.organization_id,
-      year: reportConfig.report_year,
-      format: reportConfig.output_format,
-    });
-
     // 4. Update status to 'aggregating_data'
-    console.log('[Status] Updating status to aggregating_data...');
     await serviceClient
       .from('generated_reports')
       .update({ status: 'aggregating_data' })
       .eq('id', report_config_id);
 
     // 5. Aggregate data with multi-year support
-    console.log('[Data] Aggregating report data...');
     const aggregatedData = await aggregateReportData(
       supabaseClient,
       reportConfig.organization_id,
@@ -141,13 +124,6 @@ Deno.serve(async (req: Request) => {
       reportConfig.is_multi_year,
       reportConfig.report_years
     );
-
-    console.log('[Data] Data aggregation complete:', {
-      hasOrg: !!aggregatedData.organization,
-      hasEmissions: !!aggregatedData.emissions?.total,
-      productCount: aggregatedData.products?.length || 0,
-    });
-
     // 6. Update status to 'building_content'
     await serviceClient
       .from('generated_reports')
@@ -155,8 +131,6 @@ Deno.serve(async (req: Request) => {
       .eq('id', report_config_id);
 
     // 6. Build structured content (DETERMINISTIC - no LLM interpretation)
-    console.log('[Content] Building structured report content...');
-
     const config: ReportConfig = {
       reportName: reportConfig.report_name,
       reportYear: reportConfig.report_year,
@@ -177,12 +151,6 @@ Deno.serve(async (req: Request) => {
     const structuredContent = buildReportContent(config, aggregatedData);
     const customInstructions = buildCustomInstructions(config);
     const slideCount = calculateSlideCount(config.sections);
-
-    console.log('[Content] Structured content built:', {
-      contentLength: structuredContent.length,
-      slideCount,
-    });
-
     // 7. Update status to 'generating_document'
     await serviceClient
       .from('generated_reports')
@@ -219,9 +187,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log('[SlideSpeak] Generating presentation...');
-
     // Get branded template if organization has one
     let templateId = 'default';
     const { data: orgData } = await supabaseClient
@@ -232,7 +197,6 @@ Deno.serve(async (req: Request) => {
 
     if (orgData?.slidespeak_template_id) {
       templateId = orgData.slidespeak_template_id;
-      console.log('[SlideSpeak] Using branded template:', templateId);
     }
 
     const slideSpeakResult = await slideSpeakClient.generateAndWait({
@@ -252,9 +216,6 @@ Deno.serve(async (req: Request) => {
       console.error('[SlideSpeak] No download URL received');
       throw new Error('No download URL received from SlideSpeak');
     }
-
-    console.log('[SlideSpeak] Generation complete, download URL:', documentUrl);
-
     // 8. Update report with success (using service role to bypass RLS)
     const { error: updateError } = await serviceClient
       .from('generated_reports')
@@ -342,7 +303,6 @@ async function aggregateReportData(
   };
 
   try {
-    console.log('[Data] Fetching organization info...');
     const { data: org, error: orgError } = await supabaseClient
       .from('organizations')
       .select('name, industry_sector, description')
@@ -354,7 +314,6 @@ async function aggregateReportData(
     } else if (org) {
       data.organization = org;
       data.dataAvailability.hasOrganization = true;
-      console.log('[Data] Organization loaded:', org.name);
     }
   } catch (error) {
     console.error('[Data] Exception fetching organization:', error);
@@ -363,8 +322,6 @@ async function aggregateReportData(
   // Fetch emissions data if section is included
   if (sections.includes('scope-1-2-3')) {
     try {
-      console.log('[Data] Fetching emissions data for year:', reportYear);
-
       const yearStart = `${reportYear}-01-01`;
       const yearEnd = `${reportYear}-12-31`;
 
@@ -385,11 +342,8 @@ async function aggregateReportData(
           year: reportYear,
         };
         data.dataAvailability.hasEmissions = true;
-        console.log('[Data] Emissions loaded from corporate_reports:', data.emissions.total, 'tCO2e');
       } else {
         // Fallback: Calculate from utility_data_entries + fleet + overheads (same as dashboard)
-        console.log('[Data] No corporate_reports data, calculating from facility data...');
-
         // Emission factors matching corporate-emissions.ts
         const UTILITY_FACTORS: Record<string, { factor: number; scope: string }> = {
           diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },
@@ -516,13 +470,11 @@ async function aggregateReportData(
         if (totalT > 0) {
           data.emissions = { scope1: scope1T, scope2: scope2T, scope3: scope3T, total: totalT, year: reportYear };
           data.dataAvailability.hasEmissions = true;
-          console.log('[Data] Emissions calculated from facility data:', totalT, 'tCO2e');
         }
       }
 
       // Fetch multi-year data if enabled
       if (isMultiYear && reportYears && reportYears.length > 1) {
-        console.log('[Data] Fetching multi-year trends for years:', reportYears);
         const { data: historicalReports, error: histError } = await supabaseClient
           .from('corporate_reports')
           .select('year, total_emissions, breakdown_json')
@@ -531,7 +483,6 @@ async function aggregateReportData(
           .order('year', { ascending: true });
 
         if (histError) {
-          console.log('[Data] Multi-year query error:', histError.message);
         } else if (historicalReports && historicalReports.length > 0) {
           data.emissionsTrends = historicalReports.map((r: { year: number; total_emissions: number; breakdown_json?: { scope1?: number; scope2?: number; scope3?: number } }) => ({
             year: r.year,
@@ -550,7 +501,6 @@ async function aggregateReportData(
                 : 'N/A';
             }
           }
-          console.log('[Data] Multi-year trends loaded:', data.emissionsTrends.length, 'years');
         }
       }
     } catch (error) {
@@ -560,7 +510,6 @@ async function aggregateReportData(
 
   // Fetch facility data
   try {
-    console.log('[Data] Fetching facility data...');
     const yearStart = `${reportYear}-01-01`;
     const yearEnd = `${reportYear}-12-31`;
 
@@ -610,7 +559,6 @@ async function aggregateReportData(
         hasData: (emissionsMap.get(f.id) || 0) > 0 || (utilityCountMap.get(f.id) || 0) > 0,
       }));
       data.dataAvailability.hasFacilities = facilities.length > 0;
-      console.log('[Data] Facilities loaded:', data.facilities.length);
     }
   } catch (error) {
     console.error('[Data] Exception fetching facilities:', error);
@@ -619,7 +567,6 @@ async function aggregateReportData(
   // Fetch product data if section is included
   if (sections.includes('product-footprints')) {
     try {
-      console.log('[Data] Fetching product LCA data...');
       const { data: products, error: productsError } = await supabaseClient
         .from('product_carbon_footprints')
         .select('product_name, functional_unit, aggregated_impacts, reference_year')
@@ -629,7 +576,6 @@ async function aggregateReportData(
         .limit(50);
 
       if (productsError) {
-        console.log('[Data] Product LCAs query error:', productsError.message);
       } else if (products && products.length > 0) {
         // Deduplicate: keep only the latest LCA per product name
         const seenProducts = new Map<string, typeof products[0]>();
@@ -646,9 +592,7 @@ async function aggregateReportData(
           referenceYear: p.reference_year,
         }));
         data.dataAvailability.hasProducts = true;
-        console.log('[Data] Products loaded (deduplicated):', data.products.length);
       } else {
-        console.log('[Data] No completed product LCAs found');
       }
     } catch (error) {
       console.error('[Data] Exception fetching products:', error);
@@ -658,7 +602,6 @@ async function aggregateReportData(
   // Fetch suppliers data if section is included
   if (sections.includes('supply-chain')) {
     try {
-      console.log('[Data] Fetching suppliers data...');
       const { data: suppliers, error: suppliersError } = await supabaseClient
         .from('suppliers')
         .select('name, industry_sector, country, annual_spend, spend_currency')
@@ -666,7 +609,6 @@ async function aggregateReportData(
         .limit(50);
 
       if (suppliersError) {
-        console.log('[Data] Suppliers query error:', suppliersError.message);
       } else if (suppliers && suppliers.length > 0) {
         data.suppliers = suppliers.map((s: any) => ({
           name: s.name,
@@ -676,7 +618,6 @@ async function aggregateReportData(
           spendCurrency: s.spend_currency || 'GBP',
         }));
         data.dataAvailability.hasSuppliers = true;
-        console.log('[Data] Suppliers loaded:', data.suppliers.length);
       }
     } catch (error) {
       console.error('[Data] Exception fetching suppliers:', error);
@@ -710,7 +651,5 @@ async function aggregateReportData(
       data.standards.push({ code: 'iso-14064', name: 'ISO 14064-1 GHG Inventories', status: hasScope123 ? 'Aligned' : 'Partial', detail: `${data.facilities.length} facilities reporting` });
     }
   }
-
-  console.log('[Data] Data availability summary:', data.dataAvailability);
   return data;
 }

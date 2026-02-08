@@ -393,9 +393,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log('Advisor invitation email sent successfully to:', normalizedEmail);
-
     return new Response(
       JSON.stringify({
         success: true,

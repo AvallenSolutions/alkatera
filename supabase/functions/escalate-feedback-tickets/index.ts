@@ -40,9 +40,6 @@ Deno.serve(async (req: Request) => {
         persistSession: false,
       },
     });
-
-    console.log("Starting ticket escalation check...");
-
     // Call the escalation function
     const { data, error } = await adminClient.rpc("escalate_old_tickets");
 
@@ -54,11 +51,7 @@ Deno.serve(async (req: Request) => {
     const result = data?.[0] as EscalationResult | undefined;
     const escalatedCount = result?.escalated_count || 0;
     const escalatedTickets = result?.escalated_tickets || [];
-
-    console.log(`Escalation complete. ${escalatedCount} tickets escalated.`);
-
     if (escalatedCount > 0) {
-      console.log("Escalated tickets:", JSON.stringify(escalatedTickets));
     }
 
     return new Response(

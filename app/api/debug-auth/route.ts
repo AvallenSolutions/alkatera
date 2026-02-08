@@ -8,6 +8,11 @@ export const dynamic = 'force-dynamic';
  * Debug endpoint to check authentication status and organisation membership
  */
 export async function GET(request: NextRequest) {
+  // Only available in development — disabled in production
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   try {
     const supabase = getSupabaseServerClient();
 

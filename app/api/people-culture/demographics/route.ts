@@ -130,8 +130,6 @@ export async function POST(request: NextRequest) {
     };
 
     // Insert record
-    console.log('[Demographics API] Attempting to insert record for org:', organizationId);
-
     const { data, error } = await supabase
       .from('people_workforce_demographics')
       .insert(recordData)

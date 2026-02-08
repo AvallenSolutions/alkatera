@@ -72,9 +72,6 @@ export async function POST(request: NextRequest) {
       console.error('Webhook signature verification failed:', err.message);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
-
-    console.log(`Processing Stripe event: ${event.type} (ID: ${event.id})`);
-
     // Handle the event
     switch (event.type) {
       case 'checkout.session.completed':
@@ -98,7 +95,6 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
     }
 
     return NextResponse.json({ received: true });
@@ -128,7 +124,6 @@ async function sendSubscriptionEmail(
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
-      console.log('Skipping email - missing Supabase config');
       return;
     }
 
@@ -150,7 +145,6 @@ async function sendSubscriptionEmail(
       const error = await response.text();
       console.error('Error sending subscription email:', error);
     } else {
-      console.log(`Subscription email sent: ${eventType} for org ${organizationId}`);
     }
   } catch (error) {
     console.error('Failed to send subscription email:', error);
@@ -166,10 +160,6 @@ async function sendSubscriptionEmail(
  * Activate subscription when initial payment succeeds
  */
 async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  console.log('>>> Handling checkout.session.completed');
-  console.log('Session ID:', session.id);
-  console.log('Metadata:', session.metadata);
-
   const organizationId = session.metadata?.organizationId;
   if (!organizationId) {
     console.error('ERROR: No organizationId in checkout session metadata');
@@ -179,30 +169,15 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   const customerId = session.customer as string;
   const subscriptionId = session.subscription as string;
-
-  console.log('Customer ID:', customerId);
-  console.log('Subscription ID:', subscriptionId);
-
   // Get subscription details to get the price
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const priceId = subscription.items.data[0]?.price.id;
-
-  console.log('Subscription status:', subscription.status);
-  console.log('Price ID:', priceId);
-
   if (!priceId) {
     console.error('ERROR: No price ID found in subscription');
     return;
   }
 
   // Update organization using the database function
-  console.log('Calling update_subscription_from_stripe with params:');
-  console.log('  p_organization_id:', organizationId);
-  console.log('  p_stripe_customer_id:', customerId);
-  console.log('  p_stripe_subscription_id:', subscriptionId);
-  console.log('  p_price_id:', priceId);
-  console.log('  p_status:', subscription.status);
-
   const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId,
     p_stripe_customer_id: customerId,
@@ -218,7 +193,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     console.error('  Hint:', error.hint);
     console.error('  Full error:', JSON.stringify(error, null, 2));
   } else {
-    console.log(`SUCCESS: Organization ${organizationId} subscription activated`);
   }
 }
 
@@ -227,8 +201,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
  * Update tier when subscription changes (upgrade/downgrade)
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  console.log('Subscription updated:', subscription.id);
-
   let organizationId = subscription.metadata?.organizationId;
 
   // Try to find organization by customer ID if not in metadata
@@ -275,9 +247,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     console.error('Error updating organization subscription:', error);
     return;
   }
-
-  console.log(`Organization ${organizationId} subscription updated`);
-
   // Get the new tier after update
   const { data: updatedOrg } = await getSupabaseAdmin()
     .from('organizations')
@@ -344,8 +313,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
  * Downgrade to free tier when subscription is cancelled
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  console.log('Subscription deleted:', subscription.id);
-
   // Find organization by subscription ID
   const { data: org, error: findError } = await getSupabaseAdmin()
     .from('organizations')
@@ -377,8 +344,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   if (error) {
     console.error('Error downgrading organization:', error);
   } else {
-    console.log(`Organization ${org.id} downgraded to seed tier`);
-
     // Log the cancellation
     await getSupabaseAdmin().rpc('log_subscription_change', {
       p_organization_id: org.id,
@@ -401,8 +366,6 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  * Suspend subscription when payment fails
  */
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  console.log('Invoice payment failed:', invoice.id);
-
   // Extract subscription ID from invoice
   const invoiceData = invoice as any;
   const subscriptionId = typeof invoiceData.subscription === 'string'
@@ -428,7 +391,6 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   // If already past_due (retry), don't reset the grace period
   if (org.subscription_status === 'past_due' || org.subscription_status === 'suspended') {
-    console.log(`Organization ${org.id} already ${org.subscription_status}, skipping duplicate payment_failed`);
     return;
   }
 
@@ -449,8 +411,6 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   if (error) {
     console.error('Error setting organization to past_due:', error);
   } else {
-    console.log(`Organization ${org.id} set to past_due with grace period ending ${gracePeriodEnd.toISOString()}`);
-
     // Send email notification about payment failure
     await sendSubscriptionEmail(org.id, 'payment_failed', {
       amount: invoice.amount_due,
@@ -464,8 +424,6 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
  * Reactivate subscription when payment succeeds after failure
  */
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  console.log('Invoice payment succeeded:', invoice.id);
-
   // Extract subscription ID from invoice
   // In Stripe API, subscription can be a string ID or an expanded object
   const invoiceData = invoice as any;
@@ -504,8 +462,6 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     if (error) {
       console.error('Error reactivating organization:', error);
     } else {
-      console.log(`Organization ${org.id} reactivated after successful payment (was ${org.subscription_status})`);
-
       // Send email notification about reactivation
       await sendSubscriptionEmail(org.id, 'subscription_reactivated', {
         amount: invoice.amount_paid,

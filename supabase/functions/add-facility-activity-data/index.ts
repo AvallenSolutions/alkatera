@@ -18,8 +18,6 @@ Deno.serve(async (req: Request) => {
   try {
     // DEBUGGING TRACE: Log incoming request payload
     const payload = await req.json();
-    console.log('Incoming request payload:', JSON.stringify(payload, null, 2));
-
     const {
       facility_id,
       emission_source_id,
@@ -76,9 +74,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log('Authenticated user:', user.id);
-
     // Security validation: Check if user has access to this facility
     const { data: facilityCheck, error: facilityError } = await supabase
       .from('facilities')
@@ -128,9 +123,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log('Authorization check passed for facility:', facility_id);
-
     // Insert the activity data
     const { data: activityData, error: insertError } = await supabase
       .from('facility_activity_data')
@@ -156,9 +148,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log('Activity data inserted successfully:', activityData.id);
-
     return new Response(
       JSON.stringify({ success: true, data: activityData }),
       {

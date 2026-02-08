@@ -77,9 +77,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    console.log('Blog notification email sent:', data?.id);
-
     return NextResponse.json({
       success: true,
       message: 'Email notification sent successfully',

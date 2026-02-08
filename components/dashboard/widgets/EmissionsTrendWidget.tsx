@@ -6,7 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
-import { TrendingDown, TrendingUp, Minus, LineChart } from 'lucide-react';
+import { TrendingDown, TrendingUp, Minus, LineChart, Leaf, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -207,11 +209,18 @@ export function EmissionsTrendWidget() {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-48 flex flex-col items-center justify-center text-center">
-            <LineChart className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-3" />
-            <p className="text-sm text-muted-foreground">
-              Complete product LCAs to see your emissions trend
+          <div className="h-48 flex flex-col items-center justify-center text-center px-4">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+              <Leaf className="h-5 w-5 text-emerald-400" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-3">
+              This chart will show your emissions trajectory over time. Complete a product LCA and watch your story unfold here.
             </p>
+            <Button asChild size="sm" className="bg-neon-lime text-black hover:bg-neon-lime/90">
+              <Link href="/products/new">
+                Create a Product <ArrowRight className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
           </div>
         )}
       </CardContent>

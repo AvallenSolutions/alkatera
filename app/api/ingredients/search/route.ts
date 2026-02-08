@@ -65,8 +65,6 @@ async function getOpenLCAProcesses(): Promise<any[]> {
     cachedProcesses = Array.isArray(result) ? result : [];
     cachedFilteredProcesses = filterDrinksRelevantProcesses(cachedProcesses);
     cacheTimestamp = Date.now();
-    console.log(`[OpenLCA] Cached ${cachedProcesses.length} processes, filtered to ${cachedFilteredProcesses.length} drinks-relevant`);
-
     return cachedProcesses;
   } catch (error) {
     console.error('Error fetching OpenLCA processes:', error);

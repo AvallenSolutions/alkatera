@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
-import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search } from "lucide-react";
+import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import {
@@ -201,14 +201,20 @@ export default function ProductsPage() {
       )}
 
       {products.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                No products found. Create your first product to get started.
-              </AlertDescription>
-            </Alert>
+        <Card className="border-2 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+              <Leaf className="h-7 w-7 text-emerald-400" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Build Your Product Portfolio</h3>
+            <p className="text-muted-foreground text-center max-w-md mb-6">
+              Products are at the heart of your sustainability story. Create your first one and I&apos;ll walk you through building its lifecycle assessment.
+            </p>
+            <Button asChild size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
+              <Link href="/products/new">
+                Create Your First Product <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       ) : filteredProducts.length === 0 ? (

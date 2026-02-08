@@ -51,22 +51,12 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
 
   useEffect(() => {
     if (!authLoading && !user) {
-      console.log('🚪 AppLayout: No authenticated user, redirecting to login')
       router.push('/login')
     }
   }, [user, authLoading, router])
 
   useEffect(() => {
-    console.log('🔍 AppLayout: Organization check:', {
-      authLoading,
-      isOrganizationLoading,
-      hasUser: !!user,
-      requireOrganization,
-      hasCurrentOrganization: !!currentOrganization,
-    })
-
     if (!authLoading && !isOrganizationLoading && user && requireOrganization && !currentOrganization) {
-      console.log('🏢 AppLayout: No organization found, redirecting to create organization')
       router.push('/create-organization')
     }
   }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router])
@@ -84,21 +74,18 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
 
       // suspended: redirect to suspended page
       if (subscriptionStatus === 'suspended') {
-        console.log('🚫 AppLayout: Subscription suspended, redirecting to /suspended')
         router.push('/suspended')
         return
       }
 
       // pending, cancelled, or unknown: redirect to complete-subscription
       if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
-        console.log('🚫 AppLayout: No active subscription, redirecting to complete-subscription')
         router.push('/complete-subscription')
       }
     }
   }, [user, authLoading, isOrganizationLoading, subscriptionLoading, currentOrganization, subscriptionStatus, pathname, router])
 
   if (authLoading || isOrganizationLoading) {
-    console.log('⏳ AppLayout: Loading...', { authLoading, isOrganizationLoading })
     return (
       <main className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -124,10 +111,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
         {isMobileMenuOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
-            onClick={() => {
-              console.log('🖱️ Mobile overlay clicked, closing menu')
-              setIsMobileMenuOpen(false)
-            }}
+            onClick={() => setIsMobileMenuOpen(false)}
           />
         )}
 

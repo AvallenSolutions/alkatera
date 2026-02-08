@@ -160,8 +160,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert record
-    console.log('[Certifications API] Attempting to insert record for org:', organizationId);
-
     const { data, error } = await supabase
       .from('organization_certifications')
       .insert({

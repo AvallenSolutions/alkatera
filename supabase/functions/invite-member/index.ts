@@ -404,9 +404,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log('Invitation email sent successfully to:', normalizedEmail);
-
     return new Response(
       JSON.stringify({
         success: true,

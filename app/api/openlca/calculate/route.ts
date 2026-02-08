@@ -102,9 +102,6 @@ export async function POST(request: NextRequest) {
         message: 'Set OPENLCA_SERVER_URL and OPENLCA_SERVER_ENABLED=true',
       }, { status: 503 });
     }
-
-    console.log(`[OpenLCA API] Calculating impacts for process: ${processId}, quantity: ${quantity}`);
-
     // Check cache first (gracefully handle missing table)
     let cached = null;
     try {
@@ -126,8 +123,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (cached) {
-      console.log(`[OpenLCA API] Cache HIT for process: ${processId}`);
-
       // Return cached data scaled by quantity
       return NextResponse.json({
         success: true,
@@ -155,9 +150,6 @@ export async function POST(request: NextRequest) {
         source: `OpenLCA Cache: ${cached.process_name}`,
       });
     }
-
-    console.log(`[OpenLCA API] Cache MISS, querying OpenLCA server at ${OPENLCA_SERVER_URL}`);
-
     // Create OpenLCA client with API key for authenticated access
     const OPENLCA_API_KEY = process.env.OPENLCA_API_KEY;
     const client = new OpenLCAClient(OPENLCA_SERVER_URL, OPENLCA_API_KEY);
@@ -172,27 +164,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Get process info
-    console.log(`[OpenLCA API] Getting process info for: ${processId}`);
     const processInfo = await client.getProcess(processId);
-    console.log(`[OpenLCA API] Process info retrieved: ${processInfo.name}`);
-
     // Calculate impacts using DUAL methods (per 1 kg)
     // Run both calculations in parallel for performance
-    console.log(`[OpenLCA API] Starting DUAL calculation (midpoint + endpoint)...`);
-
     const [midpointImpacts, endpointImpacts] = await Promise.all([
       client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
       client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
     ]);
-
-    console.log(`[OpenLCA API] Midpoint calculation complete, got ${midpointImpacts.length} impact categories`);
-    console.log(`[OpenLCA API] Endpoint calculation complete, got ${endpointImpacts.length} impact categories`);
-
     if (midpointImpacts.length > 0) {
-      console.log(`[OpenLCA API] Sample midpoint impact:`, JSON.stringify(midpointImpacts[0]));
     }
     if (endpointImpacts.length > 0) {
-      console.log(`[OpenLCA API] Sample endpoint impact:`, JSON.stringify(endpointImpacts[0]));
     }
 
     // Parse impacts into our format - combining midpoint and endpoint values
@@ -308,7 +289,6 @@ export async function POST(request: NextRequest) {
       if (cacheError) {
         console.warn(`[OpenLCA API] Cache write failed (table may not exist): ${cacheError.message}`);
       } else {
-        console.log(`[OpenLCA API] Cached results for process: ${processId}`);
       }
     } catch (cacheError) {
       console.warn('[OpenLCA API] Cache write error:', cacheError);

@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       // User doesn't exist, but we return success to prevent email enumeration
-      console.log('Password reset requested for non-existent email:', email)
       return NextResponse.json(
         { success: true },
         { status: 200, headers: corsHeaders }
@@ -117,7 +116,6 @@ export async function POST(request: NextRequest) {
       console.error('Resend API error:', error)
       // Still return success to not reveal issues
     } else {
-      console.log('Password reset email sent successfully to:', email)
     }
 
     return NextResponse.json(

@@ -99,7 +99,6 @@ export class SlideSpeakClient {
         // Only retry on network errors, not API errors
         if (error instanceof TypeError || (error as Error).message.includes('fetch')) {
           if (attempt < MAX_RETRIES) {
-            console.log(`[SlideSpeak] Request failed, retrying in ${RETRY_BACKOFF[attempt]}ms...`);
             await this.sleep(RETRY_BACKOFF[attempt]);
             continue;
           }
@@ -117,11 +116,6 @@ export class SlideSpeakClient {
    * Returns a task ID that can be polled for status
    */
   async generatePresentation(options: GeneratePresentationOptions): Promise<SlideSpeakResult> {
-    console.log('[SlideSpeak] Starting presentation generation...');
-    console.log('[SlideSpeak] Content length:', options.content.length, 'characters');
-    console.log('[SlideSpeak] Slide count:', options.slideCount || 15);
-    console.log('[SlideSpeak] Template:', options.template || 'DEFAULT');
-
     try {
       // Build request body - SlideSpeak uses 'plain_text' and 'length'
       const requestBody: Record<string, unknown> = {
@@ -140,9 +134,6 @@ export class SlideSpeakClient {
         method: 'POST',
         body: JSON.stringify(requestBody),
       });
-
-      console.log('[SlideSpeak] Generation started, task ID:', response.task_id);
-
       return {
         success: true,
         taskId: response.task_id,
@@ -211,9 +202,6 @@ export class SlideSpeakClient {
     const pollInterval = options.pollInterval || DEFAULT_POLL_INTERVAL;
     const maxPollTime = options.maxPollTime || DEFAULT_MAX_POLL_TIME;
     const startTime = Date.now();
-
-    console.log('[SlideSpeak] Polling for task completion:', taskId);
-
     while (Date.now() - startTime < maxPollTime) {
       try {
         const status = await this.getTaskStatus(taskId);
@@ -224,7 +212,6 @@ export class SlideSpeakClient {
 
         switch (status.status) {
           case 'SUCCESS':
-            console.log('[SlideSpeak] Generation complete, download URL:', status.downloadUrl);
             return {
               success: true,
               taskId,
@@ -241,7 +228,6 @@ export class SlideSpeakClient {
 
           case 'PENDING':
           case 'PROCESSING':
-            console.log(`[SlideSpeak] Status: ${status.status}, progress: ${status.progress || 0}%`);
             await this.sleep(pollInterval);
             break;
 
@@ -316,8 +302,6 @@ export class SlideSpeakClient {
    */
   async createBrandedTemplate(options: BrandedTemplateOptions): Promise<{ id: string } | null> {
     try {
-      console.log('[SlideSpeak] Creating branded template:', options.name);
-
       const response = await this.request<{ template_id: string }>('/presentation/templates/branded', {
         method: 'POST',
         body: JSON.stringify({
@@ -327,8 +311,6 @@ export class SlideSpeakClient {
           secondary_color: options.secondaryColor,
         }),
       });
-
-      console.log('[SlideSpeak] Branded template created:', response.template_id);
       return { id: response.template_id };
     } catch (error) {
       console.error('[SlideSpeak] Failed to create branded template:', error);
@@ -384,11 +366,6 @@ export class SlideSpeakClient {
  */
 export function createSlideSpeakClient(): SlideSpeakClient | null {
   const apiKey = Deno.env.get('SLIDESPEAK_API_KEY');
-
-  console.log('[SlideSpeak] Checking credentials:', {
-    hasApiKey: !!apiKey,
-  });
-
   if (!apiKey) {
     console.warn('[SlideSpeak] API key not configured. Set SLIDESPEAK_API_KEY environment variable.');
     return null;

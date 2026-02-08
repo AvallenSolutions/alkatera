@@ -85,7 +85,6 @@ Deno.serve(async (req: Request) => {
     // Default to sending emails if no preferences set
     const shouldSend = checkShouldSendEmail(eventType, prefs);
     if (!shouldSend) {
-      console.log(`Email skipped - user preferences disabled for ${eventType}`);
       return new Response(
         JSON.stringify({ success: true, message: "Email skipped - user preferences" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -112,9 +111,6 @@ Deno.serve(async (req: Request) => {
       subject: emailContent.subject,
       html: emailContent.html,
     });
-
-    console.log(`Email sent for ${eventType}:`, emailResult);
-
     return new Response(
       JSON.stringify({
         success: true,

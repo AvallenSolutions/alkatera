@@ -55,6 +55,7 @@ import {
   AlertCircle,
   Edit,
   RefreshCw,
+  Leaf,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
@@ -313,14 +314,19 @@ export default function SuppliersPage() {
 
       {/* Suppliers Grid */}
       {suppliers.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                No suppliers added yet. Add your first supplier from our directory to start building your supply chain network.
-              </AlertDescription>
-            </Alert>
+        <Card className="border-2 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+              <Leaf className="h-7 w-7 text-emerald-400" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Map Your Supply Chain</h3>
+            <p className="text-muted-foreground text-center max-w-md mb-6">
+              Your suppliers contribute to your Scope 3 emissions. Adding them here lets you track supply chain impact and even invite them to share their own data.
+            </p>
+            <Button onClick={handleOpenAddDialog} size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
+              <Plus className="h-5 w-5" />
+              Add Your First Supplier
+            </Button>
           </CardContent>
         </Card>
       ) : filteredSuppliers.length === 0 ? (

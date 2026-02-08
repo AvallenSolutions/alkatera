@@ -275,7 +275,6 @@ Deno.serve(async (req: Request) => {
 
         if (resendResponse.ok) {
           const resendData = await resendResponse.json();
-          console.log("Supplier invitation email sent successfully:", resendData);
           emailSent = true;
         } else {
           const errorText = await resendResponse.text();

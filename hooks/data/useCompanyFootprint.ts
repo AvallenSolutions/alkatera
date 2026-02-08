@@ -52,15 +52,6 @@ export function useCompanyFootprint(year?: number) {
       );
 
       if (result.hasData) {
-        console.log('🔍 [Company Footprint] Calculated via shared service:', {
-          year: targetYear,
-          total_emissions_kg: result.breakdown.total,
-          total_emissions_t: result.breakdown.total / 1000,
-          scope1_t: result.breakdown.scope1 / 1000,
-          scope2_t: result.breakdown.scope2 / 1000,
-          scope3_t: result.breakdown.scope3.total / 1000,
-          data_source: 'Shared corporate-emissions calculator',
-        });
 
         setFootprint({
           year: targetYear,

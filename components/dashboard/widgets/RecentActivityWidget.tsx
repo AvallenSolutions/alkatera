@@ -2,9 +2,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import {
   Activity,
-  FileText,
-  Users,
-  Settings,
   AlertCircle,
   UserPlus,
   Building,
@@ -147,7 +144,7 @@ export function RecentActivityWidget() {
       </CardHeader>
       <CardContent>
         {isLoading ? (
-          <ScrollArea className="h-[400px] pr-4">
+          <ScrollArea className="h-[340px] pr-4">
             <div className="space-y-4">
               <ActivitySkeleton />
               <ActivitySkeleton />
@@ -162,11 +159,12 @@ export function RecentActivityWidget() {
             <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
           </div>
         ) : !activities || activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <Activity className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Activity Yet</h3>
-            <p className="text-sm text-muted-foreground">
-              Activity will appear here once you start tracking emissions and managing your organisation
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+              <Leaf className="h-5 w-5 text-emerald-400" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
+              This is your activity feed &mdash; every action you and your team take will be recorded here. Time to make some history!
             </p>
           </div>
         ) : (

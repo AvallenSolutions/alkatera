@@ -38,10 +38,6 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     batchId = body.batch_id;
-
-    console.log(`Starting categorisation for batch: ${batchId}`);
-    console.log(`GEMINI_API_KEY is ${GEMINI_API_KEY ? 'SET (length: ' + GEMINI_API_KEY.length + ')' : 'NOT SET'}`);
-
     if (!batchId) {
       throw new Error('batch_id is required');
     }
@@ -66,9 +62,6 @@ Deno.serve(async (req: Request) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    console.log('GEMINI_API_KEY is configured, proceeding with AI categorisation');
-
     await supabase
       .from('spend_import_batches')
       .update({
@@ -84,17 +77,12 @@ Deno.serve(async (req: Request) => {
       .is('ai_processed_at', null)
       .order('row_number', { ascending: true })
       .limit(100);
-
-    console.log(`Query returned ${items?.length || 0} unprocessed items`);
-
     if (itemsError) {
       console.error('Error querying items:', itemsError);
       throw itemsError;
     }
 
     if (!items || items.length === 0) {
-      console.log('No items to process, marking as ready_for_review');
-
       const { count } = await supabase
         .from('spend_import_items')
         .select('*', { count: 'exact', head: true })
@@ -120,19 +108,13 @@ Deno.serve(async (req: Request) => {
     let processedCount = 0;
     let hasAIError = false;
     let aiErrorMessage = '';
-
-    console.log(`Processing ${itemsToProcess.length} items in batches of ${batchSize}`);
-
     for (let i = 0; i < itemsToProcess.length; i += batchSize) {
       const batch = itemsToProcess.slice(i, i + batchSize);
       const batchNum = Math.floor(i / batchSize) + 1;
       const totalBatches = Math.ceil(itemsToProcess.length / batchSize);
 
       try {
-        console.log(`Processing AI batch ${batchNum}/${totalBatches} (${batch.length} items)`);
         const results = await categoriseBatch(batch);
-        console.log(`AI batch ${batchNum} completed successfully`);
-
         for (let j = 0; j < batch.length; j++) {
           const item = batch[j];
           const result = results[j];
@@ -149,8 +131,6 @@ Deno.serve(async (req: Request) => {
 
           processedCount++;
         }
-
-        console.log(`Saved ${processedCount} items so far`);
       } catch (aiError: any) {
         console.error(`AI categorization error for batch ${batchNum}:`, aiError.message);
         hasAIError = true;
@@ -185,9 +165,6 @@ Deno.serve(async (req: Request) => {
       .select('*', { count: 'exact', head: true })
       .eq('batch_id', batchId)
       .not('ai_processed_at', 'is', null);
-
-    console.log(`Batch update: processed=${totalProcessedCount}, remaining=${remainingCount}, needsMore=${needsMoreProcessing}`);
-
     await supabase
       .from('spend_import_batches')
       .update({
@@ -230,9 +207,6 @@ Deno.serve(async (req: Request) => {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-        console.log(`Marking batch as failed: ${batchId}`);
-
         await supabase
           .from('spend_import_batches')
           .update({
@@ -240,8 +214,6 @@ Deno.serve(async (req: Request) => {
             error_message: userFriendlyMessage,
           })
           .eq('id', batchId);
-
-        console.log(`Successfully marked batch as failed: ${batchId}`);
       } catch (cleanupError) {
         console.error('Failed to update batch status:', cleanupError);
       }
@@ -260,9 +232,6 @@ Deno.serve(async (req: Request) => {
 
 async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
   const prompt = buildPrompt(items);
-
-  console.log(`Calling Gemini API for ${items.length} items...`);
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000);
 
@@ -314,9 +283,6 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
     console.error(`Gemini API error ${response.status}:`, errorText);
     throw new Error(`Gemini API error ${response.status}: ${errorText}`);
   }
-
-  console.log('Gemini API call successful, parsing response...');
-
   const data = await response.json();
 
   if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
@@ -357,8 +323,6 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
         reasoning: result.reasoning || 'No reasoning provided',
       };
     });
-
-    console.log(`Parsed ${normalizedResults.length} results successfully`);
     return normalizedResults;
   } catch (parseError) {
     console.error('Failed to parse Gemini response:', content?.substring(0, 500), parseError);

@@ -1,5 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Cloud, Info, AlertCircle } from "lucide-react"
+import { Cloud, Info, AlertCircle, Leaf, ArrowRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useMemo } from "react"
@@ -65,15 +67,6 @@ export function GHGEmissionsSummaryWidget({
   }
 
   const scopeData = useMemo(() => {
-    console.log('🔍 [GHG Widget] Received footprint:', {
-      has_footprint: !!footprint,
-      has_breakdown: !!footprint?.breakdown,
-      total_emissions: footprint?.total_emissions,
-      scope1: footprint?.breakdown?.scope1,
-      scope2: footprint?.breakdown?.scope2,
-      scope3_total: footprint?.breakdown?.scope3?.total,
-    });
-
     if (!footprint?.breakdown) {
       return {
         scopeTotals: { 1: 0, 2: 0, 3: 0 },
@@ -90,13 +83,6 @@ export function GHGEmissionsSummaryWidget({
 
     const totalEmissions = footprint.total_emissions / 1000;
     const reportingPeriod = footprint.year.toString();
-
-    console.log('📊 [GHG Widget] Calculated values (tonnes):', {
-      scope1_t: scopeTotals[1],
-      scope2_t: scopeTotals[2],
-      scope3_t: scopeTotals[3],
-      total_t: totalEmissions,
-    });
 
     return {
       scopeTotals,
@@ -207,9 +193,18 @@ export function GHGEmissionsSummaryWidget({
                 <span className="text-2xl font-bold">{formatEmissions(totalEmissions)}</span>
               </div>
               {totalEmissions === 0 ? (
-                <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                  <Info className="h-4 w-4" />
-                  <span>Begin tracking emissions to see your organisation&apos;s carbon footprint</span>
+                <div className="mt-3 flex flex-col items-center text-center py-2">
+                  <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center mb-2">
+                    <Leaf className="h-4 w-4 text-emerald-400" />
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mb-2">
+                    Your GHG breakdown by Scope will appear here. Scope 1 &amp; 2 come from facilities, Scope 3 from products and suppliers.
+                  </p>
+                  <Button asChild size="sm" className="h-7 bg-neon-lime text-black hover:bg-neon-lime/90 text-xs">
+                    <Link href="/company/facilities">
+                      Get Started with Facilities <ArrowRight className="ml-1 h-3 w-3" />
+                    </Link>
+                  </Button>
                 </div>
               ) : (
                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">

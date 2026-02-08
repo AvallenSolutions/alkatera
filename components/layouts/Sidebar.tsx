@@ -506,7 +506,7 @@ export function Sidebar({ className }: SidebarProps) {
         <p className="text-xs text-muted-foreground">Sustainability, Distilled</p>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto">
+      <nav className="flex-1 space-y-1 overflow-y-auto" data-guide="sidebar-nav">
         {filteredNavigation.map((item) => {
           const IconComponent = item.icon
           const active = !item.locked && isActive(item.href)
@@ -669,6 +669,7 @@ export function Sidebar({ className }: SidebarProps) {
                   ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                   : 'text-sidebar-foreground hover:bg-secondary/50'
               )}
+              {...(item.href === '/rosa/' ? { 'data-guide': 'rosa-link' } : {})}
             >
               <IconComponent className={cn(
                 'h-4 w-4 flex-shrink-0 transition-colors',

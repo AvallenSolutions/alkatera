@@ -185,14 +185,6 @@ export async function DELETE(
 
     // Check if user is authenticated and is Alkatera admin
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    console.log('[Blog DELETE] Auth check:', {
-      hasUser: !!user,
-      userId: user?.id,
-      authError: authError?.message,
-      postId: params.id
-    });
-
     if (authError || !user) {
       console.error('[Blog DELETE] Authentication failed');
       return NextResponse.json(
@@ -203,9 +195,6 @@ export async function DELETE(
 
     // Check if user is Alkatera admin
     const { data: isAdmin, error: adminError } = await supabase.rpc('is_alkatera_admin');
-
-    console.log('[Blog DELETE] Admin check:', { isAdmin, adminError: adminError?.message });
-
     if (adminError || !isAdmin) {
       console.error('[Blog DELETE] Admin check failed');
       return NextResponse.json(
@@ -228,9 +217,6 @@ export async function DELETE(
         { status: 500 }
       );
     }
-
-    console.log('[Blog DELETE] Successfully deleted post:', id);
-
     return NextResponse.json({
       success: true,
       message: 'Blog post deleted successfully',

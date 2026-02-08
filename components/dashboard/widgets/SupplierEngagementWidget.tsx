@@ -1,5 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Users, AlertCircle, Leaf, ArrowRight } from "lucide-react"
+import Link from "next/link"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useSupplierEngagement } from "@/hooks/data/useSupplierEngagement"
 
@@ -134,12 +136,18 @@ export function SupplierEngagementWidget() {
             <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
           </div>
         ) : totalSuppliers === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <Users className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No Suppliers</h3>
-            <p className="text-sm text-muted-foreground">
-              Add suppliers to track engagement and Scope 3 emissions
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+              <Leaf className="h-5 w-5 text-emerald-400" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-3">
+              Your supply chain is a huge part of your footprint. Adding suppliers helps me track your Scope 3 emissions &mdash; shall we get started?
             </p>
+            <Button asChild size="sm" className="bg-neon-lime text-black hover:bg-neon-lime/90">
+              <Link href="/suppliers">
+                Add Your First Supplier <ArrowRight className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
           </div>
         ) : (
           <div className="space-y-6">

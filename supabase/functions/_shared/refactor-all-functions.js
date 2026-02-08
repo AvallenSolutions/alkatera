@@ -51,26 +51,5 @@ const FUNCTION_METADATA = {
     formula: '(activity_data.activity_amount * Number(emissionsFactor.value)) / 1000'
   },
 };
-
-console.log('🔄 Automated Function Refactoring Script');
-console.log('==========================================\n');
-
-console.log('⚠️  This script will automatically refactor calculation functions');
-console.log('⚠️  to use the Golden Template pattern.\n');
-
-console.log('Due to complexity, this script provides guidance.');
-console.log('Manual refactoring following calculate-scope2-market-based is recommended.\n');
-
-console.log('Functions to refactor:');
 Object.keys(FUNCTION_METADATA).forEach((fname, idx) => {
-  console.log(`  ${idx + 1}. ${fname}`);
 });
-
-console.log('\nReference implementation: calculate-scope2-market-based/index.ts');
-console.log('\nKey refactoring steps for each function:');
-console.log('  1. Remove duplicate corsHeaders declaration');
-console.log('  2. Replace manual client creation with enforceRLS(req)');
-console.log('  3. Add validateProvenance() after enforceRLS()');
-console.log('  4. Replace manual log insert with createLogEntry()');
-console.log('  5. Use createSuccessResponse() and createErrorResponse()');
-console.log('  6. Use createOptionsResponse() for OPTIONS handler\n');

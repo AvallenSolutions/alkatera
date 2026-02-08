@@ -86,7 +86,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!org.billing_email) {
-      console.log("No billing email set for organization, skipping email");
       return new Response(
         JSON.stringify({ success: true, message: "No billing email configured" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -102,9 +101,6 @@ Deno.serve(async (req: Request) => {
       subject: emailContent.subject,
       html: emailContent.html,
     });
-
-    console.log(`Subscription email sent for ${eventType}:`, emailResult);
-
     return new Response(
       JSON.stringify({
         success: true,

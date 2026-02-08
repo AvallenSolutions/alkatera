@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
 
     // Clean up orphaned/duplicate records in the background
     if (orphanedIds.length > 0) {
-      console.log(`[Gap Analysis] Cleaning up ${orphanedIds.length} orphaned/duplicate records`);
       supabase
         .from('certification_gap_analyses')
         .delete()

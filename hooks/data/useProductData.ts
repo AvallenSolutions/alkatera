@@ -151,21 +151,6 @@ export function useProductData(productId: string | undefined) {
 
       if (packagingError) throw packagingError;
 
-      console.log('=== FETCHED PACKAGING DATA ===');
-      console.log('Raw packaging data:', packagingData);
-      if (packagingData && packagingData.length > 0) {
-        packagingData.forEach((pkg, idx) => {
-          console.log(`Package ${idx}:`, {
-            id: pkg.id,
-            material_name: pkg.material_name,
-            quantity: pkg.quantity,
-            unit: pkg.unit,
-            packaging_category: pkg.packaging_category,
-            has_category: !!pkg.packaging_category
-          });
-        });
-      }
-
       // Fetch LCA reports - filter by completed status and order by updated_at
       // to match passport fetch behavior and ensure consistency
       const { data: lcaData, error: lcaError } = await supabase
@@ -175,11 +160,9 @@ export function useProductData(productId: string | undefined) {
         .eq("status", "completed")
         .order("updated_at", { ascending: false });
 
-      // LCA error is non-critical, just log it
+      // LCA error is non-critical
       if (lcaError) {
         console.warn("Error fetching LCA data:", lcaError);
-      } else {
-        console.log('[useProductData] Fetched LCA reports:', lcaData?.length, lcaData);
       }
 
       // Transform data to flatten supplier information

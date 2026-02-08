@@ -94,8 +94,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert record
-    console.log('[Local Impact API] Attempting to insert record for org:', organizationId);
-
     const { data, error } = await supabase
       .from('community_local_impact')
       .insert({

@@ -133,9 +133,6 @@ Deno.serve(async (req: Request) => {
 
     const body: AnalysisRequest = await req.json();
     assessmentId = body.assessment_id;
-
-    console.log(`Starting greenwash analysis for assessment: ${assessmentId}`);
-
     if (!assessmentId || !body.content) {
       throw new Error('assessment_id and content are required');
     }
@@ -171,9 +168,6 @@ Deno.serve(async (req: Request) => {
 
     // Build the prompt with content
     const prompt = ANALYSIS_PROMPT.replace('{CONTENT}', body.content.substring(0, 30000));
-
-    console.log(`Calling Gemini API for analysis (content length: ${body.content.length})...`);
-
     // Call Gemini API
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for complex analysis
@@ -225,9 +219,6 @@ Deno.serve(async (req: Request) => {
       console.error(`Gemini API error ${response.status}:`, errorText);
       throw new Error(`AI analysis error: ${response.status}`);
     }
-
-    console.log('Gemini API call successful, parsing response...');
-
     const data = await response.json();
 
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
@@ -244,9 +235,6 @@ Deno.serve(async (req: Request) => {
       console.error('Failed to parse Gemini response:', content?.substring(0, 500));
       throw new Error('Failed to parse AI analysis results');
     }
-
-    console.log(`Analysis complete: ${analysisResult.overall_risk_level} risk, ${analysisResult.claims.length} claims identified`);
-
     // Update the assessment with results
     const { error: updateError } = await supabase
       .from('greenwash_assessments')

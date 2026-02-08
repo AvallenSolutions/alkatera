@@ -278,9 +278,6 @@ Deno.serve(async (req: Request) => {
 
     const availableYears = [...new Set((availableYearsData || []).map((r: any) => r.factor_year))];
     const targetFactorYear = getDefraFactorYear(reportingPeriodEnd, availableYears);
-
-    console.log(`Using DEFRA factor year ${targetFactorYear} for reporting period ending ${reportingPeriodEnd}`);
-
     // Fetch DEFRA energy emission factors for the appropriate year
     const { data: defraFactors, error: factorsError } = await supabaseAdmin
       .from("defra_energy_emission_factors")
@@ -320,9 +317,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
-
-    console.log(`Loaded ${defraFactors?.length || 0} DEFRA factors for year ${targetFactorYear} and ${emissionsFactors.length} legacy factors`);
-
     // Perform calculations by matching activity data with emissions factors
     // Priority: 1) Match by fuel_type from DEFRA, 2) Match by normalized unit from DEFRA, 3) Fallback to legacy factors
     const calculationResults: CalculationResult[] = [];
@@ -339,7 +333,6 @@ Deno.serve(async (req: Request) => {
         );
         if (defraMatch) {
           matchingFactor = { id: defraMatch.id, value: defraMatch.co2e_factor };
-          console.log(`Matched activity "${activity.name}" to DEFRA factor "${defraMatch.fuel_type}" (${defraMatch.co2e_factor} per ${defraMatch.factor_unit})`);
         }
       }
 
@@ -374,7 +367,6 @@ Deno.serve(async (req: Request) => {
           );
           if (defraMatch) {
             matchingFactor = { id: defraMatch.id, value: defraMatch.co2e_factor };
-            console.log(`Derived fuel_type "${derivedFuelType}" from activity name, matched to DEFRA factor (${defraMatch.co2e_factor} per ${defraMatch.factor_unit})`);
           }
         }
       }
@@ -386,7 +378,6 @@ Deno.serve(async (req: Request) => {
         );
         if (defraMatch) {
           matchingFactor = { id: defraMatch.id, value: defraMatch.co2e_factor };
-          console.log(`Matched activity "${activity.name}" to DEFRA factor by unit "${normalizedUnit}" (${defraMatch.co2e_factor})`);
         }
       }
 
@@ -397,7 +388,6 @@ Deno.serve(async (req: Request) => {
         );
         if (legacyMatch) {
           matchingFactor = { id: legacyMatch.factor_id, value: legacyMatch.value };
-          console.log(`Matched activity "${activity.name}" to legacy factor by unit "${normalizedUnit}" (${legacyMatch.value})`);
         }
       }
 
@@ -507,7 +497,6 @@ Deno.serve(async (req: Request) => {
         }
 
         const logResult = await logResponse.json();
-        console.log(`Successfully created log for calculation ${record.id}:`, logResult);
       } catch (logError) {
         console.error(`Exception while creating log for calculation ${record.id}:`, logError);
         return new Response(
@@ -528,8 +517,6 @@ Deno.serve(async (req: Request) => {
     // CRITICAL: Aggregate emissions and update facility_emissions_aggregated
     // This enables facility intensity calculation for Product LCA allocation
     // Now properly aggregates per-facility using facility_id
-    console.log("Aggregating emissions for facility intensity calculation...");
-
     try {
       // Group calculation results by facility_id
       const facilityEmissions: Record<string, {
@@ -565,13 +552,8 @@ Deno.serve(async (req: Request) => {
           facilityEmissions[facilityId].scope2 += result.calculated_value_co2e;
         }
       });
-
-      console.log(`Emissions calculated for ${Object.keys(facilityEmissions).length} facility(ies)`);
-
       // Calculate org-wide totals for logging
       const totalEmissions = calculationResults.reduce((sum, result) => sum + result.calculated_value_co2e, 0);
-      console.log(`Total emissions calculated: ${totalEmissions.toFixed(2)} kg CO₂e from ${calculationResults.length} activities`);
-
       // Query existing facility_emissions_aggregated records that need updating
       const { data: facilityRecords, error: queryError } = await supabaseAdmin
         .from('facility_emissions_aggregated')
@@ -583,8 +565,6 @@ Deno.serve(async (req: Request) => {
       if (queryError) {
         console.warn('Warning: Could not query facility_emissions_aggregated:', queryError);
       } else if (facilityRecords && facilityRecords.length > 0) {
-        console.log(`Found ${facilityRecords.length} facility record(s) awaiting emissions calculation`);
-
         for (const record of facilityRecords) {
           // Get emissions for this specific facility, or fall back to org total if no facility_id tracking
           const facilityData = facilityEmissions[record.facility_id] || facilityEmissions['unknown'];
@@ -592,9 +572,6 @@ Deno.serve(async (req: Request) => {
           const scope1 = facilityData?.scope1 || calculationResults.filter((_, idx) => activityData[idx]?.category === 'Scope 1').reduce((sum, result) => sum + result.calculated_value_co2e, 0);
           const scope2 = facilityData?.scope2 || calculationResults.filter((_, idx) => activityData[idx]?.category === 'Scope 2').reduce((sum, result) => sum + result.calculated_value_co2e, 0);
           const activityCount = facilityData?.count || calculationResults.length;
-
-          console.log(`Updating facility ${record.facility_id} with ${emissionsToApply.toFixed(2)} kg CO₂e (Scope 1: ${scope1.toFixed(2)}, Scope 2: ${scope2.toFixed(2)})`);
-
           const { error: updateError } = await supabaseAdmin
             .from('facility_emissions_aggregated')
             .update({
@@ -616,11 +593,9 @@ Deno.serve(async (req: Request) => {
           if (updateError) {
             console.error(`Warning: Failed to update facility_emissions_aggregated record ${record.id}:`, updateError);
           } else {
-            console.log(`Successfully updated facility_emissions_aggregated record ${record.id} with ${emissionsToApply.toFixed(2)} kg CO₂e using DEFRA ${targetFactorYear}`);
           }
         }
       } else {
-        console.log('No facility_emissions_aggregated records found with production volume data.');
       }
     } catch (aggError) {
       console.error('Error during facility emissions aggregation:', aggError);

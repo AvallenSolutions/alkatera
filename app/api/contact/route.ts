@@ -68,8 +68,6 @@ export async function POST(request: NextRequest) {
           </div>
         `,
       });
-
-      console.log('Contact notification email sent to hello@alkatera.com');
     } catch (emailError) {
       console.error('Failed to send notification email:', emailError);
       // Don't block form submission if email fails — log and continue
@@ -99,14 +97,6 @@ export async function POST(request: NextRequest) {
         if (company) {
           senderPayload.company = company;
         }
-
-        console.log('Attempting to add subscriber to Sender with payload:', {
-          email,
-          firstname,
-          lastname: lastname || 'N/A',
-          company: company || 'N/A',
-        });
-
         try {
           const senderResponse = await fetch('https://api.sender.net/v2/subscribers', {
             method: 'POST',
@@ -119,9 +109,6 @@ export async function POST(request: NextRequest) {
           });
 
           const responseText = await senderResponse.text();
-          console.log('Sender API response status:', senderResponse.status);
-          console.log('Sender API response body:', responseText);
-
           if (!senderResponse.ok) {
             let errorData;
             try {
@@ -132,7 +119,6 @@ export async function POST(request: NextRequest) {
             console.error('Sender API error - Status:', senderResponse.status, 'Data:', errorData);
           } else {
             const senderData = JSON.parse(responseText);
-            console.log('Successfully added subscriber to Sender:', senderData);
           }
         } catch (senderError) {
           console.error('Sender API call failed:', senderError);

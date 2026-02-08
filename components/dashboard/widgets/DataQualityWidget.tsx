@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDataQualityMetrics } from '@/hooks/data/useDataQualityMetrics';
 import { useOrganization } from '@/lib/organizationContext';
-import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Users } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Users, Leaf, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 export function DataQualityWidget() {
@@ -70,9 +70,18 @@ export function DataQualityWidget() {
           <CardDescription>Track data sources and identify improvement opportunities</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-6 text-muted-foreground">
-            <p>No LCA data available yet.</p>
-            <p className="text-sm mt-2">Create your first product LCA to see data quality metrics.</p>
+          <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+            <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center mb-3">
+              <Leaf className="h-5 w-5 text-emerald-400" />
+            </div>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mb-3">
+              Once you create your first product LCA, I can analyse your data quality and show you exactly where to improve.
+            </p>
+            <Button asChild size="sm" className="bg-neon-lime text-black hover:bg-neon-lime/90">
+              <Link href="/products/new">
+                Create Your First Product <ArrowRight className="ml-1 h-3 w-3" />
+              </Link>
+            </Button>
           </div>
         </CardContent>
       </Card>

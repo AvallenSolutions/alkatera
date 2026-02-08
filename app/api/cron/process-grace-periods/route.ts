@@ -67,7 +67,6 @@ export async function POST(request: NextRequest) {
     };
 
     // Step 1: Send 3-day warning emails
-    console.log('Checking for grace period warnings...');
     const { data: warnings, error: warningsError } = await supabase.rpc(
       'get_grace_period_warnings'
     );
@@ -76,8 +75,6 @@ export async function POST(request: NextRequest) {
       console.error('Error getting warnings:', warningsError);
       results.errors.push(`Warning check error: ${warningsError.message}`);
     } else if (warnings && warnings.length > 0) {
-      console.log(`Found ${warnings.length} organizations needing warnings`);
-
       for (const warning of warnings) {
         try {
           // Send warning email
@@ -92,7 +89,6 @@ export async function POST(request: NextRequest) {
           });
 
           results.warningsSent++;
-          console.log(`Warning sent to org ${warning.organization_id}`);
         } catch (error: any) {
           console.error(`Error sending warning to org ${warning.organization_id}:`, error);
           results.errors.push(`Warning error for ${warning.organization_id}: ${error.message}`);
@@ -101,7 +97,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2: Process expired grace periods
-    console.log('Processing expired grace periods...');
     const { data: expired, error: expiredError } = await supabase.rpc(
       'process_expired_grace_periods'
     );
@@ -110,8 +105,6 @@ export async function POST(request: NextRequest) {
       console.error('Error processing expired grace periods:', expiredError);
       results.errors.push(`Expiration processing error: ${expiredError.message}`);
     } else if (expired && expired.length > 0) {
-      console.log(`Processed ${expired.length} expired grace periods`);
-
       for (const expiredOrg of expired) {
         results.gracePeriodExpired++;
         results.itemsDeleted += expiredOrg.items_deleted || 0;
@@ -122,16 +115,12 @@ export async function POST(request: NextRequest) {
             resourceType: expiredOrg.resource_type,
             itemsDeleted: expiredOrg.items_deleted,
           });
-          console.log(`Expiry notification sent to org ${expiredOrg.organization_id}`);
         } catch (error: any) {
           console.error(`Error sending expiry notification:`, error);
           results.errors.push(`Expiry email error for ${expiredOrg.organization_id}: ${error.message}`);
         }
       }
     }
-
-    console.log('Grace period processing complete:', results);
-
     return NextResponse.json({
       success: true,
       results,

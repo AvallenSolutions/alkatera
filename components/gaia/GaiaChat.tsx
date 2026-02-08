@@ -27,9 +27,6 @@ import {
   AlertCircle,
   RefreshCw,
   BarChart3,
-  Table,
-  PieChart,
-  LineChart,
   Download,
   FileJson,
   FileText,
@@ -43,6 +40,8 @@ import {
 import { useOrganization } from '@/lib/organizationContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useOnboarding } from '@/lib/onboarding';
+import type { PersonalizationData } from '@/lib/onboarding/types';
 import {
   getConversations,
   getArchivedConversations,
@@ -149,6 +148,58 @@ function renderMessageContent(content: string): React.ReactNode {
   return <>{parts}</>;
 }
 
+function generateRosaGreeting(personalization?: PersonalizationData): { subtitle: string; body: string } | null {
+  if (!personalization || (!personalization.role && !personalization.beverageTypes?.length && !personalization.primaryGoals?.length)) {
+    return null; // No personalization data — use default greeting
+  }
+
+  const beverageMap: Record<string, string> = {
+    beer: 'beer',
+    spirits: 'spirits',
+    wine: 'wine',
+    cider: 'cider',
+    non_alcoholic: 'non-alcoholic beverages',
+    rtd: 'RTDs',
+  }
+  const beverageText = personalization.beverageTypes?.length
+    ? personalization.beverageTypes
+        .map(b => beverageMap[b] || b.replace('_', ' '))
+        .join(' and ')
+    : null
+
+  const roleMap: Record<string, string> = {
+    sustainability_manager: 'sustainability manager',
+    operations_manager: 'operations manager',
+    founder_executive: 'founder',
+    production_manager: 'production manager',
+    consultant_advisor: 'advisor',
+  }
+  const roleText = personalization.role
+    ? (roleMap[personalization.role] || personalization.roleOther || personalization.role.replace('_', ' '))
+    : null
+
+  const goalMap: Record<string, string> = {
+    track_emissions: 'tracking your emissions',
+    reduce_impact: 'reducing your environmental impact',
+    sustainability_reporting: 'sustainability reporting',
+    get_certified: 'getting certified',
+    supply_chain: 'supply chain transparency',
+    understand_footprint: 'understanding your footprint',
+    learning: 'learning about sustainability',
+  }
+  const goalText = personalization.primaryGoals?.[0] ? goalMap[personalization.primaryGoals[0]] : null
+
+  const subtitle = roleText
+    ? `Here to help you as a ${roleText}${beverageText ? ` in ${beverageText}` : ''}`
+    : 'Your sustainability companion'
+
+  let body = 'I already know a bit about you from our chat during setup. '
+  if (goalText) body += `Since you\u2019re focused on ${goalText}, `
+  body += 'I can explore your data, uncover insights, and suggest practical next steps. Ask me anything!'
+
+  return { subtitle, body }
+}
+
 interface RosaChatProps {
   fullPage?: boolean;
   initialPrompt?: string;
@@ -182,6 +233,12 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Personalised greeting from onboarding data
+  const { state: onboardingState } = useOnboarding();
+  const rosaGreeting = useMemo(() => {
+    return generateRosaGreeting(onboardingState?.personalization)
+  }, [onboardingState?.personalization]);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -792,8 +849,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
 
           <div>
             <h2 className="font-semibold">Rosa</h2>
-            <p className="text-xs text-muted-foreground">
-              Your sustainability companion
+            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+              {rosaGreeting?.subtitle || 'Your sustainability companion'}
             </p>
           </div>
 
@@ -865,11 +922,10 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                   <span className="text-foreground">Rosa</span>
                 </h2>
                 <p className="text-sm text-muted-foreground/80 mb-1">
-                  Your sustainability companion
+                  {rosaGreeting?.subtitle || 'Your sustainability companion'}
                 </p>
                 <p className="text-xs text-muted-foreground/60 mb-8 max-w-md text-center leading-relaxed">
-                  I can explore your data, uncover insights, and help you
-                  reduce your environmental impact. Where shall we start?
+                  {rosaGreeting?.body || 'I can explore your data, uncover insights, and help you reduce your environmental impact. Where shall we start?'}
                 </p>
 
                 {/* Suggestion cards — 3 columns, organic rounded shapes */}

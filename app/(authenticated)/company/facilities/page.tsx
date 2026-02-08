@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Building2, Plus, AlertCircle, MapPin } from 'lucide-react';
+import { Loader2, Building2, Plus, AlertCircle, MapPin, Leaf } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -103,12 +103,14 @@ export default function FacilitiesPage() {
       {facilities.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Building2 className="h-16 w-16 text-muted-foreground mb-4" />
+            <div className="h-14 w-14 rounded-full bg-emerald-500/20 flex items-center justify-center mb-4">
+              <Leaf className="h-7 w-7 text-emerald-400" />
+            </div>
             <h3 className="text-xl font-semibold mb-2">Connect Your Operations</h3>
             <p className="text-muted-foreground text-center max-w-md mb-6">
-              To ensure accuracy, Scope 1 & 2 emissions are calculated automatically from your facility utility data. Add your facilities to generate reports.
+              Facilities are the foundation of your Scope 1 &amp; 2 emissions. Whether it&apos;s a brewery, distillery, or warehouse &mdash; adding it here lets me calculate your operational footprint automatically.
             </p>
-            <Button onClick={() => setWizardOpen(true)} size="lg" className="gap-2">
+            <Button onClick={() => setWizardOpen(true)} size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
               <Plus className="h-5 w-5" />
               Add Your First Facility
             </Button>

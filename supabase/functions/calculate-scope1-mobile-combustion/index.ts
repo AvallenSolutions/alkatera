@@ -29,8 +29,6 @@ Deno.serve(async (req) => {
     const trimmedFuelType = fuel_type.trim();
 
     // 3. Fetch the relevant emissions factor with a hardened query
-    console.log(`Searching for emissions factor for: "${trimmedFuelType}"`)
-    
     const { data: factor, error: factorError } = await supabase
       .from('emissions_factors')
       .select('value, unit') // Also select unit for better logging
@@ -54,9 +52,6 @@ Deno.serve(async (req) => {
         status: 404,
       })
     }
-    
-    console.log(`Found factor: ${factor.value} ${factor.unit}`);
-
     // 4. Perform the calculation
     const total_emissions = distance * factor.value
 

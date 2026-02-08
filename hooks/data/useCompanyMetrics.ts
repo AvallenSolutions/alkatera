@@ -535,13 +535,15 @@ export function useCompanyMetrics(year?: number) {
       // Extract breakdown data directly from aggregated_impacts (NEW APPROACH)
       try {
         extractBreakdownFromAggregatedImpacts(lcas);
-      } catch (err) {
+      } catch (_) {
+        // Non-fatal: breakdown extraction failed; primary metrics still available
       }
 
       // Fetch facility water risks
       try {
         await fetchFacilityWaterRisks();
-      } catch (err) {
+      } catch (_) {
+        // Non-fatal: water risk enrichment failed; logged inside fetchFacilityWaterRisks
       }
 
       // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
@@ -565,22 +567,6 @@ export function useCompanyMetrics(year?: number) {
         const ghg = lca.aggregated_impacts?.ghg_breakdown;
         if (!ghg) return false;
 
-        // Log the actual values we're checking
-        console.log('🔬 Examining GHG breakdown:', {
-          ghg_breakdown: ghg,
-          gas_inventory: ghg.gas_inventory,
-          physical_mass: ghg.physical_mass,
-          checks: {
-            methane: (ghg.gas_inventory?.methane || 0),
-            methane_fossil: (ghg.gas_inventory?.methane_fossil || 0),
-            methane_biogenic: (ghg.gas_inventory?.methane_biogenic || 0),
-            nitrous_oxide: (ghg.gas_inventory?.nitrous_oxide || 0),
-            ch4_fossil_kg: (ghg.physical_mass?.ch4_fossil_kg || 0),
-            ch4_biogenic_kg: (ghg.physical_mass?.ch4_biogenic_kg || 0),
-            n2o_kg: (ghg.physical_mass?.n2o_kg || 0)
-          }
-        });
-
         // STRICT CHECK: Require breakdown data (biogenic/fossil), not just totals
         // We need either:
         // 1. CH4 breakdown: methane_fossil > 0 OR methane_biogenic > 0 (not just total methane)
@@ -597,38 +583,16 @@ export function useCompanyMetrics(year?: number) {
           (ghg.gas_inventory?.nitrous_oxide || 0) > 0 ||
           (ghg.physical_mass?.n2o_kg || 0) > 0;
 
-        const hasData = hasCH4Breakdown || hasN2OData;
-
-        console.log('🔬 GHG breakdown validation:', {
-          hasCH4Breakdown,
-          hasN2OData,
-          hasValidBreakdownData: hasData
-        });
-
-        return hasData;
-      });
-
-      console.log('🔍 Checking fallback conditions:', {
-        lcaCount: lcas.length,
-        hasMaterialBreakdown,
-        hasGHGBreakdown,
-        hasLifecycleStageBreakdown
+        return hasCH4Breakdown || hasN2OData;
       });
 
       // Fetch from database if material, GHG, or lifecycle stage data is missing from aggregated_impacts
       if (!hasMaterialBreakdown || !hasGHGBreakdown || !hasLifecycleStageBreakdown) {
-        console.log('✅ Calling fetchMaterialAndGHGBreakdown (missing:', {
-          material: !hasMaterialBreakdown,
-          ghg: !hasGHGBreakdown,
-          lifecycle: !hasLifecycleStageBreakdown
-        }, ')');
         try {
           await fetchMaterialAndGHGBreakdown(yearStart, yearEnd);
         } catch (err) {
-          console.error('❌ Error in fetchMaterialAndGHGBreakdown:', err);
+          // Fallback breakdown fetch failed — primary data still available
         }
-      } else {
-        console.log('⛔ Skipping fetchMaterialAndGHGBreakdown - using aggregated_impacts data');
       }
 
       // Fetch facility emissions breakdown - FALLBACK
@@ -636,7 +600,8 @@ export function useCompanyMetrics(year?: number) {
       if (!hasFacilityBreakdown) {
         try {
           await fetchFacilityEmissions();
-        } catch (err) {
+        } catch (_) {
+          // Non-fatal: facility emissions fallback failed
         }
       }
 
@@ -694,15 +659,6 @@ export function useCompanyMetrics(year?: number) {
       const breakdown = lca.aggregated_impacts?.breakdown;
       const ghg = lca.aggregated_impacts?.ghg_breakdown;
 
-      // DEBUG: Log what we're getting from aggregated_impacts
-      console.log('📊 LCA GHG data check:', {
-        lca_id: lca.id,
-        has_breakdown: !!breakdown,
-        has_ghg: !!ghg,
-        ghg_keys: ghg ? Object.keys(ghg) : [],
-        production_volume: lca.production_volume
-      });
-
       if (breakdown) {
         // Aggregate scope data
         if (breakdown.by_scope) {
@@ -749,12 +705,6 @@ export function useCompanyMetrics(year?: number) {
 
         // Aggregate lifecycle stage data
         if (breakdown.by_lifecycle_stage) {
-          console.log('🔍 Lifecycle stage data found:', {
-            lca_id: lca.id,
-            by_lifecycle_stage: breakdown.by_lifecycle_stage,
-            type: typeof breakdown.by_lifecycle_stage,
-            isArray: Array.isArray(breakdown.by_lifecycle_stage)
-          });
           const productionVolume = lca.production_volume || 0;
           const stages = breakdown.by_lifecycle_stage;
 
@@ -883,19 +833,8 @@ export function useCompanyMetrics(year?: number) {
     }
 
     // Set GHG breakdown
-    console.log('🔍 GHG extraction result:', {
-      hasGhgData,
-      ghgTotal_carbon_origin: ghgTotal.carbon_origin,
-      ghgTotal_gas_inventory: ghgTotal.gas_inventory,
-      ghgTotal_gwp_factors: ghgTotal.gwp_factors,
-      materialMapSize: materialMap.size
-    });
-
     if (hasGhgData) {
-      console.log('✅ Setting GHG breakdown from aggregated_impacts');
       setGhgBreakdown(ghgTotal);
-    } else {
-      console.log('⚠️ hasGhgData is false - GHG breakdown will not be set from aggregated_impacts');
     }
   }
 
@@ -1222,32 +1161,15 @@ export function useCompanyMetrics(year?: number) {
           data_quality: hasActualGhgData ? dataQuality : 'tertiary',
         };
 
-        console.log('🔍 GHG Breakdown Calculated:', {
-          ch4FossilKg,
-          ch4BiogenicKg,
-          n2oKg,
-          ch4FossilCO2e,
-          ch4BiogenicCO2e,
-          n2oCO2e,
-          materialCount: materials.length,
-          hasActualGhgData,
-          fossilCO2,
-          biogenicCO2,
-          totalClimate,
-          willSetGhgBreakdown: hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0 || totalClimate > 0
-        });
-
         // Set GHG breakdown if we have any climate data
         // The fallback above ensures fossilCO2 is populated from totalClimate if no specific split exists
         if (hasActualGhgData || fossilCO2 > 0 || biogenicCO2 > 0 || totalClimate > 0) {
-          console.log('✅ Setting GHG breakdown from materials data');
           setGhgBreakdown(ghgData);
-        } else {
-          console.log('⚠️ No GHG data to set - totalClimate:', totalClimate);
         }
       }
 
-    } catch (err) {
+    } catch (_) {
+      // Non-fatal: material/GHG breakdown fetch failed; called as fallback only
     }
   }
 
@@ -1372,7 +1294,8 @@ export function useCompanyMetrics(year?: number) {
         .sort((a, b) => b.total_emissions - a.total_emissions);
 
       setFacilityEmissionsBreakdown(facilityBreakdown);
-    } catch (err) {
+    } catch (_) {
+      // Non-fatal: facility emissions breakdown fetch failed
     }
   }
 

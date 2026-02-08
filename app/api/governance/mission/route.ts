@@ -62,8 +62,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Insert record
-    console.log('[Mission API] Attempting to insert record for org:', organizationId);
-
     const { data, error } = await supabase
       .from('governance_mission')
       .insert({

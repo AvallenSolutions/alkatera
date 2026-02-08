@@ -73,9 +73,6 @@ export async function POST(request: NextRequest) {
         if (periodEnd > now && periodEnd <= sevenDaysFromNow) {
           const renewalDate = new Date(periodEnd * 1000);
           const amount = subscription.items.data[0]?.price?.unit_amount || 0;
-
-          console.log(`Sending renewal reminder to org ${org.id} (${org.name}) - renews ${renewalDate.toISOString()}`);
-
           // Send reminder email
           const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-subscription-email`, {
             method: 'POST',

@@ -64,14 +64,6 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     // Detailed logging for debugging
-    console.log('[Blog API] Auth check:', {
-      hasUser: !!user,
-      userId: user?.id,
-      userEmail: user?.email,
-      authError: authError?.message,
-      timestamp: new Date().toISOString()
-    });
-
     if (authError || !user) {
       console.error('[Blog API] Authentication failed:', {
         error: authError?.message,
@@ -85,13 +77,6 @@ export async function POST(request: NextRequest) {
 
     // Check if user is Alkatera admin
     const { data: isAdmin, error: adminError } = await supabase.rpc('is_alkatera_admin');
-
-    console.log('[Blog API] Admin check:', {
-      isAdmin,
-      adminError: adminError?.message,
-      userId: user.id
-    });
-
     if (adminError || !isAdmin) {
       console.error('[Blog API] Admin check failed:', {
         error: adminError?.message,
@@ -210,8 +195,6 @@ export async function POST(request: NextRequest) {
 
     // If columns don't exist yet (PGRST204 or 42703), retry without the newer columns
     if (error && (error.code === 'PGRST204' || error.code === '42703')) {
-      console.log('[Blog API] Some columns not found in schema, retrying with base columns only');
-
       // Remove columns that might not exist yet (from newer migrations)
       const { video_url, video_duration, display_order, ...basePostData } = postData;
 

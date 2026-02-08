@@ -313,9 +313,6 @@ Deno.serve(async (req: Request) => {
       .replace(/```/g, "'''")
       .replace(/\{\{/g, '{ {')
       .replace(/\}\}/g, '} }');
-
-    console.log(`Rosa query from user ${user.id}: "${sanitizedMessage.substring(0, 50)}..."`);
-
     // Verify user has access to this organization
     const { data: membership } = await supabase
       .from('organization_members')
@@ -440,9 +437,6 @@ Deno.serve(async (req: Request) => {
 
     // Build the prompt
     const contextPrompt = buildContextPrompt(orgContext, knowledgeBase || [], history || [], message);
-
-    console.log('Calling Gemini API...');
-
     // Handle streaming response
     if (stream) {
       return handleStreamingResponse(
@@ -549,9 +543,6 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (msgError) throw msgError;
-
-    console.log(`Rosa response generated in ${processingTime}ms`);
-
     return new Response(
       JSON.stringify({
         message: savedMessage,
@@ -757,8 +748,6 @@ async function handleStreamingResponse(
         message_id: savedMessage?.id,
         processing_time_ms: processingTime,
       });
-
-      console.log(`Rosa streaming response completed in ${processingTime}ms`);
     } catch (err) {
       console.error('Streaming error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -786,9 +775,6 @@ async function fetchOrganizationContext(
 ): Promise<{ context: string; dataSources: DataSource[] }> {
   const dataSources: DataSource[] = [];
   const contextParts: string[] = [];
-
-  console.log(`[Rosa] Fetching context for organization: ${organizationId}`);
-
   // Get current year for date-based queries
   const currentYear = new Date().getFullYear();
 
@@ -803,7 +789,6 @@ async function fetchOrganizationContext(
     if (orgError) {
       console.error('[Rosa] Error fetching organization:', orgError);
     } else {
-      console.log('[Rosa] Organization fetched:', org?.name);
     }
 
     if (org) {
@@ -830,7 +815,6 @@ async function fetchOrganizationContext(
     if (fleetError) {
       console.error('[Rosa] Error fetching fleet:', fleetError);
     } else {
-      console.log('[Rosa] Fleet data fetched:', fleetData?.length, 'records');
     }
 
     if ((fleetVehicles && fleetVehicles.length > 0) || (fleetData && fleetData.length > 0)) {
@@ -874,7 +858,6 @@ async function fetchOrganizationContext(
     if (facilityError) {
       console.error('[Rosa] Error fetching facilities:', facilityError);
     } else {
-      console.log('[Rosa] Facilities fetched:', facilities?.length, 'records');
     }
 
     if (facilities && facilities.length > 0) {
@@ -899,7 +882,6 @@ async function fetchOrganizationContext(
       if (activityError) {
         console.error('[Rosa] Error fetching activity data:', activityError);
       } else {
-        console.log('[Rosa] Activity entries fetched:', activityData?.length, 'records');
       }
 
       if (activityData && activityData.length > 0) {
@@ -955,7 +937,6 @@ async function fetchOrganizationContext(
     if (productError) {
       console.error('[Rosa] Error fetching products:', productError);
     } else {
-      console.log('[Rosa] Products fetched:', products?.length, 'records');
     }
 
     if (products && products.length > 0) {
@@ -995,7 +976,6 @@ async function fetchOrganizationContext(
     if (lcaError) {
       console.error('[Rosa] Error fetching LCA data:', lcaError);
     } else {
-      console.log('[Rosa] LCA data fetched:', lcaData?.length, 'records');
     }
 
     if (lcaData && lcaData.length > 0) {
@@ -1599,9 +1579,6 @@ async function fetchOrganizationContext(
       contextParts.push(`- Log fleet activities in Company > Fleet`);
       contextParts.push(`- Add suppliers in Suppliers`);
     }
-
-    console.log(`[Rosa] Context built with ${dataSources.length} data sources, context length: ${contextParts.join('\n').length} chars`);
-
   } catch (error) {
     console.error('[Rosa] Error in fetchOrganizationContext:', error);
     contextParts.push(`\n### Data Retrieval Error`);

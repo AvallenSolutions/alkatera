@@ -101,61 +101,32 @@ async function propagateToFunction(
 }
 
 async function main() {
-  console.log("🚀 Starting Golden Template Propagation...\n");
-
-  console.log("📖 Reading Golden Template...");
   const templateContent = await readGoldenTemplate();
-  console.log(`✅ Loaded ${templateContent.length} characters\n`);
-
-  console.log("🔍 Discovering calculation functions...");
   const functions = await getAllCalculationFunctions();
-  console.log(`✅ Found ${functions.length} calculation functions\n`);
-
   const utilityBlock = prepareUtilityBlock(templateContent);
-
-  console.log("⚙️  Propagating utilities to functions...\n");
-
   const results: PropagationResult[] = [];
 
   for (const functionName of functions) {
-    console.log(`   Processing: ${functionName}...`);
     const result = await propagateToFunction(functionName, utilityBlock);
     results.push(result);
 
     const icon = result.status === "updated" ? "✅" :
                  result.status === "skipped" ? "⚠️" : "❌";
-    console.log(`   ${icon} ${result.status.toUpperCase()}: ${result.message}`);
   }
-
-  console.log("\n" + "=".repeat(80));
-  console.log("📊 PROPAGATION SUMMARY");
-  console.log("=".repeat(80));
-
   const updated = results.filter(r => r.status === "updated").length;
   const skipped = results.filter(r => r.status === "skipped").length;
   const errors = results.filter(r => r.status === "error").length;
-
-  console.log(`Total functions processed: ${results.length}`);
-  console.log(`✅ Updated: ${updated}`);
-  console.log(`⚠️  Skipped: ${skipped}`);
-  console.log(`❌ Errors: ${errors}`);
-
   if (errors > 0) {
-    console.log("\n❌ ERRORS:");
     results
       .filter(r => r.status === "error")
-      .forEach(r => console.log(`   - ${r.functionName}: ${r.message}`));
+      .forEach(r => console.warn(`   - ${r.functionName}: ${r.message}`));
   }
 
   if (skipped > 0) {
-    console.log("\n⚠️  SKIPPED:");
     results
       .filter(r => r.status === "skipped")
-      .forEach(r => console.log(`   - ${r.functionName}: ${r.message}`));
+      .forEach(r => console.warn(`   - ${r.functionName}: ${r.message}`));
   }
-
-  console.log("\n✨ Propagation complete!\n");
-
   if (errors > 0) {
     Deno.exit(1);
   }

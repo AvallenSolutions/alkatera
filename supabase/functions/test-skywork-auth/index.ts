@@ -173,24 +173,6 @@ Deno.serve(async (req: Request) => {
     const skyworkSecretKey = Deno.env.get('SKYWORK_SECRET_KEY') || Deno.env.get('SKYWORK_API_SECRET');
 
     // TEMPORARY: Log actual secret prefixes and lengths to verify correct values
-    console.log('🔑 SKYWORK_SECRET_ID  prefix/suffix/len:',
-      skyworkSecretId?.slice(0, 8) ?? 'NULL',
-      skyworkSecretId?.slice(-4) ?? 'NULL',
-      skyworkSecretId?.length ?? 0
-    );
-    console.log('🔑 SKYWORK_SECRET_KEY prefix/suffix/len:',
-      skyworkSecretKey?.slice(0, 8) ?? 'NULL',
-      skyworkSecretKey?.slice(-4) ?? 'NULL',
-      skyworkSecretKey?.length ?? 0
-    );
-
-    console.log('[Skywork Test] Checking credentials:', {
-      hasSecretId: !!skyworkSecretId,
-      hasSecretKey: !!skyworkSecretKey,
-      secretIdSource: Deno.env.get('SKYWORK_SECRET_ID') ? 'SKYWORK_SECRET_ID' : (Deno.env.get('SKYWORK_API_KEY') ? 'SKYWORK_API_KEY' : 'NONE'),
-      secretKeySource: Deno.env.get('SKYWORK_SECRET_KEY') ? 'SKYWORK_SECRET_KEY' : (Deno.env.get('SKYWORK_API_SECRET') ? 'SKYWORK_API_SECRET' : 'NONE'),
-    });
-
     if (!skyworkSecretId || !skyworkSecretKey) {
       return new Response(
         JSON.stringify({
@@ -224,12 +206,6 @@ Deno.serve(async (req: Request) => {
     });
 
     const testUrl = `https://api.skywork.ai/open/sse?${queryParams.toString()}`;
-
-    console.log('Testing Skywork SSE API...');
-    console.log('Secret ID:', skyworkSecretId.substring(0, 8) + '...');
-    console.log('Signature:', sign);
-    console.log('URL:', testUrl.substring(0, 100) + '...');
-
     const response = await fetch(testUrl, {
       method: 'GET',
       headers: {
@@ -237,10 +213,6 @@ Deno.serve(async (req: Request) => {
         'Cache-Control': 'no-cache',
       },
     });
-
-    console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
     if (!response.ok) {
       const errorText = await response.text();
       return new Response(
@@ -277,9 +249,6 @@ Deno.serve(async (req: Request) => {
           const chunk = decoder.decode(value, { stream: true });
           sseData += chunk;
           eventCount++;
-
-          console.log('Received chunk:', chunk.substring(0, 200));
-
           if (sseData.length > 5000 || eventCount > 50) {
             break;
           }

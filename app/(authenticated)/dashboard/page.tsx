@@ -25,19 +25,19 @@ import {
   Settings2,
   RefreshCw,
   Upload,
-  ArrowRight,
   Download,
-  Factory,
-  Package,
-  ClipboardList,
 } from 'lucide-react';
-import Link from 'next/link';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
 import { RAGStatusCard, RAGStatusCardGrid } from '@/components/dashboard/RAGStatusCard';
 import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
+import { DashboardGuide, DashboardGuideTrigger } from '@/components/dashboard/DashboardGuide';
+import { SetupProgressBanner } from '@/components/dashboard/SetupProgressBanner';
+import { useSetupProgress } from '@/hooks/data/useSetupProgress';
+import { Suspense } from 'react';
+import { InlineErrorBoundary } from '@/components/ErrorBoundary';
 
 import {
   QuickActionsWidget,
@@ -129,6 +129,7 @@ export default function DashboardPage() {
   const { companyOverview: waterCompanyOverview } = useFacilityWaterData(selectedYear);
   const { getBenchmarkForPillar } = useVitalityBenchmarks();
 
+  const setupProgress = useSetupProgress();
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -354,6 +355,7 @@ export default function DashboardPage() {
             <Upload className="h-4 w-4" />
             Import Products
           </Button>
+          <DashboardGuideTrigger />
           <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh dashboard">
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -361,23 +363,31 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <VitalityScoreHero
-        overallScore={vitalityScores.overall}
-        climateScore={vitalityScores.climate}
-        waterScore={vitalityScores.water}
-        circularityScore={vitalityScores.circularity}
-        natureScore={vitalityScores.nature}
-        hasData={vitalityScores.hasData}
-        benchmarkData={getBenchmarkForPillar('overall')}
-        lastUpdated={companyMetrics?.last_updated
-          ? new Date(companyMetrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-          : undefined
-        }
-        onRefresh={handleRefresh}
-        loading={isLoading}
-        calculationInputs={scoreCalculationInputs}
-      />
+      {/* Setup Progress Banner — shows for new users until all milestones are done */}
+      {!setupProgress.isLoading && !setupProgress.isDismissed && (
+        <SetupProgressBanner progress={setupProgress} />
+      )}
 
+      <div data-guide="vitality-score">
+        <VitalityScoreHero
+          overallScore={vitalityScores.overall}
+          climateScore={vitalityScores.climate}
+          waterScore={vitalityScores.water}
+          circularityScore={vitalityScores.circularity}
+          natureScore={vitalityScores.nature}
+          hasData={vitalityScores.hasData}
+          benchmarkData={getBenchmarkForPillar('overall')}
+          lastUpdated={companyMetrics?.last_updated
+            ? new Date(companyMetrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+            : undefined
+          }
+          onRefresh={handleRefresh}
+          loading={isLoading}
+          calculationInputs={scoreCalculationInputs}
+        />
+      </div>
+
+      <div data-guide="kpi-cards">
       <RAGStatusCardGrid>
         <RAGStatusCard
           title="Carbon Emissions"
@@ -420,97 +430,40 @@ export default function DashboardPage() {
           href="/performance"
         />
       </RAGStatusCardGrid>
+      </div>
 
-      {/* Getting Started - Full Width when enabled */}
-      {isWidgetEnabled('getting-started') && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="md:col-span-1">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/20">
-                  <Factory className="h-5 w-5 text-blue-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Step 1</p>
-                  <h3 className="text-sm font-semibold">Define Operations</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Add your facilities and utility meters</p>
-                  <Button asChild size="sm" className="mt-2 h-8 bg-neon-lime text-black hover:bg-neon-lime/90">
-                    <Link href="/company/facilities">
-                      Get Started <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="md:col-span-1">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-purple-500/20">
-                  <Package className="h-5 w-5 text-purple-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Step 2</p>
-                  <h3 className="text-sm font-semibold">Build Products</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Create recipes using supplier data</p>
-                  <Button asChild size="sm" className="mt-2 h-8 bg-neon-lime text-black hover:bg-neon-lime/90">
-                    <Link href="/products">
-                      Get Started <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="md:col-span-1">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-500/20">
-                  <ClipboardList className="h-5 w-5 text-emerald-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-muted-foreground">Step 3</p>
-                  <h3 className="text-sm font-semibold">Log Production</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Track volumes to allocate impact</p>
-                  <Button asChild size="sm" className="mt-2 h-8 bg-neon-lime text-black hover:bg-neon-lime/90">
-                    <Link href="/company/facilities">
-                      Get Started <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      {/* Getting Started - Interactive checklist with real progress tracking */}
+      {isWidgetEnabled('getting-started') && <InlineErrorBoundary><GettingStartedWidget /></InlineErrorBoundary>}
 
       {/* Main Content Grid - Responsive layout based on enabled widgets */}
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Primary Content Area */}
         <div className="lg:col-span-8 space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  Priority Actions
-                  {priorityActions.filter(a => a.priority === 'high').length > 0 && (
-                    <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-500 dark:text-red-400 rounded-full font-medium">
-                      {priorityActions.filter(a => a.priority === 'high').length} urgent
-                    </span>
-                  )}
-                </span>
-                <span className="text-sm font-normal text-muted-foreground">
-                  {priorityActions.length} action{priorityActions.length !== 1 ? 's' : ''}
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PriorityActionsList
-                actions={priorityActions}
-                maxVisible={4}
-              />
-            </CardContent>
-          </Card>
+          <div data-guide="priority-actions">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    Priority Actions
+                    {priorityActions.filter(a => a.priority === 'high').length > 0 && (
+                      <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-500 dark:text-red-400 rounded-full font-medium">
+                        {priorityActions.filter(a => a.priority === 'high').length} urgent
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    {priorityActions.length} action{priorityActions.length !== 1 ? 's' : ''}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PriorityActionsList
+                  actions={priorityActions}
+                  maxVisible={4}
+                />
+              </CardContent>
+            </Card>
+          </div>
 
           <Accordion type="single" collapsible className="space-y-2">
             {isWidgetEnabled('ghg-summary') && (
@@ -527,10 +480,12 @@ export default function DashboardPage() {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
-                  <GHGEmissionsSummaryWidget
-                    footprint={footprint}
-                    isLoading={footprintLoading}
-                  />
+                  <InlineErrorBoundary>
+                    <GHGEmissionsSummaryWidget
+                      footprint={footprint}
+                      isLoading={footprintLoading}
+                    />
+                  </InlineErrorBoundary>
                 </AccordionContent>
               </AccordionItem>
             )}
@@ -547,7 +502,7 @@ export default function DashboardPage() {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
-                  <ProductLCAStatusWidget />
+                  <InlineErrorBoundary><ProductLCAStatusWidget /></InlineErrorBoundary>
                 </AccordionContent>
               </AccordionItem>
             )}
@@ -566,7 +521,7 @@ export default function DashboardPage() {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
-                  <DataQualityWidget />
+                  <InlineErrorBoundary><DataQualityWidget /></InlineErrorBoundary>
                 </AccordionContent>
               </AccordionItem>
             )}
@@ -583,7 +538,7 @@ export default function DashboardPage() {
                   </span>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4">
-                  <ComplianceStatusWidget />
+                  <InlineErrorBoundary><ComplianceStatusWidget /></InlineErrorBoundary>
                 </AccordionContent>
               </AccordionItem>
             )}
@@ -592,12 +547,16 @@ export default function DashboardPage() {
 
         {/* Secondary Content Area - Sidebar Widgets */}
         <div className="lg:col-span-4 space-y-6">
-          {isWidgetEnabled('quick-actions') && <QuickActionsWidget />}
-          {isWidgetEnabled('supplier-engagement') && <SupplierEngagementWidget />}
-          {isWidgetEnabled('recent-activity') && <RecentActivityWidget />}
-          {isWidgetEnabled('water-risk') && <WaterRiskWidget />}
+          {isWidgetEnabled('quick-actions') && <div data-guide="quick-actions"><InlineErrorBoundary><QuickActionsWidget /></InlineErrorBoundary></div>}
+          {isWidgetEnabled('supplier-engagement') && <InlineErrorBoundary><SupplierEngagementWidget /></InlineErrorBoundary>}
+          {isWidgetEnabled('recent-activity') && <InlineErrorBoundary><RecentActivityWidget /></InlineErrorBoundary>}
+          {isWidgetEnabled('water-risk') && <InlineErrorBoundary><WaterRiskWidget /></InlineErrorBoundary>}
         </div>
       </div>
+
+      <Suspense fallback={null}>
+        <DashboardGuide />
+      </Suspense>
     </div>
   );
 }

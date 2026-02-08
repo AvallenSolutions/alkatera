@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { useOrganization } from '@/lib/organizationContext'
 
 export interface SupplierEngagement {
   organization_id: string
@@ -17,11 +18,17 @@ interface UseSupplierEngagementResult {
 }
 
 export function useSupplierEngagement(): UseSupplierEngagementResult {
+  const { currentOrganization } = useOrganization()
   const [data, setData] = useState<SupplierEngagement[] | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const fetchSupplierEngagement = async () => {
+  const fetchSupplierEngagement = useCallback(async () => {
+    if (!currentOrganization?.id) {
+      setIsLoading(false)
+      return
+    }
+
     try {
       setIsLoading(true)
       setError(null)
@@ -29,6 +36,7 @@ export function useSupplierEngagement(): UseSupplierEngagementResult {
       const { data: engagementData, error: engagementError } = await supabase
         .from('supplier_engagement_view')
         .select('*')
+        .eq('organization_id', currentOrganization.id)
 
       if (engagementError) {
         throw new Error(engagementError.message)
@@ -42,11 +50,11 @@ export function useSupplierEngagement(): UseSupplierEngagementResult {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentOrganization?.id])
 
   useEffect(() => {
     fetchSupplierEngagement()
-  }, [])
+  }, [fetchSupplierEngagement])
 
   return {
     data,

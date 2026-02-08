@@ -31,15 +31,9 @@ export async function POST(request: NextRequest) {
         const pdfData = await pdfParse(buffer);
 
         // Log first 2000 chars of extracted text for debugging
-        console.log('=== PDF RAW TEXT START ===');
-        console.log(pdfData.text.substring(0, 2000));
-        console.log('=== PDF RAW TEXT END ===');
-
         result = parseBOMFromPDFText(pdfData.text);
 
         // Log parsed results for debugging
-        console.log('=== PARSED ITEMS ===');
-        console.log(JSON.stringify(result.items.slice(0, 3), null, 2));
       } catch (pdfError: any) {
         console.error('PDF parsing error:', pdfError);
         return NextResponse.json(

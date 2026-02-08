@@ -64,19 +64,6 @@ export function useScope3Emissions(
         yearEnd
       );
 
-      console.log('📊 [SCOPE 3 HOOK] Calculated emissions (via shared service)', {
-        products: breakdown.products,
-        business_travel: breakdown.business_travel,
-        purchased_services: breakdown.purchased_services,
-        employee_commuting: breakdown.employee_commuting,
-        capital_goods: breakdown.capital_goods,
-        operational_waste: breakdown.operational_waste,
-        downstream_logistics: breakdown.downstream_logistics,
-        marketing_materials: breakdown.marketing_materials,
-        total: breakdown.total,
-        totalInTonnes: breakdown.total / 1000,
-      });
-
       setScope3Emissions(breakdown);
     } catch (err: any) {
       console.error("Error fetching Scope 3 emissions:", err);

@@ -34,15 +34,9 @@ export async function POST(request: NextRequest) {
       console.error('[Checkout] Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    console.log('[Checkout] User authenticated:', user.id);
-
     // Parse request body
     const body = await request.json();
     const { priceId: directPriceId, tierName, billingInterval: requestedInterval, organizationId } = body;
-
-    console.log('[Checkout] Request:', { directPriceId, tierName, requestedInterval, organizationId });
-
     // Determine priceId - either directly provided or derived from tier/interval
     let priceId = directPriceId;
     if (!priceId && tierName && requestedInterval) {
@@ -63,9 +57,6 @@ export async function POST(request: NextRequest) {
       .eq('organization_id', organizationId)
       .eq('user_id', user.id)
       .single();
-
-    console.log('[Checkout] Member check:', { memberData, memberError });
-
     if (memberError || !memberData) {
       console.error('[Checkout] Member error:', memberError);
       return NextResponse.json(
@@ -76,8 +67,6 @@ export async function POST(request: NextRequest) {
 
     // Check if user is admin or owner
     const roleName = (memberData as any).roles?.name;
-    console.log('[Checkout] Role name:', roleName);
-
     if (roleName !== 'admin' && roleName !== 'owner') {
       return NextResponse.json(
         { error: 'Only organization admins or owners can manage billing' },
@@ -91,9 +80,6 @@ export async function POST(request: NextRequest) {
       .select('id, name, stripe_customer_id')
       .eq('id', organizationId)
       .single();
-
-    console.log('[Checkout] Organization query:', { org, orgError });
-
     if (orgError) {
       console.error('[Checkout] Error fetching organization:', orgError);
       return NextResponse.json({

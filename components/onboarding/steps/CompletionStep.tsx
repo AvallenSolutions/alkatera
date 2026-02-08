@@ -34,11 +34,11 @@ export function CompletionStep() {
 
   const handleGoToDashboard = () => {
     completeOnboarding()
-    router.push('/dashboard')
+    router.push('/dashboard?guide=1')
   }
 
   const quickActions = [
-    { label: 'Explore your dashboard', icon: BarChart3, href: '/dashboard' },
+    { label: 'Explore your dashboard', icon: BarChart3, href: '/dashboard?guide=1' },
     { label: 'Set reduction targets', icon: Target, href: '/targets' },
     { label: 'Compare to industry', icon: TrendingUp, href: '/benchmarking' },
     { label: 'Ask Rosa a question', icon: Bot, href: '/rosa' },

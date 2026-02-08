@@ -96,9 +96,6 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log(`[calculate-product-lca-impacts] Processing PCF: ${product_carbon_footprint_id}`);
-
     const { data: materials, error: materialsError } = await supabaseClient
       .from("product_carbon_footprint_materials")
       .select("*")
@@ -118,9 +115,6 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log(`[calculate-product-lca-impacts] Found ${materials.length} materials`);
-
     // Fetch production sites from BOTH owned facilities AND contract manufacturers
     const { data: ownedSites, error: ownedSitesError } = await supabaseClient
       .from("product_carbon_footprint_production_sites")
@@ -187,10 +181,6 @@ Deno.serve(async (req: Request) => {
       ...(ownedSites || []).map(s => ({ ...s, source: 'owned' })),
       ...contractMfgSites
     ];
-
-    console.log(`[calculate-product-lca-impacts] Found ${ownedSites?.length || 0} owned production sites`);
-    console.log(`[calculate-product-lca-impacts] Found ${contractMfgAllocations?.length || 0} contract manufacturer sites`);
-
     // =========================================================================
     // CRITICAL FIX: Validate production allocation sums to 100%
     // This prevents double-counting or under-counting of facility emissions
@@ -223,12 +213,8 @@ Deno.serve(async (req: Request) => {
       }
 
       // Log allocation breakdown
-      console.log(`[calculate-product-lca-impacts] Production allocation breakdown:`);
       allocationDetails.forEach(d => {
-        console.log(`  - Facility ${d.facilityId} (${d.source}): ${d.share.toFixed(1)}%`);
       });
-      console.log(`  TOTAL: ${totalAllocationPercentage.toFixed(1)}%`);
-
       // Validate allocation sum
       const ALLOCATION_TOLERANCE = 1; // Allow 1% tolerance for rounding
       if (totalAllocationPercentage < (100 - ALLOCATION_TOLERANCE)) {
@@ -248,19 +234,13 @@ Deno.serve(async (req: Request) => {
           })
           .eq("id", product_carbon_footprint_id);
       } else {
-        console.log(`[calculate-product-lca-impacts] ✓ Allocation validation passed: ${totalAllocationPercentage.toFixed(1)}%`);
       }
     }
 
     if (contractMfgSites.length > 0) {
       contractMfgSites.forEach(site => {
-        console.log(`[calculate-product-lca-impacts] CM Site: Total ${site._total_allocated_emissions?.toFixed(2)} kg for ${site._production_volume} units = ${site.allocated_emissions_kg_co2e.toFixed(6)} kg per unit`);
-        console.log(`[calculate-product-lca-impacts] CM Scopes per unit: S1=${site.scope1_emissions_kg_co2e.toFixed(6)}, S2=${site.scope2_emissions_kg_co2e.toFixed(6)}, S3=${site.scope3_emissions_kg_co2e.toFixed(6)}`);
       });
     }
-
-    console.log(`[calculate-product-lca-impacts] Total production sites: ${productionSites.length}`);
-
     let scope1Emissions = 0;
     let scope2Emissions = 0;
     let scope3Emissions = 0;
@@ -291,9 +271,6 @@ Deno.serve(async (req: Request) => {
     let totalCH4 = 0;
     let totalN2O = 0;
     let totalHFCs = 0;
-
-    console.log("[calculate-product-lca-impacts] Processing materials...");
-
     for (const material of materials as Material[]) {
       const climateImpact = Number(material.impact_climate || 0);
       const climateFossil = Number(material.impact_climate_fossil || 0);
@@ -344,13 +321,9 @@ Deno.serve(async (req: Request) => {
         const n2oFromAgriculture = (climateImpact * 0.005) / IPCC_AR6_GWP.N2O;
         totalN2O += n2oFromAgriculture;
       }
-
-      console.log(`[calculate-product-lca-impacts] Material: ${material.material_name}, Production: ${climateImpact.toFixed(4)}, Transport: ${transportImpact.toFixed(4)} kg CO2e`);
     }
 
     if (productionSites && productionSites.length > 0) {
-      console.log("[calculate-product-lca-impacts] Processing production sites...");
-
       for (const site of productionSites as ProductionSite[]) {
         const isContractMfg = (site as any).source === 'contract_manufacturer';
 
@@ -370,10 +343,8 @@ Deno.serve(async (req: Request) => {
 
           if (perUnitIntensity > 0) {
             emissionsPerUnit = perUnitIntensity;
-            console.log(`[calculate-product-lca-impacts] Owned site ${site.facility_id}: Using emission_intensity_kg_co2e_per_unit = ${perUnitIntensity.toFixed(6)} kg/unit`);
           } else if (totalEmissions > 0 && productionVolume > 0) {
             emissionsPerUnit = totalEmissions / productionVolume;
-            console.log(`[calculate-product-lca-impacts] Owned site ${site.facility_id}: Calculated per-unit = ${totalEmissions.toFixed(2)} / ${productionVolume} = ${emissionsPerUnit.toFixed(6)} kg/unit`);
           } else {
             emissionsPerUnit = 0;
           }
@@ -394,7 +365,6 @@ Deno.serve(async (req: Request) => {
               scope1PerUnit = scope1PerUnit / productionVolume;
               scope2PerUnit = scope2PerUnit / productionVolume;
               scope3PerUnit = scope3PerUnit / productionVolume;
-              console.log(`[calculate-product-lca-impacts] Owned site ${site.facility_id}: Converted scope values to per-unit (÷ ${productionVolume})`);
             }
           }
         }
@@ -438,7 +408,6 @@ Deno.serve(async (req: Request) => {
           if (isContractManufacturer) {
             // Contract manufacturer: ALL emissions are Scope 3 for the buying company
             scope3Emissions += attributableEmissions;
-            console.log(`[calculate-product-lca-impacts] ✓ CONTRACT MFG Facility ${site.facility_id}: ${attributableEmissions.toFixed(4)} kg CO2e → Scope 3 (Purchased Goods)`);
           } else {
             // Owned/controlled facility: Add to product LCA scope breakdown
             // NOTE: These same emissions are ALSO in corporate Scope 1/2
@@ -446,13 +415,6 @@ Deno.serve(async (req: Request) => {
             scope1Emissions += facilityScope1;
             scope2Emissions += facilityScope2;
             scope3Emissions += facilityScope3;
-            console.log(`[calculate-product-lca-impacts] ✓ OWNED Facility ${site.facility_id}:`, {
-              total: attributableEmissions.toFixed(4),
-              scope1: facilityScope1.toFixed(4),
-              scope2: facilityScope2.toFixed(4),
-              scope3: facilityScope3.toFixed(4),
-              note: 'Also in corporate Scope 1/2 inventory'
-            });
           }
 
           processingEmissions += attributableEmissions;
@@ -504,19 +466,11 @@ Deno.serve(async (req: Request) => {
         totalCO2Fossil += unallocatedCO2;
       }
     }
-
-    console.log("[calculate-product-lca-impacts] Aggregated totals:", {
-      totalClimate: totalClimate.toFixed(4),
-      totalTransport: totalTransport.toFixed(4),
-      totalCarbonFootprint: totalCarbonFootprint.toFixed(4),
-    });
-
     const scopeSum = scope1Emissions + scope2Emissions + scope3Emissions;
     const scopeDiscrepancy = Math.abs(scopeSum - totalCarbonFootprint);
     if (scopeDiscrepancy > 0.01) {
       console.error(`[calculate-product-lca-impacts] VALIDATION FAILED: Scope sum (${scopeSum.toFixed(2)}) != Total (${totalCarbonFootprint.toFixed(2)}). Discrepancy: ${scopeDiscrepancy.toFixed(4)} kg CO2e`);
     } else {
-      console.log(`[calculate-product-lca-impacts] Scope validation passed: ${scopeSum.toFixed(2)} kg CO2e`);
     }
 
     const lifecycleSum = rawMaterialsEmissions + processingEmissions + packagingEmissions + distributionEmissions + usePhaseEmissions + endOfLifeEmissions;
@@ -524,7 +478,6 @@ Deno.serve(async (req: Request) => {
     if (lifecycleDiscrepancy > 0.01) {
       console.error(`[calculate-product-lca-impacts] VALIDATION FAILED: Lifecycle sum (${lifecycleSum.toFixed(2)}) != Total (${totalCarbonFootprint.toFixed(2)}). Discrepancy: ${lifecycleDiscrepancy.toFixed(4)} kg CO2e`);
     } else {
-      console.log(`[calculate-product-lca-impacts] Lifecycle validation passed: ${lifecycleSum.toFixed(2)} kg CO2e`);
     }
 
     const ghgInventorySum = totalCO2Fossil + totalCO2Biogenic + (totalCH4 * IPCC_AR6_GWP.CH4) + (totalN2O * IPCC_AR6_GWP.N2O) + totalHFCs;
@@ -532,34 +485,7 @@ Deno.serve(async (req: Request) => {
     if (ghgDiscrepancyPercent > 5) {
       console.warn(`[calculate-product-lca-impacts] GHG inventory sum (${ghgInventorySum.toFixed(2)}) deviates ${ghgDiscrepancyPercent.toFixed(1)}% from total climate (${totalClimate.toFixed(2)})`);
     } else {
-      console.log(`[calculate-product-lca-impacts] GHG inventory validation passed (${ghgDiscrepancyPercent.toFixed(1)}% deviation)`);
     }
-
-    console.log("[calculate-product-lca-impacts] Scope breakdown:", {
-      scope1: scope1Emissions.toFixed(4),
-      scope2: scope2Emissions.toFixed(4),
-      scope3: scope3Emissions.toFixed(4),
-      sum: scopeSum.toFixed(4),
-    });
-
-    console.log("[calculate-product-lca-impacts] Lifecycle breakdown:", {
-      raw_materials: rawMaterialsEmissions.toFixed(4),
-      processing: processingEmissions.toFixed(4),
-      packaging: packagingEmissions.toFixed(4),
-      distribution: distributionEmissions.toFixed(4),
-      use_phase: usePhaseEmissions.toFixed(4),
-      end_of_life: endOfLifeEmissions.toFixed(4),
-    });
-
-    console.log("[calculate-product-lca-impacts] GHG gas inventory:", {
-      co2_fossil: totalCO2Fossil.toFixed(6),
-      co2_biogenic: totalCO2Biogenic.toFixed(6),
-      ch4_kg: totalCH4.toFixed(8),
-      ch4_co2e: (totalCH4 * IPCC_AR6_GWP.CH4).toFixed(6),
-      n2o_kg: totalN2O.toFixed(8),
-      n2o_co2e: (totalN2O * IPCC_AR6_GWP.N2O).toFixed(6),
-    });
-
     const aggregatedImpacts = {
       climate_change_gwp100: totalCarbonFootprint,
       water_consumption: totalWater,
@@ -654,10 +580,6 @@ Deno.serve(async (req: Request) => {
     const bulkVolumePerUnit = productData?.unit_size_unit === 'ml'
       ? Number(productData.unit_size_value) / 1000.0
       : Number(productData.unit_size_value);
-
-    console.log(`[calculate-product-lca-impacts] ✓ RESULT: ${totalCarbonFootprint.toFixed(4)} kg CO2e per ${productData?.functional_unit || 'unit'}`);
-    console.log(`[calculate-product-lca-impacts] ✓ Per litre: ${(totalCarbonFootprint / bulkVolumePerUnit).toFixed(4)} kg CO2e/L`);
-
     // Note: aggregated_impacts.climate_change_gwp100 is the single source of truth for carbon footprint
     // total_ghg_emissions column is deprecated and will be removed in a future migration
     const { error: updateError } = await supabaseClient
@@ -695,12 +617,7 @@ Deno.serve(async (req: Request) => {
           updated_at: new Date().toISOString(),
         })
         .eq("id", lcaRecord.product_id);
-
-      console.log(`[calculate-product-lca-impacts] Updated product ${lcaRecord.product_id} with latest LCA`);
     }
-
-    console.log(`[calculate-product-lca-impacts] LCA calculation complete: ${product_carbon_footprint_id}`);
-
     return new Response(
       JSON.stringify({
         success: true,

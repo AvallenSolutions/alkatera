@@ -7,7 +7,6 @@ import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { Leaf, TrendingDown, TrendingUp, Minus, ArrowRight, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useEffect } from 'react';
 
 function ScopeDonut({
   scope1,
@@ -107,22 +106,7 @@ export function HeadlineMetricsWidget() {
   const scope3 = footprint?.breakdown?.scope3?.total ? footprint.breakdown.scope3.total / 1000 : 0;
   const hasData = footprint?.has_data || false;
 
-  // useEffect MUST be called before any conditional returns
-  useEffect(() => {
-    if (footprint) {
-      console.log('📊 [HeadlineMetricsWidget] Displaying:', {
-        total_emissions_display: totalEmissions,
-        scope1_display: scope1,
-        scope2_display: scope2,
-        scope3_display: scope3,
-        unit: 'tCO2e',
-        preview_mode: previewMode,
-        data_source: previewMode ? 'Preview (production_logs × LCAs)' : 'Official (corporate_reports)'
-      });
-    }
-  }, [footprint, totalEmissions, scope1, scope2, scope3, previewMode]);
-
-  // NOW safe to do conditional returns AFTER all hooks
+  // Conditional returns AFTER all hooks
   if (loading) {
     return (
       <Card className="col-span-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-0 shadow-lg">

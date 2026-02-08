@@ -51,9 +51,6 @@ export async function POST(request: NextRequest) {
     if (!expiredOrgs || expiredOrgs.length === 0) {
       return NextResponse.json({ message: 'No expired grace periods', processed: 0 });
     }
-
-    console.log(`Found ${expiredOrgs.length} organizations with expired grace periods`);
-
     let processed = 0;
 
     for (const org of expiredOrgs) {
@@ -72,9 +69,6 @@ export async function POST(request: NextRequest) {
         console.error(`Error suspending org ${org.id}:`, updateError);
         continue;
       }
-
-      console.log(`Suspended organization ${org.id} (${org.name}) - grace period expired`);
-
       // Send suspension email
       try {
         const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-subscription-email`, {

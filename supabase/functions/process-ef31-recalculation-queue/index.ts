@@ -21,9 +21,6 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { batch_size = 10, batch_id } = await req.json().catch(() => ({}));
-
-    console.log("[process-ef31-recalculation-queue] Starting queue processing", { batch_size, batch_id });
-
     let processedCount = 0;
     let successCount = 0;
     let failureCount = 0;
@@ -38,13 +35,10 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!job || job.length === 0) {
-        console.log("[process-ef31-recalculation-queue] No more jobs in queue");
         break;
       }
 
       const jobData = job[0];
-      console.log(`[process-ef31-recalculation-queue] Processing job ${i + 1}:`, jobData);
-
       try {
         const calcResponse = await fetch(`${supabaseUrl}/functions/v1/calculate-product-lca-impacts`, {
           method: 'POST',
@@ -110,14 +104,6 @@ Deno.serve(async (req: Request) => {
       .in('status', ['pending', 'processing']);
 
     const remainingJobs = queueStats?.length || 0;
-
-    console.log("[process-ef31-recalculation-queue] Queue processing complete", {
-      processedCount,
-      successCount,
-      failureCount,
-      remainingJobs,
-    });
-
     return new Response(
       JSON.stringify({
         success: true,

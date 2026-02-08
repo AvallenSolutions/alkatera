@@ -376,7 +376,6 @@ Deno.serve(async (req: Request) => {
         }
 
         const logResult = await logResponse.json();
-        console.log(`Successfully created log for calculation ${record.id}:`, logResult);
       } catch (logError) {
         console.error(`Exception while creating log for calculation ${record.id}:`, logError);
         
