@@ -45,12 +45,15 @@ export function FirstProductStep() {
 
     setIsSaving(true)
     try {
+      const productCategory = subCategory
+        ? `${category} > ${subCategory}`
+        : category || null
+
       const { error } = await supabase.from('products').insert({
         organization_id: currentOrganization.id,
         name: productName.trim(),
-        category: category || null,
-        sub_category: subCategory || null,
-        description: description.trim() || null,
+        product_category: productCategory,
+        product_description: description.trim() || null,
       })
 
       if (error) throw error
@@ -132,7 +135,7 @@ export function FirstProductStep() {
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[70]">
                 {CATEGORY_OPTIONS.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
@@ -147,7 +150,7 @@ export function FirstProductStep() {
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
                   <SelectValue placeholder="Select sub-category" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[70]">
                   {SUB_CATEGORY_MAP[category].map(sub => (
                     <SelectItem key={sub} value={sub}>{sub}</SelectItem>
                   ))}

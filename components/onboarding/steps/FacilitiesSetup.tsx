@@ -12,14 +12,14 @@ import { ArrowLeft, ArrowRight, SkipForward, Factory, Loader2 } from 'lucide-rea
 import { useToast } from '@/hooks/use-toast'
 
 const FACILITY_TYPES = [
-  { value: 'distillery', label: 'Distillery' },
-  { value: 'brewery', label: 'Brewery' },
-  { value: 'winery', label: 'Winery' },
-  { value: 'bottling', label: 'Bottling facility' },
-  { value: 'packing', label: 'Packing facility' },
-  { value: 'office', label: 'Office' },
-  { value: 'retail', label: 'Retail location' },
-  { value: 'warehouse', label: 'Warehouse' },
+  { value: 'Distillery', label: 'Distillery' },
+  { value: 'Brewery', label: 'Brewery' },
+  { value: 'Winery', label: 'Winery' },
+  { value: 'Bottling', label: 'Bottling facility' },
+  { value: 'Packing', label: 'Packing facility' },
+  { value: 'Office', label: 'Office' },
+  { value: 'Retail', label: 'Retail location' },
+  { value: 'Warehouse', label: 'Warehouse' },
 ]
 
 export function FacilitiesSetup() {
@@ -37,11 +37,34 @@ export function FacilitiesSetup() {
 
     setIsSaving(true)
     try {
-      const { error } = await supabase.from('production_sites').insert({
+      // Resolve or create facility_type_id
+      const typeName = facilityType || 'Office'
+      let facilityTypeId: string | null = null
+
+      const { data: existingType } = await supabase
+        .from('facility_types')
+        .select('id')
+        .eq('name', typeName)
+        .maybeSingle()
+
+      if (existingType) {
+        facilityTypeId = existingType.id
+      } else {
+        const { data: newType, error: typeError } = await supabase
+          .from('facility_types')
+          .insert({ name: typeName })
+          .select('id')
+          .single()
+        if (!typeError && newType) {
+          facilityTypeId = newType.id
+        }
+      }
+
+      const { error } = await supabase.from('facilities').insert({
         organization_id: currentOrganization.id,
         name: facilityName.trim(),
-        site_type: facilityType || 'office',
-        address: address.trim() || null,
+        facility_type_id: facilityTypeId,
+        location_address: address.trim() || null,
       })
 
       if (error) throw error
@@ -99,7 +122,7 @@ export function FacilitiesSetup() {
               <SelectTrigger className="bg-white/5 border-white/10 text-white">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-[70]">
                 {FACILITY_TYPES.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                 ))}
