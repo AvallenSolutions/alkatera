@@ -3,7 +3,7 @@ import { ImpactPageClient } from '@/marketing/components/ImpactPageClient';
 
 export const metadata: Metadata = {
   title: 'Impact | Alkatera',
-  description: 'Real-time sustainability metrics translated into living digital ecosystems. From compliance to regeneration.',
+  description: 'Measure beyond carbon. Alkatera tracks six dimensions of environmental, social, and governance impact for the drinks industry — backed by recognised standards.',
   alternates: {
     canonical: '/impact',
   },

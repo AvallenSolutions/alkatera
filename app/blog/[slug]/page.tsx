@@ -123,7 +123,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
       {/* Fixed background layer */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img
-          src="https://images.unsplash.com/photo-1511497584788-876760111969?q=80&w=2832&auto=format&fit=crop"
+          src="/images/forest.jpg"
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-luminosity"
         />
@@ -328,6 +328,18 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
       </main>
 
       <Footer />
+
+      {/* Photo credit */}
+      <div className="text-center text-[10px] text-white/20 py-4">
+        Photo by{' '}
+        <a href="https://unsplash.com/@zmachacek" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/40">
+          Zden&#283;k Mach&#225;&#269;ek
+        </a>
+        {' '}on{' '}
+        <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/40">
+          Unsplash
+        </a>
+      </div>
       </div>
     </div>
   );

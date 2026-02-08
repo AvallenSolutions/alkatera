@@ -893,9 +893,7 @@ const DrinksSection = () => (
    ═══════════════════════════════════════════ */
 
 const CTASection = () => (
-  <section className="py-40 px-6 md:px-10 text-center relative overflow-hidden">
-    <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#ccff00] to-transparent opacity-30" />
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle,_rgba(204,255,0,0.04),_transparent_60%)] pointer-events-none" />
+  <section className="py-40 px-6 md:px-20 bg-[#ccff00] text-black text-center relative overflow-hidden">
     <div className="relative z-10">
       <motion.h2
         initial={{ opacity: 0, y: 20 }}
@@ -905,27 +903,27 @@ const CTASection = () => (
       >
         Ready to Turn Sustainability
         <br />
-        Into Your <span className="text-[#ccff00]">Competitive Edge</span>?
+        Into Your Competitive Edge?
       </motion.h2>
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: 0.1 }}
-        className="text-gray-400 mb-12 font-light text-base"
+        className="text-black/60 mb-12 font-light text-base"
       >
         No PhD required. No spreadsheet chaos. Just clarity.
       </motion.p>
       <div className="flex gap-4 justify-center flex-wrap">
         <Link
           href="/getaccess"
-          className="bg-[#ccff00] text-black font-mono text-xs font-medium uppercase tracking-widest px-10 py-4 rounded-full hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(204,255,0,0.3)] transition-all"
+          className="bg-black text-white font-mono text-xs font-medium uppercase tracking-widest px-10 py-4 rounded-full hover:scale-105 transition-transform duration-300"
         >
           Get Access
         </Link>
         <Link
           href="/manifesto"
-          className="border border-white/10 text-white font-mono text-xs uppercase tracking-widest px-10 py-4 rounded-full hover:border-[#ccff00] hover:text-[#ccff00] transition-all"
+          className="border border-black/30 text-black font-mono text-xs uppercase tracking-widest px-10 py-4 rounded-full hover:border-black hover:bg-black/5 transition-all"
         >
           Read Our Manifesto
         </Link>
@@ -935,7 +933,7 @@ const CTASection = () => (
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
         transition={{ delay: 0.3 }}
-        className="font-mono text-[11px] text-gray-500 mt-6 tracking-wider"
+        className="font-mono text-[11px] text-black/50 mt-6 tracking-wider"
       >
         Start with Seed from &pound;99/month. No long-term contracts.
       </motion.p>

@@ -12,7 +12,7 @@ export const Footer = () => {
             <Logo />
           </div>
           <p className="text-gray-500 font-mono text-sm">
-            © 2026 Alkatera Ltd
+            &copy; 2026 Alkatera Ltd
           </p>
         </div>
 
@@ -20,22 +20,22 @@ export const Footer = () => {
           <h4 className="font-mono text-[#ccff00] text-xs uppercase tracking-widest mb-6">Platform</h4>
           <ul className="space-y-4 text-gray-400">
             <li>
-              <Link href="#" className="hover:text-white transition-colors">
+              <Link href="/platform" className="hover:text-white transition-colors">
                 Carbon Analytics
               </Link>
             </li>
             <li>
-              <Link href="#" className="hover:text-white transition-colors">
+              <Link href="/platform" className="hover:text-white transition-colors">
                 Water Footprint
               </Link>
             </li>
             <li>
-              <Link href="#" className="hover:text-white transition-colors">
+              <Link href="/platform" className="hover:text-white transition-colors">
                 Supply Chain
               </Link>
             </li>
             <li>
-              <Link href="#" className="hover:text-white transition-colors">
+              <Link href="/platform" className="hover:text-white transition-colors">
                 Reporting
               </Link>
             </li>
@@ -69,27 +69,24 @@ export const Footer = () => {
         </div>
 
         <div>
-          <h4 className="font-mono text-[#ccff00] text-xs uppercase tracking-widest mb-6">Newsletter</h4>
-          <form className="flex border-b border-white/30 pb-2" onSubmit={(e) => e.preventDefault()}>
-            <input
-              type="email"
-              placeholder="Email Address"
-              className="bg-transparent outline-none w-full placeholder:text-gray-600 font-mono text-sm"
-            />
-            <button
-              type="submit"
-              className="text-[#ccff00] uppercase text-xs font-bold hover:text-white transition-colors"
-            >
-              Submit
-            </button>
-          </form>
+          <h4 className="font-mono text-[#ccff00] text-xs uppercase tracking-widest mb-6">Get Started</h4>
+          <p className="text-gray-400 font-mono text-sm mb-4">
+            Founding Partner pricing available for a limited time.
+          </p>
+          <Link
+            href="/getaccess"
+            className="inline-block bg-[#ccff00] text-black font-mono text-xs font-bold uppercase tracking-widest px-6 py-3 rounded-full hover:scale-105 transition-transform duration-300"
+          >
+            Get Access
+          </Link>
         </div>
       </div>
 
-      <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-gray-600 font-mono text-xs">
-          Avallen Solutions Ltd trading as Alkatera
-        </p>
+      <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-start justify-between gap-4">
+        <div className="text-gray-600 font-mono text-xs space-y-1">
+          <p>Avallen Solutions Ltd T/A alkatera | Company No. 15905045</p>
+          <p>Registered Office: Sterling House, Fulbourne Road, London, E17 4EE</p>
+        </div>
         <div className="flex items-center gap-6 text-gray-500 font-mono text-xs">
           <Link href="/terms" className="hover:text-white transition-colors">
             Terms &amp; Conditions

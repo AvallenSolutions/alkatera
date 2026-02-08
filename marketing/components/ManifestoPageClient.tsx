@@ -6,6 +6,7 @@ import { ArrowRight, Droplets, Wind, Sprout } from 'lucide-react';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 const OrganicBackground = () => {
   return (
@@ -212,17 +213,19 @@ export function ManifestoPageClient() {
             </p>
           </div>
 
-          <button className="group relative inline-flex items-center gap-4 px-8 py-4 bg-transparent border border-[#ccff00] rounded-full overflow-hidden transition-all hover:bg-[#ccff00]">
+          <Link href="/getaccess" className="group relative inline-flex items-center gap-4 px-8 py-4 bg-transparent border border-[#ccff00] rounded-full overflow-hidden transition-all hover:bg-[#ccff00]">
             <span className="relative z-10 font-mono text-lg uppercase tracking-widest text-[#ccff00] group-hover:text-black transition-colors">
               Join the Movement
             </span>
             <ArrowRight className="w-5 h-5 text-[#ccff00] group-hover:text-black relative z-10" />
             <div className="absolute inset-0 bg-[#ccff00] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300" />
-          </button>
+          </Link>
         </motion.div>
       </div>
 
-      <Footer />
+      <div className="relative z-20">
+        <Footer />
+      </div>
     </div>
   );
 }

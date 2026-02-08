@@ -155,9 +155,9 @@ export default function BlogPage() {
             <p className="text-gray-400 mb-8">
               See how Alkatera can automate your carbon footprint calculation and turn compliance into a competitive advantage.
             </p>
-            <button className="bg-[#ccff00] text-black px-8 py-4 rounded-full font-mono text-sm font-bold uppercase tracking-widest hover:bg-white transition-colors">
-              Request a Demo
-            </button>
+            <Link href="/getaccess" className="inline-block bg-[#ccff00] text-black px-8 py-4 rounded-full font-mono text-sm font-bold uppercase tracking-widest hover:bg-white transition-colors">
+              Get Access
+            </Link>
           </motion.div>
         </div>
       </article>

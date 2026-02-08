@@ -1,21 +1,442 @@
 'use client';
 
-import { useState } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { ArrowRight, Droplets, Wind, Recycle, Sprout } from 'lucide-react';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
+import {
+  Wind,
+  Droplets,
+  Recycle,
+  Sprout,
+  TreePine,
+  Users,
+  Activity,
+  BarChart3,
+  Layers,
+  Target,
+  ShieldCheck,
+  Globe,
+  FileText,
+  Footprints,
+  ArrowRight,
+  Search,
+  Lightbulb,
+  TrendingUp,
+} from 'lucide-react';
 import { Navigation } from '@/marketing/components/Navigation';
 import { Footer } from '@/marketing/components/Footer';
 
+/* ═══════════════════════════════════════════
+   Hero Section
+   ═══════════════════════════════════════════ */
+
+const Hero = () => (
+  <section className="relative pt-40 pb-32 px-6 md:px-10 overflow-hidden">
+    <div className="max-w-5xl mx-auto text-center">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8 }}
+      >
+        <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-6">
+          Beyond Carbon
+        </p>
+        <h1 className="font-serif text-5xl md:text-8xl leading-[0.95] mb-8 tracking-tight">
+          Impact,{' '}
+          <span className="italic text-[#ccff00]">Measured</span>
+        </h1>
+        <p className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-12">
+          The drinks industry accounts for a significant share of global water use, agricultural emissions, and packaging waste. Alkatera gives you the tools to measure, understand, and reduce your true environmental footprint.
+        </p>
+        <Link
+          href="/getaccess"
+          className="inline-flex items-center gap-3 bg-[#ccff00] text-black font-mono text-xs font-medium uppercase tracking-widest px-10 py-4 rounded-full hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(204,255,0,0.3)] transition-all"
+        >
+          Start Measuring <ArrowRight className="w-4 h-4" />
+        </Link>
+      </motion.div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   The Challenge Section
+   ═══════════════════════════════════════════ */
+
+const challengeStats = [
+  {
+    icon: Wind,
+    stat: '~1.5 billion',
+    label: 'Tonnes of CO₂ from global food & drink annually',
+    color: 'text-[#ccff00]',
+  },
+  {
+    icon: Droplets,
+    stat: '70%',
+    label: 'Of global freshwater used by agriculture',
+    color: 'text-[#00ccff]',
+  },
+  {
+    icon: Recycle,
+    stat: '36%',
+    label: 'Of packaging waste comes from food & beverage',
+    color: 'text-white',
+  },
+];
+
+const ChallengeSection = () => (
+  <section className="py-32 px-6 md:px-10 relative">
+    <div className="max-w-6xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-16"
+      >
+        <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">The Challenge</p>
+        <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] max-w-3xl">
+          An industry with a{' '}
+          <span className="text-[#ccff00] italic">hidden footprint</span>
+        </h2>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {challengeStats.map((item, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.1 }}
+            className="group relative overflow-hidden backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-8 hover:border-[#ccff00]/25 transition-all duration-500"
+          >
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#ccff00]/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+            <item.icon className={`w-8 h-8 mb-6 ${item.color} opacity-70`} />
+            <div className={`text-4xl font-bold mb-3 tracking-tight ${item.color}`}>{item.stat}</div>
+            <p className="text-gray-400 text-sm leading-relaxed">{item.label}</p>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   What We Measure Section
+   ═══════════════════════════════════════════ */
+
+const measureCategories = [
+  {
+    icon: Wind,
+    title: 'Carbon Emissions',
+    description: 'Full Scope 1, 2, and 3 greenhouse gas accounting across your entire value chain — from raw materials to end-of-life.',
+    color: 'hover:border-[#ccff00]/25',
+    accent: 'via-[#ccff00]/40',
+  },
+  {
+    icon: Droplets,
+    title: 'Water Footprint',
+    description: 'Blue, green, and grey water consumption tracking across agriculture, production, and packaging processes.',
+    color: 'hover:border-[#00ccff]/25',
+    accent: 'via-[#00ccff]/40',
+  },
+  {
+    icon: TreePine,
+    title: 'Land Use & Biodiversity',
+    description: 'Measure the land footprint of your ingredients and the biodiversity impact of your agricultural supply chain.',
+    color: 'hover:border-emerald-400/25',
+    accent: 'via-emerald-400/40',
+  },
+  {
+    icon: Recycle,
+    title: 'Waste & Circularity',
+    description: 'Track packaging recyclability, spent grain diversion, wastewater treatment, and circular economy metrics.',
+    color: 'hover:border-amber-400/25',
+    accent: 'via-amber-400/40',
+  },
+  {
+    icon: Users,
+    title: 'Social Impact',
+    description: 'Community engagement, fair trade sourcing, living wages, and social governance indicators for responsible business.',
+    color: 'hover:border-pink-400/25',
+    accent: 'via-pink-400/40',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Governance & Compliance',
+    description: 'Track alignment with ESG frameworks, regulatory requirements, and industry best practices across your organisation.',
+    color: 'hover:border-purple-400/25',
+    accent: 'via-purple-400/40',
+  },
+];
+
+const MeasureSection = () => (
+  <section className="py-32 px-6 md:px-10 relative">
+    <div className="max-w-6xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-16 text-center"
+      >
+        <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">What We Measure</p>
+        <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-6">
+          Six dimensions of{' '}
+          <span className="text-[#ccff00] italic">true impact</span>
+        </h2>
+        <p className="text-gray-400 max-w-2xl mx-auto">
+          Most platforms stop at carbon. Alkatera measures the full spectrum of environmental, social, and governance impact — because sustainability is about more than emissions.
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {measureCategories.map((item, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.06 }}
+            className={`group relative overflow-hidden backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl p-8 ${item.color} transition-all duration-500`}
+          >
+            <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent ${item.accent} to-transparent opacity-0 group-hover:opacity-100 transition-opacity`} />
+            <item.icon className="w-7 h-7 mb-5 text-white/60 group-hover:text-white transition-colors" />
+            <h3 className="font-serif text-xl mb-3">{item.title}</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">{item.description}</p>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   How It Works Section
+   ═══════════════════════════════════════════ */
+
+const steps = [
+  {
+    number: '01',
+    icon: Search,
+    title: 'Measure',
+    description: 'Input your products, ingredients, processes, and supply chain data. Our LCA engine calculates your impact across all six dimensions automatically.',
+  },
+  {
+    number: '02',
+    icon: Lightbulb,
+    title: 'Analyse',
+    description: 'Understand where your biggest impacts lie. Identify hotspots, benchmark against industry peers, and discover reduction opportunities.',
+  },
+  {
+    number: '03',
+    icon: TrendingUp,
+    title: 'Act',
+    description: 'Set science-based targets, track progress over time, generate compliant reports, and communicate your impact story with confidence.',
+  },
+];
+
+const HowItWorksSection = () => (
+  <section className="py-32 px-6 md:px-10 relative">
+    <div className="max-w-6xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-16"
+      >
+        <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">How It Works</p>
+        <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] max-w-3xl">
+          From data to{' '}
+          <span className="text-[#ccff00] italic">action</span>
+        </h2>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {steps.map((step, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.15 }}
+            className="relative"
+          >
+            <div className="font-mono text-[#ccff00]/20 text-7xl font-bold mb-4">{step.number}</div>
+            <step.icon className="w-6 h-6 text-[#ccff00] mb-4" />
+            <h3 className="font-serif text-2xl mb-3">{step.title}</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">{step.description}</p>
+            {i < steps.length - 1 && (
+              <ArrowRight className="hidden md:block absolute top-8 -right-4 w-6 h-6 text-white/10" />
+            )}
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   Beyond Carbon Section
+   ═══════════════════════════════════════════ */
+
+const BeyondCarbonSection = () => (
+  <section className="py-32 px-6 md:px-10 relative">
+    <div className="max-w-6xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-16 text-center"
+      >
+        <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">Beyond Carbon</p>
+        <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-6">
+          Carbon is just the{' '}
+          <span className="text-[#ccff00] italic">beginning</span>
+        </h2>
+        <p className="text-gray-400 max-w-2xl mx-auto">
+          The Green Claims Directive demands evidence-based sustainability communication. Alkatera ensures every claim you make is defensible, verified, and backed by recognised standards.
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="group relative overflow-hidden rounded-2xl"
+        >
+          <div className="relative aspect-[16/10] overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2940&auto=format&fit=crop"
+              alt="Data visualisation"
+              className="object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all duration-700 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent" />
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-8">
+            <h3 className="font-serif text-2xl mb-2">From Spreadsheet to Story</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Transform complex environmental data into visual narratives your customers, retailers, and investors can understand. Data you can finally share with confidence.
+            </p>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.15 }}
+          className="group relative overflow-hidden rounded-2xl"
+        >
+          <div className="relative aspect-[16/10] overflow-hidden">
+            <img
+              src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2426&auto=format&fit=crop"
+              alt="Verified data"
+              className="object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all duration-700 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent" />
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 p-8">
+            <h3 className="font-serif text-2xl mb-2">The Glass Box Guarantee</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Every metric is backed by verified industry datasets and global standards. When you show an impact number via alkatera, it&apos;s a defensible fact — not a guess.
+            </p>
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   Frameworks & Standards Section
+   ═══════════════════════════════════════════ */
+
+const frameworks = [
+  { name: 'GHG Protocol', desc: 'Scope 1, 2 & 3 corporate and product-level accounting' },
+  { name: 'ISO 14040/44', desc: 'Life Cycle Assessment methodology standards' },
+  { name: 'Science Based Targets', desc: 'SBTi-aligned emissions reduction pathways' },
+  { name: 'GRI Standards', desc: 'Global Reporting Initiative sustainability disclosure' },
+  { name: 'B Corp', desc: 'B Impact Assessment alignment and certification readiness' },
+  { name: 'CSRD / ESRS', desc: 'EU Corporate Sustainability Reporting Directive compliance' },
+];
+
+const FrameworksSection = () => (
+  <section className="py-32 px-6 md:px-10 relative">
+    <div className="max-w-6xl mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="mb-16 text-center"
+      >
+        <p className="font-mono text-[#ccff00] text-xs uppercase tracking-[0.3em] mb-4">Standards &amp; Frameworks</p>
+        <h2 className="font-serif text-4xl md:text-6xl leading-[1.05] mb-6">
+          Built on{' '}
+          <span className="text-[#ccff00] italic">recognised standards</span>
+        </h2>
+        <p className="text-gray-400 max-w-2xl mx-auto">
+          Every calculation in alkatera is grounded in internationally recognised methodologies and reporting frameworks.
+        </p>
+      </motion.div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {frameworks.map((fw, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.06 }}
+            className="backdrop-blur-md bg-white/5 border border-white/10 rounded-xl px-6 py-5 hover:border-[#ccff00]/25 transition-all duration-300"
+          >
+            <div className="font-mono text-sm text-white mb-1">{fw.name}</div>
+            <div className="text-gray-500 text-xs leading-relaxed">{fw.desc}</div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   CTA Section (Neon Yellow)
+   ═══════════════════════════════════════════ */
+
+const CTASection = () => (
+  <section className="py-40 px-6 md:px-20 bg-[#ccff00] text-black text-center relative overflow-hidden">
+    <div className="relative z-10">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+      >
+        <Sprout className="w-12 h-12 text-black/70 mx-auto mb-8" />
+        <h2 className="font-serif text-4xl md:text-[56px] leading-[1.1] mb-5">
+          Start Measuring
+          <br />
+          What Matters
+        </h2>
+        <p className="text-black/60 mb-12 font-light text-base max-w-xl mx-auto">
+          Join the movement of drinks brands building a regenerative future with data they can trust.
+        </p>
+        <Link
+          href="/getaccess"
+          className="inline-flex items-center gap-3 bg-black text-white font-mono text-xs font-medium uppercase tracking-widest px-10 py-5 rounded-full hover:scale-105 transition-transform duration-300"
+        >
+          Get Access <ArrowRight className="w-4 h-4" />
+        </Link>
+      </motion.div>
+    </div>
+  </section>
+);
+
+/* ═══════════════════════════════════════════
+   Main Page Component
+   ═══════════════════════════════════════════ */
+
 export function ImpactPageClient() {
-  const [activeMetric, setActiveMetric] = useState<string | null>(null);
-  const { scrollYProgress } = useScroll();
-
-  const yContentHero = useTransform(scrollYProgress, [0, 0.5], [0, -200]);
-  const yContentStory = useTransform(scrollYProgress, [0, 1], [0, -100]);
-  const opacityHeroContent = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
-
   return (
-    <div className="relative min-h-screen w-full bg-[#050505] text-white overflow-x-hidden">
+    <div className="relative min-h-screen w-full bg-[#050505] text-white overflow-x-hidden selection:bg-[#ccff00] selection:text-black">
       <Navigation />
 
       {/* Fixed Background Layer */}
@@ -23,7 +444,7 @@ export function ImpactPageClient() {
         <div className="absolute inset-0">
           <img
             src="https://images.unsplash.com/photo-1518173946687-a4c8892bbd9f?q=80&w=2574&auto=format&fit=crop"
-            alt="Nature Data"
+            alt=""
             className="absolute inset-0 w-full h-full object-cover opacity-15 mix-blend-luminosity"
           />
           <div className="absolute inset-0 bg-[#050505]/80" />
@@ -59,125 +480,13 @@ export function ImpactPageClient() {
 
       {/* Scrollable Foreground Content */}
       <div className="relative z-10">
-        {/* Hero Section */}
-        <section className="relative h-screen w-full flex flex-col justify-center items-center overflow-hidden">
-          <motion.div
-            style={{ y: yContentHero, opacity: opacityHeroContent }}
-            className="relative text-center max-w-5xl mx-auto px-6 mt-20"
-          >
-            <motion.h1
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8 }}
-              className="font-serif text-6xl md:text-9xl mb-6 leading-none"
-            >
-              Impact <span className="italic text-gray-500">Unfolds</span>
-            </motion.h1>
-            <p className="font-mono text-sm md:text-base tracking-widest text-gray-400 uppercase max-w-xl mx-auto mb-20">
-              Real-time sustainability metrics translated into living digital ecosystems.
-            </p>
-
-            {/* Metric Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-              {[
-                { id: 'carbon', icon: Wind, label: "CO2 per Litre", value: "2.3kg", color: "text-[#ccff00]", border: "hover:border-[#ccff00]" },
-                { id: 'water', icon: Droplets, label: "Hectolitres Saved", value: "8.5M", color: "text-[#00ccff]", border: "hover:border-[#00ccff]" },
-                { id: 'waste', icon: Recycle, label: "Spent Grain Diverted", value: "94%", color: "text-white", border: "hover:border-white" },
-              ].map((metric) => (
-                <motion.button
-                  key={metric.id}
-                  onMouseEnter={() => setActiveMetric(metric.id)}
-                  onMouseLeave={() => setActiveMetric(null)}
-                  className={`group relative p-8 border border-white/10 bg-black/40 backdrop-blur-sm transition-all duration-500 ${metric.border} text-left overflow-hidden`}
-                >
-                  <div className={`absolute top-0 left-0 w-full h-1 bg-current opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${metric.color}`} />
-                  <metric.icon className={`w-8 h-8 mb-4 ${metric.color} opacity-70 group-hover:opacity-100 transition-opacity`} />
-                  <div className="text-5xl font-sans font-bold mb-2 tracking-tighter">{metric.value}</div>
-                  <div className="font-mono text-xs uppercase tracking-widest text-gray-400">{metric.label}</div>
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        </section>
-
-        {/* Story Section */}
-        <section className="relative py-32 px-6 z-20 overflow-hidden bg-gradient-to-b from-transparent via-[#050505]/60 to-[#050505]">
-          <motion.div style={{ y: yContentStory }} className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-end mb-20 border-b border-white/10 pb-8">
-              <h2 className="text-4xl md:text-6xl font-serif max-w-2xl">
-                From Compliance to <br/> <span className="text-[#ccff00] italic">Regeneration</span>
-              </h2>
-              <p className="font-mono text-sm text-gray-400 mt-6 md:mt-0 max-w-md">
-                See how leading brands are using AlkaTera to transform their environmental footprint into a competitive advantage.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-              {[
-                {
-                  client: "From Spreadsheet to Story",
-                  stat: "Data you can finally share.",
-                  desc: "For too long, sustainability has been hidden in dry, technical PDFs that nobody reads. Alkatera transforms your complex data into a visual narrative. We don't just give you a number; we give you a way to talk to your customers, retailers, and investors with total confidence.",
-                  image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=2940&auto=format&fit=crop"
-                },
-                {
-                  client: "The 'Glass Box' Guarantee",
-                  stat: "Verification is the new currency.",
-                  desc: "In an era of the Green Claims Directive, \"trust me\" isn't a strategy. Our 'Glass Box' architecture ensures that every metric on this page is backed by global standards of verified industry datasets. When you show an impact number via alkatera, it isn't a guess, it's a defensible fact.",
-                  image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2426&auto=format&fit=crop"
-                }
-              ].map((story, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 50 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.2 }}
-                  className="group cursor-pointer"
-                >
-                  <div className="relative aspect-[16/9] overflow-hidden mb-8 grayscale group-hover:grayscale-0 transition-all duration-700">
-                    <img src={story.image} alt={story.client} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-1000" />
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-                  </div>
-                  <div className="flex justify-between items-start border-t border-white/20 pt-6">
-                    <div>
-                      <h3 className="text-3xl font-serif mb-2">{story.client}</h3>
-                      <p className="text-gray-400 max-w-sm text-sm leading-relaxed">{story.desc}</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[#ccff00] font-bold text-xl mb-1">{story.stat}</div>
-                      <ArrowRight className="ml-auto w-6 h-6 -rotate-45 group-hover:rotate-0 transition-transform duration-300 text-gray-500 group-hover:text-white" />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </section>
-
-        {/* CTA Section */}
-        <section className="relative py-32 px-6 text-center overflow-hidden z-20 bg-[#050505]">
-          <div className="absolute inset-0 bg-[#ccff00] mix-blend-multiply opacity-5" />
-
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            whileInView={{ scale: 1, opacity: 1 }}
-            viewport={{ once: true }}
-            className="relative z-10 max-w-3xl mx-auto"
-          >
-            <Sprout className="w-16 h-16 text-[#ccff00] mx-auto mb-8" />
-            <h2 className="text-5xl md:text-8xl font-serif mb-8 tracking-tight">
-              Grow Your <br/> Legacy
-            </h2>
-            <p className="font-mono text-gray-400 mb-10">
-              JOIN THE MOVEMENT OF REGENERATIVE BRANDS
-            </p>
-            <button className="bg-[#ccff00] text-black px-10 py-5 rounded-full font-mono text-sm font-bold uppercase tracking-widest hover:bg-white transition-colors duration-300">
-              Start Your Impact Journey
-            </button>
-          </motion.div>
-        </section>
-
+        <Hero />
+        <ChallengeSection />
+        <MeasureSection />
+        <HowItWorksSection />
+        <BeyondCarbonSection />
+        <FrameworksSection />
+        <CTASection />
         <Footer />
       </div>
     </div>

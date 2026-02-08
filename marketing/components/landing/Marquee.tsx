@@ -10,12 +10,12 @@ export const LandingMarquee = () => {
         transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
         className="inline-block text-black font-mono text-lg md:text-2xl font-bold uppercase tracking-tight"
       >
-        <span className="mx-8">Launching Feb 2026 - Sign up to get early access •</span>
-        <span className="mx-8">Launching Feb 2026 - Sign up to get early access •</span>
-        <span className="mx-8">Launching Feb 2026 - Sign up to get early access •</span>
-        <span className="mx-8">Launching Feb 2026 - Sign up to get early access •</span>
-        <span className="mx-8">Launching Feb 2026 - Sign up to get early access •</span>
-        <span className="mx-8">Launching Feb 2026 - Sign up to get early access •</span>
+        <span className="mx-8">Founding Partner pricing available for a limited time — Get access now •</span>
+        <span className="mx-8">Founding Partner pricing available for a limited time — Get access now •</span>
+        <span className="mx-8">Founding Partner pricing available for a limited time — Get access now •</span>
+        <span className="mx-8">Founding Partner pricing available for a limited time — Get access now •</span>
+        <span className="mx-8">Founding Partner pricing available for a limited time — Get access now •</span>
+        <span className="mx-8">Founding Partner pricing available for a limited time — Get access now •</span>
       </motion.div>
     </div>
   );
