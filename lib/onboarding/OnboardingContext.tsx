@@ -59,6 +59,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const isFetchingRef = useRef(false)
   // Counter to ignore stale fetch responses
   const fetchGenerationRef = useRef(0)
+  // Session-level guard: once dismissed in this browser session, stay dismissed
+  // even if the fire-and-forget save hasn't completed or failed silently
+  const sessionDismissedRef = useRef(false)
 
   // Keep orgIdRef current
   useEffect(() => {
@@ -201,6 +204,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [updateState])
 
   const dismissOnboarding = useCallback(() => {
+    sessionDismissedRef.current = true
     updateState(prev => ({
       ...prev,
       dismissed: true,
@@ -208,12 +212,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [updateState])
 
   const resetOnboarding = useCallback(() => {
+    sessionDismissedRef.current = false
     const fresh = { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() }
     setState(fresh)
     saveState(fresh)
   }, [saveState])
 
-  const shouldShowOnboarding = !state.completed && !state.dismissed && !!user && !!currentOrganization
+  const shouldShowOnboarding = !state.completed && !state.dismissed && !sessionDismissedRef.current && !!user && !!currentOrganization
   const progress = getProgressPercentage(state.currentStep)
 
   return (

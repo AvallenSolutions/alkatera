@@ -47,6 +47,28 @@ vi.mock('../utils/data-quality-mapper', () => ({
   resolveImpactSource: vi.fn(() => 'secondary_modelled'),
 }));
 
+// Mock the aggregator
+const mockAggregateProductImpacts = vi.fn();
+vi.mock('../product-lca-aggregator', () => ({
+  aggregateProductImpacts: (...args: unknown[]) => mockAggregateProductImpacts(...args),
+}));
+
+// Mock the interpretation engine
+const mockGenerateLcaInterpretation = vi.fn();
+vi.mock('../lca-interpretation-engine', () => ({
+  generateLcaInterpretation: (...args: unknown[]) => mockGenerateLcaInterpretation(...args),
+}));
+
+// Mock the distance calculator (used when recalculating distances for facility allocations)
+vi.mock('../utils/distance-calculator', () => ({
+  calculateDistance: vi.fn(() => 0),
+}));
+
+// Mock the maturation calculator (used when maturation profiles exist)
+vi.mock('../maturation-calculator', () => ({
+  calculateMaturationImpacts: vi.fn(() => ({})),
+}));
+
 // Import after mocks are set up
 import {
   calculateProductCarbonFootprint,
@@ -215,6 +237,10 @@ interface TableMockConfig {
   product_carbon_footprint_production_sites?: { data: unknown; error?: unknown };
   contract_manufacturer_allocations?: { data: unknown; error?: unknown };
   facility_emissions_aggregated?: { data: unknown; error?: unknown };
+  maturation_profiles?: { data: unknown; error?: unknown };
+  facilities?: { data: unknown; error?: unknown };
+  utility_data_entries?: { data: unknown; error?: unknown };
+  facility_activity_entries?: { data: unknown; error?: unknown };
 }
 
 function setupTableMocks(config: TableMockConfig) {
@@ -238,6 +264,10 @@ describe('calculateProductCarbonFootprint', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Default mock return values for aggregator and interpretation engine
+    mockAggregateProductImpacts.mockResolvedValue({ success: true });
+    mockGenerateLcaInterpretation.mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -392,11 +422,6 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
@@ -424,11 +449,6 @@ describe('calculateProductCarbonFootprint', () => {
         product_carbon_footprint_materials: { data: null },
         product_carbon_footprint_production_sites: { data: [] },
         contract_manufacturer_allocations: { data: [] },
-      });
-
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
       });
 
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
@@ -489,11 +509,6 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
@@ -521,11 +536,6 @@ describe('calculateProductCarbonFootprint', () => {
         product_carbon_footprint_materials: { data: null },
         product_carbon_footprint_production_sites: { data: [] },
         contract_manufacturer_allocations: { data: [] },
-      });
-
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
       });
 
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
@@ -566,11 +576,6 @@ describe('calculateProductCarbonFootprint', () => {
         product_carbon_footprint_materials: { data: null },
         product_carbon_footprint_production_sites: { data: [] },
         contract_manufacturer_allocations: { data: [] },
-      });
-
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
       });
 
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
@@ -643,11 +648,6 @@ describe('calculateProductCarbonFootprint', () => {
         facility_emissions_aggregated: { data: facilityEmissions },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
 
       const facilityAllocation = createMockFacilityAllocation();
@@ -675,11 +675,6 @@ describe('calculateProductCarbonFootprint', () => {
         product_carbon_footprint_production_sites: { data: [] },
         contract_manufacturer_allocations: { data: [] },
         facility_emissions_aggregated: { data: null },
-      });
-
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
       });
 
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
@@ -733,11 +728,6 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: cmAllocations },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
@@ -778,7 +768,7 @@ describe('calculateProductCarbonFootprint', () => {
       });
     });
 
-    it('should call aggregation edge function after material processing', async () => {
+    it('should call aggregation after material processing', async () => {
       const lca = createMockLCA();
 
       setupTableMocks({
@@ -790,24 +780,20 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
       const result = await calculateProductCarbonFootprint(params);
 
       expect(result.success).toBe(true);
-      expect(mockSupabaseClient.functions.invoke).toHaveBeenCalledWith(
-        'calculate-product-lca-impacts',
-        { body: { product_carbon_footprint_id: 'lca-789' } }
+      expect(mockAggregateProductImpacts).toHaveBeenCalledWith(
+        expect.anything(), // supabase client
+        'lca-789',        // lca.id
+        [],               // collectedFacilityEmissions (empty when no facility allocations)
       );
     });
 
-    it('should return error when aggregation edge function fails', async () => {
+    it('should return error when aggregation fails', async () => {
       setupTableMocks({
         products: { data: createMockProduct() },
         product_materials: { data: [createMockMaterial()] },
@@ -817,9 +803,9 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: null,
-        error: { message: 'Edge function timeout' },
+      mockAggregateProductImpacts.mockResolvedValue({
+        success: false,
+        error: 'Calculation failed',
       });
 
       mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
@@ -856,18 +842,13 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
       const result = await calculateProductCarbonFootprint(params);
 
       expect(result.success).toBe(true);
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0);
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0, 'org-456');
     });
 
     it('should handle materials with string quantity', async () => {
@@ -880,11 +861,6 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
@@ -892,7 +868,7 @@ describe('calculateProductCarbonFootprint', () => {
 
       expect(result.success).toBe(true);
       // 150g should be normalized to 0.15kg
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.15);
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.15, 'org-456');
     });
 
     it('should handle packaging materials', async () => {
@@ -915,11 +891,6 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
@@ -927,7 +898,7 @@ describe('calculateProductCarbonFootprint', () => {
 
       expect(result.success).toBe(true);
       // 350g should be normalized to 0.35kg
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.35);
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.35, 'org-456');
     });
 
     it('should handle materials with supplier data source', async () => {
@@ -950,11 +921,6 @@ describe('calculateProductCarbonFootprint', () => {
         product_carbon_footprint_materials: { data: null },
         product_carbon_footprint_production_sites: { data: [] },
         contract_manufacturer_allocations: { data: [] },
-      });
-
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
       });
 
       mockResolveImpactFactors.mockResolvedValue(resolvedImpacts);
@@ -992,11 +958,6 @@ describe('calculateProductCarbonFootprint', () => {
         contract_manufacturer_allocations: { data: [] },
       });
 
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
-      });
-
       mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());
 
       const params: CalculatePCFParams = { productId: 'prod-123' };
@@ -1027,11 +988,6 @@ describe('calculateProductCarbonFootprint', () => {
         product_carbon_footprint_materials: { data: null },
         product_carbon_footprint_production_sites: { data: [] },
         contract_manufacturer_allocations: { data: [] },
-      });
-
-      mockSupabaseClient.functions.invoke.mockResolvedValue({
-        data: { success: true },
-        error: null,
       });
 
       mockResolveImpactFactors.mockResolvedValue(createMockWaterfallResult());

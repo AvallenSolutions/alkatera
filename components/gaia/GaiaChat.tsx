@@ -568,7 +568,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
           <div className="p-4 border-b space-y-3">
             <Button
               onClick={handleNewConversation}
-              className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+              className="w-full bg-neon-lime hover:bg-neon-lime/90 text-black"
             >
               <Plus className="h-4 w-4 mr-2" />
               New Chat
@@ -654,7 +654,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                           className={cn(
                             'group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors',
                             activeConversation?.id === result.conversation_id
-                              ? 'bg-emerald-500/10 text-emerald-600'
+                              ? 'bg-neon-lime/10 text-neon-lime'
                               : 'hover:bg-muted'
                           )}
                           onClick={() => loadConversation(result.conversation_id)}
@@ -691,7 +691,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                   className={cn(
                     'group flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors',
                     activeConversation?.id === conv.id
-                      ? 'bg-emerald-500/10 text-emerald-600'
+                      ? 'bg-neon-lime/10 text-neon-lime'
                       : 'hover:bg-muted'
                   )}
                   onClick={() => loadConversation(conv.id)}
@@ -786,8 +786,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             <ChevronLeft className={cn('h-4 w-4 transition-transform', !showSidebar && 'rotate-180')} />
           </Button>
 
-          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-            <Leaf className="h-5 w-5 text-white" />
+          <div className="h-10 w-10 rounded-full bg-neon-lime flex items-center justify-center">
+            <Leaf className="h-5 w-5 text-black" />
           </div>
 
           <div>
@@ -829,7 +829,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
               </TooltipProvider>
             )}
             <Badge variant="outline" className="text-xs">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+              <span className="h-2 w-2 rounded-full bg-neon-lime mr-1.5 animate-pulse" />
               Online
             </Badge>
           </div>
@@ -848,95 +848,26 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             {(!activeConversation || activeConversation.messages.length === 0) && (
               <div className="flex flex-col items-center justify-center h-full relative overflow-hidden">
 
-                {/* Organic background shapes — soft botanical silhouettes */}
+                {/* Subtle background glow */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                  {/* Floating seed particles */}
-                  <div className="absolute top-[10%] left-[15%] w-1.5 h-1.5 rounded-full bg-emerald-500/20 animate-[float_6s_ease-in-out_infinite]" />
-                  <div className="absolute top-[25%] right-[20%] w-1 h-1 rounded-full bg-teal-500/25 animate-[float_8s_ease-in-out_1s_infinite]" />
-                  <div className="absolute top-[60%] left-[10%] w-2 h-2 rounded-full bg-emerald-400/15 animate-[float_7s_ease-in-out_2s_infinite]" />
-                  <div className="absolute top-[40%] right-[12%] w-1.5 h-1.5 rounded-full bg-green-500/20 animate-[float_9s_ease-in-out_0.5s_infinite]" />
-                  <div className="absolute top-[75%] right-[30%] w-1 h-1 rounded-full bg-teal-400/20 animate-[float_5s_ease-in-out_3s_infinite]" />
-
-                  {/* Large organic gradient blobs */}
-                  <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-emerald-500/[0.03] blur-3xl" />
-                  <div className="absolute -bottom-32 -left-20 w-80 h-80 rounded-full bg-teal-500/[0.04] blur-3xl" />
+                  <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-neon-lime/[0.03] blur-3xl" />
                 </div>
 
-                {/* Growing stem illustration */}
-                <div className="relative mb-1">
-                  <svg width="90" height="105" viewBox="0 0 120 140" fill="none" className="mx-auto">
-                    {/* Main stem — grows upward */}
-                    <path
-                      d="M60 130 C60 100, 58 80, 60 50"
-                      stroke="url(#stemGrad)"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      className="animate-[grow_2s_ease-out_forwards]"
-                      style={{ strokeDasharray: 80, strokeDashoffset: 0 }}
-                    />
-                    {/* Left leaf */}
-                    <path
-                      d="M58 85 C45 75, 28 78, 22 65 C28 62, 42 60, 56 80"
-                      fill="url(#leafGrad1)"
-                      className="opacity-80 animate-[sway_4s_ease-in-out_infinite]"
-                      style={{ transformOrigin: '58px 85px' }}
-                    />
-                    {/* Right leaf */}
-                    <path
-                      d="M62 70 C75 60, 92 63, 98 50 C92 47, 78 45, 64 65"
-                      fill="url(#leafGrad2)"
-                      className="opacity-80 animate-[sway_5s_ease-in-out_0.5s_infinite_reverse]"
-                      style={{ transformOrigin: '62px 70px' }}
-                    />
-                    {/* Top unfurling leaf / bud */}
-                    <path
-                      d="M60 50 C52 38, 42 30, 35 18 C42 20, 52 28, 58 42"
-                      fill="url(#leafGrad3)"
-                      className="opacity-90 animate-[sway_6s_ease-in-out_1s_infinite]"
-                      style={{ transformOrigin: '60px 50px' }}
-                    />
-                    <path
-                      d="M60 50 C68 38, 78 30, 85 18 C78 20, 68 28, 62 42"
-                      fill="url(#leafGrad3)"
-                      className="opacity-70 animate-[sway_6s_ease-in-out_1.5s_infinite_reverse]"
-                      style={{ transformOrigin: '60px 50px' }}
-                    />
-                    {/* Small budding leaves */}
-                    <circle cx="60" cy="48" r="4" fill="url(#budGrad)" className="animate-pulse" />
-
-                    <defs>
-                      <linearGradient id="stemGrad" x1="60" y1="130" x2="60" y2="50" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stopColor="#065f46" />
-                        <stop offset="100%" stopColor="#10b981" />
-                      </linearGradient>
-                      <linearGradient id="leafGrad1" x1="22" y1="85" x2="58" y2="65" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stopColor="#059669" stopOpacity="0.6" />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.9" />
-                      </linearGradient>
-                      <linearGradient id="leafGrad2" x1="98" y1="70" x2="62" y2="50" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stopColor="#0d9488" stopOpacity="0.6" />
-                        <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.9" />
-                      </linearGradient>
-                      <linearGradient id="leafGrad3" x1="35" y1="18" x2="60" y2="50" gradientUnits="userSpaceOnUse">
-                        <stop offset="0%" stopColor="#34d399" stopOpacity="0.5" />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.8" />
-                      </linearGradient>
-                      <radialGradient id="budGrad" cx="0.5" cy="0.5" r="0.5">
-                        <stop offset="0%" stopColor="#6ee7b7" />
-                        <stop offset="100%" stopColor="#10b981" />
-                      </radialGradient>
-                    </defs>
-                  </svg>
+                {/* Rosa icon */}
+                <div className="relative mb-6">
+                  <div className="h-16 w-16 rounded-2xl bg-neon-lime/10 border border-neon-lime/20 flex items-center justify-center glow-lime">
+                    <Leaf className="h-8 w-8 text-neon-lime" />
+                  </div>
                 </div>
 
                 {/* Name and greeting */}
                 <h2 className="text-2xl font-bold mb-1 tracking-tight">
                   <span className="text-foreground">Rosa</span>
                 </h2>
-                <p className="text-sm text-muted-foreground/80 mb-0.5">
+                <p className="text-sm text-muted-foreground/80 mb-1">
                   Your sustainability companion
                 </p>
-                <p className="text-xs text-muted-foreground/60 mb-6 max-w-sm text-center">
+                <p className="text-xs text-muted-foreground/60 mb-8 max-w-md text-center leading-relaxed">
                   I can explore your data, uncover insights, and help you
                   reduce your environmental impact. Where shall we start?
                 </p>
@@ -945,28 +876,28 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 <div className="w-full max-w-2xl grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                   <button
                     onClick={() => handleSuggestionClick('What should I focus on first?')}
-                    className="group relative rounded-2xl border border-emerald-500/10 bg-gradient-to-b from-emerald-500/[0.06] to-transparent p-4 text-left transition-all hover:border-emerald-500/30 hover:from-emerald-500/[0.12] hover:shadow-lg hover:shadow-emerald-500/[0.05] hover:-translate-y-0.5"
+                    className="group relative rounded-2xl border border-neon-lime/10 bg-gradient-to-b from-neon-lime/[0.06] to-transparent p-4 text-left transition-all hover:border-neon-lime/30 hover:from-neon-lime/[0.12] hover:shadow-lg hover:shadow-neon-lime/[0.05] hover:-translate-y-0.5"
                   >
-                    <Leaf className="h-5 w-5 text-emerald-500/70 mb-2 group-hover:text-emerald-400 transition-colors" />
-                    <p className="text-sm font-semibold mb-1 group-hover:text-emerald-400 transition-colors">Where do I start?</p>
+                    <Leaf className="h-5 w-5 text-neon-lime/70 mb-2 group-hover:text-neon-lime transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-neon-lime transition-colors">Where do I start?</p>
                     <p className="text-xs text-muted-foreground/70 leading-relaxed">Find out what to focus on first to make the biggest difference</p>
                   </button>
 
                   <button
                     onClick={() => handleSuggestionClick('What is my total carbon footprint?')}
-                    className="group relative rounded-2xl border border-teal-500/10 bg-gradient-to-b from-teal-500/[0.06] to-transparent p-4 text-left transition-all hover:border-teal-500/30 hover:from-teal-500/[0.12] hover:shadow-lg hover:shadow-teal-500/[0.05] hover:-translate-y-0.5"
+                    className="group relative rounded-2xl border border-neon-lime/10 bg-gradient-to-b from-neon-lime/[0.06] to-transparent p-4 text-left transition-all hover:border-neon-lime/30 hover:from-neon-lime/[0.12] hover:shadow-lg hover:shadow-neon-lime/[0.05] hover:-translate-y-0.5"
                   >
-                    <BarChart3 className="h-5 w-5 text-teal-500/70 mb-2 group-hover:text-teal-400 transition-colors" />
-                    <p className="text-sm font-semibold mb-1 group-hover:text-teal-400 transition-colors">My footprint</p>
+                    <BarChart3 className="h-5 w-5 text-neon-lime/70 mb-2 group-hover:text-neon-lime transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-neon-lime transition-colors">My footprint</p>
                     <p className="text-xs text-muted-foreground/70 leading-relaxed">Understand your total carbon footprint and where it comes from</p>
                   </button>
 
                   <button
                     onClick={() => handleSuggestionClick('How can I reduce my carbon footprint?')}
-                    className="group relative rounded-2xl border border-green-500/10 bg-gradient-to-b from-green-500/[0.06] to-transparent p-4 text-left transition-all hover:border-green-500/30 hover:from-green-500/[0.12] hover:shadow-lg hover:shadow-green-500/[0.05] hover:-translate-y-0.5"
+                    className="group relative rounded-2xl border border-neon-lime/10 bg-gradient-to-b from-neon-lime/[0.06] to-transparent p-4 text-left transition-all hover:border-neon-lime/30 hover:from-neon-lime/[0.12] hover:shadow-lg hover:shadow-neon-lime/[0.05] hover:-translate-y-0.5"
                   >
-                    <ArrowRight className="h-5 w-5 text-green-500/70 mb-2 rotate-[-45deg] group-hover:text-green-400 transition-colors" />
-                    <p className="text-sm font-semibold mb-1 group-hover:text-green-400 transition-colors">Take action</p>
+                    <ArrowRight className="h-5 w-5 text-neon-lime/70 mb-2 rotate-[-45deg] group-hover:text-neon-lime transition-colors" />
+                    <p className="text-sm font-semibold mb-1 group-hover:text-neon-lime transition-colors">Take action</p>
                     <p className="text-xs text-muted-foreground/70 leading-relaxed">Get practical steps to reduce your environmental impact</p>
                   </button>
                 </div>
@@ -983,7 +914,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                     <button
                       key={i}
                       onClick={() => handleSuggestionClick(q)}
-                      className="text-xs px-4 py-2 rounded-full bg-muted/40 text-muted-foreground/70 hover:bg-emerald-500/10 hover:text-emerald-400 border border-transparent hover:border-emerald-500/20 transition-all"
+                      className="text-xs px-4 py-2 rounded-full bg-muted/40 text-muted-foreground/70 hover:bg-neon-lime/10 hover:text-neon-lime border border-transparent hover:border-neon-lime/20 transition-all"
                     >
                       {q}
                     </button>
@@ -1002,8 +933,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 )}
               >
                 {message.role === 'assistant' && (
-                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                    <Leaf className="h-4 w-4 text-white" />
+                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center">
+                    <Leaf className="h-4 w-4 text-black" />
                   </div>
                 )}
 
@@ -1013,7 +944,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 )}>
                   <Card className={cn(
                     message.role === 'user'
-                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      ? 'bg-neon-lime text-black border-neon-lime'
                       : 'bg-card border-border'
                   )}>
                     <CardContent className="p-3">
@@ -1032,11 +963,11 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
 
                       <div className={cn(
                         'flex items-center justify-between mt-2 pt-2 border-t',
-                        message.role === 'user' ? 'border-emerald-500/30' : 'border-border'
+                        message.role === 'user' ? 'border-black/10' : 'border-border'
                       )}>
                         <span className={cn(
                           'text-xs',
-                          message.role === 'user' ? 'text-emerald-100' : 'text-muted-foreground'
+                          message.role === 'user' ? 'text-black/50' : 'text-muted-foreground'
                         )}>
                           {formatTime(message.created_at)}
                         </span>
@@ -1107,7 +1038,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                               key={actionIdx}
                               variant="outline"
                               size="sm"
-                              className="text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50"
+                              className="text-xs bg-neon-lime/10 border-neon-lime/30 text-neon-lime/80 dark:text-neon-lime hover:bg-neon-lime/20 hover:border-neon-lime/50"
                               onClick={() => executeAction(action)}
                             >
                               <ArrowRight className="h-3 w-3 mr-1.5" />
@@ -1120,7 +1051,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 </div>
 
                 {message.role === 'user' && (
-                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-medium">
+                  <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center text-black text-sm font-medium">
                     {user?.email?.charAt(0).toUpperCase() || 'U'}
                   </div>
                 )}
@@ -1140,7 +1071,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                       key={i}
                       variant="outline"
                       size="sm"
-                      className="text-xs bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10"
+                      className="text-xs bg-neon-lime/5 border-neon-lime/20 hover:bg-neon-lime/10"
                       onClick={() => handleSuggestionClick(question)}
                     >
                       {question}
@@ -1153,8 +1084,8 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             {/* Streaming response */}
             {isStreaming && (
               <div className="flex gap-3">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                  <Leaf className="h-4 w-4 text-white" />
+                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center">
+                  <Leaf className="h-4 w-4 text-black" />
                 </div>
                 <div className="max-w-[80%] space-y-2">
                   <Card className="bg-card border-border">
@@ -1164,11 +1095,11 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                           {streamingContent ? (
                             <>
                               {renderMessageContent(streamingContent)}
-                              <span className="inline-block w-2 h-4 ml-0.5 bg-emerald-500 animate-pulse" />
+                              <span className="inline-block w-2 h-4 ml-0.5 bg-neon-lime animate-pulse" />
                             </>
                           ) : (
                             <span className="flex items-center gap-2 text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
+                              <Loader2 className="h-4 w-4 animate-spin text-neon-lime" />
                               Rosa is thinking...
                             </span>
                           )}
@@ -1189,13 +1120,13 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             {/* Loading indicator (before streaming starts) */}
             {isSending && !isStreaming && (
               <div className="flex gap-3">
-                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-                  <Leaf className="h-4 w-4 text-white" />
+                <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center">
+                  <Leaf className="h-4 w-4 text-black" />
                 </div>
                 <Card className="bg-card">
                   <CardContent className="p-3">
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-emerald-500" />
+                      <Loader2 className="h-4 w-4 animate-spin text-neon-lime" />
                       <span className="text-sm text-muted-foreground">
                         Rosa is thinking...
                       </span>
@@ -1245,14 +1176,14 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 }}
                 placeholder="Ask Rosa anything..."
                 disabled={isSending || isStreaming}
-                className="pr-4 rounded-xl border-border/60 focus:border-emerald-500/50 focus:ring-emerald-500/20 transition-colors"
+                className="pr-4 rounded-xl border-border/60 focus:border-neon-lime/50 focus:ring-neon-lime/20 transition-colors"
               />
             </div>
             <Button
               onClick={handleSend}
               disabled={!input.trim() || isSending || isStreaming}
               size="icon"
-              className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-shadow h-10 w-10"
+              className="rounded-xl bg-neon-lime hover:bg-neon-lime/90 text-black shadow-md shadow-neon-lime/20 hover:shadow-neon-lime/30 transition-all h-10 w-10"
             >
               {isSending || isStreaming ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

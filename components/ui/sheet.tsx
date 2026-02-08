@@ -56,7 +56,6 @@ function SheetRoot({ children, open, onOpenChange, ...props }: React.ComponentPr
     style.id = 'sheet-event-blocker';
     style.textContent = `
       body.sheet-open { overflow: hidden; }
-      body.sheet-open * { pointer-events: auto !important; }
     `;
     document.head.appendChild(style);
     document.body.classList.add('sheet-open');

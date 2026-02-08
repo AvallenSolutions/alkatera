@@ -110,9 +110,12 @@ export function useProductData(productId: string | undefined) {
         .from("products")
         .select("*")
         .eq("id", productId)
-        .single();
+        .maybeSingle();
 
       if (productError) throw productError;
+      if (!productData) {
+        throw new Error("Product not found");
+      }
 
       // Fetch ingredients with supplier information
       const { data: ingredientsData, error: ingredientsError } = await supabase
