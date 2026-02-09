@@ -17,7 +17,7 @@ import {
 import {
   Send,
   Loader2,
-  Leaf,
+  Dog,
   Plus,
   MessageSquare,
   ThumbsUp,
@@ -844,7 +844,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
           </Button>
 
           <div className="h-10 w-10 rounded-full bg-neon-lime flex items-center justify-center">
-            <Leaf className="h-5 w-5 text-black" />
+            <Dog className="h-5 w-5 text-black" />
           </div>
 
           <div>
@@ -913,7 +913,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                 {/* Rosa icon */}
                 <div className="relative mb-6">
                   <div className="h-16 w-16 rounded-2xl bg-neon-lime/10 border border-neon-lime/20 flex items-center justify-center glow-lime">
-                    <Leaf className="h-8 w-8 text-neon-lime" />
+                    <Dog className="h-8 w-8 text-neon-lime" />
                   </div>
                 </div>
 
@@ -934,7 +934,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
                     onClick={() => handleSuggestionClick('What should I focus on first?')}
                     className="group relative rounded-2xl border border-neon-lime/10 bg-gradient-to-b from-neon-lime/[0.06] to-transparent p-4 text-left transition-all hover:border-neon-lime/30 hover:from-neon-lime/[0.12] hover:shadow-lg hover:shadow-neon-lime/[0.05] hover:-translate-y-0.5"
                   >
-                    <Leaf className="h-5 w-5 text-neon-lime/70 mb-2 group-hover:text-neon-lime transition-colors" />
+                    <Dog className="h-5 w-5 text-neon-lime/70 mb-2 group-hover:text-neon-lime transition-colors" />
                     <p className="text-sm font-semibold mb-1 group-hover:text-neon-lime transition-colors">Where do I start?</p>
                     <p className="text-xs text-muted-foreground/70 leading-relaxed">Find out what to focus on first to make the biggest difference</p>
                   </button>
@@ -990,7 +990,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
               >
                 {message.role === 'assistant' && (
                   <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center">
-                    <Leaf className="h-4 w-4 text-black" />
+                    <Dog className="h-4 w-4 text-black" />
                   </div>
                 )}
 
@@ -1141,7 +1141,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             {isStreaming && (
               <div className="flex gap-3">
                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center">
-                  <Leaf className="h-4 w-4 text-black" />
+                  <Dog className="h-4 w-4 text-black" />
                 </div>
                 <div className="max-w-[80%] space-y-2">
                   <Card className="bg-card border-border">
@@ -1177,7 +1177,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
             {isSending && !isStreaming && (
               <div className="flex gap-3">
                 <div className="flex-shrink-0 h-8 w-8 rounded-full bg-neon-lime flex items-center justify-center">
-                  <Leaf className="h-4 w-4 text-black" />
+                  <Dog className="h-4 w-4 text-black" />
                 </div>
                 <Card className="bg-card">
                   <CardContent className="p-3">
