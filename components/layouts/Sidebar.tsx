@@ -382,7 +382,6 @@ export function Sidebar({ className }: SidebarProps) {
   const { usage, tierName, tierLevel, hasFeature, isLoading: subscriptionLoading } = useSubscription()
 
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
-  const isDevelopment = process.env.NODE_ENV === 'development'
 
   const tierDisplayNames: Record<number, string> = { 1: 'Seed', 2: 'Blossom', 3: 'Canopy' }
 
@@ -714,7 +713,7 @@ export function Sidebar({ className }: SidebarProps) {
             )}
 
             {/* Alkatera Admin Only Links */}
-            {(isAlkateraAdmin || isDevelopment) && (
+            {isAlkateraAdmin && (
               <>
                 <Link
                   href="/admin/platform/"
@@ -817,7 +816,7 @@ export function Sidebar({ className }: SidebarProps) {
         )}
 
         {/* Development Section - Admin or Dev Mode */}
-        {(isAlkateraAdmin || isDevelopment) && (
+        {isAlkateraAdmin && (
         <div className="pt-4 mt-4 border-t border-border">
           <div className="px-3 mb-2">
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">

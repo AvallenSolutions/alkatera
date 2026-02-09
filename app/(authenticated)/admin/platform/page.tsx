@@ -27,6 +27,11 @@ import {
   BarChart3,
   RefreshCw,
   AlertTriangle,
+  CreditCard,
+  Sprout,
+  Flower2,
+  TreePine,
+  UserPlus,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
@@ -49,6 +54,23 @@ interface PlatformStats {
     total_facilities: number;
     total_suppliers: number;
     total_lcas: number;
+  };
+  subscriptions: {
+    by_tier: {
+      seed: number;
+      blossom: number;
+      canopy: number;
+      none: number;
+    };
+    by_status: {
+      active: number;
+      trial: number;
+      pending: number;
+      suspended: number;
+      cancelled: number;
+    };
+    with_stripe: number;
+    recent_signups_7d: number;
   };
   pending_approvals: {
     activity_data: number;
@@ -78,12 +100,13 @@ interface OrganizationInfo {
   member_count: number;
   product_count: number;
   facility_count: number;
+  subscription_tier: string | null;
+  subscription_status: string | null;
+  subscription_started_at: string | null;
 }
 
 export default function PlatformDashboardPage() {
   const { isAlkateraAdmin, isLoading: authLoading } = useIsAlkateraAdmin();
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const hasAccess = isAlkateraAdmin || isDevelopment;
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [featureAdoption, setFeatureAdoption] = useState<FeatureAdoption | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationInfo[]>([]);
@@ -116,12 +139,12 @@ export default function PlatformDashboardPage() {
   };
 
   useEffect(() => {
-    if (hasAccess) {
+    if (isAlkateraAdmin) {
       fetchData();
     } else if (!authLoading) {
       setLoading(false);
     }
-  }, [hasAccess, authLoading]);
+  }, [isAlkateraAdmin, authLoading]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -144,7 +167,7 @@ export default function PlatformDashboardPage() {
     );
   }
 
-  if (!hasAccess) {
+  if (!isAlkateraAdmin) {
     return (
       <div className="p-6">
         <Alert variant="destructive">
@@ -173,11 +196,6 @@ export default function PlatformDashboardPage() {
             <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
               Platform Dashboard
             </h1>
-            {isDevelopment && !isAlkateraAdmin && (
-              <Badge variant="secondary" className="text-xs">
-                Development Mode
-              </Badge>
-            )}
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Platform-wide analytics and metrics (no private data)
@@ -255,6 +273,82 @@ export default function PlatformDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Subscription Overview */}
+      {stats?.subscriptions && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Active Subscriptions
+              </CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.subscriptions.by_status.active}</div>
+              <p className="text-xs text-gray-500">
+                {stats.subscriptions.by_status.trial} on trial
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Stripe Connected
+              </CardTitle>
+              <CreditCard className="h-4 w-4 text-violet-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.subscriptions.with_stripe}</div>
+              <p className="text-xs text-gray-500">
+                {stats.subscriptions.by_status.pending} pending
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Tier Breakdown
+              </CardTitle>
+              <TreePine className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="flex items-center gap-1">
+                  <Sprout className="h-3 w-3 text-emerald-500" />
+                  {stats.subscriptions.by_tier.seed}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Flower2 className="h-3 w-3 text-pink-500" />
+                  {stats.subscriptions.by_tier.blossom}
+                </span>
+                <span className="flex items-center gap-1">
+                  <TreePine className="h-3 w-3 text-teal-500" />
+                  {stats.subscriptions.by_tier.canopy}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Seed / Blossom / Canopy
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Recent Sign-ups
+              </CardTitle>
+              <UserPlus className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.subscriptions.recent_signups_7d}</div>
+              <p className="text-xs text-gray-500">last 7 days</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
@@ -410,6 +504,8 @@ export default function PlatformDashboardPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Organisation</TableHead>
+                <TableHead>Tier</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Members</TableHead>
                 <TableHead className="text-right">Products</TableHead>
                 <TableHead className="text-right">Facilities</TableHead>
@@ -419,7 +515,7 @@ export default function PlatformDashboardPage() {
             <TableBody>
               {organizations.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-gray-500">
+                  <TableCell colSpan={7} className="text-center text-gray-500">
                     No organisations found
                   </TableCell>
                 </TableRow>
@@ -427,6 +523,31 @@ export default function PlatformDashboardPage() {
                 organizations.map((org) => (
                   <TableRow key={org.id}>
                     <TableCell className="font-medium">{org.name}</TableCell>
+                    <TableCell>
+                      {org.subscription_tier ? (
+                        <Badge variant="outline" className={
+                          org.subscription_tier === 'canopy' ? 'border-teal-500 text-teal-500' :
+                          org.subscription_tier === 'blossom' ? 'border-pink-500 text-pink-500' :
+                          'border-emerald-500 text-emerald-500'
+                        }>
+                          {org.subscription_tier.charAt(0).toUpperCase() + org.subscription_tier.slice(1)}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs text-gray-400">None</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={
+                        org.subscription_status === 'active' ? 'default' :
+                        org.subscription_status === 'trial' ? 'secondary' :
+                        org.subscription_status === 'pending' ? 'outline' :
+                        'destructive'
+                      } className={
+                        org.subscription_status === 'active' ? 'bg-green-600' : ''
+                      }>
+                        {org.subscription_status || 'None'}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-right">{org.member_count}</TableCell>
                     <TableCell className="text-right">{org.product_count}</TableCell>
                     <TableCell className="text-right">{org.facility_count}</TableCell>

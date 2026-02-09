@@ -60,33 +60,14 @@ export default function TeamInvitePage() {
         // Check if user is already authenticated
         const { data: { user } } = await supabase.auth.getUser();
 
-        // Load invitation details
-        const { data, error: invError } = await supabase
-          .from('team_invitations')
-          .select(`
-            id,
-            organization_id,
-            email,
-            invited_at,
-            expires_at,
-            status,
-            organizations:organization_id (name),
-            roles:role_id (name)
-          `)
-          .eq('invitation_token', token)
-          .single();
+        // Load invitation details via server-side API route
+        // This uses the service role client to bypass RLS on the organisations table,
+        // which anonymous users cannot read directly via the anon key
+        const response = await fetch(`/api/team-invite/details?token=${encodeURIComponent(token)}`);
+        const data = await response.json();
 
-        if (invError) {
-          if (invError.code === 'PGRST116') {
-            setError('Invalid invitation link. The invitation may have been cancelled.');
-          } else {
-            throw invError;
-          }
-          return;
-        }
-
-        if (!data) {
-          setError('Invitation not found.');
+        if (!response.ok) {
+          setError(data.error || 'Failed to load invitation details.');
           return;
         }
 
@@ -121,9 +102,9 @@ export default function TeamInvitePage() {
         setInvitation({
           id: data.id,
           organization_id: data.organization_id,
-          organization_name: (data.organizations as any)?.name || 'Unknown Organization',
+          organization_name: data.organization_name || 'Unknown Organisation',
           email: data.email,
-          role_name: (data.roles as any)?.name || 'member',
+          role_name: data.role_name || 'member',
           invited_at: data.invited_at,
           expires_at: data.expires_at,
           status: data.status,
@@ -461,14 +442,14 @@ export default function TeamInvitePage() {
 
           {/* Glassmorphism Card */}
           <div className="border border-white/10 bg-white/5 backdrop-blur-md rounded-2xl p-8">
-            {/* Organization Info */}
+            {/* Organisation Info */}
             <div className="flex items-center gap-4 p-4 bg-white/5 border border-white/10 rounded-xl mb-6">
               <div className="p-3 rounded-xl bg-[#ccff00]/10 border border-[#ccff00]/20">
                 <Building2 className="h-6 w-6 text-[#ccff00]" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-mono text-white/40 uppercase tracking-widest mb-1">
-                  Organization
+                  Organisation
                 </p>
                 <p className="text-lg font-semibold text-white truncate">
                   {invitation.organization_name}

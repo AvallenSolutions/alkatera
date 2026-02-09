@@ -117,9 +117,6 @@ interface RequestStats {
 // ============================================================================
 export default function AdminFactorsPage() {
   const { isAlkateraAdmin, isLoading: authLoading } = useIsAlkateraAdmin();
-  const isDevelopment = process.env.NODE_ENV === "development";
-  const hasAccess = isAlkateraAdmin || isDevelopment;
-
   const [activeTab, setActiveTab] = useState("library");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -221,21 +218,21 @@ export default function AdminFactorsPage() {
   }, [fetchFactors, fetchRequests]);
 
   useEffect(() => {
-    if (hasAccess) {
+    if (isAlkateraAdmin) {
       fetchAll();
     } else if (!authLoading) {
       setLoading(false);
     }
-  }, [hasAccess, authLoading, fetchAll]);
+  }, [isAlkateraAdmin, authLoading, fetchAll]);
 
   // Debounced search
   useEffect(() => {
-    if (!hasAccess) return;
+    if (!isAlkateraAdmin) return;
     const timeout = setTimeout(() => {
       fetchFactors();
     }, 300);
     return () => clearTimeout(timeout);
-  }, [searchQuery, categoryFilter, qualityFilter, statusFilter, hasAccess, fetchFactors]);
+  }, [searchQuery, categoryFilter, qualityFilter, statusFilter, isAlkateraAdmin, fetchFactors]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -462,7 +459,7 @@ export default function AdminFactorsPage() {
     );
   }
 
-  if (!hasAccess) {
+  if (!isAlkateraAdmin) {
     return (
       <div className="p-6">
         <Alert variant="destructive">

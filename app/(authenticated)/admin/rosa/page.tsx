@@ -32,7 +32,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  Leaf,
+  Dog,
   MessageSquare,
   ThumbsUp,
   ThumbsDown,
@@ -240,7 +240,7 @@ export default function AdminRosaPage() {
       {/* Header */}
       <div className="mb-8 flex items-center gap-4">
         <div className="h-12 w-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center">
-          <Leaf className="h-6 w-6 text-white" />
+          <Dog className="h-6 w-6 text-white" />
         </div>
         <div>
           <h1 className="text-2xl font-bold">Rosa Admin Dashboard</h1>

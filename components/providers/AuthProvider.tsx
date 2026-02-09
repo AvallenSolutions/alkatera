@@ -117,7 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null)
         setUser(null)
         setLoading(false)
-        router.push('/login')
+        // Don't redirect to login on public invite pages — unauthenticated users
+        // need to stay on those pages to create an account and accept the invite
+        const pathname = window.location.pathname
+        const isPublicInvitePage = pathname.startsWith('/team-invite/') || pathname.startsWith('/advisor-invite/')
+        if (!isPublicInvitePage) {
+          router.push('/login')
+        }
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {
         // Only update session for token refresh - don't update user state
         // This prevents cascading refetches when switching tabs

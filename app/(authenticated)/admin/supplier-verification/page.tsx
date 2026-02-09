@@ -36,8 +36,6 @@ export default function SupplierVerificationPage() {
   const [products, setProducts] = useState<SupplierProductForVerification[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAlkateraAdmin, setIsAlkateraAdmin] = useState(false);
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const hasAccess = isAlkateraAdmin || isDevelopment;
   const [selectedProduct, setSelectedProduct] = useState<SupplierProductForVerification | null>(null);
   const [verificationNotes, setVerificationNotes] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -50,10 +48,10 @@ export default function SupplierVerificationPage() {
   }, []);
 
   useEffect(() => {
-    if (hasAccess) {
+    if (isAlkateraAdmin) {
       fetchUnverifiedProducts();
     }
-  }, [hasAccess]);
+  }, [isAlkateraAdmin]);
 
   const checkAdminStatus = async () => {
     try {
@@ -157,7 +155,7 @@ export default function SupplierVerificationPage() {
     return <PageLoader />;
   }
 
-  if (!hasAccess) {
+  if (!isAlkateraAdmin) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <Card className="max-w-md">
@@ -182,11 +180,6 @@ export default function SupplierVerificationPage() {
       <div>
         <div className="flex items-center gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Supplier Product Verification</h1>
-          {isDevelopment && !isAlkateraAdmin && (
-            <Badge variant="secondary" className="text-xs">
-              Development Mode
-            </Badge>
-          )}
         </div>
         <p className="text-muted-foreground mt-2">
           Review and verify supplier products to enable them in material search results
