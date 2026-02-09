@@ -14,6 +14,15 @@ import {
   getProgressPercentage,
 } from './types'
 
+/** Steps that ALL users see (Welcome, Meet Rosa, Personalisation).
+ *  Company Basics and everything beyond is owner-only. */
+const FOUNDATION_STEPS: OnboardingStep[] = ['welcome-screen', 'meet-rosa', 'personalization']
+
+/** Returns true if the step is within Phase 1 (foundations) */
+function isFoundationStep(step: OnboardingStep): boolean {
+  return FOUNDATION_STEPS.includes(step)
+}
+
 interface OnboardingContextType {
   /** Current onboarding state */
   state: OnboardingState
@@ -51,7 +60,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const [state, setState] = useState<OnboardingState>(INITIAL_ONBOARDING_STATE)
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
-  const { currentOrganization } = useOrganization()
+  const { currentOrganization, userRole } = useOrganization()
+  const isOwner = userRole === 'owner'
 
   // Track which org ID we've loaded state for to avoid re-fetching on every render
   const loadedOrgIdRef = useRef<string | null>(null)
@@ -194,13 +204,26 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         : [...prev.completedSteps, prev.currentStep]
 
       const next = getNextStep(prev.currentStep)
+
+      // Non-owners finish after the last foundation step (company-basics).
+      // Auto-complete onboarding so they don't see Phases 2–5.
+      if (!isOwner && next && !isFoundationStep(next)) {
+        return {
+          ...prev,
+          completedSteps,
+          completed: true,
+          completedAt: new Date().toISOString(),
+          currentStep: next,
+        }
+      }
+
       return {
         ...prev,
         completedSteps,
         currentStep: next ?? prev.currentStep,
       }
     })
-  }, [updateState])
+  }, [updateState, isOwner])
 
   const skipStep = useCallback(() => {
     updateState(prev => {
@@ -208,9 +231,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       if (!config.skippable) return prev
       const next = getNextStep(prev.currentStep)
       if (!next) return prev
+
+      // Non-owners finish after the last foundation step
+      if (!isOwner && !isFoundationStep(next)) {
+        return {
+          ...prev,
+          completed: true,
+          completedAt: new Date().toISOString(),
+          currentStep: next,
+        }
+      }
+
       return { ...prev, currentStep: next }
     })
-  }, [updateState])
+  }, [updateState, isOwner])
 
   const updatePersonalization = useCallback((data: Partial<PersonalizationData>) => {
     updateState(prev => ({
@@ -256,7 +290,16 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     saveState(fresh)
   }, [saveState])
 
-  const shouldShowOnboarding = !state.completed && !state.dismissed && !sessionDismissedRef.current && !!user && !!currentOrganization
+  // Owners see the full onboarding flow (all 5 phases).
+  // Non-owners only see Phase 1 (Welcome & Orientation / foundations).
+  // If the current step is beyond Phase 1, non-owners skip the wizard entirely.
+  const shouldShowOnboarding =
+    !state.completed &&
+    !state.dismissed &&
+    !sessionDismissedRef.current &&
+    !!user &&
+    !!currentOrganization &&
+    (isOwner || isFoundationStep(state.currentStep))
   const progress = getProgressPercentage(state.currentStep)
 
   return (
