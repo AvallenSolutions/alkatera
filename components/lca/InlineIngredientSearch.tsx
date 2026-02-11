@@ -21,7 +21,7 @@ interface SearchResult {
   land_factor?: number;
   waste_factor?: number;
   source?: string;
-  source_type?: 'primary' | 'staging' | 'global_library' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
+  source_type?: 'primary' | 'staging' | 'global_library' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'agribalyse_live' | 'defra';
   data_quality?: 'verified' | 'calculated' | 'estimated';
   data_quality_grade?: 'HIGH' | 'MEDIUM' | 'LOW';
   uncertainty_percent?: number;
@@ -41,6 +41,7 @@ interface SearchResponse {
     global_library: number;
     ecoinvent_proxy: number;
     ecoinvent_live: number;
+    agribalyse_live: number;
   };
   openlca_enabled: boolean;
 }
