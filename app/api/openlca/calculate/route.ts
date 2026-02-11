@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { OpenLCAClient } from '@/lib/openlca/client';
+import { OpenLCAClient, resolveDatabaseName } from '@/lib/openlca/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +59,8 @@ interface CalculateRequest {
   processId: string;
   quantity: number;
   organizationId: string;
+  /** Which OpenLCA database to calculate against (default: 'ecoinvent') */
+  database?: 'ecoinvent' | 'agribalyse';
 }
 
 export async function POST(request: NextRequest) {
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: CalculateRequest = await request.json();
-    const { processId, quantity, organizationId } = body;
+    const { processId, quantity, organizationId, database = 'ecoinvent' } = body;
 
     if (!processId || !quantity || !organizationId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -110,6 +112,7 @@ export async function POST(request: NextRequest) {
         .select('*')
         .eq('organization_id', organizationId)
         .eq('process_id', processId)
+        .eq('source_database', database)
         .gt('expires_at', new Date().toISOString())
         .maybeSingle();
 
@@ -127,6 +130,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         cached: true,
+        database: cached.source_database || database,
         impacts: {
           impact_climate: (cached.impact_climate || 0) * quantity,
           impact_climate_fossil: (cached.impact_climate_fossil || 0) * quantity,
@@ -163,18 +167,27 @@ export async function POST(request: NextRequest) {
       }, { status: 503 });
     }
 
-    // Get process info
-    const processInfo = await client.getProcess(processId);
-    // Calculate impacts using DUAL methods (per 1 kg)
-    // Run both calculations in parallel for performance
-    const [midpointImpacts, endpointImpacts] = await Promise.all([
-      client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
-      client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
-    ]);
-    if (midpointImpacts.length > 0) {
-    }
-    if (endpointImpacts.length > 0) {
-    }
+    // Resolve the target and default database names
+    const targetDbName = resolveDatabaseName(database);
+    const defaultDbName = resolveDatabaseName('ecoinvent');
+
+    // Switch to the requested database if not ecoinvent (the default)
+    // The withDatabase helper switches, executes, and switches back
+    const { processInfo, midpointImpacts, endpointImpacts } = await client.withDatabase(
+      targetDbName,
+      defaultDbName,
+      async () => {
+        // Get process info
+        const processInfo = await client.getProcess(processId);
+        // Calculate impacts using DUAL methods (per 1 kg)
+        // Run both calculations in parallel for performance
+        const [midpointImpacts, endpointImpacts] = await Promise.all([
+          client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
+          client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
+        ]);
+        return { processInfo, midpointImpacts, endpointImpacts };
+      }
+    );
 
     // Parse impacts into our format - combining midpoint and endpoint values
     const parsedImpacts: Record<string, number> = {
@@ -255,6 +268,7 @@ export async function POST(request: NextRequest) {
       const { error: cacheError } = await supabase.from('openlca_impact_cache').upsert({
         organization_id: organizationId,
         process_id: processId,
+        source_database: database,
         process_name: processInfo.name || 'Unknown',
         geography: (processInfo.location as any)?.code || 'GLO',
         quantity: 1,
@@ -276,14 +290,12 @@ export async function POST(request: NextRequest) {
         impact_mineral_resource_scarcity: parsedImpacts.impact_mineral_resource_scarcity,
         impact_fossil_resource_scarcity: parsedImpacts.impact_fossil_resource_scarcity,
         impact_method: 'ReCiPe 2016 Midpoint (H) + Endpoint (I)',
-        ecoinvent_version: '3.12',
-        system_model: 'cutoff',
-        // Note: endpoint fields (impact_ecosystem_damage, impact_land_biodiversity)
-        // will be added when cache table is updated
+        ecoinvent_version: database === 'agribalyse' ? 'agribalyse_3.2' : '3.12',
+        system_model: database === 'agribalyse' ? 'attributional' : 'cutoff',
         calculated_at: new Date().toISOString(),
         expires_at: expiresAt.toISOString(),
       }, {
-        onConflict: 'organization_id,process_id',
+        onConflict: 'organization_id,process_id,source_database',
       });
 
       if (cacheError) {
@@ -300,13 +312,15 @@ export async function POST(request: NextRequest) {
       scaledImpacts[key] = value * quantity;
     }
 
+    const dbLabel = database === 'agribalyse' ? 'Agribalyse 3.2' : 'ecoinvent 3.12';
     return NextResponse.json({
       success: true,
       cached: false,
+      database,
       impacts: scaledImpacts,
       processName: processInfo.name,
       geography: (processInfo.location as any)?.code || 'GLO',
-      source: `OpenLCA Live: ${processInfo.name} via ecoInvent 3.12`,
+      source: `OpenLCA Live: ${processInfo.name} via ${dbLabel}`,
       methods: {
         midpoint: 'ReCiPe 2016 v1.03, midpoint (H)',
         endpoint: 'ReCiPe 2016 v1.03, endpoint (I) no LT',

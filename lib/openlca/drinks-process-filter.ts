@@ -7,6 +7,8 @@
  */
 
 import { findMatchingAliases } from './drinks-aliases';
+import { getAgribalysePatterns, getPreferredDatabase } from './agribalyse-aliases';
+import type { OpenLCADatabaseSource } from './client';
 
 // ─── LAYER 1: ISIC CATEGORY FILTER ─────────────────────────────────────────
 
@@ -290,4 +292,226 @@ export function searchWithAliases(query: string, filteredProcesses: any[]): any[
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ─── AGRIBALYSE-SPECIFIC FILTERING ──────────────────────────────────────────
+
+/**
+ * Agribalyse uses CIQUAL-based food categories rather than ISIC codes.
+ * These patterns cover the main Agribalyse process name structures.
+ */
+const AGRIBALYSE_KEEP_PATTERNS = [
+  // Beverages & drinks
+  'wine', 'beer', 'cider', 'spirit', 'liqueur', 'juice',
+  'coffee', 'tea', 'cocoa', 'chocolate', 'beverage', 'drink',
+  'water, mineral', 'water, spring', 'water, tap',
+
+  // Dairy & plant milks
+  'milk', 'cream', 'yoghurt', 'yogurt', 'lait', 'crème',
+  'soy drink', 'oat drink', 'almond drink', 'coconut drink',
+  'boisson', // French: drink
+
+  // Fruits
+  'grape', 'apple', 'orange', 'lemon', 'lime', 'pineapple',
+  'mango', 'banana', 'berry', 'cherry', 'peach', 'pear',
+  'pomme', 'raisin', 'citron', 'ananas',
+
+  // Grains & cereals
+  'barley', 'wheat', 'corn', 'maize', 'rice', 'oat', 'rye',
+  'malt', 'orge', 'ble', 'blé', 'avoine',
+
+  // Sweeteners
+  'sugar', 'honey', 'syrup', 'sucre', 'miel', 'sirop',
+  'agave', 'maple',
+
+  // Botanicals & spices
+  'ginger', 'cinnamon', 'vanilla', 'mint', 'herb',
+  'gingembre', 'cannelle', 'vanille', 'menthe',
+  'juniper', 'elderflower', 'lavender', 'rosemary',
+
+  // Nuts
+  'almond', 'hazelnut', 'coconut', 'cashew', 'walnut',
+  'amande', 'noisette', 'noix',
+
+  // Packaging (Agribalyse includes some packaging processes)
+  'glass bottle', 'aluminium', 'cardboard', 'pet bottle', 'packaging',
+];
+
+const AGRIBALYSE_EXCLUDE_PATTERNS = [
+  // Non-drink food (we only want drinks-relevant)
+  'meat', 'beef', 'pork', 'chicken', 'fish', 'seafood',
+  'sausage', 'ham', 'viande', 'poisson',
+  'bread', 'pasta', 'pizza', 'cake', 'biscuit', 'pastry',
+  'soup', 'sauce', 'salad', 'vegetable dish',
+  // Non-food
+  'cosmetic', 'detergent', 'textile', 'clothing',
+];
+
+/**
+ * Filter Agribalyse processes to only drinks-relevant ones.
+ * Agribalyse uses different categorisation to ecoinvent, so this
+ * applies name-pattern-based filtering rather than ISIC categories.
+ *
+ * @param allProcesses - Full list of Agribalyse process descriptors
+ * @returns Filtered list of drinks-relevant Agribalyse processes
+ */
+export function filterAgribalyseProcesses(allProcesses: any[]): any[] {
+  return allProcesses.filter(process => {
+    const nameLower = (process.name || '').toLowerCase();
+
+    // Exclude non-drink food and non-food items
+    const isExcluded = AGRIBALYSE_EXCLUDE_PATTERNS.some(pattern =>
+      nameLower.includes(pattern)
+    );
+    if (isExcluded) return false;
+
+    // Keep if it matches any drinks-relevant pattern
+    return AGRIBALYSE_KEEP_PATTERNS.some(pattern =>
+      nameLower.includes(pattern)
+    );
+  });
+}
+
+/**
+ * Score an Agribalyse process's relevance to a search query.
+ * Similar to ecoinvent scoring but uses Agribalyse alias patterns
+ * and boosts French name variants.
+ */
+function scoreAgribalyseRelevance(
+  process: any,
+  queryLower: string,
+  queryWords: string[],
+  agribalysePatterns: string[]
+): number {
+  const nameLower = (process.name || '').toLowerCase();
+  let score = 0;
+
+  // Agribalyse alias pattern match — strongest boost
+  if (agribalysePatterns.length > 0) {
+    const matchesAlias = agribalysePatterns.some(pattern =>
+      nameLower.includes(pattern.toLowerCase())
+    );
+    if (matchesAlias) {
+      score += 100;
+    }
+  }
+
+  // Exact query appears as a word boundary in the name
+  const wordBoundaryRegex = new RegExp(`\\b${escapeRegex(queryLower)}\\b`);
+  if (wordBoundaryRegex.test(nameLower)) {
+    score += 20;
+  }
+
+  // All query words appear in name
+  const allWordsMatch = queryWords.every(word => nameLower.includes(word));
+  if (allWordsMatch) {
+    score += 10;
+  }
+
+  // Boost conventional vs organic (conventional is default/representative)
+  if (nameLower.includes('conventional')) {
+    score += 5;
+  }
+
+  // Penalise very long names
+  if (nameLower.length > 120) {
+    score -= 10;
+  }
+
+  return score;
+}
+
+/**
+ * Search Agribalyse processes with alias boosting.
+ *
+ * @param query - User search query
+ * @param filteredProcesses - Pre-filtered Agribalyse processes
+ * @returns Scored and sorted processes (highest relevance first)
+ */
+export function searchAgribalyseWithAliases(query: string, filteredProcesses: any[]): any[] {
+  const queryLower = query.toLowerCase().trim();
+  const queryWords = queryLower.split(/\s+/).filter(w => w.length > 1);
+
+  if (queryWords.length === 0) {
+    return [];
+  }
+
+  // Get Agribalyse-specific alias patterns
+  const agribalysePatterns = getAgribalysePatterns(query) || [];
+
+  const scored: ScoredProcess[] = [];
+
+  for (const process of filteredProcesses) {
+    const nameLower = (process.name || '').toLowerCase();
+
+    // Must match at least one query word OR an alias pattern
+    const matchesQuery = queryWords.some(word => nameLower.includes(word));
+    const matchesAlias = agribalysePatterns.some(pattern =>
+      nameLower.includes(pattern.toLowerCase())
+    );
+
+    if (!matchesQuery && !matchesAlias) {
+      continue;
+    }
+
+    const score = scoreAgribalyseRelevance(process, queryLower, queryWords, agribalysePatterns);
+    scored.push({ process, score });
+  }
+
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const nameA = a.process.name || '';
+    const nameB = b.process.name || '';
+    return nameA.localeCompare(nameB);
+  });
+
+  return scored.map(s => s.process);
+}
+
+// ─── DUAL-DATABASE SEARCH ───────────────────────────────────────────────────
+
+export interface DualDatabaseSearchResult {
+  /** Best-match processes from the preferred database */
+  preferred: any[];
+  /** Best-match processes from the secondary database (for comparison) */
+  secondary: any[];
+  /** Which database is preferred for this query */
+  preferredDatabase: OpenLCADatabaseSource;
+}
+
+/**
+ * Determine which database should be searched first for a given query,
+ * and return results from both databases for comparison.
+ *
+ * This enables the UI to show the user which database provided the best match
+ * and allows intelligent fallback when one database has no results.
+ *
+ * @param query - User search query
+ * @param ecoinventProcesses - Pre-filtered ecoinvent processes
+ * @param agribalyseProcesses - Pre-filtered Agribalyse processes
+ * @returns Results from both databases with preference indication
+ */
+export function searchBothDatabases(
+  query: string,
+  ecoinventProcesses: any[],
+  agribalyseProcesses: any[]
+): DualDatabaseSearchResult {
+  const preferredDb = getPreferredDatabase(query);
+
+  const ecoinventResults = searchWithAliases(query, ecoinventProcesses);
+  const agribalyseResults = searchAgribalyseWithAliases(query, agribalyseProcesses);
+
+  if (preferredDb === 'agribalyse') {
+    return {
+      preferred: agribalyseResults,
+      secondary: ecoinventResults,
+      preferredDatabase: 'agribalyse',
+    };
+  }
+
+  return {
+    preferred: ecoinventResults,
+    secondary: agribalyseResults,
+    preferredDatabase: 'ecoinvent',
+  };
 }

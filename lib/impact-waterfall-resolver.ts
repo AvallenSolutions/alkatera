@@ -1,5 +1,7 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { DEFAULT_AWARE_FACTOR, getAwareFactorValue } from './calculations/water-risk';
+import { getPreferredDatabase } from './openlca/agribalyse-aliases';
+import type { OpenLCADatabaseSource } from './openlca/client';
 // OpenLCA calculations now happen server-side via /api/openlca/calculate
 
 export type MaterialCategoryType =
@@ -23,6 +25,8 @@ export interface ProductMaterial {
   origin_country?: string;
   is_organic_certified?: boolean;
   category_type?: MaterialCategoryType;
+  /** Which OpenLCA database this process belongs to (ecoinvent or agribalyse) */
+  openlca_database?: OpenLCADatabaseSource;
 }
 
 export interface WaterfallResult {
@@ -531,34 +535,35 @@ export async function resolveImpactFactors(
 
   // ===========================================================
   // PRIORITY 2.5: OPENLCA LIVE CALCULATION
-  // (For materials linked to ecoInvent processes via OpenLCA)
-  // Higher priority than staging - uses real ecoInvent 3.12 data
-  // Calls server-side API to access OpenLCA IPC server
+  // (For materials linked to OpenLCA processes via ecoinvent or Agribalyse)
+  // Higher priority than staging - uses real ecoinvent 3.12 / Agribalyse 3.2 data
+  // Calls server-side API to access OpenLCA gdt-server
   // ===========================================================
-  // Debug: Log what we received from product_materials
+
+  // Determine which database to use:
+  // 1. If the material explicitly specifies a database (from product_materials.openlca_database), use that
+  // 2. Otherwise, use the Agribalyse alias logic to determine the preferred database
+  const materialDatabase: OpenLCADatabaseSource =
+    material.openlca_database || getPreferredDatabase(material.material_name);
+
   const willAttemptOpenLCA = material.data_source === 'openlca' && !!material.data_source_id && !!organizationId;
   console.log(`[Waterfall] Priority 2.5 check for ${material.material_name}:`, {
     data_source: material.data_source,
-    data_source_type: typeof material.data_source,
     data_source_id: material.data_source_id,
-    data_source_id_type: typeof material.data_source_id,
     organizationId: organizationId,
-    organizationId_type: typeof organizationId,
     will_attempt_openlca: willAttemptOpenLCA,
-    check_data_source: material.data_source === 'openlca',
-    check_data_source_id: !!material.data_source_id,
-    check_organizationId: !!organizationId,
+    preferred_database: materialDatabase,
   });
 
   if (material.data_source === 'openlca' && material.data_source_id && organizationId) {
-    console.log(`[Waterfall] Attempting Priority 2.5 (OpenLCA) for: ${material.material_name}`);
+    console.log(`[Waterfall] Attempting Priority 2.5 (OpenLCA / ${materialDatabase}) for: ${material.material_name}`);
 
     try {
       // Get auth token for API call
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.access_token) {
-        // Call server-side OpenLCA calculation API
+        // Call server-side OpenLCA calculation API with database parameter
         const response = await fetch('/api/openlca/calculate', {
           method: 'POST',
           headers: {
@@ -569,6 +574,7 @@ export async function resolveImpactFactors(
             processId: material.data_source_id,
             quantity: quantity_kg,
             organizationId: organizationId,
+            database: materialDatabase,
           }),
         });
 
@@ -576,7 +582,9 @@ export async function resolveImpactFactors(
           const result = await response.json();
 
           if (result.success && result.impacts) {
-            console.log(`[Waterfall] ✓ Priority 2.5 SUCCESS: OpenLCA calculation for ${material.material_name}`);
+            const dbLabel = result.database === 'agribalyse' ? 'Agribalyse 3.2' : 'ecoinvent 3.12';
+            const gwpSource = result.database === 'agribalyse' ? 'OpenLCA/Agribalyse' : 'OpenLCA/ecoinvent';
+            console.log(`[Waterfall] ✓ Priority 2.5 SUCCESS: OpenLCA calculation for ${material.material_name} via ${dbLabel}`);
             console.log(`[Waterfall] Climate impact: ${result.impacts.impact_climate?.toFixed(4)} kg CO2e`);
 
             // Build WaterfallResult from API response
@@ -606,11 +614,11 @@ export async function resolveImpactFactors(
               data_priority: 2,
               data_quality_tag: 'Secondary_Modelled',
               data_quality_grade: 'HIGH',
-              source_reference: result.source || `OpenLCA: ${result.processName} (${result.geography}) via ecoInvent 3.12`,
+              source_reference: result.source || `OpenLCA: ${result.processName} (${result.geography}) via ${dbLabel}`,
               confidence_score: 85,
-              methodology: 'ReCiPe 2016 Midpoint (H) / ecoInvent 3.12',
-              gwp_data_source: 'OpenLCA/ecoInvent',
-              non_gwp_data_source: 'OpenLCA/ecoInvent',
+              methodology: `ReCiPe 2016 Midpoint (H) / ${dbLabel}`,
+              gwp_data_source: gwpSource,
+              non_gwp_data_source: gwpSource,
               gwp_reference_id: material.data_source_id,
               non_gwp_reference_id: material.data_source_id,
               is_hybrid_source: false,
@@ -619,11 +627,11 @@ export async function resolveImpactFactors(
           }
         } else {
           const errorData = await response.json().catch(() => ({}));
-          console.warn(`[Waterfall] OpenLCA API error:`, errorData.error || response.statusText);
+          console.warn(`[Waterfall] OpenLCA API error (${materialDatabase}):`, errorData.error || response.statusText);
         }
       }
     } catch (error: any) {
-      console.warn(`[Waterfall] Priority 2.5 (OpenLCA) failed for ${material.material_name}:`, error.message);
+      console.warn(`[Waterfall] Priority 2.5 (OpenLCA/${materialDatabase}) failed for ${material.material_name}:`, error.message);
       // Fall through to Priority 3
     }
   }

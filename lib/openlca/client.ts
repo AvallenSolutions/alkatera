@@ -39,15 +39,79 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxDelayMs: 8000,
 };
 
+export type OpenLCADatabaseSource = 'ecoinvent' | 'agribalyse';
+
 export class OpenLCAClient {
   private baseUrl: string;
   private apiKey?: string;
   private retryConfig: RetryConfig;
+  private _activeDatabase: string | null = null;
 
   constructor(serverUrl: string, apiKey?: string, retryConfig?: Partial<RetryConfig>) {
     this.baseUrl = serverUrl.endsWith('/') ? serverUrl : `${serverUrl}/`;
     this.apiKey = apiKey;
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...retryConfig };
+  }
+
+  /**
+   * Get the currently active database name (if known)
+   */
+  get activeDatabase(): string | null {
+    return this._activeDatabase;
+  }
+
+  // ============================================================
+  // Database management (gdt-server multi-database support)
+  // ============================================================
+
+  /**
+   * List all available databases on the gdt-server
+   */
+  async listDatabases(): Promise<string[]> {
+    return this.get<string[]>('data/databases', 10000);
+  }
+
+  /**
+   * Switch the active database on the gdt-server.
+   * The server will activate the specified database for all subsequent
+   * requests. This affects ALL clients sharing the same server instance.
+   *
+   * @param databaseName - Name of the database to activate (e.g., 'agribalyse_32')
+   */
+  async switchDatabase(databaseName: string): Promise<void> {
+    console.log(`[OpenLCA] Switching database to: ${databaseName}`);
+    await this.put<void>(`data/databases/${databaseName}`, {});
+    this._activeDatabase = databaseName;
+    // Allow the server a moment to activate the database
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  /**
+   * Execute a function against a specific database, switching if necessary
+   * and switching back to the original database afterwards.
+   *
+   * @param targetDb - The database to run the operation against
+   * @param currentDb - The database to restore after the operation
+   * @param fn - The async function to execute while the target database is active
+   */
+  async withDatabase<T>(
+    targetDb: string,
+    currentDb: string,
+    fn: () => Promise<T>
+  ): Promise<T> {
+    const needsSwitch = this._activeDatabase !== targetDb;
+    if (needsSwitch) {
+      await this.switchDatabase(targetDb);
+    }
+    try {
+      return await fn();
+    } finally {
+      if (needsSwitch && currentDb) {
+        await this.switchDatabase(currentDb).catch(err => {
+          console.warn(`[OpenLCA] Failed to switch back to ${currentDb}:`, err.message);
+        });
+      }
+    }
   }
 
   // ============================================================
@@ -564,4 +628,22 @@ export function createOpenLCAClient(): OpenLCAClient | null {
   }
 
   return new OpenLCAClient(serverUrl, apiKey);
+}
+
+/**
+ * Resolve a database source label to the actual database name
+ * from environment configuration.
+ */
+export function resolveDatabaseName(source: OpenLCADatabaseSource): string {
+  if (source === 'agribalyse') {
+    return process.env.OPENLCA_DATABASE_AGRIBALYSE || 'agribalyse_32';
+  }
+  return process.env.OPENLCA_DATABASE_NAME || 'ecoinvent_312_cutoff';
+}
+
+/**
+ * Check whether the Agribalyse database is configured and available
+ */
+export function isAgribalyseConfigured(): boolean {
+  return !!(process.env.OPENLCA_DATABASE_AGRIBALYSE);
 }
