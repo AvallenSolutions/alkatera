@@ -99,6 +99,7 @@ export default function ProductRecipePage() {
       epr_ram_rating: undefined,
       epr_uk_nation: undefined,
       epr_is_drinks_container: false,
+      units_per_group: 1,
     }
   ]);
 
@@ -301,6 +302,7 @@ export default function ProductRecipePage() {
             epr_ram_rating: item.epr_ram_rating || undefined,
             epr_uk_nation: item.epr_uk_nation || undefined,
             epr_is_drinks_container: item.epr_is_drinks_container || false,
+            units_per_group: item.units_per_group || 1,
           };
         }));
       }
@@ -378,6 +380,7 @@ export default function ProductRecipePage() {
         epr_ram_rating: undefined,
         epr_uk_nation: undefined,
         epr_is_drinks_container: false,
+        units_per_group: 1,
       }
     ]);
   };
@@ -409,6 +412,7 @@ export default function ProductRecipePage() {
         epr_ram_rating: undefined,
         epr_uk_nation: undefined,
         epr_is_drinks_container: false,
+        units_per_group: 1,
       }
     ]);
     // Show a helpful toast

@@ -61,6 +61,7 @@ const createDefaultPackaging = (): PackagingFormData => ({
   epr_ram_rating: undefined,
   epr_uk_nation: undefined,
   epr_is_drinks_container: false,
+  units_per_group: 1,
 });
 
 // Simple fingerprint for comparing form states (ignores tempId)
@@ -259,6 +260,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             epr_ram_rating: item.epr_ram_rating || undefined,
             epr_uk_nation: item.epr_uk_nation || undefined,
             epr_is_drinks_container: item.epr_is_drinks_container || false,
+            units_per_group: item.units_per_group || 1,
           };
         });
         setPackagingForms(mappedPackaging);
@@ -517,6 +519,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
         if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;
         materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
+
+        // ISO 14044 allocation: units served by secondary/shipment/tertiary packaging
+        materialData.units_per_group = Number(form.units_per_group) || 1;
 
         return materialData;
       };

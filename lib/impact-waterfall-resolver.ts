@@ -22,6 +22,7 @@ export interface ProductMaterial {
   data_source_id?: string; // OpenLCA process UUID when data_source='openlca'
   supplier_product_id?: string;
   packaging_category?: string;
+  units_per_group?: number;
   origin_country?: string;
   is_organic_certified?: boolean;
   category_type?: MaterialCategoryType;

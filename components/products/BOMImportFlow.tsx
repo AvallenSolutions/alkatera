@@ -91,6 +91,7 @@ export function BOMImportFlow({
             epr_ram_rating: undefined,
             epr_uk_nation: undefined,
             epr_is_drinks_container: false,
+            units_per_group: 1,
           };
           packaging.push(packagingData);
         }

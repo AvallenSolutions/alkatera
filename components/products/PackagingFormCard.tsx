@@ -74,6 +74,7 @@ export interface PackagingFormData {
   epr_ram_rating?: EPRRAMRating;
   epr_uk_nation?: EPRUKNation;
   epr_is_drinks_container: boolean;
+  units_per_group: number | string;
 }
 
 interface ProductionFacility {
@@ -539,6 +540,8 @@ export function PackagingFormCard({
                                   // Reset weight fields
                                   net_weight_g: '',
                                   amount: '',
+                                  // Reset allocation field
+                                  units_per_group: '',
                                   // Reset origin & logistics fields
                                   origin_address: '',
                                   origin_lat: undefined,
@@ -692,6 +695,27 @@ export function PackagingFormCard({
                   The weight of one unit
                 </p>
               </div>
+
+              {/* Units Per Packaging — only for secondary/shipment/tertiary (ISO 14044 allocation) */}
+              {packaging.packaging_category && ['secondary', 'shipment', 'tertiary'].includes(packaging.packaging_category) && (
+                <div>
+                  <Label htmlFor={`units-per-group-${packaging.tempId}`}>
+                    Units Per Packaging <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id={`units-per-group-${packaging.tempId}`}
+                    type="number"
+                    step="1"
+                    min="1"
+                    placeholder="e.g. 24"
+                    value={packaging.units_per_group}
+                    onChange={(e) => onUpdate(packaging.tempId, { units_per_group: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    How many product units does this packaging contain? (e.g. 24 for a case of 24 bottles). The environmental impact will be divided by this number.
+                  </p>
+                </div>
+              )}
 
               {/* EPR Material Breakdown Section */}
               <PackagingComponentEditor

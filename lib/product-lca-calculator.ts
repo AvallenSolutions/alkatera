@@ -508,6 +508,41 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           }
         }
 
+        // ISO 14044 §4.3.4.2 — Physical allocation for shared packaging
+        // Secondary/shipment/tertiary packaging serves multiple product units.
+        // Divide all impacts by units_per_group to get the per-unit share.
+        // Primary packaging (container/label/closure) always has units_per_group=1 (no-op).
+        const unitsPerGroup = (
+          material.material_type === 'packaging' &&
+          material.packaging_category &&
+          ['secondary', 'shipment', 'tertiary'].includes(material.packaging_category) &&
+          (material as any).units_per_group &&
+          Number((material as any).units_per_group) > 1
+        ) ? Number((material as any).units_per_group) : 1;
+
+        if (unitsPerGroup > 1) {
+          console.log(`[calculateProductCarbonFootprint] Applying packaging allocation: ÷${unitsPerGroup} units for ${material.material_name}`);
+          // Divide all resolved impact values by units served
+          resolved.impact_climate /= unitsPerGroup;
+          resolved.impact_climate_fossil /= unitsPerGroup;
+          resolved.impact_climate_biogenic /= unitsPerGroup;
+          resolved.impact_climate_dluc /= unitsPerGroup;
+          if (resolved.ch4_kg) resolved.ch4_kg /= unitsPerGroup;
+          if (resolved.ch4_fossil_kg) resolved.ch4_fossil_kg /= unitsPerGroup;
+          if (resolved.ch4_biogenic_kg) resolved.ch4_biogenic_kg /= unitsPerGroup;
+          if (resolved.n2o_kg) resolved.n2o_kg /= unitsPerGroup;
+          resolved.impact_water /= unitsPerGroup;
+          resolved.impact_water_scarcity /= unitsPerGroup;
+          resolved.impact_land /= unitsPerGroup;
+          resolved.impact_waste /= unitsPerGroup;
+          if (resolved.impact_terrestrial_ecotoxicity) resolved.impact_terrestrial_ecotoxicity /= unitsPerGroup;
+          if (resolved.impact_freshwater_eutrophication) resolved.impact_freshwater_eutrophication /= unitsPerGroup;
+          if (resolved.impact_terrestrial_acidification) resolved.impact_terrestrial_acidification /= unitsPerGroup;
+          if (resolved.impact_fossil_resource_scarcity) resolved.impact_fossil_resource_scarcity /= unitsPerGroup;
+          // Transport of the packaging itself is also shared
+          transportEmissions /= unitsPerGroup;
+        }
+
         // Build LCA material record with all impact data
         // Note: data_source must be 'openlca', 'supplier', or NULL per constraint
         // For staging factors, we use NULL
@@ -527,6 +562,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           unit: 'kg',
           unit_name: material.unit,
           packaging_category: material.packaging_category,
+          units_per_group: unitsPerGroup,
           origin_country: material.origin_country,
           country_of_origin: material.origin_country,
           is_organic: material.is_organic_certified,
@@ -579,7 +615,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         lcaMaterialsWithImpacts.push(lcaMaterial);
 
         const totalMaterialEmissions = resolved.impact_climate + transportEmissions;
-        console.log(`[calculateProductCarbonFootprint] ✓ Resolved ${material.material_name}: ${resolved.impact_climate.toFixed(3)} kg CO2e + ${transportEmissions.toFixed(3)} kg transport = ${totalMaterialEmissions.toFixed(3)} kg CO2e total (Priority ${resolved.data_priority})`);
+        const allocationNote = unitsPerGroup > 1 ? ` (allocated ÷${unitsPerGroup} units)` : '';
+        console.log(`[calculateProductCarbonFootprint] ✓ Resolved ${material.material_name}: ${resolved.impact_climate.toFixed(3)} kg CO2e + ${transportEmissions.toFixed(3)} kg transport = ${totalMaterialEmissions.toFixed(3)} kg CO2e total (Priority ${resolved.data_priority})${allocationNote}`);
 
       } catch (error: any) {
         console.error(`[calculateProductCarbonFootprint] ✗ Failed to resolve ${material.material_name}:`, error.message);
