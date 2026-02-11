@@ -64,7 +64,9 @@ export default function ItemDetailPage() {
 
       const { data, error } = await supabase.storage
         .from('knowledge-bank-files')
-        .createSignedUrl(storagePath, 3600) // 1 hour expiry
+        .createSignedUrl(storagePath, 3600, {
+          download: item.file_name || true, // Use original filename for downloads
+        })
 
       if (data?.signedUrl) {
         setSignedUrl(data.signedUrl)
