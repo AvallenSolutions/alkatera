@@ -41,11 +41,39 @@ export default function ItemDetailPage() {
   const [isFavorited, setIsFavorited] = useState(false)
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false)
   const [viewRecorded, setViewRecorded] = useState(false)
+  const [signedUrl, setSignedUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (item) {
       setIsFavorited(item.is_favorited || false)
     }
+  }, [item])
+
+  // Generate a signed URL for private storage files
+  // External links (content_type === 'link') use file_url directly as it's a URL, not a storage path
+  useEffect(() => {
+    async function generateSignedUrl() {
+      if (!item?.file_url || item.content_type === 'link') return
+
+      // Handle both legacy full URLs and new path-only format
+      let storagePath = item.file_url
+      const bucketPrefix = '/storage/v1/object/public/knowledge-bank-files/'
+      if (storagePath.includes(bucketPrefix)) {
+        storagePath = storagePath.split(bucketPrefix).pop() || storagePath
+      }
+
+      const { data, error } = await supabase.storage
+        .from('knowledge-bank-files')
+        .createSignedUrl(storagePath, 3600) // 1 hour expiry
+
+      if (data?.signedUrl) {
+        setSignedUrl(data.signedUrl)
+      } else if (error) {
+        console.error('Error generating signed URL:', error)
+      }
+    }
+
+    generateSignedUrl()
   }, [item])
 
   useEffect(() => {
@@ -124,7 +152,7 @@ export default function ItemDetailPage() {
   }
 
   const handleDownload = async () => {
-    if (!item?.file_url) return
+    if (!signedUrl && !item?.file_url) return
 
     try {
       const { error: rpcError } = await supabase.rpc('increment', {
@@ -140,7 +168,7 @@ export default function ItemDetailPage() {
           .eq('id', itemId)
       }
 
-      window.open(item.file_url, '_blank')
+      window.open(signedUrl || item?.file_url || '', '_blank')
       toast.success('Download started')
     } catch (error) {
       console.error('Error downloading file:', error)
@@ -249,10 +277,10 @@ export default function ItemDetailPage() {
 
               <Separator />
 
-              {item.content_type === 'video' && item.file_url && (
+              {item.content_type === 'video' && item.file_url && signedUrl && (
                 <div className="aspect-video bg-muted rounded-lg overflow-hidden">
                   <video controls className="w-full h-full">
-                    <source src={item.file_url} />
+                    <source src={signedUrl} />
                     Your browser does not support the video tag.
                   </video>
                 </div>
@@ -279,16 +307,18 @@ export default function ItemDetailPage() {
 
               {item.content_type === 'document' && item.file_url && (
                 <div className="flex gap-3">
-                  <Button onClick={handleDownload} className="flex-1">
+                  <Button onClick={handleDownload} className="flex-1" disabled={!signedUrl}>
                     <Download className="mr-2 h-4 w-4" />
-                    Download Document
+                    {signedUrl ? 'Download Document' : 'Preparing download...'}
                   </Button>
-                  <Button variant="outline" asChild>
-                    <a href={item.file_url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      Open
-                    </a>
-                  </Button>
+                  {signedUrl && (
+                    <Button variant="outline" asChild>
+                      <a href={signedUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Open
+                      </a>
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>

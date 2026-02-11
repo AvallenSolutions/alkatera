@@ -77,11 +77,9 @@ export default function NewResourcePage() {
 
         if (uploadError) throw uploadError
 
-        const { data: urlData } = supabase.storage
-          .from('knowledge-bank-files')
-          .getPublicUrl(filePath)
-
-        fileUrl = urlData.publicUrl
+        // Store the storage path (not a public URL) — the bucket is private,
+        // so we generate signed URLs at download/view time instead.
+        fileUrl = filePath
         fileName = file.name
         fileSize = file.size
         mimeType = file.type
