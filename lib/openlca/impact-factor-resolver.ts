@@ -432,7 +432,7 @@ export async function getOpenLCAConfig(
     console.log('[OpenLCA] Using environment variable configuration');
     return {
       serverUrl: envServerUrl,
-      databaseName: process.env.OPENLCA_DATABASE_NAME || 'ecoinvent_312_cutoff',
+      databaseName: 'ecoinvent_312_cutoff',
       preferredSystemModel: 'cutoff',
       defaultAllocationMethod: 'economic',
     };

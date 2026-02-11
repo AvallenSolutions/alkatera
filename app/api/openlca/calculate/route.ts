@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { OpenLCAClient, resolveDatabaseName } from '@/lib/openlca/client';
+import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
 
 export const dynamic = 'force-dynamic';
-
-const OPENLCA_SERVER_URL = process.env.OPENLCA_SERVER_URL;
-const OPENLCA_SERVER_ENABLED = process.env.OPENLCA_SERVER_ENABLED === 'true';
 
 // ReCiPe 2016 MIDPOINT impact category mapping (problem-oriented: kg CO2-eq, m³, etc.)
 const MIDPOINT_CATEGORY_MAPPING: Record<string, string> = {
@@ -98,12 +95,26 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if OpenLCA is enabled
-    if (!OPENLCA_SERVER_URL || !OPENLCA_SERVER_ENABLED) {
+    if (process.env.OPENLCA_SERVER_ENABLED !== 'true') {
       return NextResponse.json({
         error: 'OpenLCA not configured',
         message: 'Set OPENLCA_SERVER_URL and OPENLCA_SERVER_ENABLED=true',
       }, { status: 503 });
     }
+
+    // Create OpenLCA client for the requested database (dual-server architecture)
+    // Each database source (ecoinvent / agribalyse) has its own gdt-server instance
+    const client = createOpenLCAClientForDatabase(database);
+    if (!client) {
+      const dbLabel = database === 'agribalyse' ? 'Agribalyse' : 'ecoinvent';
+      return NextResponse.json({
+        error: `OpenLCA ${dbLabel} server not configured`,
+        message: database === 'agribalyse'
+          ? 'Set OPENLCA_AGRIBALYSE_SERVER_URL to enable Agribalyse calculations'
+          : 'Set OPENLCA_SERVER_URL to enable ecoinvent calculations',
+      }, { status: 503 });
+    }
+
     // Check cache first (gracefully handle missing table)
     let cached = null;
     try {
@@ -154,40 +165,22 @@ export async function POST(request: NextRequest) {
         source: `OpenLCA Cache: ${cached.process_name}`,
       });
     }
-    // Create OpenLCA client with API key for authenticated access
-    const OPENLCA_API_KEY = process.env.OPENLCA_API_KEY;
-    const client = new OpenLCAClient(OPENLCA_SERVER_URL, OPENLCA_API_KEY);
-
-    // Health check
+    // Health check against the target server
     const isHealthy = await client.healthCheck();
     if (!isHealthy) {
+      const dbLabel = database === 'agribalyse' ? 'Agribalyse' : 'ecoinvent';
       return NextResponse.json({
-        error: 'OpenLCA server not reachable',
-        serverUrl: OPENLCA_SERVER_URL,
+        error: `OpenLCA ${dbLabel} server not reachable`,
       }, { status: 503 });
     }
 
-    // Resolve the target and default database names
-    const targetDbName = resolveDatabaseName(database);
-    const defaultDbName = resolveDatabaseName('ecoinvent');
-
-    // Switch to the requested database if not ecoinvent (the default)
-    // The withDatabase helper switches, executes, and switches back
-    const { processInfo, midpointImpacts, endpointImpacts } = await client.withDatabase(
-      targetDbName,
-      defaultDbName,
-      async () => {
-        // Get process info
-        const processInfo = await client.getProcess(processId);
-        // Calculate impacts using DUAL methods (per 1 kg)
-        // Run both calculations in parallel for performance
-        const [midpointImpacts, endpointImpacts] = await Promise.all([
-          client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
-          client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
-        ]);
-        return { processInfo, midpointImpacts, endpointImpacts };
-      }
-    );
+    // Get process info and calculate impacts using DUAL methods (per 1 kg)
+    // No database switching needed — client is already pointed at the correct server
+    const processInfo = await client.getProcess(processId);
+    const [midpointImpacts, endpointImpacts] = await Promise.all([
+      client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
+      client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
+    ]);
 
     // Parse impacts into our format - combining midpoint and endpoint values
     const parsedImpacts: Record<string, number> = {

@@ -2,33 +2,38 @@
 /**
  * Agribalyse v3.2 Factor Extraction Script
  *
- * Connects to the local OpenLCA gdt-server, switches to the Agribalyse
- * database, searches for drinks-relevant processes, calculates impacts
- * using ReCiPe 2016 Midpoint (H), and outputs a SQL migration file
- * for inserting into staging_emission_factors.
+ * Connects to the Agribalyse gdt-server instance, searches for
+ * drinks-relevant processes, calculates impacts using ReCiPe 2016
+ * Midpoint (H), and outputs a SQL migration file for inserting
+ * into staging_emission_factors.
+ *
+ * Architecture: Uses the dual-server approach — the Agribalyse
+ * gdt-server runs as a separate instance from the ecoinvent server.
+ * No database switching is needed.
  *
  * Prerequisites:
- *   1. OpenLCA running locally with gdt-server at http://localhost:8888
- *   2. Agribalyse v3.2 .zolca imported as a separate database
+ *   1. Agribalyse gdt-server running (local or cloud)
+ *   2. Agribalyse v3.2 database loaded in that server
  *   3. ReCiPe 2016 v1.03 Midpoint (H) impact method available
  *
  * Usage:
  *   npx tsx scripts/extract-agribalyse-factors.ts
  *
  * Environment overrides:
- *   OPENLCA_URL          (default: http://localhost:8888)
- *   AGRIBALYSE_DB_NAME   (default: agribalyse_32)
- *   ECOINVENT_DB_NAME    (default: ecoinvent_312_cutoff)
- *   OUTPUT_SQL           (default: supabase/migrations/20260215000000_agribalyse_factor_integration.sql)
+ *   OPENLCA_AGRIBALYSE_URL  (default: http://localhost:8081)
+ *   OPENLCA_AGRIBALYSE_API_KEY  (optional: API key for cloud server)
+ *   OUTPUT_SQL              (default: supabase/migrations/20260215000000_agribalyse_factor_integration.sql)
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 
 // ─── Configuration ─────────────────────────────────────────────────
-const OPENLCA_URL = process.env.OPENLCA_URL || 'http://localhost:8888';
-const AGRIBALYSE_DB = process.env.AGRIBALYSE_DB_NAME || 'agribalyse_32';
-const ECOINVENT_DB = process.env.ECOINVENT_DB_NAME || 'ecoinvent_312_cutoff';
+// Connects directly to the Agribalyse gdt-server (no database switching)
+const AGRIBALYSE_SERVER_URL = process.env.OPENLCA_AGRIBALYSE_URL
+  || process.env.OPENLCA_AGRIBALYSE_SERVER_URL
+  || 'http://localhost:8081';
+const AGRIBALYSE_API_KEY = process.env.OPENLCA_AGRIBALYSE_API_KEY || '';
 const OUTPUT_SQL = process.env.OUTPUT_SQL || path.join(
   __dirname, '..', 'supabase', 'migrations',
   '20260215000000_agribalyse_factor_integration.sql'
@@ -521,32 +526,29 @@ const TARGET_INGREDIENTS: TargetIngredient[] = [
 
 
 // ─── gdt-server REST API helpers ──────────────────────────────────
-async function gdtFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const url = `${OPENLCA_URL}/${path}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-  });
+async function gdtFetch<T>(endpointPath: string, options?: RequestInit): Promise<T> {
+  const baseUrl = AGRIBALYSE_SERVER_URL.endsWith('/')
+    ? AGRIBALYSE_SERVER_URL.slice(0, -1)
+    : AGRIBALYSE_SERVER_URL;
+  const url = `${baseUrl}/${endpointPath}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+  if (AGRIBALYSE_API_KEY) {
+    headers['X-API-Key'] = AGRIBALYSE_API_KEY;
+  }
+
+  const response = await fetch(url, { ...options, headers });
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'unknown');
-    throw new Error(`gdt-server ${response.status}: ${errorText} (${path})`);
+    throw new Error(`gdt-server ${response.status}: ${errorText} (${endpointPath})`);
   }
 
   const text = await response.text();
   if (!text.trim()) return undefined as T;
   return JSON.parse(text) as T;
-}
-
-async function listDatabases(): Promise<string[]> {
-  return gdtFetch<string[]>('data/databases');
-}
-
-async function switchDatabase(name: string): Promise<void> {
-  console.log(`  Switching to database: ${name}`);
-  await gdtFetch<void>(`data/databases/${name}`, { method: 'PUT' });
-  // Give the server a moment to activate
-  await new Promise(r => setTimeout(r, 1500));
 }
 
 interface Ref {
@@ -802,35 +804,25 @@ async function main() {
   console.log('╚══════════════════════════════════════════════════════════╝');
   console.log('');
 
-  // Step 1: Connect and verify
-  console.log('1. Connecting to OpenLCA gdt-server...');
-  let databases: string[];
+  // Step 1: Connect to Agribalyse server and verify
+  console.log(`1. Connecting to Agribalyse gdt-server at ${AGRIBALYSE_SERVER_URL}...`);
   try {
-    databases = await listDatabases();
-    console.log(`   Connected. Available databases: ${databases.join(', ')}`);
+    // Simple health check — fetch processes list
+    const testResponse = await gdtFetch<any[]>('data/processes');
+    console.log(`   Connected. Server has ${testResponse?.length || 0} processes.`);
   } catch (err: any) {
-    console.error(`   ERROR: Cannot connect to ${OPENLCA_URL}`);
-    console.error(`   Make sure OpenLCA is running with gdt-server enabled.`);
+    console.error(`   ERROR: Cannot connect to Agribalyse server at ${AGRIBALYSE_SERVER_URL}`);
+    console.error(`   Make sure the Agribalyse gdt-server is running.`);
     console.error(`   ${err.message}`);
     process.exit(1);
   }
 
-  // Step 2: Switch to Agribalyse
-  console.log('\n2. Switching to Agribalyse database...');
-  if (!databases.includes(AGRIBALYSE_DB)) {
-    console.error(`   ERROR: Database "${AGRIBALYSE_DB}" not found.`);
-    console.error(`   Available databases: ${databases.join(', ')}`);
-    console.error(`   Import the Agribalyse .zolca file into OpenLCA first.`);
-    process.exit(1);
-  }
-  await switchDatabase(AGRIBALYSE_DB);
-
-  // Step 3: Load processes and find impact method
-  console.log('\n3. Loading Agribalyse processes...');
+  // Step 2: Load processes and find impact method
+  console.log('\n2. Loading Agribalyse processes...');
   const allProcesses = await getAllProcesses();
   console.log(`   Found ${allProcesses.length} processes in Agribalyse.`);
 
-  console.log('\n4. Finding ReCiPe 2016 impact method...');
+  console.log('\n3. Finding ReCiPe 2016 impact method...');
   const allMethods = await getAllImpactMethods();
   const recipeMethod = allMethods.find(m => {
     const name = (m.name || '').toLowerCase();
@@ -846,7 +838,7 @@ async function main() {
   console.log(`   Using: ${recipeMethod.name} (${recipeMethod['@id']})`);
 
   // Step 4: Extract factors
-  console.log(`\n5. Extracting factors for ${TARGET_INGREDIENTS.length} target ingredients...\n`);
+  console.log(`\n4. Extracting factors for ${TARGET_INGREDIENTS.length} target ingredients...\n`);
 
   const extracted: ExtractedFactor[] = [];
   const notFound: string[] = [];
@@ -881,17 +873,8 @@ async function main() {
     }
   }
 
-  // Step 5: Switch back to ecoinvent
-  console.log('\n6. Switching back to ecoinvent database...');
-  try {
-    await switchDatabase(ECOINVENT_DB);
-    console.log('   Done.');
-  } catch {
-    console.warn('   Warning: Could not switch back to ecoinvent. Switch manually in OpenLCA.');
-  }
-
-  // Step 6: Generate SQL
-  console.log(`\n7. Generating SQL migration...`);
+  // Step 5: Generate SQL
+  console.log(`\n5. Generating SQL migration...`);
   const sql = generateSQL(extracted);
 
   const outputDir = path.dirname(OUTPUT_SQL);

@@ -17,7 +17,7 @@ export * from './impact-factor-resolver';
 export * from './drinks-process-filter';
 export * from './drinks-aliases';
 
-export { OpenLCAClient, createOpenLCAClient } from './client';
+export { OpenLCAClient, createOpenLCAClient, createOpenLCAClientForDatabase, resolveServerConfig } from './client';
 export { RecipeBuilder, convertMaterialsToRecipe } from './recipe-builder';
 export { OpenLCACalculator } from './calculator';
 export {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { filterDrinksRelevantProcesses, searchWithAliases } from '@/lib/openlca/drinks-process-filter';
+import { filterDrinksRelevantProcesses, searchWithAliases, filterAgribalyseProcesses, searchAgribalyseWithAliases } from '@/lib/openlca/drinks-process-filter';
+import { createOpenLCAClientForDatabase, isAgribalyseConfigured } from '@/lib/openlca/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ interface SearchResult {
   land_factor?: number;
   waste_factor?: number;
   source: string;
-  source_type: 'primary' | 'staging' | 'global_library' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'defra';
+  source_type: 'primary' | 'staging' | 'global_library' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'agribalyse_live' | 'defra';
   data_quality?: 'verified' | 'calculated' | 'estimated';
   data_quality_grade?: 'HIGH' | 'MEDIUM' | 'LOW';
   uncertainty_percent?: number;
@@ -23,15 +24,16 @@ interface SearchResult {
   metadata?: Record<string, any>;
 }
 
-const OPENLCA_SERVER_URL = process.env.OPENLCA_SERVER_URL;
-const OPENLCA_SERVER_ENABLED = process.env.OPENLCA_SERVER_ENABLED === 'true';
-const OPENLCA_API_KEY = process.env.OPENLCA_API_KEY;
-
-// Cache the process list in memory to avoid fetching 23k+ processes on every search
+// Cache the ecoinvent process list in memory to avoid fetching 23k+ processes on every search
 let cachedProcesses: any[] | null = null;
 let cachedFilteredProcesses: any[] | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+
+// Separate cache for Agribalyse processes (different server)
+let cachedAgribalyseProcesses: any[] | null = null;
+let cachedAgribalyseFilteredProcesses: any[] | null = null;
+let agribalyseCacheTimestamp: number = 0;
 
 async function getOpenLCAProcesses(): Promise<any[]> {
   // Return cached processes if still valid
@@ -39,35 +41,46 @@ async function getOpenLCAProcesses(): Promise<any[]> {
     return cachedProcesses;
   }
 
-  if (!OPENLCA_SERVER_URL || !OPENLCA_SERVER_ENABLED) {
+  const client = createOpenLCAClientForDatabase('ecoinvent');
+  if (!client || process.env.OPENLCA_SERVER_ENABLED !== 'true') {
     return [];
   }
 
   try {
-    const headers: Record<string, string> = {};
-    if (OPENLCA_API_KEY) {
-      headers['X-API-Key'] = OPENLCA_API_KEY;
-    }
-
-    // gdt-server REST API: GET /data/processes returns all process descriptors
-    const serverUrl = OPENLCA_SERVER_URL.endsWith('/') ? OPENLCA_SERVER_URL : `${OPENLCA_SERVER_URL}/`;
-    const response = await fetch(`${serverUrl}data/processes`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      console.error('OpenLCA server error:', response.status);
-      return [];
-    }
-
-    const result = await response.json();
-    cachedProcesses = Array.isArray(result) ? result : [];
+    const processes = await client.getAllProcesses();
+    cachedProcesses = Array.isArray(processes) ? processes : [];
     cachedFilteredProcesses = filterDrinksRelevantProcesses(cachedProcesses);
     cacheTimestamp = Date.now();
     return cachedProcesses;
   } catch (error) {
-    console.error('Error fetching OpenLCA processes:', error);
+    console.error('Error fetching ecoinvent OpenLCA processes:', error);
+    return [];
+  }
+}
+
+async function getAgribalyseProcesses(): Promise<any[]> {
+  // Return cached processes if still valid
+  if (cachedAgribalyseProcesses && Date.now() - agribalyseCacheTimestamp < CACHE_DURATION_MS) {
+    return cachedAgribalyseProcesses;
+  }
+
+  if (!isAgribalyseConfigured()) {
+    return [];
+  }
+
+  const client = createOpenLCAClientForDatabase('agribalyse');
+  if (!client) {
+    return [];
+  }
+
+  try {
+    const processes = await client.getAllProcesses();
+    cachedAgribalyseProcesses = Array.isArray(processes) ? processes : [];
+    cachedAgribalyseFilteredProcesses = filterAgribalyseProcesses(cachedAgribalyseProcesses);
+    agribalyseCacheTimestamp = Date.now();
+    return cachedAgribalyseProcesses;
+  } catch (error) {
+    console.error('Error fetching Agribalyse OpenLCA processes:', error);
     return [];
   }
 }
@@ -107,6 +120,40 @@ async function searchOpenLCAProcesses(query: string): Promise<SearchResult[]> {
       metadata: {
         openlca_id: process['@id'],
         system_model: systemModel,
+        flow_type: process.flowType,
+      },
+    };
+  });
+}
+
+async function searchAgribalyseOpenLCAProcesses(query: string): Promise<SearchResult[]> {
+  // Ensure Agribalyse processes are loaded and filtered
+  await getAgribalyseProcesses();
+
+  if (!cachedAgribalyseFilteredProcesses || cachedAgribalyseFilteredProcesses.length === 0) {
+    return [];
+  }
+
+  // Use Agribalyse-specific alias-boosted search (includes French name support)
+  const rankedProcesses = searchAgribalyseWithAliases(query, cachedAgribalyseFilteredProcesses);
+
+  return rankedProcesses.slice(0, 20).map((process: any) => {
+    const location = process.location || '';
+    const name = process.name || 'Unnamed Process';
+
+    return {
+      id: process['@id'] || process.id,
+      name: name,
+      category: process.category || 'Uncategorized',
+      unit: 'kg',
+      processType: process.processType || 'LCI_RESULT',
+      location: location,
+      source: 'Agribalyse 3.2',
+      source_type: 'agribalyse_live' as const,
+      data_quality: 'calculated' as const,
+      metadata: {
+        openlca_id: process['@id'],
+        database: 'agribalyse',
         flow_type: process.flowType,
       },
     };
@@ -181,6 +228,7 @@ export async function GET(request: NextRequest) {
       stagingResults,
       ecoinventProxyResults,
       openLCAResults,
+      agribalyseResults,
     ] = await Promise.all([
       // SOURCE 1: Verified Supplier Products (Primary Data)
       organizationId ? (async () => {
@@ -305,8 +353,11 @@ export async function GET(request: NextRequest) {
         }));
       })(),
 
-      // SOURCE 4: Live OpenLCA Search
+      // SOURCE 4: Live OpenLCA Search (ecoinvent)
       searchOpenLCAProcesses(query),
+
+      // SOURCE 5: Live Agribalyse Search (if configured)
+      searchAgribalyseOpenLCAProcesses(query),
     ]);
 
     // Combine all results
@@ -314,6 +365,7 @@ export async function GET(request: NextRequest) {
     allResults.push(...stagingResults);
     allResults.push(...ecoinventProxyResults);
     allResults.push(...openLCAResults);
+    allResults.push(...agribalyseResults);
 
     // Sort results: Primary first, then by relevance (exact matches first)
     const sortOrder: Record<string, number> = {
@@ -321,8 +373,9 @@ export async function GET(request: NextRequest) {
       'staging': 1,
       'global_library': 2,
       'ecoinvent_proxy': 3,
-      'ecoinvent_live': 4,
-      'defra': 5,
+      'agribalyse_live': 4,
+      'ecoinvent_live': 5,
+      'defra': 6,
     };
 
     allResults.sort((a, b) => {
@@ -361,6 +414,7 @@ export async function GET(request: NextRequest) {
             staging: stagingResults.length,
             ecoinvent_proxy: ecoinventProxyResults.length,
             ecoinvent_live: openLCAResults.length,
+            agribalyse_live: agribalyseResults.length,
           },
         }),
       }); // Fire-and-forget
@@ -375,8 +429,10 @@ export async function GET(request: NextRequest) {
         global_library: globalLibraryCount,
         ecoinvent_proxy: ecoinventProxyResults.length,
         ecoinvent_live: openLCAResults.length,
+        agribalyse_live: agribalyseResults.length,
       },
-      openlca_enabled: OPENLCA_SERVER_ENABLED,
+      openlca_enabled: process.env.OPENLCA_SERVER_ENABLED === 'true',
+      agribalyse_enabled: isAgribalyseConfigured(),
     });
 
   } catch (error) {
