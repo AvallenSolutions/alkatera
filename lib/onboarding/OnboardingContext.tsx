@@ -50,6 +50,10 @@ interface OnboardingContextType {
   dismissOnboarding: () => void
   /** Mark the post-onboarding dashboard guide as completed */
   markGuideCompleted: () => void
+  /** Mark the search guide as completed (dismissed) */
+  markSearchGuideCompleted: () => void
+  /** Re-enable the search guide */
+  resetSearchGuide: () => void
   /** Reset onboarding (for testing) */
   resetOnboarding: () => void
 }
@@ -283,6 +287,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const markSearchGuideCompleted = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      searchGuideCompleted: true,
+    }))
+  }, [updateState])
+
+  const resetSearchGuide = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      searchGuideCompleted: false,
+    }))
+  }, [updateState])
+
   const resetOnboarding = useCallback(() => {
     sessionDismissedRef.current = false
     const fresh = { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() }
@@ -318,6 +336,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         completeOnboarding,
         dismissOnboarding,
         markGuideCompleted,
+        markSearchGuideCompleted,
+        resetSearchGuide,
         resetOnboarding,
       }}
     >

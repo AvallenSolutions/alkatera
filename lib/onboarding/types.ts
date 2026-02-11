@@ -135,6 +135,8 @@ export interface OnboardingState {
   completedAt?: string
   /** Whether the post-onboarding dashboard guide has been completed */
   dashboardGuideCompleted?: boolean
+  /** Whether the ingredient/packaging search guide has been dismissed */
+  searchGuideCompleted?: boolean
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {
@@ -144,6 +146,7 @@ export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   completedSteps: [],
   personalization: {},
   dashboardGuideCompleted: false,
+  searchGuideCompleted: false,
 }
 
 export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {

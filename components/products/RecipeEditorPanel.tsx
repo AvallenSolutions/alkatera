@@ -13,16 +13,15 @@ import {
   Info,
   Plus,
   Sparkles,
-  Settings,
   Upload,
   Wine,
 } from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
 import { PackagingFormCard } from "@/components/products/PackagingFormCard";
-import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import { MaturationProfileCard } from "@/components/products/MaturationProfileCard";
+import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
@@ -47,7 +46,6 @@ export function RecipeEditorPanel({
 }: RecipeEditorPanelProps) {
   const { currentOrganization } = useOrganization();
   const [activeTab, setActiveTab] = useState(initialTab);
-  const [showOpenLCAConfig, setShowOpenLCAConfig] = useState(false);
   const [showBOMImport, setShowBOMImport] = useState(false);
 
   const {
@@ -160,17 +158,11 @@ export function RecipeEditorPanel({
               <Upload className="h-3 w-3 mr-1" />
               Import BOM
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowOpenLCAConfig(true)}
-            >
-              <Settings className="h-3 w-3 mr-1" />
-              OpenLCA
-            </Button>
           </div>
         </div>
       )}
+
+      <SearchGuidePanel />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className={compact ? "grid w-full grid-cols-3" : "grid w-full grid-cols-4"}>
@@ -424,10 +416,6 @@ export function RecipeEditorPanel({
         </TabsContent>
       </Tabs>
 
-      <OpenLCAConfigDialog
-        open={showOpenLCAConfig}
-        onOpenChange={setShowOpenLCAConfig}
-      />
 
       <BOMImportFlow
         open={showBOMImport}
