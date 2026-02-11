@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, BookOpen, FlaskConical, Info } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { DataSource } from "@/lib/types/lca";
 
@@ -276,6 +276,13 @@ export function InlineIngredientSearch({
             ecoInvent Live
           </Badge>
         );
+      case 'agribalyse_live':
+        return (
+          <Badge className="bg-teal-600 text-white text-xs shrink-0">
+            <Sprout className="h-3 w-3 mr-1" />
+            Agribalyse
+          </Badge>
+        );
       case 'defra':
         return (
           <Badge className="bg-orange-600 text-white text-xs shrink-0">
@@ -322,6 +329,8 @@ export function InlineIngredientSearch({
         return <Layers className="h-4 w-4 text-purple-600 shrink-0" />;
       case 'ecoinvent_live':
         return <Leaf className="h-4 w-4 text-green-600 shrink-0" />;
+      case 'agribalyse_live':
+        return <Sprout className="h-4 w-4 text-teal-600 shrink-0" />;
       case 'defra':
         return <Building2 className="h-4 w-4 text-orange-600 shrink-0" />;
       default:
@@ -389,6 +398,11 @@ export function InlineIngredientSearch({
                 {sourceCounts?.ecoinvent_live && sourceCounts.ecoinvent_live > 0 && (
                   <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
                     {sourceCounts.ecoinvent_live} ecoInvent
+                  </Badge>
+                )}
+                {sourceCounts?.agribalyse_live && sourceCounts.agribalyse_live > 0 && (
+                  <Badge variant="outline" className="text-xs bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300">
+                    {sourceCounts.agribalyse_live} Agribalyse
                   </Badge>
                 )}
                 {sourceCounts?.global_library && sourceCounts.global_library > 0 && (
