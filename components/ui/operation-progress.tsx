@@ -121,7 +121,7 @@ export function OperationOverlay({ open, ...props }: OperationOverlayProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[10000] bg-background/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200">
       <OperationProgress {...props} />
     </div>
   );
