@@ -76,9 +76,10 @@ export default function DataQualityDashboard() {
     <div className="container mx-auto p-6 space-y-6">
       {/* Page Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Data Quality Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Data Quality</h1>
         <p className="text-muted-foreground">
-          Track data sources, assess quality metrics, and identify opportunities to improve LCA accuracy
+          See how accurate your carbon footprint data is across your products, and find out where you
+          can improve it by getting better numbers from your suppliers.
         </p>
       </div>
 
@@ -87,7 +88,7 @@ export default function DataQualityDashboard() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Overall Quality Score
+              Overall Data Quality
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -114,8 +115,8 @@ export default function DataQualityDashboard() {
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               {distribution.total_count > 0
-                ? `${((supplierVerifiedCount / distribution.total_count) * 100).toFixed(0)}% of materials`
-                : 'No data'}
+                ? `${((supplierVerifiedCount / distribution.total_count) * 100).toFixed(0)}% of your materials have supplier-specific data`
+                : 'No data yet'}
             </p>
           </CardContent>
         </Card>
@@ -123,7 +124,7 @@ export default function DataQualityDashboard() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Hybrid Sources
+              Combined Sources
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -132,7 +133,7 @@ export default function DataQualityDashboard() {
               <Database className="h-8 w-8 text-blue-600 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              DEFRA GWP + Ecoinvent non-GWP
+              Using both UK government and international research data
             </p>
           </CardContent>
         </Card>
@@ -140,7 +141,7 @@ export default function DataQualityDashboard() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Upgrade Opportunities
+              Can Be Improved
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -149,7 +150,7 @@ export default function DataQualityDashboard() {
               <Target className="h-8 w-8 text-purple-600 opacity-20" />
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Materials that could benefit from supplier data
+              Materials where supplier data could make your footprint more accurate
             </p>
           </CardContent>
         </Card>
@@ -169,8 +170,8 @@ export default function DataQualityDashboard() {
             {/* Quality Distribution */}
             <Card>
               <CardHeader>
-                <CardTitle>Data Quality Distribution</CardTitle>
-                <CardDescription>Breakdown of {distribution.total_count} materials by quality grade</CardDescription>
+                <CardTitle>How Reliable Is Your Data?</CardTitle>
+                <CardDescription>Breakdown of {distribution.total_count} materials by data quality</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-4">
@@ -178,7 +179,7 @@ export default function DataQualityDashboard() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">High Quality</span>
+                        <span className="font-medium">Well Established</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <Badge variant="outline" className="bg-green-50 text-green-700">
@@ -195,7 +196,7 @@ export default function DataQualityDashboard() {
                       indicatorClassName="bg-green-600"
                     />
                     <p className="text-xs text-muted-foreground pl-6">
-                      Supplier verified EPDs with third-party certification (95% confidence)
+                      Verified directly by your supplier — the most accurate data possible
                     </p>
                   </div>
 
@@ -203,7 +204,7 @@ export default function DataQualityDashboard() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <TrendingUp className="h-4 w-4 text-amber-600" />
-                        <span className="font-medium">Medium Quality</span>
+                        <span className="font-medium">Good Estimate</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <Badge variant="outline" className="bg-amber-50 text-amber-700">
@@ -220,7 +221,7 @@ export default function DataQualityDashboard() {
                       indicatorClassName="bg-amber-600"
                     />
                     <p className="text-xs text-muted-foreground pl-6">
-                      Regional standards (DEFRA, Ecoinvent) with 70-85% confidence
+                      Based on trusted regional databases — good accuracy for most reporting needs
                     </p>
                   </div>
 
@@ -228,7 +229,7 @@ export default function DataQualityDashboard() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2">
                         <AlertCircle className="h-4 w-4 text-red-600" />
-                        <span className="font-medium">Low Quality</span>
+                        <span className="font-medium">Best Available</span>
                       </div>
                       <div className="flex items-center gap-3">
                         <Badge variant="outline" className="bg-red-50 text-red-700">
@@ -245,7 +246,7 @@ export default function DataQualityDashboard() {
                       indicatorClassName="bg-red-600"
                     />
                     <p className="text-xs text-muted-foreground pl-6">
-                      Generic proxies with broad assumptions (50% confidence)
+                      Based on general industry averages — can be improved with supplier-specific data
                     </p>
                   </div>
                 </div>
@@ -254,7 +255,7 @@ export default function DataQualityDashboard() {
                   <Alert className="mt-4">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>
-                      Over 30% of materials use low-quality data. Engaging suppliers could significantly improve LCA accuracy.
+                      Over 30% of your materials rely on general estimates. Asking your suppliers for their own data could make your carbon footprint much more accurate.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -264,16 +265,16 @@ export default function DataQualityDashboard() {
             {/* Data Source Methodology */}
             <Card>
               <CardHeader>
-                <CardTitle>Data Source Methodology</CardTitle>
-                <CardDescription>Sources used across your product portfolio</CardDescription>
+                <CardTitle>Where Your Data Comes From</CardTitle>
+                <CardDescription>The databases and sources we use across your products</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="space-y-1">
-                      <div className="font-medium">DEFRA 2025</div>
+                      <div className="font-medium">UK Government (DEFRA 2025)</div>
                       <div className="text-xs text-muted-foreground">
-                        UK Government emission factors
+                        Official UK emission factors used for regulatory reporting
                       </div>
                     </div>
                     <div className="text-right">
@@ -284,9 +285,9 @@ export default function DataQualityDashboard() {
 
                   <div className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="space-y-1">
-                      <div className="font-medium">Hybrid (DEFRA + Ecoinvent)</div>
+                      <div className="font-medium">Combined (UK + International)</div>
                       <div className="text-xs text-muted-foreground">
-                        GWP from DEFRA, other impacts from Ecoinvent
+                        UK carbon data combined with international environmental data
                       </div>
                     </div>
                     <div className="text-right">
@@ -297,9 +298,9 @@ export default function DataQualityDashboard() {
 
                   <div className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="space-y-1">
-                      <div className="font-medium">Supplier EPDs</div>
+                      <div className="font-medium">Direct From Suppliers</div>
                       <div className="text-xs text-muted-foreground">
-                        Third-party verified supplier data
+                        Verified data provided by your own suppliers
                       </div>
                     </div>
                     <div className="text-right">
@@ -310,9 +311,9 @@ export default function DataQualityDashboard() {
 
                   <div className="flex items-center justify-between p-3 rounded-lg border">
                     <div className="space-y-1">
-                      <div className="font-medium">Ecoinvent 3.12</div>
+                      <div className="font-medium">International Research (Ecoinvent)</div>
                       <div className="text-xs text-muted-foreground">
-                        Full lifecycle inventory database
+                        Comprehensive environmental database used worldwide
                       </div>
                     </div>
                     <div className="text-right">
@@ -327,7 +328,7 @@ export default function DataQualityDashboard() {
                 <Alert>
                   <BarChart3 className="h-4 w-4" />
                   <AlertDescription>
-                    Hybrid approach combines UK regulatory compliance (DEFRA) with comprehensive environmental assessment (Ecoinvent)
+                    We combine UK government data (DEFRA) with international research databases (Ecoinvent) to give you the most complete and compliant picture possible.
                   </AlertDescription>
                 </Alert>
               </CardContent>
@@ -339,18 +340,18 @@ export default function DataQualityDashboard() {
         <TabsContent value="opportunities" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Supplier Engagement Opportunities</CardTitle>
+              <CardTitle>Where You Can Improve</CardTitle>
               <CardDescription>
-                Materials ranked by potential impact improvement. Prioritise high-impact materials for supplier engagement.
+                These materials would benefit most from getting better data from your suppliers. They&apos;re ranked by how much it would improve your overall accuracy.
               </CardDescription>
             </CardHeader>
             <CardContent>
               {upgradeOpportunities.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto mb-4" />
-                  <p className="text-lg font-medium">Excellent data quality!</p>
+                  <p className="text-lg font-medium">Your data is in great shape!</p>
                   <p className="text-sm text-muted-foreground mt-2">
-                    All materials are using high-quality data sources.
+                    All your materials are using well-established data sources.
                   </p>
                 </div>
               ) : (
@@ -360,9 +361,9 @@ export default function DataQualityDashboard() {
                       <TableHead>Material</TableHead>
                       <TableHead>Product</TableHead>
                       <TableHead>Current Quality</TableHead>
-                      <TableHead className="text-right">GHG Impact (kg CO2e)</TableHead>
-                      <TableHead className="text-right">Confidence Gain</TableHead>
-                      <TableHead>Recommendation</TableHead>
+                      <TableHead className="text-right">Carbon Impact</TableHead>
+                      <TableHead className="text-right">Potential Improvement</TableHead>
+                      <TableHead>Suggested Action</TableHead>
                       <TableHead className="w-[100px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -413,16 +414,16 @@ export default function DataQualityDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Compliance Framework</CardTitle>
-                <CardDescription>Regulatory and standards compliance</CardDescription>
+                <CardTitle>Standards We Follow</CardTitle>
+                <CardDescription>Your data meets these recognised reporting standards</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-start gap-3 p-3 rounded-lg border">
                   <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
                   <div className="space-y-1">
-                    <div className="font-medium">UK Regulatory Compliance</div>
+                    <div className="font-medium">UK Government Standards</div>
                     <p className="text-xs text-muted-foreground">
-                      DEFRA 2025 factors for SECR, ESOS, and UK ETS reporting
+                      Uses official DEFRA 2025 numbers for UK energy and emissions reporting
                     </p>
                   </div>
                 </div>
@@ -430,9 +431,9 @@ export default function DataQualityDashboard() {
                 <div className="flex items-start gap-3 p-3 rounded-lg border">
                   <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
                   <div className="space-y-1">
-                    <div className="font-medium">ISO 14044/14067</div>
+                    <div className="font-medium">International Best Practice</div>
                     <p className="text-xs text-muted-foreground">
-                      Compliant LCA methodology and carbon footprint standards
+                      Follows ISO standards for lifecycle assessment and carbon footprinting
                     </p>
                   </div>
                 </div>
@@ -440,9 +441,9 @@ export default function DataQualityDashboard() {
                 <div className="flex items-start gap-3 p-3 rounded-lg border">
                   <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
                   <div className="space-y-1">
-                    <div className="font-medium">CSRD E1-E5</div>
+                    <div className="font-medium">EU Sustainability Reporting</div>
                     <p className="text-xs text-muted-foreground">
-                      Complete environmental reporting (climate, water, biodiversity, resources)
+                      Covers climate, water, biodiversity, and resource use for CSRD compliance
                     </p>
                   </div>
                 </div>
@@ -451,13 +452,13 @@ export default function DataQualityDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Impact Coverage</CardTitle>
-                <CardDescription>Environmental indicators tracked</CardDescription>
+                <CardTitle>What We Measure</CardTitle>
+                <CardDescription>Environmental impacts tracked across your products</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="text-sm space-y-1">
                   <div className="flex items-center justify-between py-1">
-                    <span className="text-muted-foreground">Climate Change (GWP100)</span>
+                    <span className="text-muted-foreground">Climate Change</span>
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
                   </div>
                   <div className="flex items-center justify-between py-1">

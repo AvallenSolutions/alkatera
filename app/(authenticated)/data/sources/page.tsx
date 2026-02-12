@@ -93,21 +93,21 @@ function QualityBadge({ grade }: { grade?: string }) {
       return (
         <Badge className="bg-emerald-600 text-white text-xs">
           <CheckCircle2 className="h-3 w-3 mr-1" />
-          High
+          Well Established
         </Badge>
       );
     case 'MEDIUM':
       return (
         <Badge className="bg-amber-600 text-white text-xs">
           <FlaskConical className="h-3 w-3 mr-1" />
-          Medium
+          Good Estimate
         </Badge>
       );
     case 'LOW':
       return (
         <Badge className="bg-slate-500 text-white text-xs">
           <Info className="h-3 w-3 mr-1" />
-          Low
+          Best Available
         </Badge>
       );
     default:
@@ -151,14 +151,14 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
             <div className="space-y-3 text-sm">
               {/* Primary source */}
               <div>
-                <span className="font-semibold text-foreground">Source: </span>
+                <span className="font-semibold text-foreground">Data source: </span>
                 <span className="text-muted-foreground">{factor.source}</span>
               </div>
 
               {/* Literature reference */}
               {lit.title && (
                 <div>
-                  <span className="font-semibold text-foreground">Reference: </span>
+                  <span className="font-semibold text-foreground">Original research: </span>
                   <span className="text-muted-foreground">
                     {lit.authors && `${lit.authors} `}
                     {lit.year && `(${lit.year}). `}
@@ -172,7 +172,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
                       rel="noopener noreferrer"
                       className="ml-2 inline-flex items-center text-xs text-blue-600 hover:underline"
                     >
-                      DOI <ExternalLink className="h-3 w-3 ml-0.5" />
+                      View study <ExternalLink className="h-3 w-3 ml-0.5" />
                     </a>
                   )}
                   {!lit.doi && lit.url && (
@@ -182,7 +182,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
                       rel="noopener noreferrer"
                       className="ml-2 inline-flex items-center text-xs text-blue-600 hover:underline"
                     >
-                      Link <ExternalLink className="h-3 w-3 ml-0.5" />
+                      View source <ExternalLink className="h-3 w-3 ml-0.5" />
                     </a>
                   )}
                 </div>
@@ -191,7 +191,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
               {/* Corroborating sources */}
               {meta.corroborating_sources && meta.corroborating_sources.length > 0 && (
                 <div>
-                  <span className="font-semibold text-foreground">Corroborating sources: </span>
+                  <span className="font-semibold text-foreground">Supporting sources: </span>
                   <ul className="list-disc list-inside text-muted-foreground ml-2">
                     {meta.corroborating_sources.map((src, i) => (
                       <li key={i}>
@@ -208,7 +208,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
               {/* Value range */}
               {(meta.value_range_low || meta.value_range_high) && (
                 <div>
-                  <span className="font-semibold text-foreground">Range: </span>
+                  <span className="font-semibold text-foreground">Typical range: </span>
                   <span className="text-muted-foreground font-mono">
                     {meta.value_range_low} &ndash; {meta.value_range_high} kg CO&#8322;e/{factor.reference_unit}
                   </span>
@@ -218,7 +218,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
               {/* System boundary */}
               {meta.system_boundary && (
                 <div>
-                  <span className="font-semibold text-foreground">System boundary: </span>
+                  <span className="font-semibold text-foreground">What&apos;s included: </span>
                   <span className="text-muted-foreground">{meta.system_boundary}</span>
                 </div>
               )}
@@ -226,7 +226,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
               {/* Proxy methodology */}
               {meta.proxy_methodology && (
                 <div>
-                  <span className="font-semibold text-foreground">Proxy methodology: </span>
+                  <span className="font-semibold text-foreground">How this was estimated: </span>
                   <span className="text-muted-foreground">{meta.proxy_methodology}</span>
                 </div>
               )}
@@ -242,7 +242,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
               {/* Drinks relevance */}
               {meta.drinks_relevance && (
                 <div>
-                  <span className="font-semibold text-foreground">Drinks relevance: </span>
+                  <span className="font-semibold text-foreground">How this applies to drinks: </span>
                   <span className="text-muted-foreground">{meta.drinks_relevance}</span>
                 </div>
               )}
@@ -250,7 +250,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
               {/* Temporal coverage */}
               {factor.temporal_coverage && (
                 <div>
-                  <span className="font-semibold text-foreground">Temporal coverage: </span>
+                  <span className="font-semibold text-foreground">Data period: </span>
                   <span className="text-muted-foreground">{factor.temporal_coverage}</span>
                 </div>
               )}
@@ -325,24 +325,34 @@ export default function DataSourcesPage() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Emission Factor Library</h1>
-        <p className="text-muted-foreground mt-1">
-          Literature-sourced emission factors for drinks industry ingredients and packaging.
-          Every factor is backed by published research, industry data, or documented proxy methodology.
+      <div className="space-y-3">
+        <h1 className="text-3xl font-bold tracking-tight">Data Sources</h1>
+        <p className="text-muted-foreground">
+          This is the reference library that powers your carbon footprint calculations. It contains the
+          conversion numbers (called &ldquo;emission factors&rdquo;) that tell us how much CO&#8322; is released
+          for every kilogram of malt, litre of fuel, or unit of packaging your business uses.
         </p>
+        <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertDescription className="text-blue-800 dark:text-blue-200">
+            <strong>Why does this matter?</strong> When you log ingredients, packaging, or energy use elsewhere in Alkatera, we
+            multiply your quantities by these numbers to calculate your carbon footprint. Better data here means more
+            accurate results for your business. You don&apos;t need to edit anything — this page is here so you can see
+            exactly where our numbers come from.
+          </AlertDescription>
+        </Alert>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total Factors</CardDescription>
+            <CardDescription>Conversion Factors</CardDescription>
             <CardTitle className="text-3xl">{summary.total}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Across {summary.categories.length} categories
+              Covering {summary.categories.length} categories of materials and processes
             </p>
           </CardContent>
         </Card>
@@ -351,13 +361,13 @@ export default function DataSourcesPage() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-              High Confidence
+              Well Established
             </CardDescription>
             <CardTitle className="text-3xl text-emerald-600">{summary.by_quality.high}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Multiple peer-reviewed sources
+              Backed by multiple published studies — the most reliable numbers
             </p>
           </CardContent>
         </Card>
@@ -366,13 +376,13 @@ export default function DataSourcesPage() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <FlaskConical className="h-3 w-3 text-amber-600" />
-              Medium Confidence
+              Good Estimate
             </CardDescription>
             <CardTitle className="text-3xl text-amber-600">{summary.by_quality.medium}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Single authoritative source
+              Based on one trusted source — reliable but less cross-checked
             </p>
           </CardContent>
         </Card>
@@ -381,13 +391,13 @@ export default function DataSourcesPage() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1">
               <Info className="h-3 w-3 text-slate-500" />
-              Low Confidence
+              Best Available
             </CardDescription>
             <CardTitle className="text-3xl text-slate-500">{summary.by_quality.low}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Proxy estimates with documented methodology
+              Based on similar materials — used when no direct data exists yet
             </p>
           </CardContent>
         </Card>
@@ -398,40 +408,44 @@ export default function DataSourcesPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Methodology
+            Where Do These Numbers Come From?
           </CardTitle>
+          <CardDescription>
+            We use internationally recognised standards to make sure your carbon footprint is calculated correctly
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            All emission factors follow the <strong>IPCC AR6 GWP100</strong> methodology and are aligned
-            with <strong>ISO 14044</strong> data quality requirements. Factors are sourced from:
+            Every number in this library is based on real-world research and follows global best practices for
+            measuring greenhouse gas emissions. We prioritise the most reliable sources available:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-start gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-foreground">Peer-Reviewed</p>
-                <p className="text-xs">Published in scientific journals with DOI. Multiple corroborating sources.</p>
+                <p className="font-semibold text-foreground">Published Research</p>
+                <p className="text-xs">Findings from scientific studies that have been checked by other experts. These are the gold standard.</p>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <FlaskConical className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-foreground">Literature-Based</p>
-                <p className="text-xs">Industry body reports (MAGB, COFALEC), recognised data platforms (CarbonCloud).</p>
+                <p className="font-semibold text-foreground">Industry Reports</p>
+                <p className="text-xs">Data from trusted trade bodies and specialist platforms like brewing and packaging associations.</p>
               </div>
             </div>
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-slate-500 mt-0.5 shrink-0" />
               <div>
-                <p className="font-semibold text-foreground">Proxy Estimates</p>
-                <p className="text-xs">Derived from analogous crops/processes with documented methodology and higher uncertainty.</p>
+                <p className="font-semibold text-foreground">Best-Available Estimates</p>
+                <p className="text-xs">When no direct data exists for a specific ingredient, we use numbers from similar materials and note the extra uncertainty.</p>
               </div>
             </div>
           </div>
           <p className="text-xs border-t pt-2">
-            Source hierarchy: peer-reviewed journal &gt; industry body report &gt; government database &gt; proxy calculation.
-            Every factor includes uncertainty percentages reflecting data quality.
+            We always prefer the most reliable source available. Published research comes first, then industry reports,
+            then government databases, and finally estimates based on similar materials. Every number also shows how
+            precise it is, so you know where the data is strongest.
           </p>
         </CardContent>
       </Card>
@@ -450,21 +464,21 @@ export default function DataSourcesPage() {
           <TabsContent key={cat} value={cat}>
             <Card>
               <CardHeader>
-                <CardTitle>{cat} Emission Factors</CardTitle>
+                <CardTitle>{cat} Data</CardTitle>
                 <CardDescription>
-                  Click any row to expand full source documentation and provenance details.
+                  Click any row to see where the number comes from, including the original research and supporting sources.
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="text-right">kg CO&#8322;e</TableHead>
+                      <TableHead>Material</TableHead>
+                      <TableHead className="text-right">CO&#8322; per unit</TableHead>
                       <TableHead className="text-center">Unit</TableHead>
-                      <TableHead className="text-center">Quality</TableHead>
-                      <TableHead className="text-center">Uncertainty</TableHead>
-                      <TableHead className="text-center">Scope</TableHead>
+                      <TableHead className="text-center">Data Quality</TableHead>
+                      <TableHead className="text-center">Accuracy</TableHead>
+                      <TableHead className="text-center">Region</TableHead>
                       <TableHead className="w-8"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -485,37 +499,40 @@ export default function DataSourcesPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BookOpen className="h-5 w-5" />
-            Data Quality Grades
+            Understanding Data Quality
           </CardTitle>
+          <CardDescription>
+            Not all data is created equal. Here&apos;s what the quality badges mean and how accurate each level is
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Grade</TableHead>
-                <TableHead>Criteria</TableHead>
-                <TableHead>Typical Uncertainty</TableHead>
-                <TableHead>Example Sources</TableHead>
+                <TableHead>Quality</TableHead>
+                <TableHead>What It Means</TableHead>
+                <TableHead>How Precise</TableHead>
+                <TableHead>Examples</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
                 <TableCell><QualityBadge grade="HIGH" /></TableCell>
-                <TableCell className="text-sm">Multiple corroborating peer-reviewed sources or large-scale industry studies</TableCell>
+                <TableCell className="text-sm">Several independent studies agree on this number — it&apos;s the most reliable data we have</TableCell>
                 <TableCell className="text-sm font-mono">10&ndash;25%</TableCell>
-                <TableCell className="text-sm">Hop Growers of America LCA, MAGB malt data, MDPI peer-reviewed</TableCell>
+                <TableCell className="text-sm">Malt, hops, common grains — well-studied brewing ingredients</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell><QualityBadge grade="MEDIUM" /></TableCell>
-                <TableCell className="text-sm">Single authoritative source: industry body, single peer-reviewed paper, or recognised data platform</TableCell>
+                <TableCell className="text-sm">One trusted source — a research paper, industry report, or specialist platform</TableCell>
                 <TableCell className="text-sm font-mono">25&ndash;40%</TableCell>
-                <TableCell className="text-sm">COFALEC/PwC yeast study, CarbonCloud, Kazemi et al. coriander</TableCell>
+                <TableCell className="text-sm">Yeast, spices, specialist packaging — data from trade bodies or single studies</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell><QualityBadge grade="LOW" /></TableCell>
-                <TableCell className="text-sm">Proxy calculation from analogous crops/processes. No published data for this specific ingredient.</TableCell>
+                <TableCell className="text-sm">No direct research exists for this specific item, so we use data from similar materials as a starting point</TableCell>
                 <TableCell className="text-sm font-mono">40&ndash;60%</TableCell>
-                <TableCell className="text-sm">Juniper berries (wild-harvest proxy), angelica root (root crop proxy)</TableCell>
+                <TableCell className="text-sm">Rare botanicals, niche ingredients — estimated from comparable crops or processes</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -586,10 +603,11 @@ function RequestFactorForm() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageSquarePlus className="h-5 w-5" />
-          Request a New Emission Factor
+          Missing Something?
         </CardTitle>
         <CardDescription>
-          Can&apos;t find the data you need? Tell us what&apos;s missing and we&apos;ll prioritise it for our next library update.
+          If you use an ingredient, packaging material, or process that isn&apos;t listed above, let us know.
+          We&apos;ll research it and add it to the library so your carbon footprint calculations are as complete as possible.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -597,7 +615,7 @@ function RequestFactorForm() {
           <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
             <CheckCircle2 className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800 dark:text-green-200">
-              Thank you! Your request has been submitted. We prioritise based on how many organisations need the same data.
+              Thanks for letting us know! We&apos;ve added this to our research list. The more businesses that request the same item, the higher it gets prioritised.
             </AlertDescription>
           </Alert>
         ) : (
