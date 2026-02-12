@@ -749,6 +749,7 @@ function CertificationDetailsContent() {
             <EvidenceLinker
               evidence={evidence}
               frameworkId={framework.id}
+              requirements={framework.requirements}
               onCreateEvidence={async (data) => {
                 await createEvidence(data);
                 toast.success('Evidence linked');

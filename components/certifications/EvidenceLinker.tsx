@@ -54,6 +54,13 @@ interface EvidenceLink {
   };
 }
 
+interface RequirementOption {
+  id: string;
+  requirement_code: string;
+  requirement_name: string;
+  category?: string;
+}
+
 interface EvidenceLinkerProps {
   evidence: EvidenceLink[];
   requirementId?: string;
@@ -62,6 +69,8 @@ interface EvidenceLinkerProps {
   onDeleteEvidence: (id: string) => Promise<void>;
   onVerifyEvidence: (id: string) => Promise<void>;
   loading?: boolean;
+  /** Pass requirements list to enable the requirement picker when no requirementId is set */
+  requirements?: RequirementOption[];
 }
 
 interface CreateEvidenceInput {
@@ -105,22 +114,29 @@ export function EvidenceLinker({
   onDeleteEvidence,
   onVerifyEvidence,
   loading,
+  requirements,
 }: EvidenceLinkerProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedRequirementId, setSelectedRequirementId] = useState<string>(requirementId || '');
   const [formData, setFormData] = useState<Partial<CreateEvidenceInput>>({
     evidence_type: 'document',
     evidence_description: '',
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // The effective requirement ID is either the fixed prop or the user-selected one
+  const effectiveRequirementId = requirementId || selectedRequirementId;
+
+  const canAddEvidence = requirementId || (requirements && requirements.length > 0);
+
   const handleSubmit = async () => {
-    if (!requirementId || !formData.evidence_description) return;
+    if (!effectiveRequirementId || !formData.evidence_description) return;
 
     setSubmitting(true);
     try {
       await onCreateEvidence({
         framework_id: frameworkId,
-        requirement_id: requirementId,
+        requirement_id: effectiveRequirementId,
         evidence_type: formData.evidence_type || 'document',
         evidence_description: formData.evidence_description,
         source_module: formData.source_module,
@@ -128,6 +144,7 @@ export function EvidenceLinker({
       });
       setIsDialogOpen(false);
       setFormData({ evidence_type: 'document', evidence_description: '' });
+      if (!requirementId) setSelectedRequirementId('');
     } finally {
       setSubmitting(false);
     }
@@ -150,8 +167,11 @@ export function EvidenceLinker({
               Link evidence to support certification requirements
             </CardDescription>
           </div>
-          {requirementId && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          {canAddEvidence && (
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open && !requirementId) setSelectedRequirementId('');
+            }}>
               <DialogTrigger asChild>
                 <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
@@ -162,10 +182,33 @@ export function EvidenceLinker({
                 <DialogHeader>
                   <DialogTitle>Link Evidence</DialogTitle>
                   <DialogDescription>
-                    Add evidence to support this requirement
+                    Add a document, URL, or data link to support a certification requirement
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
+                  {/* Requirement picker — only shown when no fixed requirementId */}
+                  {!requirementId && requirements && requirements.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Requirement</Label>
+                      <Select
+                        value={selectedRequirementId}
+                        onValueChange={setSelectedRequirementId}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select requirement..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {requirements.map((req) => (
+                            <SelectItem key={req.id} value={req.id}>
+                              <span className="font-mono text-xs mr-2">{req.requirement_code}</span>
+                              {req.requirement_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label>Evidence Type</Label>
                     <Select
@@ -214,9 +257,10 @@ export function EvidenceLinker({
                   )}
 
                   {(formData.evidence_type === 'document' ||
-                    formData.evidence_type === 'external_url') && (
+                    formData.evidence_type === 'external_url' ||
+                    formData.evidence_type === 'policy') && (
                     <div className="space-y-2">
-                      <Label>URL</Label>
+                      <Label>Document URL</Label>
                       <Input
                         value={formData.document_url || ''}
                         onChange={(e) =>
@@ -224,6 +268,9 @@ export function EvidenceLinker({
                         }
                         placeholder="https://..."
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Link to a document, policy file, or external resource
+                      </p>
                     </div>
                   )}
 
@@ -245,7 +292,7 @@ export function EvidenceLinker({
                   </Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={submitting || !formData.evidence_description}
+                    disabled={submitting || !formData.evidence_description || !effectiveRequirementId}
                   >
                     {submitting ? 'Adding...' : 'Add Evidence'}
                   </Button>
@@ -260,8 +307,8 @@ export function EvidenceLinker({
           <div className="text-center text-muted-foreground py-8">
             <LinkIcon className="h-10 w-10 mx-auto mb-2 opacity-50" />
             <p>No evidence linked yet.</p>
-            {requirementId && (
-              <p className="text-sm">Click &quot;Add Evidence&quot; to link supporting documentation.</p>
+            {canAddEvidence && (
+              <p className="text-sm">Click &quot;Add Evidence&quot; to link documents, URLs, or data sources.</p>
             )}
           </div>
         ) : (
