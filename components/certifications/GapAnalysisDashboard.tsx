@@ -27,6 +27,9 @@ import {
   Search,
   Filter,
   Target,
+  FileText,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 
 interface GapAnalysis {
@@ -58,12 +61,21 @@ interface GapSummary {
   total_points_achieved: number;
 }
 
+interface EvidenceItem {
+  id: string;
+  evidence_type: string;
+  evidence_description: string;
+  verification_status: 'pending' | 'verified' | 'rejected';
+  document_url?: string | null;
+}
+
 interface GapAnalysisDashboardProps {
   analyses: GapAnalysis[];
   analysesByCategory: Record<string, GapAnalysis[]>;
   summary: GapSummary | null;
   onUpdateStatus: (requirementId: string, status: GapAnalysis['compliance_status']) => void;
   loading?: boolean;
+  evidenceByRequirement?: Record<string, EvidenceItem[]>;
 }
 
 const statusConfig = {
@@ -107,10 +119,24 @@ export function GapAnalysisDashboard({
   summary,
   onUpdateStatus,
   loading,
+  evidenceByRequirement,
 }: GapAnalysisDashboardProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [expandedEvidence, setExpandedEvidence] = useState<Set<string>>(new Set());
+
+  const toggleEvidence = (reqId: string) => {
+    setExpandedEvidence(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(reqId)) {
+        newSet.delete(reqId);
+      } else {
+        newSet.add(reqId);
+      }
+      return newSet;
+    });
+  };
 
   const filteredCategories = Object.entries(analysesByCategory).reduce(
     (acc: Record<string, GapAnalysis[]>, [category, items]) => {
@@ -270,7 +296,11 @@ export function GapAnalysisDashboard({
                           <div className="flex items-center gap-2 mt-2">
                             {item.requirement?.points_available && (
                               <Badge variant="outline" className="text-xs">
-                                {item.current_score || 0}/{item.requirement.points_available} pts
+                                {item.compliance_status === 'compliant'
+                                  ? item.requirement.points_available
+                                  : item.compliance_status === 'partial'
+                                    ? Math.round(item.requirement.points_available * 0.5)
+                                    : 0}/{item.requirement.points_available} pts
                               </Badge>
                             )}
                             {item.priority && (
@@ -278,7 +308,49 @@ export function GapAnalysisDashboard({
                                 {item.priority}
                               </Badge>
                             )}
+                            {evidenceByRequirement && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleEvidence(item.requirement_id);
+                                }}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <FileText className="h-3 w-3" />
+                                {(evidenceByRequirement[item.requirement_id] || []).length} evidence
+                                {expandedEvidence.has(item.requirement_id)
+                                  ? <ChevronDown className="h-3 w-3" />
+                                  : <ChevronRight className="h-3 w-3" />
+                                }
+                              </button>
+                            )}
                           </div>
+                          {/* Inline evidence list */}
+                          {evidenceByRequirement && expandedEvidence.has(item.requirement_id) && (
+                            <div className="mt-2 pl-2 border-l-2 border-blue-200 dark:border-blue-800 space-y-1">
+                              {(evidenceByRequirement[item.requirement_id] || []).length === 0 ? (
+                                <p className="text-xs text-muted-foreground italic">No evidence linked</p>
+                              ) : (
+                                (evidenceByRequirement[item.requirement_id] || []).map(ev => (
+                                  <div key={ev.id} className="flex items-center gap-2 text-xs">
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-xs ${
+                                        ev.verification_status === 'verified'
+                                          ? 'border-emerald-500 text-emerald-600'
+                                          : ev.verification_status === 'rejected'
+                                            ? 'border-red-500 text-red-600'
+                                            : 'border-amber-500 text-amber-600'
+                                      }`}
+                                    >
+                                      {ev.verification_status}
+                                    </Badge>
+                                    <span className="truncate">{ev.evidence_description}</span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="ml-4">
                           <Select

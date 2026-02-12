@@ -4,7 +4,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { VitalityRing } from './VitalityRing';
 import { Sparkline } from '@/components/shared/TrendIndicator';
-import { RefreshCw, Calendar, Info } from 'lucide-react';
+import { RefreshCw, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScoreExplainer, type CalculationInputs } from './ScoreExplainer';
 
@@ -208,86 +208,8 @@ export function VitalityScoreHero({
                 calculationInputs={calculationInputs?.nature}
               />
             </div>
-
-            <WeightedBreakdownRow
-              climateScore={climateScore}
-              waterScore={waterScore}
-              circularityScore={circularityScore}
-              natureScore={natureScore}
-              overallScore={overallScore}
-            />
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function WeightedBreakdownRow({
-  climateScore,
-  waterScore,
-  circularityScore,
-  natureScore,
-  overallScore,
-}: {
-  climateScore: number | null;
-  waterScore: number | null;
-  circularityScore: number | null;
-  natureScore: number | null;
-  overallScore: number | null;
-}) {
-  const pillars = [
-    { name: 'Climate', score: climateScore, weight: 0.30 },
-    { name: 'Water', score: waterScore, weight: 0.25 },
-    { name: 'Circularity', score: circularityScore, weight: 0.25 },
-    { name: 'Nature', score: natureScore, weight: 0.20 },
-  ];
-  const available = pillars.filter(p => p.score !== null);
-  const totalWeight = available.reduce((sum, p) => sum + p.weight, 0);
-
-  if (available.length === 0) {
-    return (
-      <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
-        <div className="flex items-center gap-2 text-xs text-white/60">
-          <Info className="h-3.5 w-3.5" />
-          <span>Add data to see your score breakdown</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-4 p-3 rounded-lg bg-white/5 border border-white/10">
-      <div className="space-y-1.5">
-        {pillars.map((p) => {
-          if (p.score === null) {
-            return (
-              <div key={p.name} className="flex items-center justify-between text-xs">
-                <span className="text-white/40">{p.name} ({(p.weight * 100).toFixed(0)}%)</span>
-                <span className="text-white/30 italic">No data</span>
-              </div>
-            );
-          }
-          const adjustedWeight = (p.weight / totalWeight);
-          const contribution = p.score * adjustedWeight;
-          return (
-            <div key={p.name} className="flex items-center justify-between text-xs">
-              <span className="text-white/60">{p.name} ({(p.weight * 100).toFixed(0)}%)</span>
-              <span className="text-white/80 tabular-nums">
-                {p.score} x {(adjustedWeight * 100).toFixed(0)}% = <span className="text-white font-medium">{contribution.toFixed(1)}</span>
-              </span>
-            </div>
-          );
-        })}
-        <div className="flex items-center justify-between text-xs border-t border-white/10 pt-1.5 mt-1.5">
-          <span className="text-white/60 font-medium">Overall Score</span>
-          <span className="text-white font-bold tabular-nums">{overallScore ?? '—'}</span>
-        </div>
-        {available.length < 4 && (
-          <p className="text-[10px] text-white/40 mt-0.5">
-            Weights redistributed across {available.length} pillar{available.length !== 1 ? 's' : ''} with data.
-          </p>
-        )}
       </div>
     </div>
   );

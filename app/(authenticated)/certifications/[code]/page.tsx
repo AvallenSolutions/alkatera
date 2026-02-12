@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,12 +20,21 @@ import {
   ExternalLink,
   Loader2,
   RefreshCw,
+  Package,
+  Plus,
+  Trash2,
+  XCircle,
 } from 'lucide-react';
 import { useOrganization } from '@/lib/organizationContext';
 import { GapAnalysisDashboard } from '@/components/certifications/GapAnalysisDashboard';
+import { EvidenceLinker } from '@/components/certifications/EvidenceLinker';
+import { YearProgressionStepper } from '@/components/certifications/YearProgressionStepper';
+import { useCertificationEvidence } from '@/hooks/data/useCertificationEvidence';
+import { useCertificationAuditPackages } from '@/hooks/data/useCertificationAuditPackages';
 import { toast } from 'sonner';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import type { FeatureCode } from '@/hooks/useSubscription';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Framework {
   id: string;
@@ -38,6 +47,8 @@ interface Framework {
   total_points: number;
   governing_body?: string;
   website_url?: string;
+  scoring_model?: 'points' | 'pass_fail';
+  progression_model?: { years: number[]; labels: string[] } | null;
   requirements: Requirement[];
 }
 
@@ -53,6 +64,9 @@ interface Requirement {
   is_required: boolean;
   guidance: string;
   data_sources: string[];
+  applicable_from_year?: number;
+  size_threshold?: string;
+  topic_area?: string;
 }
 
 interface Certification {
@@ -64,6 +78,7 @@ interface Certification {
   certification_date: string | null;
   expiry_date: string | null;
   certificate_number: string | null;
+  current_year?: number;
 }
 
 interface GapAnalysis {
@@ -175,6 +190,27 @@ function CertificationDetailsContent() {
   const frameworkRef = useRef<Framework | null>(null);
   const orgIdRef = useRef<string | null>(null);
   const hasFetchedRef = useRef(false);
+
+  // Evidence and audit packages hooks — scoped to current framework once loaded
+  const frameworkId = framework?.id;
+  const {
+    evidence,
+    byRequirement: evidenceByRequirement,
+    verificationSummary,
+    loading: evidenceLoading,
+    refetch: refetchEvidence,
+    createEvidence,
+    deleteEvidence,
+    verifyEvidence,
+  } = useCertificationEvidence(frameworkId);
+  const {
+    packages: auditPackages,
+    statusSummary: packageStatusSummary,
+    loading: packagesLoading,
+    refetch: refetchPackages,
+    createPackage,
+    deletePackage,
+  } = useCertificationAuditPackages(frameworkId);
 
   // Keep refs in sync
   orgIdRef.current = currentOrganization?.id ?? null;
@@ -400,11 +436,46 @@ function CertificationDetailsContent() {
     );
   }
 
+  const [selectedYear, setSelectedYear] = useState<number>(0);
+
   const status = certification?.status || 'not_started';
   const config = statusConfig[status];
   const StatusIcon = config.icon;
-  const score = certification?.current_score ?? 0;
-  const isPassingScore = score >= framework.passing_score;
+  const isPassFail = framework.scoring_model === 'pass_fail';
+
+  // Derive score from gap summary (which is computed from compliance_status) instead of
+  // certification.current_score which is never populated
+  const score = isPassFail
+    ? (gapSummary && gapSummary.total > 0
+        ? Math.round(((gapSummary.compliant || 0) / gapSummary.total) * 100)
+        : 0)
+    : (gapSummary && gapSummary.total_points_available > 0
+        ? Math.round((gapSummary.total_points_achieved / gapSummary.total_points_available) * 100)
+        : 0);
+  const isPassingScore = isPassFail
+    ? (gapSummary?.total ?? 0) > 0 && (gapSummary?.compliant ?? 0) === (gapSummary?.total ?? 0)
+    : score >= framework.passing_score;
+
+  // Build requirement counts by year for the stepper
+  const requirementCountsByYear = useMemo(() => {
+    if (!framework.progression_model?.years || !framework.requirements) return {};
+    const counts: Record<number, { total: number; passed: number }> = {};
+    for (const year of framework.progression_model.years) {
+      const yearReqs = framework.requirements.filter(
+        r => (r.applicable_from_year ?? 0) <= year
+      );
+      // Count requirements at exactly this year tier (not cumulative from previous)
+      const thisYearReqs = framework.requirements.filter(
+        r => (r.applicable_from_year ?? 0) === year
+      );
+      const passedCount = thisYearReqs.filter(r => {
+        const analysis = gapAnalyses.find(a => a.requirement_id === r.id);
+        return analysis?.compliance_status === 'compliant';
+      }).length;
+      counts[year] = { total: thisYearReqs.length, passed: passedCount };
+    }
+    return counts;
+  }, [framework.progression_model, framework.requirements, gapAnalyses]);
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -452,6 +523,17 @@ function CertificationDetailsContent() {
         </Button>
       </div>
 
+      {/* Year Progression Stepper for pass/fail frameworks */}
+      {isPassFail && framework.progression_model && (
+        <YearProgressionStepper
+          progressionModel={framework.progression_model}
+          currentYear={certification?.current_year ?? 0}
+          requirementCountsByYear={requirementCountsByYear}
+          onYearSelect={setSelectedYear}
+          selectedYear={selectedYear}
+        />
+      )}
+
       {/* Overview Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* Score Card */}
@@ -459,24 +541,46 @@ function CertificationDetailsContent() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Target className="h-4 w-4 text-blue-600" />
-              Current Score
+              {isPassFail ? 'Requirements Passed' : 'Current Score'}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex justify-between items-baseline">
-                <span className={`text-3xl font-bold ${isPassingScore ? 'text-emerald-600' : ''}`}>
-                  {score}%
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {framework.passing_score}% required
-                </span>
+            {isPassFail ? (
+              <div className="space-y-2">
+                <div className="flex justify-between items-baseline">
+                  <span className={`text-3xl font-bold ${isPassingScore ? 'text-emerald-600' : ''}`}>
+                    {gapSummary?.compliant || 0}/{gapSummary?.total || 0}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    mandatory passed
+                  </span>
+                </div>
+                <Progress
+                  value={score}
+                  className={`h-2 ${isPassingScore ? '[&>div]:bg-emerald-500' : ''}`}
+                />
+                {!isPassingScore && gapSummary && gapSummary.total > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {gapSummary.total - (gapSummary.compliant || 0)} requirements remaining
+                  </p>
+                )}
               </div>
-              <Progress
-                value={score}
-                className={`h-2 ${isPassingScore ? '[&>div]:bg-emerald-500' : ''}`}
-              />
-            </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex justify-between items-baseline">
+                  <span className={`text-3xl font-bold ${isPassingScore ? 'text-emerald-600' : ''}`}>
+                    {score}%
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {framework.passing_score}% required
+                  </span>
+                </div>
+                <Progress
+                  value={score}
+                  className={`h-2 ${isPassingScore ? '[&>div]:bg-emerald-500' : ''}`}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -493,9 +597,15 @@ function CertificationDetailsContent() {
               <span className="text-3xl font-bold">{framework.requirements?.length || 0}</span>
               <span className="text-sm text-muted-foreground">total requirements</span>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {framework.total_points} total points available
-            </p>
+            {isPassFail ? (
+              <p className="text-sm text-muted-foreground mt-1">
+                All mandatory &mdash; pass/fail model
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-1">
+                {framework.total_points} total points available
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -546,6 +656,24 @@ function CertificationDetailsContent() {
             <Target className="h-4 w-4" />
             Gap Analysis
           </TabsTrigger>
+          <TabsTrigger value="evidence" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Evidence
+            {verificationSummary.total > 0 && (
+              <Badge variant="secondary" className="text-xs ml-1">
+                {verificationSummary.total}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="audit-packages" className="flex items-center gap-2">
+            <Package className="h-4 w-4" />
+            Audit Packages
+            {packageStatusSummary.total > 0 && (
+              <Badge variant="secondary" className="text-xs ml-1">
+                {packageStatusSummary.total}
+              </Badge>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="requirements" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             All Requirements
@@ -565,6 +693,7 @@ function CertificationDetailsContent() {
               summary={gapSummary}
               onUpdateStatus={handleUpdateGapStatus}
               loading={gapLoading}
+              evidenceByRequirement={evidenceByRequirement}
             />
           ) : (
             <Card>
@@ -612,6 +741,137 @@ function CertificationDetailsContent() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Evidence Tab */}
+        <TabsContent value="evidence">
+          {evidenceLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <EvidenceLinker
+              evidence={evidence}
+              frameworkId={framework.id}
+              onCreateEvidence={async (data) => {
+                await createEvidence(data);
+                toast.success('Evidence linked');
+              }}
+              onDeleteEvidence={async (id) => {
+                await deleteEvidence(id);
+                toast.success('Evidence removed');
+              }}
+              onVerifyEvidence={async (id) => {
+                await verifyEvidence(id, 'current_user');
+                toast.success('Evidence verified');
+              }}
+              loading={evidenceLoading}
+            />
+          )}
+        </TabsContent>
+
+        {/* Audit Packages Tab */}
+        <TabsContent value="audit-packages">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5 text-purple-600" />
+                    Audit Packages
+                  </CardTitle>
+                  <CardDescription>
+                    {packageStatusSummary.total} packages for {framework.name}
+                  </CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await createPackage({
+                        framework_id: framework.id,
+                        package_name: `${framework.name} Audit - ${new Date().toLocaleDateString()}`,
+                      });
+                      toast.success('Audit package created');
+                    } catch {
+                      toast.error('Failed to create audit package');
+                    }
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Package
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {packagesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : auditPackages.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No audit packages for this framework.</p>
+                  <p className="text-sm mt-1">
+                    Create a package to compile evidence for certification submission.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {auditPackages.map((pkg) => {
+                    const statusColor =
+                      pkg.status === 'approved'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : pkg.status === 'submitted'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : pkg.status === 'in_review'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            : pkg.status === 'rejected'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                    return (
+                      <div
+                        key={pkg.id}
+                        className="flex items-start justify-between p-4 border rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{pkg.package_name}</span>
+                            <Badge className={`text-xs capitalize ${statusColor}`}>
+                              {pkg.status.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          {pkg.description && (
+                            <p className="text-sm text-muted-foreground mt-1">{pkg.description}</p>
+                          )}
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            <span>
+                              Created {formatDistanceToNow(new Date(pkg.created_at), { addSuffix: true })}
+                            </span>
+                            <span>
+                              {pkg.included_requirements?.length || 0} requirements &middot;{' '}
+                              {pkg.included_evidence?.length || 0} evidence
+                            </span>
+                          </div>
+                        </div>
+                        {pkg.status === 'draft' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              deletePackage(pkg.id).then(() => toast.success('Package deleted'))
+                            }
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Requirements Tab */}

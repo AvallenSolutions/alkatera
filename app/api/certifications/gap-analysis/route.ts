@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const organizationId = searchParams.get('organization_id');
     const frameworkId = searchParams.get('framework_id');
+    const currentYear = searchParams.get('current_year');
 
     if (!organizationId) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     const requirementIds = Array.from(new Set(analyses.map((a: any) => a.requirement_id)));
     const { data: requirements } = await supabase
       .from('framework_requirements')
-      .select('id, requirement_code, requirement_name, requirement_category, subsection, max_points')
+      .select('id, requirement_code, requirement_name, requirement_category, subsection, max_points, applicable_from_year, size_threshold, topic_area')
       .in('id', requirementIds);
 
     const requirementMap = new Map(
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
     const frameworkIds = Array.from(new Set(validAnalyses.map((a: any) => a.framework_id)));
     const { data: frameworks } = await supabase
       .from('certification_frameworks')
-      .select('id, framework_name, framework_code, framework_version')
+      .select('id, framework_name, framework_code, framework_version, scoring_model')
       .in('id', frameworkIds);
 
     const frameworkMap = new Map(
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
     );
 
     // Transform and merge data
-    const transformedData = validAnalyses.map((item: any) => {
+    let transformedData = validAnalyses.map((item: any) => {
       const req = requirementMap.get(item.requirement_id);
       const fw = frameworkMap.get(item.framework_id);
 
@@ -115,6 +116,7 @@ export async function GET(request: NextRequest) {
           name: fw.framework_name,
           code: fw.framework_code,
           version: fw.framework_version,
+          scoring_model: fw.scoring_model || 'points',
         } : undefined,
         requirement: req ? {
           requirement_code: req.requirement_code,
@@ -122,9 +124,23 @@ export async function GET(request: NextRequest) {
           category: req.requirement_category,
           sub_category: req.subsection,
           points_available: req.max_points,
+          applicable_from_year: req.applicable_from_year ?? 0,
+          size_threshold: req.size_threshold || 'all',
+          topic_area: req.topic_area || null,
         } : undefined,
       };
     });
+
+    // Filter by current_year if provided (only show requirements applicable at that year)
+    if (currentYear != null) {
+      const yearNum = parseInt(currentYear, 10);
+      if (!isNaN(yearNum)) {
+        transformedData = transformedData.filter((item: any) =>
+          item.requirement?.applicable_from_year == null ||
+          item.requirement.applicable_from_year <= yearNum
+        );
+      }
+    }
 
     const summary = calculateGapSummary(transformedData);
 
@@ -371,14 +387,17 @@ function calculateGapSummary(analyses: any[]) {
     ? ((compliant + (partial * 0.5)) / assessedCount) * 100
     : 0;
 
-  const totalPointsAvailable = analyses.reduce(
-    (sum, a) => sum + (a.requirement?.points_available || 0),
-    0
-  );
-  const totalPointsAchieved = analyses.reduce(
-    (sum, a) => sum + (a.current_score || 0),
-    0
-  );
+  const totalPointsAvailable = analyses
+    .filter(a => a.compliance_status !== 'not_applicable')
+    .reduce((sum, a) => sum + (a.requirement?.points_available || 0), 0);
+
+  const totalPointsAchieved = analyses.reduce((sum, a) => {
+    if (a.compliance_status === 'not_applicable') return sum;
+    const pts = a.requirement?.points_available || 0;
+    if (a.compliance_status === 'compliant') return sum + pts;
+    if (a.compliance_status === 'partial') return sum + pts * 0.5;
+    return sum;
+  }, 0);
 
   return {
     total,

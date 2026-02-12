@@ -165,17 +165,20 @@ export async function POST(request: NextRequest) {
       requirement: reqLookup[a.requirement_id] || null,
     }));
 
-    // Calculate scores
-    const scoreBreakdown = calculateScoreBreakdown(enrichedGapAnalyses);
-
-    // Get framework passing score
+    // Get framework details including scoring model
     const { data: framework } = await supabase
       .from('certification_frameworks')
-      .select('passing_score')
+      .select('passing_score, scoring_model')
       .eq('id', body.framework_id)
       .maybeSingle();
 
     const passingScore = framework?.passing_score || 80;
+    const scoringModel = framework?.scoring_model || 'points';
+
+    // Calculate scores based on scoring model
+    const scoreBreakdown = scoringModel === 'pass_fail'
+      ? calculatePassFailBreakdown(enrichedGapAnalyses)
+      : calculateScoreBreakdown(enrichedGapAnalyses);
 
     // Insert score history record
     const { data, error } = await supabase
@@ -234,9 +237,26 @@ function calculateScoreBreakdown(gapAnalyses: any[]) {
   let requirementsNotMet = 0;
 
   gapAnalyses.forEach(analysis => {
+    // Skip not_applicable — excluded from both achieved AND available
+    if (analysis.compliance_status === 'not_applicable') {
+      return;
+    }
+
     const category = analysis.requirement?.requirement_category || 'Uncategorized';
     const pointsAvailable = analysis.requirement?.max_points || 0;
-    const pointsAchieved = analysis.current_score || 0;
+
+    // Derive points from compliance_status (not from current_score which is never set)
+    let pointsAchieved = 0;
+    if (analysis.compliance_status === 'compliant') {
+      pointsAchieved = pointsAvailable;
+      requirementsMet++;
+    } else if (analysis.compliance_status === 'partial') {
+      pointsAchieved = pointsAvailable * 0.5;
+      requirementsPartial++;
+    } else if (analysis.compliance_status === 'non_compliant') {
+      requirementsNotMet++;
+    }
+    // not_assessed gets 0 points but is NOT counted in met/partial/not_met
 
     if (!categoryScores[category]) {
       categoryScores[category] = { achieved: 0, available: 0, percentage: 0 };
@@ -246,14 +266,6 @@ function calculateScoreBreakdown(gapAnalyses: any[]) {
     categoryScores[category].available += pointsAvailable;
     totalAchieved += pointsAchieved;
     totalAvailable += pointsAvailable;
-
-    if (analysis.compliance_status === 'compliant') {
-      requirementsMet++;
-    } else if (analysis.compliance_status === 'partial') {
-      requirementsPartial++;
-    } else if (analysis.compliance_status === 'non_compliant') {
-      requirementsNotMet++;
-    }
   });
 
   // Calculate percentages
@@ -272,6 +284,64 @@ function calculateScoreBreakdown(gapAnalyses: any[]) {
     totalScore,
     totalAchieved,
     totalAvailable,
+    categoryScores,
+    requirementsMet,
+    requirementsPartial,
+    requirementsNotMet,
+  };
+}
+
+function calculatePassFailBreakdown(gapAnalyses: any[]) {
+  const categoryScores: Record<string, { achieved: number; available: number; percentage: number }> = {};
+  let totalMandatoryPassed = 0;
+  let totalMandatory = 0;
+  let requirementsMet = 0;
+  let requirementsPartial = 0;
+  let requirementsNotMet = 0;
+
+  gapAnalyses.forEach(analysis => {
+    if (analysis.compliance_status === 'not_applicable') return;
+
+    const category = analysis.requirement?.requirement_category || 'Uncategorized';
+    const isPassed = analysis.compliance_status === 'compliant';
+
+    totalMandatory++;
+    if (isPassed) {
+      totalMandatoryPassed++;
+      requirementsMet++;
+    } else if (analysis.compliance_status === 'partial') {
+      requirementsPartial++;
+    } else if (analysis.compliance_status === 'non_compliant') {
+      requirementsNotMet++;
+    }
+
+    if (!categoryScores[category]) {
+      categoryScores[category] = { achieved: 0, available: 0, percentage: 0 };
+    }
+
+    categoryScores[category].available += 1;
+    if (isPassed) {
+      categoryScores[category].achieved += 1;
+    }
+  });
+
+  // Calculate percentages per category
+  Object.keys(categoryScores).forEach(category => {
+    const cat = categoryScores[category];
+    cat.percentage = cat.available > 0
+      ? Math.round((cat.achieved / cat.available) * 1000) / 10
+      : 0;
+  });
+
+  // Pass/fail: 100% when all mandatory are met, otherwise proportional
+  const totalScore = totalMandatory > 0
+    ? Math.round((totalMandatoryPassed / totalMandatory) * 1000) / 10
+    : 0;
+
+  return {
+    totalScore,
+    totalAchieved: totalMandatoryPassed,
+    totalAvailable: totalMandatory,
     categoryScores,
     requirementsMet,
     requirementsPartial,

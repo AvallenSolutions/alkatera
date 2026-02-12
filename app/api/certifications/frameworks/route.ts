@@ -16,6 +16,8 @@ function transformFramework(dbFramework: any) {
     display_order: dbFramework.display_order || 0,
     governing_body: dbFramework.governing_body,
     website_url: dbFramework.website_url,
+    scoring_model: dbFramework.scoring_model || 'points',
+    progression_model: dbFramework.progression_model || null,
     requirements: (dbFramework.requirements || []).map((req: any) => ({
       id: req.id,
       framework_id: req.framework_id,
@@ -28,6 +30,9 @@ function transformFramework(dbFramework: any) {
       is_required: req.is_required || req.is_mandatory || false,
       guidance: req.guidance || req.examples,
       data_sources: req.data_sources || req.required_data_sources || [],
+      applicable_from_year: req.applicable_from_year ?? 0,
+      size_threshold: req.size_threshold || 'all',
+      topic_area: req.topic_area || null,
     })),
   };
 }
@@ -111,6 +116,7 @@ export async function GET(request: NextRequest) {
           expiry_date: cert.expiry_date,
           certificate_number: cert.certification_number || cert.certificate_number,
           current_score: cert.readiness_score || cert.current_score || cert.score_achieved,
+          current_year: cert.current_year ?? 0,
         }));
       }
     }
