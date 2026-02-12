@@ -6,9 +6,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
-  Factory,
   Package,
-  ClipboardList,
   FileText,
   TrendingUp,
   Settings,
@@ -33,7 +31,6 @@ import {
   Briefcase,
   GraduationCap,
   AlertCircle,
-  Shield,
   CheckSquare,
   Activity,
   CreditCard,
@@ -50,7 +47,6 @@ import {
   MapPin,
   HandHelping,
   FileHeart,
-  Target,
   Library,
   Lock,
   Database,
@@ -75,18 +71,19 @@ interface NavItem {
 }
 
 // Navigation configuration with tier requirements
+// Order: Core workflow first, then reporting/compliance, then ESG, then tools
 const navigationStructure: NavItem[] = [
   {
     name: 'Dashboard',
     href: '/dashboard/',
     icon: LayoutDashboard,
-    minTier: 1, // Available to all tiers
+    minTier: 1,
   },
   {
     name: 'Company',
     href: '/company/facilities/',
     icon: Building2,
-    minTier: 1, // Available to all tiers
+    minTier: 1,
     children: [
       {
         name: 'Facilities',
@@ -98,20 +95,14 @@ const navigationStructure: NavItem[] = [
         name: 'Fleet',
         href: '/company/fleet/',
         icon: Truck,
-        minTier: 2, // Blossom and above
+        minTier: 2,
         featureCode: 'vehicle_registry',
-      },
-      {
-        name: 'Company Emissions',
-        href: '/data/scope-1-2/',
-        icon: Flame,
-        minTier: 1, // Available to all tiers (includes Scope 1, 2, and 3)
       },
       {
         name: 'Company Vitality',
         href: '/performance/',
         icon: Sparkles,
-        minTier: 2, // Blossom and above
+        minTier: 2,
       },
     ],
   },
@@ -119,24 +110,30 @@ const navigationStructure: NavItem[] = [
     name: 'Products',
     href: '/products/',
     icon: Package,
-    minTier: 1, // Available to all tiers
+    minTier: 1,
   },
   {
     name: 'Suppliers',
     href: '/suppliers/',
     icon: Users,
-    minTier: 1, // Available to all tiers
+    minTier: 1,
   },
   {
-    name: 'Resources',
-    href: '/knowledge-bank/',
-    icon: Library,
-    minTier: 1, // Available to all tiers
+    name: 'Emissions Data',
+    href: '/data/scope-1-2/',
+    icon: Flame,
+    minTier: 1,
     children: [
       {
-        name: 'Knowledge Bank',
-        href: '/knowledge-bank/',
-        icon: GraduationCap,
+        name: 'Company Emissions',
+        href: '/data/scope-1-2/',
+        icon: Flame,
+        minTier: 1,
+      },
+      {
+        name: 'Data Quality',
+        href: '/data/quality/',
+        icon: BarChart3,
         minTier: 1,
       },
       {
@@ -145,31 +142,165 @@ const navigationStructure: NavItem[] = [
         icon: BookOpen,
         minTier: 1,
       },
+    ],
+  },
+  {
+    name: 'Reports',
+    href: '/reports/',
+    icon: FileText,
+    minTier: 1,
+    children: [
       {
-        name: 'Reports',
-        href: '/reports/',
-        icon: FileText,
+        name: 'Sustainability Reports',
+        href: '/reports/sustainability/',
+        icon: TrendingUp,
         minTier: 1,
-        children: [
-          {
-            name: 'Sustainability Reports',
-            href: '/reports/sustainability/',
-            icon: TrendingUp,
-            minTier: 1,
-          },
-          {
-            name: "PEI's & EPD's",
-            href: '/reports/lcas/',
-            icon: Award,
-            minTier: 2, // Blossom and above
-          },
-        ],
+      },
+      {
+        name: "PEI's & EPD's",
+        href: '/reports/lcas/',
+        icon: Award,
+        minTier: 2,
+      },
+    ],
+  },
+  {
+    name: 'Certifications',
+    href: '/certifications/',
+    icon: Award,
+    minTier: 2,
+  },
+  {
+    name: 'People & Culture',
+    href: '/people-culture/',
+    icon: UserCheck,
+    minTier: 2,
+    children: [
+      {
+        name: 'Overview',
+        href: '/people-culture/',
+        icon: UserCheck,
+        minTier: 2,
+      },
+      {
+        name: 'Fair Work',
+        href: '/people-culture/fair-work/',
+        icon: Briefcase,
+        minTier: 2,
+      },
+      {
+        name: 'Diversity & Inclusion',
+        href: '/people-culture/diversity-inclusion/',
+        icon: Users,
+        minTier: 2,
+      },
+      {
+        name: 'Wellbeing',
+        href: '/people-culture/wellbeing/',
+        icon: Heart,
+        minTier: 2,
+      },
+      {
+        name: 'Training',
+        href: '/people-culture/training/',
+        icon: GraduationCap,
+        minTier: 2,
+      },
+    ],
+  },
+  {
+    name: 'Community Impact',
+    href: '/community-impact/',
+    icon: Heart,
+    minTier: 2,
+    children: [
+      {
+        name: 'Overview',
+        href: '/community-impact/',
+        icon: Heart,
+        minTier: 2,
+      },
+      {
+        name: 'Charitable Giving',
+        href: '/community-impact/charitable-giving/',
+        icon: Gift,
+        minTier: 2,
+      },
+      {
+        name: 'Local Impact',
+        href: '/community-impact/local-impact/',
+        icon: MapPin,
+        minTier: 2,
+      },
+      {
+        name: 'Volunteering',
+        href: '/community-impact/volunteering/',
+        icon: HandHelping,
+        minTier: 2,
+      },
+      {
+        name: 'Impact Stories',
+        href: '/community-impact/stories/',
+        icon: FileHeart,
+        minTier: 2,
+      },
+    ],
+  },
+  {
+    name: 'Governance',
+    href: '/governance/',
+    icon: Scale,
+    minTier: 3,
+    children: [
+      {
+        name: 'Overview',
+        href: '/governance/',
+        icon: Scale,
+        minTier: 3,
+      },
+      {
+        name: 'Policies',
+        href: '/governance/policies/',
+        icon: FileText,
+        minTier: 3,
+      },
+      {
+        name: 'Stakeholders',
+        href: '/governance/stakeholders/',
+        icon: Handshake,
+        minTier: 3,
+      },
+      {
+        name: 'Board',
+        href: '/governance/board/',
+        icon: Users,
+        minTier: 3,
+      },
+      {
+        name: 'Transparency',
+        href: '/governance/transparency/',
+        icon: Eye,
+        minTier: 3,
+      },
+    ],
+  },
+  {
+    name: 'Resources',
+    href: '/knowledge-bank/',
+    icon: Library,
+    minTier: 1,
+    children: [
+      {
+        name: 'Knowledge Bank',
+        href: '/knowledge-bank/',
+        icon: GraduationCap,
+        minTier: 1,
       },
       {
         name: 'Greenwash Guardian',
         href: '/greenwash-guardian/',
         icon: Leaf,
-        minTier: 2, // Blossom and above
+        minTier: 2,
       },
     ],
   },
@@ -177,139 +308,15 @@ const navigationStructure: NavItem[] = [
     name: 'Rosa',
     href: '/rosa/',
     icon: Dog,
-    minTier: 2, // Blossom and above
-  },
-  {
-    name: 'Certifications',
-    href: '/certifications/',
-    icon: Award,
-    minTier: 2, // Blossom and above (B Corp & CDP are Blossom+)
+    minTier: 2,
   },
   {
     name: 'Settings',
     href: '/settings/',
     icon: Settings,
-    minTier: 1, // Available to all tiers
+    minTier: 1,
   },
 ]
-
-// Social Impact sections configuration
-const peopleAndCultureSection: NavItem = {
-  name: 'People & Culture',
-  href: '/people-culture/',
-  icon: UserCheck,
-  minTier: 2, // Blossom and above
-  children: [
-    {
-      name: 'Overview',
-      href: '/people-culture/',
-      icon: UserCheck,
-      minTier: 2,
-    },
-    {
-      name: 'Fair Work',
-      href: '/people-culture/fair-work/',
-      icon: Briefcase,
-      minTier: 2,
-    },
-    {
-      name: 'Diversity & Inclusion',
-      href: '/people-culture/diversity-inclusion/',
-      icon: Users,
-      minTier: 2,
-    },
-    {
-      name: 'Wellbeing',
-      href: '/people-culture/wellbeing/',
-      icon: Heart,
-      minTier: 2,
-    },
-    {
-      name: 'Training',
-      href: '/people-culture/training/',
-      icon: GraduationCap,
-      minTier: 2,
-    },
-  ],
-}
-
-const governanceSection: NavItem = {
-  name: 'Governance',
-  href: '/governance/',
-  icon: Scale,
-  minTier: 3, // Canopy only
-  children: [
-    {
-      name: 'Overview',
-      href: '/governance/',
-      icon: Scale,
-      minTier: 3,
-    },
-    {
-      name: 'Policies',
-      href: '/governance/policies/',
-      icon: FileText,
-      minTier: 3,
-    },
-    {
-      name: 'Stakeholders',
-      href: '/governance/stakeholders/',
-      icon: Handshake,
-      minTier: 3,
-    },
-    {
-      name: 'Board',
-      href: '/governance/board/',
-      icon: Users,
-      minTier: 3,
-    },
-    {
-      name: 'Transparency',
-      href: '/governance/transparency/',
-      icon: Eye,
-      minTier: 3,
-    },
-  ],
-}
-
-const communityImpactSection: NavItem = {
-  name: 'Community Impact',
-  href: '/community-impact/',
-  icon: Heart,
-  minTier: 2, // Blossom and above
-  children: [
-    {
-      name: 'Overview',
-      href: '/community-impact/',
-      icon: Heart,
-      minTier: 2,
-    },
-    {
-      name: 'Charitable Giving',
-      href: '/community-impact/charitable-giving/',
-      icon: Gift,
-      minTier: 2,
-    },
-    {
-      name: 'Local Impact',
-      href: '/community-impact/local-impact/',
-      icon: MapPin,
-      minTier: 2,
-    },
-    {
-      name: 'Volunteering',
-      href: '/community-impact/volunteering/',
-      icon: HandHelping,
-      minTier: 2,
-    },
-    {
-      name: 'Impact Stories',
-      href: '/community-impact/stories/',
-      icon: FileHeart,
-      minTier: 2,
-    },
-  ],
-}
 
 const developmentStructure: NavItem[] = [
   {
@@ -402,37 +409,8 @@ export function Sidebar({ className }: SidebarProps) {
     })
   }
 
-  // Build final navigation structure
-  const getFilteredNavigation = (): NavItem[] => {
-    // Start with base navigation
-    let filteredNav = filterNavItems(navigationStructure)
-
-    // Always insert ESG sections (they'll be shown as locked if tier is insufficient)
-    // Insert People & Culture after Suppliers
-    const suppliersIndex = filteredNav.findIndex(item => item.href === '/suppliers/')
-    if (suppliersIndex !== -1) {
-      const processedPeople = filterNavItems([peopleAndCultureSection])[0]
-      filteredNav.splice(suppliersIndex + 1, 0, processedPeople)
-    }
-
-    // Insert Governance after People & Culture
-    const peopleCultureIndex = filteredNav.findIndex(item => item.href === '/people-culture/')
-    if (peopleCultureIndex !== -1) {
-      const processedGov = filterNavItems([governanceSection])[0]
-      filteredNav.splice(peopleCultureIndex + 1, 0, processedGov)
-    }
-
-    // Insert Community Impact after Governance
-    const govIndex = filteredNav.findIndex(item => item.href === '/governance/')
-    if (govIndex !== -1) {
-      const processedCommunity = filterNavItems([communityImpactSection])[0]
-      filteredNav.splice(govIndex + 1, 0, processedCommunity)
-    }
-
-    return filteredNav
-  }
-
-  const filteredNavigation = getFilteredNavigation()
+  // Build final navigation structure (all items are now in the main array)
+  const filteredNavigation = filterNavItems(navigationStructure)
 
   useEffect(() => {
     async function checkAlkateraAdmin() {
