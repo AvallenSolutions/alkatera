@@ -148,15 +148,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: gapError.message }, { status: 500 });
     }
 
-    // Fetch requirement details separately
+    // Fetch requirement details from both tables (IDs may live in either)
     const gapReqIds = Array.from(new Set((gapAnalyses || []).map((a: any) => a.requirement_id)));
     let reqLookup: Record<string, any> = {};
     if (gapReqIds.length > 0) {
-      const { data: reqs } = await supabase
-        .from('framework_requirements')
-        .select('id, max_points, requirement_category')
-        .in('id', gapReqIds);
-      reqLookup = Object.fromEntries((reqs || []).map((r: any) => [r.id, r]));
+      const reqFields = 'id, max_points, requirement_category';
+      const [{ data: reqs1 }, { data: reqs2 }] = await Promise.all([
+        supabase.from('framework_requirements').select(reqFields).in('id', gapReqIds),
+        supabase.from('certification_framework_requirements').select(reqFields).in('id', gapReqIds),
+      ]);
+      (reqs1 || []).forEach((r: any) => { reqLookup[r.id] = r; });
+      (reqs2 || []).forEach((r: any) => { if (!reqLookup[r.id]) reqLookup[r.id] = r; });
     }
 
     // Enrich gap analyses with requirement data

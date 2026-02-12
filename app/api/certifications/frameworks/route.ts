@@ -67,21 +67,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: frameworksError.message }, { status: 500 });
     }
 
-    // Fetch requirements separately and group by framework_id
+    // Fetch requirements from both tables (legacy frameworks use framework_requirements,
+    // newer frameworks like B Corp 2026 use certification_framework_requirements)
     const fwIds = (rawFrameworks || []).map((f: any) => f.id);
     let requirementsByFramework: Record<string, any[]> = {};
     if (fwIds.length > 0) {
-      const { data: allReqs } = await supabase
-        .from('framework_requirements')
-        .select('*')
-        .in('framework_id', fwIds)
-        .order('order_index', { ascending: true });
+      const [{ data: reqs1 }, { data: reqs2 }] = await Promise.all([
+        supabase
+          .from('framework_requirements')
+          .select('*')
+          .in('framework_id', fwIds)
+          .order('order_index', { ascending: true }),
+        supabase
+          .from('certification_framework_requirements')
+          .select('*')
+          .in('framework_id', fwIds)
+          .order('order_index', { ascending: true }),
+      ]);
 
-      (allReqs || []).forEach((req: any) => {
+      // Index framework_requirements
+      (reqs1 || []).forEach((req: any) => {
         if (!requirementsByFramework[req.framework_id]) {
           requirementsByFramework[req.framework_id] = [];
         }
         requirementsByFramework[req.framework_id].push(req);
+      });
+
+      // Add certification_framework_requirements only for frameworks that
+      // had no entries in framework_requirements (avoids duplicates)
+      const fwIdsWithReqs = new Set(Object.keys(requirementsByFramework));
+      (reqs2 || []).forEach((req: any) => {
+        if (!fwIdsWithReqs.has(req.framework_id)) {
+          if (!requirementsByFramework[req.framework_id]) {
+            requirementsByFramework[req.framework_id] = [];
+          }
+          requirementsByFramework[req.framework_id].push(req);
+        }
       });
     }
 

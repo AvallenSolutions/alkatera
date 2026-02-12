@@ -45,16 +45,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fetch related requirements separately
+    // Fetch related requirements from both tables (IDs may live in either)
     const requirementIds = Array.from(new Set(analyses.map((a: any) => a.requirement_id)));
-    const { data: requirements } = await supabase
-      .from('framework_requirements')
-      .select('id, requirement_code, requirement_name, requirement_category, subsection, max_points, applicable_from_year, size_threshold, topic_area')
-      .in('id', requirementIds);
+    const reqFields = 'id, requirement_code, requirement_name, requirement_category, subsection, max_points, applicable_from_year, size_threshold, topic_area';
+    const [{ data: reqs1 }, { data: reqs2 }] = await Promise.all([
+      supabase.from('framework_requirements').select(reqFields).in('id', requirementIds),
+      supabase.from('certification_framework_requirements').select(reqFields).in('id', requirementIds),
+    ]);
 
-    const requirementMap = new Map(
-      (requirements || []).map((r: any) => [r.id, r])
-    );
+    const requirementMap = new Map<string, any>();
+    (reqs1 || []).forEach((r: any) => requirementMap.set(r.id, r));
+    // Add from certification_framework_requirements only if not already found
+    (reqs2 || []).forEach((r: any) => {
+      if (!requirementMap.has(r.id)) requirementMap.set(r.id, r);
+    });
 
     // Filter out orphaned records (requirement_id doesn't exist in framework_requirements)
     // and deduplicate (keep only the latest record per requirement_id)
