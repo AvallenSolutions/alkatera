@@ -212,6 +212,25 @@ function CertificationDetailsContent() {
     deletePackage,
   } = useCertificationAuditPackages(frameworkId);
 
+  const [selectedYear, setSelectedYear] = useState<number>(0);
+
+  // Build requirement counts by year for the stepper (must be before early returns)
+  const requirementCountsByYear = useMemo(() => {
+    if (!framework?.progression_model?.years || !framework?.requirements) return {};
+    const counts: Record<number, { total: number; passed: number }> = {};
+    for (const year of framework.progression_model.years) {
+      const thisYearReqs = framework.requirements.filter(
+        (r: Requirement) => (r.applicable_from_year ?? 0) === year
+      );
+      const passedCount = thisYearReqs.filter((r: Requirement) => {
+        const analysis = gapAnalyses.find(a => a.requirement_id === r.id);
+        return analysis?.compliance_status === 'compliant';
+      }).length;
+      counts[year] = { total: thisYearReqs.length, passed: passedCount };
+    }
+    return counts;
+  }, [framework?.progression_model, framework?.requirements, gapAnalyses]);
+
   // Keep refs in sync
   orgIdRef.current = currentOrganization?.id ?? null;
 
@@ -436,8 +455,6 @@ function CertificationDetailsContent() {
     );
   }
 
-  const [selectedYear, setSelectedYear] = useState<number>(0);
-
   const status = certification?.status || 'not_started';
   const config = statusConfig[status];
   const StatusIcon = config.icon;
@@ -455,27 +472,6 @@ function CertificationDetailsContent() {
   const isPassingScore = isPassFail
     ? (gapSummary?.total ?? 0) > 0 && (gapSummary?.compliant ?? 0) === (gapSummary?.total ?? 0)
     : score >= framework.passing_score;
-
-  // Build requirement counts by year for the stepper
-  const requirementCountsByYear = useMemo(() => {
-    if (!framework.progression_model?.years || !framework.requirements) return {};
-    const counts: Record<number, { total: number; passed: number }> = {};
-    for (const year of framework.progression_model.years) {
-      const yearReqs = framework.requirements.filter(
-        r => (r.applicable_from_year ?? 0) <= year
-      );
-      // Count requirements at exactly this year tier (not cumulative from previous)
-      const thisYearReqs = framework.requirements.filter(
-        r => (r.applicable_from_year ?? 0) === year
-      );
-      const passedCount = thisYearReqs.filter(r => {
-        const analysis = gapAnalyses.find(a => a.requirement_id === r.id);
-        return analysis?.compliance_status === 'compliant';
-      }).length;
-      counts[year] = { total: thisYearReqs.length, passed: passedCount };
-    }
-    return counts;
-  }, [framework.progression_model, framework.requirements, gapAnalyses]);
 
   return (
     <div className="space-y-6 animate-fade-in-up">
