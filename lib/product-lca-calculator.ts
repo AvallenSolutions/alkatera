@@ -604,12 +604,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           // Data quality & provenance
           data_priority: resolved.data_priority,
           data_quality_tag: resolved.data_quality_tag,
+          data_quality_grade: resolved.data_quality_grade,
           supplier_lca_id: resolved.supplier_lca_id || null,
           confidence_score: resolved.confidence_score,
           methodology: resolved.methodology,
           source_reference: resolved.source_reference,
           impact_source: resolveImpactSource(resolved.data_quality_tag, resolved.data_priority),
           impact_reference_id: resolved.supplier_lca_id || null,
+
+          // Data source tracking for quality metrics
+          gwp_data_source: resolved.gwp_data_source,
+          non_gwp_data_source: resolved.non_gwp_data_source,
+          is_hybrid_source: resolved.is_hybrid_source,
+          category_type: resolved.category_type,
         };
 
         lcaMaterialsWithImpacts.push(lcaMaterial);
@@ -708,6 +715,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         source_reference: `Barrel allocation: ${matResult.barrel_total_co2e.toFixed(1)} kg total ÷ ${totalBottles.toFixed(0)} bottles = ${barrelPerBottle.toFixed(4)} kg/bottle (${(bottleSizeLitres * 1000).toFixed(0)}ml, ${matResult.output_volume_litres.toFixed(1)}L output). ${matResult.methodology_notes}`,
         impact_source: 'secondary_modelled',
         impact_reference_id: null,
+        data_quality_grade: 'LOW',
+        gwp_data_source: 'Alkatera staging factor',
+        non_gwp_data_source: 'Alkatera staging factor',
+        is_hybrid_source: false,
+        category_type: 'maturation',
       });
 
       // Inject warehouse energy as a synthetic material (per-bottle)
@@ -758,6 +770,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         source_reference: `Warehouse energy: ${matResult.warehouse_co2e_total.toFixed(1)} kg total ÷ ${totalBottles.toFixed(0)} bottles = ${warehousePerBottle.toFixed(4)} kg/bottle. ${maturationProfile.warehouse_energy_kwh_per_barrel_year} kWh/barrel/yr (${maturationProfile.warehouse_energy_source})`,
         impact_source: 'secondary_modelled',
         impact_reference_id: null,
+        data_quality_grade: 'LOW',
+        gwp_data_source: 'DEFRA 2025',
+        non_gwp_data_source: 'DEFRA 2025',
+        is_hybrid_source: false,
+        category_type: 'maturation',
       });
 
       console.log(`[calculateProductCarbonFootprint] ✓ Maturation impacts (per-bottle): barrel=${barrelPerBottle.toFixed(4)} kg CO2e, warehouse=${warehousePerBottle.toFixed(4)} kg CO2e, angel's share=${matResult.angel_share_loss_percent_total.toFixed(1)}% volume loss, VOC=${vocPerBottle.toFixed(4)} kg/bottle`);

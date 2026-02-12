@@ -54,16 +54,101 @@ export interface DataQualityMetrics {
   error: string | null;
 }
 
+/**
+ * Derive a data quality grade from whatever columns are available on a material row.
+ *
+ * Priority order:
+ *   1. data_quality_grade  — written by calculator since Feb 2026
+ *   2. data_priority       — 1 = HIGH, 2 = MEDIUM, 3 = LOW
+ *   3. data_quality_tag    — Primary_Verified = HIGH, Regional_Standard = MEDIUM, else LOW
+ *   4. impact_source       — 'supplier_verified' = HIGH, 'regional_standard'/'hybrid' = MEDIUM, else LOW
+ *   5. data_source         — 'supplier' = HIGH, 'openlca' = MEDIUM, else LOW
+ *   6. Fallback            — LOW
+ */
+function deriveQualityGrade(m: Record<string, any>): 'HIGH' | 'MEDIUM' | 'LOW' {
+  // 1. Explicit grade
+  if (m.data_quality_grade === 'HIGH' || m.data_quality_grade === 'MEDIUM' || m.data_quality_grade === 'LOW') {
+    return m.data_quality_grade;
+  }
+
+  // 2. data_priority (number 1-3)
+  if (m.data_priority === 1) return 'HIGH';
+  if (m.data_priority === 2) return 'MEDIUM';
+  if (m.data_priority === 3) return 'LOW';
+
+  // 3. data_quality_tag
+  if (m.data_quality_tag === 'Primary_Verified') return 'HIGH';
+  if (m.data_quality_tag === 'Regional_Standard') return 'MEDIUM';
+  if (m.data_quality_tag === 'Secondary_Modelled' || m.data_quality_tag === 'Secondary_Estimated') return 'LOW';
+
+  // 4. impact_source
+  if (m.impact_source === 'supplier_verified') return 'HIGH';
+  if (m.impact_source === 'regional_standard' || m.impact_source === 'hybrid') return 'MEDIUM';
+  if (m.impact_source === 'secondary_modelled' || m.impact_source === 'staging_factor') return 'LOW';
+
+  // 5. data_source
+  if (m.data_source === 'supplier') return 'HIGH';
+  if (m.data_source === 'openlca') return 'MEDIUM';
+
+  // 6. Fallback
+  return 'LOW';
+}
+
+/**
+ * Derive confidence score when the stored value is missing or zero.
+ */
+function deriveConfidence(m: Record<string, any>): number {
+  if (m.confidence_score && m.confidence_score > 0) return m.confidence_score;
+
+  const grade = deriveQualityGrade(m);
+  if (grade === 'HIGH') return 95;
+  if (grade === 'MEDIUM') return 75;
+  return 50;
+}
+
+/**
+ * Determine if the material uses DEFRA data, checking multiple columns.
+ */
+function isDefraSource(m: Record<string, any>): boolean {
+  if (m.gwp_data_source?.includes('DEFRA')) return true;
+  if (m.source_reference?.includes('DEFRA')) return true;
+  if (m.impact_source === 'regional_standard') return true;
+  return false;
+}
+
+/**
+ * Determine if the material is supplier-verified.
+ */
+function isSupplierVerified(m: Record<string, any>): boolean {
+  if (m.data_source === 'supplier') return true;
+  if (m.supplier_product_id) return true;
+  if (m.gwp_data_source?.includes('Supplier')) return true;
+  if (m.impact_source === 'supplier_verified') return true;
+  return false;
+}
+
+/**
+ * Determine if the material uses a hybrid data source.
+ */
+function isHybrid(m: Record<string, any>): boolean {
+  if (m.is_hybrid_source === true) return true;
+  if (m.impact_source === 'hybrid') return true;
+  if (m.non_gwp_data_source && m.gwp_data_source && m.non_gwp_data_source !== m.gwp_data_source) return true;
+  return false;
+}
+
+const emptyDistribution: DataQualityDistribution = {
+  high_count: 0,
+  high_percentage: 0,
+  medium_count: 0,
+  medium_percentage: 0,
+  low_count: 0,
+  low_percentage: 0,
+  total_count: 0,
+};
+
 export function useDataQualityMetrics(organizationId: string | undefined): DataQualityMetrics {
-  const [distribution, setDistribution] = useState<DataQualityDistribution>({
-    high_count: 0,
-    high_percentage: 0,
-    medium_count: 0,
-    medium_percentage: 0,
-    low_count: 0,
-    low_percentage: 0,
-    total_count: 0,
-  });
+  const [distribution, setDistribution] = useState<DataQualityDistribution>(emptyDistribution);
   const [averageConfidence, setAverageConfidence] = useState<number>(0);
   const [hybridSourcesCount, setHybridSourcesCount] = useState<number>(0);
   const [defraCount, setDefraCount] = useState<number>(0);
@@ -83,6 +168,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         setLoading(true);
         setError(null);
 
+        // 1. Fetch all LCAs for this org
         const { data: lcas, error: lcasError } = await supabase
           .from('product_carbon_footprints')
           .select('id, product_id')
@@ -91,21 +177,14 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         if (lcasError) throw lcasError;
 
         if (!lcas || lcas.length === 0) {
-          setDistribution({
-            high_count: 0,
-            high_percentage: 0,
-            medium_count: 0,
-            medium_percentage: 0,
-            low_count: 0,
-            low_percentage: 0,
-            total_count: 0,
-          });
+          setDistribution(emptyDistribution);
           setLoading(false);
           return;
         }
 
         const lcaIds = lcas.map(l => l.id);
 
+        // 2. Fetch products for name lookup
         const { data: products, error: productsError } = await supabase
           .from('products')
           .select('id, name')
@@ -116,6 +195,9 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         const productMap = new Map((products || []).map(p => [p.id, p.name]));
         const lcaProductMap = new Map(lcas.map(l => [l.id, l.product_id]));
 
+        // 3. Fetch materials with ALL available quality columns
+        //    This includes both new columns (data_quality_grade, gwp_data_source, etc.)
+        //    and legacy columns (data_priority, data_quality_tag, impact_source) for fallback derivation
         const { data: materials, error: materialsError } = await supabase
           .from('product_carbon_footprint_materials')
           .select(`
@@ -125,10 +207,15 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
             quantity,
             unit,
             data_quality_grade,
+            data_priority,
+            data_quality_tag,
             confidence_score,
             impact_climate,
             data_source,
+            impact_source,
+            source_reference,
             gwp_data_source,
+            non_gwp_data_source,
             is_hybrid_source,
             category_type,
             supplier_product_id
@@ -138,23 +225,33 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
         if (materialsError) throw materialsError;
 
         if (!materials || materials.length === 0) {
-          setDistribution({
-            high_count: 0,
-            high_percentage: 0,
-            medium_count: 0,
-            medium_percentage: 0,
-            low_count: 0,
-            low_percentage: 0,
-            total_count: 0,
-          });
+          setDistribution(emptyDistribution);
           setLoading(false);
           return;
         }
 
+        // 4. Derive quality for each material using all available signals
         const totalCount = materials.length;
-        const highCount = materials.filter(m => m.data_quality_grade === 'HIGH').length;
-        const mediumCount = materials.filter(m => m.data_quality_grade === 'MEDIUM').length;
-        const lowCount = materials.filter(m => m.data_quality_grade === 'LOW').length;
+        let highCount = 0;
+        let mediumCount = 0;
+        let lowCount = 0;
+        let totalConfidence = 0;
+        let hybridCount = 0;
+        let defraUsageCount = 0;
+        let supplierCount = 0;
+
+        for (const m of materials) {
+          const grade = deriveQualityGrade(m);
+          if (grade === 'HIGH') highCount++;
+          else if (grade === 'MEDIUM') mediumCount++;
+          else lowCount++;
+
+          totalConfidence += deriveConfidence(m);
+
+          if (isHybrid(m)) hybridCount++;
+          if (isDefraSource(m)) defraUsageCount++;
+          if (isSupplierVerified(m)) supplierCount++;
+        }
 
         setDistribution({
           high_count: highCount,
@@ -166,43 +263,33 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
           total_count: totalCount,
         });
 
-        const avgConfidence =
-          materials.reduce((sum, m) => sum + (m.confidence_score || 0), 0) / totalCount;
-        setAverageConfidence(Math.round(avgConfidence));
-
-        const hybridCount = materials.filter(m => m.is_hybrid_source === true).length;
+        setAverageConfidence(Math.round(totalConfidence / totalCount));
         setHybridSourcesCount(hybridCount);
-
-        const defraUsageCount = materials.filter(m =>
-          m.gwp_data_source?.includes('DEFRA')
-        ).length;
         setDefraCount(defraUsageCount);
-
-        const supplierCount = materials.filter(m =>
-          m.data_source === 'supplier' || m.gwp_data_source?.includes('Supplier')
-        ).length;
         setSupplierVerifiedCount(supplierCount);
 
+        // 5. Build upgrade opportunities from non-HIGH, non-supplier materials
         const opportunities: UpgradeOpportunity[] = materials
-          .filter(m => m.data_quality_grade === 'LOW' || m.data_quality_grade === 'MEDIUM')
+          .filter(m => {
+            const grade = deriveQualityGrade(m);
+            return grade === 'LOW' || grade === 'MEDIUM';
+          })
           .filter(m => !m.supplier_product_id)
           .map(m => {
-            const currentQuality = m.data_quality_grade || 'LOW';
-            const currentConfidence = m.confidence_score || 50;
+            const currentQuality = deriveQualityGrade(m);
+            const currentConfidence = deriveConfidence(m);
             const ghgImpact = m.impact_climate || 0;
-
             const potentialConfidence = 95;
             const confidenceGain = potentialConfidence - currentConfidence;
-
             const priorityScore = (ghgImpact * confidenceGain) / 100;
 
             let recommendation = '';
             if (ghgImpact > 10) {
-              recommendation = 'High impact material - Priority supplier engagement';
+              recommendation = 'High impact material — priority supplier engagement';
             } else if (ghgImpact > 1) {
-              recommendation = 'Medium impact - Request supplier EPD';
+              recommendation = 'Medium impact — request supplier data';
             } else {
-              recommendation = 'Low impact - Consider when updating product';
+              recommendation = 'Low impact — consider when next updating this product';
             }
 
             const productId = lcaProductMap.get(m.product_carbon_footprint_id) || '';
@@ -219,7 +306,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
               potential_confidence: potentialConfidence,
               confidence_gain: confidenceGain,
               priority_score: priorityScore,
-              recommendation: recommendation,
+              recommendation,
             };
           })
           .sort((a, b) => b.priority_score - a.priority_score)

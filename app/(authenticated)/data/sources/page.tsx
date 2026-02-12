@@ -19,11 +19,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
   BookOpen,
   FlaskConical,
   AlertCircle,
@@ -125,7 +120,7 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
   const lit = meta.literature_source || {};
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <>
       <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setIsOpen(!isOpen)}>
         <TableCell className="font-medium">{factor.name}</TableCell>
         <TableCell className="text-right font-mono">
@@ -139,13 +134,11 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
           {factor.uncertainty_percent ? `\u00B1${factor.uncertainty_percent}%` : '-'}
         </TableCell>
         <TableCell className="text-center">{factor.geographic_scope || '-'}</TableCell>
-        <TableCell>
-          <CollapsibleTrigger asChild>
-            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </CollapsibleTrigger>
+        <TableCell className="text-center">
+          <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
         </TableCell>
       </TableRow>
-      <CollapsibleContent asChild>
+      {isOpen && (
         <TableRow>
           <TableCell colSpan={7} className="bg-muted/30 p-4">
             <div className="space-y-3 text-sm">
@@ -264,8 +257,8 @@ function FactorRow({ factor }: { factor: EmissionFactor }) {
             </div>
           </TableCell>
         </TableRow>
-      </CollapsibleContent>
-    </Collapsible>
+      )}
+    </>
   );
 }
 
@@ -470,16 +463,16 @@ export default function DataSourcesPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Material</TableHead>
-                      <TableHead className="text-right">CO&#8322; per unit</TableHead>
-                      <TableHead className="text-center">Unit</TableHead>
-                      <TableHead className="text-center">Data Quality</TableHead>
-                      <TableHead className="text-center">Accuracy</TableHead>
-                      <TableHead className="text-center">Region</TableHead>
-                      <TableHead className="w-8"></TableHead>
+                      <TableHead className="w-[30%]">Material</TableHead>
+                      <TableHead className="w-[10%] text-right">CO&#8322; per unit</TableHead>
+                      <TableHead className="w-[8%] text-center">Unit</TableHead>
+                      <TableHead className="w-[18%] text-center">Data Quality</TableHead>
+                      <TableHead className="w-[12%] text-center">Accuracy</TableHead>
+                      <TableHead className="w-[12%] text-center">Region</TableHead>
+                      <TableHead className="w-[10%]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

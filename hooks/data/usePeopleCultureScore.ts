@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
 
@@ -52,6 +52,7 @@ export function usePeopleCultureScore(year?: number) {
   const [history, setHistory] = useState<PeopleCultureScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasAutoCalculated = useRef(false);
 
   const fetchScore = useCallback(async () => {
     if (!currentOrganization?.id) {
@@ -106,6 +107,28 @@ export function usePeopleCultureScore(year?: number) {
         console.warn('Error fetching summary:', summaryError);
       } else {
         setSummary(summaryData || null);
+      }
+
+      // Auto-calculate if no score exists yet (first visit)
+      if (!scoreData && !hasAutoCalculated.current) {
+        hasAutoCalculated.current = true;
+        try {
+          const response = await fetch('/api/people-culture/score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ year: currentYear }),
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.score) {
+              setScore(result.score);
+              setHistory(prev => [result.score, ...prev]);
+            }
+          }
+        } catch (calcErr) {
+          console.warn('Auto-calculation failed (non-critical):', calcErr);
+        }
       }
 
     } catch (err) {

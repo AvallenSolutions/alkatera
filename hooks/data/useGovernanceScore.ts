@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOrganization } from '@/lib/organizationContext';
 
 export interface GovernanceScore {
@@ -37,6 +37,7 @@ export function useGovernanceScore(): UseGovernanceScoreResult {
   const [history, setHistory] = useState<GovernanceScoreHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const hasAutoCalculated = useRef(false);
 
   const fetchScore = useCallback(async () => {
     if (!currentOrganization?.id) {
@@ -59,6 +60,28 @@ export function useGovernanceScore(): UseGovernanceScoreResult {
       const data = await response.json();
       setScore(data.current);
       setHistory(data.history || []);
+
+      // Auto-calculate if no score exists yet (first visit)
+      if (!data.current && !hasAutoCalculated.current) {
+        hasAutoCalculated.current = true;
+        try {
+          const calcResponse = await fetch('/api/governance/score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ organization_id: currentOrganization.id }),
+          });
+
+          if (calcResponse.ok) {
+            const newScore = await calcResponse.json();
+            if (newScore) {
+              setScore(newScore);
+              setHistory(prev => [{ overall_score: newScore.overall_score, calculated_at: newScore.calculated_at }, ...prev]);
+            }
+          }
+        } catch (calcErr) {
+          console.warn('Auto-calculation failed (non-critical):', calcErr);
+        }
+      }
     } catch (err) {
       console.error('Error fetching governance score:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch score');
