@@ -507,13 +507,39 @@ export function Sidebar({ className }: SidebarProps) {
 
   const isExpanded = (menuName: string) => expandedMenus.includes(menuName)
 
-  // Auto-expand parent menu if child is active
-  const shouldAutoExpand = (item: NavItem) => {
+  // Check if a menu item has an active child (used for styling only)
+  const hasActiveChild = (item: NavItem) => {
     if (item.children) {
       return item.children.some(child => isActive(child.href))
     }
     return false
   }
+
+  // Auto-expand parent menus on route change (but don't prevent manual collapse)
+  useEffect(() => {
+    const menusToExpand: string[] = []
+    for (const item of filteredNavigation) {
+      if (item.children && !item.locked) {
+        if (item.children.some(child => isActive(child.href))) {
+          menusToExpand.push(item.name)
+        }
+        // Also check grandchildren
+        for (const child of item.children) {
+          if (child.children && child.children.some(gc => isActive(gc.href))) {
+            menusToExpand.push(item.name)
+            menusToExpand.push(child.name)
+          }
+        }
+      }
+    }
+    if (menusToExpand.length > 0) {
+      setExpandedMenus(prev => {
+        const combined = new Set([...prev, ...menusToExpand])
+        return Array.from(combined)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname])
 
   return (
     <aside
@@ -538,7 +564,7 @@ export function Sidebar({ className }: SidebarProps) {
           const IconComponent = item.icon
           const active = !item.locked && isActive(item.href)
           const hasChildren = item.children && item.children.length > 0
-          const expanded = !item.locked && (isExpanded(item.name) || shouldAutoExpand(item))
+          const expanded = !item.locked && isExpanded(item.name)
 
           // Locked top-level item (no children) — show greyed out with lock
           if (item.locked && !hasChildren) {
@@ -579,14 +605,14 @@ export function Sidebar({ className }: SidebarProps) {
                   onClick={() => toggleMenu(item.name)}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    active || shouldAutoExpand(item)
+                    active || hasActiveChild(item)
                       ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                       : 'text-sidebar-foreground hover:bg-secondary/50'
                   )}
                 >
                   <IconComponent className={cn(
                     'h-4 w-4 flex-shrink-0 transition-colors',
-                    active || shouldAutoExpand(item) ? 'text-neon-lime' : ''
+                    active || hasActiveChild(item) ? 'text-neon-lime' : ''
                   )} />
                   <span className="truncate flex-1 text-left">{item.name}</span>
                   {expanded ? (
@@ -602,7 +628,7 @@ export function Sidebar({ className }: SidebarProps) {
                       const ChildIcon = child.icon
                       const childActive = isActive(child.href)
                       const childHasChildren = child.children && child.children.length > 0
-                      const childExpanded = isExpanded(child.name) || shouldAutoExpand(child)
+                      const childExpanded = isExpanded(child.name)
 
                       // If child has its own children (e.g., Social Impact subsections)
                       if (childHasChildren) {
@@ -612,14 +638,14 @@ export function Sidebar({ className }: SidebarProps) {
                               onClick={() => toggleMenu(child.name)}
                               className={cn(
                                 'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
-                                childActive || shouldAutoExpand(child)
+                                childActive || hasActiveChild(child)
                                   ? 'bg-secondary/50 text-foreground font-medium'
                                   : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
                               )}
                             >
                               <ChildIcon className={cn(
                                 'h-3.5 w-3.5 flex-shrink-0',
-                                childActive || shouldAutoExpand(child) ? 'text-neon-lime' : ''
+                                childActive || hasActiveChild(child) ? 'text-neon-lime' : ''
                               )} />
                               <span className="truncate flex-1 text-left">{child.name}</span>
                               {childExpanded ? (
