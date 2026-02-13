@@ -52,9 +52,11 @@ export function InviteTeamStep() {
       // Deduplicate
       const uniqueEmails = Array.from(new Set(emailList))
 
-      const { data: { session } } = await supabase.auth.getSession()
+      // Force a session refresh so the JWT contains the current_organization_id
+      // that was set earlier in onboarding when the org was created
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession()
 
-      if (!session) {
+      if (sessionError || !session) {
         toast({
           title: 'Authentication error',
           description: 'Please refresh the page and try again.',
