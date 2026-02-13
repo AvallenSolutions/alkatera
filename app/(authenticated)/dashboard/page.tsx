@@ -95,12 +95,30 @@ function EmptyDashboard({ onRefetch }: { onRefetch: () => void }) {
 
 function deriveBiodiversityRisk(natureMetrics: NatureMetrics | null): 'high' | 'medium' | 'low' | undefined {
   if (!natureMetrics) return undefined;
-  const landUse = natureMetrics.land_use || 0;
-  const ecotoxicity = natureMetrics.terrestrial_ecotoxicity || 0;
-  const impactScore = landUse + ecotoxicity;
-  if (impactScore > 1000) return 'high';
-  if (impactScore > 100) return 'medium';
-  return 'low';
+  if (!natureMetrics.per_unit) return undefined;
+
+  const pu = natureMetrics.per_unit;
+
+  // Score each metric: 3 = excellent, 2 = good, 1 = needs work
+  function rateMetric(value: number, excellent: number, good: number): number {
+    if (value <= excellent) return 3; // Excellent
+    if (value <= good) return 2;     // Good
+    return 1;                         // Needs work
+  }
+
+  const scores = [
+    rateMetric(pu.land_use || 0, 500, 2000),
+    rateMetric(pu.terrestrial_ecotoxicity || 0, 5, 15),
+    rateMetric(pu.freshwater_eutrophication || 0, 0.3, 0.7),
+    rateMetric(pu.terrestrial_acidification || 0, 1.5, 3.0),
+  ];
+
+  const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+  // Map average metric score to risk level
+  if (avgScore >= 2.5) return 'low';    // Mostly excellent → low risk
+  if (avgScore >= 1.5) return 'medium'; // Mixed performance → medium risk
+  return 'high';                         // Mostly needs work → high risk
 }
 
 function getStatusFromScore(score: number | null): 'good' | 'warning' | 'critical' | 'neutral' {
@@ -108,6 +126,13 @@ function getStatusFromScore(score: number | null): 'good' | 'warning' | 'critica
   if (score >= 70) return 'good';
   if (score >= 50) return 'warning';
   return 'critical';
+}
+
+function formatValue(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  if (value < 0.1 && value > 0) return value.toExponential(1);
+  return value.toFixed(1);
 }
 
 const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
@@ -415,7 +440,7 @@ export default function DashboardPage() {
         <RAGStatusCard
           title="Nature & Biodiversity"
           status={getStatusFromScore(scores.natureScore)}
-          value={landUse > 0 ? landUse.toFixed(0) : '--'}
+          value={landUse > 0 ? formatValue(landUse) : '--'}
           unit="m² crop eq"
           category="suppliers"
           href="/performance"

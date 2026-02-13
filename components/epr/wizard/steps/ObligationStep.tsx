@@ -71,8 +71,8 @@ export function ObligationStep({ onComplete, onBack }: ObligationStepProps) {
       const response = await fetch(`/api/epr/obligation?${params}`)
       if (!response.ok) throw new Error('Failed to fetch obligation')
 
-      const data: ObligationResult = await response.json()
-      setObligation(data)
+      const data = await response.json()
+      setObligation(data.obligation as ObligationResult)
     } catch (err) {
       console.error('Error fetching obligation:', err)
       // Don't toast on every debounce failure
