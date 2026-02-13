@@ -589,7 +589,11 @@ export function useCompanyMetrics(year?: number) {
       // Fetch from database if material, GHG, or lifecycle stage data is missing from aggregated_impacts
       if (!hasMaterialBreakdown || !hasGHGBreakdown || !hasLifecycleStageBreakdown) {
         try {
-          await fetchMaterialAndGHGBreakdown(yearStart, yearEnd);
+          // Pass LCA IDs and product ID mapping directly to avoid ambiguous PostgREST joins
+          const lcaIds = lcas.map((lca: any) => lca.id).filter(Boolean);
+          const lcaToProductId = new Map<string, any>();
+          lcas.forEach((lca: any) => { lcaToProductId.set(lca.id, lca.product_id); });
+          await fetchMaterialAndGHGBreakdown(yearStart, yearEnd, lcaIds, lcaToProductId);
         } catch (err) {
           console.error('[useCompanyMetrics] Material/GHG breakdown fallback failed:', err);
         }
@@ -855,14 +859,21 @@ export function useCompanyMetrics(year?: number) {
     }
   }
 
-  async function fetchMaterialAndGHGBreakdown(yearStart: string, yearEnd: string) {
+  async function fetchMaterialAndGHGBreakdown(yearStart: string, yearEnd: string, lcaIds?: string[], lcaToProductId?: Map<string, any>) {
     try {
       if (!currentOrganization?.id) {
         return;
       }
 
-      // Fetch materials from all completed PEIs (no year filter on updated_at,
-      // matching the corporate-emissions approach - production volume determines the year)
+      // Fetch materials from completed LCAs.
+      // Use lcaIds directly (passed from the main query) to avoid ambiguous PostgREST
+      // joins — product_carbon_footprint_materials has two FKs to product_carbon_footprints
+      // (product_carbon_footprint_id + supplier_lca_id) which causes relationship errors.
+      if (!lcaIds || lcaIds.length === 0) {
+        console.warn('[useCompanyMetrics] No LCA IDs provided for material breakdown');
+        return;
+      }
+
       const { data: materials, error } = await supabase
         .from('product_carbon_footprint_materials')
         .select(`
@@ -900,11 +911,9 @@ export function useCompanyMetrics(year?: number) {
             id,
             name,
             lca_stage_id
-          ),
-          product_carbon_footprints!product_lca_materials_lca_id_fkey!inner(status, organization_id, product_id, updated_at)
+          )
         `)
-        .eq('product_carbon_footprints.organization_id', currentOrganization.id)
-        .eq('product_carbon_footprints.status', 'completed')
+        .in('product_carbon_footprint_id', lcaIds)
         .not('impact_climate', 'is', null);
 
       if (error) {
@@ -916,7 +925,10 @@ export function useCompanyMetrics(year?: number) {
       }
 
       // Fetch production volumes for all products within the selected year
-      const productIds = Array.from(new Set(materials.map((m: any) => m.product_carbon_footprints?.product_id).filter(Boolean)));
+      // Map materials to product IDs via the LCA → product mapping
+      const productIds = Array.from(new Set(
+        materials.map((m: any) => lcaToProductId?.get(m.product_carbon_footprint_id)).filter(Boolean)
+      ));
       const { data: productionData } = await supabase
         .from('production_logs')
         .select('product_id, units_produced')
@@ -936,7 +948,7 @@ export function useCompanyMetrics(year?: number) {
       const materialMap = new Map<string, MaterialBreakdownItem>();
 
       materials.forEach((material: any) => {
-        const productId = material.product_carbon_footprints?.product_id;
+        const productId = lcaToProductId?.get(material.product_carbon_footprint_id);
         const productionVolume = productionMap.get(String(productId)) || 1;
 
         const name = material.name || 'Unknown Material';
@@ -973,7 +985,7 @@ export function useCompanyMetrics(year?: number) {
       let totalNatureProductionVolume = 0;
 
       materials.forEach((material: any) => {
-        const productId = material.product_carbon_footprints?.product_id;
+        const productId = lcaToProductId?.get(material.product_carbon_footprint_id);
         const productionVolume = productionMap.get(String(productId)) || 1;
 
         totalTerrestrialEcotoxicity += (Number(material.impact_terrestrial_ecotoxicity) || 0) * productionVolume;
@@ -1019,7 +1031,7 @@ export function useCompanyMetrics(year?: number) {
       }>();
 
       materials.forEach((material: any) => {
-        const productId = material.product_carbon_footprints?.product_id;
+        const productId = lcaToProductId?.get(material.product_carbon_footprint_id);
         const productionVolume = productionMap.get(String(productId)) || 1;
 
         const impact = (Number(material.impact_climate) || 0) * productionVolume;
@@ -1081,8 +1093,8 @@ export function useCompanyMetrics(year?: number) {
         let hasActualGhgData = false;
 
         materials.forEach((material: any) => {
-          const productId = material.product_carbon_footprints?.product_id;
-          const productionVolume = productionMap.get(productId) || 1;
+          const productId = lcaToProductId?.get(material.product_carbon_footprint_id);
+          const productionVolume = productionMap.get(String(productId)) || 1;
 
           const fossilFromDB = Number(material.impact_climate_fossil || 0) * productionVolume;
           const biogenicFromDB = Number(material.impact_climate_biogenic || 0) * productionVolume;
