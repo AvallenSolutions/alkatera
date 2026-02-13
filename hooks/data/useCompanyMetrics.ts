@@ -587,6 +587,7 @@ export function useCompanyMetrics(year?: number) {
       });
 
       // Fetch from database if material, GHG, or lifecycle stage data is missing from aggregated_impacts
+      console.log('[useCompanyMetrics] Breakdown check:', { hasMaterialBreakdown, hasGHGBreakdown, hasLifecycleStageBreakdown, lcaCount: lcas.length });
       if (!hasMaterialBreakdown || !hasGHGBreakdown || !hasLifecycleStageBreakdown) {
         try {
           // Pass LCA IDs and product ID mapping directly to avoid ambiguous PostgREST joins
@@ -869,6 +870,8 @@ export function useCompanyMetrics(year?: number) {
       // Use lcaIds directly (passed from the main query) to avoid ambiguous PostgREST
       // joins — product_carbon_footprint_materials has two FKs to product_carbon_footprints
       // (product_carbon_footprint_id + supplier_lca_id) which causes relationship errors.
+      console.log('[useCompanyMetrics] fetchMaterialAndGHGBreakdown called with', lcaIds?.length, 'LCA IDs:', lcaIds);
+
       if (!lcaIds || lcaIds.length === 0) {
         console.warn('[useCompanyMetrics] No LCA IDs provided for material breakdown');
         return;
@@ -906,21 +909,20 @@ export function useCompanyMetrics(year?: number) {
           gwp_ch4_biogenic,
           gwp_n2o,
           ghg_data_quality,
-          product_carbon_footprint_id,
-          lca_sub_stages (
-            id,
-            name,
-            lca_stage_id
-          )
+          product_carbon_footprint_id
         `)
         .in('product_carbon_footprint_id', lcaIds)
         .not('impact_climate', 'is', null);
 
       if (error) {
+        console.error('[useCompanyMetrics] Material query error:', error);
         throw error;
       }
 
+      console.log('[useCompanyMetrics] Materials fetched:', materials?.length || 0, 'rows');
+
       if (!materials || materials.length === 0) {
+        console.warn('[useCompanyMetrics] No materials found for LCA IDs');
         return;
       }
 
@@ -974,6 +976,10 @@ export function useCompanyMetrics(year?: number) {
 
       const totalClimate = aggregatedMaterials.reduce((sum, m) => sum + m.climate, 0);
 
+      console.log('[useCompanyMetrics] Setting materialBreakdown:', aggregatedMaterials.length, 'materials, total climate:', totalClimate.toFixed(2));
+      if (aggregatedMaterials.length > 0) {
+        console.log('[useCompanyMetrics] Top 3 materials:', aggregatedMaterials.slice(0, 3).map(m => `${m.name}: ${m.climate.toFixed(4)} kg CO2e`));
+      }
       setMaterialBreakdown(aggregatedMaterials);
 
       // Aggregate nature impacts from materials
@@ -1013,7 +1019,9 @@ export function useCompanyMetrics(year?: number) {
         }));
       }
 
-      // Fetch lifecycle stages mapping
+      // Fetch lifecycle stages and sub-stages mapping
+      // Note: product_carbon_footprint_materials has no FK to lca_sub_stages,
+      // so we fetch the mapping separately instead of using a PostgREST join
       const { data: lifecycleStages } = await supabase
         .from('lca_life_cycle_stages')
         .select('id, name');
@@ -1022,6 +1030,21 @@ export function useCompanyMetrics(year?: number) {
       lifecycleStages?.forEach((stage: any) => {
         stageIdToName.set(stage.id, stage.name);
       });
+
+      // Build sub-stage → stage mapping
+      const subStageIds = Array.from(new Set(
+        materials.map((m: any) => m.lca_sub_stage_id).filter(Boolean)
+      ));
+      const subStageToStageId = new Map<number, number>();
+      if (subStageIds.length > 0) {
+        const { data: subStages } = await supabase
+          .from('lca_sub_stages')
+          .select('id, lca_stage_id')
+          .in('id', subStageIds);
+        subStages?.forEach((ss: any) => {
+          subStageToStageId.set(ss.id, ss.lca_stage_id);
+        });
+      }
 
       // Calculate lifecycle stage breakdown
       const stageMap = new Map<string, {
@@ -1035,7 +1058,7 @@ export function useCompanyMetrics(year?: number) {
         const productionVolume = productionMap.get(String(productId)) || 1;
 
         const impact = (Number(material.impact_climate) || 0) * productionVolume;
-        const lca_stage_id = material.lca_sub_stages?.lca_stage_id;
+        const lca_stage_id = material.lca_sub_stage_id ? subStageToStageId.get(material.lca_sub_stage_id) : undefined;
         const stageName = lca_stage_id ? (stageIdToName.get(lca_stage_id) || 'Unclassified') : 'Unclassified';
 
         // Filter out "Use Phase" stage
