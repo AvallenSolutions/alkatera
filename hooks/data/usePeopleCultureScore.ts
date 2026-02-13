@@ -24,7 +24,6 @@ export interface PeopleCultureScore {
 
 export interface PeopleCultureSummary {
   organization_id: string;
-  organization_name: string;
   total_employees: number;
   gender_data: Record<string, number> | null;
   latest_demographics_date: string | null;
@@ -35,14 +34,9 @@ export interface PeopleCultureSummary {
   training_hours_per_employee: number;
   dei_total_actions: number;
   dei_completed_actions: number;
-  people_culture_score: number | null;
-  fair_work_score: number | null;
-  diversity_score: number | null;
-  wellbeing_score: number | null;
-  training_score: number | null;
   living_wage_compliance: number | null;
   gender_pay_gap_mean: number | null;
-  score_calculation_date: string | null;
+  wellbeing_score: number | null;
 }
 
 export function usePeopleCultureScore(year?: number) {
@@ -66,69 +60,54 @@ export function usePeopleCultureScore(year?: number) {
     try {
       const currentYear = year || new Date().getFullYear();
 
-      // Fetch latest score
-      const { data: scoreData, error: scoreError } = await supabase
-        .from('people_culture_scores')
-        .select('*')
-        .eq('organization_id', currentOrganization.id)
-        .eq('reporting_year', currentYear)
-        .order('calculation_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Fetch score and summary from the API route (which builds summary from raw tables)
+      const response = await fetch(
+        `/api/people-culture/score?year=${currentYear}&history=true`
+      );
 
-      if (scoreError && scoreError.code !== 'PGRST116') {
-        throw scoreError;
-      }
+      if (response.ok) {
+        const data = await response.json();
+        setScore(data.score || null);
+        setSummary(data.summary || null);
+        setHistory(data.history || []);
 
-      setScore(scoreData || null);
+        // Auto-calculate if no score exists yet (first visit)
+        if (!data.score && !hasAutoCalculated.current) {
+          hasAutoCalculated.current = true;
+          try {
+            const calcResponse = await fetch('/api/people-culture/score', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ year: currentYear }),
+            });
 
-      // Fetch score history
-      const { data: historyData, error: historyError } = await supabase
-        .from('people_culture_scores')
-        .select('*')
-        .eq('organization_id', currentOrganization.id)
-        .order('calculation_date', { ascending: false })
-        .limit(12);
-
-      if (historyError && historyError.code !== 'PGRST116') {
-        console.warn('Error fetching score history:', historyError);
-      } else {
-        setHistory(historyData || []);
-      }
-
-      // Fetch summary view
-      const { data: summaryData, error: summaryError } = await supabase
-        .from('people_culture_summary')
-        .select('*')
-        .eq('organization_id', currentOrganization.id)
-        .maybeSingle();
-
-      if (summaryError && summaryError.code !== 'PGRST116') {
-        console.warn('Error fetching summary:', summaryError);
-      } else {
-        setSummary(summaryData || null);
-      }
-
-      // Auto-calculate if no score exists yet (first visit)
-      if (!scoreData && !hasAutoCalculated.current) {
-        hasAutoCalculated.current = true;
-        try {
-          const response = await fetch('/api/people-culture/score', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ year: currentYear }),
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            if (result.score) {
-              setScore(result.score);
-              setHistory(prev => [result.score, ...prev]);
+            if (calcResponse.ok) {
+              const result = await calcResponse.json();
+              if (result.score) {
+                setScore(result.score);
+                setHistory(prev => [result.score, ...prev]);
+              }
             }
+          } catch (calcErr) {
+            console.warn('Auto-calculation failed (non-critical):', calcErr);
           }
-        } catch (calcErr) {
-          console.warn('Auto-calculation failed (non-critical):', calcErr);
         }
+      } else {
+        // Fallback: fetch score directly from Supabase if API fails
+        const { data: scoreData, error: scoreError } = await supabase
+          .from('people_culture_scores')
+          .select('*')
+          .eq('organization_id', currentOrganization.id)
+          .eq('reporting_year', currentYear)
+          .order('calculation_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (scoreError && scoreError.code !== 'PGRST116') {
+          throw scoreError;
+        }
+
+        setScore(scoreData || null);
       }
 
     } catch (err) {
