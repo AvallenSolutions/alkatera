@@ -165,6 +165,56 @@ const navigationStructure: NavItem[] = [
     ],
   },
   {
+    name: 'EPR Compliance',
+    href: '/epr/',
+    icon: ShieldCheck,
+    minTier: 1,
+    children: [
+      {
+        name: 'Setup Wizard',
+        href: '/epr/wizard/',
+        icon: Sparkles,
+        minTier: 1,
+      },
+      {
+        name: 'Dashboard',
+        href: '/epr/',
+        icon: LayoutDashboard,
+        minTier: 1,
+      },
+      {
+        name: 'Submissions',
+        href: '/epr/submissions/',
+        icon: FileBarChart,
+        minTier: 1,
+      },
+      {
+        name: 'Cost Estimator',
+        href: '/epr/costs/',
+        icon: Calculator,
+        minTier: 3,
+      },
+      {
+        name: 'PRN Tracker',
+        href: '/epr/prn/',
+        icon: ClipboardCheck,
+        minTier: 3,
+      },
+      {
+        name: 'Settings',
+        href: '/epr/settings/',
+        icon: Settings,
+        minTier: 1,
+      },
+      {
+        name: 'Audit Trail',
+        href: '/epr/audit/',
+        icon: Activity,
+        minTier: 1,
+      },
+    ],
+  },
+  {
     name: 'Certifications',
     href: '/certifications/',
     icon: Award,
