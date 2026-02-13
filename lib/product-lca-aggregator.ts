@@ -154,6 +154,9 @@ export async function aggregateProductImpacts(
   let totalN2O = 0;
   let totalHFCs = 0;
 
+  // Build per-material breakdown for hotspots
+  const materialBreakdown: { name: string; quantity: number; unit: string; climate: number; source: string }[] = [];
+
   console.log('[aggregateProductImpacts] Processing materials...');
 
   for (const material of materials as Material[]) {
@@ -207,6 +210,22 @@ export async function aggregateProductImpacts(
     if (materialType === 'ingredient' && quantity > 0) {
       const n2oFromAgriculture = (climateImpact * 0.005) / IPCC_AR6_GWP.N2O;
       totalN2O += n2oFromAgriculture;
+    }
+
+    // Add to per-material breakdown (aggregate by material name)
+    const materialKey = material.material_name || 'Unknown Material';
+    const existingMat = materialBreakdown.find(m => m.name === materialKey);
+    if (existingMat) {
+      existingMat.quantity += quantity;
+      existingMat.climate += climateImpact + transportImpact;
+    } else {
+      materialBreakdown.push({
+        name: materialKey,
+        quantity,
+        unit: material.unit || 'kg',
+        climate: climateImpact + transportImpact,
+        source: (material as any).impact_source || 'Product LCA',
+      });
     }
 
     console.log(`[aggregateProductImpacts] Material: ${material.material_name}, Climate: ${climateImpact.toFixed(4)}, Transport: ${transportImpact.toFixed(4)} kg CO2e`);
@@ -330,6 +349,7 @@ export async function aggregateProductImpacts(
         scope2: scope2Emissions,
         scope3: scope3Emissions,
       },
+      by_material: materialBreakdown.sort((a, b) => b.climate - a.climate),
       by_lifecycle_stage: {
         raw_materials: rawMaterialsEmissions,
         processing: processingEmissions,

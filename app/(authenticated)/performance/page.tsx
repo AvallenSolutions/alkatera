@@ -60,14 +60,41 @@ import {
 } from '@/components/ui/collapsible';
 import type { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
 
+/**
+ * Derive biodiversity risk from per-unit nature metrics using the established
+ * NATURE_PERFORMANCE_THRESHOLDS. Evaluates all 4 impact categories and averages
+ * their performance levels to determine overall risk.
+ *
+ * Previously this used raw totals (land_use + ecotoxicity) with arbitrary thresholds,
+ * which produced misleading results — e.g. showing "high" risk (score 30) when all
+ * individual per-unit metrics were rated "Excellent".
+ */
 function deriveBiodiversityRisk(natureMetrics: NatureMetrics | null): 'high' | 'medium' | 'low' | undefined {
   if (!natureMetrics) return undefined;
-  const landUse = natureMetrics.land_use || 0;
-  const ecotoxicity = natureMetrics.terrestrial_ecotoxicity || 0;
-  const impactScore = landUse + ecotoxicity;
-  if (impactScore > 1000) return 'high';
-  if (impactScore > 100) return 'medium';
-  return 'low';
+  if (!natureMetrics.per_unit) return undefined;
+
+  const pu = natureMetrics.per_unit;
+
+  // Score each metric: 3 = excellent, 2 = good, 1 = needs work
+  function rateMetric(value: number, excellent: number, good: number): number {
+    if (value <= excellent) return 3; // Excellent
+    if (value <= good) return 2;     // Good
+    return 1;                         // Needs work
+  }
+
+  const scores = [
+    rateMetric(pu.land_use || 0, 500, 2000),
+    rateMetric(pu.terrestrial_ecotoxicity || 0, 5, 15),
+    rateMetric(pu.freshwater_eutrophication || 0, 0.3, 0.7),
+    rateMetric(pu.terrestrial_acidification || 0, 1.5, 3.0),
+  ];
+
+  const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+  // Map average metric score to risk level
+  if (avgScore >= 2.5) return 'low';    // Mostly excellent → low risk
+  if (avgScore >= 1.5) return 'medium'; // Mixed performance → medium risk
+  return 'high';                         // Mostly needs work → high risk
 }
 
 interface ScopeBreakdown {
@@ -449,7 +476,7 @@ export default function PerformancePage() {
   const [natureSheetOpen, setNatureSheetOpen] = useState(false);
 
   const [expandedPillar, setExpandedPillar] = useState<string | null>(null);
-  const [showHotspots, setShowHotspots] = useState(false);
+  const [showHotspots, setShowHotspots] = useState(true);
   const [showCompliance, setShowCompliance] = useState(false);
 
   const corporateTotalCO2 = footprintData?.total_emissions || 0;

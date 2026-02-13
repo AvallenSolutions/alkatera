@@ -591,7 +591,7 @@ export function useCompanyMetrics(year?: number) {
         try {
           await fetchMaterialAndGHGBreakdown(yearStart, yearEnd);
         } catch (err) {
-          // Fallback breakdown fetch failed — primary data still available
+          console.error('[useCompanyMetrics] Material/GHG breakdown fallback failed:', err);
         }
       }
 
@@ -901,7 +901,7 @@ export function useCompanyMetrics(year?: number) {
             name,
             lca_stage_id
           ),
-          product_carbon_footprints!inner(status, organization_id, product_id, updated_at)
+          product_carbon_footprints!product_lca_materials_lca_id_fkey!inner(status, organization_id, product_id, updated_at)
         `)
         .eq('product_carbon_footprints.organization_id', currentOrganization.id)
         .eq('product_carbon_footprints.status', 'completed')
