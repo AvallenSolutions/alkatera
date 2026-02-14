@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -250,23 +249,23 @@ export default function ImportPage() {
                 <h2 className="text-xl font-semibold">Upload File</h2>
               </div>
 
-              <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative">
-                <Input
+              <label className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer block">
+                <input
                   type="file"
                   accept=".xlsx,.xls"
                   onChange={handleFileUpload}
                   disabled={state.status === 'uploading'}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
+                  className="sr-only"
                 />
                 <div className="space-y-2">
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
                   <div>
-                    <p className="font-medium">Drag and drop your file here</p>
-                    <p className="text-sm text-muted-foreground">or click to browse</p>
+                    <p className="font-medium">Click to select your file</p>
+                    <p className="text-sm text-muted-foreground">or drag and drop here</p>
                   </div>
                   <p className="text-xs text-muted-foreground">Excel files (.xlsx) only</p>
                 </div>
-              </div>
+              </label>
 
               {state.error && (
                 <Alert variant="destructive">
