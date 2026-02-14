@@ -40,6 +40,7 @@ next-env.d.ts
 *-import/
 # Exception: bulk-import is part of the codebase
 !lib/bulk-import/
+!app/api/bulk-import/
 Alkatera Marketing/
 STRIPE_PRODUCTION_KEYS.txt
 STRIPE_TEST_KEYS.txt

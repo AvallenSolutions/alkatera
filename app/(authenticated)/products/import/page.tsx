@@ -16,41 +16,48 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Download, Upload, FileText, CheckCircle, AlertTriangle } from 'lucide-react';
+import {
+  Download,
+  Upload,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+  Package,
+  Leaf,
+  Box,
+} from 'lucide-react';
 import { downloadTemplateAsXLSX } from '@/lib/bulk-import/template-generator';
-import { useAuth } from '@/hooks/useAuth';
+import { useOrganization } from '@/lib/organizationContext';
 import { toast } from 'sonner';
-
-interface ExtractedItem {
-  id: string;
-  raw_name: string;
-  clean_name: string | null;
-  quantity: number | null;
-  unit: string | null;
-  item_type: 'ingredient' | 'packaging';
-  matched_material_id: string | null;
-  match_confidence: number | null;
-  is_reviewed: boolean;
-  is_imported: boolean;
-}
+import type {
+  ParsedProduct,
+  ParsedIngredient,
+  ParsedPackaging,
+} from '@/lib/bulk-import/types';
 
 interface ImportState {
-  status: 'idle' | 'uploading' | 'processing' | 'preview' | 'confirming' | 'complete';
-  importId: string | null;
-  items: ExtractedItem[];
+  status: 'idle' | 'uploading' | 'preview' | 'confirming' | 'complete';
+  products: ParsedProduct[];
+  ingredients: ParsedIngredient[];
+  packaging: ParsedPackaging[];
+  errors: string[];
   error: string | null;
 }
 
+const INITIAL_STATE: ImportState = {
+  status: 'idle',
+  products: [],
+  ingredients: [],
+  packaging: [],
+  errors: [],
+  error: null,
+};
+
 export default function ImportPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [organizationId, setOrganizationId] = useState<string>('');
-  const [state, setState] = useState<ImportState>({
-    status: 'idle',
-    importId: null,
-    items: [],
-    error: null,
-  });
+  const { currentOrganization } = useOrganization();
+  const [state, setState] = useState<ImportState>(INITIAL_STATE);
+  const [activeTab, setActiveTab] = useState<string>('template');
   const [showConfirm, setShowConfirm] = useState(false);
 
   const handleDownloadTemplate = () => {
@@ -61,17 +68,11 @@ export default function ImportPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!organizationId) {
-      toast.error('Please select an organization first');
-      return;
-    }
-
     try {
-      setState({ ...state, status: 'uploading', error: null });
+      setState(prev => ({ ...prev, status: 'uploading', error: null }));
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('organizationId', organizationId);
 
       const response = await fetch('/api/bulk-import/upload', {
         method: 'POST',
@@ -79,82 +80,101 @@ export default function ImportPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        setState({
-          ...state,
+        const err = await response.json();
+        setState(prev => ({
+          ...prev,
           status: 'idle',
-          error: error.error || 'Upload failed',
-        });
-        toast.error(error.error || 'Upload failed');
+          error: err.error || 'Upload failed',
+          errors: err.errors || [],
+        }));
+        toast.error(err.error || 'Upload failed');
         return;
       }
 
       const data = await response.json();
 
       if (data.success) {
-        setState({
-          ...state,
+        setState(prev => ({
+          ...prev,
           status: 'preview',
-          importId: data.importId,
-          items: data.items || [],
-        });
-        toast.success(`Imported ${data.itemCount} items`);
+          products: data.data.products,
+          ingredients: data.data.ingredients,
+          packaging: data.data.packaging,
+          errors: data.data.errors || [],
+        }));
+        toast.success(
+          `Found ${data.summary.products} products, ${data.summary.ingredients} ingredients, ${data.summary.packaging} packaging items`
+        );
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed';
-      setState({
-        ...state,
-        status: 'idle',
-        error: message,
-      });
+      setState(prev => ({ ...prev, status: 'idle', error: message }));
       toast.error(message);
     }
+
+    // Reset file input so the same file can be re-uploaded
+    event.target.value = '';
   };
 
   const handleConfirmImport = async () => {
-    if (!state.importId) return;
+    if (!currentOrganization) {
+      toast.error('No organization selected');
+      return;
+    }
 
     try {
-      setState({ ...state, status: 'confirming' });
+      setState(prev => ({ ...prev, status: 'confirming' }));
       setShowConfirm(false);
 
-      const response = await fetch(`/api/bulk-import/${state.importId}/confirm`, {
+      const response = await fetch('/api/bulk-import/import/confirm', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: currentOrganization.id,
+          products: state.products,
+          ingredients: state.ingredients,
+          packaging: state.packaging,
+        }),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        setState({
-          ...state,
+        const err = await response.json();
+        setState(prev => ({
+          ...prev,
           status: 'preview',
-          error: error.error || 'Confirmation failed',
-        });
-        toast.error(error.error || 'Confirmation failed');
+          error: err.error || 'Import failed',
+        }));
+        toast.error(err.error || 'Import failed');
         return;
       }
 
-      setState({
-        ...state,
-        status: 'complete',
-      });
-      toast.success('Import completed successfully!');
+      const result = await response.json();
+      setState(prev => ({ ...prev, status: 'complete' }));
+      toast.success(
+        `Created ${result.created.products} products with ${result.created.ingredients} ingredients and ${result.created.packaging} packaging items`
+      );
 
       setTimeout(() => {
         router.push('/products');
       }, 2000);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Confirmation failed';
-      setState({
-        ...state,
-        status: 'preview',
-        error: message,
-      });
+      const message = error instanceof Error ? error.message : 'Import failed';
+      setState(prev => ({ ...prev, status: 'preview', error: message }));
       toast.error(message);
     }
   };
 
-  const matchedCount = state.items.filter(i => i.matched_material_id).length;
-  const reviewedCount = state.items.filter(i => i.is_reviewed).length;
+  // Group ingredients and packaging by product SKU for preview
+  const ingredientsBySku: Record<string, ParsedIngredient[]> = {};
+  for (const ing of state.ingredients) {
+    if (!ingredientsBySku[ing.product_sku]) ingredientsBySku[ing.product_sku] = [];
+    ingredientsBySku[ing.product_sku].push(ing);
+  }
+  const packagingBySku: Record<string, ParsedPackaging[]> = {};
+  for (const pkg of state.packaging) {
+    if (!packagingBySku[pkg.product_sku]) packagingBySku[pkg.product_sku] = [];
+    packagingBySku[pkg.product_sku].push(pkg);
+  }
 
   return (
     <div className="space-y-8 py-8">
@@ -165,7 +185,7 @@ export default function ImportPage() {
         </p>
       </div>
 
-      <Tabs value={state.status === 'idle' ? 'template' : 'import'} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="template">Template</TabsTrigger>
           <TabsTrigger value="import">Import</TabsTrigger>
@@ -182,18 +202,17 @@ export default function ImportPage() {
               <div>
                 <h3 className="font-medium mb-2">What you&apos;ll get:</h3>
                 <ul className="space-y-2 text-sm text-muted-foreground">
-                  <li>✓ Company information sheet</li>
-                  <li>✓ Products sheet with ingredient tracking</li>
-                  <li>✓ Packaging specifications</li>
-                  <li>✓ Instructions and validation rules</li>
-                  <li>✓ Example data to guide you</li>
+                  <li>✓ Products sheet — name, SKU, category</li>
+                  <li>✓ Ingredients sheet — linked by SKU, with quantities and origins</li>
+                  <li>✓ Packaging sheet — materials, EPR data, component breakdowns</li>
+                  <li>✓ Example data and field reference to guide you</li>
                 </ul>
               </div>
 
               <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
                 <p className="text-sm text-blue-900 dark:text-blue-100">
-                  The template supports both Excel and CSV formats. You can fill it out
-                  in Excel, Google Sheets, or any spreadsheet application, then upload it here.
+                  Download the Excel template, fill it out in Excel or Google Sheets, then come
+                  back here to upload it.
                 </p>
               </div>
 
@@ -213,10 +232,10 @@ export default function ImportPage() {
             <ol className="space-y-3 text-sm text-muted-foreground list-decimal list-inside">
               <li>Download the template file</li>
               <li>Open in Excel, Google Sheets, or your preferred spreadsheet app</li>
-              <li>Fill in your company and product information</li>
+              <li>Fill in products, ingredients, and packaging (linked by SKU)</li>
               <li>Leave optional fields blank if not applicable</li>
-              <li>Save as Excel (.xlsx) or CSV (.csv)</li>
-              <li>Come back here and upload the file</li>
+              <li>Save as Excel (.xlsx)</li>
+              <li>Switch to the Import tab and upload the file</li>
               <li>Review the extracted data</li>
               <li>Confirm to save everything to your products</li>
             </ol>
@@ -234,7 +253,7 @@ export default function ImportPage() {
               <div className="border-2 border-dashed rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative">
                 <Input
                   type="file"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".xlsx,.xls"
                   onChange={handleFileUpload}
                   disabled={state.status === 'uploading'}
                   className="absolute inset-0 opacity-0 cursor-pointer"
@@ -245,7 +264,7 @@ export default function ImportPage() {
                     <p className="font-medium">Drag and drop your file here</p>
                     <p className="text-sm text-muted-foreground">or click to browse</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">CSV or Excel files only</p>
+                  <p className="text-xs text-muted-foreground">Excel files (.xlsx) only</p>
                 </div>
               </div>
 
@@ -263,116 +282,185 @@ export default function ImportPage() {
                 </div>
               )}
             </Card>
-          ) : state.status === 'preview' ? (
+          ) : state.status === 'preview' || state.status === 'confirming' ? (
             <div className="space-y-4">
-              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-                <CheckCircle className="h-4 w-4 text-blue-600" />
-                <AlertDescription>
-                  Found {state.items.length} items. Review below before confirming.
-                </AlertDescription>
-              </Alert>
-
-              <Card className="p-6 space-y-4">
+              {/* Summary counts */}
+              <Card className="p-6">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold">{state.items.length}</div>
-                    <div className="text-sm text-muted-foreground">Total Items</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">{matchedCount}</div>
-                    <div className="text-sm text-muted-foreground">Auto-Matched</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-amber-600">
-                      {state.items.length - matchedCount}
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Package className="h-4 w-4 text-blue-600" />
+                      <span className="text-2xl font-bold">{state.products.length}</span>
                     </div>
-                    <div className="text-sm text-muted-foreground">Needs Review</div>
+                    <div className="text-sm text-muted-foreground">Products</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Leaf className="h-4 w-4 text-green-600" />
+                      <span className="text-2xl font-bold">{state.ingredients.length}</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">Ingredients</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Box className="h-4 w-4 text-amber-600" />
+                      <span className="text-2xl font-bold">{state.packaging.length}</span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">Packaging Items</div>
                   </div>
                 </div>
               </Card>
 
-              <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="px-4 py-2 text-left font-medium">Item Name</th>
-                        <th className="px-4 py-2 text-left font-medium">Type</th>
-                        <th className="px-4 py-2 text-left font-medium">Qty</th>
-                        <th className="px-4 py-2 text-left font-medium">Match</th>
-                        <th className="px-4 py-2 text-left font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {state.items.slice(0, 20).map(item => (
-                        <tr key={item.id} className="hover:bg-muted/50">
-                          <td className="px-4 py-2">
-                            <div>
-                              <p className="font-medium">{item.clean_name}</p>
-                              <p className="text-xs text-muted-foreground">{item.raw_name}</p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2">
-                            <Badge variant="outline" className="capitalize">
-                              {item.item_type}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-2">
-                            {item.quantity && item.unit ? `${item.quantity} ${item.unit}` : '-'}
-                          </td>
-                          <td className="px-4 py-2">
-                            {item.match_confidence ? (
-                              <div className="flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                                  <span className="text-xs font-bold text-green-700">
-                                    {Math.round((item.match_confidence || 0) * 100)}%
-                                  </span>
-                                </div>
-                                <span className="text-xs capitalize">
-                                  {(item.match_confidence || 0) >= 0.8 ? 'High' : (item.match_confidence || 0) >= 0.6 ? 'Medium' : 'Low'}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">No match</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2">
-                            {item.is_reviewed ? (
-                              <Badge variant="secondary">Reviewed</Badge>
-                            ) : (
-                              <Badge variant="outline">Pending</Badge>
-                            )}
-                          </td>
-                        </tr>
+              {/* Warnings */}
+              {state.errors.length > 0 && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <p className="font-medium mb-1">
+                      {state.errors.length} warning{state.errors.length !== 1 ? 's' : ''}:
+                    </p>
+                    <ul className="text-xs space-y-0.5 list-disc list-inside">
+                      {state.errors.slice(0, 5).map((err, i) => (
+                        <li key={i}>{err}</li>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-
-              {state.items.length > 20 && (
-                <p className="text-sm text-muted-foreground text-center">
-                  Showing 20 of {state.items.length} items
-                </p>
+                      {state.errors.length > 5 && (
+                        <li>...and {state.errors.length - 5} more</li>
+                      )}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
               )}
 
+              {/* Per-product breakdown */}
+              {state.products.map(product => (
+                <Card key={product.sku} className="overflow-hidden">
+                  <div className="p-4 border-b bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold">{product.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          SKU: {product.sku}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{product.category}</Badge>
+                    </div>
+                  </div>
+
+                  {/* Ingredients table */}
+                  {(ingredientsBySku[product.sku]?.length ?? 0) > 0 && (
+                    <div className="p-4 border-b">
+                      <h4 className="text-sm font-medium flex items-center gap-1.5 mb-2">
+                        <Leaf className="h-3.5 w-3.5 text-green-600" />
+                        Ingredients ({ingredientsBySku[product.sku].length})
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-muted-foreground text-xs">
+                              <th className="pb-1 pr-4 font-medium">Name</th>
+                              <th className="pb-1 pr-4 font-medium">Qty</th>
+                              <th className="pb-1 font-medium">Origin</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/50">
+                            {ingredientsBySku[product.sku].map((ing, i) => (
+                              <tr key={i}>
+                                <td className="py-1.5 pr-4">{ing.name}</td>
+                                <td className="py-1.5 pr-4 text-muted-foreground">
+                                  {ing.quantity} {ing.unit}
+                                </td>
+                                <td className="py-1.5 text-muted-foreground text-xs">
+                                  {ing.origin || '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Packaging table */}
+                  {(packagingBySku[product.sku]?.length ?? 0) > 0 && (
+                    <div className="p-4">
+                      <h4 className="text-sm font-medium flex items-center gap-1.5 mb-2">
+                        <Box className="h-3.5 w-3.5 text-amber-600" />
+                        Packaging ({packagingBySku[product.sku].length})
+                      </h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-muted-foreground text-xs">
+                              <th className="pb-1 pr-4 font-medium">Name</th>
+                              <th className="pb-1 pr-4 font-medium">Category</th>
+                              <th className="pb-1 pr-4 font-medium">Material</th>
+                              <th className="pb-1 pr-4 font-medium">Weight</th>
+                              <th className="pb-1 font-medium">EPR</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border/50">
+                            {packagingBySku[product.sku].map((pkg, i) => (
+                              <tr key={i}>
+                                <td className="py-1.5 pr-4">
+                                  {pkg.name}
+                                  {pkg.components.length > 0 && (
+                                    <span className="text-xs text-muted-foreground ml-1">
+                                      ({pkg.components.length} components)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-1.5 pr-4">
+                                  <Badge variant="outline" className="capitalize text-xs">
+                                    {pkg.category}
+                                  </Badge>
+                                </td>
+                                <td className="py-1.5 pr-4 capitalize text-muted-foreground">
+                                  {pkg.main_material}
+                                </td>
+                                <td className="py-1.5 pr-4 text-muted-foreground">
+                                  {pkg.weight_g}g
+                                </td>
+                                <td className="py-1.5">
+                                  {pkg.epr_level ? (
+                                    <Badge variant="secondary" className="capitalize text-xs">
+                                      {pkg.epr_level}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              ))}
+
+              {/* Action buttons */}
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    setState({
-                      ...state,
-                      status: 'idle',
-                      importId: null,
-                      items: [],
-                      error: null,
-                    })
-                  }
+                  onClick={() => setState(INITIAL_STATE)}
+                  disabled={state.status === 'confirming'}
                 >
                   Upload Different File
                 </Button>
-                <Button onClick={() => setShowConfirm(true)} className="ml-auto">
-                  Confirm & Import
+                <Button
+                  onClick={() => setShowConfirm(true)}
+                  className="ml-auto"
+                  disabled={state.status === 'confirming'}
+                >
+                  {state.status === 'confirming' ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                      Importing...
+                    </>
+                  ) : (
+                    'Confirm & Import'
+                  )}
                 </Button>
               </div>
             </div>
@@ -398,8 +486,9 @@ export default function ImportPage() {
         <AlertDialogContent>
           <AlertDialogTitle>Confirm Import</AlertDialogTitle>
           <AlertDialogDescription>
-            You are about to import {state.items.length} items into your product database. This
-            action can be undone by deleting the created products. Continue?
+            This will create {state.products.length} product{state.products.length !== 1 ? 's' : ''} with{' '}
+            {state.ingredients.length} ingredients and {state.packaging.length} packaging items.
+            Products will be created as drafts. Continue?
           </AlertDialogDescription>
           <div className="flex gap-2 justify-end">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
