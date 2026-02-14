@@ -79,6 +79,20 @@ function yesNo(val: unknown): boolean | null {
   return null;
 }
 
+/** Return val only if it's in the allowed set, otherwise null */
+function enumVal(val: unknown, allowed: string[]): string | null {
+  const s = str(val).toLowerCase();
+  return allowed.includes(s) ? s : null;
+}
+
+// DB CHECK constraint allowed values
+const VALID_PACKAGING_CATEGORIES = ['container', 'label', 'closure', 'secondary', 'shipment', 'tertiary'];
+const VALID_EPR_LEVELS = ['primary', 'secondary', 'tertiary', 'shipment'];
+const VALID_EPR_ACTIVITIES = ['brand', 'packed_filled', 'imported', 'empty', 'hired', 'marketplace'];
+const VALID_EPR_RAM_RATINGS = ['red', 'amber', 'green'];
+const VALID_EPR_UK_NATIONS = ['england', 'scotland', 'wales', 'northern_ireland'];
+const VALID_TRANSPORT_MODES = ['truck', 'train', 'ship', 'air'];
+
 // ── Products sheet ─────────────────────────────────────────────────────────
 
 function parseProductsSheet(wb: XLSX.WorkBook, errors: string[]): ParsedProduct[] {
@@ -204,21 +218,21 @@ function parsePackagingSheet(wb: XLSX.WorkBook, errors: string[]): ParsedPackagi
     packaging.push({
       product_sku,
       name,
-      category: category || 'container',
+      category: enumVal(row?.[2], VALID_PACKAGING_CATEGORIES) || 'container',
       main_material,
       weight_g,
       net_content: num(row?.[5]),
       recycled_pct: num(row?.[6]),
       origin_country: str(row?.[7]) || null,
-      transport_mode: str(row?.[8]).toLowerCase() || null,
+      transport_mode: enumVal(row?.[8], VALID_TRANSPORT_MODES),
       distance_km: num(row?.[9]),
-      epr_level: str(row?.[10]).toLowerCase() || null,
-      epr_activity: str(row?.[11]).toLowerCase() || null,
+      epr_level: enumVal(row?.[10], VALID_EPR_LEVELS),
+      epr_activity: enumVal(row?.[11], VALID_EPR_ACTIVITIES),
       epr_material_type: str(row?.[12]).toLowerCase() || null,
       epr_is_household: yesNo(row?.[13]),
       epr_is_drinks_container: yesNo(row?.[14]),
-      epr_ram_rating: str(row?.[15]).toLowerCase() || null,
-      epr_uk_nation: str(row?.[16]).toLowerCase() || null,
+      epr_ram_rating: enumVal(row?.[15], VALID_EPR_RAM_RATINGS),
+      epr_uk_nation: enumVal(row?.[16], VALID_EPR_UK_NATIONS),
       components,
     });
   }
