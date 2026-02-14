@@ -74,8 +74,4 @@ export interface MatchResult {
   match_type: 'exact' | 'fuzzy' | 'category';
 }
 
-export interface ConfidenceLevel {
-  level: 'high' | 'medium' | 'low' | 'none';
-  label: string;
-  color: string;
-}
+// ConfidenceLevel is exported from ./material-matcher — not duplicated here
