@@ -57,10 +57,18 @@ async function getProductByToken(token: string) {
 
   console.log('Materials count:', materials?.length);
 
+  // Count completed LCAs for version number
+  const { count: lcaCount } = await supabase
+    .from('product_carbon_footprints')
+    .select('id', { count: 'exact', head: true })
+    .eq('product_id', product.id)
+    .eq('status', 'completed');
+
   return {
     product,
     lca,
     materials: materials || [],
+    lcaCount: lcaCount || 1,
   };
 }
 
@@ -74,13 +82,37 @@ export async function generateMetadata({ params }: PassportPageProps): Promise<M
     };
   }
 
+  const org = Array.isArray(data.product.organization)
+    ? data.product.organization[0]
+    : data.product.organization;
+  const orgName = org?.name || '';
+  const carbonValue = data.lca?.aggregated_impacts?.climate_change_gwp100;
+  const category = data.product.product_category || '';
+
+  const descriptionParts = [];
+  if (category) descriptionParts.push(category);
+  if (orgName) descriptionParts.push(`by ${orgName}`);
+  if (carbonValue) descriptionParts.push(`Carbon footprint: ${carbonValue.toFixed(2)} kg CO\u2082e`);
+
+  const description = descriptionParts.length > 0
+    ? `${data.product.name} - ${descriptionParts.join('. ')}. View the verified environmental passport.`
+    : data.product.product_description || `Environmental impact data for ${data.product.name}`;
+
   return {
-    title: `${data.product.name} - Product Passport`,
-    description: data.product.product_description || `Environmental impact data for ${data.product.name}`,
+    title: `${data.product.name} - Product Passport | alkatera`,
+    description,
     openGraph: {
+      type: 'article',
+      siteName: 'alkatera',
       title: `${data.product.name} - Environmental Passport`,
-      description: data.product.product_description || 'View detailed environmental impact metrics',
-      images: data.product.image_url ? [data.product.image_url] : [],
+      description,
+      images: data.product.product_image_url ? [data.product.product_image_url] : [],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${data.product.name} - Environmental Passport`,
+      description,
+      images: data.product.product_image_url ? [data.product.product_image_url] : [],
     },
   };
 }

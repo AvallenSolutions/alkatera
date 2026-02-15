@@ -13,6 +13,21 @@ export interface LCADataMeta {
   organizationLogo: string | null;
   functionalUnit: string;
   methodologyPageUrl: string | null;
+  referenceYear: number | null;
+  systemBoundary: string | null;
+  totalCarbon: number;
+  carbonUnit: string;
+}
+
+export interface LCADataProductIdentity {
+  productImage: string | null;
+  productCategory: string | null;
+  volumeDisplay: string | null;
+  productDescription: string | null;
+  organizationName: string;
+  organizationLogo: string | null;
+  certifications: Array<{ name: string }>;
+  awards: Array<{ name: string }>;
 }
 
 export interface LCADataExecutiveSummary {
@@ -93,6 +108,39 @@ export interface LCADataResults {
   landUse: number | null;
 }
 
+export interface OriginItem {
+  name: string;
+  originCountry: string;
+  originCountryCode: string | null;
+  isOrganic: boolean;
+  type: 'ingredient' | 'packaging';
+  packagingCategory?: string;
+}
+
+export interface LCADataOrigins {
+  ingredients: OriginItem[];
+  packaging: OriginItem[];
+  totalIngredients: number;
+  totalCountries: number;
+}
+
+export interface PackagingComponentItem {
+  name: string;
+  packagingCategory: string;
+  recycledContentPercentage: number | null;
+  recyclabilityScore: number | null;
+  endOfLifePathway: string | null;
+  isReusable: boolean;
+  isCompostable: boolean;
+}
+
+export interface LCADataPackaging {
+  components: PackagingComponentItem[];
+  averageRecycledContent: number | null;
+  circularityScore: number | null;
+  circularEndOfLifePercentage: number | null;
+}
+
 export interface LCADataConclusion {
   title: string;
   content: string;
@@ -100,8 +148,11 @@ export interface LCADataConclusion {
 
 export interface LCAData {
   meta: LCADataMeta;
+  productIdentity: LCADataProductIdentity;
   executiveSummary: LCADataExecutiveSummary;
   methodology: LCADataMethodology;
+  origins: LCADataOrigins | null;
+  packaging: LCADataPackaging | null;
   results: LCADataResults;
   conclusion: LCADataConclusion;
 }
@@ -120,6 +171,10 @@ export interface TierVisibility {
   showDownloadPDF: boolean;
   showDataSources: boolean;
   showMethodologyLink: boolean;
+  showCertifications: boolean;
+  showOrigins: boolean;
+  showPackagingSummary: boolean;
+  showPackagingDetail: boolean;
 }
 
 export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
@@ -137,6 +192,10 @@ export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
     showDownloadPDF: false,
     showDataSources: false,
     showMethodologyLink: false,
+    showCertifications: false,
+    showOrigins: false,
+    showPackagingSummary: true,
+    showPackagingDetail: false,
   },
   blossom: {
     showExecutiveSummary: true,
@@ -152,6 +211,10 @@ export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
     showDownloadPDF: false,
     showDataSources: true,
     showMethodologyLink: true,
+    showCertifications: true,
+    showOrigins: true,
+    showPackagingSummary: true,
+    showPackagingDetail: true,
   },
   canopy: {
     showExecutiveSummary: true,
@@ -167,5 +230,9 @@ export const TIER_VISIBILITY: Record<SubscriptionTier, TierVisibility> = {
     showDownloadPDF: true,
     showDataSources: true,
     showMethodologyLink: true,
+    showCertifications: true,
+    showOrigins: true,
+    showPackagingSummary: true,
+    showPackagingDetail: true,
   },
 };

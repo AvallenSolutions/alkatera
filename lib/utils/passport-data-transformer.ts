@@ -3,26 +3,36 @@ import type {
   LCADataBreakdownItem,
   LCADataWaterFootprint,
   LCADataWasteFootprint,
+  LCADataProductIdentity,
+  LCADataOrigins,
+  LCADataPackaging,
+  OriginItem,
+  PackagingComponentItem,
   WaterBreakdownItem,
   WasteBreakdownItem,
   SubscriptionTier,
 } from '@/lib/types/passport';
 
-interface TransformInput {
+export interface TransformInput {
   product: {
     id: string;
     name: string;
     product_description?: string | null;
     image_url?: string | null;
+    product_category?: string | null;
     functional_unit?: string | null;
     unit_size_value?: number | null;
     unit_size_unit?: string | null;
+    system_boundary?: string | null;
     certifications?: Array<{ name: string }> | null;
+    awards?: Array<{ name: string }> | null;
+    packaging_circularity_score?: number | null;
     created_at: string;
     updated_at: string;
   };
   lca: {
     id?: string;
+    reference_year?: number | null;
     aggregated_impacts?: {
       climate_change_gwp100?: number;
       water_consumption?: number;
@@ -67,6 +77,15 @@ interface TransformInput {
     name?: string;
     material_type?: string;
     quantity?: number;
+    origin_country?: string | null;
+    origin_country_code?: string | null;
+    is_organic_certified?: boolean | null;
+    packaging_category?: string | null;
+    recycled_content_percentage?: number | null;
+    recyclability_score?: number | null;
+    end_of_life_pathway?: string | null;
+    is_reusable?: boolean | null;
+    is_compostable?: boolean | null;
   }>;
   organization: {
     id: string;
@@ -76,6 +95,7 @@ interface TransformInput {
     subscription_status?: string;
   } | null;
   token?: string;
+  lcaCount?: number;
 }
 
 const CARBON_BREAKDOWN_COLORS: Record<string, string> = {
@@ -494,6 +514,101 @@ function buildWasteFootprint(lca: TransformInput['lca']): LCADataWasteFootprint 
   };
 }
 
+function buildProductIdentity(
+  product: TransformInput['product'],
+  organization: TransformInput['organization']
+): LCADataProductIdentity {
+  const volumeDisplay = product.unit_size_value && product.unit_size_unit
+    ? `${product.unit_size_value}${product.unit_size_unit}`
+    : null;
+
+  return {
+    productImage: product.image_url || null,
+    productCategory: product.product_category || null,
+    volumeDisplay,
+    productDescription: product.product_description || null,
+    organizationName: organization?.name || '',
+    organizationLogo: organization?.logo_url || null,
+    certifications: product.certifications || [],
+    awards: product.awards || [],
+  };
+}
+
+function buildOrigins(materials: TransformInput['materials']): LCADataOrigins | null {
+  const ingredients: OriginItem[] = [];
+  const packaging: OriginItem[] = [];
+  const countriesSet = new Set<string>();
+
+  for (const mat of materials) {
+    if (!mat.origin_country || !mat.name) continue;
+
+    countriesSet.add(mat.origin_country);
+
+    const item: OriginItem = {
+      name: mat.name,
+      originCountry: mat.origin_country,
+      originCountryCode: mat.origin_country_code || null,
+      isOrganic: mat.is_organic_certified === true,
+      type: mat.material_type === 'packaging' ? 'packaging' : 'ingredient',
+      packagingCategory: mat.packaging_category || undefined,
+    };
+
+    if (item.type === 'packaging') {
+      packaging.push(item);
+    } else {
+      ingredients.push(item);
+    }
+  }
+
+  if (ingredients.length === 0 && packaging.length === 0) return null;
+
+  return {
+    ingredients,
+    packaging,
+    totalIngredients: ingredients.length + packaging.length,
+    totalCountries: countriesSet.size,
+  };
+}
+
+function buildPackaging(
+  materials: TransformInput['materials'],
+  product: TransformInput['product']
+): LCADataPackaging | null {
+  const packagingMaterials = materials.filter(m => m.material_type === 'packaging');
+  if (packagingMaterials.length === 0) return null;
+
+  const components: PackagingComponentItem[] = packagingMaterials.map(m => ({
+    name: m.name || 'Unknown',
+    packagingCategory: m.packaging_category || 'other',
+    recycledContentPercentage: m.recycled_content_percentage ?? null,
+    recyclabilityScore: m.recyclability_score ?? null,
+    endOfLifePathway: m.end_of_life_pathway || null,
+    isReusable: m.is_reusable === true,
+    isCompostable: m.is_compostable === true,
+  }));
+
+  // Calculate avg recycled content across ALL packaging components (including 0%)
+  const withRecycled = components.filter(c => c.recycledContentPercentage != null);
+  const averageRecycledContent = withRecycled.length > 0
+    ? Math.round(withRecycled.reduce((sum, c) => sum + (c.recycledContentPercentage ?? 0), 0) / components.length)
+    : null;
+
+  // Count components with circular end-of-life pathways (avoid "recyclable" terminology)
+  const circularCount = components.filter(c =>
+    c.endOfLifePathway === 'recycling' || c.endOfLifePathway === 'reuse' || c.endOfLifePathway === 'composting'
+  ).length;
+  const circularEndOfLifePercentage = components.length > 0
+    ? Math.round((circularCount / components.length) * 100)
+    : null;
+
+  return {
+    components,
+    averageRecycledContent,
+    circularityScore: product.packaging_circularity_score ?? null,
+    circularEndOfLifePercentage,
+  };
+}
+
 function generateConclusionContent(
   tier: SubscriptionTier,
   breakdown: LCADataBreakdownItem[]
@@ -517,11 +632,21 @@ function generateConclusionContent(
     `We continue to work on reducing impacts across all lifecycle stages through sustainable innovation.`;
 }
 
+function formatSystemBoundary(boundary: string | null | undefined): string | null {
+  if (!boundary) return null;
+  return boundary
+    .replace(/_/g, '-')
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('-to-')
+    .replace(/-to-to-/g, '-to-');
+}
+
 export function transformToLCAData(
   input: TransformInput,
   tier: SubscriptionTier
 ): LCAData {
-  const { product, lca, organization, token } = input;
+  const { product, lca, materials, organization } = input;
 
   const ghg = lca?.aggregated_impacts?.climate_change_gwp100 || 0;
   const reductionPct = ghg > 0 && ghg < INDUSTRY_BENCHMARK
@@ -545,7 +670,7 @@ export function transformToLCAData(
     meta: {
       title: 'Carbon Footprint Report',
       productName: product.name,
-      version: 'v1.0',
+      version: `v${input.lcaCount || 1}.0`,
       date: lca?.updated_at
         ? formatDate(lca.updated_at)
         : formatDate(product.updated_at),
@@ -555,7 +680,12 @@ export function transformToLCAData(
       organizationLogo: organization?.logo_url || null,
       functionalUnit,
       methodologyPageUrl,
+      referenceYear: lca?.reference_year ?? null,
+      systemBoundary: formatSystemBoundary(product.system_boundary),
+      totalCarbon: ghg,
+      carbonUnit: 'kg CO\u2082e',
     },
+    productIdentity: buildProductIdentity(product, organization),
     executiveSummary: {
       heading: generateExecutiveSummaryHeading(product.name, reductionPct),
       content: generateExecutiveSummaryContent(product, lca, tier),
@@ -599,9 +729,11 @@ export function transformToLCAData(
       ],
       standards: ['ISO 14040', 'ISO 14044', 'ISO 14067', 'GHG Protocol'],
     },
+    origins: buildOrigins(materials),
+    packaging: buildPackaging(materials, product),
     results: {
       totalCarbon: ghg,
-      unit: 'kg CO₂e',
+      unit: 'kg CO\u2082e',
       breakdown,
       comparison: tier === 'canopy' && reductionPct !== null
         ? {

@@ -12,11 +12,16 @@ interface PassportViewProps {
       id: string;
       name: string;
       product_description?: string | null;
-      image_url?: string | null;
+      product_image_url?: string | null;
+      product_category?: string | null;
       functional_unit?: string | null;
       unit_size_value?: number | null;
       unit_size_unit?: string | null;
+      system_boundary?: string | null;
       certifications?: Array<{ name: string }> | null;
+      awards?: Array<{ name: string }> | null;
+      packaging_circularity_score?: number | null;
+      passport_settings?: Record<string, unknown> | null;
       created_at: string;
       updated_at: string;
       organization?: Array<{
@@ -35,6 +40,7 @@ interface PassportViewProps {
     };
     lca: {
       id?: string;
+      reference_year?: number | null;
       aggregated_impacts?: {
         climate_change_gwp100?: number;
         water_consumption?: number;
@@ -64,7 +70,17 @@ interface PassportViewProps {
       name?: string;
       material_type?: string;
       quantity?: number;
+      origin_country?: string | null;
+      origin_country_code?: string | null;
+      is_organic_certified?: boolean | null;
+      packaging_category?: string | null;
+      recycled_content_percentage?: number | null;
+      recyclability_score?: number | null;
+      end_of_life_pathway?: string | null;
+      is_reusable?: boolean | null;
+      is_compostable?: boolean | null;
     }>;
+    lcaCount?: number;
   };
   token: string;
 }
@@ -119,11 +135,15 @@ export default function PassportView({ data, token }: PassportViewProps) {
           id: product.id,
           name: product.name,
           product_description: product.product_description,
-          image_url: product.image_url,
+          image_url: product.product_image_url,
+          product_category: product.product_category,
           functional_unit: product.functional_unit,
           unit_size_value: product.unit_size_value,
           unit_size_unit: product.unit_size_unit,
+          system_boundary: product.system_boundary,
           certifications: product.certifications,
+          awards: product.awards,
+          packaging_circularity_score: product.packaging_circularity_score,
           created_at: product.created_at,
           updated_at: product.updated_at,
         },
@@ -131,35 +151,43 @@ export default function PassportView({ data, token }: PassportViewProps) {
         materials,
         organization: normalizedOrganization,
         token,
+        lcaCount: data.lcaCount,
       },
       effectiveTier
     );
-  }, [product, lca, materials, organization, effectiveTier, token]);
+  }, [product, lca, materials, organization, effectiveTier, token, data.lcaCount]);
 
   const handleDownloadPDF = () => {
     window.print();
   };
 
   const handleShare = async () => {
+    const shareText = lcaData.meta.totalCarbon > 0
+      ? `${product.name} Environmental Passport - ${lcaData.meta.totalCarbon.toFixed(2)} ${lcaData.meta.carbonUnit} per ${lcaData.meta.functionalUnit}. View the full report: ${window.location.href}`
+      : `View the environmental impact data for ${product.name}: ${window.location.href}`;
+
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
           title: `${product.name} - Product Passport`,
-          text: `View the environmental impact data for ${product.name}`,
+          text: shareText,
           url: window.location.href,
         });
       } catch {
-        navigator.clipboard?.writeText(window.location.href);
+        navigator.clipboard?.writeText(shareText);
       }
     } else {
-      navigator.clipboard?.writeText(window.location.href);
+      navigator.clipboard?.writeText(shareText);
     }
   };
+
+  const hiddenSections = (product.passport_settings?.hiddenSections as string[]) || [];
 
   return (
     <LCAPassportTemplate
       data={lcaData}
       tier={effectiveTier}
+      hiddenSections={hiddenSections}
       onDownloadPDF={handleDownloadPDF}
       onShare={handleShare}
     />

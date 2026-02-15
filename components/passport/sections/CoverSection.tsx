@@ -3,6 +3,7 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowDown } from 'lucide-react';
 import Image from 'next/image';
+import { AlkaTeraLogoHorizontal } from '@/components/lca-report/Logo';
 import type { LCADataMeta } from '@/lib/types/passport';
 
 interface CoverSectionProps {
@@ -36,10 +37,12 @@ export default function CoverSection({ meta }: CoverSectionProps) {
 
       <div className="relative z-10 flex justify-between items-start text-white mix-blend-difference">
         <div className="flex flex-col">
-          <span className="font-mono text-xs uppercase tracking-[0.3em] mb-2">
-            Alkatera Intelligence
-          </span>
-          <span className="font-serif text-xl italic">Product Passport</span>
+          <AlkaTeraLogoHorizontal
+            iconSize="h-6 w-6"
+            textSize="text-lg"
+            className="mb-1"
+          />
+          <span className="font-serif text-sm italic ml-10 opacity-70">Product Passport</span>
         </div>
         <div className="text-right font-mono text-xs hidden md:block">
           <p>REF: {meta.version}</p>

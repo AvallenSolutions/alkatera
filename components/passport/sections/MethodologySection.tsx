@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Leaf, Factory, Truck, Zap, Recycle, Globe, Scale, Info } from 'lucide-react';
 import type { LCADataMethodology, LifecycleStageIcon, TierVisibility } from '@/lib/types/passport';
+import SectionHeading from './SectionHeading';
 
 const IconMap: Record<LifecycleStageIcon, React.ElementType> = {
   material: Leaf,
@@ -11,24 +12,6 @@ const IconMap: Record<LifecycleStageIcon, React.ElementType> = {
   usage: Zap,
   endOfLife: Recycle,
 };
-
-interface SectionHeadingProps {
-  children: React.ReactNode;
-  number: string;
-}
-
-function SectionHeading({ children, number }: SectionHeadingProps) {
-  return (
-    <div className="flex items-baseline gap-4 mb-8 md:mb-12 border-b border-stone-200 pb-4">
-      <span className="font-mono text-lime-800 text-sm font-bold tracking-widest">
-        {number}
-      </span>
-      <h2 className="font-serif text-3xl md:text-5xl text-stone-900">
-        {children}
-      </h2>
-    </div>
-  );
-}
 
 interface MethodologySectionProps {
   data: LCADataMethodology;

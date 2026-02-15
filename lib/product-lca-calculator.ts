@@ -567,6 +567,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           country_of_origin: material.origin_country,
           is_organic: material.is_organic_certified,
           is_organic_certified: material.is_organic_certified,
+          recycled_content_percentage: material.recycled_content_percentage ?? null,
           supplier_product_id: material.supplier_product_id,
           data_source: dataSource,
           data_source_id: material.data_source_id || null,

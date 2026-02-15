@@ -137,6 +137,8 @@ export interface OnboardingState {
   dashboardGuideCompleted?: boolean
   /** Whether the ingredient/packaging search guide has been dismissed */
   searchGuideCompleted?: boolean
+  /** Whether the product page guide has been completed */
+  productGuideCompleted?: boolean
 }
 
 export const INITIAL_ONBOARDING_STATE: OnboardingState = {
@@ -147,6 +149,7 @@ export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   personalization: {},
   dashboardGuideCompleted: false,
   searchGuideCompleted: false,
+  productGuideCompleted: false,
 }
 
 export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {

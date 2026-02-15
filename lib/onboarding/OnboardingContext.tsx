@@ -50,6 +50,8 @@ interface OnboardingContextType {
   dismissOnboarding: () => void
   /** Mark the post-onboarding dashboard guide as completed */
   markGuideCompleted: () => void
+  /** Mark the product page guide as completed */
+  markProductGuideCompleted: () => void
   /** Mark the search guide as completed (dismissed) */
   markSearchGuideCompleted: () => void
   /** Re-enable the search guide */
@@ -287,6 +289,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     }))
   }, [updateState])
 
+  const markProductGuideCompleted = useCallback(() => {
+    updateState(prev => ({
+      ...prev,
+      productGuideCompleted: true,
+    }))
+  }, [updateState])
+
   const markSearchGuideCompleted = useCallback(() => {
     updateState(prev => ({
       ...prev,
@@ -336,6 +345,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         completeOnboarding,
         dismissOnboarding,
         markGuideCompleted,
+        markProductGuideCompleted,
         markSearchGuideCompleted,
         resetSearchGuide,
         resetOnboarding,

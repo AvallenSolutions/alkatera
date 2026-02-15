@@ -71,6 +71,7 @@ export interface Product {
   passport_token?: string | null;
   passport_views_count?: number;
   passport_last_viewed_at?: string | null;
+  passport_settings?: Record<string, unknown> | null;
 }
 
 export interface ProductData {

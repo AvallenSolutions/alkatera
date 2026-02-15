@@ -4,22 +4,7 @@ import { motion } from 'framer-motion';
 import { Droplets, Recycle, TreeDeciduous, CheckCircle2, XCircle, Factory } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import type { LCADataResults, TierVisibility, LCADataWaterFootprint, LCADataWasteFootprint, LCADataBreakdownItem } from '@/lib/types/passport';
-
-interface SectionHeadingProps {
-  children: React.ReactNode;
-  number: string;
-}
-
-function SectionHeading({ children, number }: SectionHeadingProps) {
-  return (
-    <div className="flex items-baseline gap-4 mb-8 md:mb-12 border-b border-stone-700 pb-4">
-      <span className="font-mono text-brand-accent text-sm font-bold tracking-widest">
-        {number}
-      </span>
-      <h2 className="font-serif text-3xl md:text-5xl text-white">{children}</h2>
-    </div>
-  );
-}
+import SectionHeading from './SectionHeading';
 
 function SubSectionHeading({ children, icon: Icon }: { children: React.ReactNode; icon: React.ElementType }) {
   return (
@@ -347,7 +332,7 @@ function WasteFootprintSection({ data, showBreakdown }: WasteFootprintSectionPro
 
             <div className="bg-white/5 rounded-lg p-4">
               <div className="text-xs font-mono text-stone-400 uppercase tracking-wider mb-1">
-                Recyclable Fraction
+                Recovery Rate
               </div>
               <div className="text-lg font-semibold text-white">
                 {recyclablePercentage}%
@@ -425,21 +410,118 @@ function WasteFootprintSection({ data, showBreakdown }: WasteFootprintSectionPro
   );
 }
 
+interface ImpactAtAGlanceProps {
+  data: LCADataResults;
+  visibility: TierVisibility;
+  functionalUnit: string;
+}
+
+function ImpactAtAGlance({ data, visibility, functionalUnit }: ImpactAtAGlanceProps) {
+  const cards: Array<{
+    icon: React.ElementType;
+    label: string;
+    value: string;
+    unit: string;
+    context: string;
+  }> = [];
+
+  cards.push({
+    icon: Factory,
+    label: 'Carbon Footprint',
+    value: data.totalCarbon.toFixed(2),
+    unit: data.unit,
+    context: `per ${functionalUnit}`,
+  });
+
+  if (visibility.showWaterMetrics && data.waterFootprint) {
+    cards.push({
+      icon: Droplets,
+      label: 'Water Footprint',
+      value: data.waterFootprint.total.toFixed(1),
+      unit: data.waterFootprint.unit,
+      context: `per ${functionalUnit}`,
+    });
+  }
+
+  if (visibility.showWasteMetrics && data.wasteFootprint) {
+    cards.push({
+      icon: Recycle,
+      label: 'Waste Generated',
+      value: data.wasteFootprint.total.toFixed(3),
+      unit: data.wasteFootprint.unit,
+      context: data.wasteFootprint.recyclingRate
+        ? `${data.wasteFootprint.recyclingRate}% recycling rate`
+        : `per ${functionalUnit}`,
+    });
+  }
+
+  if (visibility.showLandUseMetrics && data.landUse !== null && data.landUse > 0) {
+    cards.push({
+      icon: TreeDeciduous,
+      label: 'Land Use',
+      value: data.landUse.toFixed(3),
+      unit: 'm\u00B2a',
+      context: `per ${functionalUnit}`,
+    });
+  }
+
+  return (
+    <div className="mb-12">
+      <div className={`grid gap-4 ${cards.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-4'}`}>
+        {cards.map((card, index) => {
+          const Icon = card.icon;
+          return (
+            <motion.div
+              key={card.label}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-white/5 border border-white/10 rounded-xl p-6 text-center"
+            >
+              <Icon className="text-brand-accent w-6 h-6 mx-auto mb-3" />
+              <p className="font-mono text-xs text-stone-400 uppercase tracking-widest mb-2">
+                {card.label}
+              </p>
+              <p className="font-serif text-3xl md:text-4xl text-white">
+                {card.value}
+              </p>
+              <p className="font-serif text-sm text-stone-400 mt-1">
+                {card.unit}
+              </p>
+              <p className="text-xs text-stone-500 mt-2">
+                {card.context}
+              </p>
+            </motion.div>
+          );
+        })}
+      </div>
+      <div className="border-b border-white/10 mt-12" />
+    </div>
+  );
+}
+
 interface ResultsSectionProps {
   data: LCADataResults;
   visibility: TierVisibility;
+  sectionNumber: string;
+  functionalUnit: string;
 }
 
 export default function ResultsSection({
   data,
   visibility,
+  sectionNumber,
+  functionalUnit,
 }: ResultsSectionProps) {
   return (
     <section className="py-24 px-6 md:px-12 bg-stone-900 text-white overflow-hidden relative">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-accent rounded-full blur-[150px] opacity-10 pointer-events-none" />
 
       <div className="max-w-7xl mx-auto relative z-10">
-        <SectionHeading number="03">Impact Results</SectionHeading>
+        <SectionHeading number={sectionNumber} variant="dark">Impact Results</SectionHeading>
+
+        <ImpactAtAGlance data={data} visibility={visibility} functionalUnit={functionalUnit} />
 
         <div className="space-y-8">
           <CarbonFootprintSection

@@ -20,6 +20,7 @@ import { CalculateLCASheet } from "@/components/products/CalculateLCASheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
+import { ProductGuide, ProductGuideTrigger } from "@/components/products/ProductGuide";
 import { useProductData } from "@/hooks/data/useProductData";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
@@ -215,6 +216,7 @@ export default function ProductDashboardPage() {
       {/* Content */}
       <div className="relative z-10">
         {/* Header */}
+        <div data-guide="product-header">
         <ProductHeader
           product={{
             name: product.name,
@@ -226,20 +228,25 @@ export default function ProductDashboardPage() {
           isHealthy={isHealthy}
           onEdit={() => setShowEditDialog(true)}
         />
+        </div>
 
         {/* Main Content */}
         <div className="container mx-auto px-6 py-6">
         <div className="mb-6 flex items-center justify-between">
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/products")}
-            className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Products
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/products")}
+              className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Products
+            </Button>
+            <ProductGuideTrigger />
+          </div>
 
           <Button
+            data-guide="product-calculate-btn"
             onClick={handleCalculate}
             disabled={!isHealthy}
             size="lg"
@@ -260,7 +267,7 @@ export default function ProductDashboardPage() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 max-w-4xl backdrop-blur-xl bg-white/5 border border-white/10 p-1">
+          <TabsList data-guide="product-tabs" className="grid w-full grid-cols-5 max-w-4xl backdrop-blur-xl bg-white/5 border border-white/10 p-1">
             <TabsTrigger
               value="overview"
               className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
@@ -270,6 +277,7 @@ export default function ProductDashboardPage() {
             </TabsTrigger>
             <TabsTrigger
               value="specification"
+              data-guide="product-specification"
               className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
             >
               <FileBarChart className="mr-2 h-4 w-4" />
@@ -284,6 +292,7 @@ export default function ProductDashboardPage() {
             </TabsTrigger>
             <TabsTrigger
               value="passport"
+              data-guide="product-passport-tab"
               className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
             >
               <Globe className="mr-2 h-4 w-4" />
@@ -298,7 +307,7 @@ export default function ProductDashboardPage() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
+          <TabsContent value="overview" data-guide="product-overview" className="space-y-6">
             <OverviewTab
               product={product}
               ingredients={ingredients}
@@ -335,6 +344,7 @@ export default function ProductDashboardPage() {
               initialPassportToken={product.passport_token || null}
               initialViewsCount={product.passport_views_count || 0}
               initialLastViewedAt={product.passport_last_viewed_at || null}
+              initialPassportSettings={(product.passport_settings as Record<string, unknown>) || {}}
             />
           </TabsContent>
 
@@ -348,6 +358,15 @@ export default function ProductDashboardPage() {
         </Tabs>
         </div>
       </div>
+
+      {/* Product Guide */}
+      <ProductGuide
+        onAction={(action) => {
+          if (action === 'open-ingredients') {
+            openRecipeEditor('ingredients');
+          }
+        }}
+      />
 
       {/* Edit Product Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>

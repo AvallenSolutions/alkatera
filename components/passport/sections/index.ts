@@ -1,5 +1,9 @@
 export { default as CoverSection } from './CoverSection';
+export { default as ProductIdentitySection } from './ProductIdentitySection';
 export { default as ExecutiveSummarySection } from './ExecutiveSummarySection';
 export { default as MethodologySection } from './MethodologySection';
+export { default as OriginsSection } from './OriginsSection';
+export { default as PackagingSection } from './PackagingSection';
 export { default as ResultsSection } from './ResultsSection';
 export { default as ConclusionSection } from './ConclusionSection';
+export { default as SectionHeading } from './SectionHeading';

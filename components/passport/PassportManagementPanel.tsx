@@ -15,12 +15,18 @@ import {
   Calendar,
   ExternalLink,
   Info,
-  Loader2
+  Loader2,
+  MapPin,
+  Package
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { toast } from 'sonner';
 import QRCodeDisplay from './QRCodeDisplay';
 import Link from 'next/link';
+
+interface PassportSettings {
+  hiddenSections?: string[];
+}
 
 interface PassportManagementPanelProps {
   productId: string;
@@ -29,6 +35,7 @@ interface PassportManagementPanelProps {
   initialPassportToken: string | null;
   initialViewsCount: number;
   initialLastViewedAt: string | null;
+  initialPassportSettings?: Record<string, unknown>;
 }
 
 export default function PassportManagementPanel({
@@ -38,12 +45,16 @@ export default function PassportManagementPanel({
   initialPassportToken,
   initialViewsCount,
   initialLastViewedAt,
+  initialPassportSettings = {},
 }: PassportManagementPanelProps) {
   const [isEnabled, setIsEnabled] = useState(initialPassportEnabled);
   const [token, setToken] = useState(initialPassportToken);
   const [viewsCount, setViewsCount] = useState(initialViewsCount);
   const [lastViewedAt, setLastViewedAt] = useState(initialLastViewedAt);
   const [isLoading, setIsLoading] = useState(false);
+  const [passportSettings, setPassportSettings] = useState<PassportSettings>({
+    hiddenSections: (initialPassportSettings?.hiddenSections as string[]) || [],
+  });
 
   const passportUrl = token
     ? `${window.location.origin}/passport/${token}`
@@ -116,6 +127,43 @@ export default function PassportManagementPanel({
       return () => clearInterval(interval);
     }
   }, [isEnabled]);
+
+  const isSectionVisible = (section: string) => {
+    return !passportSettings.hiddenSections?.includes(section);
+  };
+
+  const handleToggleSection = async (section: string, visible: boolean) => {
+    const currentHidden = passportSettings.hiddenSections || [];
+    const newHidden = visible
+      ? currentHidden.filter(s => s !== section)
+      : [...currentHidden, section];
+
+    const newSettings: PassportSettings = {
+      ...passportSettings,
+      hiddenSections: newHidden,
+    };
+
+    setPassportSettings(newSettings);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error } = await supabase
+        .from('products')
+        .update({ passport_settings: newSettings })
+        .eq('id', productId);
+
+      if (error) throw error;
+      toast.success(`Section ${visible ? 'shown' : 'hidden'} on passport`);
+    } catch (error: any) {
+      console.error('Error updating passport settings:', error);
+      toast.error('Failed to update passport settings');
+      // Revert on failure
+      setPassportSettings(prev => ({
+        ...prev,
+        hiddenSections: currentHidden,
+      }));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -233,6 +281,54 @@ export default function PassportManagementPanel({
           url={passportUrl}
           productName={productName}
         />
+      )}
+
+      {isEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Passport Sections</CardTitle>
+            <CardDescription>
+              Choose which sections appear on your public passport. Sensitive data like ingredient origins and packaging details can be hidden.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="toggle-origins" className="flex items-center gap-3 cursor-pointer">
+                <div className="p-1.5 bg-blue-50 rounded-lg">
+                  <MapPin className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <span className="block text-sm font-medium">Ingredient Origins</span>
+                  <span className="block text-xs text-neutral-500">Show where your ingredients are sourced</span>
+                </div>
+              </Label>
+              <Switch
+                id="toggle-origins"
+                checked={isSectionVisible('origins')}
+                onCheckedChange={(checked) => handleToggleSection('origins', checked)}
+              />
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <Label htmlFor="toggle-packaging" className="flex items-center gap-3 cursor-pointer">
+                <div className="p-1.5 bg-emerald-50 rounded-lg">
+                  <Package className="h-4 w-4 text-emerald-600" />
+                </div>
+                <div>
+                  <span className="block text-sm font-medium">Packaging &amp; Circularity</span>
+                  <span className="block text-xs text-neutral-500">Show packaging sustainability data</span>
+                </div>
+              </Label>
+              <Switch
+                id="toggle-packaging"
+                checked={isSectionVisible('packaging')}
+                onCheckedChange={(checked) => handleToggleSection('packaging', checked)}
+              />
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
