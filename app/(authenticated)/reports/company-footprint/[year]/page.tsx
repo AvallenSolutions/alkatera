@@ -1,11 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FileText, Loader2, Lock } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  Download,
+  Factory,
+  FileText,
+  Leaf,
+  Loader2,
+  Lock,
+  Package,
+  Sparkles,
+} from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
 import { PageLoader } from "@/components/ui/page-loader";
@@ -20,11 +43,15 @@ import { OperationalWasteCard } from "@/components/reports/OperationalWasteCard"
 import { CompanyFleetCard } from "@/components/reports/CompanyFleetCard";
 import { MarketingMaterialsCard } from "@/components/reports/MarketingMaterialsCard";
 import { FootprintSummaryDashboard } from "@/components/reports/FootprintSummaryDashboard";
+import { FootprintHeroSummary } from "@/components/reports/FootprintHeroSummary";
+import { FootprintProgressBanner } from "@/components/reports/FootprintProgressBanner";
 // New GHG Protocol Scope 3 category cards
 import { UpstreamTransportCard } from "@/components/reports/UpstreamTransportCard";
 import { DownstreamTransportCard } from "@/components/reports/DownstreamTransportCard";
 import { UsePhaseCard } from "@/components/reports/UsePhaseCard";
 import { useScope3Emissions } from "@/hooks/data/useScope3Emissions";
+import { calculateScope1, calculateScope2 } from "@/lib/calculations/corporate-emissions";
+import { calculateDataCompleteness } from "@/lib/calculations/footprint-completeness";
 import { toast } from "sonner";
 
 interface CorporateReport {
@@ -132,7 +159,7 @@ export default function FootprintBuilderPage() {
       // Fetch operations emissions (Scope 1 & 2)
       await fetchOperationsEmissions();
 
-      // Fetch fleet emissions (Scope 1 & 2)
+      // Fetch fleet emissions (for CompanyFleetCard display)
       await fetchFleetEmissions();
 
       // Refetch Scope 3 emissions
@@ -153,29 +180,13 @@ export default function FootprintBuilderPage() {
       const yearStart = `${year}-01-01`;
       const yearEnd = `${year}-12-31`;
 
-      // Fetch Scope 1 and 2 separately to avoid mixing them
-      const { data: scope1Data, error: scope1Error } = await supabase
-        .from("calculated_emissions")
-        .select("total_co2e")
-        .eq("organization_id", currentOrganization.id)
-        .gte("date", yearStart)
-        .lte("date", yearEnd)
-        .eq("scope", 1);
-
-      if (scope1Error) throw scope1Error;
-
-      const { data: scope2Data, error: scope2Error } = await supabase
-        .from("calculated_emissions")
-        .select("total_co2e")
-        .eq("organization_id", currentOrganization.id)
-        .gte("date", yearStart)
-        .lte("date", yearEnd)
-        .eq("scope", 2);
-
-      if (scope2Error) throw scope2Error;
-
-      const scope1Total = scope1Data?.reduce((sum, item) => sum + (item.total_co2e || 0), 0) || 0;
-      const scope2Total = scope2Data?.reduce((sum, item) => sum + (item.total_co2e || 0), 0) || 0;
+      // Use the single source of truth calculation functions from corporate-emissions.ts
+      // These calculate live from utility_data_entries + fleet_activities,
+      // including ALL facilities (owned + 3rd party) assigned to the organization.
+      const [scope1Total, scope2Total] = await Promise.all([
+        calculateScope1(supabase, currentOrganization.id, yearStart, yearEnd),
+        calculateScope2(supabase, currentOrganization.id, yearStart, yearEnd),
+      ]);
 
       setScope1CO2e(scope1Total);
       setScope2CO2e(scope2Total);
@@ -184,7 +195,6 @@ export default function FootprintBuilderPage() {
       console.error("Error fetching operations emissions:", error);
     }
   };
-
 
   const fetchFleetEmissions = async () => {
     if (!currentOrganization?.id) return;
@@ -236,7 +246,7 @@ export default function FootprintBuilderPage() {
       }
 
       const data = await response.json();
-      toast.success("Footprint calculated successfully!");
+      toast.success("Report finalised successfully!");
       fetchReportData();
     } catch (error: any) {
       console.error("Error generating report:", error);
@@ -254,6 +264,10 @@ export default function FootprintBuilderPage() {
     return <div>Report not found</div>;
   }
 
+  // =========================================================================
+  // Derived data
+  // =========================================================================
+
   const travelEntries = overheads.filter((o) => o.category === "business_travel");
   const serviceEntries = overheads.filter((o) => o.category === "purchased_services" && !o.material_type);
   const marketingEntries = overheads.filter((o) => o.category === "purchased_services" && o.material_type);
@@ -262,7 +276,6 @@ export default function FootprintBuilderPage() {
   const capitalGoodsEntries = overheads.filter((o) => o.category === "capital_goods") as any[];
   const logisticsEntries = overheads.filter((o) => o.category === "downstream_logistics") as any[];
   const wasteEntries = overheads.filter((o) => o.category === "operational_waste") as any[];
-  // New GHG Protocol categories
   const upstreamTransportEntries = overheads.filter((o) => o.category === "upstream_transport") as any[];
   const downstreamTransportEntries = overheads.filter((o) => o.category === "downstream_transport") as any[];
   const usePhaseEntries = overheads.filter((o) => o.category === "use_phase") as any[];
@@ -271,19 +284,53 @@ export default function FootprintBuilderPage() {
   const scope3TotalCO2e = scope3Emissions.total;
 
   // CRITICAL: Calculate LIVE totals from real-time data to ensure accuracy
-  // Fleet emissions are Scope 1 (mobile combustion), so add to Scope 1 total
-  const liveScope1Total = scope1CO2e + fleetCO2e;
+  // Note: calculateScope1/calculateScope2 from corporate-emissions.ts already include
+  // fleet emissions (Scope 1 fleet + Scope 2 fleet respectively), so DO NOT add fleetCO2e again.
+  // fleetCO2e is kept separately only for the CompanyFleetCard display.
+  const liveScope1Total = scope1CO2e;
   const liveScope2Total = scope2CO2e;
   const liveScope3Total = scope3TotalCO2e;
-
-  // Calculate the actual live total emissions
   const liveTotalEmissions = liveScope1Total + liveScope2Total + liveScope3Total;
 
-  const canGenerate = true; // Always allow generation
+  const scope3Breakdown = {
+    products: scope3Emissions.products,
+    business_travel: scope3Emissions.business_travel,
+    purchased_services: scope3Emissions.purchased_services,
+    employee_commuting: scope3Emissions.employee_commuting,
+    capital_goods: scope3Emissions.capital_goods,
+    downstream_logistics: scope3Emissions.downstream_logistics,
+    operational_waste: scope3Emissions.operational_waste,
+    marketing_materials: scope3Emissions.marketing_materials,
+    upstream_transport: scope3Emissions.upstream_transport,
+    downstream_transport: scope3Emissions.downstream_transport,
+    use_phase: scope3Emissions.use_phase,
+  };
+
+  // Data completeness
+  const completeness = calculateDataCompleteness({
+    operationsEmissions: operationsCO2e,
+    fleetEmissions: fleetCO2e,
+    scope3Breakdown,
+  });
+
+  // Scope 3 completeness for the accordion trigger
+  const scope3Categories = completeness.categories.filter(c => c.scope === 3 && !c.isComingSoon);
+  const scope3CompletedCount = scope3Categories.filter(c => c.hasData).length;
+
+  // Format emissions helper
+  const formatEmissions = (value: number): string => {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(2)} kt`;
+    if (value >= 1000) return `${(value / 1000).toFixed(3)} t`;
+    return `${value.toFixed(2)} kg`;
+  };
+
+  const isFinalized = report.status === "Finalized";
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* ================================================================= */}
+      {/* Header                                                            */}
+      {/* ================================================================= */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -299,148 +346,273 @@ export default function FootprintBuilderPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {report.status === "Finalized" ? (
-            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 border-green-200">
-              <Lock className="h-3 w-3 mr-1" />
-              Complete
-            </Badge>
+          {isFinalized ? (
+            <Button variant="outline" onClick={handleGenerateReport} disabled={isGenerating}>
+              {isGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Report
+                </>
+              )}
+            </Button>
           ) : (
-            <Badge variant="secondary">Draft</Badge>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      onClick={handleGenerateReport}
+                      disabled={isGenerating || completeness.score < 50}
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Finalising...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Finalise Report
+                        </>
+                      )}
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {completeness.score < 50 && (
+                  <TooltipContent>
+                    <p>Add more data to finalise (currently {completeness.score}% complete)</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
-          <Button onClick={handleGenerateReport} disabled={!canGenerate || isGenerating}>
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4 mr-2" />
-                Generate Report
-              </>
-            )}
-          </Button>
         </div>
       </div>
 
-      {/* Activity Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {/* Card 1: Operations & Energy */}
-        <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
-
-        {/* Card 2: Scope 3 - All Categories */}
-        <ProductsSupplyChainCard
-          totalCO2e={scope3TotalCO2e}
-          productsCO2e={scope3Emissions.products}
-          year={year}
-          report={report}
-          isLoading={isLoadingScope3}
-        />
-
-        {/* Card 3: Company Fleet & Vehicles */}
-        <CompanyFleetCard totalCO2e={fleetCO2e} year={year} />
-
-        {/* Card 4: Business Travel */}
-        {report && (
-          <BusinessTravelCard reportId={report.id} entries={travelEntries} onUpdate={fetchReportData} />
-        )}
-
-        {/* Card 5: Marketing Materials & Merchandise */}
-        {report && (
-          <MarketingMaterialsCard reportId={report.id} entries={marketingEntries} onUpdate={fetchReportData} />
-        )}
-
-        {/* Card 6: Services & Overhead */}
-        {report && (
-          <ServicesOverheadCard reportId={report.id} entries={serviceEntries} onUpdate={fetchReportData} />
-        )}
-
-        {/* Card 7: Team & Commuting */}
-        {report && (
-          <TeamCommutingCard reportId={report.id} initialFteCount={fteCount} onUpdate={fetchReportData} />
-        )}
-
-        {/* Card 8: Capital Goods & Assets */}
-        {report && (
-          <CapitalGoodsCard reportId={report.id} entries={capitalGoodsEntries} onUpdate={fetchReportData} />
-        )}
-
-        {/* Card 9: Logistics & Distribution */}
-        {report && currentOrganization && (
-          <LogisticsDistributionCard
-            reportId={report.id}
-            organizationId={currentOrganization.id}
-            year={year}
-            entries={logisticsEntries}
-            onUpdate={fetchReportData}
-          />
-        )}
-
-        {/* Card 10: Operational Waste */}
-        {report && (
-          <OperationalWasteCard reportId={report.id} entries={wasteEntries} onUpdate={fetchReportData} />
-        )}
-
-        {/* Card 11: Upstream Transport (Category 4) */}
-        {report && currentOrganization && (
-          <UpstreamTransportCard
-            reportId={report.id}
-            organizationId={currentOrganization.id}
-            year={year}
-            entries={upstreamTransportEntries}
-            onUpdate={fetchReportData}
-          />
-        )}
-
-        {/* Card 12: Downstream Transport (Category 9) */}
-        {report && currentOrganization && (
-          <DownstreamTransportCard
-            reportId={report.id}
-            organizationId={currentOrganization.id}
-            year={year}
-            entries={downstreamTransportEntries}
-            onUpdate={fetchReportData}
-          />
-        )}
-
-        {/* Card 13: Use of Products (Category 11) */}
-        {report && currentOrganization && (
-          <UsePhaseCard
-            reportId={report.id}
-            organizationId={currentOrganization.id}
-            year={year}
-            entries={usePhaseEntries}
-            onUpdate={fetchReportData}
-          />
-        )}
-      </div>
-
-      {/* Summary Dashboard */}
-      <FootprintSummaryDashboard
+      {/* ================================================================= */}
+      {/* Hero Summary                                                      */}
+      {/* ================================================================= */}
+      <FootprintHeroSummary
         totalEmissions={liveTotalEmissions}
         scope1Emissions={liveScope1Total}
         scope2Emissions={liveScope2Total}
         scope3Emissions={liveScope3Total}
-        scope3Breakdown={{
-          products: scope3Emissions.products,
-          business_travel: scope3Emissions.business_travel,
-          purchased_services: scope3Emissions.purchased_services,
-          employee_commuting: scope3Emissions.employee_commuting,
-          capital_goods: scope3Emissions.capital_goods,
-          downstream_logistics: scope3Emissions.downstream_logistics,
-          operational_waste: scope3Emissions.operational_waste,
-          marketing_materials: scope3Emissions.marketing_materials,
-          // New GHG Protocol categories
-          upstream_transport: scope3Emissions.upstream_transport,
-          downstream_transport: scope3Emissions.downstream_transport,
-          use_phase: scope3Emissions.use_phase,
-        }}
-        operationsEmissions={operationsCO2e}
-        fleetEmissions={fleetCO2e}
+        dataCompletenessScore={completeness.score}
         year={year}
-        lastUpdated={report.updated_at}
         status={report.status}
+        lastUpdated={report.updated_at}
       />
+
+      {/* ================================================================= */}
+      {/* Progress Banner                                                   */}
+      {/* ================================================================= */}
+      <FootprintProgressBanner
+        categories={completeness.categories}
+        completedCount={completeness.completedCount}
+        totalCount={completeness.totalCount}
+        score={completeness.score}
+        firstIncompleteCategory={completeness.firstIncompleteCategory}
+      />
+
+      {/* ================================================================= */}
+      {/* Scope-Grouped Activity Cards (Accordion)                          */}
+      {/* ================================================================= */}
+      <Accordion type="multiple" defaultValue={["scope12", "scope3"]} className="space-y-3">
+
+        {/* ─────────────────────────────────────────────────────────────── */}
+        {/* Scope 1 & 2: Direct & Energy Emissions                        */}
+        {/* ─────────────────────────────────────────────────────────────── */}
+        <AccordionItem value="scope12" className="border rounded-xl overflow-hidden">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+            <span className="flex items-center gap-3 flex-1">
+              <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-blue-500/20">
+                <Factory className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              </span>
+              <span className="flex flex-col items-start">
+                <span className="font-semibold text-sm">Scope 1 & 2 — Direct & Energy Emissions</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  {formatEmissions(liveScope1Total + liveScope2Total)} CO₂e from operations & fleet
+                </span>
+              </span>
+              {(liveScope1Total + liveScope2Total) > 0 && (
+                <Badge variant="outline" className="ml-auto mr-2 bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-800 text-xs">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  2 sources
+                </Badge>
+              )}
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <OperationsEnergyCard totalCO2e={operationsCO2e} year={year} />
+              <CompanyFleetCard totalCO2e={fleetCO2e} year={year} />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* ─────────────────────────────────────────────────────────────── */}
+        {/* Scope 3: Value Chain Emissions                                 */}
+        {/* ─────────────────────────────────────────────────────────────── */}
+        <AccordionItem value="scope3" className="border rounded-xl overflow-hidden">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+            <span className="flex items-center gap-3 flex-1">
+              <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-500/20">
+                <Leaf className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </span>
+              <span className="flex flex-col items-start">
+                <span className="font-semibold text-sm">Scope 3 — Value Chain Emissions</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  {formatEmissions(liveScope3Total)} CO₂e across {scope3Categories.length} categories
+                </span>
+              </span>
+              <Badge variant="outline" className="ml-auto mr-2 bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800 text-xs">
+                {scope3CompletedCount} of {scope3Categories.length} tracked
+              </Badge>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5 space-y-6">
+
+            {/* Sub-section: Data You Enter */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Data you enter
+                </span>
+                <div className="flex-1 border-t border-slate-200 dark:border-slate-700" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {report && (
+                  <BusinessTravelCard reportId={report.id} entries={travelEntries} onUpdate={fetchReportData} />
+                )}
+                {report && (
+                  <ServicesOverheadCard reportId={report.id} entries={serviceEntries} onUpdate={fetchReportData} />
+                )}
+                {report && (
+                  <MarketingMaterialsCard reportId={report.id} entries={marketingEntries} onUpdate={fetchReportData} />
+                )}
+                {report && (
+                  <TeamCommutingCard reportId={report.id} initialFteCount={fteCount} onUpdate={fetchReportData} />
+                )}
+                {report && (
+                  <CapitalGoodsCard reportId={report.id} entries={capitalGoodsEntries} onUpdate={fetchReportData} />
+                )}
+                {report && currentOrganization && (
+                  <LogisticsDistributionCard
+                    reportId={report.id}
+                    organizationId={currentOrganization.id}
+                    year={year}
+                    entries={logisticsEntries}
+                    onUpdate={fetchReportData}
+                  />
+                )}
+                {report && (
+                  <OperationalWasteCard reportId={report.id} entries={wasteEntries} onUpdate={fetchReportData} />
+                )}
+              </div>
+            </div>
+
+            {/* Sub-section: Auto-Calculated from Products */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Auto-calculated from products
+                </span>
+                <Sparkles className="h-3.5 w-3.5 text-emerald-500" />
+                <div className="flex-1 border-t border-slate-200 dark:border-slate-700" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
+                  <ProductsSupplyChainCard
+                    totalCO2e={scope3TotalCO2e}
+                    productsCO2e={scope3Emissions.products}
+                    year={year}
+                    report={report}
+                    isLoading={isLoadingScope3}
+                  />
+                </div>
+                {report && currentOrganization && (
+                  <div className="border-l-4 border-emerald-500/20 pl-0 rounded-lg">
+                    <UpstreamTransportCard
+                      reportId={report.id}
+                      organizationId={currentOrganization.id}
+                      year={year}
+                      entries={upstreamTransportEntries}
+                      onUpdate={fetchReportData}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+
+        {/* ─────────────────────────────────────────────────────────────── */}
+        {/* Coming Soon                                                    */}
+        {/* ─────────────────────────────────────────────────────────────── */}
+        <AccordionItem value="coming-soon" className="border rounded-xl overflow-hidden">
+          <AccordionTrigger className="px-5 py-4 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
+            <span className="flex items-center gap-3 flex-1">
+              <span className="flex items-center justify-center h-8 w-8 rounded-lg bg-slate-500/10">
+                <Clock className="h-4 w-4 text-slate-500" />
+              </span>
+              <span className="flex flex-col items-start">
+                <span className="font-semibold text-sm text-muted-foreground">Coming Soon</span>
+                <span className="text-xs text-muted-foreground font-normal">
+                  Cradle-to-grave categories
+                </span>
+              </span>
+              <Badge variant="secondary" className="ml-auto mr-2 text-xs">
+                2 categories
+              </Badge>
+            </span>
+          </AccordionTrigger>
+          <AccordionContent className="px-5 pb-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {report && currentOrganization && (
+                <DownstreamTransportCard
+                  reportId={report.id}
+                  organizationId={currentOrganization.id}
+                  year={year}
+                  entries={downstreamTransportEntries}
+                  onUpdate={fetchReportData}
+                />
+              )}
+              {report && currentOrganization && (
+                <UsePhaseCard
+                  reportId={report.id}
+                  organizationId={currentOrganization.id}
+                  year={year}
+                  entries={usePhaseEntries}
+                  onUpdate={fetchReportData}
+                />
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
+      {/* ================================================================= */}
+      {/* Detailed Summary Dashboard                                        */}
+      {/* ================================================================= */}
+      <div id="summary-dashboard">
+        <FootprintSummaryDashboard
+          totalEmissions={liveTotalEmissions}
+          scope1Emissions={liveScope1Total}
+          scope2Emissions={liveScope2Total}
+          scope3Emissions={liveScope3Total}
+          scope3Breakdown={scope3Breakdown}
+          operationsEmissions={operationsCO2e}
+          fleetEmissions={fleetCO2e}
+          year={year}
+          lastUpdated={report.updated_at}
+          status={report.status}
+        />
+      </div>
     </div>
   );
 }
