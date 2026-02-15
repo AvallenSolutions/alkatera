@@ -35,10 +35,10 @@ export function FootprintHeroSummary({
   lastUpdated,
 }: FootprintHeroSummaryProps) {
   const formatEmissions = (value: number): string => {
-    if (value >= 1000000) {
-      return `${(value / 1000000).toFixed(2)} kt`;
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(2)} kt`;
     }
-    return `${(value / 1000).toFixed(2)} t`;
+    return `${value.toFixed(2)} t`;
   };
 
   const formatPercentage = (value: number, total: number): string => {
