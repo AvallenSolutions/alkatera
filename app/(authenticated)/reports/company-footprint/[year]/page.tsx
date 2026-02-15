@@ -320,8 +320,7 @@ export default function FootprintBuilderPage() {
   // Format emissions helper
   const formatEmissions = (value: number): string => {
     if (value >= 1000000) return `${(value / 1000000).toFixed(2)} kt`;
-    if (value >= 1000) return `${(value / 1000).toFixed(3)} t`;
-    return `${value.toFixed(2)} kg`;
+    return `${(value / 1000).toFixed(2)} t`;
   };
 
   const isFinalized = report.status === "Finalized";

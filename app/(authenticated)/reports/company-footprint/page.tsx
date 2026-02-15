@@ -117,8 +117,7 @@ export default function CompanyFootprintPage() {
 
   const formatEmissions = (value: number) => {
     if (value >= 1000000) return `${(value / 1000000).toFixed(2)} kt CO₂e`;
-    if (value >= 1000) return `${(value / 1000).toFixed(3)} t CO₂e`;
-    return `${value.toFixed(2)} kg CO₂e`;
+    return `${(value / 1000).toFixed(2)} t CO₂e`;
   };
 
   const getAvailableYears = () => {
