@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ThemeProvider } from 'next-themes';
 import { GoogleAnalytics } from '@/components/GoogleAnalytics';
+import { PostHogProvider } from './providers';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -155,20 +156,22 @@ export default function RootLayout({
       </head>
       <GoogleAnalytics />
       <body className={`${inter.variable} ${lora.variable} ${jetbrainsMono.variable} ${playfairDisplay.variable} font-body`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange={false}
-        >
-          <AuthProvider>
-            <OrganizationProvider>
-              {children}
-              <Toaster />
-              <SonnerToaster />
-            </OrganizationProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <PostHogProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange={false}
+          >
+            <AuthProvider>
+              <OrganizationProvider>
+                {children}
+                <Toaster />
+                <SonnerToaster />
+              </OrganizationProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

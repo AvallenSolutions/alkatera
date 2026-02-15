@@ -85,6 +85,7 @@
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^4.2.67",
     "postcss": "^8.4.31",
+    "posthog-js": "^1.347.2",
     "qrcode.react": "^4.2.0",
     "react": "18.2.0",
     "react-day-picker": "^8.10.1",
