@@ -33,6 +33,8 @@ import {
   Send,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { useOrganization } from '@/lib/organizationContext';
+import { createTicket } from '@/lib/feedback';
 import { PageLoader } from '@/components/ui/page-loader';
 import { toast } from 'sonner';
 
@@ -539,6 +541,7 @@ export default function DataSourcesPage() {
 }
 
 function RequestFactorForm() {
+  const { currentOrganization } = useOrganization();
   const [materialName, setMaterialName] = useState('');
   const [materialType, setMaterialType] = useState('ingredient');
   const [notes, setNotes] = useState('');
@@ -561,6 +564,7 @@ function RequestFactorForm() {
         return;
       }
 
+      // 1. Log the emission factor request (existing behaviour)
       const response = await fetch('/api/data/factor-requests', {
         method: 'POST',
         headers: {
@@ -576,6 +580,22 @@ function RequestFactorForm() {
 
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
+
+      // 2. Also create a feedback ticket so admins see it in User Feedback
+      if (currentOrganization?.id) {
+        try {
+          await createTicket(currentOrganization.id, {
+            title: `Missing data: ${materialName.trim()}`,
+            description: `A user requested a missing ${materialType} emission factor.\n\nMaterial: ${materialName.trim()}${notes.trim() ? `\nNotes: ${notes.trim()}` : ''}`,
+            category: 'feature',
+            priority: 'low',
+            page_url: '/data/sources',
+          });
+        } catch (feedbackErr) {
+          // Don't fail the whole submission if feedback ticket creation fails
+          console.error('Failed to create feedback ticket:', feedbackErr);
+        }
+      }
 
       setSubmitted(true);
       setMaterialName('');
