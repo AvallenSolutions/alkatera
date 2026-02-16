@@ -1,14 +1,14 @@
 'use client'
 
 import Image from 'next/image'
-import { useOnboarding, ONBOARDING_STEPS, PHASE_CONFIG, getStepConfig } from '@/lib/onboarding'
+import { useOnboarding, ONBOARDING_STEPS, MEMBER_ONBOARDING_STEPS, PHASE_CONFIG, MEMBER_PHASES, getStepConfig } from '@/lib/onboarding'
 import type { OnboardingPhase } from '@/lib/onboarding'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// Step components
+// Step components — owner flow
 import { WelcomeScreen } from './steps/WelcomeScreen'
 import { MeetRosa } from './steps/MeetRosa'
 import { PersonalizationStep } from './steps/PersonalizationStep'
@@ -24,7 +24,14 @@ import { FeatureShowcase } from './steps/FeatureShowcase'
 import { InviteTeamStep } from './steps/InviteTeamStep'
 import { CompletionStep } from './steps/CompletionStep'
 
+// Step components — member flow
+import { MemberWelcomeScreen } from './steps/MemberWelcomeScreen'
+import { MemberOrgOverview } from './steps/MemberOrgOverview'
+import { MemberPlatformTour } from './steps/MemberPlatformTour'
+import { MemberCompletionStep } from './steps/MemberCompletionStep'
+
 const STEP_COMPONENTS: Record<string, React.ComponentType> = {
+  // Owner steps
   'welcome-screen': WelcomeScreen,
   'meet-rosa': MeetRosa,
   'personalization': PersonalizationStep,
@@ -39,10 +46,17 @@ const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'feature-showcase': FeatureShowcase,
   'invite-team': InviteTeamStep,
   'completion': CompletionStep,
+  // Member steps
+  'member-welcome': MemberWelcomeScreen,
+  'member-org-overview': MemberOrgOverview,
+  'member-platform-tour': MemberPlatformTour,
+  'member-completion': MemberCompletionStep,
 }
 
+const OWNER_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features']
+
 export function OnboardingWizard() {
-  const { state, shouldShowOnboarding, isLoading, progress, dismissOnboarding } = useOnboarding()
+  const { state, shouldShowOnboarding, isLoading, progress, dismissOnboarding, onboardingFlow } = useOnboarding()
 
   if (isLoading || !shouldShowOnboarding) {
     return null
@@ -53,10 +67,13 @@ export function OnboardingWizard() {
   const currentPhase = currentStepConfig.phase
   const phaseConfig = PHASE_CONFIG[currentPhase]
 
-  const phases: OnboardingPhase[] = ['welcome', 'quick-wins', 'core-setup', 'first-insights', 'power-features']
+  // Use flow-appropriate phases and steps for the top bar
+  const isMemberFlow = onboardingFlow === 'member'
+  const phases = isMemberFlow ? MEMBER_PHASES : OWNER_PHASES
+  const flowSteps = isMemberFlow ? MEMBER_ONBOARDING_STEPS : ONBOARDING_STEPS
 
-  const isWelcome = state.currentStep === 'welcome-screen'
-  const isCompletion = state.currentStep === 'completion'
+  const isWelcome = state.currentStep === 'welcome-screen' || state.currentStep === 'member-welcome'
+  const isCompletion = state.currentStep === 'completion' || state.currentStep === 'member-completion'
 
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-label="Onboarding wizard">
@@ -83,7 +100,7 @@ export function OnboardingWizard() {
                 {phases.map((phase) => {
                   const pConfig = PHASE_CONFIG[phase]
                   const isActive = phase === currentPhase
-                  const phaseSteps = ONBOARDING_STEPS.filter(s => s.phase === phase)
+                  const phaseSteps = flowSteps.filter(s => s.phase === phase)
                   const isComplete = phaseSteps.every(s => state.completedSteps.includes(s.id))
                   const isPast = phases.indexOf(phase) < phases.indexOf(currentPhase)
 
@@ -128,7 +145,7 @@ export function OnboardingWizard() {
             <Progress value={progress} indicatorColor="lime" className="h-1 bg-white/10" />
             <div className="flex items-center justify-between mt-1">
               <p className="text-xs text-white/40">
-                {currentStepConfig.title} &mdash; {phaseConfig.duration}
+                {currentStepConfig.title} &mdash; {isMemberFlow ? '~3 min' : phaseConfig.duration}
               </p>
               <p className="text-xs text-white/40">{progress}%</p>
             </div>

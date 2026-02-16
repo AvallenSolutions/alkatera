@@ -4,24 +4,18 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { useAuth } from '@/hooks/useAuth'
 import { useOrganization } from '@/lib/organizationContext'
 import {
+  OnboardingFlow,
   OnboardingState,
   OnboardingStep,
   PersonalizationData,
   INITIAL_ONBOARDING_STATE,
+  INITIAL_MEMBER_ONBOARDING_STATE,
   getNextStep,
   getPreviousStep,
   getStepConfig,
   getProgressPercentage,
+  getInitialStateForFlow,
 } from './types'
-
-/** Steps that ALL users see (Welcome, Meet Rosa, Personalisation).
- *  Company Basics and everything beyond is owner-only. */
-const FOUNDATION_STEPS: OnboardingStep[] = ['welcome-screen', 'meet-rosa', 'personalization']
-
-/** Returns true if the step is within Phase 1 (foundations) */
-function isFoundationStep(step: OnboardingStep): boolean {
-  return FOUNDATION_STEPS.includes(step)
-}
 
 interface OnboardingContextType {
   /** Current onboarding state */
@@ -32,6 +26,8 @@ interface OnboardingContextType {
   isLoading: boolean
   /** Progress percentage (0-100) */
   progress: number
+  /** The onboarding flow type: 'owner' or 'member' */
+  onboardingFlow: OnboardingFlow
   /** Go to the next step */
   nextStep: () => void
   /** Go to the previous step */
@@ -65,14 +61,16 @@ const OnboardingContext = createContext<OnboardingContextType | undefined>(undef
 export function OnboardingProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<OnboardingState>(INITIAL_ONBOARDING_STATE)
   const [isLoading, setIsLoading] = useState(true)
+  const [onboardingFlow, setOnboardingFlow] = useState<OnboardingFlow>('owner')
   const { user } = useAuth()
   const { currentOrganization, userRole } = useOrganization()
   const isOwner = userRole === 'owner'
 
   // Track which org ID we've loaded state for to avoid re-fetching on every render
   const loadedOrgIdRef = useRef<string | null>(null)
-  // Track the org ID for saves so the callback doesn't need currentOrganization in deps
+  // Track the org ID and flow for saves so the callback doesn't need them in deps
   const orgIdRef = useRef<string | null>(null)
+  const flowRef = useRef<OnboardingFlow>('owner')
   // Guard against saving while a fetch is in flight
   const isFetchingRef = useRef(false)
   // Counter to ignore stale fetch responses
@@ -81,10 +79,14 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   // even if the fire-and-forget save hasn't completed or failed silently
   const sessionDismissedRef = useRef(false)
 
-  // Keep orgIdRef current
+  // Keep refs current
   useEffect(() => {
     orgIdRef.current = currentOrganization?.id ?? null
   }, [currentOrganization?.id])
+
+  useEffect(() => {
+    flowRef.current = onboardingFlow
+  }, [onboardingFlow])
 
   // Queue of state updates that arrived while a fetch was in-flight.
   // When the fetch completes we merge these on top of the server state
@@ -92,8 +94,8 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const pendingUpdatesRef = useRef<Array<(prev: OnboardingState) => OnboardingState>>([])
 
   // Save onboarding state to the API — fires immediately, no debounce.
-  // Uses orgIdRef so it doesn't depend on currentOrganization (avoids
-  // re-creating the callback on every org reference change).
+  // Uses orgIdRef/flowRef so it doesn't depend on reactive values (avoids
+  // re-creating the callback on every reference change).
   // Returns true on success, false on failure.
   const saveState = useCallback(async (newState: OnboardingState): Promise<boolean> => {
     const orgId = orgIdRef.current
@@ -106,6 +108,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         body: JSON.stringify({
           organizationId: orgId,
           state: newState,
+          flow: flowRef.current,
         }),
       })
       return res.ok
@@ -139,6 +142,10 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
         if (res.ok) {
           const data = await res.json()
+          // Set the flow from the API response
+          const serverFlow: OnboardingFlow = data.flow || (isOwner ? 'owner' : 'member')
+          setOnboardingFlow(serverFlow)
+
           if (data.state) {
             // Replay any updates the user made while we were fetching
             let merged = data.state as OnboardingState
@@ -163,7 +170,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         }
       }
     })()
-  }, [currentOrganization?.id, saveState])
+  }, [currentOrganization?.id, isOwner, saveState])
 
   // Helper: update state in memory and persist immediately.
   // If a fetch is in-flight, queue the updater so it can be replayed
@@ -185,7 +192,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const nextStep = useCallback(() => {
     updateState(prev => {
-      const next = getNextStep(prev.currentStep)
+      const next = getNextStep(prev.currentStep, flowRef.current)
       if (!next) return prev
       return { ...prev, currentStep: next }
     })
@@ -193,7 +200,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const previousStep = useCallback(() => {
     updateState(prev => {
-      const prevStep = getPreviousStep(prev.currentStep)
+      const prevStep = getPreviousStep(prev.currentStep, flowRef.current)
       if (!prevStep) return prev
       return { ...prev, currentStep: prevStep }
     })
@@ -209,19 +216,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         ? prev.completedSteps
         : [...prev.completedSteps, prev.currentStep]
 
-      const next = getNextStep(prev.currentStep)
-
-      // Non-owners finish after the last foundation step (company-basics).
-      // Auto-complete onboarding so they don't see Phases 2–5.
-      if (!isOwner && next && !isFoundationStep(next)) {
-        return {
-          ...prev,
-          completedSteps,
-          completed: true,
-          completedAt: new Date().toISOString(),
-          currentStep: next,
-        }
-      }
+      const next = getNextStep(prev.currentStep, flowRef.current)
 
       return {
         ...prev,
@@ -229,28 +224,18 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         currentStep: next ?? prev.currentStep,
       }
     })
-  }, [updateState, isOwner])
+  }, [updateState])
 
   const skipStep = useCallback(() => {
     updateState(prev => {
       const config = getStepConfig(prev.currentStep)
       if (!config.skippable) return prev
-      const next = getNextStep(prev.currentStep)
+      const next = getNextStep(prev.currentStep, flowRef.current)
       if (!next) return prev
-
-      // Non-owners finish after the last foundation step
-      if (!isOwner && !isFoundationStep(next)) {
-        return {
-          ...prev,
-          completed: true,
-          completedAt: new Date().toISOString(),
-          currentStep: next,
-        }
-      }
 
       return { ...prev, currentStep: next }
     })
-  }, [updateState, isOwner])
+  }, [updateState])
 
   const updatePersonalization = useCallback((data: Partial<PersonalizationData>) => {
     updateState(prev => ({
@@ -260,14 +245,16 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   }, [updateState])
 
   const completeOnboarding = useCallback(async () => {
+    // Use the appropriate completion step for the flow
+    const completionStep = flowRef.current === 'member' ? 'member-completion' : 'completion'
     const completedState: OnboardingState = {
       ...state,
       completed: true,
       completedAt: new Date().toISOString(),
-      currentStep: 'completion' as OnboardingStep,
-      completedSteps: state.completedSteps.includes('completion')
+      currentStep: completionStep as OnboardingStep,
+      completedSteps: state.completedSteps.includes(completionStep as OnboardingStep)
         ? state.completedSteps
-        : [...state.completedSteps, 'completion'],
+        : [...state.completedSteps, completionStep as OnboardingStep],
     }
     setState(completedState)
     // Await the save so callers can wait for persistence before navigating
@@ -312,22 +299,20 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const resetOnboarding = useCallback(() => {
     sessionDismissedRef.current = false
-    const fresh = { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() }
+    const fresh = { ...getInitialStateForFlow(flowRef.current), startedAt: new Date().toISOString() }
     setState(fresh)
     saveState(fresh)
   }, [saveState])
 
-  // Owners see the full onboarding flow (all 5 phases).
-  // Non-owners only see Phase 1 (Welcome & Orientation / foundations).
-  // If the current step is beyond Phase 1, non-owners skip the wizard entirely.
+  // Both owners and members see the onboarding wizard — just different flows.
   const shouldShowOnboarding =
     !state.completed &&
     !state.dismissed &&
     !sessionDismissedRef.current &&
     !!user &&
-    !!currentOrganization &&
-    (isOwner || isFoundationStep(state.currentStep))
-  const progress = getProgressPercentage(state.currentStep)
+    !!currentOrganization
+
+  const progress = getProgressPercentage(state.currentStep, onboardingFlow)
 
   return (
     <OnboardingContext.Provider
@@ -336,6 +321,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
         shouldShowOnboarding,
         isLoading,
         progress,
+        onboardingFlow,
         nextStep,
         previousStep,
         goToStep,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { INITIAL_ONBOARDING_STATE } from '@/lib/onboarding/types'
+import { INITIAL_ONBOARDING_STATE, INITIAL_MEMBER_ONBOARDING_STATE } from '@/lib/onboarding/types'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -11,7 +11,7 @@ function getServiceClient() {
   return createClient(supabaseUrl, supabaseServiceKey)
 }
 
-/** Authenticate the request and verify org membership */
+/** Authenticate the request and verify org membership. Returns user, auth status, and org role. */
 async function authenticateAndAuthorize(organizationId: string) {
   const cookieStore = cookies()
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -32,34 +32,37 @@ async function authenticateAndAuthorize(organizationId: string) {
 
   const { data: { user }, error } = await authClient.auth.getUser()
   if (error || !user) {
-    return { user: null, authorized: false }
+    return { user: null, authorized: false, orgRole: null as string | null }
   }
 
-  // Verify user belongs to this organization
+  // Verify user belongs to this organization and get their role
   const serviceClient = getServiceClient()
   const { data: membership } = await serviceClient
     .from('organization_members')
-    .select('id')
+    .select('id, role_id, roles(name)')
     .eq('organization_id', organizationId)
     .eq('user_id', user.id)
     .maybeSingle()
 
-  if (!membership) {
-    // Also check advisor access
-    const { data: advisorAccess } = await serviceClient
-      .from('advisor_organization_access')
-      .select('id')
-      .eq('organization_id', organizationId)
-      .eq('advisor_user_id', user.id)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (!advisorAccess) {
-      return { user, authorized: false }
-    }
+  if (membership) {
+    const roleName = (membership as any)?.roles?.name || null
+    return { user, authorized: true, orgRole: roleName as string | null }
   }
 
-  return { user, authorized: true }
+  // Also check advisor access
+  const { data: advisorAccess } = await serviceClient
+    .from('advisor_organization_access')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('advisor_user_id', user.id)
+    .eq('is_active', true)
+    .maybeSingle()
+
+  if (advisorAccess) {
+    return { user, authorized: true, orgRole: 'advisor' as string | null }
+  }
+
+  return { user, authorized: false, orgRole: null as string | null }
 }
 
 /** GET /api/onboarding?organizationId=xxx - Fetch onboarding state */
@@ -71,7 +74,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Authenticate and verify org membership
-  const { user, authorized } = await authenticateAndAuthorize(organizationId)
+  const { user, authorized, orgRole } = await authenticateAndAuthorize(organizationId)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -80,12 +83,15 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getServiceClient()
+  const isOwner = orgRole === 'owner'
 
   try {
+    // Fetch the user's own onboarding state (per-user, per-org)
     const { data, error } = await supabase
       .from('onboarding_state')
-      .select('state')
+      .select('state, onboarding_flow')
       .eq('organization_id', organizationId)
+      .eq('user_id', user.id)
       .maybeSingle()
 
     if (error) {
@@ -94,46 +100,58 @@ export async function GET(request: NextRequest) {
     }
 
     if (!data) {
-      // No onboarding record exists yet. Check if this org already has real
-      // data (e.g. the user signed up before the onboarding wizard was deployed,
-      // or completed onboarding but the save was lost). If so, treat them as
-      // completed so they aren't forced through the wizard again.
-      const { count: productCount } = await supabase
-        .from('products')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
+      // No onboarding record exists for this user yet.
+      // For owners, check if org already has data (pre-existing user).
+      if (isOwner) {
+        const { count: productCount } = await supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
 
-      const { count: facilityCount } = await supabase
-        .from('facilities')
-        .select('id', { count: 'exact', head: true })
-        .eq('organization_id', organizationId)
+        const { count: facilityCount } = await supabase
+          .from('facilities')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
 
-      if ((productCount ?? 0) > 0 || (facilityCount ?? 0) > 0) {
-        // Org already has data — mark onboarding as completed and persist it
-        const completedState = {
-          ...INITIAL_ONBOARDING_STATE,
-          completed: true,
-          completedAt: new Date().toISOString(),
-          currentStep: 'completion' as const,
+        if ((productCount ?? 0) > 0 || (facilityCount ?? 0) > 0) {
+          // Org already has data — mark onboarding as completed and persist it
+          const completedState = {
+            ...INITIAL_ONBOARDING_STATE,
+            completed: true,
+            completedAt: new Date().toISOString(),
+            currentStep: 'completion' as const,
+          }
+          await supabase.from('onboarding_state').upsert(
+            {
+              organization_id: organizationId,
+              user_id: user.id,
+              onboarding_flow: 'owner',
+              state: completedState,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'organization_id,user_id' }
+          )
+          return NextResponse.json({ state: completedState, flow: 'owner' })
         }
-        // Persist so this check only runs once
-        await supabase.from('onboarding_state').upsert(
-          {
-            organization_id: organizationId,
-            state: completedState,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'organization_id' }
-        )
-        return NextResponse.json({ state: completedState })
+
+        // Fresh owner — return initial owner state
+        return NextResponse.json({
+          state: { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() },
+          flow: 'owner',
+        })
       }
 
+      // Non-owner (invited member) — return initial member state
       return NextResponse.json({
-        state: { ...INITIAL_ONBOARDING_STATE, startedAt: new Date().toISOString() },
+        state: { ...INITIAL_MEMBER_ONBOARDING_STATE, startedAt: new Date().toISOString() },
+        flow: 'member',
       })
     }
 
-    return NextResponse.json({ state: data.state })
+    return NextResponse.json({
+      state: data.state,
+      flow: data.onboarding_flow || (isOwner ? 'owner' : 'member'),
+    })
   } catch (err) {
     console.error('Onboarding GET error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -144,7 +162,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { organizationId, state } = body
+    const { organizationId, state, flow } = body
 
     if (!organizationId || !state) {
       return NextResponse.json(
@@ -154,7 +172,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Authenticate and verify org membership
-    const { user, authorized } = await authenticateAndAuthorize(organizationId)
+    const { user, authorized, orgRole } = await authenticateAndAuthorize(organizationId)
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -163,16 +181,19 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServiceClient()
+    const onboardingFlow = flow || (orgRole === 'owner' ? 'owner' : 'member')
 
     const { error } = await supabase
       .from('onboarding_state')
       .upsert(
         {
           organization_id: organizationId,
+          user_id: user.id,
+          onboarding_flow: onboardingFlow,
           state,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: 'organization_id' }
+        { onConflict: 'organization_id,user_id' }
       )
 
     if (error) {

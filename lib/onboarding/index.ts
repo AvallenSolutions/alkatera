@@ -1,5 +1,6 @@
 export { OnboardingProvider, useOnboarding } from './OnboardingContext'
 export type {
+  OnboardingFlow,
   OnboardingPhase,
   OnboardingStep,
   OnboardingState,
@@ -12,9 +13,15 @@ export type {
 } from './types'
 export {
   ONBOARDING_STEPS,
+  MEMBER_ONBOARDING_STEPS,
   TOTAL_STEPS,
+  TOTAL_MEMBER_STEPS,
   PHASE_CONFIG,
+  MEMBER_PHASES,
   INITIAL_ONBOARDING_STATE,
+  INITIAL_MEMBER_ONBOARDING_STATE,
+  getStepsForFlow,
+  getInitialStateForFlow,
   getStepConfig,
   getPhaseSteps,
   getNextStep,

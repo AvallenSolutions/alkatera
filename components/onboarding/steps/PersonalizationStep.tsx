@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useOnboarding, type UserRole, type BeverageType, type CompanySize, type PrimaryGoal } from '@/lib/onboarding'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,9 +44,25 @@ const GOAL_OPTIONS: { value: PrimaryGoal; label: string }[] = [
   { value: 'learning', label: 'Just learning about sustainability' },
 ]
 
+/** All possible sub-step IDs */
+type SubStepId = 'role' | 'beverage' | 'size' | 'goals'
+
+/** Owner sees all 4 questions; member sees only role + goals */
+const OWNER_SUB_STEPS: SubStepId[] = ['role', 'beverage', 'size', 'goals']
+const MEMBER_SUB_STEPS: SubStepId[] = ['role', 'goals']
+
 export function PersonalizationStep() {
-  const { state, updatePersonalization, completeStep, previousStep } = useOnboarding()
-  const [subStep, setSubStep] = useState(0) // 0-3 for the 4 questions
+  const { state, updatePersonalization, completeStep, previousStep, onboardingFlow } = useOnboarding()
+
+  const subSteps = useMemo(
+    () => (onboardingFlow === 'member' ? MEMBER_SUB_STEPS : OWNER_SUB_STEPS),
+    [onboardingFlow]
+  )
+  const totalSubSteps = subSteps.length
+
+  const [subStepIndex, setSubStepIndex] = useState(0)
+  const currentSubStep = subSteps[subStepIndex]
+
   const [role, setRole] = useState<UserRole | undefined>(state.personalization.role)
   const [roleOther, setRoleOther] = useState(state.personalization.roleOther || '')
   const [beverageTypes, setBeverageTypes] = useState<BeverageType[]>(state.personalization.beverageTypes || [])
@@ -69,18 +85,18 @@ export function PersonalizationStep() {
   }
 
   const canProceed = () => {
-    switch (subStep) {
-      case 0: return !!role
-      case 1: return beverageTypes.length > 0
-      case 2: return !!companySize
-      case 3: return primaryGoals.length > 0
+    switch (currentSubStep) {
+      case 'role': return !!role
+      case 'beverage': return beverageTypes.length > 0
+      case 'size': return !!companySize
+      case 'goals': return primaryGoals.length > 0
       default: return false
     }
   }
 
   const handleNext = () => {
-    if (subStep < 3) {
-      setSubStep(s => s + 1)
+    if (subStepIndex < totalSubSteps - 1) {
+      setSubStepIndex(s => s + 1)
     } else {
       // Save all personalization and move to next onboarding step
       updatePersonalization({
@@ -96,8 +112,8 @@ export function PersonalizationStep() {
   }
 
   const handleBack = () => {
-    if (subStep > 0) {
-      setSubStep(s => s - 1)
+    if (subStepIndex > 0) {
+      setSubStepIndex(s => s - 1)
     } else {
       previousStep()
     }
@@ -112,18 +128,18 @@ export function PersonalizationStep() {
             Let&apos;s personalise your experience
           </p>
           <p className="text-xs text-white/40">
-            (4 quick questions) &mdash; {subStep + 1}/4
+            ({totalSubSteps} quick questions) &mdash; {subStepIndex + 1}/{totalSubSteps}
           </p>
           {/* Sub-step progress dots */}
           <div className="flex items-center justify-center gap-2 pt-2">
-            {[0, 1, 2, 3].map(i => (
+            {subSteps.map((_, i) => (
               <div
                 key={i}
                 className={cn(
                   'h-2 rounded-full transition-all duration-300',
-                  i === subStep
+                  i === subStepIndex
                     ? 'bg-[#ccff00] w-6'
-                    : i < subStep
+                    : i < subStepIndex
                     ? 'bg-[#ccff00]/50 w-2'
                     : 'bg-white/15 w-2'
                 )}
@@ -132,8 +148,8 @@ export function PersonalizationStep() {
           </div>
         </div>
 
-        {/* Question 1: Role */}
-        {subStep === 0 && (
+        {/* Question: Role */}
+        {currentSubStep === 'role' && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <h3 className="text-xl font-serif font-bold text-white text-center">
               What&apos;s your role?
@@ -168,8 +184,8 @@ export function PersonalizationStep() {
           </div>
         )}
 
-        {/* Question 2: Beverage type */}
-        {subStep === 1 && (
+        {/* Question: Beverage type (owner only) */}
+        {currentSubStep === 'beverage' && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <h3 className="text-xl font-serif font-bold text-white text-center">
               What do you produce?
@@ -207,8 +223,8 @@ export function PersonalizationStep() {
           </div>
         )}
 
-        {/* Question 3: Company size */}
-        {subStep === 2 && (
+        {/* Question: Company size (owner only) */}
+        {currentSubStep === 'size' && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <h3 className="text-xl font-serif font-bold text-white text-center">
               Company size?
@@ -235,8 +251,8 @@ export function PersonalizationStep() {
           </div>
         )}
 
-        {/* Question 4: Primary goal */}
-        {subStep === 3 && (
+        {/* Question: Primary goal */}
+        {currentSubStep === 'goals' && (
           <div className="space-y-4 animate-in slide-in-from-right duration-300 bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6">
             <h3 className="text-xl font-serif font-bold text-white text-center">
               Your primary goal?
@@ -281,7 +297,7 @@ export function PersonalizationStep() {
             disabled={!canProceed()}
             className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90 font-medium rounded-xl"
           >
-            {subStep === 3 ? 'Continue' : 'Next'}
+            {subStepIndex === totalSubSteps - 1 ? 'Continue' : 'Next'}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>

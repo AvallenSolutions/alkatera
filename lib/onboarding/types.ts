@@ -3,7 +3,12 @@
  *
  * Defines the five-phase onboarding journey for new Alkatera users.
  * Based on the ALKATERA_ONBOARDING_PLAN_2026.md specification.
+ *
+ * Owner flow: Full 14-step onboarding (create org, add data, etc.)
+ * Member flow: Streamlined 6-step onboarding (welcome, learn platform)
  */
+
+export type OnboardingFlow = 'owner' | 'member'
 
 export type OnboardingPhase =
   | 'welcome'           // Phase 1: Welcome & Orientation
@@ -32,6 +37,11 @@ export type OnboardingStep =
   | 'feature-showcase'
   | 'invite-team'
   | 'completion'
+  // Member-specific steps
+  | 'member-welcome'
+  | 'member-org-overview'
+  | 'member-platform-tour'
+  | 'member-completion'
 
 export interface OnboardingStepConfig {
   id: OnboardingStep
@@ -66,7 +76,18 @@ export const ONBOARDING_STEPS: OnboardingStepConfig[] = [
   { id: 'completion', phase: 'power-features', title: 'Complete', description: 'You did it!', skippable: false, index: 13 },
 ]
 
+/** Member onboarding: streamlined 6-step flow for invited team members */
+export const MEMBER_ONBOARDING_STEPS: OnboardingStepConfig[] = [
+  { id: 'member-welcome', phase: 'welcome', title: 'Welcome', description: 'Welcome to the team', skippable: false, index: 0 },
+  { id: 'meet-rosa', phase: 'welcome', title: 'Meet Rosa', description: 'Your sustainability guide', skippable: false, index: 1 },
+  { id: 'personalization', phase: 'welcome', title: 'Personalization', description: 'Tell us about yourself', skippable: false, index: 2 },
+  { id: 'member-org-overview', phase: 'quick-wins', title: 'Your Organisation', description: 'Meet your sustainability hub', skippable: false, index: 3 },
+  { id: 'member-platform-tour', phase: 'quick-wins', title: 'Platform Tour', description: 'What you can do', skippable: false, index: 4 },
+  { id: 'member-completion', phase: 'quick-wins', title: 'Complete', description: 'You are all set!', skippable: false, index: 5 },
+]
+
 export const TOTAL_STEPS = ONBOARDING_STEPS.length
+export const TOTAL_MEMBER_STEPS = MEMBER_ONBOARDING_STEPS.length
 
 export const PHASE_CONFIG: Record<OnboardingPhase, { label: string; duration: string; color: string }> = {
   'welcome': { label: 'Welcome & Orientation', duration: '~3 min', color: 'lime' },
@@ -75,6 +96,9 @@ export const PHASE_CONFIG: Record<OnboardingPhase, { label: string; duration: st
   'first-insights': { label: 'First Insights', duration: '~2 min', color: 'emerald' },
   'power-features': { label: 'Power Features', duration: '~2 min', color: 'lime' },
 }
+
+/** Phases used in the member onboarding flow */
+export const MEMBER_PHASES: OnboardingPhase[] = ['welcome', 'quick-wins']
 
 export type UserRole =
   | 'sustainability_manager'
@@ -152,29 +176,69 @@ export const INITIAL_ONBOARDING_STATE: OnboardingState = {
   productGuideCompleted: false,
 }
 
+export const INITIAL_MEMBER_ONBOARDING_STATE: OnboardingState = {
+  completed: false,
+  dismissed: false,
+  currentStep: 'member-welcome',
+  completedSteps: [],
+  personalization: {},
+  dashboardGuideCompleted: false,
+  searchGuideCompleted: false,
+  productGuideCompleted: false,
+}
+
+// ---------------------------------------------------------------------------
+// Helper functions
+// ---------------------------------------------------------------------------
+
+/** Get the steps array for the given flow */
+export function getStepsForFlow(flow: OnboardingFlow): OnboardingStepConfig[] {
+  return flow === 'member' ? MEMBER_ONBOARDING_STEPS : ONBOARDING_STEPS
+}
+
+/** Get the initial state for the given flow */
+export function getInitialStateForFlow(flow: OnboardingFlow): OnboardingState {
+  return flow === 'member' ? { ...INITIAL_MEMBER_ONBOARDING_STATE } : { ...INITIAL_ONBOARDING_STATE }
+}
+
+/** Get step config — searches both owner and member step arrays */
 export function getStepConfig(step: OnboardingStep): OnboardingStepConfig {
-  return ONBOARDING_STEPS.find(s => s.id === step)!
+  const ownerStep = ONBOARDING_STEPS.find(s => s.id === step)
+  if (ownerStep) return ownerStep
+  const memberStep = MEMBER_ONBOARDING_STEPS.find(s => s.id === step)
+  if (memberStep) return memberStep
+  // Fallback — should never happen
+  return ONBOARDING_STEPS[0]
 }
 
 export function getPhaseSteps(phase: OnboardingPhase): OnboardingStepConfig[] {
   return ONBOARDING_STEPS.filter(s => s.phase === phase)
 }
 
-export function getNextStep(currentStep: OnboardingStep): OnboardingStep | null {
-  const config = getStepConfig(currentStep)
-  const next = ONBOARDING_STEPS[config.index + 1]
+/** Get next step within the given flow */
+export function getNextStep(currentStep: OnboardingStep, flow: OnboardingFlow = 'owner'): OnboardingStep | null {
+  const steps = getStepsForFlow(flow)
+  const idx = steps.findIndex(s => s.id === currentStep)
+  if (idx === -1) return null
+  const next = steps[idx + 1]
   return next?.id ?? null
 }
 
-export function getPreviousStep(currentStep: OnboardingStep): OnboardingStep | null {
-  const config = getStepConfig(currentStep)
-  const prev = ONBOARDING_STEPS[config.index - 1]
+/** Get previous step within the given flow */
+export function getPreviousStep(currentStep: OnboardingStep, flow: OnboardingFlow = 'owner'): OnboardingStep | null {
+  const steps = getStepsForFlow(flow)
+  const idx = steps.findIndex(s => s.id === currentStep)
+  if (idx <= 0) return null
+  const prev = steps[idx - 1]
   return prev?.id ?? null
 }
 
-export function getProgressPercentage(currentStep: OnboardingStep): number {
-  const config = getStepConfig(currentStep)
-  return Math.round(((config.index + 1) / TOTAL_STEPS) * 100)
+/** Get progress percentage within the given flow */
+export function getProgressPercentage(currentStep: OnboardingStep, flow: OnboardingFlow = 'owner'): number {
+  const steps = getStepsForFlow(flow)
+  const idx = steps.findIndex(s => s.id === currentStep)
+  if (idx === -1) return 0
+  return Math.round(((idx + 1) / steps.length) * 100)
 }
 
 export function isPhaseComplete(phase: OnboardingPhase, completedSteps: OnboardingStep[]): boolean {
