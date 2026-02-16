@@ -62,7 +62,7 @@ export function useEPRSettings(): UseEPRSettingsResult {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             organizationId: currentOrganization.id,
-            ...data,
+            settings: data,
           }),
         });
 

@@ -172,12 +172,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ settings: data })
     }
 
+    // Merge incoming partial settings with existing values (or defaults)
+    const defaults = {
+      rpd_organization_id: null,
+      rpd_subsidiary_id: null,
+      annual_turnover_gbp: null,
+      estimated_annual_packaging_tonnage: null,
+      obligation_size: 'pending',
+      default_packaging_activity: 'brand',
+      default_uk_nation: 'england',
+      nation_sales_england_pct: 84.3,
+      nation_sales_scotland_pct: 8.2,
+      nation_sales_wales_pct: 4.7,
+      nation_sales_ni_pct: 2.8,
+      nation_sales_method: 'manual',
+      nation_sales_last_estimated_at: null,
+      drs_applies: true,
+    }
+
+    const merged = { ...defaults, ...(existing || {}), ...settings }
+
     // Validate nation percentages sum to 100 (within tolerance)
     const nationSum =
-      (settings.nation_sales_england_pct ?? 0) +
-      (settings.nation_sales_scotland_pct ?? 0) +
-      (settings.nation_sales_wales_pct ?? 0) +
-      (settings.nation_sales_ni_pct ?? 0)
+      (merged.nation_sales_england_pct ?? 0) +
+      (merged.nation_sales_scotland_pct ?? 0) +
+      (merged.nation_sales_wales_pct ?? 0) +
+      (merged.nation_sales_ni_pct ?? 0)
 
     if (Math.abs(nationSum - 100) > 0.5) {
       return NextResponse.json(
@@ -188,20 +208,20 @@ export async function POST(request: NextRequest) {
 
     const upsertPayload: Record<string, unknown> = {
       organization_id: organizationId,
-      rpd_organization_id: settings.rpd_organization_id ?? null,
-      rpd_subsidiary_id: settings.rpd_subsidiary_id ?? null,
-      annual_turnover_gbp: settings.annual_turnover_gbp ?? null,
-      estimated_annual_packaging_tonnage: settings.estimated_annual_packaging_tonnage ?? null,
-      obligation_size: settings.obligation_size ?? 'pending',
-      default_packaging_activity: settings.default_packaging_activity ?? 'brand',
-      default_uk_nation: settings.default_uk_nation ?? 'england',
-      nation_sales_england_pct: settings.nation_sales_england_pct ?? 84.3,
-      nation_sales_scotland_pct: settings.nation_sales_scotland_pct ?? 8.2,
-      nation_sales_wales_pct: settings.nation_sales_wales_pct ?? 4.7,
-      nation_sales_ni_pct: settings.nation_sales_ni_pct ?? 2.8,
-      nation_sales_method: settings.nation_sales_method ?? 'manual',
-      nation_sales_last_estimated_at: settings.nation_sales_last_estimated_at ?? null,
-      drs_applies: settings.drs_applies ?? true,
+      rpd_organization_id: merged.rpd_organization_id ?? null,
+      rpd_subsidiary_id: merged.rpd_subsidiary_id ?? null,
+      annual_turnover_gbp: merged.annual_turnover_gbp ?? null,
+      estimated_annual_packaging_tonnage: merged.estimated_annual_packaging_tonnage ?? null,
+      obligation_size: merged.obligation_size ?? 'pending',
+      default_packaging_activity: merged.default_packaging_activity ?? 'brand',
+      default_uk_nation: merged.default_uk_nation ?? 'england',
+      nation_sales_england_pct: merged.nation_sales_england_pct ?? 84.3,
+      nation_sales_scotland_pct: merged.nation_sales_scotland_pct ?? 8.2,
+      nation_sales_wales_pct: merged.nation_sales_wales_pct ?? 4.7,
+      nation_sales_ni_pct: merged.nation_sales_ni_pct ?? 2.8,
+      nation_sales_method: merged.nation_sales_method ?? 'manual',
+      nation_sales_last_estimated_at: merged.nation_sales_last_estimated_at ?? null,
+      drs_applies: merged.drs_applies ?? true,
     }
 
     // Include wizard_state in the upsert if provided alongside settings
