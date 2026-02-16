@@ -115,10 +115,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare record data
+    // Note: survey_title is a legacy NOT NULL column — keep it in sync with survey_name
     const recordData = {
       organization_id: organizationId,
       created_by: user.id,
       survey_name: body.survey_name,
+      survey_title: body.survey_name,
       survey_type: body.survey_type,
       description: body.description || null,
       status: body.status || 'draft',
