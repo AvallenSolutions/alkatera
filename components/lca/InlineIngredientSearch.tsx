@@ -391,29 +391,29 @@ export function InlineIngredientSearch({
                 Found {results.length} result{results.length !== 1 ? 's' : ''}
               </span>
               <div className="flex flex-wrap gap-1">
-                {sourceCounts?.primary && sourceCounts.primary > 0 && (
+                {(sourceCounts?.primary ?? 0) > 0 && (
                   <Badge variant="outline" className="text-xs bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
-                    {sourceCounts.primary} Primary
+                    {sourceCounts!.primary} Primary
                   </Badge>
                 )}
-                {sourceCounts?.ecoinvent_live && sourceCounts.ecoinvent_live > 0 && (
+                {(sourceCounts?.ecoinvent_live ?? 0) > 0 && (
                   <Badge variant="outline" className="text-xs bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300">
-                    {sourceCounts.ecoinvent_live} ecoInvent
+                    {sourceCounts!.ecoinvent_live} ecoInvent
                   </Badge>
                 )}
-                {sourceCounts?.agribalyse_live && sourceCounts.agribalyse_live > 0 && (
+                {(sourceCounts?.agribalyse_live ?? 0) > 0 && (
                   <Badge variant="outline" className="text-xs bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300">
-                    {sourceCounts.agribalyse_live} Agribalyse
+                    {sourceCounts!.agribalyse_live} Agribalyse
                   </Badge>
                 )}
-                {sourceCounts?.global_library && sourceCounts.global_library > 0 && (
+                {(sourceCounts?.global_library ?? 0) > 0 && (
                   <Badge variant="outline" className="text-xs bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
-                    {sourceCounts.global_library} Library
+                    {sourceCounts!.global_library} Library
                   </Badge>
                 )}
-                {sourceCounts?.staging && sourceCounts.staging > 0 && (
+                {(sourceCounts?.staging ?? 0) > 0 && (
                   <Badge variant="outline" className="text-xs">
-                    {sourceCounts.staging} Internal
+                    {sourceCounts!.staging} Internal
                   </Badge>
                 )}
               </div>
