@@ -555,47 +555,20 @@ function RequestFactorForm() {
       return;
     }
 
+    if (!currentOrganization?.id) {
+      toast.error('No organization selected');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const token = session?.session?.access_token;
-      if (!token) {
-        toast.error('Please sign in to submit a request');
-        return;
-      }
-
-      // 1. Log the emission factor request (existing behaviour)
-      const response = await fetch('/api/data/factor-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          material_name: materialName.trim(),
-          material_type: materialType,
-          notes: notes.trim() || undefined,
-        }),
+      await createTicket(currentOrganization.id, {
+        title: `Missing data: ${materialName.trim()}`,
+        description: `A user requested a missing ${materialType} emission factor.\n\nMaterial: ${materialName.trim()}${notes.trim() ? `\nNotes: ${notes.trim()}` : ''}`,
+        category: 'feature',
+        priority: 'medium',
+        page_url: '/data/sources',
       });
-
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
-
-      // 2. Also create a feedback ticket so admins see it in User Feedback
-      if (currentOrganization?.id) {
-        try {
-          await createTicket(currentOrganization.id, {
-            title: `Missing data: ${materialName.trim()}`,
-            description: `A user requested a missing ${materialType} emission factor.\n\nMaterial: ${materialName.trim()}${notes.trim() ? `\nNotes: ${notes.trim()}` : ''}`,
-            category: 'feature',
-            priority: 'low',
-            page_url: '/data/sources',
-          });
-        } catch (feedbackErr) {
-          // Don't fail the whole submission if feedback ticket creation fails
-          console.error('Failed to create feedback ticket:', feedbackErr);
-        }
-      }
 
       setSubmitted(true);
       setMaterialName('');
@@ -605,7 +578,8 @@ function RequestFactorForm() {
       // Reset submitted state after 5 seconds
       setTimeout(() => setSubmitted(false), 5000);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to submit request');
+      console.error('Failed to submit missing data request:', error);
+      toast.error(error.message || 'Failed to submit request. Please try again.');
     } finally {
       setSubmitting(false);
     }
