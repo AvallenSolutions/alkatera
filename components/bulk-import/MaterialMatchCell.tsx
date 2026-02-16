@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/popover';
 import { AlertTriangle, Check, ChevronDown, Loader2, Search, Sparkles, X, Link2Off } from 'lucide-react';
 import type { MaterialMatchState, ProxySuggestion, SearchResultForMatch } from '@/lib/bulk-import/types';
+import { cleanSearchQuery } from '@/lib/bulk-import/batch-matcher';
 
 interface MaterialMatchCellProps {
   matchState: MaterialMatchState | undefined;
@@ -126,19 +127,28 @@ export function MaterialMatchCell({
     }
   };
 
-  // No match found
+  // No match found — show prominent search trigger
   if (status === 'no_match' || selectedIndex == null || searchResults.length === 0) {
     return (
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1.5 text-xs gap-1">
-            <Link2Off className="h-3 w-3 text-red-500" />
-            <span className="text-red-500">Unlinked</span>
-            <Search className="h-3 w-3" />
-          </Button>
+          <button
+            className={cn(
+              'flex items-center gap-1.5 h-7 px-2 rounded-md text-xs',
+              'border border-dashed border-red-500/40 hover:border-red-500/70 hover:bg-red-500/5',
+              'text-red-500 transition-colors cursor-pointer max-w-[200px]'
+            )}
+          >
+            <Link2Off className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">Unlinked</span>
+            <Search className="h-3 w-3 flex-shrink-0 opacity-60" />
+          </button>
         </PopoverTrigger>
         <PopoverContent className="w-96 p-0" align="start">
-          <div className="p-2">
+          <div className="p-2 border-b bg-muted/30">
+            <p className="text-[11px] font-medium mb-1.5">
+              Find emission factor for &quot;{matchState.materialName}&quot;
+            </p>
             <SearchPopoverContent
               inputRef={inputRef}
               searchQuery={searchQuery}
@@ -159,7 +169,7 @@ export function MaterialMatchCell({
                 onSelectResult(idx);
                 setOpen(false);
               }}
-              initialName={matchState.materialName}
+              initialName={cleanSearchQuery(matchState.materialName)}
             />
           </div>
 

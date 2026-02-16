@@ -7,15 +7,29 @@ import type {
 // ── Query cleaning ───────────────────────────────────────────────────────
 
 /**
+ * Common modifiers/adjectives that don't help identify an ingredient
+ * in LCA databases. Stripped during search to improve match quality.
+ */
+const INGREDIENT_MODIFIERS = new Set([
+  'granulated', 'refined', 'raw', 'organic', 'conventional',
+  'natural', 'pure', 'food', 'grade', 'technical',
+  'powdered', 'ground', 'crushed', 'whole', 'dried',
+  'liquid', 'crystalline', 'anhydrous', 'hydrated',
+  'deionised', 'deionized', 'distilled', 'filtered',
+  'premium', 'standard', 'commercial',
+]);
+
+/**
  * Clean a raw ingredient name for search by stripping supplier codes,
- * percentages, volume info, and parenthetical trade names.
+ * percentages, volume info, parenthetical trade names, and common
+ * non-meaningful modifiers.
  *
  * Examples:
- *  "Orange Blossom Extract FA-13523" → "Orange Blossom Extract"
- *  "Vanilla Inf 48% Vol"            → "Vanilla"
- *  "Ethanol 96%"                    → "Ethanol"
- *  "Granulated Beet Sugar (Kent Foods)" → "Granulated Beet Sugar"
- *  "Barley Malt"                    → "Barley Malt" (no change)
+ *  "Orange Blossom Extract FA-13523"    → "Orange Blossom Extract"
+ *  "Vanilla Inf 48% Vol"               → "Vanilla"
+ *  "Ethanol 96%"                       → "Ethanol"
+ *  "Granulated Beet Sugar (Kent Foods)" → "Beet Sugar"
+ *  "Barley Malt"                       → "Barley Malt" (no change)
  */
 export function cleanSearchQuery(raw: string): string {
   let q = raw.trim();
@@ -31,6 +45,13 @@ export function cleanSearchQuery(raw: string): string {
 
   // Strip standalone "Inf" / "Infusion" (often precedes percentages)
   q = q.replace(/\b(?:inf|infusion)\b/gi, '');
+
+  // Strip common non-meaningful modifiers (only if other words remain)
+  const words = q.split(/\s+/).filter(w => w.length > 0);
+  const coreWords = words.filter(w => !INGREDIENT_MODIFIERS.has(w.toLowerCase()));
+  if (coreWords.length >= 1) {
+    q = coreWords.join(' ');
+  }
 
   // Collapse multiple spaces and trim
   q = q.replace(/\s{2,}/g, ' ').trim();
@@ -83,8 +104,10 @@ export const MIN_AUTO_MATCH_CONFIDENCE = 0.4;
  * Returns 0.0–1.0 where:
  *  - 1.0 = exact match
  *  - 0.8 = substring containment
+ *  - 0.7 = all result core words found in query (e.g. "sugar beet" in "granulated beet sugar")
  *  - 0.6 = first word match
- *  - 0.5 = significant word overlap
+ *  - 0.5 = significant word overlap (≥50% of query words found in result)
+ *  - 0.45 = moderate word overlap (≥33% of query words, or result words found in query)
  *  - 0.15 = fallback (very weak / no meaningful match)
  *
  * Uses trigram analysis to catch false positives like "malic" ≠ "maize".
@@ -99,22 +122,45 @@ export function computeConfidence(query: string, resultName: string): number {
   // One contains the other
   if (r.includes(q) || q.includes(r)) return 0.8;
 
+  const qWords = q.split(' ').filter(w => w.length > 2);
+  const rWords = r.split(' ').filter(w => w.length > 2);
+  const qWordSet = new Set(qWords);
+  const rWordSet = new Set(rWords);
+
+  // Check if ALL significant result words appear in the query
+  // E.g. result "sugar beet" → words ["sugar", "beet"] both in query "granulated beet sugar"
+  // This is a strong signal even if the query has extra words
+  if (rWords.length > 0) {
+    const resultWordsInQuery = rWords.filter(w => qWordSet.has(w)).length;
+    if (resultWordsInQuery === rWords.length) return 0.7;
+  }
+
   // First word matches (must be 3+ chars)
-  const qFirst = q.split(' ')[0];
-  const rFirst = r.split(' ')[0];
+  const qFirst = qWords[0] || '';
+  const rFirst = rWords[0] || '';
   if (qFirst.length >= 3 && qFirst === rFirst) return 0.6;
 
-  // Partial overlap — check if most words in query appear in result
-  const qWords = q.split(' ').filter(w => w.length > 2);
-  const rWords = new Set(r.split(' '));
-  const overlap = qWords.filter(w => rWords.has(w)).length;
-  if (qWords.length > 0 && overlap / qWords.length >= 0.5) return 0.5;
+  // Forward overlap — query words found in result (≥50%)
+  const forwardOverlap = qWords.length > 0
+    ? qWords.filter(w => rWordSet.has(w)).length / qWords.length
+    : 0;
+  if (forwardOverlap >= 0.5) return 0.5;
+
+  // Reverse overlap — result words found in query (≥50%)
+  // Catches "beet sugar" (query has 3 words, result has 2, both in query)
+  const reverseOverlap = rWords.length > 0
+    ? rWords.filter(w => qWordSet.has(w)).length / rWords.length
+    : 0;
+  if (reverseOverlap >= 0.5) return 0.45;
+
+  // Any meaningful word overlap at all
+  if (forwardOverlap > 0 || reverseOverlap > 0) return 0.35;
 
   // Trigram analysis — catch near-misses vs false positives
   // E.g. "malic" vs "maize" have low trigram overlap despite similar first letters
   const tOverlap = trigramOverlap(q, r);
-  if (tOverlap >= 0.5) return 0.35;
-  if (tOverlap >= 0.3) return 0.25;
+  if (tOverlap >= 0.5) return 0.3;
+  if (tOverlap >= 0.3) return 0.2;
 
   // Very weak or no meaningful match
   return 0.15;
