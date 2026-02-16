@@ -10,7 +10,8 @@ export const LandingTrustedBy = () => {
     { name: "Three Spirit", url: "https://threespiritdrinks.com", logo: "/logos/three-spirit.svg" },
     { name: "Takamaka Rum", url: "https://www.takamakarum.com", logo: "/logos/takamaka.svg" },
     { name: "Black Lines", url: "https://blacklinesdrinks.com", logo: "/logos/black-lines.svg" },
-    { name: "FABRIC", url: "https://drinkfabric.com", logo: "/logos/fabric.svg" }
+    { name: "FABRIC", url: "https://drinkfabric.com", logo: "/logos/fabric.svg" },
+    { name: "Veto", url: "https://vetodrinks.com", logo: "/logos/veto.svg" }
   ];
 
   return (
