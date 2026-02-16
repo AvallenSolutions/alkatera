@@ -553,7 +553,7 @@ export function Sidebar({ className }: SidebarProps) {
           <img
             src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
             alt="AlkaTera"
-            className="h-10 w-auto object-contain"
+            className="h-10 w-auto object-contain dark:invert-0 invert"
           />
         </div>
         <p className="text-xs text-muted-foreground">Sustainability, Distilled</p>

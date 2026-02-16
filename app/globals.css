@@ -28,34 +28,34 @@
     --card-foreground: 0 0% 4%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 4%;
-    --primary: 84 100% 60%;
-    --primary-foreground: 0 0% 4%;
+    --primary: 84 80% 32%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 150 60% 96%;
     --secondary-foreground: 150 60% 20%;
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
-    --accent: 84 100% 60%;
-    --accent-foreground: 0 0% 4%;
+    --accent: 84 80% 32%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 90%;
     --input: 0 0% 90%;
-    --ring: 84 100% 60%;
+    --ring: 84 80% 32%;
     --sidebar: 150 60% 96%;
     --sidebar-foreground: 0 0% 20%;
 
-    /* AlkaTera Neon Colours */
-    --neon-lime: 84 100% 60%;
-    --neon-cyan: 190 100% 50%;
-    --neon-purple: 280 100% 50%;
-    --neon-emerald: 160 84% 39%;
+    /* AlkaTera Brand Colours (darkened for light backgrounds) */
+    --neon-lime: 84 80% 32%;
+    --neon-cyan: 190 100% 32%;
+    --neon-purple: 280 80% 40%;
+    --neon-emerald: 160 84% 28%;
 
-    /* Chart Colours */
-    --chart-1: 84 100% 60%;
-    --chart-2: 190 100% 50%;
-    --chart-3: 280 100% 50%;
-    --chart-4: 160 84% 39%;
-    --chart-5: 84 100% 70%;
+    /* Chart Colours (darkened for light backgrounds) */
+    --chart-1: 84 80% 32%;
+    --chart-2: 190 100% 32%;
+    --chart-3: 280 80% 40%;
+    --chart-4: 160 84% 28%;
+    --chart-5: 84 80% 45%;
 
     --radius: 0.75rem;
   }
@@ -84,7 +84,7 @@
     --sidebar: 0 0% 2%;
     --sidebar-foreground: 0 0% 90%;
 
-    /* AlkaTera Neon Colours (same in both modes) */
+    /* AlkaTera Neon Colours (bright for dark backgrounds) */
     --neon-lime: 84 100% 60%;
     --neon-cyan: 190 100% 50%;
     --neon-purple: 280 100% 50%;
