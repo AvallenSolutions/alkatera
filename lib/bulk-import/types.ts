@@ -85,6 +85,15 @@ export interface SearchResultForMatch {
   source: string;
 }
 
+export interface ProxySuggestion {
+  proxy_name: string;
+  search_query: string;
+  category: string;
+  reasoning: string;
+  confidence_note: 'high' | 'medium' | 'low';
+  uncertainty_impact?: string;
+}
+
 export interface MaterialMatchState {
   materialName: string;
   materialType: 'ingredient' | 'packaging';
@@ -93,6 +102,10 @@ export interface MaterialMatchState {
   selectedIndex: number | null;
   autoMatchConfidence: number | null;
   userReviewed: boolean;
+  /** AI-suggested proxy options (populated on demand) */
+  proxySuggestions?: ProxySuggestion[];
+  /** Whether the selected match came from a proxy suggestion */
+  isProxyMatch?: boolean;
 }
 
 export interface MaterialMatchSelection {

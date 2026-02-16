@@ -34,6 +34,7 @@ import type { IngredientFormData } from "./IngredientFormCard";
 import type { PackagingFormData } from "./PackagingFormCard";
 import type {
   MaterialMatchState,
+  ProxySuggestion,
   SearchResultForMatch,
 } from "@/lib/bulk-import/types";
 
@@ -102,6 +103,35 @@ export function BOMImportFlow({
       }));
     },
     [organizationId, getAuthToken]
+  );
+
+  // ── Proxy suggestion for MaterialMatchCell ──────────────────────────
+
+  const handleSuggestProxy = useCallback(
+    async (ingredientName: string): Promise<ProxySuggestion[]> => {
+      const token = await getAuthToken();
+      if (!token) return [];
+
+      try {
+        const response = await fetch('/api/ingredients/proxy-suggest', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            ingredient_name: ingredientName,
+            ingredient_type: 'ingredient',
+          }),
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        return data.suggestions || [];
+      } catch {
+        return [];
+      }
+    },
+    [getAuthToken]
   );
 
   // ── Step handlers ──────────────────────────────────────────────────
@@ -536,6 +566,7 @@ export function BOMImportFlow({
                               onSelectResult={(idx) =>
                                 handleSelectMatchResult(item.cleanName, idx)
                               }
+                              onSuggestProxy={handleSuggestProxy}
                               onManualSearch={async (q) => {
                                 const results = await handleManualSearch(q);
                                 if (results.length > 0) {
@@ -600,6 +631,7 @@ export function BOMImportFlow({
                               onSelectResult={(idx) =>
                                 handleSelectMatchResult(item.cleanName, idx)
                               }
+                              onSuggestProxy={handleSuggestProxy}
                               onManualSearch={async (q) => {
                                 const results = await handleManualSearch(q);
                                 if (results.length > 0) {

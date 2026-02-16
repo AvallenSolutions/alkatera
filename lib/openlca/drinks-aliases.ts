@@ -101,6 +101,100 @@ export const INGREDIENT_ALIASES: DrinksAlias[] = [
     category: 'ingredient',
   },
 
+  // Spirits & aperitif botanicals
+  {
+    searchTerms: ['gentian', 'gentiane'],
+    processPatterns: ['gentian', 'gentiane'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['liquorice', 'licorice'],
+    processPatterns: ['liquorice', 'licorice'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['orris root', 'iris root'],
+    processPatterns: ['iris', 'orris'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['angelica', 'angelica root'],
+    processPatterns: ['angelica'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['elderflower', 'elder flower', 'sureau'],
+    processPatterns: ['elderflower', 'elder'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['wormwood', 'absinthe herb'],
+    processPatterns: ['wormwood', 'artemisia'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['caraway', 'carvi'],
+    processPatterns: ['caraway', 'carvi'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['cardamom', 'cardamome'],
+    processPatterns: ['cardamom', 'cardamome'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['star anise', 'badiane'],
+    processPatterns: ['anise', 'badiane'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['orange blossom', 'orange flower water', 'neroli'],
+    processPatterns: ['orange blossom', 'orange flower', 'neroli'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['fennel', 'fenouil'],
+    processPatterns: ['fennel', 'fenouil'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['saffron', 'safran'],
+    processPatterns: ['saffron', 'safran'],
+    category: 'ingredient',
+  },
+
+  // Additives & stabilisers
+  {
+    searchTerms: ['carrageenan', 'carrageen'],
+    processPatterns: ['carrageenan', 'seaweed'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['acacia gum', 'gum arabic', 'arabic gum'],
+    processPatterns: ['acacia', 'arabic gum'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['malic acid'],
+    processPatterns: ['malic acid'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['tartaric acid'],
+    processPatterns: ['tartaric acid'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['potassium sorbate'],
+    processPatterns: ['potassium sorbate', 'sorbate'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['sodium benzoate'],
+    processPatterns: ['sodium benzoate', 'benzoate'],
+    category: 'ingredient',
+  },
+
   // Sugars & sweeteners
   {
     searchTerms: ['sugar', 'cane sugar', 'sugar cane'],
@@ -494,18 +588,50 @@ export const ALL_DRINKS_ALIASES: DrinksAlias[] = [
 ];
 
 /**
+ * Check whether `needle` appears in `haystack` at a word boundary.
+ *
+ * Word boundaries are: start/end of string, space, or hyphen.
+ * This prevents "liquorice".includes("rice") from triggering the rice alias.
+ */
+export function matchesAtWordBoundary(haystack: string, needle: string): boolean {
+  if (needle.length === 0) return false;
+  const idx = haystack.indexOf(needle);
+  if (idx === -1) return false;
+
+  // Check character BEFORE the match is a word boundary
+  const charBefore = idx > 0 ? haystack[idx - 1] : ' ';
+  const isBoundaryBefore = charBefore === ' ' || charBefore === '-';
+
+  // Check character AFTER the match is a word boundary
+  const afterIdx = idx + needle.length;
+  const charAfter = afterIdx < haystack.length ? haystack[afterIdx] : ' ';
+  const isBoundaryAfter = charAfter === ' ' || charAfter === '-';
+
+  return isBoundaryBefore && isBoundaryAfter;
+}
+
+/**
  * Find matching aliases for a given search query.
  * Returns all aliases where the query matches any searchTerm.
+ *
+ * Uses word-boundary matching to prevent false positives
+ * (e.g. "liquorice" should NOT match the "rice" alias).
  */
 export function findMatchingAliases(query: string): DrinksAlias[] {
   const queryLower = query.toLowerCase().trim();
 
   return ALL_DRINKS_ALIASES.filter(alias =>
     alias.searchTerms.some(term => {
-      // Exact match or query contains the term or term contains the query
-      return queryLower === term ||
-        queryLower.includes(term) ||
-        term.includes(queryLower);
+      // Exact match
+      if (queryLower === term) return true;
+
+      // Query contains the term at a word boundary
+      if (matchesAtWordBoundary(queryLower, term)) return true;
+
+      // Term contains the query at a word boundary
+      if (matchesAtWordBoundary(term, queryLower)) return true;
+
+      return false;
     })
   );
 }

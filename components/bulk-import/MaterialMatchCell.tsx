@@ -9,13 +9,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Check, ChevronDown, Loader2, Search, X, Link2Off } from 'lucide-react';
-import type { MaterialMatchState, SearchResultForMatch } from '@/lib/bulk-import/types';
+import { AlertTriangle, Check, ChevronDown, Loader2, Search, Sparkles, X, Link2Off } from 'lucide-react';
+import type { MaterialMatchState, ProxySuggestion, SearchResultForMatch } from '@/lib/bulk-import/types';
 
 interface MaterialMatchCellProps {
   matchState: MaterialMatchState | undefined;
   onSelectResult: (index: number) => void;
   onManualSearch?: (query: string) => Promise<SearchResultForMatch[]>;
+  /** AI-powered proxy suggestion callback */
+  onSuggestProxy?: (ingredientName: string) => Promise<ProxySuggestion[]>;
 }
 
 function sourceLabel(sourceType: string): string {
@@ -37,15 +39,25 @@ function sourceBadgeVariant(sourceType: string): 'default' | 'secondary' | 'outl
   return 'outline';
 }
 
+function confidenceBadgeColor(note: 'high' | 'medium' | 'low'): string {
+  if (note === 'high') return 'border-green-600/30 text-green-600';
+  if (note === 'medium') return 'border-amber-500/30 text-amber-500';
+  return 'border-red-500/30 text-red-500';
+}
+
 export function MaterialMatchCell({
   matchState,
   onSelectResult,
   onManualSearch,
+  onSuggestProxy,
 }: MaterialMatchCellProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [manualResults, setManualResults] = useState<SearchResultForMatch[]>([]);
+  const [proxySuggestions, setProxySuggestions] = useState<ProxySuggestion[]>([]);
+  const [loadingProxy, setLoadingProxy] = useState(false);
+  const [proxySearching, setProxySearching] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus input when popover opens
@@ -86,6 +98,34 @@ export function MaterialMatchCell({
     );
   }
 
+  // Handler: request proxy suggestions from AI
+  const handleSuggestProxy = async () => {
+    if (!onSuggestProxy || loadingProxy) return;
+    setLoadingProxy(true);
+    try {
+      const suggestions = await onSuggestProxy(matchState.materialName);
+      setProxySuggestions(suggestions);
+    } finally {
+      setLoadingProxy(false);
+    }
+  };
+
+  // Handler: use a proxy suggestion (search for it then select first result)
+  const handleUseProxy = async (suggestion: ProxySuggestion) => {
+    if (!onManualSearch) return;
+    setProxySearching(suggestion.search_query);
+    try {
+      const results = await onManualSearch(suggestion.search_query);
+      setManualResults(results);
+      if (results.length > 0) {
+        onSelectResult(0);
+        setOpen(false);
+      }
+    } finally {
+      setProxySearching(null);
+    }
+  };
+
   // No match found
   if (status === 'no_match' || selectedIndex == null || searchResults.length === 0) {
     return (
@@ -97,31 +137,109 @@ export function MaterialMatchCell({
             <Search className="h-3 w-3" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 p-2" align="start">
-          <SearchPopoverContent
-            inputRef={inputRef}
-            searchQuery={searchQuery}
-            setSearchQuery={setSearchQuery}
-            searching={searching}
-            results={manualResults}
-            onSearch={async (q) => {
-              if (!onManualSearch || q.length < 2) return;
-              setSearching(true);
-              try {
-                const results = await onManualSearch(q);
-                setManualResults(results);
-              } finally {
-                setSearching(false);
-              }
-            }}
-            onSelect={(idx) => {
-              // Need to update the parent's state with the manual results
-              // For now, select from manual results
-              onSelectResult(idx);
-              setOpen(false);
-            }}
-            initialName={matchState.materialName}
-          />
+        <PopoverContent className="w-96 p-0" align="start">
+          <div className="p-2">
+            <SearchPopoverContent
+              inputRef={inputRef}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              searching={searching}
+              results={manualResults}
+              onSearch={async (q) => {
+                if (!onManualSearch || q.length < 2) return;
+                setSearching(true);
+                try {
+                  const results = await onManualSearch(q);
+                  setManualResults(results);
+                } finally {
+                  setSearching(false);
+                }
+              }}
+              onSelect={(idx) => {
+                onSelectResult(idx);
+                setOpen(false);
+              }}
+              initialName={matchState.materialName}
+            />
+          </div>
+
+          {/* AI Proxy Suggestion Section */}
+          {onSuggestProxy && (
+            <div className="border-t">
+              <div className="px-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-xs gap-1.5 h-7"
+                  onClick={handleSuggestProxy}
+                  disabled={loadingProxy}
+                >
+                  {loadingProxy ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Finding proxy suggestions...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3" />
+                      AI Proxy Suggestion
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {proxySuggestions.length > 0 && (
+                <div className="px-2 pb-2 space-y-1">
+                  <p className="text-[10px] text-muted-foreground font-medium px-1">
+                    Suggested proxies:
+                  </p>
+                  {proxySuggestions.map((suggestion, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-md border px-2.5 py-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium truncate">{suggestion.proxy_name}</span>
+                        <Badge
+                          variant="outline"
+                          className={cn('text-[9px] px-1 py-0 flex-shrink-0', confidenceBadgeColor(suggestion.confidence_note))}
+                        >
+                          {suggestion.confidence_note}
+                        </Badge>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                        {suggestion.reasoning}
+                      </p>
+                      {suggestion.uncertainty_impact && (
+                        <p className="text-[9px] text-muted-foreground/70 mt-0.5">
+                          Uncertainty: {suggestion.uncertainty_impact}
+                        </p>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="mt-1.5 h-5 text-[10px] px-2"
+                        onClick={() => handleUseProxy(suggestion)}
+                        disabled={proxySearching === suggestion.search_query}
+                      >
+                        {proxySearching === suggestion.search_query ? (
+                          <>
+                            <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
+                            Searching...
+                          </>
+                        ) : (
+                          <>
+                            <Search className="h-2.5 w-2.5 mr-1" />
+                            Use this proxy
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     );
@@ -130,12 +248,16 @@ export function MaterialMatchCell({
   // Matched
   const selected = searchResults[selectedIndex];
   const isHighConfidence = (autoMatchConfidence ?? 0) >= 0.7;
+  const isLowConfidence = (autoMatchConfidence ?? 0) < 0.5;
+
+  const ConfidenceIcon = isLowConfidence ? AlertTriangle : Check;
+  const confidenceColor = isHighConfidence ? 'text-green-600' : isLowConfidence ? 'text-amber-600' : 'text-amber-500';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1.5 text-xs gap-1 max-w-[200px]">
-          <Check className={`h-3 w-3 flex-shrink-0 ${isHighConfidence ? 'text-green-600' : 'text-amber-500'}`} />
+          <ConfidenceIcon className={`h-3 w-3 flex-shrink-0 ${confidenceColor}`} />
           <span className="truncate">{selected.name}</span>
           <Badge
             variant={sourceBadgeVariant(selected.source_type)}
@@ -188,11 +310,60 @@ export function MaterialMatchCell({
             </button>
           ))}
         </div>
-        <div className="p-2 border-t">
+        <div className="p-2 border-t space-y-1">
+          {/* AI Proxy suggestion for low-confidence matches */}
+          {isLowConfidence && onSuggestProxy && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs gap-1.5 h-7"
+              onClick={handleSuggestProxy}
+              disabled={loadingProxy}
+            >
+              {loadingProxy ? (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Finding alternatives...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3 w-3" />
+                  Suggest better proxy
+                </>
+              )}
+            </Button>
+          )}
+          {proxySuggestions.length > 0 && (
+            <div className="space-y-1 pt-1">
+              {proxySuggestions.slice(0, 3).map((suggestion, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs h-auto py-1 justify-start gap-1.5"
+                  onClick={() => handleUseProxy(suggestion)}
+                  disabled={proxySearching === suggestion.search_query}
+                >
+                  {proxySearching === suggestion.search_query ? (
+                    <Loader2 className="h-3 w-3 animate-spin flex-shrink-0" />
+                  ) : (
+                    <Search className="h-3 w-3 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{suggestion.proxy_name}</span>
+                  <Badge
+                    variant="outline"
+                    className={cn('text-[9px] px-1 py-0 ml-auto flex-shrink-0', confidenceBadgeColor(suggestion.confidence_note))}
+                  >
+                    {suggestion.confidence_note}
+                  </Badge>
+                </Button>
+              ))}
+            </div>
+          )}
           <Button
             variant="ghost"
             size="sm"
-            className="w-full text-xs"
+            className="w-full text-xs h-7"
             onClick={() => {
               onSelectResult(-1); // -1 = deselect (unlink)
               setOpen(false);
@@ -249,7 +420,7 @@ function SearchPopoverContent({
 
   return (
     <div>
-      <div className="p-2">
+      <div className="pb-2">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <input

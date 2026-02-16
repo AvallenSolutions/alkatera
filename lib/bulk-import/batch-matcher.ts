@@ -4,6 +4,43 @@ import type {
   SearchResultForMatch,
 } from './types';
 
+// ── Query cleaning ───────────────────────────────────────────────────────
+
+/**
+ * Clean a raw ingredient name for search by stripping supplier codes,
+ * percentages, volume info, and parenthetical trade names.
+ *
+ * Examples:
+ *  "Orange Blossom Extract FA-13523" → "Orange Blossom Extract"
+ *  "Vanilla Inf 48% Vol"            → "Vanilla"
+ *  "Ethanol 96%"                    → "Ethanol"
+ *  "Granulated Beet Sugar (Kent Foods)" → "Granulated Beet Sugar"
+ *  "Barley Malt"                    → "Barley Malt" (no change)
+ */
+export function cleanSearchQuery(raw: string): string {
+  let q = raw.trim();
+
+  // Strip trailing parenthetical notes: "(Kent Foods)", "(Lambda)"
+  q = q.replace(/\s*\([^)]*\)\s*$/, '');
+
+  // Strip supplier/product codes: FA-13523, SKU-001, REF 12345
+  q = q.replace(/\b[A-Z]{1,4}[-\s]?\d{3,}\b/gi, '');
+
+  // Strip percentage/volume info: 48% Vol, 96%, 5.5% abv, 40% v/v
+  q = q.replace(/\d+(\.\d+)?\s*%\s*(v\/v|vol|abv|alc\.?)?/gi, '');
+
+  // Strip standalone "Inf" / "Infusion" (often precedes percentages)
+  q = q.replace(/\b(?:inf|infusion)\b/gi, '');
+
+  // Collapse multiple spaces and trim
+  q = q.replace(/\s{2,}/g, ' ').trim();
+
+  // If cleaning removed everything, fall back to the original
+  if (q.length < 2) return raw.trim();
+
+  return q;
+}
+
 // ── String similarity ────────────────────────────────────────────────────
 
 function normalise(s: string): string {
@@ -11,7 +48,46 @@ function normalise(s: string): string {
 }
 
 /**
- * Simple confidence score based on string similarity between query and result.
+ * Generate character trigrams from a string.
+ * E.g. "malic acid" → ["mal", "ali", "lic", "ic ", "c a", " ac", "aci", "cid"]
+ */
+function trigrams(s: string): Set<string> {
+  const grams = new Set<string>();
+  for (let i = 0; i <= s.length - 3; i++) {
+    grams.add(s.substring(i, i + 3));
+  }
+  return grams;
+}
+
+/**
+ * Compute trigram overlap ratio between two strings.
+ * Returns 0-1 (1 = perfect overlap).
+ */
+function trigramOverlap(a: string, b: string): number {
+  const aGrams = trigrams(a);
+  const bGrams = trigrams(b);
+  if (aGrams.size === 0 || bGrams.size === 0) return 0;
+
+  let shared = 0;
+  aGrams.forEach(g => { if (bGrams.has(g)) shared++; });
+
+  return shared / Math.min(aGrams.size, bGrams.size);
+}
+
+/** Minimum auto-match confidence — below this, mark as no_match */
+export const MIN_AUTO_MATCH_CONFIDENCE = 0.4;
+
+/**
+ * Confidence score based on string similarity between query and result.
+ *
+ * Returns 0.0–1.0 where:
+ *  - 1.0 = exact match
+ *  - 0.8 = substring containment
+ *  - 0.6 = first word match
+ *  - 0.5 = significant word overlap
+ *  - 0.15 = fallback (very weak / no meaningful match)
+ *
+ * Uses trigram analysis to catch false positives like "malic" ≠ "maize".
  */
 export function computeConfidence(query: string, resultName: string): number {
   const q = normalise(query);
@@ -23,7 +99,7 @@ export function computeConfidence(query: string, resultName: string): number {
   // One contains the other
   if (r.includes(q) || q.includes(r)) return 0.8;
 
-  // First word matches
+  // First word matches (must be 3+ chars)
   const qFirst = q.split(' ')[0];
   const rFirst = r.split(' ')[0];
   if (qFirst.length >= 3 && qFirst === rFirst) return 0.6;
@@ -34,7 +110,14 @@ export function computeConfidence(query: string, resultName: string): number {
   const overlap = qWords.filter(w => rWords.has(w)).length;
   if (qWords.length > 0 && overlap / qWords.length >= 0.5) return 0.5;
 
-  return 0.3;
+  // Trigram analysis — catch near-misses vs false positives
+  // E.g. "malic" vs "maize" have low trigram overlap despite similar first letters
+  const tOverlap = trigramOverlap(q, r);
+  if (tOverlap >= 0.5) return 0.35;
+  if (tOverlap >= 0.3) return 0.25;
+
+  // Very weak or no meaningful match
+  return 0.15;
 }
 
 // ── Source type mapping ──────────────────────────────────────────────────
@@ -133,13 +216,27 @@ export async function batchMatchMaterials(
 
         if (results.length > 0) {
           const confidence = computeConfidence(item.name, results[0].name);
-          states[key] = {
-            ...states[key],
-            status: 'matched',
-            searchResults: results.slice(0, 10),
-            selectedIndex: 0,
-            autoMatchConfidence: confidence,
-          };
+
+          if (confidence >= MIN_AUTO_MATCH_CONFIDENCE) {
+            // Good enough to auto-select
+            states[key] = {
+              ...states[key],
+              status: 'matched',
+              searchResults: results.slice(0, 10),
+              selectedIndex: 0,
+              autoMatchConfidence: confidence,
+            };
+          } else {
+            // Results exist but confidence too low — show as unlinked
+            // with search results available for manual review
+            states[key] = {
+              ...states[key],
+              status: 'no_match',
+              searchResults: results.slice(0, 10),
+              selectedIndex: null,
+              autoMatchConfidence: confidence,
+            };
+          }
         } else {
           states[key] = {
             ...states[key],
@@ -175,7 +272,9 @@ async function searchMaterial(
   organizationId: string,
   authToken: string
 ): Promise<SearchResultForMatch[]> {
-  const url = `/api/ingredients/search?q=${encodeURIComponent(name)}&organization_id=${organizationId}`;
+  // Clean the name before searching — strip supplier codes, percentages, etc.
+  const cleanedName = cleanSearchQuery(name);
+  const url = `/api/ingredients/search?q=${encodeURIComponent(cleanedName)}&organization_id=${organizationId}`;
 
   const response = await fetch(url, {
     headers: {

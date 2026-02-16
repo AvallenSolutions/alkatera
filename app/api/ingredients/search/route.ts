@@ -273,13 +273,33 @@ export async function GET(request: NextRequest) {
 
       // SOURCE 2: Staging Emission Factors (includes Global Drinks Factor Library)
       (async () => {
-        const { data: stagingFactors, error } = await supabase
+        let stagingFactors: any[] | null = null;
+        let error: any = null;
+
+        // Primary search: full phrase ILIKE match
+        ({ data: stagingFactors, error } = await supabase
           .from('staging_emission_factors')
           .select('*')
           .ilike('name', `%${normalizedQuery}%`)
           .in('category', ['Ingredient', 'Packaging'])
           .order('name')
-          .limit(15);
+          .limit(15));
+
+        // Fallback: if no results and query has multiple words, try word-by-word OR search
+        // This catches cases like "malic acid" when DB has "Malic Acid (DL-malic acid)"
+        if ((!stagingFactors || stagingFactors.length === 0) && !error) {
+          const words = normalizedQuery.split(/\s+/).filter((w: string) => w.length >= 3);
+          if (words.length > 1) {
+            const orFilter = words.map((w: string) => `name.ilike.%${w}%`).join(',');
+            ({ data: stagingFactors, error } = await supabase
+              .from('staging_emission_factors')
+              .select('*')
+              .or(orFilter)
+              .in('category', ['Ingredient', 'Packaging'])
+              .order('name')
+              .limit(15));
+          }
+        }
 
         if (error || !stagingFactors) return [];
 

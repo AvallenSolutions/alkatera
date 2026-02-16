@@ -328,6 +328,23 @@ const AGRIBALYSE_KEEP_PATTERNS = [
   'ginger', 'cinnamon', 'vanilla', 'mint', 'herb',
   'gingembre', 'cannelle', 'vanille', 'menthe',
   'juniper', 'elderflower', 'lavender', 'rosemary',
+  'gentian', 'gentiane',
+  'liquorice', 'licorice', 'réglisse', 'reglisse',
+  'saffron', 'safran',
+  'fennel', 'fenouil',
+  'sureau', // elderflower (French)
+  'wormwood', 'artemisia', 'absinthe',
+  'caraway', 'carvi',
+  'cardamom', 'cardamome',
+  'anise', 'anis', 'badiane',
+  'angelica',
+  'orris', 'iris',
+  'pepper', 'poivre',
+  // Additives relevant to drinks
+  'acid', // catches malic acid, citric acid, tartaric acid, ascorbic acid
+  'carrageenan', 'carraghénane',
+  'acacia', 'arabic gum',
+  'sorbate', 'benzoate',
 
   // Nuts
   'almond', 'hazelnut', 'coconut', 'cashew', 'walnut',

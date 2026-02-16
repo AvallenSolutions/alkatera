@@ -10,6 +10,7 @@
  */
 
 import { type OpenLCADatabaseSource } from './client';
+import { matchesAtWordBoundary } from './drinks-aliases';
 
 export interface AgribalyseAlias {
   /** Search terms that trigger this alias (lowercase) */
@@ -226,6 +227,46 @@ export const AGRIBALYSE_PREFERRED_ALIASES: AgribalyseAlias[] = [
     category: 'ingredient',
     rationale: 'Ecoinvent has no mint process; Agribalyse covers herbs',
   },
+  {
+    searchTerms: ['gentian', 'gentiane'],
+    agribalysePatterns: ['gentian', 'gentiane'],
+    ecoinventPatterns: [],
+    preferredDatabase: 'agribalyse',
+    category: 'ingredient',
+    rationale: 'Gentian is a classic French bitter herb (Suze, Salers); Agribalyse covers it',
+  },
+  {
+    searchTerms: ['liquorice', 'licorice', 'réglisse'],
+    agribalysePatterns: ['liquorice', 'licorice', 'réglisse', 'reglisse'],
+    ecoinventPatterns: [],
+    preferredDatabase: 'agribalyse',
+    category: 'ingredient',
+    rationale: 'Agribalyse covers liquorice as a food/spice ingredient',
+  },
+  {
+    searchTerms: ['saffron', 'safran'],
+    agribalysePatterns: ['saffron', 'safran'],
+    ecoinventPatterns: [],
+    preferredDatabase: 'agribalyse',
+    category: 'ingredient',
+    rationale: 'Agribalyse has saffron spice data with French agricultural context',
+  },
+  {
+    searchTerms: ['fennel', 'fenouil'],
+    agribalysePatterns: ['fennel', 'fenouil'],
+    ecoinventPatterns: [],
+    preferredDatabase: 'agribalyse',
+    category: 'ingredient',
+    rationale: 'Agribalyse covers fennel as a herb/spice ingredient',
+  },
+  {
+    searchTerms: ['elderflower', 'sureau', 'elder flower'],
+    agribalysePatterns: ['elderflower', 'sureau', 'elder'],
+    ecoinventPatterns: [],
+    preferredDatabase: 'agribalyse',
+    category: 'ingredient',
+    rationale: 'Elderflower is common in European beverages; Agribalyse has relevant botanical data',
+  },
 
   // Nuts
   {
@@ -275,14 +316,18 @@ export const ECOINVENT_PREFERRED_CATEGORIES: string[] = [
 export function getPreferredDatabase(materialName: string): OpenLCADatabaseSource {
   const nameLower = materialName.toLowerCase();
 
-  // Check if it matches an ecoinvent-preferred category
-  if (ECOINVENT_PREFERRED_CATEGORIES.some(term => nameLower.includes(term))) {
+  // Check if it matches an ecoinvent-preferred category (word boundary match)
+  if (ECOINVENT_PREFERRED_CATEGORIES.some(term =>
+    nameLower === term || matchesAtWordBoundary(nameLower, term)
+  )) {
     return 'ecoinvent';
   }
 
-  // Check if it matches an Agribalyse-preferred alias
+  // Check if it matches an Agribalyse-preferred alias (word boundary match)
   const agribalyseMatch = AGRIBALYSE_PREFERRED_ALIASES.find(alias =>
-    alias.searchTerms.some(term => nameLower.includes(term))
+    alias.searchTerms.some(term =>
+      nameLower === term || matchesAtWordBoundary(nameLower, term)
+    )
   );
 
   if (agribalyseMatch) {
@@ -301,7 +346,9 @@ export function getAgribalysePatterns(materialName: string): string[] | null {
   const nameLower = materialName.toLowerCase();
 
   const match = AGRIBALYSE_PREFERRED_ALIASES.find(alias =>
-    alias.searchTerms.some(term => nameLower.includes(term))
+    alias.searchTerms.some(term =>
+      nameLower === term || matchesAtWordBoundary(nameLower, term)
+    )
   );
 
   return match ? match.agribalysePatterns : null;
