@@ -11,7 +11,7 @@ export const LandingTrustedBy = () => {
     { name: "Takamaka Rum", url: "https://www.takamakarum.com", logo: "/logos/takamaka.svg" },
     { name: "Black Lines", url: "https://blacklinesdrinks.com", logo: "/logos/black-lines.svg" },
     { name: "FABRIC", url: "https://drinkfabric.com", logo: "/logos/fabric.svg" },
-    { name: "Veto", url: "https://vetodrinks.com", logo: "/logos/veto.svg" }
+    { name: "Veto", url: "https://www.weareveto.com/", logo: "/logos/veto.svg", invert: true }
   ];
 
   return (
@@ -46,7 +46,7 @@ export const LandingTrustedBy = () => {
                     alt={brand.name}
                     width={360}
                     height={120}
-                    className="h-[72px] md:h-[120px] w-auto max-w-[270px] md:max-w-[360px] object-contain"
+                    className={`h-[72px] md:h-[120px] w-auto max-w-[270px] md:max-w-[360px] object-contain${brand.invert ? ' brightness-0 invert' : ''}`}
                     unoptimized
                   />
                 ) : (
