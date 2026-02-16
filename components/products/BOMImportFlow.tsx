@@ -200,17 +200,21 @@ export function BOMImportFlow({
   };
 
   const handleSelectMatchResult = useCallback(
-    (materialName: string, index: number) => {
+    (materialName: string, index: number, manualResults?: SearchResultForMatch[]) => {
       const key = normalise(materialName);
       setMatchStates((prev) => {
         const current = prev[key];
         if (!current) return prev;
+
+        // If manual results provided (from proxy suggestion), replace search results
+        const searchResults = manualResults || current.searchResults;
 
         if (index === -1) {
           return {
             ...prev,
             [key]: {
               ...current,
+              searchResults,
               selectedIndex: null,
               status: "no_match",
               userReviewed: true,
@@ -222,11 +226,12 @@ export function BOMImportFlow({
           ...prev,
           [key]: {
             ...current,
+            searchResults,
             selectedIndex: index,
             status: "matched",
             autoMatchConfidence: computeConfidence(
               materialName,
-              current.searchResults[index]?.name || ""
+              searchResults[index]?.name || ""
             ),
             userReviewed: true,
           },
@@ -563,8 +568,8 @@ export function BOMImportFlow({
                           <td className="p-2">
                             <MaterialMatchCell
                               matchState={matchState}
-                              onSelectResult={(idx) =>
-                                handleSelectMatchResult(item.cleanName, idx)
+                              onSelectResult={(idx, manualResults) =>
+                                handleSelectMatchResult(item.cleanName, idx, manualResults)
                               }
                               onSuggestProxy={handleSuggestProxy}
                               onManualSearch={async (q) => {
@@ -628,8 +633,8 @@ export function BOMImportFlow({
                           <td className="p-2">
                             <MaterialMatchCell
                               matchState={matchState}
-                              onSelectResult={(idx) =>
-                                handleSelectMatchResult(item.cleanName, idx)
+                              onSelectResult={(idx, manualResults) =>
+                                handleSelectMatchResult(item.cleanName, idx, manualResults)
                               }
                               onSuggestProxy={handleSuggestProxy}
                               onManualSearch={async (q) => {

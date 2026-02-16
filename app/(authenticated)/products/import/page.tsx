@@ -733,8 +733,8 @@ export default function ImportPage() {
                                   <td className="py-1.5">
                                     <MaterialMatchCell
                                       matchState={matchState}
-                                      onSelectResult={(idx) =>
-                                        handleSelectMatchResult(ing.name, idx)
+                                      onSelectResult={(idx, manualResults) =>
+                                        handleSelectMatchResult(ing.name, idx, manualResults)
                                       }
                                       onSuggestProxy={handleSuggestProxy}
                                       onManualSearch={async (q) => {
@@ -829,8 +829,8 @@ export default function ImportPage() {
                                   <td className="py-1.5">
                                     <MaterialMatchCell
                                       matchState={matchState}
-                                      onSelectResult={(idx) =>
-                                        handleSelectMatchResult(pkg.name, idx)
+                                      onSelectResult={(idx, manualResults) =>
+                                        handleSelectMatchResult(pkg.name, idx, manualResults)
                                       }
                                       onSuggestProxy={handleSuggestProxy}
                                       onManualSearch={async (q) => {

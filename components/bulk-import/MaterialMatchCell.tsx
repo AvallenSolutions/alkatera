@@ -15,7 +15,7 @@ import { cleanSearchQuery } from '@/lib/bulk-import/batch-matcher';
 
 interface MaterialMatchCellProps {
   matchState: MaterialMatchState | undefined;
-  onSelectResult: (index: number) => void;
+  onSelectResult: (index: number, manualResults?: SearchResultForMatch[]) => void;
   onManualSearch?: (query: string) => Promise<SearchResultForMatch[]>;
   /** AI-powered proxy suggestion callback */
   onSuggestProxy?: (ingredientName: string) => Promise<ProxySuggestion[]>;
@@ -119,7 +119,10 @@ export function MaterialMatchCell({
       const results = await onManualSearch(suggestion.search_query);
       setManualResults(results);
       if (results.length > 0) {
-        onSelectResult(0);
+        // Pass the manual results so the parent can update searchResults
+        // and select index 0 in the same state update (avoids race condition
+        // where searchResults haven't flushed yet).
+        onSelectResult(0, results);
         setOpen(false);
       }
     } finally {
@@ -166,7 +169,8 @@ export function MaterialMatchCell({
                 }
               }}
               onSelect={(idx) => {
-                onSelectResult(idx);
+                // Pass manualResults so parent can update searchResults atomically
+                onSelectResult(idx, manualResults);
                 setOpen(false);
               }}
               initialName={cleanSearchQuery(matchState.materialName)}

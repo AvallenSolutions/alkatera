@@ -7,16 +7,25 @@ import type {
 // ── Query cleaning ───────────────────────────────────────────────────────
 
 /**
- * Common modifiers/adjectives that don't help identify an ingredient
+ * Common modifiers/adjectives that don't help identify a material
  * in LCA databases. Stripped during search to improve match quality.
+ * Covers both ingredient modifiers and packaging descriptors.
  */
-const INGREDIENT_MODIFIERS = new Set([
+const MATERIAL_MODIFIERS = new Set([
+  // Ingredient quality/processing modifiers
   'granulated', 'refined', 'raw', 'organic', 'conventional',
   'natural', 'pure', 'food', 'grade', 'technical',
   'powdered', 'ground', 'crushed', 'whole', 'dried',
   'liquid', 'crystalline', 'anhydrous', 'hydrated',
   'deionised', 'deionized', 'distilled', 'filtered',
   'premium', 'standard', 'commercial',
+  // Packaging descriptors (not the core material)
+  'corrugated', 'fluted', 'recycled', 'virgin', 'coated',
+  'laminated', 'printed', 'unprinted', 'clear', 'coloured',
+  'colored', 'tinted', 'frosted', 'embossed', 'moulded',
+  'molded', 'rigid', 'flexible', 'lightweight', 'heavy',
+  'single', 'double', 'triple', 'wall', 'ply',
+  'primary', 'secondary', 'tertiary', 'outer', 'inner',
 ]);
 
 /**
@@ -43,12 +52,15 @@ export function cleanSearchQuery(raw: string): string {
   // Strip percentage/volume info: 48% Vol, 96%, 5.5% abv, 40% v/v
   q = q.replace(/\d+(\.\d+)?\s*%\s*(v\/v|vol|abv|alc\.?)?/gi, '');
 
+  // Strip size/unit info: 75cl, 330ml, 500ml, 1L, 1.5L, 20L, etc.
+  q = q.replace(/\b\d+(\.\d+)?\s*(cl|ml|l|litre|liter|oz|fl\.?\s*oz|gal|gallon|pt|pint)\b/gi, '');
+
   // Strip standalone "Inf" / "Infusion" (often precedes percentages)
   q = q.replace(/\b(?:inf|infusion)\b/gi, '');
 
   // Strip common non-meaningful modifiers (only if other words remain)
   const words = q.split(/\s+/).filter(w => w.length > 0);
-  const coreWords = words.filter(w => !INGREDIENT_MODIFIERS.has(w.toLowerCase()));
+  const coreWords = words.filter(w => !MATERIAL_MODIFIERS.has(w.toLowerCase()));
   if (coreWords.length >= 1) {
     q = coreWords.join(' ');
   }
@@ -153,8 +165,15 @@ export function computeConfidence(query: string, resultName: string): number {
     : 0;
   if (reverseOverlap >= 0.5) return 0.45;
 
-  // Any meaningful word overlap at all
-  if (forwardOverlap > 0 || reverseOverlap > 0) return 0.35;
+  // Any meaningful word overlap — but distinguish core material words from fillers
+  // Words like "for", "at", "the", "and", "market" are common in process names
+  // but don't indicate a real match. A core word overlap (e.g. "glass", "aluminium") is stronger.
+  if (forwardOverlap > 0 || reverseOverlap > 0) {
+    const fillers = new Set(['for', 'at', 'the', 'and', 'market', 'production', 'processing', 'plant', 'white', 'black', 'global', 'average']);
+    const coreOverlapping = qWords.filter(w => rWordSet.has(w) && !fillers.has(w));
+    if (coreOverlapping.length > 0) return 0.42;
+    return 0.35;
+  }
 
   // Trigram analysis — catch near-misses vs false positives
   // E.g. "malic" vs "maize" have low trigram overlap despite similar first letters
