@@ -272,6 +272,30 @@ export default function ProductRecipePage() {
       }
 
       if (packagingItems.length > 0) {
+        // Load component breakdowns for all packaging items
+        const packagingIds = packagingItems.map(p => p.id);
+        const { data: allComponents } = await supabase
+          .from('packaging_material_components')
+          .select('*')
+          .in('product_material_id', packagingIds);
+
+        // Group components by parent packaging item
+        const componentsByMaterial: Record<string, any[]> = {};
+        for (const comp of (allComponents || [])) {
+          if (!componentsByMaterial[comp.product_material_id]) {
+            componentsByMaterial[comp.product_material_id] = [];
+          }
+          componentsByMaterial[comp.product_material_id].push({
+            id: comp.id,
+            product_material_id: comp.product_material_id,
+            epr_material_type: comp.epr_material_type,
+            component_name: comp.component_name,
+            weight_grams: comp.weight_grams,
+            recycled_content_percentage: comp.recycled_content_percentage,
+            is_recyclable: comp.is_recyclable,
+          });
+        }
+
         setPackagingForms(packagingItems.map(item => {
           const categoryMatch = item.notes?.match(/Category: (\w+)/);
           return {
@@ -295,7 +319,7 @@ export default function ProductRecipePage() {
             distance_km: item.distance_km || '',
             // EPR Compliance fields
             has_component_breakdown: item.has_component_breakdown || false,
-            components: [], // Components loaded separately if needed
+            components: componentsByMaterial[item.id] || [],
             epr_packaging_level: item.epr_packaging_level || undefined,
             epr_packaging_activity: item.epr_packaging_activity || undefined,
             epr_is_household: item.epr_is_household !== undefined ? item.epr_is_household : true,

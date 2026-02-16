@@ -195,42 +195,43 @@ export async function POST(
       }
     }
 
-    // Insert packaging as product_materials
-    const packagingRows = packaging
-      .filter(pkg => skuToProductId[pkg.product_sku])
-      .map(pkg => {
-        const componentWeights = aggregateComponentWeights(pkg.components);
+    // Insert packaging as product_materials (with .select() to get IDs back)
+    const validPackaging = packaging.filter(pkg => skuToProductId[pkg.product_sku]);
+    const packagingRows = validPackaging.map(pkg => {
+      const componentWeights = aggregateComponentWeights(pkg.components);
 
-        return {
-          product_id: skuToProductId[pkg.product_sku],
-          material_name: pkg.name,
-          material_type: 'packaging' as const,
-          quantity: pkg.weight_g,
-          unit: 'g',
-          packaging_category: pkg.category,
-          origin_country: pkg.origin_country,
-          transport_mode: pkg.transport_mode || null,
-          distance_km: pkg.distance_km,
-          recycled_content_percentage: pkg.recycled_pct,
-          net_weight_g: pkg.net_content,
-          // EPR fields
-          epr_packaging_level: pkg.epr_level,
-          epr_packaging_activity: pkg.epr_activity,
-          epr_material_type: pkg.epr_material_type,
-          epr_is_household: pkg.epr_is_household ?? false,
-          epr_is_drinks_container: pkg.epr_is_drinks_container ?? false,
-          epr_ram_rating: pkg.epr_ram_rating,
-          epr_uk_nation: pkg.epr_uk_nation,
-          // Component breakdown
-          has_component_breakdown: pkg.components.length > 0,
-          ...componentWeights,
-        };
-      });
+      return {
+        product_id: skuToProductId[pkg.product_sku],
+        material_name: pkg.name,
+        material_type: 'packaging' as const,
+        quantity: pkg.weight_g,
+        unit: 'g',
+        packaging_category: pkg.category,
+        origin_country: pkg.origin_country,
+        transport_mode: pkg.transport_mode || null,
+        distance_km: pkg.distance_km,
+        recycled_content_percentage: pkg.recycled_pct,
+        net_weight_g: pkg.net_content,
+        // EPR fields (matching useRecipeEditor field names)
+        epr_packaging_level: pkg.epr_level,
+        epr_packaging_activity: pkg.epr_activity,
+        epr_material_type: pkg.epr_material_type,
+        epr_is_household: pkg.epr_is_household ?? false,
+        epr_is_drinks_container: pkg.epr_is_drinks_container ?? false,
+        epr_ram_rating: pkg.epr_ram_rating,
+        epr_uk_nation: pkg.epr_uk_nation,
+        // Component breakdown flag
+        has_component_breakdown: pkg.components.length > 0,
+        ...componentWeights,
+      };
+    });
 
+    let insertedPackaging: Array<{ id: number; material_name: string; packaging_category: string }> = [];
     if (packagingRows.length > 0) {
-      const { error } = await serviceClient
+      const { data, error } = await serviceClient
         .from('product_materials')
-        .insert(packagingRows);
+        .insert(packagingRows)
+        .select('id, material_name, packaging_category');
 
       if (error) {
         console.error('Failed to insert packaging:', error);
@@ -238,6 +239,38 @@ export async function POST(
           { error: `Failed to import packaging: ${error.message}` },
           { status: 500 }
         );
+      }
+      insertedPackaging = data || [];
+    }
+
+    // Insert component breakdowns into packaging_material_components
+    let totalComponents = 0;
+    for (let i = 0; i < validPackaging.length; i++) {
+      const pkg = validPackaging[i];
+      if (pkg.components.length === 0) continue;
+
+      // Match the inserted row by position (insert order is preserved)
+      const materialRow = insertedPackaging[i];
+      if (!materialRow) continue;
+
+      const componentRows = pkg.components.map(comp => ({
+        product_material_id: materialRow.id,
+        epr_material_type: comp.material,
+        component_name: comp.name,
+        weight_grams: comp.weight_g ?? 0,
+        recycled_content_percentage: comp.recycled_pct ?? 0,
+        is_recyclable: true,
+      }));
+
+      const { error: compError } = await serviceClient
+        .from('packaging_material_components')
+        .insert(componentRows);
+
+      if (compError) {
+        console.error('Failed to insert components for', pkg.name, compError);
+        // Non-blocking — the main packaging item was saved
+      } else {
+        totalComponents += componentRows.length;
       }
     }
 
@@ -247,6 +280,7 @@ export async function POST(
         products: createdProducts.length,
         ingredients: ingredientRows.length,
         packaging: packagingRows.length,
+        components: totalComponents,
       },
       productIds: Object.values(skuToProductId),
     });

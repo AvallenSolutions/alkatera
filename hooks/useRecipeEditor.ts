@@ -231,6 +231,30 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
 
       if (packagingItems.length > 0) {
+        // Load component breakdowns for all packaging items
+        const packagingIds = packagingItems.map(p => p.id);
+        const { data: allComponents } = await supabase
+          .from('packaging_material_components')
+          .select('*')
+          .in('product_material_id', packagingIds);
+
+        // Group components by parent packaging item
+        const componentsByMaterial: Record<string, any[]> = {};
+        for (const comp of (allComponents || [])) {
+          if (!componentsByMaterial[comp.product_material_id]) {
+            componentsByMaterial[comp.product_material_id] = [];
+          }
+          componentsByMaterial[comp.product_material_id].push({
+            id: comp.id,
+            product_material_id: comp.product_material_id,
+            epr_material_type: comp.epr_material_type,
+            component_name: comp.component_name,
+            weight_grams: comp.weight_grams,
+            recycled_content_percentage: comp.recycled_content_percentage,
+            is_recyclable: comp.is_recyclable,
+          });
+        }
+
         const mappedPackaging = packagingItems.map(item => {
           const categoryMatch = item.notes?.match(/Category: (\w+)/);
           return {
@@ -253,7 +277,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
             transport_mode: item.transport_mode || 'truck',
             distance_km: item.distance_km || '',
             has_component_breakdown: item.has_component_breakdown || false,
-            components: [],
+            components: componentsByMaterial[item.id] || [],
             epr_packaging_level: item.epr_packaging_level || undefined,
             epr_packaging_activity: item.epr_packaging_activity || undefined,
             epr_is_household: item.epr_is_household !== undefined ? item.epr_is_household : true,
