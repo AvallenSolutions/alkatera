@@ -119,22 +119,22 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
       <div className="text-center space-y-2">
-        <h2 className="text-2xl md:text-3xl font-serif font-bold text-white">
+        <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
           Generate Submission
         </h2>
-        <p className="text-white/60 text-sm max-w-md mx-auto">
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
           Select your reporting period and fee year, then generate your RPD
           submission lines.
         </p>
       </div>
 
       {/* Period & Fee Year Selectors */}
-      <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+      <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Submission Period */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-white/50 uppercase tracking-wide">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Submission Period
               </label>
               <Select
@@ -142,7 +142,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                 onValueChange={setSubmissionPeriod}
                 disabled={generating}
               >
-                <SelectTrigger className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50">
+                <SelectTrigger className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -157,7 +157,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
             {/* Fee Year */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-white/50 uppercase tracking-wide">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                 Fee Year
               </label>
               <Select
@@ -165,7 +165,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                 onValueChange={setFeeYear}
                 disabled={generating}
               >
-                <SelectTrigger className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50">
+                <SelectTrigger className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50">
                   <SelectValue placeholder="Select fee year" />
                 </SelectTrigger>
                 <SelectContent>
@@ -185,7 +185,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
               <Button
                 onClick={handleGenerate}
                 disabled={generating || !submissionPeriod || !feeYear}
-                className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl px-8 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl px-8 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {generating ? (
                   <>
@@ -221,10 +221,10 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
       {generated && submission && (
         <>
           {/* Summary Stats */}
-          <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+          <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-sm font-medium text-white/70 flex items-center gap-2">
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4" />
                   Submission Summary
                 </h3>
@@ -235,32 +235,32 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Total Weight */}
-                <div className="bg-white/5 rounded-xl p-4 text-center">
-                  <Weight className="w-5 h-5 text-[#ccff00] mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-white">
+                <div className="bg-muted/50 rounded-xl p-4 text-center">
+                  <Weight className="w-5 h-5 text-neon-lime mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-foreground">
                     {totalWeightTonnes}
                   </p>
-                  <p className="text-xs text-white/40 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Total Weight (tonnes)
                   </p>
                 </div>
 
                 {/* Estimated Fee */}
-                <div className="bg-white/5 rounded-xl p-4 text-center">
-                  <PoundSterling className="w-5 h-5 text-[#ccff00] mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-white">
+                <div className="bg-muted/50 rounded-xl p-4 text-center">
+                  <PoundSterling className="w-5 h-5 text-neon-lime mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-foreground">
                     {formatGBP(submission.total_estimated_fee_gbp)}
                   </p>
-                  <p className="text-xs text-white/40 mt-1">Estimated Fee</p>
+                  <p className="text-xs text-muted-foreground mt-1">Estimated Fee</p>
                 </div>
 
                 {/* Line Count */}
-                <div className="bg-white/5 rounded-xl p-4 text-center">
-                  <Rows3 className="w-5 h-5 text-[#ccff00] mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-white">
+                <div className="bg-muted/50 rounded-xl p-4 text-center">
+                  <Rows3 className="w-5 h-5 text-neon-lime mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-foreground">
                     {submission.total_line_items}
                   </p>
-                  <p className="text-xs text-white/40 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Submission Lines
                   </p>
                 </div>
@@ -270,22 +270,22 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
 
           {/* Material Breakdown */}
           {Object.keys(materialSummary).length > 0 && (
-            <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+            <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
               <CardContent className="p-6">
-                <h3 className="text-sm font-medium text-white/70 mb-4">
+                <h3 className="text-sm font-medium text-muted-foreground mb-4">
                   Material Breakdown
                 </h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-white/5">
-                        <th className="text-left text-xs text-white/40 font-medium pb-2 pr-4">
+                      <tr className="border-b border-border/50">
+                        <th className="text-left text-xs text-muted-foreground font-medium pb-2 pr-4">
                           Material
                         </th>
-                        <th className="text-right text-xs text-white/40 font-medium pb-2 px-4">
+                        <th className="text-right text-xs text-muted-foreground font-medium pb-2 px-4">
                           Weight (kg)
                         </th>
-                        <th className="text-right text-xs text-white/40 font-medium pb-2 pl-4">
+                        <th className="text-right text-xs text-muted-foreground font-medium pb-2 pl-4">
                           Est. Fee
                         </th>
                       </tr>
@@ -295,17 +295,17 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                         ([code, data]) => (
                           <tr
                             key={code}
-                            className="border-b border-white/5 last:border-0"
+                            className="border-b border-border/50 last:border-0"
                           >
-                            <td className="py-2.5 pr-4 text-white/80">
+                            <td className="py-2.5 pr-4 text-foreground/80">
                               {RPD_MATERIAL_NAMES[
                                 code as RPDMaterialCode
                               ] || code}
                             </td>
-                            <td className="py-2.5 px-4 text-right text-white/60 tabular-nums">
+                            <td className="py-2.5 px-4 text-right text-muted-foreground tabular-nums">
                               {data.weight_kg.toLocaleString('en-GB')}
                             </td>
-                            <td className="py-2.5 pl-4 text-right text-white/60 tabular-nums">
+                            <td className="py-2.5 pl-4 text-right text-muted-foreground tabular-nums">
                               {formatGBP(data.fee_gbp)}
                             </td>
                           </tr>
@@ -313,16 +313,16 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
                       )}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-white/10">
-                        <td className="pt-3 pr-4 text-white font-medium">
+                      <tr className="border-t border-border">
+                        <td className="pt-3 pr-4 text-foreground font-medium">
                           Total
                         </td>
-                        <td className="pt-3 px-4 text-right text-white font-medium tabular-nums">
+                        <td className="pt-3 px-4 text-right text-foreground font-medium tabular-nums">
                           {submission.total_packaging_weight_kg.toLocaleString(
                             'en-GB'
                           )}
                         </td>
-                        <td className="pt-3 pl-4 text-right text-white font-medium tabular-nums">
+                        <td className="pt-3 pl-4 text-right text-foreground font-medium tabular-nums">
                           {formatGBP(submission.total_estimated_fee_gbp)}
                         </td>
                       </tr>
@@ -363,7 +363,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
         <Button
           variant="ghost"
           onClick={onBack}
-          className="text-white/40 hover:text-white hover:bg-white/10"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted"
         >
           Back
         </Button>
@@ -371,7 +371,7 @@ export function GenerateStep({ onComplete, onBack }: GenerateStepProps) {
         {generated && (
           <Button
             onClick={onComplete}
-            className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl"
+            className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
           >
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />

@@ -35,7 +35,7 @@ export function RosaGuide({ step, className }: RosaGuideProps) {
       {/* Name */}
       <div className="text-center">
         <p className="text-sm font-semibold text-emerald-400">Rosa</p>
-        <p className="text-xs text-white/40">Your sustainability guide</p>
+        <p className="text-xs text-muted-foreground">Your sustainability guide</p>
       </div>
 
       {/* Speech bubble */}
@@ -46,7 +46,7 @@ export function RosaGuide({ step, className }: RosaGuideProps) {
         <div className="bg-emerald-500/10 border border-emerald-400/20 rounded-xl p-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex items-start gap-2">
             <MessageCircle className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-white/80 leading-relaxed">{message}</p>
+            <p className="text-sm text-foreground/80 leading-relaxed">{message}</p>
           </div>
         </div>
       </div>

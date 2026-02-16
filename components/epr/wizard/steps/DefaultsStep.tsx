@@ -81,8 +81,8 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-        <Loader2 className="w-8 h-8 text-[#ccff00] animate-spin" />
-        <p className="mt-3 text-sm text-white/40">Loading settings...</p>
+        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <p className="mt-3 text-sm text-muted-foreground">Loading settings...</p>
       </div>
     )
   }
@@ -92,29 +92,29 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <Settings2 className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
+            <Settings2 className="w-8 h-8 text-neon-lime" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
+          <h3 className="text-xl font-serif font-bold text-foreground">
             Set your packaging defaults
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             These defaults will apply to new packaging items, saving you time.
             You can always override them on individual products.
           </p>
         </div>
 
         {/* Form Card */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-5">
+        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-5">
           {/* Default Packaging Activity */}
           <div className="space-y-2">
-            <Label htmlFor="epr-default-activity" className="text-sm font-medium text-white/70">
+            <Label htmlFor="epr-default-activity" className="text-sm font-medium text-muted-foreground">
               Default Packaging Activity
             </Label>
             <Select value={defaultActivity} onValueChange={setDefaultActivity}>
               <SelectTrigger
                 id="epr-default-activity"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
               >
                 <SelectValue placeholder="Select activity..." />
               </SelectTrigger>
@@ -126,20 +126,20 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-white/30">
+            <p className="text-xs text-muted-foreground/70">
               Most drinks brands select &quot;Brand Owner&quot;.
             </p>
           </div>
 
           {/* Default UK Nation */}
           <div className="space-y-2">
-            <Label htmlFor="epr-default-nation" className="text-sm font-medium text-white/70">
+            <Label htmlFor="epr-default-nation" className="text-sm font-medium text-muted-foreground">
               Default UK Nation
             </Label>
             <Select value={defaultNation} onValueChange={setDefaultNation}>
               <SelectTrigger
                 id="epr-default-nation"
-                className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+                className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
               >
                 <SelectValue placeholder="Select nation..." />
               </SelectTrigger>
@@ -151,7 +151,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-white/30">
+            <p className="text-xs text-muted-foreground/70">
               The primary nation where your products are sold.
             </p>
           </div>
@@ -159,10 +159,10 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
           {/* DRS Exclusions Toggle */}
           <div className="flex items-center justify-between gap-4 pt-2">
             <div className="space-y-1">
-              <Label htmlFor="epr-drs-toggle" className="text-sm font-medium text-white/70">
+              <Label htmlFor="epr-drs-toggle" className="text-sm font-medium text-muted-foreground">
                 DRS Exclusions
               </Label>
-              <p className="text-xs text-white/30">
+              <p className="text-xs text-muted-foreground/70">
                 Enable if your drinks containers fall under the Deposit Return Scheme.
               </p>
             </div>
@@ -176,8 +176,8 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
 
         {/* Help text */}
         <div className="flex items-start gap-2 px-1">
-          <Info className="w-4 h-4 text-white/30 flex-shrink-0 mt-0.5" />
-          <p className="text-xs text-white/30">
+          <Info className="w-4 h-4 text-muted-foreground/70 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground/70">
             These defaults are applied automatically when you add new packaging items.
             Existing items are not changed. Use the Bulk Edit step to update
             multiple existing items at once.
@@ -189,7 +189,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
           <Button
             variant="ghost"
             onClick={onBack}
-            className="text-white/40 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -199,7 +199,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
               <Button
                 variant="ghost"
                 onClick={onSkip}
-                className="text-white/40 hover:text-white hover:bg-white/10 text-sm"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted text-sm"
               >
                 <SkipForward className="w-4 h-4 mr-1" />
                 Skip
@@ -208,7 +208,7 @@ export function DefaultsStep({ onComplete, onBack, onSkip }: DefaultsStepProps) 
             <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl"
+              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
             >
               {isSaving ? (
                 <>

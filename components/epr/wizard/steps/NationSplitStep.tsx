@@ -160,7 +160,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
   if (settingsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-[#ccff00] animate-spin" />
+        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
       </div>
     )
   }
@@ -170,13 +170,13 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <MapPin className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
+            <MapPin className="w-8 h-8 text-neon-lime" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
+          <h3 className="text-xl font-serif font-bold text-foreground">
             Nation Sales Split
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             How are your product sales distributed across the UK nations?
           </p>
         </div>
@@ -186,7 +186,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
           variant="outline"
           onClick={handleAutoEstimate}
           disabled={estimating || isSaving}
-          className="w-full border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+          className="w-full border-border bg-muted/50 text-foreground hover:bg-muted hover:text-foreground"
         >
           {estimating ? (
             <>
@@ -195,7 +195,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
             </>
           ) : (
             <>
-              <Sparkles className="w-4 h-4 mr-2 text-[#ccff00]" />
+              <Sparkles className="w-4 h-4 mr-2 text-neon-lime" />
               Auto-Estimate from Delivery Data
             </>
           )}
@@ -204,7 +204,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
         {/* Method + confidence indicators */}
         {method === 'auto_estimated' && confidence && (
           <div className="flex items-center justify-center gap-2 animate-in fade-in duration-200">
-            <Badge variant="outline" className="bg-[#ccff00]/10 text-[#ccff00] border-[#ccff00]/30 text-xs">
+            <Badge variant="outline" className="bg-neon-lime/10 text-neon-lime border-neon-lime/30 text-xs">
               Auto-estimated
             </Badge>
             <Badge
@@ -217,7 +217,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
         )}
 
         {/* Nation split inputs */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-4">
+        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-4">
           {NATIONS.map((nation) => (
             <div key={nation.key} className="flex items-center gap-3">
               <span className="text-lg w-8 text-center" role="img" aria-label={nation.label}>
@@ -225,7 +225,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
               </span>
               <Label
                 htmlFor={`epr-nation-${nation.key}`}
-                className="text-sm font-medium text-white/70 w-32 flex-shrink-0"
+                className="text-sm font-medium text-muted-foreground w-32 flex-shrink-0"
               >
                 {nation.label}
               </Label>
@@ -239,9 +239,9 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
                   value={splits[nation.key]}
                   onChange={(e) => handleSplitChange(nation.key, e.target.value)}
                   disabled={isSaving}
-                  className="pr-8 bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50 text-right"
+                  className="pr-8 bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50 text-right"
                 />
-                <span className="absolute inset-y-0 right-3 flex items-center text-white/30 text-sm pointer-events-none">
+                <span className="absolute inset-y-0 right-3 flex items-center text-muted-foreground/70 text-sm pointer-events-none">
                   %
                 </span>
               </div>
@@ -249,9 +249,9 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
           ))}
 
           {/* Sum indicator */}
-          <div className="pt-3 border-t border-white/5">
+          <div className="pt-3 border-t border-border/50">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-white/50">Total</span>
+              <span className="text-sm font-medium text-muted-foreground">Total</span>
               <span
                 className={`text-sm font-mono font-semibold ${
                   isValid ? 'text-emerald-400' : 'text-red-400'
@@ -277,7 +277,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
             variant="ghost"
             onClick={onBack}
             disabled={isSaving}
-            className="text-white/40 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -288,7 +288,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
                 variant="ghost"
                 onClick={onSkip}
                 disabled={isSaving}
-                className="text-white/40 hover:text-white hover:bg-white/10 text-sm"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted text-sm"
               >
                 <SkipForward className="w-4 h-4 mr-1" />
                 Skip
@@ -297,7 +297,7 @@ export function NationSplitStep({ onComplete, onBack, onSkip }: NationSplitStepP
             <Button
               onClick={handleContinue}
               disabled={isSaving || !isValid}
-              className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl"
+              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
             >
               {isSaving ? (
                 <>

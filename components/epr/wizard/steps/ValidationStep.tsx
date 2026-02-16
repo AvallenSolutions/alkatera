@@ -56,8 +56,8 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
   if (loading && !completeness) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 animate-in fade-in duration-500">
-        <Loader2 className="w-8 h-8 text-[#ccff00] animate-spin" />
-        <p className="text-white/60 text-sm">Checking data completeness...</p>
+        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
+        <p className="text-muted-foreground text-sm">Checking data completeness...</p>
       </div>
     )
   }
@@ -66,11 +66,11 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 animate-in fade-in duration-500">
         <XCircle className="w-10 h-10 text-red-400" />
-        <p className="text-white/60 text-sm">{error}</p>
+        <p className="text-muted-foreground text-sm">{error}</p>
         <Button
           variant="ghost"
           onClick={handleRefresh}
-          className="text-white/40 hover:text-white hover:bg-white/10"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted"
         >
           <RefreshCw className="w-4 h-4 mr-2" />
           Try Again
@@ -83,17 +83,17 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Header */}
       <div className="text-center space-y-2">
-        <h2 className="text-2xl md:text-3xl font-serif font-bold text-white">
+        <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
           Data Validation
         </h2>
-        <p className="text-white/60 text-sm max-w-md mx-auto">
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
           Checking that every packaging item has the required EPR fields
           completed before generating your submission.
         </p>
       </div>
 
       {/* Completeness Score */}
-      <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+      <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
         <CardContent className="p-6 md:p-8">
           <div className="flex flex-col items-center gap-6">
             {/* Percentage circle */}
@@ -120,8 +120,8 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-white">{pct}%</span>
-                <span className="text-xs text-white/40">Complete</span>
+                <span className="text-3xl font-bold text-foreground">{pct}%</span>
+                <span className="text-xs text-muted-foreground">Complete</span>
               </div>
             </div>
 
@@ -130,9 +130,9 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
               <Progress
                 value={pct}
                 indicatorColor={isComplete ? 'emerald' : 'lime'}
-                className="h-3 bg-white/5"
+                className="h-3 bg-muted/50"
               />
-              <div className="flex justify-between text-xs text-white/40">
+              <div className="flex justify-between text-xs text-muted-foreground">
                 <span>
                   {completeItems} of {totalItems} items complete
                 </span>
@@ -182,16 +182,16 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
 
       {/* Per-Product Status List */}
       {totalItems > 0 && (
-        <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+        <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-white/70 flex items-center gap-2">
+              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Package className="w-4 h-4" />
                 Packaging Item Status
               </h3>
               <Badge
                 variant="outline"
-                className="text-xs border-white/10 text-white/40"
+                className="text-xs border-border text-muted-foreground"
               >
                 {totalItems} items
               </Badge>
@@ -202,7 +202,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
               {completeItems > 0 && gaps.length > 0 && (
                 <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-emerald-500/5 mb-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                  <span className="text-sm text-white/70">
+                  <span className="text-sm text-muted-foreground">
                     {completeItems} item{completeItems !== 1 ? 's' : ''} fully
                     complete
                   </span>
@@ -214,7 +214,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
               {isComplete && (
                 <div className="text-center py-6">
                   <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
-                  <p className="text-sm text-white/60">
+                  <p className="text-sm text-muted-foreground">
                     All {totalItems} packaging items have complete EPR data.
                   </p>
                 </div>
@@ -224,17 +224,17 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
               {Object.entries(gapsByProduct).map(
                 ([productId, { productName, items }]) => (
                   <div key={productId} className="mb-3">
-                    <p className="text-xs font-medium text-white/50 px-3 py-1.5 uppercase tracking-wide">
+                    <p className="text-xs font-medium text-muted-foreground px-3 py-1.5 uppercase tracking-wide">
                       {productName}
                     </p>
                     {items.map((gap) => (
                       <div
                         key={gap.product_material_id}
-                        className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
+                        className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors"
                       >
                         <XCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white/80 truncate">
+                          <p className="text-sm text-foreground/80 truncate">
                             {gap.material_name}
                           </p>
                           <p className="text-xs text-red-400/70 mt-0.5">
@@ -263,7 +263,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
         <Button
           variant="ghost"
           onClick={onBack}
-          className="text-white/40 hover:text-white hover:bg-white/10"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted"
         >
           Back
         </Button>
@@ -273,7 +273,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
             variant="ghost"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="text-white/40 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             {refreshing ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -286,7 +286,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
           <Button
             onClick={onComplete}
             disabled={!isComplete}
-            className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />

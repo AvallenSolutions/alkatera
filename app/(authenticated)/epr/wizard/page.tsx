@@ -107,7 +107,7 @@ export default function EPRWizardPage() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       {/* Top bar — phase indicators + progress */}
-      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4">
+      <div className="bg-card/80 backdrop-blur-md border border-border rounded-2xl p-4">
         <div className="max-w-3xl mx-auto">
           {/* Phase indicators */}
           <div className="flex items-center justify-between mb-3">
@@ -125,16 +125,16 @@ export default function EPRWizardPage() {
                     className={cn(
                       'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs transition-all',
                       isActive
-                        ? 'bg-[#ccff00]/10 text-[#ccff00] font-medium'
+                        ? 'bg-neon-lime/10 text-neon-lime font-medium'
                         : isPast || isComplete
-                        ? 'text-white/50'
-                        : 'text-white/25'
+                        ? 'text-muted-foreground'
+                        : 'text-muted-foreground/60'
                     )}
                   >
                     <div
                       className={cn(
                         'w-2 h-2 rounded-full',
-                        isActive ? 'bg-[#ccff00]' : isPast || isComplete ? 'bg-white/40' : 'bg-white/15'
+                        isActive ? 'bg-neon-lime' : isPast || isComplete ? 'bg-muted-foreground/40' : 'bg-muted-foreground/20'
                       )}
                     />
                     <span className="hidden sm:inline">{pConfig.label}</span>
@@ -148,7 +148,7 @@ export default function EPRWizardPage() {
                 variant="ghost"
                 size="sm"
                 onClick={handleDismiss}
-                className="text-white/40 hover:text-white hover:bg-white/10 -mr-1"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted -mr-1"
                 aria-label="Exit wizard"
               >
                 <X className="w-4 h-4" />
@@ -157,12 +157,12 @@ export default function EPRWizardPage() {
           </div>
 
           {/* Progress bar */}
-          <Progress value={progress} indicatorColor="lime" className="h-1 bg-white/10" />
+          <Progress value={progress} indicatorColor="lime" className="h-1 bg-muted" />
           <div className="flex items-center justify-between mt-1.5">
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-muted-foreground">
               {currentStepConfig.title} &mdash; {phaseConfig.duration}
             </p>
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-muted-foreground">
               Step {currentStepConfig.index + 1} of {EPR_WIZARD_STEPS.length}
             </p>
           </div>
@@ -173,13 +173,13 @@ export default function EPRWizardPage() {
       <div className="grid lg:grid-cols-[280px_1fr] gap-6">
         {/* Rosa panel — side on desktop, top on mobile */}
         <div className="lg:order-first order-first">
-          <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden">
+          <div className="bg-card/80 backdrop-blur-md border border-border rounded-2xl overflow-hidden">
             <RosaGuide step={state.currentStep} />
           </div>
         </div>
 
         {/* Step content */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 min-h-[400px] flex flex-col">
+        <div className="bg-card/80 backdrop-blur-md border border-border rounded-2xl p-6 min-h-[400px] flex flex-col">
           <div className="flex-1">
             {CurrentStepComponent ? (
               <CurrentStepComponent
@@ -192,11 +192,11 @@ export default function EPRWizardPage() {
 
           {/* Navigation footer (hidden on welcome and export-complete — they have their own buttons) */}
           {!isWelcome && !isLast && (
-            <div className="flex items-center justify-between pt-6 mt-6 border-t border-white/10">
+            <div className="flex items-center justify-between pt-6 mt-6 border-t border-border">
               <Button
                 variant="ghost"
                 onClick={previousStep}
-                className="text-white/40 hover:text-white hover:bg-white/10"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
@@ -206,7 +206,7 @@ export default function EPRWizardPage() {
                   <Button
                     variant="ghost"
                     onClick={skipStep}
-                    className="text-white/40 hover:text-white hover:bg-white/10 text-sm"
+                    className="text-muted-foreground hover:text-foreground hover:bg-muted text-sm"
                   >
                     <SkipForward className="w-4 h-4 mr-1" />
                     Skip
@@ -214,7 +214,7 @@ export default function EPRWizardPage() {
                 )}
                 <Button
                   onClick={completeStep}
-                  className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl"
+                  className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
                 >
                   Continue
                   <ArrowRight className="w-4 h-4 ml-2" />

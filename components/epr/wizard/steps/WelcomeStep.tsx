@@ -28,31 +28,31 @@ export function WelcomeStep({ onComplete }: WelcomeStepProps) {
 
       {/* Heading */}
       <div className="space-y-4 max-w-lg">
-        <h1 className="text-3xl md:text-4xl font-serif font-bold text-white">
+        <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
           Let&apos;s Get Your EPR Sorted
         </h1>
-        <p className="text-lg text-white/60">
+        <p className="text-lg text-muted-foreground">
           Extended Producer Responsibility is the UK&apos;s packaging waste law.
           Every producer placing packaging on the market must report to Defra.
         </p>
       </div>
 
       {/* What this wizard helps with */}
-      <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 w-full max-w-md space-y-4">
-        <p className="text-sm font-medium text-white/70">
+      <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 w-full max-w-md space-y-4">
+        <p className="text-sm font-medium text-muted-foreground">
           This wizard will walk you through:
         </p>
         <ul className="space-y-3 text-left">
           {FEATURES.map((feature) => (
             <li key={feature} className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-[#ccff00] flex-shrink-0" />
-              <span className="text-sm text-white/80">{feature}</span>
+              <CheckCircle2 className="w-5 h-5 text-neon-lime flex-shrink-0" />
+              <span className="text-sm text-foreground/80">{feature}</span>
             </li>
           ))}
         </ul>
-        <div className="flex items-center gap-2 pt-2 border-t border-white/5">
-          <Clock className="w-4 h-4 text-white/40" />
-          <span className="text-xs text-white/40">
+        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+          <Clock className="w-4 h-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">
             Estimated time: ~13 minutes total
           </span>
         </div>
@@ -62,7 +62,7 @@ export function WelcomeStep({ onComplete }: WelcomeStepProps) {
       <Button
         size="lg"
         onClick={onComplete}
-        className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium text-base px-8 rounded-xl"
+        className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium text-base px-8 rounded-xl"
       >
         Let&apos;s Begin
         <ArrowRight className="w-5 h-5 ml-2" />

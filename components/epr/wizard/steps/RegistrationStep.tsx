@@ -52,7 +52,7 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-[#ccff00] animate-spin" />
+        <Loader2 className="w-8 h-8 text-neon-lime animate-spin" />
       </div>
     )
   }
@@ -62,22 +62,22 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-3">
-          <div className="mx-auto w-16 h-16 bg-[#ccff00]/20 backdrop-blur-md border border-[#ccff00]/30 rounded-2xl flex items-center justify-center">
-            <KeyRound className="w-8 h-8 text-[#ccff00]" />
+          <div className="mx-auto w-16 h-16 bg-neon-lime/20 backdrop-blur-md border border-neon-lime/30 rounded-2xl flex items-center justify-center">
+            <KeyRound className="w-8 h-8 text-neon-lime" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-white">
+          <h3 className="text-xl font-serif font-bold text-foreground">
             RPD Registration Details
           </h3>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-muted-foreground">
             Link your Alkatera account to the Defra RPD portal.
           </p>
         </div>
 
         {/* Form card */}
-        <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-6 space-y-5">
+        <div className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-6 space-y-5">
           {/* RPD Organisation ID */}
           <div className="space-y-2">
-            <Label htmlFor="epr-rpd-org-id" className="text-sm font-medium text-white/70">
+            <Label htmlFor="epr-rpd-org-id" className="text-sm font-medium text-muted-foreground">
               RPD Organisation ID
             </Label>
             <Input
@@ -86,18 +86,18 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
               value={rpdOrgId}
               onChange={(e) => setRpdOrgId(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
             />
-            <p className="text-xs text-white/30">
+            <p className="text-xs text-muted-foreground/70">
               Found in your RPD portal account. Usually a 6-digit number.
             </p>
           </div>
 
           {/* RPD Subsidiary ID */}
           <div className="space-y-2">
-            <Label htmlFor="epr-rpd-sub-id" className="text-sm font-medium text-white/70">
+            <Label htmlFor="epr-rpd-sub-id" className="text-sm font-medium text-muted-foreground">
               Subsidiary ID
-              <span className="ml-2 text-xs text-white/30 font-normal">(optional)</span>
+              <span className="ml-2 text-xs text-muted-foreground/70 font-normal">(optional)</span>
             </Label>
             <Input
               id="epr-rpd-sub-id"
@@ -105,15 +105,15 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
               value={rpdSubId}
               onChange={(e) => setRpdSubId(e.target.value)}
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
+              className="bg-muted/50 border-border text-foreground placeholder:text-muted-foreground/50 focus:ring-neon-lime/50"
             />
-            <p className="text-xs text-white/30">
+            <p className="text-xs text-muted-foreground/70">
               Only required if your organisation has multiple subsidiaries registered with RPD.
             </p>
           </div>
         </div>
 
-        <p className="text-xs text-white/30 text-center">
+        <p className="text-xs text-muted-foreground/70 text-center">
           Don&apos;t have your RPD details yet? You can skip this step and add them later in EPR Settings.
         </p>
 
@@ -123,7 +123,7 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
             variant="ghost"
             onClick={onBack}
             disabled={isSaving}
-            className="text-white/40 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
@@ -134,7 +134,7 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
                 variant="ghost"
                 onClick={onSkip}
                 disabled={isSaving}
-                className="text-white/40 hover:text-white hover:bg-white/10 text-sm"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted text-sm"
               >
                 <SkipForward className="w-4 h-4 mr-1" />
                 Skip
@@ -143,7 +143,7 @@ export function RegistrationStep({ onComplete, onBack, onSkip }: RegistrationSte
             <Button
               onClick={handleContinue}
               disabled={isSaving}
-              className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl"
+              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl"
             >
               {isSaving ? (
                 <>

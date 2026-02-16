@@ -159,30 +159,30 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                 <CheckCircle2 className="w-10 h-10 text-emerald-400" />
               </div>
               {/* Confetti-style dots */}
-              <div className="absolute -top-2 -left-3 w-2 h-2 rounded-full bg-[#ccff00] animate-bounce" />
+              <div className="absolute -top-2 -left-3 w-2 h-2 rounded-full bg-neon-lime animate-bounce" />
               <div className="absolute -top-1 right-0 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce delay-100" />
               <div className="absolute -bottom-1 -left-1 w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce delay-200" />
               <div className="absolute top-0 -right-3 w-2 h-2 rounded-full bg-purple-400 animate-bounce delay-150" />
               <div className="absolute -bottom-2 right-1 w-1 h-1 rounded-full bg-amber-400 animate-bounce delay-300" />
               <div className="absolute top-4 -left-5 w-1 h-1 rounded-full bg-pink-400 animate-bounce delay-75" />
             </div>
-            <h2 className="text-2xl md:text-3xl font-serif font-bold text-white">
+            <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
               Your RPD CSV is Ready!
             </h2>
-            <p className="text-white/60 text-sm max-w-md mx-auto">
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
               Download the file below and upload it to the Defra RPD portal.
               Everything has been recorded in your audit trail.
             </p>
           </>
         ) : (
           <>
-            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto border border-white/10">
-              <Download className="w-10 h-10 text-[#ccff00]" />
+            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mx-auto border border-border">
+              <Download className="w-10 h-10 text-neon-lime" />
             </div>
-            <h2 className="text-2xl md:text-3xl font-serif font-bold text-white">
+            <h2 className="text-2xl md:text-3xl font-serif font-bold text-foreground">
               Export &amp; Finish
             </h2>
-            <p className="text-white/60 text-sm max-w-md mx-auto">
+            <p className="text-muted-foreground text-sm max-w-md mx-auto">
               Generate the official RPD-format CSV file ready for upload to the
               Defra portal.
             </p>
@@ -197,7 +197,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
             onClick={handleExport}
             disabled={exporting}
             size="lg"
-            className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl px-8"
+            className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl px-8"
           >
             {exporting ? (
               <>
@@ -238,7 +238,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
       {exported && exportResult && (
         <>
           {/* Download Card */}
-          <Card className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl">
+          <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center flex-shrink-0 border border-emerald-500/20">
@@ -246,7 +246,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                 </div>
                 <div className="flex-1 min-w-0 space-y-3">
                   <div>
-                    <p className="text-sm font-medium text-white truncate">
+                    <p className="text-sm font-medium text-foreground truncate">
                       {exportResult.filename}
                     </p>
                     <div className="flex items-center gap-3 mt-1">
@@ -257,7 +257,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                         Ready
                       </Badge>
                       {exportResult.line_count > 0 && (
-                        <span className="text-xs text-white/40">
+                        <span className="text-xs text-muted-foreground">
                           {exportResult.line_count} lines
                         </span>
                       )}
@@ -265,13 +265,13 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                   </div>
 
                   {/* Checksum */}
-                  <div className="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-                    <ShieldCheck className="w-3.5 h-3.5 text-white/30 flex-shrink-0" />
+                  <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg">
+                    <ShieldCheck className="w-3.5 h-3.5 text-muted-foreground/70 flex-shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[10px] text-white/30 uppercase tracking-wide">
+                      <p className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">
                         SHA-256 Checksum
                       </p>
-                      <p className="text-xs text-white/50 font-mono truncate">
+                      <p className="text-xs text-muted-foreground font-mono truncate">
                         {exportResult.checksum}
                       </p>
                     </div>
@@ -283,7 +283,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                       href={exportResult.download_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-medium text-[#ccff00] hover:text-[#b8e600] transition-colors"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-neon-lime hover:text-neon-lime/80 transition-colors"
                     >
                       <Download className="w-4 h-4" />
                       Download CSV
@@ -302,7 +302,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
             </div>
             <div>
               <p className="text-sm font-semibold text-emerald-400">Rosa</p>
-              <p className="text-sm text-white/70 mt-1 leading-relaxed">
+              <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                 Brilliant! Your RPD CSV is ready to download. You can upload
                 this directly to the Defra portal. I&apos;ve also recorded
                 everything in your audit trail for your compliance records.
@@ -312,7 +312,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
 
           {/* What's Next? */}
           <div className="space-y-4">
-            <h3 className="text-sm font-medium text-white/50 uppercase tracking-wide text-center">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide text-center">
               What&apos;s Next?
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -322,16 +322,16 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
                   <a
                     key={step.href}
                     href={step.href}
-                    className="group bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 hover:bg-white/8 hover:border-white/15 transition-all"
+                    className="group bg-muted/50 backdrop-blur-md border border-border rounded-2xl p-4 hover:bg-muted/80 hover:border-border transition-all"
                   >
-                    <Icon className="w-5 h-5 text-[#ccff00] mb-3 group-hover:scale-110 transition-transform" />
-                    <p className="text-sm font-medium text-white">
+                    <Icon className="w-5 h-5 text-neon-lime mb-3 group-hover:scale-110 transition-transform" />
+                    <p className="text-sm font-medium text-foreground">
                       {step.title}
                     </p>
-                    <p className="text-xs text-white/40 mt-1 leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                       {step.description}
                     </p>
-                    <div className="flex items-center gap-1 mt-3 text-xs text-[#ccff00]/60 group-hover:text-[#ccff00] transition-colors">
+                    <div className="flex items-center gap-1 mt-3 text-xs text-neon-lime/60 group-hover:text-neon-lime transition-colors">
                       <span>Open</span>
                       <ArrowRight className="w-3 h-3" />
                     </div>
@@ -346,7 +346,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
             <Button
               onClick={onComplete}
               size="lg"
-              className="bg-[#ccff00] text-black hover:bg-[#b8e600] font-medium rounded-xl px-10"
+              className="bg-neon-lime text-black hover:bg-neon-lime/80 font-medium rounded-xl px-10"
             >
               <PartyPopper className="w-5 h-5 mr-2" />
               Finish
@@ -361,7 +361,7 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
           <Button
             variant="ghost"
             onClick={onBack}
-            className="text-white/40 hover:text-white hover:bg-white/10"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted"
           >
             Back
           </Button>
