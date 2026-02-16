@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       p_requested_by: userData.user.id,
       p_source_page: source_page || '/data/sources',
       p_product_id: product_id ? parseInt(product_id) : null,
-      p_metadata: JSON.stringify({ notes: notes || null }),
+      p_metadata: { notes: notes || null },
     });
 
     if (error) throw error;

@@ -428,7 +428,7 @@ export async function GET(request: NextRequest) {
         p_requested_by: user?.user?.id || null,
         p_source_page: '/ingredients/search',
         p_product_id: null,
-        p_metadata: JSON.stringify({
+        p_metadata: {
           sources_checked: {
             supplier: supplierResults.length,
             staging: stagingResults.length,
@@ -436,7 +436,7 @@ export async function GET(request: NextRequest) {
             ecoinvent_live: openLCAResults.length,
             agribalyse_live: agribalyseResults.length,
           },
-        }),
+        },
       }); // Fire-and-forget
     }
 
