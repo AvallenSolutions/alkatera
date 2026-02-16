@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { FeedbackDialog } from '@/components/feedback/FeedbackDialog'
+import { NotificationBell } from '@/components/layouts/NotificationBell'
 
 interface HeaderProps {
   onMenuClick?: () => void
@@ -166,6 +167,7 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
               </Button>
             }
           />
+          <NotificationBell />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
