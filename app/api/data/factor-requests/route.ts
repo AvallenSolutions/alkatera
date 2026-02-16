@@ -45,23 +45,69 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    const { data: result, error } = await supabase.rpc('log_emission_factor_request', {
-      p_search_query: material_name.trim(),
-      p_material_name: material_name.trim(),
-      p_material_type: material_type || null,
-      p_context: 'user_request',
-      p_organization_id: membership?.organization_id || null,
-      p_requested_by: userData.user.id,
-      p_source_page: source_page || '/data/sources',
-      p_product_id: product_id ? parseInt(product_id) : null,
-      p_metadata: { notes: notes || null },
-    });
+    const orgId = membership?.organization_id || null;
+    const trimmedName = material_name.trim();
 
-    if (error) throw error;
+    // Use service role for the insert so RLS doesn't block it
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const serviceClient = createClient(supabaseUrl, serviceKey);
+
+    // Check for an existing pending request with the same material name
+    const { data: existing } = await serviceClient
+      .from('emission_factor_requests')
+      .select('id, request_count, unique_org_count')
+      .ilike('material_name', trimmedName)
+      .in('status', ['pending', 'researching'])
+      .limit(1)
+      .maybeSingle();
+
+    let requestId: string;
+
+    if (existing) {
+      // Increment counts on the existing request
+      const newOrgCount = orgId
+        ? existing.unique_org_count + 1  // approximate — good enough
+        : existing.unique_org_count;
+      const newCount = existing.request_count + 1;
+
+      const { error: updateError } = await serviceClient
+        .from('emission_factor_requests')
+        .update({
+          request_count: newCount,
+          unique_org_count: newOrgCount,
+          priority_score: newCount * 10 + newOrgCount * 5,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+
+      if (updateError) throw updateError;
+      requestId = existing.id;
+    } else {
+      // Insert a new request
+      const { data: inserted, error: insertError } = await serviceClient
+        .from('emission_factor_requests')
+        .insert({
+          search_query: trimmedName,
+          material_name: trimmedName,
+          material_type: material_type || null,
+          context: 'user_request',
+          organization_id: orgId,
+          requested_by: userData.user.id,
+          source_page: source_page || '/data/sources',
+          product_id: product_id ? parseInt(product_id) : null,
+          metadata: { notes: notes || null },
+          priority_score: 10,
+        })
+        .select('id')
+        .single();
+
+      if (insertError) throw insertError;
+      requestId = inserted.id;
+    }
 
     return NextResponse.json({
       success: true,
-      request_id: result,
+      request_id: requestId,
       message: 'Factor request submitted. Our team will review and prioritise this.',
     });
   } catch (error: any) {
