@@ -51,11 +51,45 @@ export default function ItemDetailPage() {
 
   // Generate a signed URL for private storage files
   // External links (content_type === 'link') use file_url directly as it's a URL, not a storage path
+  // Global items (organization_id === null) use a server-side API route because
+  // the files may be stored under another org's path in the storage bucket.
   useEffect(() => {
     async function generateSignedUrl() {
       if (!item?.file_url || item.content_type === 'link') return
 
-      // Handle both legacy full URLs and new path-only format
+      // Global items: use the API route (service role) to bypass storage path restrictions
+      if (item.organization_id === null) {
+        try {
+          const { data: session } = await supabase.auth.getSession()
+          const token = session?.session?.access_token
+          if (!token) return
+
+          const response = await fetch('/api/knowledge-bank/signed-url', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              file_url: item.file_url,
+              file_name: item.file_name,
+              item_id: item.id,
+            }),
+          })
+
+          const result = await response.json()
+          if (response.ok && result.signedUrl) {
+            setSignedUrl(result.signedUrl)
+          } else {
+            console.error('Error generating signed URL via API:', result.error)
+          }
+        } catch (err) {
+          console.error('Error generating signed URL via API:', err)
+        }
+        return
+      }
+
+      // Org-specific items: use client-side signed URL generation
       let storagePath = item.file_url
       const bucketPrefix = '/storage/v1/object/public/knowledge-bank-files/'
       if (storagePath.includes(bucketPrefix)) {
@@ -362,7 +396,7 @@ export default function ItemDetailPage() {
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Author:</span>
                   <span className="font-medium ml-auto truncate">
-                    {item.author?.full_name || 'Unknown'}
+                    {item.author?.full_name || (item.organization_id === null ? 'AlkaTera' : 'Unknown')}
                   </span>
                 </div>
 

@@ -191,7 +191,7 @@ export function KnowledgeBankCard({ item, onFavoriteToggle }: KnowledgeBankCardP
               <User className="h-4 w-4" />
             )}
             <span className="truncate max-w-[120px]">
-              {item.author?.full_name || 'Unknown'}
+              {item.author?.full_name || (item.organization_id === null ? 'AlkaTera' : 'Unknown')}
             </span>
           </div>
           <div className="flex items-center gap-1">
