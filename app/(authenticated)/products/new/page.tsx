@@ -17,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers, FileUp, PenLine } from "lucide-react";
+import { Loader2, Save, ArrowLeft, Image as ImageIcon, AlertCircle, Info, Package, Layers, FileUp, PenLine, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";
@@ -504,7 +504,7 @@ export default function NewProductLCAPage() {
           />
         )}
 
-        <div className="grid md:grid-cols-2 gap-6 pt-4">
+        <div className="grid md:grid-cols-3 gap-6 pt-4">
           <Card
             className="cursor-pointer hover:border-primary hover:shadow-md transition-all"
             onClick={() => handleCreationMethodSelect("manual")}
@@ -551,6 +551,31 @@ export default function NewProductLCAPage() {
               </ul>
               <Button className="mt-4 w-full" variant="outline">
                 Import BOM
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card
+            className="cursor-pointer hover:border-primary hover:shadow-md transition-all"
+            onClick={() => router.push("/products/import")}
+          >
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <FileSpreadsheet className="h-8 w-8 text-primary" />
+              </div>
+              <CardTitle>Bulk Import from Spreadsheet</CardTitle>
+              <CardDescription>
+                Import multiple products with ingredients, packaging, and EPR data from Excel
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>Download and fill in the Excel template</li>
+                <li>Import multiple products at once</li>
+                <li>Auto-match to emission factor databases</li>
+              </ul>
+              <Button className="mt-4 w-full" variant="outline">
+                Bulk Import
               </Button>
             </CardContent>
           </Card>
