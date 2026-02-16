@@ -6,7 +6,7 @@ import { useOrganization } from '@/lib/organizationContext'
 
 export interface KnowledgeBankCategory {
   id: string
-  organization_id: string
+  organization_id: string | null
   name: string
   description: string | null
   icon: string
@@ -19,7 +19,7 @@ export interface KnowledgeBankCategory {
 
 export interface KnowledgeBankItem {
   id: string
-  organization_id: string
+  organization_id: string | null
   category_id: string
   title: string
   description: string | null
@@ -49,7 +49,7 @@ export interface KnowledgeBankItem {
 
 export interface KnowledgeBankTag {
   id: string
-  organization_id: string
+  organization_id: string | null
   name: string
   created_at: string
 }
@@ -71,10 +71,11 @@ export function useKnowledgeBankCategories() {
         setLoading(true)
         setError(null)
 
+        // Fetch both org-specific and global (platform) categories
         const { data: categoriesData, error: categoriesError } = await supabase
           .from('knowledge_bank_categories')
           .select('*')
-          .eq('organization_id', currentOrganization.id)
+          .or(`organization_id.eq.${currentOrganization.id},organization_id.is.null`)
           .order('sort_order', { ascending: true })
 
         if (categoriesError) throw categoriesError
@@ -131,6 +132,7 @@ export function useKnowledgeBankItems(filters?: {
         setLoading(true)
         setError(null)
 
+        // Fetch both org-specific and global (platform) items
         let query = supabase
           .from('knowledge_bank_items')
           .select(`
@@ -138,7 +140,7 @@ export function useKnowledgeBankItems(filters?: {
             category:knowledge_bank_categories(*),
             author:profiles(id, full_name, avatar_url)
           `)
-          .eq('organization_id', currentOrganization.id)
+          .or(`organization_id.eq.${currentOrganization.id},organization_id.is.null`)
 
         if (filters?.categoryId) {
           query = query.eq('category_id', filters.categoryId)

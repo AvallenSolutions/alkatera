@@ -138,6 +138,11 @@ export function KnowledgeBankCard({ item, onFavoriteToggle }: KnowledgeBankCardP
 
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-1.5">
+            {item.organization_id === null && (
+              <Badge variant="outline" className="text-xs bg-neon-lime/10 text-neon-lime border-neon-lime/30">
+                Platform
+              </Badge>
+            )}
             {item.category && (
               <Badge variant="secondary" className="text-xs">
                 {item.category.name}
