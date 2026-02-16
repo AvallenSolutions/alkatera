@@ -7,6 +7,7 @@ export interface EmployeeSurvey {
   organization_id: string;
   survey_name: string;
   survey_type: string;
+  survey_provider: string | null;
   description: string | null;
   status: string;
   launch_date: string | null;
@@ -20,18 +21,31 @@ export interface EmployeeSurvey {
   updated_at: string;
 }
 
-export interface SurveyResponse {
+/** Matches a single row in people_survey_responses */
+export interface SurveyResponseRow {
   id: string;
   survey_id: string;
   organization_id: string;
-  response_date: string;
-  overall_score: number | null;
-  category_scores: Record<string, number>;
-  question_aggregates: { question_id: string; avg_score: number; response_count: number }[];
-  positive_themes: string[];
-  improvement_themes: string[];
-  demographic_breakdown: Record<string, unknown>;
+  question_category: string | null;
+  question_text: string | null;
+  avg_score: number | null;
+  response_count: number | null;
+  score_1_count: number;
+  score_2_count: number;
+  score_3_count: number;
+  score_4_count: number;
+  score_5_count: number;
+  positive_sentiment_percentage: number | null;
+  neutral_sentiment_percentage: number | null;
+  negative_sentiment_percentage: number | null;
   created_at: string;
+  updated_at: string;
+}
+
+/** Aggregated category scores derived from multiple SurveyResponseRow records */
+export interface AggregatedSurveyScores {
+  category_scores: Record<string, number>;
+  overall_score: number | null;
 }
 
 export interface Benefit {
@@ -66,7 +80,7 @@ export interface BenefitTypeBreakdown {
 export interface WellbeingMetrics {
   surveys: EmployeeSurvey[];
   latest_survey: EmployeeSurvey | null;
-  latest_responses: SurveyResponse | null;
+  latest_responses: AggregatedSurveyScores | null;
   benefits: Benefit[];
   active_benefits_count: number;
   benefit_summary: {
@@ -139,7 +153,28 @@ export function useWellbeingMetrics(year?: number) {
       // Find latest completed survey
       const completedSurveys = surveys.filter(s => s.status === 'closed' || s.total_responses > 0);
       const latestSurvey = completedSurveys[0] || null;
-      const latestResponses = latestSurvey?.people_survey_responses?.[0] || null;
+
+      // Aggregate per-row responses into a category_scores map
+      let latestResponses: AggregatedSurveyScores | null = null;
+      if (latestSurvey?.people_survey_responses && latestSurvey.people_survey_responses.length > 0) {
+        const responseRows = latestSurvey.people_survey_responses as SurveyResponseRow[];
+        const categoryScores: Record<string, number> = {};
+        let totalScore = 0;
+        let scoreCount = 0;
+
+        for (const row of responseRows) {
+          if (row.question_category && row.avg_score !== null) {
+            categoryScores[row.question_category] = row.avg_score;
+            totalScore += row.avg_score;
+            scoreCount++;
+          }
+        }
+
+        latestResponses = {
+          category_scores: categoryScores,
+          overall_score: scoreCount > 0 ? totalScore / scoreCount : null,
+        };
+      }
 
       // Calculate benefit summary
       const activeBenefits = benefits.filter(b => b.is_active);
@@ -180,8 +215,8 @@ export function useWellbeingMetrics(year?: number) {
       let wellbeingScore: number | null = null;
 
       if (latestResponses) {
-        engagementScore = latestResponses.category_scores?.engagement || latestResponses.overall_score;
-        wellbeingScore = latestResponses.category_scores?.wellbeing || latestResponses.overall_score;
+        engagementScore = latestResponses.category_scores?.engagement ?? latestResponses.overall_score;
+        wellbeingScore = latestResponses.category_scores?.wellbeing ?? latestResponses.overall_score;
       }
 
       // Calculate survey participation trend

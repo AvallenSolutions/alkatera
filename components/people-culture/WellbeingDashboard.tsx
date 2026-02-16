@@ -161,14 +161,21 @@ function SurveysCard({ surveys, latestSurvey, latestResponses }: {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="font-medium">{latestSurvey.survey_name}</p>
-                    <Badge
-                      className={cn(
-                        'text-xs mt-1',
-                        SURVEY_STATUS_CONFIG[latestSurvey.status as keyof typeof SURVEY_STATUS_CONFIG]?.color
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge
+                        className={cn(
+                          'text-xs',
+                          SURVEY_STATUS_CONFIG[latestSurvey.status as keyof typeof SURVEY_STATUS_CONFIG]?.color
+                        )}
+                      >
+                        {SURVEY_STATUS_CONFIG[latestSurvey.status as keyof typeof SURVEY_STATUS_CONFIG]?.label || latestSurvey.status}
+                      </Badge>
+                      {latestSurvey.survey_provider && (
+                        <span className="text-xs text-muted-foreground">
+                          via {latestSurvey.survey_provider.replace(/_/g, ' ')}
+                        </span>
                       )}
-                    >
-                      {SURVEY_STATUS_CONFIG[latestSurvey.status as keyof typeof SURVEY_STATUS_CONFIG]?.label || latestSurvey.status}
-                    </Badge>
+                    </div>
                   </div>
                   {latestSurvey.response_rate && (
                     <div className="text-right">

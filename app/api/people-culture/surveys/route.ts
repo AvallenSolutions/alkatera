@@ -114,6 +114,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validate category_scores if provided
+    if (body.category_scores && Array.isArray(body.category_scores)) {
+      for (const cs of body.category_scores) {
+        if (!cs.question_category || typeof cs.avg_score !== 'number') {
+          return NextResponse.json({
+            error: 'Each category score must have a question_category and numeric avg_score'
+          }, { status: 400 });
+        }
+        if (cs.avg_score < 1 || cs.avg_score > 5) {
+          return NextResponse.json({
+            error: 'Category avg_score must be between 1 and 5'
+          }, { status: 400 });
+        }
+      }
+    }
+
     // Prepare record data
     // Note: survey_title is a legacy NOT NULL column — keep it in sync with survey_name
     const recordData = {
@@ -122,6 +138,7 @@ export async function POST(request: NextRequest) {
       survey_name: body.survey_name,
       survey_title: body.survey_name,
       survey_type: body.survey_type,
+      survey_provider: body.survey_provider || null,
       description: body.description || null,
       status: body.status || 'draft',
       launch_date: body.launch_date || null,
@@ -142,6 +159,31 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Error creating survey:', error);
       return NextResponse.json({ error: 'Failed to create survey', details: error.message }, { status: 500 });
+    }
+
+    // Insert category score rows into people_survey_responses
+    if (data && body.category_scores && Array.isArray(body.category_scores) && body.category_scores.length > 0) {
+      const responseRows = body.category_scores.map((cs: {
+        question_category: string;
+        avg_score: number;
+        response_count?: number | null;
+      }) => ({
+        survey_id: data.id,
+        organization_id: organizationId,
+        question_category: cs.question_category,
+        question_text: `${cs.question_category.replace(/_/g, ' ')} category average`,
+        avg_score: cs.avg_score,
+        response_count: cs.response_count || body.total_responses || null,
+      }));
+
+      const { error: responsesError } = await supabase
+        .from('people_survey_responses')
+        .insert(responseRows);
+
+      if (responsesError) {
+        console.error('Error inserting survey responses:', responsesError);
+        // Survey was created successfully, don't fail the whole request
+      }
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });
