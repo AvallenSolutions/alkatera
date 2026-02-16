@@ -74,4 +74,39 @@ export interface MatchResult {
   match_type: 'exact' | 'fuzzy' | 'category';
 }
 
+// ── Material matching (auto-match during import) ─────────────────────────
+
+export interface SearchResultForMatch {
+  id: string;
+  name: string;
+  category: string;
+  source_type: 'primary' | 'staging' | 'global_library' | 'ecoinvent_proxy' | 'ecoinvent_live' | 'agribalyse_live' | 'defra';
+  co2_factor?: number;
+  source: string;
+}
+
+export interface MaterialMatchState {
+  materialName: string;
+  materialType: 'ingredient' | 'packaging';
+  status: 'pending' | 'searching' | 'matched' | 'no_match' | 'error';
+  searchResults: SearchResultForMatch[];
+  selectedIndex: number | null;
+  autoMatchConfidence: number | null;
+  userReviewed: boolean;
+}
+
+export interface MaterialMatchSelection {
+  data_source: 'openlca' | 'supplier' | null;
+  data_source_id: string | null;
+  supplier_product_id: string | null;
+}
+
+export interface MatchedIngredient extends ParsedIngredient {
+  match?: MaterialMatchSelection;
+}
+
+export interface MatchedPackaging extends ParsedPackaging {
+  match?: MaterialMatchSelection;
+}
+
 // ConfidenceLevel is exported from ./material-matcher — not duplicated here

@@ -7,6 +7,9 @@ import type {
   ParsedIngredient,
   ParsedPackaging,
   ParsedPackagingComponent,
+  MaterialMatchSelection,
+  MatchedIngredient,
+  MatchedPackaging,
 } from '@/lib/bulk-import/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -93,8 +96,8 @@ export async function POST(
     } = body as {
       organizationId: string;
       products: ParsedProduct[];
-      ingredients: ParsedIngredient[];
-      packaging: ParsedPackaging[];
+      ingredients: MatchedIngredient[];
+      packaging: MatchedPackaging[];
     };
 
     if (!organizationId) {
@@ -172,14 +175,25 @@ export async function POST(
     // Insert ingredients as product_materials
     const ingredientRows = ingredients
       .filter(ing => skuToProductId[ing.product_sku])
-      .map(ing => ({
-        product_id: skuToProductId[ing.product_sku],
-        material_name: ing.name,
-        material_type: 'ingredient' as const,
-        quantity: ing.quantity,
-        unit: ing.unit,
-        origin_address: ing.origin,
-      }));
+      .map(ing => {
+        const row: Record<string, any> = {
+          product_id: skuToProductId[ing.product_sku],
+          material_name: ing.name,
+          material_type: 'ingredient' as const,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          origin_address: ing.origin,
+        };
+
+        // Include match data if provided
+        if (ing.match) {
+          if (ing.match.data_source) row.data_source = ing.match.data_source;
+          if (ing.match.data_source_id) row.data_source_id = ing.match.data_source_id;
+          if (ing.match.supplier_product_id) row.supplier_product_id = ing.match.supplier_product_id;
+        }
+
+        return row;
+      });
 
     if (ingredientRows.length > 0) {
       const { error } = await serviceClient
@@ -200,7 +214,7 @@ export async function POST(
     const packagingRows = validPackaging.map(pkg => {
       const componentWeights = aggregateComponentWeights(pkg.components);
 
-      return {
+      const row: Record<string, any> = {
         product_id: skuToProductId[pkg.product_sku],
         material_name: pkg.name,
         material_type: 'packaging' as const,
@@ -224,6 +238,15 @@ export async function POST(
         has_component_breakdown: pkg.components.length > 0,
         ...componentWeights,
       };
+
+      // Include match data if provided
+      if (pkg.match) {
+        if (pkg.match.data_source) row.data_source = pkg.match.data_source;
+        if (pkg.match.data_source_id) row.data_source_id = pkg.match.data_source_id;
+        if (pkg.match.supplier_product_id) row.supplier_product_id = pkg.match.supplier_product_id;
+      }
+
+      return row;
     });
 
     let insertedPackaging: Array<{ id: number; material_name: string; packaging_category: string }> = [];

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,23 +25,43 @@ import {
   Package,
   Leaf,
   Box,
+  Link2,
+  Link2Off,
+  SkipForward,
 } from 'lucide-react';
 import { downloadTemplateAsXLSX } from '@/lib/bulk-import/template-generator';
 import { useOrganization } from '@/lib/organizationContext';
+import { supabase } from '@/lib/supabaseClient';
 import { toast } from 'sonner';
+import { MaterialMatchCell } from '@/components/bulk-import/MaterialMatchCell';
+import {
+  batchMatchMaterials,
+  getMatchSelection,
+  computeConfidence,
+  mapSearchResultToDBSource,
+} from '@/lib/bulk-import/batch-matcher';
 import type {
   ParsedProduct,
   ParsedIngredient,
   ParsedPackaging,
+  MaterialMatchState,
+  MaterialMatchSelection,
+  SearchResultForMatch,
 } from '@/lib/bulk-import/types';
 
+function normalise(s: string): string {
+  return s.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+}
+
 interface ImportState {
-  status: 'idle' | 'uploading' | 'preview' | 'confirming' | 'complete';
+  status: 'idle' | 'uploading' | 'matching' | 'preview' | 'confirming' | 'complete';
   products: ParsedProduct[];
   ingredients: ParsedIngredient[];
   packaging: ParsedPackaging[];
   errors: string[];
   error: string | null;
+  matchStates: Record<string, MaterialMatchState>;
+  matchProgress: { completed: number; total: number };
 }
 
 const INITIAL_STATE: ImportState = {
@@ -50,6 +71,8 @@ const INITIAL_STATE: ImportState = {
   packaging: [],
   errors: [],
   error: null,
+  matchStates: {},
+  matchProgress: { completed: 0, total: 0 },
 };
 
 export default function ImportPage() {
@@ -58,10 +81,46 @@ export default function ImportPage() {
   const [state, setState] = useState<ImportState>(INITIAL_STATE);
   const [activeTab, setActiveTab] = useState<string>('template');
   const [showConfirm, setShowConfirm] = useState(false);
+  const abortRef = useRef(false);
 
   const handleDownloadTemplate = () => {
     downloadTemplateAsXLSX();
   };
+
+  // ── Get auth token ───────────────────────────────────────────────────
+
+  const getAuthToken = useCallback(async (): Promise<string | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token ?? null;
+  }, []);
+
+  // ── Manual search for MaterialMatchCell ──────────────────────────────
+
+  const handleManualSearch = useCallback(
+    async (query: string): Promise<SearchResultForMatch[]> => {
+      if (!currentOrganization) return [];
+      const token = await getAuthToken();
+      if (!token) return [];
+
+      const url = `/api/ingredients/search?q=${encodeURIComponent(query)}&organization_id=${currentOrganization.id}`;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (data.results || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        source_type: r.source_type,
+        co2_factor: r.co2_factor,
+        source: r.source,
+      }));
+    },
+    [currentOrganization, getAuthToken]
+  );
+
+  // ── File upload ──────────────────────────────────────────────────────
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -93,17 +152,13 @@ export default function ImportPage() {
       const data = await response.json();
 
       if (data.success) {
-        setState(prev => ({
-          ...prev,
-          status: 'preview',
-          products: data.data.products,
-          ingredients: data.data.ingredients,
-          packaging: data.data.packaging,
-          errors: data.data.errors || [],
-        }));
+        const { products, ingredients, packaging, errors } = data.data;
         toast.success(
           `Found ${data.summary.products} products, ${data.summary.ingredients} ingredients, ${data.summary.packaging} packaging items`
         );
+
+        // Start matching phase
+        startMatching(products, ingredients, packaging, errors || []);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Upload failed';
@@ -111,9 +166,162 @@ export default function ImportPage() {
       toast.error(message);
     }
 
-    // Reset file input so the same file can be re-uploaded
     event.target.value = '';
   };
+
+  // ── Matching phase ───────────────────────────────────────────────────
+
+  const startMatching = async (
+    products: ParsedProduct[],
+    ingredients: ParsedIngredient[],
+    packaging: ParsedPackaging[],
+    errors: string[]
+  ) => {
+    if (!currentOrganization) {
+      // Can't match without org — skip to preview
+      setState(prev => ({
+        ...prev,
+        status: 'preview',
+        products,
+        ingredients,
+        packaging,
+        errors,
+      }));
+      return;
+    }
+
+    const token = await getAuthToken();
+    if (!token) {
+      setState(prev => ({
+        ...prev,
+        status: 'preview',
+        products,
+        ingredients,
+        packaging,
+        errors,
+      }));
+      return;
+    }
+
+    // Collect all material names
+    const materials: Array<{ name: string; type: 'ingredient' | 'packaging' }> = [
+      ...ingredients.map(i => ({ name: i.name, type: 'ingredient' as const })),
+      ...packaging.map(p => ({ name: p.name, type: 'packaging' as const })),
+    ];
+
+    if (materials.length === 0) {
+      setState(prev => ({
+        ...prev,
+        status: 'preview',
+        products,
+        ingredients,
+        packaging,
+        errors,
+      }));
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      status: 'matching',
+      products,
+      ingredients,
+      packaging,
+      errors,
+      matchProgress: { completed: 0, total: materials.length },
+    }));
+
+    abortRef.current = false;
+
+    try {
+      const matchStates = await batchMatchMaterials(materials, {
+        organizationId: currentOrganization.id,
+        authToken: token,
+        concurrency: 4,
+        onProgress: (completed, total, states) => {
+          if (abortRef.current) return;
+          setState(prev => ({
+            ...prev,
+            matchStates: states,
+            matchProgress: { completed, total },
+          }));
+        },
+      });
+
+      if (abortRef.current) return;
+
+      setState(prev => ({
+        ...prev,
+        status: 'preview',
+        matchStates,
+      }));
+    } catch (err) {
+      console.error('Matching failed:', err);
+      // Move to preview even if matching fails
+      setState(prev => ({
+        ...prev,
+        status: 'preview',
+      }));
+    }
+  };
+
+  const handleSkipMatching = () => {
+    abortRef.current = true;
+    setState(prev => ({
+      ...prev,
+      status: 'preview',
+    }));
+  };
+
+  // ── Select/deselect match result ─────────────────────────────────────
+
+  const handleSelectMatchResult = useCallback(
+    (materialName: string, index: number, manualResults?: SearchResultForMatch[]) => {
+      const key = normalise(materialName);
+      setState(prev => {
+        const current = prev.matchStates[key];
+        if (!current) return prev;
+
+        // If manual results provided (from search), replace search results
+        const searchResults = manualResults || current.searchResults;
+
+        if (index === -1) {
+          // Deselect
+          return {
+            ...prev,
+            matchStates: {
+              ...prev.matchStates,
+              [key]: {
+                ...current,
+                searchResults,
+                selectedIndex: null,
+                status: 'no_match',
+                userReviewed: true,
+              },
+            },
+          };
+        }
+
+        return {
+          ...prev,
+          matchStates: {
+            ...prev.matchStates,
+            [key]: {
+              ...current,
+              searchResults,
+              selectedIndex: index,
+              status: 'matched',
+              autoMatchConfidence: computeConfidence(materialName, searchResults[index]?.name || ''),
+              userReviewed: true,
+            },
+          },
+        };
+      });
+    },
+    []
+  );
+
+  // ── Confirm import ───────────────────────────────────────────────────
 
   const handleConfirmImport = async () => {
     if (!currentOrganization) {
@@ -125,14 +333,25 @@ export default function ImportPage() {
       setState(prev => ({ ...prev, status: 'confirming' }));
       setShowConfirm(false);
 
+      // Attach match selections to ingredients and packaging
+      const ingredientsWithMatch = state.ingredients.map(ing => {
+        const match = getMatchSelection(ing.name, state.matchStates);
+        return { ...ing, match: match || undefined };
+      });
+
+      const packagingWithMatch = state.packaging.map(pkg => {
+        const match = getMatchSelection(pkg.name, state.matchStates);
+        return { ...pkg, match: match || undefined };
+      });
+
       const response = await fetch('/api/bulk-import/import/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           organizationId: currentOrganization.id,
           products: state.products,
-          ingredients: state.ingredients,
-          packaging: state.packaging,
+          ingredients: ingredientsWithMatch,
+          packaging: packagingWithMatch,
         }),
       });
 
@@ -162,6 +381,22 @@ export default function ImportPage() {
       toast.error(message);
     }
   };
+
+  // ── Match summary stats ──────────────────────────────────────────────
+
+  const matchSummary = (() => {
+    const states = Object.values(state.matchStates);
+    const matched = states.filter(
+      s => s.status === 'matched' && s.selectedIndex != null && (s.autoMatchConfidence ?? 0) >= 0.7
+    ).length;
+    const needReview = states.filter(
+      s => s.status === 'matched' && s.selectedIndex != null && (s.autoMatchConfidence ?? 0) < 0.7
+    ).length;
+    const unlinked = states.filter(
+      s => s.status === 'no_match' || s.status === 'error' || s.selectedIndex == null
+    ).length;
+    return { matched, needReview, unlinked, total: states.length };
+  })();
 
   // Group ingredients and packaging by product SKU for preview
   const ingredientsBySku: Record<string, ParsedIngredient[]> = {};
@@ -235,14 +470,15 @@ export default function ImportPage() {
               <li>Leave optional fields blank if not applicable</li>
               <li>Save as Excel (.xlsx)</li>
               <li>Switch to the Import tab and upload the file</li>
-              <li>Review the extracted data</li>
+              <li>Review the extracted data and matched emission factors</li>
               <li>Confirm to save everything to your products</li>
             </ol>
           </Card>
         </TabsContent>
 
         <TabsContent value="import" className="space-y-4">
-          {state.status === 'idle' || state.status === 'uploading' ? (
+          {/* Upload state */}
+          {(state.status === 'idle' || state.status === 'uploading') && (
             <Card className="p-6 space-y-4">
               <div className="flex items-center gap-2">
                 <Upload className="h-5 w-5 text-blue-600" />
@@ -281,7 +517,68 @@ export default function ImportPage() {
                 </div>
               )}
             </Card>
-          ) : state.status === 'preview' || state.status === 'confirming' ? (
+          )}
+
+          {/* Matching phase */}
+          {state.status === 'matching' && (
+            <Card className="p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-blue-600 animate-pulse" />
+                <h2 className="text-xl font-semibold">Matching Materials</h2>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                Searching emission factor databases to find matching entries for your materials...
+              </p>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span>
+                    Matching materials... ({state.matchProgress.completed}/{state.matchProgress.total})
+                  </span>
+                  <span className="text-muted-foreground">
+                    {state.matchProgress.total > 0
+                      ? Math.round((state.matchProgress.completed / state.matchProgress.total) * 100)
+                      : 0}%
+                  </span>
+                </div>
+                <Progress
+                  value={
+                    state.matchProgress.total > 0
+                      ? (state.matchProgress.completed / state.matchProgress.total) * 100
+                      : 0
+                  }
+                />
+              </div>
+
+              {/* Show matches as they come in */}
+              {Object.values(state.matchStates).filter(s => s.status === 'matched').length > 0 && (
+                <div className="text-xs text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto">
+                  {Object.values(state.matchStates)
+                    .filter(s => s.status === 'matched' && s.selectedIndex != null)
+                    .slice(0, 8)
+                    .map(s => (
+                      <div key={s.materialName} className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
+                        <span className="truncate">{s.materialName}</span>
+                        <span className="text-muted-foreground/50 mx-0.5">→</span>
+                        <span className="truncate text-muted-foreground">
+                          {s.searchResults[s.selectedIndex!]?.name}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              <Button variant="outline" onClick={handleSkipMatching} className="gap-2">
+                <SkipForward className="h-4 w-4" />
+                Skip Matching
+              </Button>
+            </Card>
+          )}
+
+          {/* Preview / Confirming state */}
+          {(state.status === 'preview' || state.status === 'confirming') && (
             <div className="space-y-4">
               {/* Summary counts */}
               <Card className="p-6">
@@ -309,6 +606,34 @@ export default function ImportPage() {
                   </div>
                 </div>
               </Card>
+
+              {/* Match summary banner */}
+              {matchSummary.total > 0 && (
+                <Card className="p-4">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="text-sm font-medium">Material Matching:</span>
+                    {matchSummary.matched > 0 && (
+                      <Badge variant="secondary" className="gap-1">
+                        <CheckCircle className="h-3 w-3 text-green-600" />
+                        {matchSummary.matched} matched
+                      </Badge>
+                    )}
+                    {matchSummary.needReview > 0 && (
+                      <Badge variant="secondary" className="gap-1 border-amber-300">
+                        <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        {matchSummary.needReview} need review
+                      </Badge>
+                    )}
+                    {matchSummary.unlinked > 0 && (
+                      <Badge variant="outline" className="gap-1">
+                        <Link2Off className="h-3 w-3 text-red-500" />
+                        {matchSummary.unlinked} unlinked
+                      </Badge>
+                    )}
+                  </div>
+                </Card>
+              )}
 
               {/* Warnings */}
               {state.errors.length > 0 && (
@@ -358,21 +683,59 @@ export default function ImportPage() {
                             <tr className="text-left text-muted-foreground text-xs">
                               <th className="pb-1 pr-4 font-medium">Name</th>
                               <th className="pb-1 pr-4 font-medium">Qty</th>
-                              <th className="pb-1 font-medium">Origin</th>
+                              <th className="pb-1 pr-4 font-medium">Origin</th>
+                              <th className="pb-1 font-medium">Emission Factor</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border/50">
-                            {ingredientsBySku[product.sku].map((ing, i) => (
-                              <tr key={i}>
-                                <td className="py-1.5 pr-4">{ing.name}</td>
-                                <td className="py-1.5 pr-4 text-muted-foreground">
-                                  {ing.quantity} {ing.unit}
-                                </td>
-                                <td className="py-1.5 text-muted-foreground text-xs">
-                                  {ing.origin || '-'}
-                                </td>
-                              </tr>
-                            ))}
+                            {ingredientsBySku[product.sku].map((ing, i) => {
+                              const key = normalise(ing.name);
+                              const matchState = state.matchStates[key];
+                              return (
+                                <tr key={i}>
+                                  <td className="py-1.5 pr-4">{ing.name}</td>
+                                  <td className="py-1.5 pr-4 text-muted-foreground">
+                                    {ing.quantity} {ing.unit}
+                                  </td>
+                                  <td className="py-1.5 pr-4 text-muted-foreground text-xs">
+                                    {ing.origin || '-'}
+                                  </td>
+                                  <td className="py-1.5">
+                                    <MaterialMatchCell
+                                      matchState={matchState}
+                                      onSelectResult={(idx) =>
+                                        handleSelectMatchResult(ing.name, idx)
+                                      }
+                                      onManualSearch={async (q) => {
+                                        const results = await handleManualSearch(q);
+                                        // Store manual results in matchStates
+                                        if (results.length > 0) {
+                                          const mKey = normalise(ing.name);
+                                          setState(prev => ({
+                                            ...prev,
+                                            matchStates: {
+                                              ...prev.matchStates,
+                                              [mKey]: {
+                                                ...(prev.matchStates[mKey] || {
+                                                  materialName: ing.name,
+                                                  materialType: 'ingredient',
+                                                  status: 'no_match',
+                                                  selectedIndex: null,
+                                                  autoMatchConfidence: null,
+                                                  userReviewed: false,
+                                                }),
+                                                searchResults: results,
+                                              },
+                                            },
+                                          }));
+                                        }
+                                        return results;
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -394,42 +757,79 @@ export default function ImportPage() {
                               <th className="pb-1 pr-4 font-medium">Category</th>
                               <th className="pb-1 pr-4 font-medium">Material</th>
                               <th className="pb-1 pr-4 font-medium">Weight</th>
-                              <th className="pb-1 font-medium">EPR</th>
+                              <th className="pb-1 pr-4 font-medium">EPR</th>
+                              <th className="pb-1 font-medium">Emission Factor</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border/50">
-                            {packagingBySku[product.sku].map((pkg, i) => (
-                              <tr key={i}>
-                                <td className="py-1.5 pr-4">
-                                  {pkg.name}
-                                  {pkg.components.length > 0 && (
-                                    <span className="text-xs text-muted-foreground ml-1">
-                                      ({pkg.components.length} components)
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="py-1.5 pr-4">
-                                  <Badge variant="outline" className="capitalize text-xs">
-                                    {pkg.category}
-                                  </Badge>
-                                </td>
-                                <td className="py-1.5 pr-4 capitalize text-muted-foreground">
-                                  {pkg.main_material}
-                                </td>
-                                <td className="py-1.5 pr-4 text-muted-foreground">
-                                  {pkg.weight_g}g
-                                </td>
-                                <td className="py-1.5">
-                                  {pkg.epr_level ? (
-                                    <Badge variant="secondary" className="capitalize text-xs">
-                                      {pkg.epr_level}
+                            {packagingBySku[product.sku].map((pkg, i) => {
+                              const key = normalise(pkg.name);
+                              const matchState = state.matchStates[key];
+                              return (
+                                <tr key={i}>
+                                  <td className="py-1.5 pr-4">
+                                    {pkg.name}
+                                    {pkg.components.length > 0 && (
+                                      <span className="text-xs text-muted-foreground ml-1">
+                                        ({pkg.components.length} components)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5 pr-4">
+                                    <Badge variant="outline" className="capitalize text-xs">
+                                      {pkg.category}
                                     </Badge>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">-</span>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
+                                  </td>
+                                  <td className="py-1.5 pr-4 capitalize text-muted-foreground">
+                                    {pkg.main_material}
+                                  </td>
+                                  <td className="py-1.5 pr-4 text-muted-foreground">
+                                    {pkg.weight_g}g
+                                  </td>
+                                  <td className="py-1.5 pr-4">
+                                    {pkg.epr_level ? (
+                                      <Badge variant="secondary" className="capitalize text-xs">
+                                        {pkg.epr_level}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">-</span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5">
+                                    <MaterialMatchCell
+                                      matchState={matchState}
+                                      onSelectResult={(idx) =>
+                                        handleSelectMatchResult(pkg.name, idx)
+                                      }
+                                      onManualSearch={async (q) => {
+                                        const results = await handleManualSearch(q);
+                                        if (results.length > 0) {
+                                          const mKey = normalise(pkg.name);
+                                          setState(prev => ({
+                                            ...prev,
+                                            matchStates: {
+                                              ...prev.matchStates,
+                                              [mKey]: {
+                                                ...(prev.matchStates[mKey] || {
+                                                  materialName: pkg.name,
+                                                  materialType: 'packaging',
+                                                  status: 'no_match',
+                                                  selectedIndex: null,
+                                                  autoMatchConfidence: null,
+                                                  userReviewed: false,
+                                                }),
+                                                searchResults: results,
+                                              },
+                                            },
+                                          }));
+                                        }
+                                        return results;
+                                      }}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -463,7 +863,10 @@ export default function ImportPage() {
                 </Button>
               </div>
             </div>
-          ) : state.status === 'complete' ? (
+          )}
+
+          {/* Complete state */}
+          {state.status === 'complete' && (
             <Card className="p-8 text-center space-y-4">
               <div className="flex justify-center">
                 <div className="rounded-full bg-green-100 p-4">
@@ -477,17 +880,33 @@ export default function ImportPage() {
                 </p>
               </div>
             </Card>
-          ) : null}
+          )}
         </TabsContent>
       </Tabs>
 
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
         <AlertDialogContent>
           <AlertDialogTitle>Confirm Import</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will create {state.products.length} product{state.products.length !== 1 ? 's' : ''} with{' '}
-            {state.ingredients.length} ingredients and {state.packaging.length} packaging items.
-            Products will be created as drafts. Continue?
+          <AlertDialogDescription asChild>
+            <div className="space-y-2">
+              <p>
+                This will create {state.products.length} product{state.products.length !== 1 ? 's' : ''} with{' '}
+                {state.ingredients.length} ingredients and {state.packaging.length} packaging items.
+                Products will be created as drafts.
+              </p>
+              {matchSummary.total > 0 && (
+                <div className="flex items-center gap-2 flex-wrap text-sm">
+                  <Link2 className="h-3.5 w-3.5" />
+                  <span>{matchSummary.matched + matchSummary.needReview} materials linked to emission factors</span>
+                  {matchSummary.unlinked > 0 && (
+                    <span className="text-muted-foreground">
+                      · {matchSummary.unlinked} unlinked (can be linked later)
+                    </span>
+                  )}
+                </div>
+              )}
+              <p>Continue?</p>
+            </div>
           </AlertDialogDescription>
           <div className="flex gap-2 justify-end">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
