@@ -95,15 +95,25 @@ function deriveQualityGrade(m: Record<string, any>): 'HIGH' | 'MEDIUM' | 'LOW' {
 }
 
 /**
- * Derive confidence score when the stored value is missing or zero.
+ * Confidence score derived purely from quality grade.
+ *
+ * We deliberately ignore any stored `confidence_score` on the material row
+ * because those values were set by the resolver with different semantics
+ * (e.g. staging LOW factors got 70-75) which inflated the average.
+ *
+ * The grade-based mapping gives a defensible, consistent metric:
+ *   HIGH   (Supplier EPD / Verified)       → 100 %  — gold standard, theoretical maximum
+ *   MEDIUM (DEFRA hybrid / Regional / Live) →  60 %  — reputable secondary data
+ *   LOW    (Generic proxy / estimate)       →  25 %  — high uncertainty, upgrade encouraged
+ *
+ * This means 100 % is achievable when every material has supplier-verified
+ * data, giving users a clear improvement journey.
  */
 function deriveConfidence(m: Record<string, any>): number {
-  if (m.confidence_score && m.confidence_score > 0) return m.confidence_score;
-
   const grade = deriveQualityGrade(m);
-  if (grade === 'HIGH') return 95;
-  if (grade === 'MEDIUM') return 75;
-  return 50;
+  if (grade === 'HIGH') return 100;
+  if (grade === 'MEDIUM') return 60;
+  return 25;
 }
 
 /**
@@ -279,7 +289,7 @@ export function useDataQualityMetrics(organizationId: string | undefined): DataQ
             const currentQuality = deriveQualityGrade(m);
             const currentConfidence = deriveConfidence(m);
             const ghgImpact = m.impact_climate || 0;
-            const potentialConfidence = 95;
+            const potentialConfidence = 100;
             const confidenceGain = potentialConfidence - currentConfidence;
             const priorityScore = (ghgImpact * confidenceGain) / 100;
 

@@ -7,7 +7,13 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDataQualityMetrics } from '@/hooks/data/useDataQualityMetrics';
 import { useOrganization } from '@/lib/organizationContext';
-import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Users, Leaf, ArrowRight } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertCircle, CheckCircle2, Users, Leaf, ArrowRight, Info } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import Link from 'next/link';
 
 export function DataQualityWidget() {
@@ -89,8 +95,8 @@ export function DataQualityWidget() {
   }
 
   const getQualityColor = (percentage: number) => {
-    if (percentage >= 70) return 'text-green-600';
-    if (percentage >= 40) return 'text-amber-600';
+    if (percentage >= 80) return 'text-green-600';
+    if (percentage >= 50) return 'text-amber-600';
     return 'text-red-600';
   };
 
@@ -109,7 +115,30 @@ export function DataQualityWidget() {
         {/* Overall Score */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Average Confidence Score</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium">Average Confidence Score</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                    <p className="font-semibold mb-1">How this is calculated</p>
+                    <p className="mb-2">
+                      Each material is scored based on its data quality grade, then averaged across all {distribution.total_count} materials:
+                    </p>
+                    <ul className="space-y-1 mb-2">
+                      <li><span className="font-medium text-green-500">High</span> (Supplier EPD / Verified) = 100%</li>
+                      <li><span className="font-medium text-amber-500">Medium</span> (Regional standard / DEFRA) = 60%</li>
+                      <li><span className="font-medium text-red-500">Low</span> (Generic proxy / estimate) = 25%</li>
+                    </ul>
+                    <p className="text-muted-foreground">
+                      Reach 100% by obtaining supplier-verified data (EPDs) for every material. Upgrade high-impact materials first for the biggest improvement.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <span className={`text-2xl font-bold ${getQualityColor(averageConfidence)}`}>
               {averageConfidence}%
             </span>
@@ -128,7 +157,7 @@ export function DataQualityWidget() {
                 <span>High Quality (Supplier Verified)</span>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-green-50 text-green-700">
+                <Badge variant="outline" className="bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300">
                   {distribution.high_count}
                 </Badge>
                 <span className="text-muted-foreground w-12 text-right">
@@ -136,7 +165,7 @@ export function DataQualityWidget() {
                 </span>
               </div>
             </div>
-            <Progress value={distribution.high_percentage} className="h-1.5 bg-green-100" />
+            <Progress value={distribution.high_percentage} className="h-1.5 bg-green-100 dark:bg-green-950" />
 
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
@@ -144,7 +173,7 @@ export function DataQualityWidget() {
                 <span>Medium Quality (Regional Standard)</span>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-amber-50 text-amber-700">
+                <Badge variant="outline" className="bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                   {distribution.medium_count}
                 </Badge>
                 <span className="text-muted-foreground w-12 text-right">
@@ -152,7 +181,7 @@ export function DataQualityWidget() {
                 </span>
               </div>
             </div>
-            <Progress value={distribution.medium_percentage} className="h-1.5 bg-amber-100" />
+            <Progress value={distribution.medium_percentage} className="h-1.5 bg-amber-100 dark:bg-amber-950" />
 
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
@@ -160,7 +189,7 @@ export function DataQualityWidget() {
                 <span>Low Quality (Generic Proxy)</span>
               </div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="bg-red-50 text-red-700">
+                <Badge variant="outline" className="bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300">
                   {distribution.low_count}
                 </Badge>
                 <span className="text-muted-foreground w-12 text-right">
@@ -168,7 +197,7 @@ export function DataQualityWidget() {
                 </span>
               </div>
             </div>
-            <Progress value={distribution.low_percentage} className="h-1.5 bg-red-100" />
+            <Progress value={distribution.low_percentage} className="h-1.5 bg-red-100 dark:bg-red-950" />
           </div>
         </div>
 
