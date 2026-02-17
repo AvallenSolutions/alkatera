@@ -83,28 +83,49 @@ export async function generateMetadata(
     };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://alkatera.com';
+  const postUrl = `${siteUrl}/blog/${post.slug}`;
+
+  // Use meta_title only if it looks like a real title (not a slug or fragment).
+  // Slugs typically contain underscores/hyphens and no spaces.
+  const metaTitleIsValid = post.meta_title && post.meta_title.includes(' ');
+  const title = metaTitleIsValid ? post.meta_title! : post.title;
+  const description = post.meta_description || post.excerpt || '';
+
+  const imageUrl = post.og_image_url || post.featured_image_url;
+
   return {
-    title: post.meta_title || post.title,
-    description: post.meta_description || post.excerpt,
+    title,
+    description,
+    alternates: {
+      canonical: postUrl,
+    },
     openGraph: {
-      title: post.meta_title || post.title,
-      description: post.meta_description || post.excerpt,
-      images: post.og_image_url || post.featured_image_url ? [
-        {
-          url: post.og_image_url || post.featured_image_url!,
-          width: 1200,
-          height: 630,
-          alt: post.title,
-        },
-      ] : [],
+      title,
+      description,
+      url: postUrl,
+      siteName: 'Alkatera',
+      locale: 'en_GB',
       type: 'article',
       publishedTime: post.published_at,
+      authors: post.author_name ? [post.author_name] : undefined,
+      images: imageUrl
+        ? [
+            {
+              url: imageUrl,
+              width: 1200,
+              height: 630,
+              alt: post.title,
+            },
+          ]
+        : [],
     },
     twitter: {
       card: 'summary_large_image',
-      title: post.meta_title || post.title,
-      description: post.meta_description || post.excerpt,
-      images: post.og_image_url || post.featured_image_url ? [(post.og_image_url || post.featured_image_url)!] : [],
+      title,
+      description,
+      images: imageUrl ? [{ url: imageUrl, alt: post.title }] : [],
+      creator: '@alkatera',
     },
   };
 }
@@ -116,10 +137,42 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
     notFound();
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://alkatera.com';
+  const postUrl = `${siteUrl}/blog/${post.slug}`;
+  const imageUrl = post.og_image_url || post.featured_image_url;
   const publishedDate = post.published_at ? new Date(post.published_at) : null;
+
+  // JSON-LD structured data for rich previews on LinkedIn, Google, etc.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: post.title,
+    description: post.meta_description || post.excerpt || '',
+    image: imageUrl || undefined,
+    datePublished: post.published_at || undefined,
+    author: {
+      '@type': 'Person',
+      name: post.author_name || 'Alkatera',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Alkatera',
+      url: siteUrl,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteUrl}/logo.svg`,
+      },
+    },
+    url: postUrl,
+    mainEntityOfPage: postUrl,
+  };
 
   return (
     <div className="min-h-screen bg-[#050505] text-white relative">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Fixed background layer */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <img
