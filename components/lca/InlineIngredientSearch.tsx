@@ -5,9 +5,18 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import type { DataSource } from "@/lib/types/lca";
+
+interface ProxySuggestion {
+  proxy_name: string;
+  search_query: string;
+  category: string;
+  reasoning: string;
+  confidence_note: 'high' | 'medium' | 'low';
+  uncertainty_impact?: string;
+}
 
 interface SearchResult {
   id: string;
@@ -50,6 +59,8 @@ interface InlineIngredientSearchProps {
   organizationId: string;
   value: string;
   placeholder?: string;
+  /** Whether this search is for an ingredient or packaging material. Affects AI proxy suggestions. */
+  materialType?: 'ingredient' | 'packaging';
   onSelect: (selection: {
     name: string;
     data_source: DataSource;
@@ -70,6 +81,7 @@ export function InlineIngredientSearch({
   organizationId,
   value,
   placeholder = "Search for ingredient...",
+  materialType = 'ingredient',
   onSelect,
   onChange,
   className,
@@ -82,6 +94,9 @@ export function InlineIngredientSearch({
   const [sourceCounts, setSourceCounts] = useState<SearchResponse['sources'] | null>(null);
   const [openLCAEnabled, setOpenLCAEnabled] = useState(false);
   const [searchDuration, setSearchDuration] = useState(0);
+  const [proxySuggestions, setProxySuggestions] = useState<ProxySuggestion[]>([]);
+  const [loadingProxy, setLoadingProxy] = useState(false);
+  const [proxySearching, setProxySearching] = useState<string | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchStartRef = useRef<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -160,9 +175,80 @@ export function InlineIngredientSearch({
     }
   };
 
+  const fetchProxySuggestions = async (ingredientName: string) => {
+    if (loadingProxy || ingredientName.length < 2) return;
+    setLoadingProxy(true);
+    setProxySuggestions([]);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/ingredients/proxy-suggest', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          ingredient_name: ingredientName,
+          ingredient_type: materialType,
+        }),
+      });
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      if (data.success && data.suggestions) {
+        setProxySuggestions(data.suggestions);
+      }
+    } catch (err) {
+      console.error('[InlineSearch] Proxy suggestion error:', err);
+    } finally {
+      setLoadingProxy(false);
+    }
+  };
+
+  const handleUseProxy = async (suggestion: ProxySuggestion) => {
+    setProxySearching(suggestion.search_query);
+    try {
+      // Search with the proxy's optimised query
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch(
+        `/api/ingredients/search?q=${encodeURIComponent(suggestion.search_query)}&organization_id=${organizationId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) return;
+
+      const data: SearchResponse = await response.json();
+      if (data.results && data.results.length > 0) {
+        // Auto-select the first result
+        handleResultSelect(data.results[0]);
+        setProxySuggestions([]);
+      } else {
+        // Show the proxy results in the main results list
+        setResults([]);
+        setShowResults(true);
+        setError(`No database matches found for "${suggestion.proxy_name}". Try another proxy.`);
+      }
+    } catch (err) {
+      console.error('[InlineSearch] Proxy search error:', err);
+    } finally {
+      setProxySearching(null);
+    }
+  };
+
   const handleInputChange = (newValue: string) => {
     setQuery(newValue);
     onChange?.(newValue);
+    setProxySuggestions([]);
 
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -481,6 +567,16 @@ export function InlineIngredientSearch({
                 </div>
               </Button>
             ))}
+
+            {/* AI Proxy Suggestion at bottom of results */}
+            <ProxySuggestionPanel
+              query={query}
+              proxySuggestions={proxySuggestions}
+              loadingProxy={loadingProxy}
+              proxySearching={proxySearching}
+              onFetchProxy={() => fetchProxySuggestions(query)}
+              onUseProxy={handleUseProxy}
+            />
           </div>
         </Card>
       )}
@@ -495,7 +591,121 @@ export function InlineIngredientSearch({
               </div>
             )}
           </div>
+          <ProxySuggestionPanel
+            query={query}
+            proxySuggestions={proxySuggestions}
+            loadingProxy={loadingProxy}
+            proxySearching={proxySearching}
+            onFetchProxy={() => fetchProxySuggestions(query)}
+            onUseProxy={handleUseProxy}
+          />
         </Card>
+      )}
+    </div>
+  );
+}
+
+// ── AI Proxy Suggestion Panel ─────────────────────────────────────────
+
+function confidenceBadgeColor(note: 'high' | 'medium' | 'low'): string {
+  if (note === 'high') return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+  if (note === 'medium') return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+  return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+}
+
+function ProxySuggestionPanel({
+  query,
+  proxySuggestions,
+  loadingProxy,
+  proxySearching,
+  onFetchProxy,
+  onUseProxy,
+}: {
+  query: string;
+  proxySuggestions: ProxySuggestion[];
+  loadingProxy: boolean;
+  proxySearching: string | null;
+  onFetchProxy: () => void;
+  onUseProxy: (suggestion: ProxySuggestion) => void;
+}) {
+  return (
+    <div className="border-t px-2 py-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full text-xs gap-1.5 h-7"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onFetchProxy();
+        }}
+        disabled={loadingProxy || query.length < 2}
+      >
+        {loadingProxy ? (
+          <>
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Finding proxy suggestions...
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-3 w-3" />
+            AI Proxy Suggestion
+          </>
+        )}
+      </Button>
+
+      {proxySuggestions.length > 0 && (
+        <div className="mt-1.5 space-y-1.5">
+          <p className="text-[10px] text-muted-foreground font-medium px-1">
+            Suggested proxies for &quot;{query}&quot;:
+          </p>
+          {proxySuggestions.map((suggestion, idx) => (
+            <div
+              key={idx}
+              className="rounded-md border bg-background px-2.5 py-2 text-xs"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium truncate">{suggestion.proxy_name}</span>
+                <Badge
+                  className={`text-[9px] px-1.5 py-0 flex-shrink-0 ${confidenceBadgeColor(suggestion.confidence_note)}`}
+                >
+                  {suggestion.confidence_note}
+                </Badge>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                {suggestion.reasoning}
+              </p>
+              {suggestion.uncertainty_impact && (
+                <p className="text-[9px] text-muted-foreground/70 mt-0.5">
+                  Uncertainty: {suggestion.uncertainty_impact}
+                </p>
+              )}
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-1.5 h-5 text-[10px] px-2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onUseProxy(suggestion);
+                }}
+                disabled={proxySearching === suggestion.search_query}
+              >
+                {proxySearching === suggestion.search_query ? (
+                  <>
+                    <Loader2 className="h-2.5 w-2.5 animate-spin mr-1" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-2.5 w-2.5 mr-1" />
+                    Use this proxy
+                  </>
+                )}
+              </Button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

@@ -590,6 +590,7 @@ export function PackagingFormCard({
                   organizationId={organizationId}
                   value={packaging.name}
                   placeholder="Search for packaging material..."
+                  materialType="packaging"
                   onSelect={handleSearchSelect}
                   onChange={(value) => onUpdate(packaging.tempId, { name: value })}
                 />

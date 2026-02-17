@@ -136,7 +136,7 @@ async function buildPeopleCultureSummary(
   ).length;
 
   // Wellbeing score from surveys and benefits
-  let wellbeingScore = 50;
+  let wellbeingScore = 0;
   if (surveyRecords.length > 0) {
     const avgResponseRate = surveyRecords.reduce(
       (sum: number, s: any) => sum + (s.response_rate || 0), 0
@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
     // Diversity Score
     const hasDemographics = summary.total_employees > 0;
     const payGap = Math.abs(summary.gender_pay_gap_mean);
-    const payGapScore = payGap > 0 ? Math.max(0, 100 - (payGap * 2)) : 50;
+    const payGapScore = payGap > 0 ? Math.max(0, 100 - (payGap * 2)) : 0;
     const diversityScore = hasDemographics
       ? Math.round((payGapScore * 0.6) + (summary.dei_completed_actions > 0 ? 40 : 20))
       : 0;
