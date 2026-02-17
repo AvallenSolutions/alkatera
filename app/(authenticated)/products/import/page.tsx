@@ -738,29 +738,7 @@ export default function ImportPage() {
                                       }
                                       onSuggestProxy={handleSuggestProxy}
                                       onManualSearch={async (q) => {
-                                        const results = await handleManualSearch(q);
-                                        // Store manual results in matchStates
-                                        if (results.length > 0) {
-                                          const mKey = normalise(ing.name);
-                                          setState(prev => ({
-                                            ...prev,
-                                            matchStates: {
-                                              ...prev.matchStates,
-                                              [mKey]: {
-                                                ...(prev.matchStates[mKey] || {
-                                                  materialName: ing.name,
-                                                  materialType: 'ingredient',
-                                                  status: 'no_match',
-                                                  selectedIndex: null,
-                                                  autoMatchConfidence: null,
-                                                  userReviewed: false,
-                                                }),
-                                                searchResults: results,
-                                              },
-                                            },
-                                          }));
-                                        }
-                                        return results;
+                                        return await handleManualSearch(q);
                                       }}
                                     />
                                   </td>
@@ -834,28 +812,7 @@ export default function ImportPage() {
                                       }
                                       onSuggestProxy={handleSuggestProxy}
                                       onManualSearch={async (q) => {
-                                        const results = await handleManualSearch(q);
-                                        if (results.length > 0) {
-                                          const mKey = normalise(pkg.name);
-                                          setState(prev => ({
-                                            ...prev,
-                                            matchStates: {
-                                              ...prev.matchStates,
-                                              [mKey]: {
-                                                ...(prev.matchStates[mKey] || {
-                                                  materialName: pkg.name,
-                                                  materialType: 'packaging',
-                                                  status: 'no_match',
-                                                  selectedIndex: null,
-                                                  autoMatchConfidence: null,
-                                                  userReviewed: false,
-                                                }),
-                                                searchResults: results,
-                                              },
-                                            },
-                                          }));
-                                        }
-                                        return results;
+                                        return await handleManualSearch(q);
                                       }}
                                     />
                                   </td>

@@ -573,25 +573,7 @@ export function BOMImportFlow({
                               }
                               onSuggestProxy={handleSuggestProxy}
                               onManualSearch={async (q) => {
-                                const results = await handleManualSearch(q);
-                                if (results.length > 0) {
-                                  const mKey = normalise(item.cleanName);
-                                  setMatchStates((prev) => ({
-                                    ...prev,
-                                    [mKey]: {
-                                      ...(prev[mKey] || {
-                                        materialName: item.cleanName,
-                                        materialType: "ingredient",
-                                        status: "no_match",
-                                        selectedIndex: null,
-                                        autoMatchConfidence: null,
-                                        userReviewed: false,
-                                      }),
-                                      searchResults: results,
-                                    },
-                                  }));
-                                }
-                                return results;
+                                return await handleManualSearch(q);
                               }}
                             />
                           </td>
@@ -638,25 +620,7 @@ export function BOMImportFlow({
                               }
                               onSuggestProxy={handleSuggestProxy}
                               onManualSearch={async (q) => {
-                                const results = await handleManualSearch(q);
-                                if (results.length > 0) {
-                                  const mKey = normalise(item.cleanName);
-                                  setMatchStates((prev) => ({
-                                    ...prev,
-                                    [mKey]: {
-                                      ...(prev[mKey] || {
-                                        materialName: item.cleanName,
-                                        materialType: "packaging",
-                                        status: "no_match",
-                                        selectedIndex: null,
-                                        autoMatchConfidence: null,
-                                        userReviewed: false,
-                                      }),
-                                      searchResults: results,
-                                    },
-                                  }));
-                                }
-                                return results;
+                                return await handleManualSearch(q);
                               }}
                             />
                           </td>
