@@ -154,18 +154,18 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // Prefer validated suggestions, but fall back to all if none validated
+    // ONLY return suggestions that have been validated against real database
+    // results. Never return unvalidated suggestions — they may be hallucinated
+    // materials that don't exist in our emission factor databases.
     const verified = validatedSuggestions.filter(s => s.validated !== false);
-    const finalSuggestions = verified.length > 0
-      ? verified
-      : validatedSuggestions;
 
     return NextResponse.json({
       success: true,
-      suggestions: finalSuggestions,
+      suggestions: verified,
       cached: result.cached,
       from_fallback: result.from_fallback,
       remaining: rateLimit.remaining,
+      all_failed: verified.length === 0 && validatedSuggestions.length > 0,
     });
   } catch (error) {
     console.error('[Proxy Suggest API] Unexpected error:', error);

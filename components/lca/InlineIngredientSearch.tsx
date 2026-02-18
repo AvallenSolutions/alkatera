@@ -97,6 +97,7 @@ export function InlineIngredientSearch({
   const [proxySuggestions, setProxySuggestions] = useState<ProxySuggestion[]>([]);
   const [loadingProxy, setLoadingProxy] = useState(false);
   const [proxySearching, setProxySearching] = useState<string | null>(null);
+  const [proxyAllFailed, setProxyAllFailed] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchStartRef = useRef<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -179,6 +180,7 @@ export function InlineIngredientSearch({
     if (loadingProxy || ingredientName.length < 2) return;
     setLoadingProxy(true);
     setProxySuggestions([]);
+    setProxyAllFailed(false);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -202,6 +204,9 @@ export function InlineIngredientSearch({
       const data = await response.json();
       if (data.success && data.suggestions) {
         setProxySuggestions(data.suggestions);
+      }
+      if (data.all_failed) {
+        setProxyAllFailed(true);
       }
     } catch (err) {
       console.error('[InlineSearch] Proxy suggestion error:', err);
@@ -575,6 +580,7 @@ export function InlineIngredientSearch({
               proxySuggestions={proxySuggestions}
               loadingProxy={loadingProxy}
               proxySearching={proxySearching}
+              proxyAllFailed={proxyAllFailed}
               onFetchProxy={() => fetchProxySuggestions(query)}
               onUseProxy={handleUseProxy}
             />
@@ -597,6 +603,7 @@ export function InlineIngredientSearch({
             proxySuggestions={proxySuggestions}
             loadingProxy={loadingProxy}
             proxySearching={proxySearching}
+            proxyAllFailed={proxyAllFailed}
             onFetchProxy={() => fetchProxySuggestions(query)}
             onUseProxy={handleUseProxy}
           />
@@ -619,6 +626,7 @@ function ProxySuggestionPanel({
   proxySuggestions,
   loadingProxy,
   proxySearching,
+  proxyAllFailed,
   onFetchProxy,
   onUseProxy,
 }: {
@@ -626,6 +634,7 @@ function ProxySuggestionPanel({
   proxySuggestions: ProxySuggestion[];
   loadingProxy: boolean;
   proxySearching: string | null;
+  proxyAllFailed: boolean;
   onFetchProxy: () => void;
   onUseProxy: (suggestion: ProxySuggestion) => void;
 }) {
@@ -654,6 +663,22 @@ function ProxySuggestionPanel({
           </>
         )}
       </Button>
+
+      {proxyAllFailed && proxySuggestions.length === 0 && (
+        <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-2.5 py-2 text-xs">
+          <div className="flex items-start gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-200">
+                No matching materials found
+              </p>
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5">
+                AI suggestions could not be matched to entries in our emission factor databases. Try searching with different terms or a broader category name.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {proxySuggestions.length > 0 && (
         <div className="mt-1.5 space-y-1.5">

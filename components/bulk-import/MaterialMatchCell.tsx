@@ -108,9 +108,13 @@ export function MaterialMatchCell({
   const handleSuggestProxy = async () => {
     if (!onSuggestProxy || loadingProxy) return;
     setLoadingProxy(true);
+    setProxyError(null);
     try {
       const suggestions = await onSuggestProxy(matchState.materialName);
       setProxySuggestions(suggestions);
+      if (suggestions.length === 0) {
+        setProxyError('No matching materials found in our emission factor databases. Try a manual search with broader terms.');
+      }
     } finally {
       setLoadingProxy(false);
     }
