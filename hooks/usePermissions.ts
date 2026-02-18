@@ -173,17 +173,32 @@ export function useIsAlkateraAdmin(): {
   useEffect(() => {
     async function checkAdmin() {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsAlkateraAdmin(false);
+          return;
+        }
         const { data, error } = await supabase.rpc("is_alkatera_admin");
         if (!error) {
           setIsAlkateraAdmin(data === true);
+        } else {
+          setIsAlkateraAdmin(false);
         }
       } catch (err) {
         console.error("Error checking Alkatera admin status:", err);
+        setIsAlkateraAdmin(false);
       } finally {
         setIsLoading(false);
       }
     }
     checkAdmin();
+
+    // Re-check when auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      setIsLoading(true);
+      checkAdmin();
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   return { isAlkateraAdmin, isLoading };

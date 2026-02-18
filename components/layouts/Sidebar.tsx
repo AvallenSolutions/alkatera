@@ -465,14 +465,26 @@ export function Sidebar({ className }: SidebarProps) {
   useEffect(() => {
     async function checkAlkateraAdmin() {
       try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setIsAlkateraAdmin(false)
+          return
+        }
         const { data } = await supabase.rpc('is_alkatera_admin')
         setIsAlkateraAdmin(data === true)
       } catch (err) {
         console.error('Error checking admin status:', err)
+        setIsAlkateraAdmin(false)
       }
     }
     checkAlkateraAdmin()
-  }, [])
+
+    // Re-check when auth state changes (e.g. session switch, sign-out/sign-in)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      checkAlkateraAdmin()
+    })
+    return () => subscription.unsubscribe()
+  }, [currentOrganization?.id])
 
   useEffect(() => {
     async function fetchPendingCount() {
