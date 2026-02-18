@@ -85,7 +85,7 @@ export const AGRIBALYSE_PREFERRED_ALIASES: AgribalyseAlias[] = [
   },
   {
     searchTerms: ['maple syrup', 'maple', 'sirop érable', 'sirop erable'],
-    agribalysePatterns: ['maple', 'syrup, maple', 'sirop', 'érable'],
+    agribalysePatterns: ['syrup, maple', 'sirop d\'érable', 'sirop d\'erable', 'maple syrup'],
     ecoinventPatterns: [],
     preferredDatabase: 'agribalyse',
     category: 'ingredient',

@@ -223,7 +223,7 @@ export const INGREDIENT_ALIASES: DrinksAlias[] = [
   },
   {
     searchTerms: ['maple syrup', 'maple'],
-    processPatterns: ['maple syrup', 'maple', 'syrup, maple'],
+    processPatterns: ['maple syrup', 'syrup, maple', 'market for maple'],
     category: 'ingredient',
   },
   {

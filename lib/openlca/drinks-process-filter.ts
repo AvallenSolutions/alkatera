@@ -262,8 +262,14 @@ export function searchWithAliases(query: string, filteredProcesses: any[]): any[
   for (const process of filteredProcesses) {
     const nameLower = (process.name || '').toLowerCase();
 
-    // Must match at least one query word OR an alias pattern
-    const matchesQuery = queryWords.some(word => nameLower.includes(word));
+    // For multi-word queries, require ALL query words to appear in the
+    // process name.  This prevents "maple syrup" from matching processes
+    // that only contain "syrup" (e.g. "Heat, central...for syrup production").
+    // Single-word queries still pass with just one match.
+    // Alias pattern matches always pass through regardless.
+    const matchesQuery = queryWords.length > 1
+      ? queryWords.every(word => nameLower.includes(word))
+      : queryWords.some(word => nameLower.includes(word));
     const matchesAlias = aliasPatterns.some(pattern =>
       nameLower.includes(pattern.toLowerCase())
     );
@@ -461,8 +467,14 @@ export function searchAgribalyseWithAliases(query: string, filteredProcesses: an
   for (const process of filteredProcesses) {
     const nameLower = (process.name || '').toLowerCase();
 
-    // Must match at least one query word OR an alias pattern
-    const matchesQuery = queryWords.some(word => nameLower.includes(word));
+    // For multi-word queries, require ALL query words to appear in the
+    // process name.  This prevents "maple syrup" from matching processes
+    // that only contain "syrup" (e.g. "Heat, central...for syrup production").
+    // Single-word queries still pass with just one match.
+    // Alias pattern matches always pass through regardless.
+    const matchesQuery = queryWords.length > 1
+      ? queryWords.every(word => nameLower.includes(word))
+      : queryWords.some(word => nameLower.includes(word));
     const matchesAlias = agribalysePatterns.some(pattern =>
       nameLower.includes(pattern.toLowerCase())
     );
