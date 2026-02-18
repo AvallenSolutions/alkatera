@@ -59,6 +59,7 @@ export function MaterialMatchCell({
   const [proxySuggestions, setProxySuggestions] = useState<ProxySuggestion[]>([]);
   const [loadingProxy, setLoadingProxy] = useState(false);
   const [proxySearching, setProxySearching] = useState<string | null>(null);
+  const [proxyError, setProxyError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   /** Cancels any in-flight search when a proxy selection is made or popover closes */
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -122,6 +123,7 @@ export function MaterialMatchCell({
     abortControllerRef.current?.abort();
     selectionMadeRef.current = true;
     setProxySearching(suggestion.search_query);
+    setProxyError(null);
     try {
       const results = await onManualSearch(suggestion.search_query);
       if (results.length > 0) {
@@ -130,6 +132,10 @@ export function MaterialMatchCell({
         // where searchResults haven't flushed yet).
         onSelectResult(0, results);
         setOpen(false);
+      } else {
+        setProxyError(
+          `No database matches found for "${suggestion.proxy_name}". Try another proxy or manual search.`
+        );
       }
     } finally {
       setProxySearching(null);
@@ -141,6 +147,7 @@ export function MaterialMatchCell({
     setOpen(isOpen);
     if (isOpen) {
       selectionMadeRef.current = false;
+      setProxyError(null);
     } else {
       // Cancel any in-flight search when popover closes
       abortControllerRef.current?.abort();
@@ -230,6 +237,12 @@ export function MaterialMatchCell({
                   )}
                 </Button>
               </div>
+
+              {proxyError && (
+                <div className="px-3 pb-2">
+                  <p className="text-[10px] text-red-500">{proxyError}</p>
+                </div>
+              )}
 
               {proxySuggestions.length > 0 && (
                 <div className="px-2 pb-2 space-y-1">

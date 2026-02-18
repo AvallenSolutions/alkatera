@@ -122,6 +122,7 @@ export function BOMImportFlow({
           body: JSON.stringify({
             ingredient_name: ingredientName,
             ingredient_type: 'ingredient',
+            organization_id: organizationId,
           }),
         });
         if (!response.ok) return [];

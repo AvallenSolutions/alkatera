@@ -83,6 +83,22 @@ export const AGRIBALYSE_PREFERRED_ALIASES: AgribalyseAlias[] = [
     category: 'ingredient',
     rationale: 'Ecoinvent has no honey process; Agribalyse includes apiculture data',
   },
+  {
+    searchTerms: ['maple syrup', 'maple', 'sirop érable', 'sirop erable'],
+    agribalysePatterns: ['maple', 'syrup, maple', 'sirop', 'érable'],
+    ecoinventPatterns: [],
+    preferredDatabase: 'agribalyse',
+    category: 'ingredient',
+    rationale: 'Agribalyse has specific "Syrup, Maple" process data',
+  },
+  {
+    searchTerms: ['liquorice', 'licorice', 'liquorice root', 'réglisse'],
+    agribalysePatterns: ['liquorice', 'licorice', 'réglisse'],
+    ecoinventPatterns: [],
+    preferredDatabase: 'agribalyse',
+    category: 'ingredient',
+    rationale: 'Agribalyse has botanical/spice processes applicable to liquorice',
+  },
 
   // Dairy & Plant Milks
   {

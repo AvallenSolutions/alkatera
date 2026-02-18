@@ -138,6 +138,7 @@ export default function ImportPage() {
           body: JSON.stringify({
             ingredient_name: ingredientName,
             ingredient_type: 'ingredient',
+            organization_id: currentOrganization?.id,
           }),
         });
         if (!response.ok) return [];
@@ -147,7 +148,7 @@ export default function ImportPage() {
         return [];
       }
     },
-    [getAuthToken]
+    [getAuthToken, currentOrganization]
   );
 
   // ── File upload ──────────────────────────────────────────────────────

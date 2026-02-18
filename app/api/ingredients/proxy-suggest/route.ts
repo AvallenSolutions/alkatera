@@ -109,9 +109,60 @@ export async function POST(request: NextRequest) {
     // Generate proxy suggestions
     const result = await suggestProxy(input);
 
+    // Validate each suggestion by checking if its search_query returns actual
+    // database results. This prevents Claude from hallucinating ingredient names
+    // that don't exist in our emission factor databases (e.g. "Maple syrup"
+    // with "high" confidence when no such entry exists).
+    const organization_id = (body as any).organization_id as string | undefined;
+    const searchBaseUrl = new URL('/api/ingredients/search', request.url);
+
+    const validatedSuggestions = await Promise.all(
+      result.suggestions.map(async (suggestion) => {
+        try {
+          const searchUrl = new URL(searchBaseUrl);
+          searchUrl.searchParams.set('q', suggestion.search_query);
+          if (organization_id) {
+            searchUrl.searchParams.set('organization_id', organization_id);
+          }
+
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 3000);
+
+          const searchResponse = await fetch(searchUrl.toString(), {
+            headers: { Authorization: authHeader! },
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            if (searchData.results && searchData.results.length > 0) {
+              return {
+                ...suggestion,
+                validated: true,
+                result_count: searchData.results.length,
+                top_match_name: searchData.results[0].name,
+              };
+            }
+          }
+          // No results found — mark as unvalidated
+          return { ...suggestion, validated: false };
+        } catch {
+          // Timeout or error — include anyway but mark as unvalidated
+          return { ...suggestion, validated: false };
+        }
+      })
+    );
+
+    // Prefer validated suggestions, but fall back to all if none validated
+    const verified = validatedSuggestions.filter(s => s.validated !== false);
+    const finalSuggestions = verified.length > 0
+      ? verified
+      : validatedSuggestions;
+
     return NextResponse.json({
       success: true,
-      suggestions: result.suggestions,
+      suggestions: finalSuggestions,
       cached: result.cached,
       from_fallback: result.from_fallback,
       remaining: rateLimit.remaining,

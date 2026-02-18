@@ -193,6 +193,7 @@ export function InlineIngredientSearch({
         body: JSON.stringify({
           ingredient_name: ingredientName,
           ingredient_type: materialType,
+          organization_id: organizationId,
         }),
       });
 

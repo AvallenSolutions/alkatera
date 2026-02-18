@@ -221,6 +221,16 @@ export const INGREDIENT_ALIASES: DrinksAlias[] = [
     processPatterns: ['glucose production', 'market for glucose', 'syrup production'],
     category: 'ingredient',
   },
+  {
+    searchTerms: ['maple syrup', 'maple'],
+    processPatterns: ['maple syrup', 'maple', 'syrup, maple'],
+    category: 'ingredient',
+  },
+  {
+    searchTerms: ['liquorice', 'licorice', 'liquorice root'],
+    processPatterns: ['liquorice', 'licorice', 'glycyrrhiza'],
+    category: 'ingredient',
+  },
 
   // Yeast & fermentation
   {

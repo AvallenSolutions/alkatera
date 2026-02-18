@@ -160,6 +160,64 @@ async function searchAgribalyseOpenLCAProcesses(query: string): Promise<SearchRe
   });
 }
 
+/**
+ * Compute a 0-100 relevance score for a search result name against a query.
+ * Used to rank results by name similarity rather than just source type.
+ *
+ * Scoring tiers:
+ *  100 = exact match
+ *   90 = result starts with query
+ *   80 = query fully contained in result
+ *   75 = result fully contained in query
+ *   70 = all query words present in result
+ *   55 = ≥75% of query words present
+ *   40 = ≥50% of query words present
+ *   25 = any single query word present
+ *   10 = weak/alias-only match (no meaningful word overlap)
+ */
+function computeSearchRelevance(resultName: string, query: string): number {
+  const r = resultName.toLowerCase();
+  const q = query.toLowerCase();
+
+  // Exact match
+  if (r === q) return 100;
+
+  // Result name starts with the query
+  if (r.startsWith(q + ' ') || r.startsWith(q + ',') || r.startsWith(q + '/')) return 90;
+  if (r.startsWith(q)) return 90;
+
+  // Query fully contained in result name
+  if (r.includes(q)) return 80;
+
+  // Result name fully contained in query
+  if (q.includes(r)) return 75;
+
+  // Word-level analysis
+  const qWords = q.split(/\s+/).filter(w => w.length >= 3);
+  const rTokens = r.split(/[\s,/()]+/).filter(w => w.length >= 3);
+
+  if (qWords.length === 0) return 10;
+
+  // Count how many query words appear in the result name
+  const matchedQueryWords = qWords.filter(w => r.includes(w));
+  const queryWordCoverage = matchedQueryWords.length / qWords.length;
+
+  if (queryWordCoverage === 1.0) return 70; // All query words found
+  if (queryWordCoverage >= 0.75) return 55;
+  if (queryWordCoverage >= 0.5) return 40;
+
+  // Check reverse: result words in query (catches "Syrup, Maple" vs "maple syrup")
+  if (rTokens.length > 0) {
+    const reverseMatched = rTokens.filter(w => q.includes(w));
+    const reverseCoverage = reverseMatched.length / rTokens.length;
+    if (reverseCoverage >= 0.5) return 60;
+  }
+
+  if (queryWordCoverage > 0) return 25; // At least one word matches
+
+  return 10; // Weak/alias-only match
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -285,19 +343,36 @@ export async function GET(request: NextRequest) {
           .order('name')
           .limit(15));
 
-        // Fallback: if no results and query has multiple words, try word-by-word OR search
-        // This catches cases like "malic acid" when DB has "Malic Acid (DL-malic acid)"
+        // Fallback: if no results and query has multiple words, search by the
+        // most distinctive (longest) word, then filter in-memory to require
+        // multiple word matches. This catches "malic acid" → "Malic Acid
+        // (DL-malic acid)" while preventing "maple syrup" from matching any
+        // process that merely contains "syrup" (e.g. heat/syrup production).
         if ((!stagingFactors || stagingFactors.length === 0) && !error) {
           const words = normalizedQuery.split(/\s+/).filter((w: string) => w.length >= 3);
           if (words.length > 1) {
-            const orFilter = words.map((w: string) => `name.ilike.%${w}%`).join(',');
+            // Use the longest word as the primary DB filter (most distinctive)
+            const sortedByLength = [...words].sort((a, b) => b.length - a.length);
+            const primaryWord = sortedByLength[0];
+
             ({ data: stagingFactors, error } = await supabase
               .from('staging_emission_factors')
               .select('*')
-              .or(orFilter)
+              .ilike('name', `%${primaryWord}%`)
               .in('category', ['Ingredient', 'Packaging'])
               .order('name')
-              .limit(15));
+              .limit(30));
+
+            // In-memory AND filter: require at least 2 query words to appear
+            // in the result name (or all words if only 2 words in query)
+            if (stagingFactors && stagingFactors.length > 0) {
+              const minWordsRequired = Math.min(words.length, 2);
+              stagingFactors = stagingFactors.filter((factor: any) => {
+                const nameLower = (factor.name as string).toLowerCase();
+                const matchCount = words.filter(w => nameLower.includes(w)).length;
+                return matchCount >= minWordsRequired;
+              });
+            }
           }
         }
 
@@ -387,29 +462,33 @@ export async function GET(request: NextRequest) {
     allResults.push(...openLCAResults);
     allResults.push(...agribalyseResults);
 
-    // Sort results: Primary first, then by relevance (exact matches first)
-    const sortOrder: Record<string, number> = {
-      'primary': 0,
-      'staging': 1,
-      'global_library': 2,
-      'ecoinvent_proxy': 3,
-      'agribalyse_live': 4,
-      'ecoinvent_live': 5,
-      'defra': 6,
+    // Score each result by name relevance to the query, then use source type
+    // as a tiebreaker. This prevents irrelevant staging results (e.g. "Heat,
+    // central...syrup production") from ranking above the correct Agribalyse
+    // match (e.g. "Syrup, Maple") just because staging has a higher source priority.
+    const sourceBoost: Record<string, number> = {
+      'primary': 5,        // Verified supplier data gets a small boost
+      'global_library': 3, // Curated drinks factor library
+      'staging': 2,        // Internal/staging factors
+      'ecoinvent_proxy': 1,
+      'agribalyse_live': 1,
+      'ecoinvent_live': 1,
+      'defra': 0,
     };
 
     allResults.sort((a, b) => {
-      // First sort by source type priority
-      const priorityDiff = sortOrder[a.source_type] - sortOrder[b.source_type];
-      if (priorityDiff !== 0) return priorityDiff;
+      const aRelevance = computeSearchRelevance(a.name, normalizedQuery);
+      const bRelevance = computeSearchRelevance(b.name, normalizedQuery);
 
-      // Then by name match quality (exact match first)
-      const aExact = a.name.toLowerCase().includes(normalizedQuery);
-      const bExact = b.name.toLowerCase().includes(normalizedQuery);
-      if (aExact && !bExact) return -1;
-      if (!aExact && bExact) return 1;
+      // Primary sort: relevance score (higher is better)
+      if (aRelevance !== bRelevance) return bRelevance - aRelevance;
 
-      // Then alphabetically
+      // Secondary sort: source type boost (tiebreaker only)
+      const aBoost = sourceBoost[a.source_type] ?? 0;
+      const bBoost = sourceBoost[b.source_type] ?? 0;
+      if (aBoost !== bBoost) return bBoost - aBoost;
+
+      // Tertiary: alphabetical
       return a.name.localeCompare(b.name);
     });
 

@@ -19,6 +19,10 @@ const MATERIAL_MODIFIERS = new Set([
   'liquid', 'crystalline', 'anhydrous', 'hydrated',
   'deionised', 'deionized', 'distilled', 'filtered',
   'premium', 'standard', 'commercial',
+  // Drinks-industry descriptors (colour, strength, style)
+  'dark', 'light', 'pale', 'amber', 'golden', 'robust', 'mild', 'strong',
+  'fine', 'coarse', 'extra', 'special', 'select', 'reserve',
+  'type', 'style', 'blend',
   // Packaging descriptors (not the core material)
   'corrugated', 'fluted', 'recycled', 'virgin', 'coated',
   'laminated', 'printed', 'unprinted', 'clear', 'coloured',
@@ -34,11 +38,13 @@ const MATERIAL_MODIFIERS = new Set([
  * non-meaningful modifiers.
  *
  * Examples:
- *  "Orange Blossom Extract FA-13523"    → "Orange Blossom Extract"
- *  "Vanilla Inf 48% Vol"               → "Vanilla"
- *  "Ethanol 96%"                       → "Ethanol"
- *  "Granulated Beet Sugar (Kent Foods)" → "Beet Sugar"
- *  "Barley Malt"                       → "Barley Malt" (no change)
+ *  "N03 - Maple syrup dark robust - VP637" → "Maple syrup"
+ *  "Orange Blossom Extract FA-13523"       → "Orange Blossom Extract"
+ *  "Vanilla Inf 48% Vol"                  → "Vanilla"
+ *  "Ethanol 96%"                          → "Ethanol"
+ *  "Granulated Beet Sugar (Kent Foods)"    → "Beet Sugar"
+ *  "L24 Green Ginger Soluble"             → "Green Ginger Soluble"
+ *  "Barley Malt"                          → "Barley Malt" (no change)
  */
 export function cleanSearchQuery(raw: string): string {
   let q = raw.trim();
@@ -46,8 +52,15 @@ export function cleanSearchQuery(raw: string): string {
   // Strip trailing parenthetical notes: "(Kent Foods)", "(Lambda)"
   q = q.replace(/\s*\([^)]*\)\s*$/, '');
 
+  // Strip short item codes: N03, L24, A1, P12 (1-3 letters + 1-3 digits)
+  // These are common in supplier BOMs like "N03 - Maple syrup"
+  q = q.replace(/\b[A-Z]{1,3}\d{1,3}\b/gi, '');
+
   // Strip supplier/product codes: FA-13523, SKU-001, REF 12345
   q = q.replace(/\b[A-Z]{1,4}[-\s]?\d{3,}\b/gi, '');
+
+  // Clean standalone hyphens / dashes left after code removal
+  q = q.replace(/\s*-\s*/g, ' ');
 
   // Strip percentage/volume info: 48% Vol, 96%, 5.5% abv, 40% v/v
   q = q.replace(/\d+(\.\d+)?\s*%\s*(v\/v|vol|abv|alc\.?)?/gi, '');
@@ -280,16 +293,33 @@ export async function batchMatchMaterials(
         const results = await searchMaterial(item.name, organizationId, authToken);
 
         if (results.length > 0) {
-          const confidence = computeConfidence(item.name, results[0].name);
+          // Use the cleaned name for confidence scoring — the raw supplier name
+          // (e.g. "N03 - Maple syrup dark robust - VP637") contains codes and
+          // modifiers that pollute the similarity check.
+          const cleanedName = cleanSearchQuery(item.name);
 
-          if (confidence >= MIN_AUTO_MATCH_CONFIDENCE) {
+          // Scan all returned results for the best semantic match instead of
+          // blindly trusting results[0]. The search API may rank by source type
+          // or alias, so the best name match can be at any position.
+          let bestIndex = 0;
+          let bestConfidence = computeConfidence(cleanedName, results[0].name);
+
+          for (let i = 1; i < Math.min(results.length, 10); i++) {
+            const conf = computeConfidence(cleanedName, results[i].name);
+            if (conf > bestConfidence) {
+              bestConfidence = conf;
+              bestIndex = i;
+            }
+          }
+
+          if (bestConfidence >= MIN_AUTO_MATCH_CONFIDENCE) {
             // Good enough to auto-select
             states[key] = {
               ...states[key],
               status: 'matched',
               searchResults: results.slice(0, 10),
-              selectedIndex: 0,
-              autoMatchConfidence: confidence,
+              selectedIndex: bestIndex,
+              autoMatchConfidence: bestConfidence,
             };
           } else {
             // Results exist but confidence too low — show as unlinked
@@ -299,7 +329,7 @@ export async function batchMatchMaterials(
               status: 'no_match',
               searchResults: results.slice(0, 10),
               selectedIndex: null,
-              autoMatchConfidence: confidence,
+              autoMatchConfidence: bestConfidence,
             };
           }
         } else {
