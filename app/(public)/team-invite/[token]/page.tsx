@@ -94,8 +94,12 @@ export default function TeamInvitePage() {
           if (user.email?.toLowerCase() === data.email.toLowerCase()) {
             setExistingUser(true);
           } else {
-            setError(`This invitation was sent to ${data.email}. Please sign out and try again with the correct account.`);
-            return;
+            // A different user is logged in — sign them out automatically
+            // so the invited user can sign up or sign in with the correct account.
+            // This handles stale sessions and the case where someone opens the
+            // invite link in a browser where another account is active.
+            await supabase.auth.signOut();
+            // Don't set existingUser — fall through to show the signup form
           }
         }
 
