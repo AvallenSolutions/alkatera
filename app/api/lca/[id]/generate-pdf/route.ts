@@ -112,6 +112,19 @@ export async function POST(
       .eq('id', pcf.organization_id)
       .maybeSingle();
 
+    // Fetch product image (fallback chain: PCF record → products table)
+    if (!pcf.product_image_url && pcf.product_id) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('product_image_url, image_url')
+        .eq('id', pcf.product_id)
+        .maybeSingle();
+
+      if (product) {
+        pcf.product_image_url = product.product_image_url || product.image_url;
+      }
+    }
+
     // ========================================================================
     // TRANSFORM DATA
     // ========================================================================

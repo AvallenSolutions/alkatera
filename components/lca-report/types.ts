@@ -9,10 +9,26 @@ export interface LCAReportData {
     assessmentPeriod: string;
     publishedDate: string;
     heroImage?: string;
+    productImageUrl?: string;
+    productDescription?: string;
+    referenceYear?: number;
+    lcaScopeType?: string;
   };
   functionalUnit: {
     value: string;
     description: string;
+  };
+  goalAndScope: {
+    intendedApplication: string;
+    reasonsForStudy: string;
+    intendedAudience: string[];
+    isComparativeAssertion: boolean;
+    systemBoundary: string;
+    systemBoundaryDescription: string;
+    cutOffCriteria: string;
+    allocationProcedure: string;
+    assumptionsAndLimitations: Array<{ type: string; text: string }>;
+    referenceStandards: string[];
   };
   executiveSummary: {
     content: string;
@@ -26,7 +42,41 @@ export interface LCAReportData {
   methodology: {
     includedStages: string[];
     excludedStages: string[];
-    dataSources: Array<{ name: string; count: number }>;
+    dataSources: Array<{ name: string; count: number; version?: string; description?: string }>;
+    lciaMethod: string;
+    lciaMethodDescription: string;
+    characterizationModels: Array<{ category: string; model: string; reference: string }>;
+    softwareAndDatabases: Array<{ name: string; version: string; purpose: string }>;
+  };
+  dataQuality: {
+    overallScore: number;
+    overallRating: string;
+    pedigreeMatrix: {
+      reliability: number;
+      completeness: number;
+      temporalRepresentativeness: number;
+      geographicRepresentativeness: number;
+      technologicalRepresentativeness: number;
+    };
+    coverageSummary: {
+      primaryDataShare: number;
+      secondaryDataShare: number;
+      proxyDataShare: number;
+      primaryCount: number;
+      secondaryCount: number;
+      proxyCount: number;
+      totalMaterials: number;
+    };
+    materialQuality: Array<{
+      name: string;
+      source: string;
+      grade: string;
+      confidence: number;
+      temporalCoverage: string;
+      geographicCoverage: string;
+    }>;
+    missingDataTreatment: string;
+    uncertaintyNote: string;
   };
   climateImpact: {
     totalCarbon: string;
@@ -37,6 +87,52 @@ export interface LCAReportData {
       ghgBreakdown: Array<{ label: string; value: string; unit: string; gwp: string }>;
       standards: string[];
     };
+  };
+  ghgDetailed: {
+    totalGwp100: string;
+    fossilCo2: string;
+    biogenicCo2: string;
+    dlucCo2: string;
+    ch4Fossil: string;
+    ch4FossilKgCo2e: string;
+    ch4Biogenic: string;
+    ch4BiogenicKgCo2e: string;
+    n2o: string;
+    n2oKgCo2e: string;
+    hfcPfc: string;
+    gwpMethod: string;
+    gwpFactors: Array<{ gas: string; gwp100: string; source: string }>;
+    biogenicNote: string;
+  };
+  environmentalImpacts: {
+    categories: Array<{
+      name: string;
+      indicator: string;
+      unit: string;
+      totalValue: string;
+      topContributors: Array<{ name: string; value: string; percentage: string }>;
+      description: string;
+    }>;
+    referenceMethod: string;
+    normalisationNote: string;
+  };
+  ingredientBreakdown: {
+    ingredients: Array<{
+      name: string;
+      category: string;
+      quantity: string;
+      unit: string;
+      origin: string;
+      climateImpact: string;
+      climatePercentage: string;
+      waterImpact: string;
+      landUseImpact: string;
+      acidification: string;
+      eutrophication: string;
+      dataSource: string;
+      dataQualityGrade: string;
+    }>;
+    totalClimateImpact: string;
   };
   waterFootprint: {
     totalConsumption: string;
