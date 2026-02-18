@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 import { motion } from 'framer-motion';
+import { supabase } from '@/lib/supabaseClient';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -28,12 +28,6 @@ interface InvitationDetails {
   expires_at: string;
   status: string;
 }
-
-// Create a Supabase client for public access
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function TeamInvitePage() {
   const params = useParams();
