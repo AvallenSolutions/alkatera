@@ -105,15 +105,17 @@ export function LocationPicker({
 
       const data = await response.json() as NominatimResult[];
 
-      // Filter results to prioritize cities and specific locations
+      // Filter results to prioritize cities, addresses, and specific locations
       const filteredResults = data.filter(result => {
         const type = result.type?.toLowerCase() || "";
         const resultClass = result.class?.toLowerCase() || "";
 
-        // Include cities, towns, villages, establishments, and addresses
+        // Include cities, towns, villages, addresses, buildings, streets, postcodes
         return (
           resultClass === "place" ||
           resultClass === "boundary" ||
+          resultClass === "building" ||
+          resultClass === "highway" ||
           type === "city" ||
           type === "town" ||
           type === "village" ||
@@ -121,7 +123,14 @@ export function LocationPicker({
           type === "municipality" ||
           type === "administrative" ||
           type === "industrial" ||
-          type === "commercial"
+          type === "commercial" ||
+          type === "house" ||
+          type === "apartments" ||
+          type === "retail" ||
+          type === "warehouse" ||
+          type === "office" ||
+          type === "residential" ||
+          type === "postcode"
         );
       });
 
