@@ -25,7 +25,7 @@ const MOCK_LCA_REPORT = {
   id: '550e8400-e29b-41d4-a716-446655440000',
   product_id: 1,
   product_name: 'Elderflower Pressé 250ml',
-  title: '2025 Product Impact Assessment',
+  title: '2025 Life Cycle Assessment',
   version: '1.0',
   status: 'published' as const,
   dqi_score: 92,
@@ -409,6 +409,22 @@ export default function ProductLcaReportPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
+      {/* Banner directing to new LCA Report Generator */}
+      <div className="p-4 rounded-lg bg-[#ccff00]/10 border border-[#ccff00]/30 flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-sm">New: Generate Beautiful PDF Reports</p>
+          <p className="text-xs text-muted-foreground">
+            Use our new LCA Report Generator for ISO-compliant PDF reports with AI-enhanced narratives.
+          </p>
+        </div>
+        <Link href={`/products/${productId}/lca-report`}>
+          <Button size="sm" className="bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold gap-1.5">
+            <FileText className="h-4 w-4" />
+            Generate PDF Report
+          </Button>
+        </Link>
+      </div>
+
       <div className="flex items-center gap-2 mb-4">
         <Link href={`/products/${productId}`}>
           <Button variant="ghost" size="sm" className="gap-2">

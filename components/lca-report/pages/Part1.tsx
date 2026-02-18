@@ -33,7 +33,7 @@ export const CoverPage = ({ data }: { data: LCAReportData }) => (
 
     <div className="relative z-10 w-full max-w-2xl">
       <div className="bg-[#ccff00] text-black p-8 rounded-xl shadow-2xl mb-24 transform -rotate-1 backdrop-blur-sm bg-opacity-90">
-        <h2 className="font-mono font-bold italic text-2xl tracking-tighter">PRODUCT LIFECYCLE ANALYSIS</h2>
+        <h2 className="font-mono font-bold italic text-2xl tracking-tighter">LIFE CYCLE ASSESSMENT</h2>
       </div>
 
       <h1 className="text-8xl font-serif font-light leading-tight mb-4 text-white drop-shadow-lg">
@@ -194,7 +194,7 @@ export const ClimatePage = ({ data }: { data: LCAReportData }) => (
 
     <div className="flex items-center justify-between mb-8">
       <div className="w-1/3">
-        <div className="text-sm font-mono text-neutral-500 mb-2">TOTAL CARBON FOOTPRINT</div>
+        <div className="text-sm font-mono text-neutral-500 mb-2">TOTAL CLIMATE IMPACT</div>
         <div className="text-8xl font-serif text-[#ccff00] leading-none">
           {data.climateImpact.totalCarbon}
           <span className="text-2xl text-neutral-500 ml-2 font-sans">kg CO2e</span>

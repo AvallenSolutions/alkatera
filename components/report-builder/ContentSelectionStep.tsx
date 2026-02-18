@@ -92,9 +92,9 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
       }
 
       if (productCount > 0) {
-        recs['product-footprints'] = { id: 'product-footprints', priority: productCount >= 5 ? 'high' : 'medium', dataCompleteness: Math.min(100, (productCount / 10) * 100), rationale: `${productCount} product PEI${productCount > 1 ? 's' : ''} available` };
+        recs['product-footprints'] = { id: 'product-footprints', priority: productCount >= 5 ? 'high' : 'medium', dataCompleteness: Math.min(100, (productCount / 10) * 100), rationale: `${productCount} product LCA${productCount > 1 ? 's' : ''} available` };
       } else {
-        recs['product-footprints'] = { id: 'product-footprints', priority: 'low', dataCompleteness: 0, rationale: 'No product PEIs completed' };
+        recs['product-footprints'] = { id: 'product-footprints', priority: 'low', dataCompleteness: 0, rationale: 'No product LCAs completed' };
       }
 
       if (supplierCount > 0) {

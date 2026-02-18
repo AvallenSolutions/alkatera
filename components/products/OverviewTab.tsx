@@ -152,7 +152,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                 </div>
                 <Link href={`/products/${product.id}/calculate-lca`}>
                   <Button className="bg-lime-500 hover:bg-lime-600 text-slate-900">
-                    Calculate Carbon Footprint
+                    Run LCA
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
@@ -208,7 +208,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         functionalUnit={product.functional_unit || 'unit'}
         carbonBreakdown={breakdown}
         containerType="bottle"
-        lcaReportUrl={`/products/${product.id}/report`}
+        lcaReportUrl={`/products/${product.id}/lca-report`}
       />
 
       {/* Multipack Contents Card - only shown for multipacks */}
@@ -236,7 +236,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Total GHG emissions by lifecycle stage"
           value={totalCarbon}
           unit="kg CO₂e"
-          detailsLink={`/products/${product.id}/report`}
+          detailsLink={`/products/${product.id}/lca-report`}
         >
           <SimpleBreakdownTable
             data={[
@@ -258,7 +258,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Water consumption and scarcity footprint"
           value={waterScarcity}
           unit="m³ world eq"
-          detailsLink={`/products/${product.id}/report`}
+          detailsLink={`/products/${product.id}/lca-report`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -293,7 +293,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Material circularity and resource efficiency"
           value={circularityRate}
           unit="%"
-          detailsLink={`/products/${product.id}/report`}
+          detailsLink={`/products/${product.id}/lca-report`}
         >
           <div className="space-y-4">
             <div className="flex items-center gap-4">
@@ -334,7 +334,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Land use and biodiversity impact"
           value={landUse}
           unit="m²a"
-          detailsLink={`/products/${product.id}/report`}
+          detailsLink={`/products/${product.id}/lca-report`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
@@ -403,7 +403,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                   <FileText className="h-5 w-5 text-cyan-400" />
                 </div>
                 <div>
-                  <CardTitle className="text-white">Carbon Footprint Reports</CardTitle>
+                  <CardTitle className="text-white">LCA Reports</CardTitle>
                   <CardDescription className="text-slate-400">Calculation history</CardDescription>
                 </div>
               </div>
@@ -418,7 +418,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </CardHeader>
           <CardContent className="space-y-3">
             {lcaReports.slice(0, 3).map((lca) => (
-              <Link key={lca.id} href={`/products/${product.id}/report`}>
+              <Link key={lca.id} href={`/products/${product.id}/lca-report`}>
                 <div className="p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer">
                   <div className="flex items-center justify-between mb-2">
                     <Badge className={`${lca.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>

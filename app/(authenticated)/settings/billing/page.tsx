@@ -237,7 +237,7 @@ export default function BillingPage() {
               isUnlimited={usageData.usage.products.is_unlimited}
             />
             <UsageItem
-              label="PEIs"
+              label="LCAs"
               current={usageData.usage.lcas.current}
               max={usageData.usage.lcas.max}
               isUnlimited={usageData.usage.lcas.is_unlimited}

@@ -831,7 +831,7 @@ export default function CalculateLCAPage() {
       {/* Calculation progress overlay */}
       <OperationOverlay
         open={calculating}
-        title="Calculating Product Carbon Footprint"
+        title="Running Life Cycle Assessment"
         steps={calcSteps}
         progress={calcProgress}
         message="ISO 14067 compliant lifecycle assessment"

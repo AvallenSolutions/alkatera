@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-interface PEIInfoTooltipProps {
+interface LCAInfoTooltipProps {
   /** Show the full explanation or just a brief version */
   variant?: 'brief' | 'detailed';
   /** Custom trigger element (defaults to info icon) */
@@ -20,19 +20,19 @@ interface PEIInfoTooltipProps {
 }
 
 /**
- * Product Environmental Impact (PEI) Information Tooltip
+ * Life Cycle Assessment (LCA) Information Tooltip
  *
- * Provides users with context about what PEI means and how it covers multiple impact categories.
+ * Provides users with context about what an LCA is and how it covers multiple impact categories.
  * Aligns with ISO 14044/14067 and GHG Protocol methodology.
  */
-export function PEIInfoTooltip({
+export function LCAInfoTooltip({
   variant = 'brief',
   children,
   className
-}: PEIInfoTooltipProps) {
+}: LCAInfoTooltipProps) {
   const briefContent = (
     <div className="max-w-xs space-y-2">
-      <p className="font-medium">Product Environmental Impact (PEI)</p>
+      <p className="font-medium">Life Cycle Assessment (LCA)</p>
       <p className="text-muted-foreground text-xs">
         A comprehensive assessment of environmental impacts associated with a product throughout its lifecycle,
         including carbon, water, land use, and other critical factors.
@@ -46,9 +46,9 @@ export function PEIInfoTooltip({
 
   const detailedContent = (
     <div className="max-w-sm space-y-3 p-1">
-      <p className="font-medium">Product Environmental Impact (PEI)</p>
+      <p className="font-medium">Life Cycle Assessment (LCA)</p>
       <p className="text-muted-foreground text-xs">
-        A Product Environmental Impact assessment measures multiple environmental factors
+        A Life Cycle Assessment measures multiple environmental factors
         associated with a product across its entire lifecycle - from raw material
         extraction through manufacturing, distribution, use, and disposal.
       </p>
@@ -93,7 +93,7 @@ export function PEIInfoTooltip({
               className={`h-5 w-5 rounded-full ${className}`}
             >
               <Info className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="sr-only">Product Environmental Impact information</span>
+              <span className="sr-only">Life Cycle Assessment information</span>
             </Button>
           )}
         </TooltipTrigger>
@@ -106,34 +106,40 @@ export function PEIInfoTooltip({
 }
 
 /**
- * Inline PEI label with tooltip
- * Use this when displaying "Product Environmental Impact" as a label with explanation
+ * Inline LCA label with tooltip
+ * Use this when displaying "Life Cycle Assessment" as a label with explanation
  */
-export function PEILabel({ className }: { className?: string }) {
+export function LCALabel({ className }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-1 ${className}`}>
-      Product Environmental Impact
-      <PEIInfoTooltip variant="brief" />
+      Life Cycle Assessment
+      <LCAInfoTooltip variant="brief" />
     </span>
   );
 }
 
 /**
- * PEI badge for use in headers and cards
+ * LCA badge for use in headers and cards
  */
-export function PEIBadge({ className }: { className?: string }) {
+export function LCABadge({ className }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium bg-primary/10 text-primary rounded-full ${className}`}>
-      PEI
-      <PEIInfoTooltip variant="brief" />
+      LCA
+      <LCAInfoTooltip variant="brief" />
     </span>
   );
 }
 
 // Legacy exports for backward compatibility during transition
-/** @deprecated Use PEIInfoTooltip instead */
-export const PCFInfoTooltip = PEIInfoTooltip;
-/** @deprecated Use PEILabel instead */
-export const PCFLabel = PEILabel;
-/** @deprecated Use PEIBadge instead */
-export const PCFBadge = PEIBadge;
+/** @deprecated Use LCAInfoTooltip instead */
+export const PEIInfoTooltip = LCAInfoTooltip;
+/** @deprecated Use LCALabel instead */
+export const PEILabel = LCALabel;
+/** @deprecated Use LCABadge instead */
+export const PEIBadge = LCABadge;
+/** @deprecated Use LCAInfoTooltip instead */
+export const PCFInfoTooltip = LCAInfoTooltip;
+/** @deprecated Use LCALabel instead */
+export const PCFLabel = LCALabel;
+/** @deprecated Use LCABadge instead */
+export const PCFBadge = LCABadge;

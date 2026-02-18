@@ -130,15 +130,15 @@ export default function LcasPage() {
     <div className="container mx-auto py-8 space-y-8">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">Product Environmental Impacts</h1>
+          <h1 className="text-4xl font-bold tracking-tight">Life Cycle Assessments</h1>
           <p className="text-lg text-muted-foreground">
-            Product Environmental Impact assessments and Environmental Product Declarations
+            ISO 14044 compliant Life Cycle Assessment reports for your products
           </p>
         </div>
         <Link href="/products">
           <Button className="gap-2">
             <Package className="h-4 w-4" />
-            Create New PEI
+            Create New LCA
           </Button>
         </Link>
       </div>
@@ -299,16 +299,18 @@ export default function LcasPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Link href={`/products/${report.product_id}/report`}>
+                      <Link href={`/products/${report.product_id}/lca-report`}>
                         <Button variant="outline" size="sm" className="gap-2">
                           <Eye className="h-4 w-4" />
                           View Report
                         </Button>
                       </Link>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <Download className="h-4 w-4" />
-                        Download
-                      </Button>
+                      <Link href={`/products/${report.product_id}/lca-report`}>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Download
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </CardContent>
@@ -326,7 +328,7 @@ export default function LcasPage() {
               <Award className="h-6 w-6 text-blue-600" />
             </div>
             <div className="space-y-2">
-              <h3 className="font-semibold text-blue-900">About Carbon Footprint Reports</h3>
+              <h3 className="font-semibold text-blue-900">About LCA Reports</h3>
               <p className="text-sm text-blue-800">
                 Life Cycle Assessments (LCAs) provide a comprehensive environmental profile of your products following ISO 14044:2006 standards.
                 Each report includes cradle-to-gate impacts across multiple environmental categories including climate change, water use,

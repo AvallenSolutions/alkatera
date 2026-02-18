@@ -157,7 +157,7 @@ const navigationStructure: NavItem[] = [
         minTier: 1,
       },
       {
-        name: "PEI's & EPD's",
+        name: "LCA Reports",
         href: '/reports/lcas/',
         icon: Award,
         minTier: 2,

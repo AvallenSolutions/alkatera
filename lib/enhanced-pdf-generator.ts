@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use `lib/pdf/render-lca-html.ts` + `lib/pdf/pdfshift-client.ts` instead.
+ * This file uses the old jsPDF approach which produces lower-quality PDFs.
+ * The new system uses PDFShift API with HTML/CSS templates for pixel-perfect output.
+ * See `.claude/skills/pdf-generation.md` for the new architecture.
+ */
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 

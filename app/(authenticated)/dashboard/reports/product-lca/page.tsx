@@ -170,15 +170,15 @@ export default function ProductLCAReportsPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Product Environmental Impact Reports</h1>
+            <h1 className="text-3xl font-bold tracking-tight">LCA Reports</h1>
             <p className="text-muted-foreground mt-2">
-              View and manage environmental impact assessments for your products
+              View and manage Life Cycle Assessment reports for your products
             </p>
           </div>
           <Link href="/lca/new">
             <Button size="lg" className="gap-2">
               <Plus className="h-5 w-5" />
-              Create New PEI
+              Create New LCA
             </Button>
           </Link>
         </div>
@@ -189,7 +189,7 @@ export default function ProductLCAReportsPage() {
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  No product environmental impact assessments found. Create your first PEI to get started.
+                  No Life Cycle Assessments found. Create your first LCA to get started.
                 </AlertDescription>
               </Alert>
             </CardContent>

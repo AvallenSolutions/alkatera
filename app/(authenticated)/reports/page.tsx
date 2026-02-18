@@ -69,7 +69,7 @@ export default function ReportsPage() {
                 <FileText className="h-12 w-12 text-slate-300 dark:text-slate-700 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No Product Reports</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Create products and complete PEIs to generate product reports
+                  Create products and complete LCAs to generate product reports
                 </p>
                 <Button asChild>
                   <Link href="/products">Go to Products</Link>

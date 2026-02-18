@@ -37,7 +37,7 @@ export function PreviewDashboard() {
           <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl pt-4 pb-3 px-4">
             <div className="flex items-center gap-2 mb-2">
               <TrendingDown className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs text-white/40">Carbon Footprint</span>
+              <span className="text-xs text-white/40">Climate Impact</span>
             </div>
             <div className="text-2xl font-bold font-data text-white">1,234 <span className="text-xs text-emerald-400">-15%</span></div>
             <p className="text-xs text-white/30">tCO2e/year</p>

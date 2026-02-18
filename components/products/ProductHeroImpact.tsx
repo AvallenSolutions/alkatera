@@ -455,7 +455,7 @@ export function ProductHeroImpact({
 
             <div className="flex-1 text-center lg:text-left">
               <div className="mb-6">
-                <p className="text-sm text-white/50 mb-1">Carbon Footprint</p>
+                <p className="text-sm text-white/50 mb-1">Climate Impact</p>
                 <div className="flex items-baseline gap-2 justify-center lg:justify-start">
                   <span className="text-5xl lg:text-6xl font-bold text-white tabular-nums">
                     {totalCarbonFootprint.toFixed(2)}
@@ -507,7 +507,7 @@ export function ProductHeroImpact({
                   <Button variant="secondary" asChild className="bg-white/10 hover:bg-white/20 text-white border-0">
                     <Link href={lcaReportUrl}>
                       <FileText className="h-4 w-4 mr-2" />
-                      View Full Carbon Footprint Report
+                      View Full LCA Report
                     </Link>
                   </Button>
                 )}

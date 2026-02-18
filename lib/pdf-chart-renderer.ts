@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use CSS conic-gradient charts in `lib/pdf/render-lca-html.ts` instead.
+ * This file uses the old jsPDF/Canvas approach for rendering charts.
+ * The new system uses pure CSS charts rendered via PDFShift's Chromium engine.
+ * See `.claude/skills/pdf-generation.md` for the new architecture.
+ */
 import jsPDF from 'jspdf';
 
 export interface ChartDataItem {
