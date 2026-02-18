@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +34,7 @@ import {
   Building2,
   Users,
   Calendar,
+  Search,
 } from "lucide-react";
 import Link from "next/link";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -41,6 +42,8 @@ import { validateMaterialsBeforeCalculation, type ProductMaterial } from "@/lib/
 import { calculateProductLCA } from "@/lib/product-lca-calculator";
 import { OperationOverlay, type OperationStep } from "@/components/ui/operation-progress";
 import { toast } from "sonner";
+import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import type { DataSource } from "@/lib/types/lca";
 
 interface MaterialWithValidation extends ProductMaterial {
   hasData: boolean;
@@ -119,6 +122,8 @@ export function CalculateLCASheet({
   const [linkedFacilities, setLinkedFacilities] = useState<LinkedFacility[]>([]);
   const [facilityAllocations, setFacilityAllocations] = useState<FacilityAllocation[]>([]);
   const [reportingSessions, setReportingSessions] = useState<Record<string, ReportingSession[]>>({});
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [savingMaterialId, setSavingMaterialId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -242,6 +247,93 @@ export function CalculateLCASheet({
     }
   }
 
+  async function handleEmissionFactorSelect(
+    materialId: string,
+    selection: {
+      name: string;
+      data_source: DataSource;
+      data_source_id?: string;
+      supplier_product_id?: string;
+      unit: string;
+      carbon_intensity?: number;
+    }
+  ) {
+    const supabase = getSupabaseBrowserClient();
+    setSavingMaterialId(materialId);
+
+    try {
+      // 1. Update DB row
+      const updateData: Record<string, any> = {
+        data_source: selection.data_source,
+        data_source_id: selection.data_source_id || null,
+        supplier_product_id: null,
+      };
+      if (selection.data_source === 'supplier' && selection.supplier_product_id) {
+        updateData.supplier_product_id = selection.supplier_product_id;
+      }
+
+      const { error: updateError } = await supabase
+        .from('product_materials')
+        .update(updateData)
+        .eq('id', materialId);
+
+      if (updateError) throw updateError;
+
+      // 2. Re-fetch the updated row
+      const { data: updatedRow, error: fetchError } = await supabase
+        .from('product_materials')
+        .select('*')
+        .eq('id', materialId)
+        .single();
+
+      if (fetchError || !updatedRow) throw fetchError || new Error('Material not found');
+
+      // 3. Re-validate this single material
+      const validation = await validateMaterialsBeforeCalculation(
+        [updatedRow as ProductMaterial],
+        product.organization_id
+      );
+
+      // 4. Update local state
+      setMaterials(prev => {
+        const updated = prev.map(m => {
+          if (m.id !== materialId) return m;
+          const valid = validation.validMaterials[0];
+          if (valid) {
+            return {
+              ...updatedRow,
+              hasData: true,
+              dataQuality: valid.resolved.data_quality_tag,
+              confidenceScore: valid.resolved.confidence_score,
+              error: undefined,
+            } as MaterialWithValidation;
+          }
+          const missing = validation.missingData[0];
+          return {
+            ...updatedRow,
+            hasData: false,
+            error: missing?.error || 'Validation failed',
+          } as MaterialWithValidation;
+        });
+
+        // 5. Recalculate canCalculate and missingCount
+        const newMissing = updated.filter(m => !m.hasData).length;
+        setMissingCount(newMissing);
+        setCanCalculate(newMissing === 0);
+
+        return updated;
+      });
+
+      setEditingMaterialId(null);
+      toast.success(`Emission factor assigned for ${updatedRow.material_name}`);
+    } catch (error: any) {
+      console.error('Error updating emission factor:', error);
+      toast.error(error.message || 'Failed to update emission factor');
+    } finally {
+      setSavingMaterialId(null);
+    }
+  }
+
   const handleCalculate = async () => {
     if (!canCalculate) {
       toast.error('Cannot calculate: some materials are missing emission data');
@@ -340,7 +432,7 @@ export function CalculateLCASheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-4xl overflow-y-auto" preventClose>
         <SheetHeader className="mb-4">
-          <SheetTitle>Calculate Carbon Footprint</SheetTitle>
+          <SheetTitle>Create LCA</SheetTitle>
           <SheetDescription>
             ISO 14067 compliant lifecycle assessment for {productName}
           </SheetDescription>
@@ -360,6 +452,7 @@ export function CalculateLCASheet({
                 <AlertTitle>Missing Emission Data</AlertTitle>
                 <AlertDescription>
                   {missingCount} material{missingCount !== 1 ? 's are' : ' is'} missing emission factors.
+                  Click &quot;Fix&quot; next to each missing material to search and assign one.
                 </AlertDescription>
               </Alert>
             )}
@@ -393,29 +486,64 @@ export function CalculateLCASheet({
                     {materials.map((material) => {
                       const badgeProps = material.dataQuality ? getQualityBadgeProps(material.dataQuality) : null;
                       const Icon = badgeProps?.icon;
+                      const isEditing = editingMaterialId === material.id;
+                      const isSaving = savingMaterialId === material.id;
+
                       return (
-                        <TableRow key={material.id}>
-                          <TableCell className="font-medium text-sm">{material.material_name}</TableCell>
-                          <TableCell className="capitalize text-sm">{material.material_type}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{material.quantity} {material.unit}</TableCell>
-                          <TableCell>
-                            {material.hasData && badgeProps ? (
-                              <Badge variant={badgeProps.variant} className={`${badgeProps.className} text-xs`}>
-                                {Icon && <Icon className="h-3 w-3 mr-1" />}
-                                {material.dataQuality?.replace('_', ' ')}
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive" className="text-xs">Missing</Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {material.hasData ? (
-                              <CheckCircle2 className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <AlertCircle className="h-4 w-4 text-red-600" />
-                            )}
-                          </TableCell>
-                        </TableRow>
+                        <Fragment key={material.id}>
+                          <TableRow>
+                            <TableCell className="font-medium text-sm">{material.material_name}</TableCell>
+                            <TableCell className="capitalize text-sm">{material.material_type}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{material.quantity} {material.unit}</TableCell>
+                            <TableCell>
+                              {material.hasData && badgeProps ? (
+                                <Badge variant={badgeProps.variant} className={`${badgeProps.className} text-xs`}>
+                                  {Icon && <Icon className="h-3 w-3 mr-1" />}
+                                  {material.dataQuality?.replace('_', ' ')}
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="text-xs">Missing</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {material.hasData ? (
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                              ) : isSaving ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-lime-500" />
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs text-lime-600 hover:text-lime-700 hover:bg-lime-50 dark:text-lime-400 dark:hover:text-lime-300 dark:hover:bg-lime-950/30"
+                                  onClick={() => setEditingMaterialId(isEditing ? null : material.id)}
+                                >
+                                  <Search className="h-3 w-3 mr-1" />
+                                  {isEditing ? 'Cancel' : 'Fix'}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+
+                          {/* Inline search row for missing materials */}
+                          {isEditing && !material.hasData && (
+                            <TableRow className="bg-muted/30 hover:bg-muted/30">
+                              <TableCell colSpan={5} className="py-3">
+                                <div className="max-w-lg">
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    Search for an emission factor for &quot;{material.material_name}&quot;:
+                                  </p>
+                                  <InlineIngredientSearch
+                                    organizationId={product.organization_id}
+                                    value={material.material_name}
+                                    placeholder={`Search emission factor for ${material.material_name}...`}
+                                    materialType={material.material_type as 'ingredient' | 'packaging'}
+                                    onSelect={(selection) => handleEmissionFactorSelect(material.id, selection)}
+                                  />
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </TableBody>
@@ -574,7 +702,7 @@ export function CalculateLCASheet({
         {/* Calculation progress overlay */}
         <OperationOverlay
           open={calculating}
-          title="Calculating Product Carbon Footprint"
+          title="Creating Lifecycle Assessment"
           steps={calcSteps}
           progress={calcProgress}
           message="ISO 14067 compliant lifecycle assessment"

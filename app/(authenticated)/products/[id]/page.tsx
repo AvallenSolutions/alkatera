@@ -253,7 +253,7 @@ export default function ProductDashboardPage() {
             className="backdrop-blur-xl bg-lime-500/90 hover:bg-lime-500 text-black font-semibold shadow-lg shadow-lime-500/20 border border-lime-400/50"
           >
             <Calculator className="mr-2 h-4 w-4" />
-            Calculate Carbon Footprint
+            Create LCA
           </Button>
         </div>
 
