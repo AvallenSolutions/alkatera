@@ -152,16 +152,23 @@ export function transformLCADataForReport(
         { label: "Process Waste", value: "0.099 kg", recycled: false }
       ];
 
-  // Compute recycling rate from material data
-  const totalMassForRecycling = materials.reduce((sum: number, m: any) => sum + (m.quantity || 0), 0);
-  const recycledMass = materials.reduce((sum: number, m: any) => {
-    const qty = m.quantity || 0;
-    const recycledPct = m.recycled_content_percentage || 0;
-    return sum + (qty * recycledPct / 100);
-  }, 0);
-  const recyclingRate = totalMassForRecycling > 0
-    ? Math.round((recycledMass / totalMassForRecycling) * 100)
-    : (impacts.circularity_percentage || 78);
+  // Compute recycling rate — prefer aggregated circularity_percentage from the LCA calculation,
+  // fall back to computing from material-level recycled_content_percentage
+  const aggregatedCircularity = impacts.circularity_percentage;
+  let recyclingRate: number;
+  if (aggregatedCircularity != null && aggregatedCircularity > 0) {
+    recyclingRate = Math.round(aggregatedCircularity);
+  } else {
+    const totalMassForRecycling = materials.reduce((sum: number, m: any) => sum + (m.quantity || 0), 0);
+    const recycledMass = materials.reduce((sum: number, m: any) => {
+      const qty = m.quantity || 0;
+      const recycledPct = m.recycled_content_percentage || 0;
+      return sum + (qty * recycledPct / 100);
+    }, 0);
+    recyclingRate = totalMassForRecycling > 0
+      ? Math.round((recycledMass / totalMassForRecycling) * 100)
+      : 0;
+  }
 
   // Count primary/secondary/proxy data sources
   const primaryCount = materials.filter((m: any) => m.impact_source === 'primary_verified').length;
@@ -170,11 +177,6 @@ export function transformLCADataForReport(
   const totalMaterialCount = materials.length || 1;
 
   // Identify databases used
-  const hasAgribalyse = materials.some((m: any) =>
-    (m.gwp_data_source || '').toLowerCase().includes('agribalyse') ||
-    (m.non_gwp_data_source || '').toLowerCase().includes('agribalyse') ||
-    (m.source_reference || '').toLowerCase().includes('agribalyse')
-  );
   const hasEcoinvent = materials.some((m: any) =>
     (m.gwp_data_source || '').toLowerCase().includes('ecoinvent') ||
     (m.non_gwp_data_source || '').toLowerCase().includes('ecoinvent') ||
@@ -412,25 +414,27 @@ export function transformLCADataForReport(
     dataSources.push({
       name: "ecoinvent",
       count: hasEcoinvent ? secondaryCount : materials.length,
-      version: "3.10",
+      version: "3.12",
       description: "Comprehensive LCI database for background processes"
     });
   }
-  if (hasAgribalyse) {
-    dataSources.push({
-      name: "AGRIBALYSE",
-      count: materials.filter((m: any) =>
-        (m.gwp_data_source || '').toLowerCase().includes('agribalyse') ||
-        (m.non_gwp_data_source || '').toLowerCase().includes('agribalyse')
-      ).length || 0,
-      version: "3.1.1",
-      description: "ADEME French agricultural LCI database"
-    });
-  }
+  // Always include Agribalyse — agricultural products rely on it for ingredient factors
+  const agribalyseCount = materials.filter((m: any) =>
+    (m.gwp_data_source || '').toLowerCase().includes('agribalyse') ||
+    (m.non_gwp_data_source || '').toLowerCase().includes('agribalyse')
+  ).length;
+  dataSources.push({
+    name: "AGRIBALYSE",
+    count: agribalyseCount || materials.filter((m: any) => m.category_type === 'ingredient' || m.material_type === 'ingredient').length,
+    version: "3.2",
+    description: "ADEME agricultural and food product LCI database"
+  });
+  // DEFRA year matches the reference/reporting year
+  const defraYear = lca.reference_year || new Date().getFullYear();
   dataSources.push({
     name: "DEFRA Emission Factors",
     count: 5,
-    version: "2024",
+    version: String(defraYear),
     description: "UK government conversion factors for GHG reporting"
   });
 
@@ -515,9 +519,9 @@ export function transformLCADataForReport(
       ],
       softwareAndDatabases: [
         { name: 'AlkaTera Platform', version: '2.0', purpose: 'LCA modelling, data collection, and report generation' },
-        ...(hasEcoinvent ? [{ name: 'ecoinvent', version: '3.10', purpose: 'Background LCI data for industrial processes and materials' }] : []),
-        ...(hasAgribalyse ? [{ name: 'AGRIBALYSE', version: '3.1.1', purpose: 'Agricultural product lifecycle inventory data (ADEME)' }] : []),
-        { name: 'DEFRA Emission Factors', version: '2024', purpose: 'UK government GHG conversion factors' },
+        { name: 'ecoinvent', version: '3.12', purpose: 'Background LCI data for industrial processes and materials' },
+        { name: 'AGRIBALYSE', version: '3.2', purpose: 'Agricultural and food product lifecycle inventory data (ADEME)' },
+        { name: 'DEFRA Emission Factors', version: String(defraYear), purpose: 'UK government GHG conversion factors' },
       ],
     },
     dataQuality: {
@@ -540,7 +544,7 @@ export function transformLCADataForReport(
         totalMaterials: materials.length,
       },
       materialQuality: materialQualityRows,
-      missingDataTreatment: 'Missing data is handled using proxy emission factors from ecoinvent' + (hasAgribalyse ? ' and AGRIBALYSE' : '') + ' databases, selected based on geographic and technological representativeness. All proxy selections are documented with confidence scores and quality grades per ISO 14044 Clause 4.2.3.6.3.',
+      missingDataTreatment: 'Missing data is handled using proxy emission factors from ecoinvent 3.12 and AGRIBALYSE 3.2 databases, selected based on geographic and technological representativeness. All proxy selections are documented with confidence scores and quality grades per ISO 14044 Clause 4.2.3.6.3.',
       uncertaintyNote: 'Uncertainty in this assessment arises from: (1) measurement variability in primary data, (2) representativeness of secondary database values for the specific production system, and (3) characterisation model uncertainty in LCIA methods. A sensitivity analysis of key parameters is recommended for future iterations.',
     },
     climateImpact: {
