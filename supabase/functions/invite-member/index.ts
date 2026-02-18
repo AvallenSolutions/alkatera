@@ -213,13 +213,28 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    // Use userClient for RPC calls that need user context (JWT claims)
-    const { data: orgIdData, error: orgIdError } = await userClient.rpc(
-      'get_current_organization_id'
-    );
+    // Determine the organization ID. Try the user's JWT metadata first
+    // (set by the client app when switching orgs), then fall back to a
+    // direct database lookup. The JWT approach can fail when the service
+    // role key is used because request.jwt.claims may not reflect the
+    // user's token.
+    let organizationId: string | null =
+      user.user_metadata?.current_organization_id ?? null;
 
-    if (orgIdError || !orgIdData) {
-      console.error("Error getting organization ID:", orgIdError);
+    if (!organizationId) {
+      // Fallback: look up the user's first organization membership
+      const { data: membership } = await adminClient
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .single();
+
+      organizationId = membership?.organization_id ?? null;
+    }
+
+    if (!organizationId) {
+      console.error("No organization found for user:", user.id);
       return new Response(
         JSON.stringify({
           error: "You must be a member of an organization to invite others"
@@ -231,15 +246,29 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const organizationId = orgIdData;
+    // Verify the user is an owner or admin of this organization
+    const { data: membership, error: membershipError } = await adminClient
+      .from('organization_members')
+      .select('id, roles!inner(name)')
+      .eq('user_id', user.id)
+      .eq('organization_id', organizationId)
+      .single();
 
-    // Use userClient for role check (needs user context)
-    const { data: userRole } = await userClient.rpc('get_my_organization_role', {
-      org_id: organizationId
-    });
+    if (membershipError || !membership) {
+      console.error("Membership check failed:", membershipError);
+      return new Response(
+        JSON.stringify({
+          error: "You must be a member of an organization to invite others"
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
-    // get_my_organization_role returns 'company_admin' or 'company_user'
-    if (!userRole || userRole !== 'company_admin') {
+    const roleName = (membership as any).roles?.name;
+    if (!roleName || !['owner', 'admin'].includes(roleName)) {
       return new Response(
         JSON.stringify({
           error: "Only organization owners and admins can invite members"
