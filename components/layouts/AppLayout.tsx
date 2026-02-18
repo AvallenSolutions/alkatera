@@ -10,6 +10,7 @@ import { Header } from './Header'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
+import { UnreadRepliesBanner } from '@/components/feedback/UnreadRepliesBanner'
 import { OnboardingProvider } from '@/lib/onboarding'
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
 
@@ -129,6 +130,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
           />
 
           <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+            <UnreadRepliesBanner />
             {subscriptionStatus === 'past_due' && currentOrganization && (
               <PaymentWarningBanner organizationId={currentOrganization.id} />
             )}

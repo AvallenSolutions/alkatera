@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { Bell, MessageSquare, MessageCircle, AlertTriangle, CheckCheck, Inbox } from 'lucide-react'
+import { Bell, MessageSquare, MessageCircle, AlertTriangle, CheckCheck, Inbox, Users } from 'lucide-react'
 
 function getRelativeTime(dateString: string): string {
   const now = Date.now()
@@ -42,33 +42,42 @@ function getNotificationIcon(type: string) {
     case 'feedback_reply':
       return <MessageCircle className="h-4 w-4 text-emerald-500 shrink-0" />
     case 'escalation':
+    case 'ticket_escalated':
       return <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+    case 'advisor_message':
+      return <Users className="h-4 w-4 text-purple-500 shrink-0" />
     default:
       return <Bell className="h-4 w-4 text-muted-foreground shrink-0" />
   }
 }
 
-function getNotificationRoute(notification: { entity_type: string | null; entity_id: string | null }): string | null {
+function getNotificationRoute(
+  notification: { entity_type: string | null; entity_id: string | null; notification_type: string },
+  isAdmin: boolean
+): string | null {
   if (notification.entity_type === 'feedback_ticket' && notification.entity_id) {
-    return `/admin/feedback/${notification.entity_id}`
+    return isAdmin
+      ? `/admin/feedback/${notification.entity_id}`
+      : `/settings/feedback/${notification.entity_id}`
+  }
+  if (notification.entity_type === 'advisor_conversation' && notification.entity_id) {
+    return `/settings/messages/${notification.entity_id}`
   }
   return null
 }
 
 export function NotificationBell() {
-  const isAdmin = useIsAlkateraAdmin()
+  const { isAlkateraAdmin } = useIsAlkateraAdmin()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const router = useRouter()
   const [open, setOpen] = useState(false)
-
-  if (!isAdmin) return null
 
   const handleNotificationClick = async (notification: typeof notifications[0]) => {
     if (!notification.is_read) {
       await markAsRead(notification.id)
     }
 
-    const route = getNotificationRoute(notification)
+    const route = getNotificationRoute(notification, isAlkateraAdmin)
     if (route) {
       setOpen(false)
       router.push(route)
@@ -78,6 +87,8 @@ export function NotificationBell() {
   const handleMarkAllRead = async () => {
     await markAllAsRead()
   }
+
+  const feedbackRoute = isAlkateraAdmin ? '/admin/feedback' : '/settings/feedback'
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -120,7 +131,6 @@ export function NotificationBell() {
             </div>
           ) : (
             notifications.map((notification) => {
-              const route = getNotificationRoute(notification)
               return (
                 <button
                   key={notification.id}
@@ -152,7 +162,7 @@ export function NotificationBell() {
           )}
         </div>
 
-        {/* Footer - link to feedback dashboard */}
+        {/* Footer */}
         {notifications.length > 0 && (
           <div className="border-t px-4 py-2">
             <Button
@@ -161,10 +171,10 @@ export function NotificationBell() {
               className="w-full text-xs text-muted-foreground hover:text-foreground"
               onClick={() => {
                 setOpen(false)
-                router.push('/admin/feedback')
+                router.push(feedbackRoute)
               }}
             >
-              View all feedback
+              {isAlkateraAdmin ? 'View all feedback' : 'View your tickets'}
             </Button>
           </div>
         )}

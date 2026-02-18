@@ -37,6 +37,7 @@ import {
   FileEdit,
   Leaf,
   MessageSquare,
+  Mail,
   Dog,
   Heart,
   UserCheck,
@@ -359,6 +360,18 @@ const navigationStructure: NavItem[] = [
     href: '/rosa/',
     icon: Dog,
     minTier: 2,
+  },
+  {
+    name: 'Support',
+    href: '/settings/feedback/',
+    icon: MessageSquare,
+    minTier: 1,
+  },
+  {
+    name: 'Messages',
+    href: '/settings/messages/',
+    icon: Mail,
+    minTier: 1,
   },
   {
     name: 'Settings',

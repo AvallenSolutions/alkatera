@@ -19,10 +19,12 @@ import {
   Circle,
 } from "lucide-react";
 import { fetchUserTickets } from "@/lib/feedback";
+import { cn } from "@/lib/utils";
 import { FeedbackDialog } from "@/components/feedback/FeedbackDialog";
 import type { FeedbackTicket, FeedbackCategory, FeedbackStatus } from "@/lib/types/feedback";
 import { FEEDBACK_STATUSES, FEEDBACK_PRIORITIES } from "@/lib/types/feedback";
 import { format } from "date-fns";
+import { supabase } from "@/lib/supabaseClient";
 
 const categoryIcons: Record<FeedbackCategory, React.ElementType> = {
   bug: Bug,
@@ -85,6 +87,8 @@ function PriorityBadge({ priority }: { priority: string }) {
 export default function FeedbackPage() {
   const [tickets, setTickets] = useState<FeedbackTicket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [unreadByTicket, setUnreadByTicket] = useState<Record<string, number>>({});
+  const [totalUnread, setTotalUnread] = useState(0);
 
   useEffect(() => {
     loadTickets();
@@ -95,6 +99,26 @@ export default function FeedbackPage() {
     try {
       const data = await fetchUserTickets();
       setTickets(data);
+
+      // Load unread admin reply counts per ticket
+      if (data.length > 0) {
+        const ticketIds = data.map((t) => t.id);
+        const { data: unreadMessages } = await supabase
+          .from('feedback_messages')
+          .select('ticket_id')
+          .in('ticket_id', ticketIds)
+          .eq('is_admin_reply', true)
+          .eq('is_read', false);
+
+        const counts: Record<string, number> = {};
+        let total = 0;
+        for (const msg of (unreadMessages || [])) {
+          counts[msg.ticket_id] = (counts[msg.ticket_id] || 0) + 1;
+          total++;
+        }
+        setUnreadByTicket(counts);
+        setTotalUnread(total);
+      }
     } catch (error) {
       console.error("Error loading tickets:", error);
     } finally {
@@ -110,7 +134,14 @@ export default function FeedbackPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold">Feedback & Support</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            Feedback & Support
+            {totalUnread > 0 && (
+              <Badge className="bg-red-500 text-white text-xs px-1.5 py-0">
+                {totalUnread} new {totalUnread === 1 ? 'reply' : 'replies'}
+              </Badge>
+            )}
+          </h1>
           <p className="text-muted-foreground">
             View your submitted feedback and bug reports
           </p>
@@ -158,7 +189,7 @@ export default function FeedbackPage() {
               </h2>
               <div className="space-y-3">
                 {openTickets.map((ticket) => (
-                  <TicketCard key={ticket.id} ticket={ticket} />
+                  <TicketCard key={ticket.id} ticket={ticket} unreadCount={unreadByTicket[ticket.id] || 0} />
                 ))}
               </div>
             </div>
@@ -173,7 +204,7 @@ export default function FeedbackPage() {
               </h2>
               <div className="space-y-3">
                 {resolvedTickets.map((ticket) => (
-                  <TicketCard key={ticket.id} ticket={ticket} />
+                  <TicketCard key={ticket.id} ticket={ticket} unreadCount={unreadByTicket[ticket.id] || 0} />
                 ))}
               </div>
             </div>
@@ -184,16 +215,24 @@ export default function FeedbackPage() {
   );
 }
 
-function TicketCard({ ticket }: { ticket: FeedbackTicket }) {
+function TicketCard({ ticket, unreadCount = 0 }: { ticket: FeedbackTicket; unreadCount?: number }) {
   const Icon = categoryIcons[ticket.category];
 
   return (
     <Link href={`/settings/feedback/${ticket.id}`}>
-      <Card className="hover:bg-muted/50 transition-colors cursor-pointer">
+      <Card className={cn(
+        "hover:bg-muted/50 transition-colors cursor-pointer",
+        unreadCount > 0 && "ring-1 ring-lime-500/30 bg-lime-500/5"
+      )}>
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
-            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+            <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 relative">
               <Icon className="h-5 w-5 text-muted-foreground" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">
+                  {unreadCount}
+                </span>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
@@ -201,6 +240,11 @@ function TicketCard({ ticket }: { ticket: FeedbackTicket }) {
                 <Badge variant="outline" className="text-xs">
                   {categoryLabels[ticket.category]}
                 </Badge>
+                {unreadCount > 0 && (
+                  <Badge className="bg-lime-500 text-black text-[10px] px-1.5 py-0">
+                    New reply
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
                 {ticket.description}

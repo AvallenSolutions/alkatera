@@ -178,6 +178,13 @@ export async function updateTicket(
     throw error;
   }
 
+  // Notify user when status changes (fire-and-forget)
+  if (input.status !== undefined) {
+    sendFeedbackEmail(ticketId, 'ticket_updated').catch((err) => {
+      console.error('[Feedback] Email notification failed:', err);
+    });
+  }
+
   return data;
 }
 
@@ -265,6 +272,12 @@ export async function createMessage(input: CreateMessageInput): Promise<Feedback
     throw error;
   }
 
+  // Send email notification via edge function (fire-and-forget)
+  const eventType = input.is_admin_reply ? 'admin_reply' : 'user_reply';
+  sendFeedbackEmail(input.ticket_id, eventType, data.id).catch((err) => {
+    console.error('[Feedback] Email notification failed:', err);
+  });
+
   return data;
 }
 
@@ -285,6 +298,69 @@ export async function markMessagesAsRead(ticketId: string, isAdmin: boolean): Pr
 
   if (error) {
     console.error('Error marking messages as read:', error);
+  }
+}
+
+/**
+ * Fetch count of unread admin replies across all of the user's tickets.
+ * Used for sidebar badges and notification indicators.
+ */
+export async function fetchUnreadReplyCount(): Promise<number> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return 0;
+
+  // Get all tickets created by this user
+  const { data: tickets, error: ticketsError } = await supabase
+    .from('feedback_tickets')
+    .select('id')
+    .eq('created_by', userData.user.id);
+
+  if (ticketsError || !tickets || tickets.length === 0) return 0;
+
+  const ticketIds = tickets.map((t) => t.id);
+
+  // Count unread admin replies
+  const { count, error } = await supabase
+    .from('feedback_messages')
+    .select('id', { count: 'exact', head: true })
+    .in('ticket_id', ticketIds)
+    .eq('is_admin_reply', true)
+    .eq('is_read', false);
+
+  if (error) {
+    console.error('Error fetching unread reply count:', error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
+// ============================================================================
+// Email Notifications
+// ============================================================================
+
+/**
+ * Send feedback email notification via Supabase Edge Function.
+ * Fire-and-forget — errors are logged but never thrown to callers.
+ */
+export async function sendFeedbackEmail(
+  ticketId: string,
+  eventType: 'ticket_created' | 'ticket_updated' | 'admin_reply' | 'user_reply' | 'escalated',
+  messageId?: string
+): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { error } = await supabase.functions.invoke('send-feedback-email', {
+      body: { ticketId, eventType, messageId },
+    });
+
+    if (error) {
+      console.error('[Feedback] Email edge function error:', error);
+    }
+  } catch (err) {
+    console.error('[Feedback] Failed to invoke email function:', err);
   }
 }
 
