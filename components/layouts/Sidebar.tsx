@@ -105,6 +105,12 @@ const navigationStructure: NavItem[] = [
         icon: Sparkles,
         minTier: 2,
       },
+      {
+        name: 'Log Data',
+        href: '/company/log-data/',
+        icon: ClipboardCheck,
+        minTier: 1,
+      },
     ],
   },
   {
