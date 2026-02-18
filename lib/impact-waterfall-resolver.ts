@@ -643,13 +643,105 @@ export async function resolveImpactFactors(
   // ===========================================================
   console.log(`[Waterfall] Checking Priority 3 (Full Ecoinvent/Staging) for: ${material.material_name}`);
 
-  // Try staging_emission_factors — first exact match, then partial match
-  let { data: stagingFactor } = await supabase
-    .from('staging_emission_factors')
-    .select('*')
-    .ilike('name', material.material_name)
-    .limit(1)
-    .maybeSingle();
+  // If data_source_id is set, try direct ID lookup first (most reliable)
+  let stagingFactor: any = null;
+
+  if (material.data_source_id && (material.data_source === 'staging' || material.data_source === 'defra')) {
+    const { data: directMatch } = await supabase
+      .from('staging_emission_factors')
+      .select('*')
+      .eq('id', material.data_source_id)
+      .maybeSingle();
+    if (directMatch) {
+      console.log(`[Waterfall] Direct ID lookup success for staging factor: ${directMatch.name}`);
+      stagingFactor = directMatch;
+    }
+  }
+
+  if (material.data_source_id && material.data_source === 'ecoinvent') {
+    // Try ecoinvent_material_proxies by ID first
+    const { data: directProxy } = await supabase
+      .from('ecoinvent_material_proxies')
+      .select('*')
+      .eq('id', material.data_source_id)
+      .maybeSingle();
+    if (directProxy && directProxy.impact_climate) {
+      console.log(`[Waterfall] ✓ Direct ID lookup SUCCESS: Using Ecoinvent proxy ${directProxy.material_name}`);
+
+      const climateTotal = Number(directProxy.impact_climate || 0) * quantity_kg;
+      const hasGHGBreakdown = directProxy.impact_climate_fossil || directProxy.impact_climate_biogenic;
+      const fossilCO2 = hasGHGBreakdown
+        ? Number(directProxy.impact_climate_fossil || 0) * quantity_kg
+        : climateTotal * 0.85;
+      const biogenicCO2 = hasGHGBreakdown
+        ? Number(directProxy.impact_climate_biogenic || 0) * quantity_kg
+        : climateTotal * 0.15;
+
+      return {
+        impact_climate: climateTotal,
+        impact_climate_fossil: fossilCO2,
+        impact_climate_biogenic: biogenicCO2,
+        impact_climate_dluc: Number(directProxy.impact_climate_dluc || 0) * quantity_kg,
+        ch4_kg: Number(directProxy.ch4_factor || 0) * quantity_kg,
+        ch4_fossil_kg: Number(directProxy.ch4_fossil_factor || 0) * quantity_kg,
+        ch4_biogenic_kg: Number(directProxy.ch4_biogenic_factor || 0) * quantity_kg,
+        n2o_kg: Number(directProxy.n2o_factor || 0) * quantity_kg,
+        impact_water: Number(directProxy.impact_water || 0) * quantity_kg,
+        impact_water_scarcity: Number(directProxy.impact_water || 0) * quantity_kg * awareFactor,
+        impact_land: Number(directProxy.impact_land_use || directProxy.impact_land || 0) * quantity_kg,
+        impact_waste: Number(directProxy.impact_waste || 0) * quantity_kg,
+        impact_ozone_depletion: Number(directProxy.impact_ozone_depletion || 0) * quantity_kg,
+        impact_photochemical_ozone_formation: Number(directProxy.impact_photochemical_ozone_formation || 0) * quantity_kg,
+        impact_ionising_radiation: Number(directProxy.impact_ionising_radiation || 0) * quantity_kg,
+        impact_particulate_matter: Number(directProxy.impact_particulate_matter || 0) * quantity_kg,
+        impact_human_toxicity_carcinogenic: Number(directProxy.impact_human_toxicity_carcinogenic || 0) * quantity_kg,
+        impact_human_toxicity_non_carcinogenic: Number(directProxy.impact_human_toxicity_non_carcinogenic || 0) * quantity_kg,
+        impact_terrestrial_ecotoxicity: Number(directProxy.impact_terrestrial_ecotoxicity || 0) * quantity_kg,
+        impact_freshwater_ecotoxicity: Number(directProxy.impact_freshwater_ecotoxicity || 0) * quantity_kg,
+        impact_marine_ecotoxicity: Number(directProxy.impact_marine_ecotoxicity || 0) * quantity_kg,
+        impact_freshwater_eutrophication: Number(directProxy.impact_freshwater_eutrophication || 0) * quantity_kg,
+        impact_marine_eutrophication: Number(directProxy.impact_marine_eutrophication || 0) * quantity_kg,
+        impact_terrestrial_acidification: Number(directProxy.impact_terrestrial_acidification || 0) * quantity_kg,
+        impact_mineral_resource_scarcity: Number(directProxy.impact_mineral_resource_scarcity || 0) * quantity_kg,
+        impact_fossil_resource_scarcity: Number(directProxy.impact_fossil_fuel_scarcity || 0) * quantity_kg,
+        data_priority: 3,
+        data_quality_tag: 'Secondary_Modelled',
+        data_quality_grade: category === 'MANUFACTURING_MATERIAL' ? 'MEDIUM' as const : 'LOW' as const,
+        source_reference: `Ecoinvent 3.12: ${directProxy.material_name} (${directProxy.geography || 'GLO'})`,
+        confidence_score: 50,
+        methodology: `ReCiPe 2016 Midpoint (H) / Ecoinvent ${directProxy.ecoinvent_version || '3.12'}`,
+        gwp_data_source: 'Ecoinvent 3.12',
+        non_gwp_data_source: 'Ecoinvent 3.12',
+        gwp_reference_id: directProxy.id,
+        non_gwp_reference_id: directProxy.id,
+        is_hybrid_source: false,
+        category_type: category,
+      };
+    }
+    // Also check staging_emission_factors for ecoinvent (some are stored there)
+    if (!stagingFactor) {
+      const { data: stagingMatch } = await supabase
+        .from('staging_emission_factors')
+        .select('*')
+        .eq('id', material.data_source_id)
+        .maybeSingle();
+      if (stagingMatch) {
+        console.log(`[Waterfall] Direct ID lookup in staging for ecoinvent source: ${stagingMatch.name}`);
+        stagingFactor = stagingMatch;
+      }
+    }
+  }
+
+  // Fallback: Try staging_emission_factors by name — first exact match, then partial match
+  if (!stagingFactor) {
+    const { data: nameMatch } = await supabase
+      .from('staging_emission_factors')
+      .select('*')
+      .ilike('name', material.material_name)
+      .limit(1)
+      .maybeSingle();
+    stagingFactor = nameMatch;
+  }
 
   // If no exact match, try partial/fuzzy match with wildcards
   if (!stagingFactor) {

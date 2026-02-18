@@ -345,6 +345,8 @@ export default function CalculateLCAPage() {
         product.organization_id
       );
 
+      const validationSucceeded = validation.validMaterials.length > 0;
+
       setMaterials(prev => {
         const updated = prev.map(m => {
           if (m.id !== materialId) return m;
@@ -374,7 +376,12 @@ export default function CalculateLCAPage() {
       });
 
       setEditingMaterialId(null);
-      toast.success(`Emission factor assigned for ${updatedRow.material_name}`);
+      if (validationSucceeded) {
+        toast.success(`Emission factor assigned for ${updatedRow.material_name}`);
+      } else {
+        const errorMsg = validation.missingData[0]?.error || 'Could not resolve emission factor';
+        toast.error(`Factor saved but validation failed for ${updatedRow.material_name}: ${errorMsg}`);
+      }
     } catch (error: any) {
       console.error('Error updating emission factor:', error);
       toast.error(error.message || 'Failed to update emission factor');
