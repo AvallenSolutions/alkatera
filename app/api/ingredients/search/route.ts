@@ -166,56 +166,95 @@ async function searchAgribalyseOpenLCAProcesses(query: string): Promise<SearchRe
  *
  * Scoring tiers:
  *  100 = exact match
+ *   95 = reversed ingredient name (e.g. "Syrup, Maple" for "maple syrup")
  *   90 = result starts with query
- *   80 = query fully contained in result
- *   75 = result fully contained in query
+ *   80 = query fully contained in result AND result is an ingredient
  *   70 = all query words present in result
+ *   60 = reverse word coverage ≥50%
  *   55 = ≥75% of query words present
  *   40 = ≥50% of query words present
  *   25 = any single query word present
- *   10 = weak/alias-only match (no meaningful word overlap)
+ *   10 = weak/alias-only match
+ *
+ * Sub-process penalty: results starting with non-ingredient terms like
+ * "Heat,", "Transport,", "Metal working" etc. get a -50 penalty.
  */
 function computeSearchRelevance(resultName: string, query: string): number {
   const r = resultName.toLowerCase();
   const q = query.toLowerCase();
 
+  // Extract the "primary name" portion before any pipe or brace
+  // e.g. "Syrup, Maple {CA-QC}| production..." → "syrup, maple"
+  const rPrimary = r.split('|')[0].split('{')[0].trim();
+
+  // ── Sub-process detection ──────────────────────────────────────────
+  // Agribalyse/ecoinvent include many intermediate processes (heat,
+  // transport, thermoforming, etc.) that are "adapted for [ingredient]".
+  // These should always rank below the actual ingredient process.
+  const SUB_PROCESS_PREFIXES = [
+    'heat,', 'heat production', 'heat, central', 'heat, district',
+    'transport,', 'transport ', 'lorry,', 'dry van',
+    'thermoforming', 'calendering',
+    'metal working', 'chromium steel', 'steel product',
+    'electricity,', 'electricity production', 'electricity mix', 'electricity from',
+    'packaging,', 'filling,',
+    'treatment of', 'waste treatment',
+    'water, deionised', 'water, decarbonised', 'water, ultrapure',
+    'extrusion,', 'injection moulding', 'blow moulding',
+    'corrugated board', 'kraft paper',
+    'tap water', 'market for tap water',
+    'diesel,', 'petrol,', 'natural gas,',
+  ];
+  const isSubProcess = SUB_PROCESS_PREFIXES.some(prefix => r.startsWith(prefix));
+  const isAdaptedFor = r.includes('adapted for') || r.includes('- adapted');
+  const subProcessPenalty = (isSubProcess || isAdaptedFor) ? 50 : 0;
+
   // Exact match
-  if (r === q) return 100;
+  if (r === q || rPrimary === q) return 100 - subProcessPenalty;
+
+  // Check for reversed ingredient name: "maple syrup" → "Syrup, Maple"
+  const qWords = q.split(/\s+/).filter(w => w.length >= 2);
+  if (qWords.length >= 2) {
+    const reversed = [...qWords].reverse().join(', ');
+    if (rPrimary === reversed || rPrimary.startsWith(reversed)) {
+      return 95 - subProcessPenalty;
+    }
+  }
 
   // Result name starts with the query
-  if (r.startsWith(q + ' ') || r.startsWith(q + ',') || r.startsWith(q + '/')) return 90;
-  if (r.startsWith(q)) return 90;
+  if (r.startsWith(q + ' ') || r.startsWith(q + ',') || r.startsWith(q + '/')) return 90 - subProcessPenalty;
+  if (r.startsWith(q)) return 90 - subProcessPenalty;
+  if (rPrimary.startsWith(q)) return 90 - subProcessPenalty;
 
   // Query fully contained in result name
-  if (r.includes(q)) return 80;
+  if (r.includes(q)) return 80 - subProcessPenalty;
 
-  // Result name fully contained in query
-  if (q.includes(r)) return 75;
+  // Result primary name fully contained in query
+  if (q.includes(rPrimary) && rPrimary.length > 3) return 75 - subProcessPenalty;
 
   // Word-level analysis
-  const qWords = q.split(/\s+/).filter(w => w.length >= 3);
   const rTokens = r.split(/[\s,/()]+/).filter(w => w.length >= 3);
 
-  if (qWords.length === 0) return 10;
+  if (qWords.length === 0) return 10 - subProcessPenalty;
 
   // Count how many query words appear in the result name
   const matchedQueryWords = qWords.filter(w => r.includes(w));
   const queryWordCoverage = matchedQueryWords.length / qWords.length;
 
-  if (queryWordCoverage === 1.0) return 70; // All query words found
-  if (queryWordCoverage >= 0.75) return 55;
-  if (queryWordCoverage >= 0.5) return 40;
+  if (queryWordCoverage === 1.0) return 70 - subProcessPenalty;
 
   // Check reverse: result words in query (catches "Syrup, Maple" vs "maple syrup")
   if (rTokens.length > 0) {
     const reverseMatched = rTokens.filter(w => q.includes(w));
     const reverseCoverage = reverseMatched.length / rTokens.length;
-    if (reverseCoverage >= 0.5) return 60;
+    if (reverseCoverage >= 0.5) return 60 - subProcessPenalty;
   }
 
-  if (queryWordCoverage > 0) return 25; // At least one word matches
+  if (queryWordCoverage >= 0.75) return 55 - subProcessPenalty;
+  if (queryWordCoverage >= 0.5) return 40 - subProcessPenalty;
+  if (queryWordCoverage > 0) return 25 - subProcessPenalty;
 
-  return 10; // Weak/alias-only match
+  return 10 - subProcessPenalty;
 }
 
 export async function GET(request: NextRequest) {

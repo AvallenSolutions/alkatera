@@ -409,7 +409,53 @@ function scoreAgribalyseRelevance(
   const nameLower = (process.name || '').toLowerCase();
   let score = 0;
 
-  // Agribalyse alias pattern match — strongest boost
+  // ── Penalise sub-processes that are part of a production chain ──────
+  // Agribalyse includes intermediate processes like heat, transport,
+  // thermoforming, metal working etc. that are "adapted for [ingredient]".
+  // These are NOT the ingredient itself and should rank well below it.
+  const SUB_PROCESS_INDICATORS = [
+    'heat,', 'heat production', 'heat, central', 'heat, district',
+    'transport,', 'transport ', 'lorry', 'dry van',
+    'thermoforming', 'calendering',
+    'metal working', 'chromium steel', 'steel product',
+    'electricity,', 'electricity production', 'electricity mix',
+    'packaging,', 'filling,',
+    'treatment of', 'waste treatment',
+    'water, deionised', 'water, decarbonised',
+    'extrusion,', 'injection moulding', 'blow moulding',
+    'corrugated board', 'kraft paper',
+  ];
+
+  const isSubProcess = SUB_PROCESS_INDICATORS.some(ind => nameLower.startsWith(ind) || nameLower.includes('| ' + ind));
+  const isAdaptedFor = nameLower.includes('adapted for') || nameLower.includes('- adapted');
+
+  if (isSubProcess) {
+    score -= 200; // Heavily penalise — these should never rank above the actual ingredient
+  }
+  if (isAdaptedFor && !nameLower.startsWith(queryLower)) {
+    score -= 100; // "adapted for maple syrup" is a sub-process, not the ingredient
+  }
+
+  // ── Boost: process name starts with or IS the ingredient ───────────
+  // In Agribalyse, the actual ingredient entry is typically named like
+  // "Syrup, Maple" or "Sugar, from sugar cane" — the food item is first.
+  const nameBeforePipe = nameLower.split('|')[0].trim();
+  const nameBeforeBrace = nameBeforePipe.split('{')[0].trim();
+
+  // Check if the process name (before pipe/brace) closely matches the query
+  if (nameBeforeBrace === queryLower || nameBeforeBrace.startsWith(queryLower)) {
+    score += 50; // Strong boost for direct name match
+  }
+
+  // Check reversed word order: "maple syrup" → "syrup, maple"
+  if (queryWords.length >= 2) {
+    const reversed = [...queryWords].reverse().join(', ');
+    if (nameBeforeBrace.startsWith(reversed)) {
+      score += 50; // "syrup, maple" starts the name — this IS the ingredient
+    }
+  }
+
+  // Agribalyse alias pattern match — boost
   if (agribalysePatterns.length > 0) {
     const matchesAlias = agribalysePatterns.some(pattern =>
       nameLower.includes(pattern.toLowerCase())
@@ -436,7 +482,7 @@ function scoreAgribalyseRelevance(
     score += 5;
   }
 
-  // Penalise very long names
+  // Penalise very long names (overly specific sub-processes)
   if (nameLower.length > 120) {
     score -= 10;
   }
