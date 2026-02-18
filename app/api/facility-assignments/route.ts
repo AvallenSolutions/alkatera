@@ -65,27 +65,60 @@ export async function POST(request: NextRequest) {
     const toAdd = selectedFacilityIds.filter((id: string) => !currentIds.includes(id))
     const toRemove = currentIds.filter((id: string) => !selectedFacilityIds.includes(id))
 
-    // Add new facility assignments
+    // Add new facility assignments (reactivate archived ones first)
     if (toAdd.length > 0) {
-      const { error: insertError } = await supabase
+      // Check which facilities already have archived rows
+      const { data: existingArchived } = await supabase
         .from('facility_product_assignments')
-        .insert(
-          toAdd.map((facilityId: string, index: number) => ({
-            organization_id: organizationId,
-            facility_id: facilityId,
-            product_id: productId,
-            is_primary_facility: index === 0 && currentIds.length === 0,
-            assignment_status: 'active',
-            created_by: user.id,
-          }))
-        )
+        .select('facility_id')
+        .eq('product_id', productId)
+        .eq('organization_id', organizationId)
+        .in('facility_id', toAdd)
+        .eq('assignment_status', 'archived')
 
-      if (insertError) {
-        console.error('Error inserting facility assignments:', insertError)
-        return NextResponse.json(
-          { error: `Failed to add facilities: ${insertError.message}`, details: insertError },
-          { status: 500 }
-        )
+      const archivedFacilityIds = new Set((existingArchived || []).map((r: any) => r.facility_id))
+
+      // Reactivate archived assignments
+      if (archivedFacilityIds.size > 0) {
+        const { error: reactivateError } = await supabase
+          .from('facility_product_assignments')
+          .update({ assignment_status: 'active' })
+          .eq('product_id', productId)
+          .eq('organization_id', organizationId)
+          .in('facility_id', Array.from(archivedFacilityIds))
+
+        if (reactivateError) {
+          console.error('Error reactivating facility assignments:', reactivateError)
+          return NextResponse.json(
+            { error: `Failed to reactivate facilities: ${reactivateError.message}` },
+            { status: 500 }
+          )
+        }
+      }
+
+      // Insert only truly new assignments
+      const trulyNew = toAdd.filter((id: string) => !archivedFacilityIds.has(id))
+      if (trulyNew.length > 0) {
+        const { error: insertError } = await supabase
+          .from('facility_product_assignments')
+          .insert(
+            trulyNew.map((facilityId: string, index: number) => ({
+              organization_id: organizationId,
+              facility_id: facilityId,
+              product_id: productId,
+              is_primary_facility: index === 0 && currentIds.length === 0,
+              assignment_status: 'active',
+              created_by: user.id,
+            }))
+          )
+
+        if (insertError) {
+          console.error('Error inserting facility assignments:', insertError)
+          return NextResponse.json(
+            { error: `Failed to add facilities: ${insertError.message}`, details: insertError },
+            { status: 500 }
+          )
+        }
       }
     }
 
