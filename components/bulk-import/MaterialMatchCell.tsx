@@ -60,6 +60,10 @@ export function MaterialMatchCell({
   const [loadingProxy, setLoadingProxy] = useState(false);
   const [proxySearching, setProxySearching] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** Cancels any in-flight search when a proxy selection is made or popover closes */
+  const abortControllerRef = useRef<AbortController | null>(null);
+  /** Guards against late-resolving searches overwriting state after a proxy selection */
+  const selectionMadeRef = useRef(false);
 
   // Focus input when popover opens
   useEffect(() => {
@@ -114,10 +118,12 @@ export function MaterialMatchCell({
   // Handler: use a proxy suggestion (search for it then select first result)
   const handleUseProxy = async (suggestion: ProxySuggestion) => {
     if (!onManualSearch) return;
+    // Cancel any in-flight auto-search to prevent it from overwriting state
+    abortControllerRef.current?.abort();
+    selectionMadeRef.current = true;
     setProxySearching(suggestion.search_query);
     try {
       const results = await onManualSearch(suggestion.search_query);
-      setManualResults(results);
       if (results.length > 0) {
         // Pass the manual results so the parent can update searchResults
         // and select index 0 in the same state update (avoids race condition
@@ -130,10 +136,22 @@ export function MaterialMatchCell({
     }
   };
 
+  // Popover open/close handler — resets guards on open, cancels searches on close
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      selectionMadeRef.current = false;
+    } else {
+      // Cancel any in-flight search when popover closes
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   // No match found — show prominent search trigger
   if (status === 'no_match' || selectedIndex == null || searchResults.length === 0) {
     return (
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={handleOpenChange}>
         <PopoverTrigger asChild>
           <button
             className={cn(
@@ -159,17 +177,28 @@ export function MaterialMatchCell({
               searching={searching}
               results={manualResults}
               onSearch={async (q) => {
-                if (!onManualSearch || q.length < 2) return;
+                if (!onManualSearch || q.length < 2 || selectionMadeRef.current) return;
+                // Cancel any previous in-flight search
+                abortControllerRef.current?.abort();
+                const controller = new AbortController();
+                abortControllerRef.current = controller;
                 setSearching(true);
                 try {
                   const results = await onManualSearch(q);
-                  setManualResults(results);
+                  // Only update if this search wasn't cancelled and no proxy selection was made
+                  if (!controller.signal.aborted && !selectionMadeRef.current) {
+                    setManualResults(results);
+                  }
                 } finally {
-                  setSearching(false);
+                  if (!controller.signal.aborted) {
+                    setSearching(false);
+                  }
                 }
               }}
               onSelect={(idx) => {
                 // Pass manualResults so parent can update searchResults atomically
+                selectionMadeRef.current = true;
+                abortControllerRef.current?.abort();
                 onSelectResult(idx, manualResults);
                 setOpen(false);
               }}
@@ -268,7 +297,7 @@ export function MaterialMatchCell({
   const confidenceColor = isHighConfidence ? 'text-green-600' : isLowConfidence ? 'text-amber-600' : 'text-amber-500';
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-auto py-0.5 px-1.5 text-xs gap-1 max-w-[200px]">
           <ConfidenceIcon className={`h-3 w-3 flex-shrink-0 ${confidenceColor}`} />
