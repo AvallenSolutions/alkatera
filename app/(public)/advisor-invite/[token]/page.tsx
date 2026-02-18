@@ -44,10 +44,9 @@ export default function AdvisorInvitePage() {
       try {
         // Check if user is authenticated
         const { data: { user } } = await supabase.auth.getUser();
-        setIsAuthenticated(!!user);
-        setUserEmail(user?.email || null);
 
-        // Load invitation details
+        // Load invitation details first (before deciding on auth state)
+        // so we can compare emails
         const { data, error: invError } = await supabase
           .from('advisor_invitations')
           .select(`
@@ -92,6 +91,22 @@ export default function AdvisorInvitePage() {
         if (data.status === 'revoked') {
           setError('This invitation has been cancelled by the organisation.');
           return;
+        }
+
+        // Handle auth state: if a different user is logged in, sign them out
+        if (user) {
+          if (user.email?.toLowerCase() === data.advisor_email.toLowerCase()) {
+            setIsAuthenticated(true);
+            setUserEmail(user.email || null);
+          } else {
+            // A different user is logged in — sign them out automatically
+            await supabase.auth.signOut();
+            setIsAuthenticated(false);
+            setUserEmail(null);
+          }
+        } else {
+          setIsAuthenticated(false);
+          setUserEmail(null);
         }
 
         setInvitation({
