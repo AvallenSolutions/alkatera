@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
@@ -20,9 +20,15 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Pencil,
+  ChevronRight,
   Globe,
   Tag,
+  Cloud,
+  Droplets,
+  Recycle,
+  Leaf,
+  FileText,
+  ImageIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
@@ -32,13 +38,18 @@ interface SupplierProduct {
   description: string | null;
   category: string | null;
   unit: string;
-  unit_measurement: number | null;
-  unit_measurement_type: string | null;
   carbon_intensity: number | null;
+  impact_climate: number | null;
+  impact_water: number | null;
+  impact_waste: number | null;
+  impact_land: number | null;
+  recycled_content_pct: number | null;
   product_code: string | null;
+  product_image_url: string | null;
   is_active: boolean;
   is_verified: boolean;
   origin_country_code: string | null;
+  certifications: string[] | null;
   created_at: string;
 }
 
@@ -48,25 +59,18 @@ interface SupplierInfo {
 }
 
 export default function SupplierProductsPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<SupplierProduct[]>([]);
   const [supplier, setSupplier] = useState<SupplierInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<SupplierProduct | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
-  // Form state
+  // Simple "Add Product" form state
   const [productName, setProductName] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
   const [unit, setUnit] = useState('');
-  const [unitMeasurement, setUnitMeasurement] = useState('');
-  const [unitMeasurementType, setUnitMeasurementType] = useState('');
-  const [carbonIntensity, setCarbonIntensity] = useState('');
-  const [productCode, setProductCode] = useState('');
-  const [originCountryCode, setOriginCountryCode] = useState('');
+  const [category, setCategory] = useState('');
 
   useEffect(() => {
     loadData();
@@ -77,7 +81,6 @@ export default function SupplierProductsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get supplier record
     const { data: supplierData } = await supabase
       .from('suppliers')
       .select('id, organization_id')
@@ -88,10 +91,9 @@ export default function SupplierProductsPage() {
     if (supplierData) {
       setSupplier(supplierData);
 
-      // Get supplier products
       const { data: productsData, error: productsError } = await supabase
         .from('supplier_products')
-        .select('id, name, description, category, unit, unit_measurement, unit_measurement_type, carbon_intensity, product_code, is_active, is_verified, origin_country_code, created_at')
+        .select('id, name, description, category, unit, carbon_intensity, impact_climate, impact_water, impact_waste, impact_land, recycled_content_pct, product_code, product_image_url, is_active, is_verified, origin_country_code, certifications, created_at')
         .eq('supplier_id', supplierData.id)
         .order('created_at', { ascending: false });
 
@@ -107,41 +109,12 @@ export default function SupplierProductsPage() {
 
   const resetForm = () => {
     setProductName('');
-    setDescription('');
-    setCategory('');
     setUnit('');
-    setUnitMeasurement('');
-    setUnitMeasurementType('');
-    setCarbonIntensity('');
-    setProductCode('');
-    setOriginCountryCode('');
-    setEditingProduct(null);
+    setCategory('');
     setError(null);
-    setSuccess(false);
   };
 
-  const openNewProduct = () => {
-    resetForm();
-    setModalOpen(true);
-  };
-
-  const openEditProduct = (product: SupplierProduct) => {
-    setEditingProduct(product);
-    setProductName(product.name);
-    setDescription(product.description || '');
-    setCategory(product.category || '');
-    setUnit(product.unit);
-    setUnitMeasurement(product.unit_measurement?.toString() || '');
-    setUnitMeasurementType(product.unit_measurement_type || '');
-    setCarbonIntensity(product.carbon_intensity?.toString() || '');
-    setProductCode(product.product_code || '');
-    setOriginCountryCode(product.origin_country_code || '');
-    setError(null);
-    setSuccess(false);
-    setModalOpen(true);
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplier) return;
 
@@ -156,48 +129,37 @@ export default function SupplierProductsPage() {
     try {
       const supabase = getSupabaseBrowserClient();
 
-      const productData: any = {
-        supplier_id: supplier.id,
-        organization_id: supplier.organization_id,
-        name: productName.trim(),
-        description: description.trim() || null,
-        category: category.trim() || null,
-        unit: unit.trim(),
-        unit_measurement: unitMeasurement ? parseFloat(unitMeasurement) : null,
-        unit_measurement_type: unitMeasurementType || null,
-        carbon_intensity: carbonIntensity ? parseFloat(carbonIntensity) : null,
-        product_code: productCode.trim() || null,
-        origin_country_code: originCountryCode.trim() || null,
-        updated_at: new Date().toISOString(),
-      };
+      const { data: newProduct, error: insertError } = await supabase
+        .from('supplier_products')
+        .insert({
+          supplier_id: supplier.id,
+          organization_id: supplier.organization_id,
+          name: productName.trim(),
+          unit: unit.trim(),
+          category: category.trim() || null,
+        })
+        .select('id')
+        .single();
 
-      if (editingProduct) {
-        const { error: updateError } = await supabase
-          .from('supplier_products')
-          .update(productData)
-          .eq('id', editingProduct.id);
+      if (insertError) throw insertError;
 
-        if (updateError) throw updateError;
-      } else {
-        const { error: insertError } = await supabase
-          .from('supplier_products')
-          .insert(productData);
-
-        if (insertError) throw insertError;
-      }
-
-      setSuccess(true);
-      await loadData();
-      setTimeout(() => {
-        setModalOpen(false);
-        resetForm();
-      }, 1500);
+      // Redirect to detail page to complete data entry
+      router.push(`/supplier-portal/products/${newProduct.id}`);
     } catch (err: any) {
-      console.error('Error saving product:', err);
-      setError(err.message || 'Failed to save product');
-    } finally {
+      console.error('Error creating product:', err);
+      setError(err.message || 'Failed to create product');
       setSaving(false);
     }
+  };
+
+  const getPillarBadges = (product: SupplierProduct) => {
+    const climate = product.impact_climate ?? product.carbon_intensity;
+    const badges = [];
+    if (climate !== null) badges.push({ icon: Cloud, color: 'text-blue-400 bg-blue-500/10', label: 'Climate' });
+    if (product.impact_water !== null) badges.push({ icon: Droplets, color: 'text-cyan-400 bg-cyan-500/10', label: 'Water' });
+    if (product.impact_waste !== null || product.recycled_content_pct !== null) badges.push({ icon: Recycle, color: 'text-amber-400 bg-amber-500/10', label: 'Circularity' });
+    if (product.impact_land !== null) badges.push({ icon: Leaf, color: 'text-green-400 bg-green-500/10', label: 'Nature' });
+    return badges;
   };
 
   if (loading) {
@@ -214,10 +176,10 @@ export default function SupplierProductsPage() {
         <div>
           <h1 className="text-2xl font-serif text-foreground">Products</h1>
           <p className="text-muted-foreground mt-1">
-            Manage your product catalog with verified environmental data.
+            Manage your product catalog with environmental data, evidence, and certifications.
           </p>
         </div>
-        <Button onClick={openNewProduct} disabled={!supplier}>
+        <Button onClick={() => { resetForm(); setModalOpen(true); }} disabled={!supplier}>
           <Plus className="mr-2 h-4 w-4" />
           Add Product
         </Button>
@@ -238,248 +200,164 @@ export default function SupplierProductsPage() {
           <p className="text-muted-foreground max-w-md mx-auto mb-6">
             Add your products with environmental data so your customers can use verified data in their sustainability assessments.
           </p>
-          <Button onClick={openNewProduct}>
+          <Button onClick={() => { resetForm(); setModalOpen(true); }}>
             <Plus className="mr-2 h-4 w-4" />
             Add Your First Product
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className="flex items-center justify-between p-5 rounded-xl border border-border bg-card hover:border-border/80 transition-colors"
-            >
-              <div className="flex items-center gap-4">
-                <div className="p-2.5 rounded-lg bg-purple-500/10">
-                  <Package className="h-5 w-5 text-purple-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-foreground">{product.name}</p>
-                    {product.is_verified && (
-                      <Badge variant="default" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Verified
-                      </Badge>
-                    )}
-                    {!product.is_active && (
-                      <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                    {product.category && (
-                      <span className="flex items-center gap-1">
-                        <Tag className="h-3 w-3" />
-                        {product.category}
-                      </span>
-                    )}
-                    <span>Unit: {product.unit}</span>
-                    {product.carbon_intensity !== null && (
-                      <span>{product.carbon_intensity} kg CO2e/{product.unit}</span>
-                    )}
-                    {product.origin_country_code && (
-                      <span className="flex items-center gap-1">
-                        <Globe className="h-3 w-3" />
-                        {product.origin_country_code}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => openEditProduct(product)}
+        <div className="grid gap-3">
+          {products.map((product) => {
+            const pillarBadges = getPillarBadges(product);
+            return (
+              <button
+                key={product.id}
+                onClick={() => router.push(`/supplier-portal/products/${product.id}`)}
+                className="flex items-center justify-between p-5 rounded-xl border border-border bg-card hover:border-[#ccff00]/30 hover:bg-card/80 transition-colors text-left w-full group"
               >
-                <Pencil className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+                <div className="flex items-center gap-4 min-w-0">
+                  {product.product_image_url ? (
+                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-border">
+                      <img src={product.product_image_url} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-lg bg-purple-500/10 flex-shrink-0">
+                      <Package className="h-5 w-5 text-purple-400" />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-foreground truncate">{product.name}</p>
+                      {product.is_verified && (
+                        <Badge variant="default" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      )}
+                      {!product.is_active && (
+                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                      {product.category && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Tag className="h-3 w-3" />
+                          {product.category}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">Unit: {product.unit}</span>
+                      {product.origin_country_code && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Globe className="h-3 w-3" />
+                          {product.origin_country_code}
+                        </span>
+                      )}
+                      {/* Pillar coverage indicators */}
+                      {pillarBadges.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          {pillarBadges.map((badge) => (
+                            <div key={badge.label} className={`p-1 rounded ${badge.color}`} title={badge.label}>
+                              <badge.icon className="h-3 w-3" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {product.certifications && product.certifications.length > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          {product.certifications.length} cert{product.certifications.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#ccff00] transition-colors flex-shrink-0 ml-4" />
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {/* Add/Edit Product Modal */}
+      {/* Add Product Dialog — basic fields only, then redirect to detail page */}
       <Dialog open={modalOpen} onOpenChange={(open) => { if (!open) { setModalOpen(false); resetForm(); } }}>
-        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
-              {editingProduct ? 'Edit Product' : 'Add Product'}
+              Add Product
             </DialogTitle>
             <DialogDescription>
-              {editingProduct
-                ? 'Update your product information and environmental data.'
-                : 'Add a new product to your catalog with environmental data.'}
+              Create a product, then add environmental data, evidence, and certifications on the detail page.
             </DialogDescription>
           </DialogHeader>
 
-          {success ? (
-            <div className="py-8 flex flex-col items-center justify-center gap-4">
-              <CheckCircle2 className="h-12 w-12 text-green-500" />
-              <div className="text-center">
-                <h3 className="font-semibold text-lg">
-                  Product {editingProduct ? 'Updated' : 'Added'}!
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Your product has been {editingProduct ? 'updated' : 'added'} successfully.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleSave} className="space-y-4 py-2">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+          <form onSubmit={handleCreate} className="space-y-4 py-2">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
+            <div className="space-y-2">
+              <Label htmlFor="product-name">
+                Product Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="product-name"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                placeholder="e.g., Organic Barley Malt"
+                required
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="product-name">
-                  Product Name <span className="text-destructive">*</span>
+                <Label htmlFor="product-unit">
+                  Unit <span className="text-destructive">*</span>
                 </Label>
                 <Input
-                  id="product-name"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  placeholder="e.g., Organic Barley Malt"
+                  id="product-unit"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  placeholder="e.g., kg"
                   required
                 />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="product-description">Description</Label>
-                <Textarea
-                  id="product-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Brief description of this product..."
-                  rows={2}
+                <Label htmlFor="product-category">Category</Label>
+                <Input
+                  id="product-category"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="e.g., Grain"
                 />
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="product-category">Category</Label>
-                  <Input
-                    id="product-category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    placeholder="e.g., Grain"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="product-code">Product Code / SKU</Label>
-                  <Input
-                    id="product-code"
-                    value={productCode}
-                    onChange={(e) => setProductCode(e.target.value)}
-                    placeholder="e.g., BM-001"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="product-unit">
-                    Unit <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="product-unit"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    placeholder="e.g., kg"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unit-measurement">Measurement</Label>
-                  <Input
-                    id="unit-measurement"
-                    type="number"
-                    step="any"
-                    value={unitMeasurement}
-                    onChange={(e) => setUnitMeasurement(e.target.value)}
-                    placeholder="e.g., 25"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="measurement-type">Type</Label>
-                  <select
-                    id="measurement-type"
-                    value={unitMeasurementType}
-                    onChange={(e) => setUnitMeasurementType(e.target.value)}
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="">Select...</option>
-                    <option value="weight">Weight</option>
-                    <option value="volume">Volume</option>
-                    <option value="length">Length</option>
-                    <option value="area">Area</option>
-                    <option value="count">Count</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="carbon-intensity">
-                    Carbon Intensity (kg CO2e/unit)
-                  </Label>
-                  <Input
-                    id="carbon-intensity"
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={carbonIntensity}
-                    onChange={(e) => setCarbonIntensity(e.target.value)}
-                    placeholder="e.g., 0.35"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Carbon footprint per unit of product
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="origin-country">Origin Country Code</Label>
-                  <Input
-                    id="origin-country"
-                    value={originCountryCode}
-                    onChange={(e) => setOriginCountryCode(e.target.value)}
-                    placeholder="e.g., GB"
-                    maxLength={3}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    ISO country code (e.g., GB, US, DE)
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => { setModalOpen(false); resetForm(); }}
-                  disabled={saving}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={saving}>
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      {editingProduct ? 'Update Product' : 'Add Product'}
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { setModalOpen(false); resetForm(); }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create & Continue'
+                )}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

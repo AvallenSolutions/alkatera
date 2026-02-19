@@ -103,6 +103,39 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         return
       }
 
+      // CRITICAL: Check if user is a supplier FIRST (authoritative source).
+      // Suppliers are external users — they should NOT be in organization_members.
+      // Their org access comes from the suppliers table (user_id + organization_id).
+      const { data: supplierRecord } = await supabase
+        .from('suppliers')
+        .select('id, organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle()
+
+      if (supplierRecord) {
+        console.log('👤 OrganizationContext: User is a supplier, fetching supplier org...')
+
+        const { data: supplierOrg } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', supplierRecord.organization_id)
+          .single()
+
+        if (supplierOrg) {
+          setOrganizations([supplierOrg])
+          setCurrentOrganization(supplierOrg)
+          setUserRole('supplier')
+          console.log('✅ OrganizationContext: Supplier org set:', supplierOrg.name)
+        } else {
+          console.error('❌ OrganizationContext: Supplier org not found')
+          setOrganizations([])
+        }
+        setIsLoading(false)
+        isFetchingRef.current = false
+        return
+      }
+
       // Check for advisor access if no regular memberships
       let advisorOrgIds: string[] = []
       let isAdvisor = false
@@ -209,27 +242,39 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         return;
     }
 
-    // Check for regular membership first
-    const { data: membership } = await supabase
-      .from('organization_members')
-      .select('roles!inner (name)')
-      .eq('organization_id', orgId)
+    // CRITICAL: Check if user is a supplier first (authoritative check)
+    const { data: supplierRecord } = await supabase
+      .from('suppliers')
+      .select('id')
       .eq('user_id', user.id)
+      .limit(1)
       .maybeSingle()
 
-    if (membership) {
-      setUserRole((membership as any)?.roles?.name || null)
+    if (supplierRecord) {
+      setUserRole('supplier')
     } else {
-      // Check for advisor access
-      const { data: advisorAccess } = await supabase
-        .from('advisor_organization_access')
-        .select('id')
+      // Check for regular membership
+      const { data: membership } = await supabase
+        .from('organization_members')
+        .select('roles!inner (name)')
         .eq('organization_id', orgId)
-        .eq('advisor_user_id', user.id)
-        .eq('is_active', true)
+        .eq('user_id', user.id)
         .maybeSingle()
 
-      setUserRole(advisorAccess ? 'advisor' : null)
+      if (membership) {
+        setUserRole((membership as any)?.roles?.name || null)
+      } else {
+        // Check for advisor access
+        const { data: advisorAccess } = await supabase
+          .from('advisor_organization_access')
+          .select('id')
+          .eq('organization_id', orgId)
+          .eq('advisor_user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle()
+
+        setUserRole(advisorAccess ? 'advisor' : null)
+      }
     }
   }
 

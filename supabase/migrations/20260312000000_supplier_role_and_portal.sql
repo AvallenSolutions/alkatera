@@ -109,7 +109,6 @@ SET search_path = public
 AS $$
 DECLARE
   v_invitation record;
-  v_supplier_role_id uuid;
   v_supplier_id uuid;
   v_user_email text;
 BEGIN
@@ -122,14 +121,6 @@ BEGIN
 
   IF NOT FOUND THEN
     RETURN jsonb_build_object('success', false, 'error', 'Invalid or expired invitation');
-  END IF;
-
-  -- Get supplier role ID
-  SELECT id INTO v_supplier_role_id
-  FROM public.roles WHERE name = 'supplier';
-
-  IF v_supplier_role_id IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Supplier role not configured');
   END IF;
 
   -- Get user email for verification
@@ -164,16 +155,13 @@ BEGIN
     RETURNING id INTO v_supplier_id;
   END IF;
 
-  -- Add user to organization with supplier role (idempotent)
-  INSERT INTO public.organization_members (
-    organization_id, user_id, role_id, joined_at
-  ) VALUES (
-    v_invitation.organization_id,
-    p_user_id,
-    v_supplier_role_id,
-    now()
-  )
-  ON CONFLICT (organization_id, user_id) DO NOTHING;
+  -- SECURITY: Do NOT add suppliers to organization_members.
+  -- Suppliers are external users — their access is via the suppliers table only.
+  -- If they somehow already have an org membership, remove it to prevent
+  -- them from appearing in the Team Members list or accessing org data.
+  DELETE FROM public.organization_members
+  WHERE organization_id = v_invitation.organization_id
+    AND user_id = p_user_id;
 
   -- Create engagement record
   INSERT INTO public.supplier_engagements (
@@ -198,7 +186,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.accept_supplier_invitation(text, uuid) IS
-  'Accepts a supplier invitation: creates supplier record, org membership with supplier role, and engagement.';
+  'Accepts a supplier invitation: creates supplier record and engagement. Removes any org membership to keep suppliers isolated.';
 
 -- Grant execute to service_role (called from API routes)
 GRANT EXECUTE ON FUNCTION public.accept_supplier_invitation(text, uuid) TO service_role;
@@ -235,6 +223,27 @@ BEGIN
   END IF;
 END$$;
 
+-- Suppliers can view the organization they belong to (via suppliers table)
+-- This is needed because suppliers are NOT in organization_members,
+-- so the standard "Allow members to view their organizations" policy won't apply.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'organizations'
+      AND policyname = 'Suppliers can view their organization'
+  ) THEN
+    CREATE POLICY "Suppliers can view their organization"
+    ON public.organizations FOR SELECT TO authenticated
+    USING (
+      id IN (
+        SELECT s.organization_id FROM public.suppliers s
+        WHERE s.user_id = auth.uid()
+      )
+    );
+  END IF;
+END$$;
+
 -- Suppliers can view their own invitations
 DO $$
 BEGIN
@@ -245,7 +254,7 @@ BEGIN
   ) THEN
     CREATE POLICY "Suppliers can view own invitations by email"
     ON public.supplier_invitations FOR SELECT TO authenticated
-    USING (lower(supplier_email) = lower((auth.jwt() -> 'user_metadata' ->> 'email')));
+    USING (lower(supplier_email) = lower((auth.jwt() ->> 'email')));
   END IF;
 END$$;
 
