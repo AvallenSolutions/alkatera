@@ -51,65 +51,59 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login')
-    }
-  }, [user, authLoading, router])
-
   const isSupplier = userRole === 'supplier'
   const isSupplierRoute = pathname?.startsWith('/supplier-portal')
 
-  useEffect(() => {
-    // Suppliers don't need to create an organization — skip this redirect
-    if (isSupplier) return
-    if (!authLoading && !isOrganizationLoading && user && requireOrganization && !currentOrganization) {
-      router.push('/create-organization')
-    }
-  }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router, isSupplier])
-
-  // Supplier route gating
+  // Single consolidated redirect effect — all routing decisions in one place
+  // to prevent flash of wrong content from multiple competing effects.
   useEffect(() => {
     if (authLoading || isOrganizationLoading) return
-    if (!user) return
 
-    // Supplier users: redirect to /supplier-portal if on a non-supplier route
-    if (isSupplier && !isSupplierRoute) {
-      router.push('/supplier-portal')
+    // Not logged in → login
+    if (!user) {
+      router.push('/login')
       return
     }
 
-    // Non-supplier users: block access to /supplier-portal
-    if (!isSupplier && isSupplierRoute) {
-      router.push('/dashboard')
+    // Supplier users: ALWAYS go to /supplier-portal
+    if (isSupplier) {
+      if (!isSupplierRoute) {
+        router.replace('/supplier-portal')
+      }
       return
     }
-  }, [user, authLoading, isOrganizationLoading, isSupplier, isSupplierRoute, pathname, router])
 
-  // Payment gate: redirect based on subscription status (skip for suppliers)
-  useEffect(() => {
-    if (isSupplier) return
-    if (!authLoading && !isOrganizationLoading && !subscriptionLoading && user && currentOrganization) {
+    // Non-supplier users: block /supplier-portal
+    if (isSupplierRoute) {
+      router.replace('/dashboard')
+      return
+    }
+
+    // No organization → create one
+    if (requireOrganization && !currentOrganization) {
+      router.push('/create-organization')
+      return
+    }
+
+    // Payment gate (skip for suppliers — already returned above)
+    if (!subscriptionLoading && currentOrganization) {
       const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization') || pathname?.startsWith('/complete-subscription') || pathname?.startsWith('/contact') || pathname?.startsWith('/suspended')
       if (isAllowedPage) return
 
-      // past_due: allow access (grace period) - banner will show warning
-      if (subscriptionStatus === 'past_due') {
-        return
-      }
+      if (subscriptionStatus === 'past_due') return
 
-      // suspended: redirect to suspended page
       if (subscriptionStatus === 'suspended') {
         router.push('/suspended')
         return
       }
 
-      // pending, cancelled, or unknown: redirect to complete-subscription
       if (subscriptionStatus !== 'active' && subscriptionStatus !== 'trial') {
         router.push('/complete-subscription')
       }
     }
-  }, [user, authLoading, isOrganizationLoading, subscriptionLoading, currentOrganization, subscriptionStatus, pathname, router, isSupplier])
+  }, [user, authLoading, isOrganizationLoading, isSupplier, isSupplierRoute, currentOrganization, requireOrganization, subscriptionLoading, subscriptionStatus, pathname, router])
+
+  // --- Render gates: show loading spinner until we KNOW who the user is ---
 
   if (authLoading || isOrganizationLoading) {
     return (
@@ -126,13 +120,23 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
     return null
   }
 
-  if (requireOrganization && !currentOrganization && !isSupplier) {
+  // Supplier on wrong route — show nothing while redirect happens
+  if (isSupplier && !isSupplierRoute) {
+    return null
+  }
+
+  // Non-supplier on supplier route — show nothing while redirect happens
+  if (!isSupplier && isSupplierRoute) {
     return null
   }
 
   // Supplier users get a minimal, isolated layout — no sidebar, no subscription gate
   if (isSupplier && isSupplierRoute) {
     return <SupplierLayout>{children}</SupplierLayout>
+  }
+
+  if (requireOrganization && !currentOrganization) {
+    return null
   }
 
   return (
