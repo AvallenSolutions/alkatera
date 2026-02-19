@@ -1,8 +1,23 @@
 -- ==========================================================================
 -- Supplier Product 4-Pillar Data + Evidence Table Migration
--- Adds environmental impact columns to supplier_products and creates
--- the supplier_product_evidence table for document uploads.
+-- Adds environmental impact columns to supplier_products, creates
+-- the supplier_product_evidence table for document uploads, and
+-- adds logo_url + description to the suppliers table.
 -- ==========================================================================
+
+-- 0. Add logo_url and description to suppliers table
+-- ==========================================================================
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='suppliers' AND column_name='logo_url') THEN
+    ALTER TABLE public.suppliers ADD COLUMN logo_url text;
+  END IF;
+END$$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='suppliers' AND column_name='description') THEN
+    ALTER TABLE public.suppliers ADD COLUMN description text;
+  END IF;
+END$$;
 
 -- 1a. Add 4-pillar impact columns to supplier_products
 -- ==========================================================================
