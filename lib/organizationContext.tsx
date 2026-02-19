@@ -128,38 +128,35 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         return
       }
 
-      // Check for advisor access if no regular memberships
-      let advisorOrgIds: string[] = []
-      let isAdvisor = false
+      // Always check advisor access — advisors may also be members of their own org,
+      // so we must check regardless of whether memberships exist.
+      const { data: advisorAccess, error: advisorError } = await supabase
+        .from('advisor_organization_access')
+        .select('organization_id')
+        .eq('advisor_user_id', user.id)
+        .eq('is_active', true)
 
-      if (!memberships || memberships.length === 0) {
-        console.log('ℹ️ OrganizationContext: No organization memberships found, checking advisor access...')
+      console.log('📊 OrganizationContext: Advisor access result:', { advisorAccess, error: advisorError })
 
-        // Check advisor_organization_access table
-        const { data: advisorAccess, error: advisorError } = await supabase
-          .from('advisor_organization_access')
-          .select('organization_id')
-          .eq('advisor_user_id', user.id)
-          .eq('is_active', true)
+      const advisorOrgIds = (!advisorError && advisorAccess) ? advisorAccess.map(a => a.organization_id) : []
+      const memberOrgIds = memberships ? memberships.map(m => m.organization_id) : []
 
-        console.log('📊 OrganizationContext: Advisor access result:', { advisorAccess, error: advisorError })
-
-        if (!advisorError && advisorAccess && advisorAccess.length > 0) {
-          advisorOrgIds = advisorAccess.map(a => a.organization_id)
-          isAdvisor = true
-          console.log('✅ OrganizationContext: Found advisor access to', advisorOrgIds.length, 'organization(s)')
-        } else {
-          console.log('ℹ️ OrganizationContext: No advisor access found either')
-          setOrganizations([])
-          setIsLoading(false)
-          return
-        }
+      if (advisorOrgIds.length > 0) {
+        console.log('✅ OrganizationContext: Found advisor access to', advisorOrgIds.length, 'organization(s)')
       }
 
-      // Get org IDs from either memberships or advisor access
-      const orgIds = memberships && memberships.length > 0
-        ? memberships.map(m => m.organization_id)
-        : advisorOrgIds
+      // Merge and deduplicate membership + advisor org IDs
+      const allOrgIds = Array.from(new Set([...memberOrgIds, ...advisorOrgIds]))
+
+      if (allOrgIds.length === 0) {
+        console.log('ℹ️ OrganizationContext: No memberships or advisor access found')
+        setOrganizations([])
+        setIsLoading(false)
+        isFetchingRef.current = false
+        return
+      }
+
+      const orgIds = allOrgIds
 
       // Then fetch the organizations
       const { data: orgs, error: orgsError } = await supabase
@@ -190,23 +187,29 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             await supabase.auth.updateUser({ data: { current_organization_id: orgToSet.id } })
         }
 
-        // Set role based on whether user is advisor or regular member
-        if (isAdvisor) {
+        // Set role based on whether user is a member or advisor for the CURRENT org.
+        // If user is a member of this org, use their membership role.
+        // If user only has advisor access to this org, set role to 'advisor'.
+        const membership = memberships?.find((m: any) => m.organization_id === orgToSet.id)
+        const isAdvisorForThisOrg = advisorOrgIds.includes(orgToSet.id)
+
+        if (membership) {
+          // User is a regular member of this org — use their membership role
+          const { data: roleData } = await supabase
+            .from('roles')
+            .select('name')
+            .eq('id', membership.role_id)
+            .single()
+
+          setUserRole(roleData?.name || null)
+          console.log('👤 OrganizationContext: User role:', roleData?.name)
+        } else if (isAdvisorForThisOrg) {
+          // User only has advisor access to this org
           setUserRole('advisor')
           console.log('👤 OrganizationContext: User role: advisor')
         } else {
-          // Fetch the role for this organization
-          const membership = memberships?.find((m: any) => m.organization_id === orgToSet.id)
-          if (membership) {
-            const { data: roleData } = await supabase
-              .from('roles')
-              .select('name')
-              .eq('id', membership.role_id)
-              .single()
-
-            setUserRole(roleData?.name || null)
-            console.log('👤 OrganizationContext: User role:', roleData?.name)
-          }
+          setUserRole(null)
+          console.log('👤 OrganizationContext: No role found for this org')
         }
       }
     } catch (error) {

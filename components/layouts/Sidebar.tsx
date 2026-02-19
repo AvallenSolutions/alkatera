@@ -479,7 +479,12 @@ export function Sidebar({ className }: SidebarProps) {
   }
 
   // Build final navigation structure (all items are now in the main array)
-  const filteredNavigation = filterNavItems(navigationStructure)
+  const isAdvisor = userRole === 'advisor'
+  const filteredNavigation = filterNavItems(navigationStructure).filter(item => {
+    // Hide Settings from advisors — they don't manage org settings
+    if (isAdvisor && item.href === '/settings/') return false
+    return true
+  })
 
   useEffect(() => {
     async function checkAlkateraAdmin() {
