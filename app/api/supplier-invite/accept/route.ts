@@ -9,6 +9,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
+// Simple in-memory rate limiter (per IP, per endpoint)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_MAX = 10
+const RATE_LIMIT_WINDOW_MS = 60 * 1000 // 1 minute
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  const entry = rateLimitMap.get(ip)
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return false
+  }
+
+  entry.count++
+  if (entry.count > RATE_LIMIT_MAX) {
+    return true
+  }
+  return false
+}
+
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders })
 }
@@ -17,20 +38,31 @@ export async function OPTIONS() {
  * POST /api/supplier-invite/accept
  *
  * Accepts a supplier invitation. Supports two flows:
- * 1. Existing user: { token, user_id }
- * 2. New user:      { token, full_name, password }
+ * 1. Existing user (already authenticated): { token, user_id }
+ * 2. New user (account already created client-side via auth.signUp): { token, user_id }
  *
- * Creates the supplier record, org membership with supplier role,
- * and marks the invitation as accepted — all via the
- * accept_supplier_invitation RPC for transactional safety.
+ * The client handles account creation via Supabase auth.signUp() directly,
+ * so passwords never transit through this API route.
  */
 export async function POST(request: NextRequest) {
   try {
-    const { token, user_id, full_name, password } = await request.json()
+    // Rate limiting
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown'
 
-    if (!token) {
+    if (isRateLimited(ip)) {
       return NextResponse.json(
-        { error: 'Invitation token is required' },
+        { error: 'Too many requests. Please try again later.' },
+        { status: 429, headers: corsHeaders }
+      )
+    }
+
+    const { token, user_id } = await request.json()
+
+    if (!token || !user_id) {
+      return NextResponse.json(
+        { error: 'Invitation token and user_id are required' },
         { status: 400, headers: corsHeaders }
       )
     }
@@ -50,7 +82,7 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // Get invitation to verify it's valid and get the email
+    // Validate invitation
     const { data: invitation, error: invError } = await adminClient
       .from('supplier_invitations')
       .select('id, supplier_email, status, expires_at, organization_id')
@@ -83,97 +115,27 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    let userId: string
+    // Verify user exists and email matches
+    const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(user_id)
 
-    if (user_id) {
-      // Existing user accepting invitation
-      userId = user_id
-
-      // Verify user exists and email matches
-      const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(user_id)
-
-      if (userError || !userData.user) {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404, headers: corsHeaders }
-        )
-      }
-
-      if (userData.user.email?.toLowerCase() !== invitation.supplier_email.toLowerCase()) {
-        return NextResponse.json(
-          { error: 'Email does not match invitation' },
-          { status: 400, headers: corsHeaders }
-        )
-      }
-    } else {
-      // New user — create account
-      if (!full_name || !password) {
-        return NextResponse.json(
-          { error: 'Full name and password are required for new users' },
-          { status: 400, headers: corsHeaders }
-        )
-      }
-
-      if (password.length < 8) {
-        return NextResponse.json(
-          { error: 'Password must be at least 8 characters' },
-          { status: 400, headers: corsHeaders }
-        )
-      }
-
-      // Check if user already exists
-      const { data: existingUsers } = await adminClient.auth.admin.listUsers()
-      const existingUser = existingUsers?.users?.find(
-        u => u.email?.toLowerCase() === invitation.supplier_email.toLowerCase()
+    if (userError || !userData.user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404, headers: corsHeaders }
       )
+    }
 
-      if (existingUser) {
-        return NextResponse.json(
-          { error: 'An account with this email already exists. Please sign in instead.' },
-          { status: 409, headers: corsHeaders }
-        )
-      }
-
-      // Create the user
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-        email: invitation.supplier_email,
-        password: password,
-        email_confirm: true, // Auto-confirm since they came via invite
-        user_metadata: {
-          full_name: full_name,
-        },
-      })
-
-      if (createError || !newUser.user) {
-        console.error('Error creating supplier user:', createError)
-        return NextResponse.json(
-          { error: createError?.message || 'Failed to create account' },
-          { status: 500, headers: corsHeaders }
-        )
-      }
-
-      userId = newUser.user.id
-
-      // Create profile
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .insert({
-          id: userId,
-          email: invitation.supplier_email,
-          full_name: full_name,
-        })
-
-      if (profileError) {
-        console.error('Error creating supplier profile:', profileError)
-        // Continue anyway — profile might be created by database trigger
-      }
+    if (userData.user.email?.toLowerCase() !== invitation.supplier_email.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'Email does not match invitation' },
+        { status: 400, headers: corsHeaders }
+      )
     }
 
     // Call the transactional RPC to accept the invitation
-    // This creates: supplier record, org membership (supplier role), engagement, marks accepted
     const { data: result, error: acceptError } = await adminClient.rpc(
       'accept_supplier_invitation',
-      { p_token: token, p_user_id: userId }
+      { p_token: token, p_user_id: user_id }
     )
 
     if (acceptError) {
@@ -192,7 +154,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user metadata with current organization
-    await adminClient.auth.admin.updateUserById(userId, {
+    await adminClient.auth.admin.updateUserById(user_id, {
       user_metadata: {
         current_organization_id: invitation.organization_id,
       },

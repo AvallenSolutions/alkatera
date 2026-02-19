@@ -223,34 +223,54 @@ export default function SupplierInvitePage() {
     setError(null);
 
     try {
+      // Step 1: Create account directly via Supabase Auth (password never sent to our API)
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: invitation.supplier_email,
+        password: password,
+        options: {
+          data: {
+            full_name: fullName.trim(),
+          },
+        },
+      });
+
+      if (signUpError) {
+        throw new Error(signUpError.message);
+      }
+
+      if (!signUpData.user) {
+        throw new Error('Failed to create account');
+      }
+
+      // Step 2: Accept the invitation via API (no password sent, just user_id + token)
       const response = await fetch('/api/supplier-invite/accept', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           token: token,
-          full_name: fullName.trim(),
-          password: password,
+          user_id: signUpData.user.id,
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to create account');
+        throw new Error(result.error || 'Failed to accept invitation');
+      }
+
+      // Step 3: Sign in (signUp may auto-sign-in depending on config, but be explicit)
+      if (!signUpData.session) {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: invitation.supplier_email,
+          password: password,
+        });
+
+        if (signInError) {
+          console.error('Error signing in after account creation:', signInError);
+        }
       }
 
       setSuccess(true);
-
-      // Auto sign-in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: invitation.supplier_email,
-        password: password,
-      });
-
-      if (signInError) {
-        console.error('Error signing in after account creation:', signInError);
-      }
-
       setTimeout(() => {
         router.push('/supplier-portal');
       }, 2000);

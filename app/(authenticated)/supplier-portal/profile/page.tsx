@@ -87,6 +87,14 @@ export default function SupplierProfilePage() {
     loadProfile();
   }, []);
 
+  // Extract storage path from a public URL for the given bucket
+  const extractStoragePath = (url: string, bucket: string): string | null => {
+    const marker = `/object/public/${bucket}/`;
+    const idx = url.indexOf(marker);
+    if (idx === -1) return null;
+    return decodeURIComponent(url.slice(idx + marker.length));
+  };
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
@@ -112,7 +120,7 @@ export default function SupplierProfilePage() {
 
       // Delete old logo if exists
       if (logoUrl) {
-        const oldPath = logoUrl.split('/supplier-product-images/')[1];
+        const oldPath = extractStoragePath(logoUrl, 'supplier-product-images');
         if (oldPath) {
           await supabase.storage.from('supplier-product-images').remove([oldPath]);
         }
@@ -148,13 +156,14 @@ export default function SupplierProfilePage() {
 
   const handleRemoveLogo = async () => {
     if (!profile || !logoUrl) return;
+    if (!window.confirm('Remove your company logo?')) return;
 
     setError(null);
     try {
       const supabase = getSupabaseBrowserClient();
 
       // Delete from storage
-      const oldPath = logoUrl.split('/supplier-product-images/')[1];
+      const oldPath = extractStoragePath(logoUrl, 'supplier-product-images');
       if (oldPath) {
         await supabase.storage.from('supplier-product-images').remove([oldPath]);
       }
@@ -215,8 +224,30 @@ export default function SupplierProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="space-y-6 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-8 w-48 bg-muted rounded" />
+          <div className="h-4 w-80 bg-muted rounded" />
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="h-4 w-32 bg-muted rounded" />
+          <div className="flex items-start gap-6">
+            <div className="h-24 w-24 bg-muted rounded-xl" />
+            <div className="space-y-2">
+              <div className="h-4 w-48 bg-muted rounded" />
+              <div className="h-9 w-28 bg-muted rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="h-4 w-32 bg-muted rounded" />
+          <div className="h-10 w-full bg-muted rounded" />
+          <div className="h-24 w-full bg-muted rounded" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-10 bg-muted rounded" />
+            <div className="h-10 bg-muted rounded" />
+          </div>
+        </div>
       </div>
     );
   }

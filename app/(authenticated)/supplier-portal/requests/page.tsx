@@ -18,6 +18,7 @@ interface DataRequest {
 export default function SupplierRequestsPage() {
   const [requests, setRequests] = useState<DataRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadRequests() {
@@ -42,6 +43,7 @@ export default function SupplierRequestsPage() {
 
       if (error) {
         console.error('Error loading requests:', error);
+        setFetchError('Failed to load data requests');
       } else if (invitations) {
         setRequests(invitations.map((inv: any) => ({
           id: inv.id,
@@ -62,8 +64,25 @@ export default function SupplierRequestsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="space-y-6 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-8 w-40 bg-muted rounded" />
+          <div className="h-4 w-80 bg-muted rounded" />
+        </div>
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="flex items-center justify-between p-5 rounded-xl border border-border bg-card">
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 rounded-lg bg-muted w-10 h-10" />
+                <div className="space-y-2">
+                  <div className="h-5 w-36 bg-muted rounded" />
+                  <div className="h-3 w-48 bg-muted rounded" />
+                </div>
+              </div>
+              <div className="h-6 w-20 bg-muted rounded-full" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -84,7 +103,13 @@ export default function SupplierRequestsPage() {
         </p>
       </div>
 
-      {requests.length === 0 ? (
+      {fetchError && (
+        <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-sm">
+          {fetchError}
+        </div>
+      )}
+
+      {requests.length === 0 && !fetchError ? (
         <div className="py-16 text-center">
           <ClipboardList className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-foreground mb-2">No Data Requests</h2>

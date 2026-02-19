@@ -23,7 +23,9 @@ interface PendingRequest {
 export default function SupplierPortalDashboard() {
   const [supplier, setSupplier] = useState<SupplierInfo | null>(null);
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [productsCount, setProductsCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -32,30 +34,46 @@ export default function SupplierPortalDashboard() {
       if (!user) return;
 
       // Load supplier record
-      const { data: supplierData } = await supabase
+      const { data: supplierData, error: supplierError } = await supabase
         .from('suppliers')
         .select('id, name, contact_email, contact_name')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
 
-      if (supplierData) {
+      if (supplierError) {
+        console.error('Error loading supplier:', supplierError);
+        setFetchError('Failed to load supplier data');
+      } else if (supplierData) {
         setSupplier(supplierData);
+
+        // Load products count
+        const { count, error: countError } = await supabase
+          .from('supplier_products')
+          .select('id', { count: 'exact', head: true })
+          .eq('supplier_id', supplierData.id);
+
+        if (!countError && count !== null) {
+          setProductsCount(count);
+        }
       }
 
-      // Load accepted invitations (data requests) that haven't had data submitted yet
-      const { data: invitations } = await supabase
+      // Load accepted invitations (data requests) with organisation name
+      const { data: invitations, error: invError } = await supabase
         .from('supplier_invitations')
-        .select('id, material_name, material_type, invited_at')
+        .select('id, material_name, material_type, invited_at, organizations!inner (name)')
         .eq('supplier_email', user.email?.toLowerCase() || '')
         .eq('status', 'accepted')
         .order('invited_at', { ascending: false });
 
-      if (invitations) {
-        setPendingRequests(invitations.map(inv => ({
+      if (invError) {
+        console.error('Error loading invitations:', invError);
+      } else if (invitations) {
+        setPendingRequests(invitations.map((inv: any) => ({
           id: inv.id,
           material_name: inv.material_name,
           material_type: inv.material_type,
+          organization_name: inv.organizations?.name,
           invited_at: inv.invited_at,
         })));
       }
@@ -68,14 +86,32 @@ export default function SupplierPortalDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="space-y-8 animate-pulse">
+        <div className="space-y-2">
+          <div className="h-8 w-64 bg-muted rounded" />
+          <div className="h-4 w-96 bg-muted rounded" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="p-5 rounded-xl border border-border bg-card">
+              <div className="h-10 w-10 bg-muted rounded-lg mb-3" />
+              <div className="h-8 w-12 bg-muted rounded mb-1" />
+              <div className="h-4 w-24 bg-muted rounded" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
+      {fetchError && (
+        <div className="p-4 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-sm">
+          {fetchError}
+        </div>
+      )}
+
       {/* Welcome */}
       <div>
         <h1 className="text-2xl font-serif text-foreground">
@@ -126,7 +162,7 @@ export default function SupplierPortalDashboard() {
             </div>
             <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
           </div>
-          <p className="text-2xl font-bold text-foreground">0</p>
+          <p className="text-2xl font-bold text-foreground">{productsCount}</p>
           <p className="text-sm text-muted-foreground">Products</p>
         </Link>
       </div>
@@ -147,7 +183,10 @@ export default function SupplierPortalDashboard() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{req.material_name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{req.material_type}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="capitalize">{req.material_type}</span>
+                      {req.organization_name && <> &middot; {req.organization_name}</>}
+                    </p>
                   </div>
                 </div>
                 <span className="text-xs text-muted-foreground">

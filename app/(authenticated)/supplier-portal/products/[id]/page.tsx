@@ -200,6 +200,35 @@ export default function SupplierProductDetailPage() {
       return;
     }
 
+    // Validate percentage fields are within 0-100
+    const pctRecycled = parseNum(recycledContentPct);
+    const pctRecyclability = parseNum(recyclabilityPct);
+    if (pctRecycled !== null && (pctRecycled < 0 || pctRecycled > 100)) {
+      setError('Recycled content must be between 0% and 100%');
+      return;
+    }
+    if (pctRecyclability !== null && (pctRecyclability < 0 || pctRecyclability > 100)) {
+      setError('Recyclability must be between 0% and 100%');
+      return;
+    }
+
+    // Validate non-negative for impact fields
+    const numericFields = [
+      { val: parseNum(impactClimate), label: 'Carbon footprint' },
+      { val: parseNum(impactWater), label: 'Water footprint' },
+      { val: parseNum(impactWaste), label: 'Waste per unit' },
+      { val: parseNum(impactLand), label: 'Land use' },
+      { val: parseNum(waterBlue), label: 'Blue water' },
+      { val: parseNum(waterGreen), label: 'Green water' },
+      { val: parseNum(waterGrey), label: 'Grey water' },
+    ];
+    for (const { val, label } of numericFields) {
+      if (val !== null && val < 0) {
+        setError(`${label} cannot be negative`);
+        return;
+      }
+    }
+
     setError(null);
     setSaving(true);
     setSaveSuccess(false);
@@ -258,6 +287,13 @@ export default function SupplierProductDetailPage() {
     const file = e.target.files?.[0];
     if (!file || !supplier) return;
 
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Please upload a JPG, PNG, or WebP image');
+      return;
+    }
+
     if (file.size > 5 * 1024 * 1024) {
       setError('Image must be under 5MB');
       return;
@@ -283,6 +319,17 @@ export default function SupplierProductDetailPage() {
         .getPublicUrl(storagePath);
 
       setProductImageUrl(publicUrl);
+
+      // Persist image URL to database immediately
+      const { error: updateError } = await supabase
+        .from('supplier_products')
+        .update({ product_image_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', productId);
+
+      if (updateError) {
+        console.error('Error saving image URL:', updateError);
+        setError('Image uploaded but failed to save. Please click Save All Changes.');
+      }
     } catch (err: any) {
       console.error('Error uploading image:', err);
       setError(err.message || 'Failed to upload image');
@@ -307,8 +354,34 @@ export default function SupplierProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      <div className="space-y-6 animate-pulse">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-24 bg-muted rounded" />
+            <div className="h-6 w-px bg-border" />
+            <div className="h-7 w-40 bg-muted rounded" />
+          </div>
+          <div className="h-10 w-36 bg-muted rounded" />
+        </div>
+        <div className="h-10 w-full bg-muted rounded" />
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="h-4 w-32 bg-muted rounded" />
+          <div className="flex items-start gap-6">
+            <div className="w-32 h-32 bg-muted rounded-lg" />
+            <div className="space-y-2">
+              <div className="h-9 w-32 bg-muted rounded" />
+              <div className="h-3 w-40 bg-muted rounded" />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <div className="h-4 w-32 bg-muted rounded" />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-10 bg-muted rounded" />
+            <div className="h-10 bg-muted rounded" />
+          </div>
+          <div className="h-20 bg-muted rounded" />
+        </div>
       </div>
     );
   }
@@ -401,7 +474,17 @@ export default function SupplierProductDetailPage() {
                     className="w-32 h-32 object-cover rounded-lg border border-border"
                   />
                   <button
-                    onClick={() => setProductImageUrl('')}
+                    onClick={() => {
+                      if (window.confirm('Remove this product image?')) {
+                        setProductImageUrl('');
+                        // Clear from DB immediately
+                        const supabase = getSupabaseBrowserClient();
+                        supabase.from('supplier_products')
+                          .update({ product_image_url: null, updated_at: new Date().toISOString() })
+                          .eq('id', productId)
+                          .then(({ error: e }) => { if (e) console.error('Error clearing image:', e); });
+                      }
+                    }}
                     className="absolute -top-2 -right-2 p-1 bg-destructive rounded-full text-destructive-foreground opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-3 w-3" />

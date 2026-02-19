@@ -125,11 +125,31 @@ export function SupplierProductEvidenceTab({
     covers_land: false,
   });
 
+  const [fileError, setFileError] = useState<string | null>(null);
+
+  const ALLOWED_MIME_TYPES = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'text/csv',
+    'image/jpeg',
+    'image/png',
+  ];
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setFileError(null);
+
+    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+      setFileError('Unsupported file type. Please upload a PDF, Excel, CSV, JPG, or PNG file.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     if (file.size > 20 * 1024 * 1024) {
+      setFileError('File is too large. Maximum size is 20MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -177,6 +197,7 @@ export function SupplierProductEvidenceTab({
 
   const resetForm = () => {
     setSelectedFile(null);
+    setFileError(null);
     setFormData({
       evidence_type: "epd",
       document_name: "",
@@ -649,6 +670,9 @@ export function SupplierProductEvidenceTab({
                       PDF, Excel, CSV, or images up to 20MB
                     </p>
                   </div>
+                )}
+                {fileError && (
+                  <p className="text-sm text-destructive mt-2">{fileError}</p>
                 )}
               </div>
             </div>
