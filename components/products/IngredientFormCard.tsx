@@ -43,7 +43,6 @@ export interface IngredientFormData {
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   carbon_intensity?: number;
-  location?: string;
 }
 
 interface ProductionFacility {
@@ -203,9 +202,13 @@ export function IngredientFormCard({
       data_source_id: selection.data_source_id,
       supplier_product_id: selection.supplier_product_id,
       supplier_name: selection.supplier_name,
-      unit: selection.unit,
       carbon_intensity: selection.carbon_intensity,
-      location: selection.location,
+      // Only prefill unit from search result when ingredient has no amount set yet (first selection).
+      // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
+      ...(!ingredient.amount ? { unit: selection.unit } : {}),
+      // Map search location to origin_address (the field actually saved to DB).
+      // Only prefill if user hasn't already set an origin address.
+      ...(!ingredient.origin_address && selection.location ? { origin_address: selection.location } : {}),
     };
 
     console.log('[IngredientFormCard] Calling onUpdate with:', updates);

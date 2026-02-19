@@ -65,7 +65,6 @@ export interface PackagingFormData {
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   carbon_intensity?: number;
-  location?: string;
   // EPR Compliance fields
   has_component_breakdown: boolean;
   components: PackagingMaterialComponent[];
@@ -451,10 +450,14 @@ export function PackagingFormCard({
       data_source_id: selection.data_source_id,
       supplier_product_id: selection.supplier_product_id,
       supplier_name: selection.supplier_name,
-      unit: selection.unit,
       carbon_intensity: selection.carbon_intensity,
-      location: selection.location,
       packaging_category: detectedCategory,
+      // Only prefill unit from search result when packaging has no amount set yet (first selection).
+      // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
+      ...(!packaging.amount ? { unit: selection.unit } : {}),
+      // Map search location to origin_address (the field actually saved to DB).
+      // Only prefill if user hasn't already set an origin address.
+      ...(!packaging.origin_address && selection.location ? { origin_address: selection.location } : {}),
     };
 
     // Auto-populate recycled content if provided
@@ -537,7 +540,6 @@ export function PackagingFormCard({
                                   supplier_product_id: undefined,
                                   supplier_name: undefined,
                                   carbon_intensity: undefined,
-                                  location: undefined,
                                   // Reset EPR components
                                   components: [],
                                   has_component_breakdown: false,

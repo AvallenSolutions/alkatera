@@ -275,17 +275,21 @@ export function InlineIngredientSearch({
       user_query: overrideUserQuery || query,
     });
 
-    // Map source_type to DataSource
+    // Map source_type to DB-valid DataSource values.
+    // The product_materials.data_source constraint only allows 'openlca', 'supplier', or NULL.
+    // All emission factor sources (staging, global_library, ecoinvent, defra, agribalyse)
+    // use data_source_id UUIDs and should be stored as 'openlca' so the save function persists them.
     const dataSourceType: DataSource =
       result.source_type === 'primary' ? 'supplier' :
-      result.source_type === 'staging' ? 'staging' :
-      result.source_type === 'global_library' ? 'staging' : // Global library stored in staging table
-      result.source_type === 'ecoinvent_proxy' ? 'ecoinvent' :
+      result.source_type === 'staging' ? 'openlca' :
+      result.source_type === 'global_library' ? 'openlca' :
+      result.source_type === 'ecoinvent_proxy' ? 'openlca' :
       result.source_type === 'ecoinvent_live' ? 'openlca' :
-      result.source_type === 'defra' ? 'defra' :
+      result.source_type === 'agribalyse_live' ? 'openlca' :
+      result.source_type === 'defra' ? 'openlca' :
       // Fallback to old logic
-      result.processType === 'STAGING_FACTOR' ? 'staging' :
-      result.processType === 'ECOINVENT_PROXY' ? 'ecoinvent' :
+      result.processType === 'STAGING_FACTOR' ? 'openlca' :
+      result.processType === 'ECOINVENT_PROXY' ? 'openlca' :
       result.supplier_name ? 'supplier' :
       'openlca';
 
