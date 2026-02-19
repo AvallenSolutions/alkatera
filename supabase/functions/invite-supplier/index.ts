@@ -8,10 +8,10 @@ const corsHeaders = {
 };
 
 interface InviteSupplierRequest {
-  productId: number;
-  materialId: string;
-  materialName: string;
-  materialType: 'ingredient' | 'packaging';
+  productId?: number;
+  materialId?: string;
+  materialName?: string;
+  materialType?: 'ingredient' | 'packaging';
   supplierEmail: string;
   contactPersonName?: string;
   supplierName?: string;
@@ -90,9 +90,9 @@ Deno.serve(async (req: Request) => {
       personalMessage,
     }: InviteSupplierRequest = requestBody;
 
-    if (!productId || !materialId || !materialName || !materialType || !supplierEmail) {
+    if (!supplierEmail) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Supplier email is required" }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!['ingredient', 'packaging'].includes(materialType)) {
+    if (materialType && !['ingredient', 'packaging'].includes(materialType)) {
       return new Response(
         JSON.stringify({ error: "Material type must be either 'ingredient' or 'packaging'" }),
         {
@@ -165,51 +165,82 @@ Deno.serve(async (req: Request) => {
       .single();
     const inviterName = inviterProfile?.full_name || user.email || "Your customer";
 
-    const { data: product, error: productError } = await adminClient
-      .from("products")
-      .select("id, name")
-      .eq("id", productId)
-      .eq("organization_id", organizationId)
-      .single();
+    // Validate product if provided (material-specific invite from Supply Chain Map)
+    let product: { id: number; name: string } | null = null;
+    if (productId) {
+      const { data: productData, error: productError } = await adminClient
+        .from("products")
+        .select("id, name")
+        .eq("id", productId)
+        .eq("organization_id", organizationId)
+        .single();
 
-    if (productError || !product) {
-      return new Response(
-        JSON.stringify({ error: "Product not found or access denied" }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      if (productError || !productData) {
+        return new Response(
+          JSON.stringify({ error: "Product not found or access denied" }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      product = productData;
     }
 
-    const { data: existingInvitation } = await adminClient
-      .from("supplier_invitations")
-      .select("id, status")
-      .eq("material_id", materialId)
-      .eq("supplier_email", supplierEmail.toLowerCase())
-      .eq("status", "pending")
-      .single();
+    // Check for duplicate pending invitations
+    if (materialId) {
+      // Material-specific: check by material_id + email
+      const { data: existingInvitation } = await adminClient
+        .from("supplier_invitations")
+        .select("id, status")
+        .eq("material_id", materialId)
+        .eq("supplier_email", supplierEmail.toLowerCase())
+        .eq("status", "pending")
+        .single();
 
-    if (existingInvitation) {
-      return new Response(
-        JSON.stringify({
-          error: "An invitation to this supplier for this material is already pending"
-        }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      if (existingInvitation) {
+        return new Response(
+          JSON.stringify({
+            error: "An invitation to this supplier for this material is already pending"
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    } else {
+      // General invite: check by org + email where material_id is null
+      const { data: existingInvitation } = await adminClient
+        .from("supplier_invitations")
+        .select("id, status")
+        .eq("organization_id", organizationId)
+        .is("material_id", null)
+        .eq("supplier_email", supplierEmail.toLowerCase())
+        .eq("status", "pending")
+        .single();
+
+      if (existingInvitation) {
+        return new Response(
+          JSON.stringify({
+            error: "A general invitation to this supplier is already pending"
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
     }
 
     const { data: invitation, error: invitationError } = await adminClient
       .from("supplier_invitations")
       .insert({
         organization_id: organizationId,
-        product_id: productId,
-        material_id: materialId,
-        material_name: materialName,
-        material_type: materialType,
+        product_id: productId || null,
+        material_id: materialId || null,
+        material_name: materialName || null,
+        material_type: materialType || null,
         supplier_email: supplierEmail.toLowerCase(),
         contact_person_name: contactPersonName || null,
         supplier_name: supplierName || null,
@@ -249,7 +280,7 @@ Deno.serve(async (req: Request) => {
           Dear ${greeting},
         </p>
         <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-          <strong style="color: #fff;">${inviterName}</strong> at <strong style="color: #fff;">${organizationName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to provide verified sustainability data for <strong style="color: #fff;">${materialName}</strong>.
+          <strong style="color: #fff;">${inviterName}</strong> at <strong style="color: #fff;">${organizationName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to ${materialName ? `provide verified sustainability data for <strong style="color: #fff;">${materialName}</strong>` : 'share your sustainability data'}.
         </p>
         ${personalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${inviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${personalMessage}</p></div>` : ''}
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
@@ -257,14 +288,14 @@ Deno.serve(async (req: Request) => {
             <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">From</td>
             <td style="padding: 10px 0; color: #fff; font-size: 14px;">${inviterName}, ${organizationName}</td>
           </tr>
-          <tr>
+          ${product ? `<tr>
             <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Product</td>
             <td style="padding: 10px 0; color: #fff; font-size: 14px;">${product.name}</td>
-          </tr>
-          <tr>
+          </tr>` : ''}
+          ${materialName ? `<tr>
             <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Material</td>
             <td style="padding: 10px 0; color: #fff; font-size: 14px;">${materialName} (${materialType})</td>
-          </tr>
+          </tr>` : ''}
         </table>
         <div style="margin: 30px 0; text-align: center;">
           <a href="${invitationUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Accept Invitation</a>

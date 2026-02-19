@@ -26,8 +26,8 @@ interface InvitationDetails {
   supplier_email: string;
   supplier_name: string | null;
   contact_person_name: string | null;
-  material_name: string;
-  material_type: string;
+  material_name: string | null;
+  material_type: string | null;
   personal_message: string | null;
   inviter_name: string | null;
   invited_at: string;
@@ -385,7 +385,7 @@ export default function SupplierInvitePage() {
             <div className="text-center space-y-2">
               <h1 className="font-serif text-3xl text-white">You&apos;re Invited</h1>
               <p className="text-white/60 text-sm">
-                <strong className="text-white">{invitation?.organization_name}</strong> has invited you to join alkatera
+                <strong className="text-white">{invitation?.organization_name}</strong> has invited you to join alkatera and share your sustainability data
               </p>
             </div>
 
@@ -403,17 +403,19 @@ export default function SupplierInvitePage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <Package className="h-4 w-4 text-blue-400" />
+              {invitation?.material_name && (
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
+                  <div className="p-2 rounded-lg bg-blue-500/10">
+                    <Package className="h-4 w-4 text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/40 uppercase tracking-wider">Data requested for</p>
+                    <p className="text-sm text-white font-medium">
+                      {invitation.material_name} {invitation.material_type && <span className="text-white/40">({invitation.material_type})</span>}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-white/40 uppercase tracking-wider">Data requested for</p>
-                  <p className="text-sm text-white font-medium">
-                    {invitation?.material_name} <span className="text-white/40">({invitation?.material_type})</span>
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Personal message */}

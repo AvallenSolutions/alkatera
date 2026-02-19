@@ -180,8 +180,11 @@ export default function SupplierPortalDashboard() {
                   <div>
                     <p className="text-sm font-medium text-foreground">{req.material_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      <span className="capitalize">{req.material_type}</span>
-                      {req.organization_name && <> &middot; {req.organization_name}</>}
+                      {req.material_type !== 'general' && (
+                        <span className="capitalize">{req.material_type}</span>
+                      )}
+                      {req.material_type !== 'general' && req.organization_name && ' \u00b7 '}
+                      {req.organization_name}
                     </p>
                   </div>
                 </div>

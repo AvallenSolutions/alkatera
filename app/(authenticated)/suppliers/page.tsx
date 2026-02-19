@@ -46,32 +46,22 @@ import {
   Search,
   Building2,
   MapPin,
-  Package,
   Lock,
   MoreVertical,
   Trash2,
   Globe,
   CheckCircle,
   AlertCircle,
-  Edit,
   RefreshCw,
   Leaf,
   Mail,
   Info,
 } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
 import { useSupplierPermissions } from '@/hooks/useSupplierPermissions';
-import { InviteSupplierModal } from '@/components/products/InviteSupplierModal';
+import { useSupplierLimit } from '@/hooks/useSubscription';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
@@ -103,17 +93,6 @@ interface PlatformSupplier {
   is_verified: boolean;
 }
 
-interface SimpleProduct {
-  id: number;
-  name: string;
-}
-
-interface SimpleMaterial {
-  id: string;
-  material_name: string;
-  material_type: 'ingredient' | 'packaging';
-}
-
 export default function SuppliersPage() {
   const { currentOrganization } = useOrganization();
   const { canCreateSuppliers, canDeleteSuppliers } = useSupplierPermissions();
@@ -132,14 +111,16 @@ export default function SuppliersPage() {
   const [deleting, setDeleting] = useState(false);
 
   // Invite supplier flow state
-  const [invitePickerOpen, setInvitePickerOpen] = useState(false);
-  const [inviteModalOpen, setInviteModalOpen] = useState(false);
-  const [orgProducts, setOrgProducts] = useState<SimpleProduct[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const [selectedProductId, setSelectedProductId] = useState<string>('');
-  const [productMaterials, setProductMaterials] = useState<SimpleMaterial[]>([]);
-  const [loadingMaterials, setLoadingMaterials] = useState(false);
-  const [selectedMaterialId, setSelectedMaterialId] = useState<string>('');
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteContactName, setInviteContactName] = useState('');
+  const [inviteCompanyName, setInviteCompanyName] = useState('');
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const { currentCount, maxCount, isUnlimited, checkLimit } = useSupplierLimit();
+  const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount;
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -262,71 +243,94 @@ export default function SuppliersPage() {
   };
 
   // Invite supplier flow
-  const fetchOrgProducts = async () => {
-    if (!currentOrganization?.id) return;
+  const handleOpenInviteDialog = () => {
+    setInviteEmail('');
+    setInviteContactName('');
+    setInviteCompanyName('');
+    setInviteMessage('');
+    setInviteSuccess(false);
+    setInviteError(null);
+    setInviteDialogOpen(true);
+  };
+
+  const handleCloseInviteDialog = () => {
+    setInviteDialogOpen(false);
+    setInviteSuccess(false);
+    setInviteError(null);
+  };
+
+  const validateEmail = (email: string): boolean => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const handleSendInvitation = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!inviteEmail.trim()) {
+      setInviteError('Supplier email is required');
+      return;
+    }
+
+    if (!validateEmail(inviteEmail)) {
+      setInviteError('Please enter a valid email address');
+      return;
+    }
+
+    setInviteError(null);
+    setInviteSubmitting(true);
+
     try {
-      setLoadingProducts(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name')
-        .eq('organization_id', currentOrganization.id)
-        .order('name');
+      // Server-side limit check
+      const limitResult = await checkLimit();
+      if (!limitResult.allowed) {
+        setInviteError(limitResult.reason || 'Supplier limit reached. Please upgrade your plan.');
+        setInviteSubmitting(false);
+        return;
+      }
 
-      if (error) throw error;
-      setOrgProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-      toast.error('Failed to load products');
+      const browserClient = getSupabaseBrowserClient();
+      const { data: { session } } = await browserClient.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/invite-supplier`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            supplierEmail: inviteEmail.toLowerCase().trim(),
+            contactPersonName: inviteContactName.trim() || undefined,
+            supplierName: inviteCompanyName.trim() || undefined,
+            personalMessage: inviteMessage.trim() || undefined,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send invitation');
+      }
+
+      setInviteSuccess(true);
+      toast.success('Invitation sent successfully');
+      setTimeout(() => {
+        handleCloseInviteDialog();
+      }, 2000);
+    } catch (err: any) {
+      console.error('Error sending invitation:', err);
+      setInviteError(err.message || 'Failed to send invitation. Please try again.');
     } finally {
-      setLoadingProducts(false);
+      setInviteSubmitting(false);
     }
   };
-
-  const fetchProductMaterials = async (productId: string) => {
-    try {
-      setLoadingMaterials(true);
-      const { data, error } = await supabase
-        .from('product_materials')
-        .select('id, material_name, material_type')
-        .eq('product_id', productId)
-        .in('material_type', ['ingredient', 'packaging'])
-        .order('material_type')
-        .order('material_name');
-
-      if (error) throw error;
-      setProductMaterials((data || []) as SimpleMaterial[]);
-    } catch (error) {
-      console.error('Error fetching materials:', error);
-      toast.error('Failed to load materials');
-    } finally {
-      setLoadingMaterials(false);
-    }
-  };
-
-  const handleOpenInvitePicker = () => {
-    setSelectedProductId('');
-    setSelectedMaterialId('');
-    setProductMaterials([]);
-    fetchOrgProducts();
-    setInvitePickerOpen(true);
-  };
-
-  const handleProductChange = (productId: string) => {
-    setSelectedProductId(productId);
-    setSelectedMaterialId('');
-    setProductMaterials([]);
-    if (productId) {
-      fetchProductMaterials(productId);
-    }
-  };
-
-  const handleContinueToInvite = () => {
-    setInvitePickerOpen(false);
-    setInviteModalOpen(true);
-  };
-
-  const selectedProduct = orgProducts.find(p => String(p.id) === selectedProductId);
-  const selectedMaterial = productMaterials.find(m => m.id === selectedMaterialId);
 
   const formatCurrency = (amount: number | null, currency: string | null) => {
     if (!amount) return 'Not specified';
@@ -379,7 +383,7 @@ export default function SuppliersPage() {
         <div className="flex items-center gap-3">
           {canCreateSuppliers ? (
             <>
-              <Button variant="outline" size="lg" onClick={handleOpenInvitePicker}>
+              <Button variant="outline" size="lg" onClick={handleOpenInviteDialog}>
                 <Mail className="h-5 w-5 mr-2" />
                 Invite Supplier
               </Button>
@@ -699,143 +703,142 @@ export default function SuppliersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Invite Supplier - Product/Material Picker */}
-      <Dialog open={invitePickerOpen} onOpenChange={setInvitePickerOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+      {/* Invite Supplier Dialog */}
+      <Dialog open={inviteDialogOpen} onOpenChange={handleCloseInviteDialog}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
               Invite a Supplier
             </DialogTitle>
             <DialogDescription>
-              Select the product and material you want to invite a supplier for. They&apos;ll be asked to provide verified sustainability data.
+              Send an email invitation to your supplier to join alkatera and share their sustainability data.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Step 1: Select Product */}
-            <div className="space-y-2">
-              <Label>Product</Label>
-              {loadingProducts ? (
-                <Skeleton className="h-10 w-full" />
-              ) : orgProducts.length === 0 ? (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    No products found. Add a product first before inviting suppliers.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Select value={selectedProductId} onValueChange={handleProductChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a product..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {orgProducts.map((product) => (
-                      <SelectItem key={product.id} value={String(product.id)}>
-                        {product.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+          {atLimit && (
+            <div className="flex items-center gap-3 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+              <Lock className="h-5 w-5 text-destructive shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-destructive">Supplier limit reached</p>
+                <p className="text-xs text-muted-foreground">
+                  You&apos;ve used {currentCount} of {maxCount} suppliers on your current plan.{' '}
+                  <a href="/dashboard/settings" className="underline text-primary">Upgrade</a> to add more.
+                </p>
+              </div>
             </div>
+          )}
 
-            {/* Step 2: Select Material */}
-            {selectedProductId && (
+          {inviteSuccess ? (
+            <div className="py-8 flex flex-col items-center justify-center gap-4">
+              <CheckCircle className="h-12 w-12 text-green-500" />
+              <div className="text-center">
+                <h3 className="font-semibold text-lg">Invitation Sent!</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your supplier will receive an email with instructions to join the platform.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSendInvitation} className="space-y-4 py-4">
+              {inviteError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{inviteError}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-2">
-                <Label>Ingredient or Packaging Material</Label>
-                {loadingMaterials ? (
-                  <Skeleton className="h-10 w-full" />
-                ) : productMaterials.length === 0 ? (
-                  <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      No materials found for this product. Add ingredients or packaging to the product recipe first.
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a material..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productMaterials.some(m => m.material_type === 'ingredient') && (
-                        <SelectGroup>
-                          <SelectLabel>Ingredients</SelectLabel>
-                          {productMaterials
-                            .filter(m => m.material_type === 'ingredient')
-                            .map((material) => (
-                              <SelectItem key={material.id} value={material.id}>
-                                {material.material_name}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      )}
-                      {productMaterials.some(m => m.material_type === 'packaging') && (
-                        <SelectGroup>
-                          <SelectLabel>Packaging</SelectLabel>
-                          {productMaterials
-                            .filter(m => m.material_type === 'packaging')
-                            .map((material) => (
-                              <SelectItem key={material.id} value={material.id}>
-                                {material.material_name}
-                              </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
+                <Label htmlFor="invite-email">
+                  Supplier Contact Email <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="supplier@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  disabled={inviteSubmitting}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  The invitation will be sent to this email address
+                </p>
               </div>
-            )}
 
-            {/* Selection Summary */}
-            {selectedProduct && selectedMaterial && (
-              <div className="rounded-lg bg-muted p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Product:</span>
-                  <span className="font-medium">{selectedProduct.name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Material:</span>
-                  <span className="font-medium">{selectedMaterial.material_name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Type:</span>
-                  <span className="font-medium capitalize">{selectedMaterial.material_type}</span>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-contact-name">Contact Person Name (Optional)</Label>
+                <Input
+                  id="invite-contact-name"
+                  type="text"
+                  placeholder="e.g., Sarah Johnson"
+                  value={inviteContactName}
+                  onChange={(e) => setInviteContactName(e.target.value)}
+                  disabled={inviteSubmitting}
+                />
               </div>
-            )}
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setInvitePickerOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleContinueToInvite}
-              disabled={!selectedProductId || !selectedMaterialId}
-            >
-              <Mail className="h-4 w-4 mr-2" />
-              Continue to Invite
-            </Button>
-          </DialogFooter>
+              <div className="space-y-2">
+                <Label htmlFor="invite-company-name">Supplier Company Name (Optional)</Label>
+                <Input
+                  id="invite-company-name"
+                  type="text"
+                  placeholder="e.g., Acme Materials Ltd"
+                  value={inviteCompanyName}
+                  onChange={(e) => setInviteCompanyName(e.target.value)}
+                  disabled={inviteSubmitting}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="invite-message">Personal Message (Optional)</Label>
+                <Textarea
+                  id="invite-message"
+                  placeholder="Add a personal note to your invitation..."
+                  value={inviteMessage}
+                  onChange={(e) => setInviteMessage(e.target.value)}
+                  disabled={inviteSubmitting}
+                  rows={3}
+                />
+              </div>
+
+              <div className="text-xs text-muted-foreground bg-muted p-3 rounded-lg">
+                <p className="font-medium mb-1">What happens next:</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>Your supplier will receive an email invitation</li>
+                  <li>A copy will be sent to you and hello@alkatera.com</li>
+                  <li>They can create a free account and complete their profile</li>
+                  <li>You&apos;ll be notified when they accept</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseInviteDialog}
+                  disabled={inviteSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={inviteSubmitting || atLimit}>
+                  {inviteSubmitting ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="mr-2 h-4 w-4" />
+                      Send Invitation
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
-
-      {/* Invite Supplier Modal (reuses existing component) */}
-      {selectedProduct && selectedMaterial && (
-        <InviteSupplierModal
-          open={inviteModalOpen}
-          onOpenChange={setInviteModalOpen}
-          productId={selectedProduct.id}
-          productName={selectedProduct.name}
-          materialId={selectedMaterial.id}
-          materialName={selectedMaterial.material_name}
-          materialType={selectedMaterial.material_type}
-        />
-      )}
     </div>
   );
 }

@@ -88,7 +88,7 @@ export default function SupplierRequestsPage() {
       <div>
         <h1 className="text-2xl font-serif text-foreground">Data Requests</h1>
         <p className="text-muted-foreground mt-1">
-          View and manage data requests from your customers. Each request is for verified sustainability data about a specific material.
+          View and manage invitations from your customers to share sustainability data on alkatera.
         </p>
       </div>
 
@@ -124,9 +124,11 @@ export default function SupplierRequestsPage() {
                   <div>
                     <p className="font-medium text-foreground">{req.material_name}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-muted-foreground capitalize">
-                        {req.material_type}
-                      </span>
+                      {req.material_type !== 'general' && (
+                        <span className="text-xs text-muted-foreground capitalize">
+                          {req.material_type}
+                        </span>
+                      )}
                       {req.organization_name && (
                         <>
                           <span className="text-xs text-muted-foreground">&middot;</span>
