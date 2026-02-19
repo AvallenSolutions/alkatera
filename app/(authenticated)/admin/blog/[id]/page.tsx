@@ -46,7 +46,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoadingAuth && isAlkateraAdmin) {
@@ -79,7 +79,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
     try {
       setIsSubmitting(true);
       setError(null);
-      setSuccess(false);
+      setSuccessMessage(null);
 
       const payload: any = {
         title: post.title,
@@ -113,14 +113,22 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
         throw new Error(data.error || 'Failed to update post');
       }
 
-      setSuccess(true);
       setPost(data.post);
 
-      // If published, redirect to blog dashboard after a short delay
       if (status === 'published') {
+        setSuccessMessage('Post published successfully! Redirecting to blog dashboard...');
         setTimeout(() => {
           router.push('/admin/blog');
         }, 1500);
+      } else if (status === 'draft') {
+        setSuccessMessage('Saved as draft.');
+      } else if (status === 'archived') {
+        setSuccessMessage('Post archived successfully! Redirecting...');
+        setTimeout(() => {
+          router.push('/admin/blog');
+        }, 1500);
+      } else {
+        setSuccessMessage('Post updated successfully!');
       }
 
     } catch (err) {
@@ -182,14 +190,28 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
           </div>
         </div>
         <div className="flex gap-2">
-          {post.status !== 'draft' && (
+          {post.status === 'draft' && (
+            <Button
+              variant="outline"
+              onClick={() => handleUpdate('draft')}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Save Draft
+            </Button>
+          )}
+          {post.status === 'published' && (
             <Button
               variant="outline"
               onClick={() => handleUpdate('draft')}
               disabled={isSubmitting}
             >
               <Save className="w-4 h-4 mr-2" />
-              Save as Draft
+              Unpublish to Draft
             </Button>
           )}
           {post.status !== 'archived' && (
@@ -221,10 +243,10 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
       </div>
 
       {/* Success/Error Messages */}
-      {success && (
+      {successMessage && (
         <Alert className="bg-green-50 text-green-900 border-green-200">
           <AlertDescription>
-            Post updated successfully!
+            {successMessage}
           </AlertDescription>
         </Alert>
       )}

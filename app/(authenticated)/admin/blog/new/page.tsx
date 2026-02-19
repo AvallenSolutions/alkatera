@@ -61,7 +61,7 @@ export default function NewBlogPost() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
 
@@ -167,7 +167,7 @@ export default function NewBlogPost() {
     try {
       setIsSubmitting(true);
       setError(null);
-      setSuccess(false);
+      setSuccessMessage(null);
 
       // Validate required fields
       const isQuote = formData.content_type === 'quote';
@@ -216,16 +216,23 @@ export default function NewBlogPost() {
         throw new Error(data.error || 'Failed to create post');
       }
 
-      setSuccess(true);
-
-      // Clear the saved draft
+      // Clear the localStorage draft (it's now saved to DB)
       localStorage.removeItem(DRAFT_STORAGE_KEY);
       setHasDraft(false);
 
-      // Redirect to blog dashboard after a short delay
-      setTimeout(() => {
-        router.push('/admin/blog');
-      }, 1500);
+      if (status === 'draft') {
+        // Draft saved — redirect to edit page so they can continue working
+        setSuccessMessage('Draft saved successfully! Redirecting to editor...');
+        setTimeout(() => {
+          router.push(`/admin/blog/${data.post.id}`);
+        }, 1500);
+      } else {
+        // Published — redirect to blog dashboard
+        setSuccessMessage('Post published successfully! Redirecting to blog dashboard...');
+        setTimeout(() => {
+          router.push('/admin/blog');
+        }, 1500);
+      }
 
     } catch (err) {
       console.error('Error creating post:', err);
@@ -309,7 +316,7 @@ export default function NewBlogPost() {
       </div>
 
       {/* Draft Loaded Notice */}
-      {hasDraft && !success && (
+      {hasDraft && !successMessage && (
         <Alert>
           <AlertDescription className="flex items-center justify-between">
             <span>Draft restored from your last session</span>
@@ -321,10 +328,10 @@ export default function NewBlogPost() {
       )}
 
       {/* Success/Error Messages */}
-      {success && (
+      {successMessage && (
         <Alert className="bg-green-50 text-green-900 border-green-200">
           <AlertDescription>
-            Post created successfully! Redirecting to blog dashboard...
+            {successMessage}
           </AlertDescription>
         </Alert>
       )}

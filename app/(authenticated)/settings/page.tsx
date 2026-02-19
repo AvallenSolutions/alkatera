@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { User, Users, Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, Infinity, AlertCircle, FileText, Calendar, DollarSign, MessageSquare, History, Loader2 } from 'lucide-react'
+import { Building2, Truck, Plus, CreditCard, Check, Sparkles, Leaf, Flower2, TreeDeciduous, AlertCircle, FileText, Calendar, History, Loader2 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
@@ -18,6 +18,10 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { ProfileSettings } from '@/components/settings/ProfileSettings'
+import { TeamSettings } from '@/components/settings/TeamSettings'
+import { OrganisationSettings } from '@/components/settings/OrganisationSettings'
+import { SupportSettings } from '@/components/settings/SupportSettings'
 
 type BillingInterval = 'monthly' | 'annual'
 
@@ -964,41 +968,11 @@ export default function SettingsPage() {
         </TabsContent>}
 
         <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Profile Settings
-              </CardTitle>
-              <CardDescription>
-                Manage your personal account information and preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/dashboard/settings/profile">Edit Profile</Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <ProfileSettings showHeader={false} />
         </TabsContent>
 
         {isOrgAdmin && <TabsContent value="team" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Team Management
-              </CardTitle>
-              <CardDescription>
-                Invite members, manage roles and permissions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/dashboard/settings/team">Manage Team</Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <TeamSettings showHeader={false} />
         </TabsContent>}
 
         {isOrgAdmin && <TabsContent value="suppliers" className="space-y-4">
@@ -1029,47 +1003,11 @@ export default function SettingsPage() {
         </TabsContent>}
 
         <TabsContent value="organisation" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Organisation Details
-              </CardTitle>
-              <CardDescription>
-                View and update your organisation information
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild>
-                <Link href="/company/overview">View Organisation</Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <OrganisationSettings showHeader={false} />
         </TabsContent>
 
         <TabsContent value="support" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                Feedback & Support
-              </CardTitle>
-              <CardDescription>
-                Report bugs, suggest features, and view your support tickets
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Have a bug to report or a feature suggestion? We&apos;d love to hear from you.
-                Your feedback helps us improve the platform.
-              </p>
-              <div className="flex gap-3">
-                <Button asChild>
-                  <Link href="/settings/feedback">View My Tickets</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <SupportSettings showHeader={false} />
         </TabsContent>
       </Tabs>
     </div>
