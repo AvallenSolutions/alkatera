@@ -72,6 +72,7 @@ interface InlineIngredientSearchProps {
     location?: string;
     recycled_content_pct?: number;
     packaging_components?: any;
+    user_query?: string;
   }) => void;
   onChange?: (value: string) => void;
   className?: string;
@@ -216,6 +217,7 @@ export function InlineIngredientSearch({
   };
 
   const handleUseProxy = async (suggestion: ProxySuggestion) => {
+    const originalUserQuery = query; // Capture user's real ingredient name before proxy search
     setProxySearching(suggestion.search_query);
     try {
       // Search with the proxy's optimised query
@@ -235,8 +237,8 @@ export function InlineIngredientSearch({
 
       const data: SearchResponse = await response.json();
       if (data.results && data.results.length > 0) {
-        // Auto-select the first result
-        handleResultSelect(data.results[0]);
+        // Auto-select the first result, preserving the user's original query
+        handleResultSelect(data.results[0], originalUserQuery);
         setProxySuggestions([]);
       } else {
         // Show the proxy results in the main results list
@@ -265,11 +267,12 @@ export function InlineIngredientSearch({
     }, 300);
   };
 
-  const handleResultSelect = (result: SearchResult) => {
+  const handleResultSelect = (result: SearchResult, overrideUserQuery?: string) => {
     console.log('[InlineSearch] Selected result:', {
       id: result.id,
       source_type: result.source_type,
       name: result.name,
+      user_query: overrideUserQuery || query,
     });
 
     // Map source_type to DataSource
@@ -288,6 +291,7 @@ export function InlineIngredientSearch({
 
     const selectedData = {
       name: result.name,
+      user_query: overrideUserQuery || query,
       data_source: dataSourceType,
       data_source_id: result.id,
       supplier_product_id: result.source_type === 'primary' ? result.id : undefined,
@@ -303,11 +307,12 @@ export function InlineIngredientSearch({
       data_source: selectedData.data_source,
       data_source_id: selectedData.data_source_id,
       name: selectedData.name,
+      user_query: selectedData.user_query,
     });
 
     onSelect(selectedData);
 
-    setQuery(result.name);
+    setQuery(overrideUserQuery || result.name);
     setShowResults(false);
   };
 

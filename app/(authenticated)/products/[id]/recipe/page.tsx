@@ -255,6 +255,7 @@ export default function ProductRecipePage() {
         setIngredientForms(ingredientItems.map(item => ({
           tempId: item.id,
           name: item.material_name,
+          matched_source_name: item.matched_source_name || undefined,
           data_source: item.data_source as any,
           data_source_id: item.data_source_id,
           supplier_product_id: item.supplier_product_id,
@@ -301,6 +302,7 @@ export default function ProductRecipePage() {
           return {
             tempId: item.id,
             name: item.material_name,
+            matched_source_name: item.matched_source_name || undefined,
             data_source: item.data_source as any,
             data_source_id: item.data_source_id,
             supplier_product_id: item.supplier_product_id,
@@ -506,6 +508,7 @@ export default function ProductRecipePage() {
     const materialsToInsert = validForms.map(form => ({
       product_id: parseInt(productId),
       material_name: form.name,
+      matched_source_name: form.matched_source_name || null,
       quantity: Number(form.amount),
       unit: form.unit,
       material_type: 'ingredient',
@@ -550,6 +553,7 @@ export default function ProductRecipePage() {
     const materialsToInsert = validForms.map(form => ({
       product_id: parseInt(productId),
       material_name: form.name,
+      matched_source_name: form.matched_source_name || null,
       quantity: Number(form.net_weight_g) || Number(form.amount),
       unit: form.unit,
       material_type: 'packaging',
@@ -616,6 +620,7 @@ export default function ProductRecipePage() {
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
+          matched_source_name: form.matched_source_name || null,
           quantity: Number(form.amount),
           unit: form.unit,
           material_type: 'ingredient',
@@ -805,6 +810,7 @@ export default function ProductRecipePage() {
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
+          matched_source_name: form.matched_source_name || null,
           quantity: Number(form.amount),
           unit: form.unit,
           material_type: 'packaging',
@@ -1121,6 +1127,9 @@ export default function ProductRecipePage() {
                       <div key={ingredient.tempId} className="flex items-center justify-between p-2 border rounded text-sm">
                         <div className="flex-1">
                           <p className="font-medium">{ingredient.name}</p>
+                          {ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">Proxy: {ingredient.matched_source_name}</p>
+                          )}
                           {ingredient.origin_country && (
                             <p className="text-xs text-muted-foreground">Origin: {ingredient.origin_country}</p>
                           )}
@@ -1154,6 +1163,9 @@ export default function ProductRecipePage() {
                       <div key={packaging.tempId} className="flex items-center justify-between p-2 border rounded text-sm">
                         <div className="flex-1">
                           <p className="font-medium">{packaging.name}</p>
+                          {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">Proxy: {packaging.matched_source_name}</p>
+                          )}
                           {packaging.packaging_category && (
                             <p className="text-xs text-muted-foreground capitalize">
                               {packaging.packaging_category.replace('_', ' ')}

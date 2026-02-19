@@ -46,6 +46,7 @@ import { calculateDistance } from "@/lib/utils/distance-calculator";
 export interface PackagingFormData {
   tempId: string;
   name: string;
+  matched_source_name?: string; // Database match name when proxy used
   data_source: DataSource | null;
   data_source_id?: string;
   supplier_product_id?: string;
@@ -411,6 +412,7 @@ export function PackagingFormCard({
 
   const handleSearchSelect = (selection: {
     name: string;
+    user_query?: string;
     data_source: DataSource;
     data_source_id?: string;
     supplier_product_id?: string;
@@ -421,7 +423,10 @@ export function PackagingFormCard({
     recycled_content_pct?: number;
     packaging_components?: any;
   }) => {
-    // Auto-detect packaging category from material name
+    // Preserve user's real material name, store DB match name separately
+    const userOriginalName = selection.user_query || selection.name;
+
+    // Auto-detect packaging category from the DATABASE match name (not user name)
     const nameLower = selection.name.toLowerCase();
     let detectedCategory: PackagingCategory = 'container';
 
@@ -440,7 +445,8 @@ export function PackagingFormCard({
     }
 
     const updates: Partial<PackagingFormData> = {
-      name: selection.name,
+      name: userOriginalName,
+      matched_source_name: selection.name,
       data_source: selection.data_source,
       data_source_id: selection.data_source_id,
       supplier_product_id: selection.supplier_product_id,
@@ -592,11 +598,19 @@ export function PackagingFormCard({
                   placeholder="Search for packaging material..."
                   materialType="packaging"
                   onSelect={handleSearchSelect}
-                  onChange={(value) => onUpdate(packaging.tempId, { name: value })}
+                  onChange={(value) => onUpdate(packaging.tempId, { name: value, matched_source_name: undefined, data_source: null, data_source_id: undefined })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Search by material name to find matches from your supplier network or global database
                 </p>
+                {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && (
+                  <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs">
+                    <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span className="text-amber-700 dark:text-amber-300">
+                      Calculation proxy: <span className="font-medium">{packaging.matched_source_name}</span>
+                    </span>
+                  </div>
+                )}
               </div>
 
               {packaging.packaging_category === 'container' && (

@@ -6,6 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 export interface ProductIngredient {
   id: string;
   material_name: string;
+  matched_source_name?: string | null;
   quantity: number;
   unit: string;
   data_source: string | null;
@@ -22,6 +23,7 @@ export interface ProductIngredient {
 export interface ProductPackaging {
   id: string;
   material_name: string;
+  matched_source_name?: string | null;
   quantity: number;
   unit: string;
   packaging_category: string;

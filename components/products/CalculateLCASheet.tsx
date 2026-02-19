@@ -263,10 +263,13 @@ export function CalculateLCASheet({
 
     try {
       // 1. Update DB row
+      const material = materials.find(m => m.id === materialId);
       const updateData: Record<string, any> = {
         data_source: selection.data_source,
         data_source_id: selection.data_source_id || null,
         supplier_product_id: null,
+        // Set matched_source_name if the selected factor name differs from the material name
+        matched_source_name: material && selection.name !== material.material_name ? selection.name : null,
       };
       if (selection.data_source === 'supplier' && selection.supplier_product_id) {
         updateData.supplier_product_id = selection.supplier_product_id;
@@ -492,7 +495,12 @@ export function CalculateLCASheet({
                       return (
                         <Fragment key={material.id}>
                           <TableRow>
-                            <TableCell className="font-medium text-sm">{material.material_name}</TableCell>
+                            <TableCell className="font-medium text-sm">
+                              {material.material_name}
+                              {material.matched_source_name && material.matched_source_name !== material.material_name && (
+                                <div className="text-xs text-amber-500 font-normal mt-0.5">Proxy: {material.matched_source_name}</div>
+                              )}
+                            </TableCell>
                             <TableCell className="capitalize text-sm">{material.material_type}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{material.quantity} {material.unit}</TableCell>
                             <TableCell>

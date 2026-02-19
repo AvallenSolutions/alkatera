@@ -27,6 +27,7 @@ import { calculateDistance } from "@/lib/utils/distance-calculator";
 export interface IngredientFormData {
   tempId: string;
   name: string;
+  matched_source_name?: string; // Database match name when proxy used
   data_source: DataSource | null;
   data_source_id?: string;
   supplier_product_id?: string;
@@ -175,6 +176,7 @@ export function IngredientFormCard({
 
   const handleSearchSelect = (selection: {
     name: string;
+    user_query?: string;
     data_source: DataSource;
     data_source_id?: string;
     supplier_product_id?: string;
@@ -183,14 +185,20 @@ export function IngredientFormCard({
     carbon_intensity?: number;
     location?: string;
   }) => {
+    // Preserve the user's real ingredient name, store DB match name separately
+    const userOriginalName = selection.user_query || selection.name;
+
     console.log('[IngredientFormCard] handleSearchSelect received:', {
       name: selection.name,
+      user_query: selection.user_query,
+      userOriginalName,
       data_source: selection.data_source,
       data_source_id: selection.data_source_id,
     });
 
-    const updates = {
-      name: selection.name,
+    const updates: Partial<IngredientFormData> = {
+      name: userOriginalName,
+      matched_source_name: selection.name,
       data_source: selection.data_source,
       data_source_id: selection.data_source_id,
       supplier_product_id: selection.supplier_product_id,
@@ -243,11 +251,19 @@ export function IngredientFormCard({
               value={ingredient.name}
               placeholder="Search for ingredient..."
               onSelect={handleSearchSelect}
-              onChange={(value) => onUpdate(ingredient.tempId, { name: value })}
+              onChange={(value) => onUpdate(ingredient.tempId, { name: value, matched_source_name: undefined, data_source: null, data_source_id: undefined })}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Search by ingredient name to find matches from your supplier network or global database
             </p>
+            {ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && (
+              <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs">
+                <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="text-amber-700 dark:text-amber-300">
+                  Calculation proxy: <span className="font-medium">{ingredient.matched_source_name}</span>
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

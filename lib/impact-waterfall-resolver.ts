@@ -15,6 +15,7 @@ export interface ProductMaterial {
   id: string;
   product_id: string;
   material_name: string;
+  matched_source_name?: string | null;
   material_type: 'ingredient' | 'packaging';
   quantity: string | number;
   unit: string;

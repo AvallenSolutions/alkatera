@@ -116,6 +116,11 @@ export function SpecificationTab({ productId, ingredients, packaging, onManageIn
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <span className="text-xs font-medium text-slate-500 w-4">{idx + 1}.</span>
                         <span className="text-sm text-slate-300 truncate">{ing.material_name}</span>
+                        {ing.matched_source_name && ing.matched_source_name !== ing.material_name && (
+                          <Badge variant="outline" className="text-xs bg-amber-500/20 border-amber-500/30 text-amber-400 shrink-0">
+                            Proxy
+                          </Badge>
+                        )}
                         {ing.data_source === 'supplier' && (
                           <Badge variant="outline" className="text-xs bg-green-500/20 border-green-500/30 text-green-400">
                             <Building2 className="h-2.5 w-2.5 mr-1" />
@@ -215,6 +220,11 @@ export function SpecificationTab({ productId, ingredients, packaging, onManageIn
                       <span className="text-sm font-medium text-slate-300">
                         {primaryContainer.material_name}
                       </span>
+                      {primaryContainer.matched_source_name && primaryContainer.matched_source_name !== primaryContainer.material_name && (
+                        <Badge variant="outline" className="text-xs bg-amber-500/20 border-amber-500/30 text-amber-400 shrink-0">
+                          Proxy
+                        </Badge>
+                      )}
                     </div>
                     <span className="text-sm text-slate-400">
                       {(() => {
