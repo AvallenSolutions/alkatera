@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Plus, Search, MessageSquare } from 'lucide-react'
+import { LogOut, User, Menu, X, Building2, Check, ChevronsUpDown, Search, MessageSquare } from 'lucide-react'
 import { CommandPalette } from '@/components/dashboard/CommandPalette'
 import {
   Command,
@@ -24,7 +24,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from '@/components/ui/command'
 import {
   Popover,
@@ -124,18 +123,6 @@ export function Header({ onMenuClick, isMobileMenuOpen }: HeaderProps) {
                           {org.name}
                         </CommandItem>
                       ))}
-                    </CommandGroup>
-                    <CommandSeparator />
-                    <CommandGroup>
-                      <CommandItem
-                        onSelect={() => {
-                          router.push('/create-organization')
-                          setOrgPopoverOpen(false)
-                        }}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create organisation
-                      </CommandItem>
                     </CommandGroup>
                   </CommandList>
                 </Command>
