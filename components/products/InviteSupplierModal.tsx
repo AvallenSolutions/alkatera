@@ -37,6 +37,7 @@ export function InviteSupplierModal({
   materialType,
 }: InviteSupplierModalProps) {
   const [supplierEmail, setSupplierEmail] = useState("");
+  const [contactPersonName, setContactPersonName] = useState("");
   const [supplierName, setSupplierName] = useState("");
   const [personalMessage, setPersonalMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,6 +48,7 @@ export function InviteSupplierModal({
 
   const handleClose = () => {
     setSupplierEmail("");
+    setContactPersonName("");
     setSupplierName("");
     setPersonalMessage("");
     setSuccess(false);
@@ -104,6 +106,7 @@ export function InviteSupplierModal({
             materialName,
             materialType,
             supplierEmail: supplierEmail.toLowerCase().trim(),
+            contactPersonName: contactPersonName.trim() || undefined,
             supplierName: supplierName.trim() || undefined,
             personalMessage: personalMessage.trim() || undefined,
           }),
@@ -208,6 +211,21 @@ export function InviteSupplierModal({
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="contact-person-name">Contact Person Name (Optional)</Label>
+              <Input
+                id="contact-person-name"
+                type="text"
+                placeholder="e.g., Sarah Johnson"
+                value={contactPersonName}
+                onChange={(e) => setContactPersonName(e.target.value)}
+                disabled={isSubmitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                The name of the person receiving the email, for personalisation
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="supplier-name">Supplier Company Name (Optional)</Label>
               <Input
                 id="supplier-name"
@@ -235,7 +253,7 @@ export function InviteSupplierModal({
               <p className="font-medium mb-1">What happens next:</p>
               <ul className="list-disc list-inside space-y-1">
                 <li>Your supplier will receive an email invitation</li>
-                <li>A copy will be sent to hello@alkatera.com</li>
+                <li>A copy will be sent to you and hello@alkatera.com</li>
                 <li>They can complete their profile and upload product data</li>
                 <li>You&apos;ll be notified when they accept</li>
               </ul>

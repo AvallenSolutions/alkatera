@@ -13,6 +13,7 @@ interface InviteSupplierRequest {
   materialName: string;
   materialType: 'ingredient' | 'packaging';
   supplierEmail: string;
+  contactPersonName?: string;
   supplierName?: string;
   personalMessage?: string;
 }
@@ -30,7 +31,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const siteUrl = Deno.env.get("SITE_URL") || supabaseUrl;
+    const siteUrl = Deno.env.get("SITE_URL") || "https://www.alkatera.com";
     const authHeader = req.headers.get("Authorization");
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
@@ -84,6 +85,7 @@ Deno.serve(async (req: Request) => {
       materialName,
       materialType,
       supplierEmail,
+      contactPersonName,
       supplierName,
       personalMessage,
     }: InviteSupplierRequest = requestBody;
@@ -126,7 +128,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // Use userClient (which carries the user's JWT) so the RPC can read
-    // current_organization_id from request.jwt.claims → user_metadata.
+    // current_organization_id from request.jwt.claims -> user_metadata.
     // adminClient has no JWT context and would always return null.
     const { data: orgIdData, error: orgIdError } = await userClient.rpc(
       'get_current_organization_id'
@@ -146,6 +148,22 @@ Deno.serve(async (req: Request) => {
     }
 
     const organizationId = orgIdData;
+
+    // Fetch org name for the email template
+    const { data: orgData } = await adminClient
+      .from("organizations")
+      .select("name")
+      .eq("id", organizationId)
+      .single();
+    const organizationName = orgData?.name || "an alkatera customer";
+
+    // Fetch inviter's name for the email template
+    const { data: inviterProfile } = await adminClient
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+    const inviterName = inviterProfile?.full_name || user.email || "Your customer";
 
     const { data: product, error: productError } = await adminClient
       .from("products")
@@ -193,6 +211,7 @@ Deno.serve(async (req: Request) => {
         material_name: materialName,
         material_type: materialType,
         supplier_email: supplierEmail.toLowerCase(),
+        contact_person_name: contactPersonName || null,
         supplier_name: supplierName || null,
         invited_by: user.id,
         personal_message: personalMessage || null,
@@ -213,11 +232,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const invitationUrl = `${siteUrl}/supplier-onboarding?token=${invitation.invitation_token}`;
+    // New URL format: /supplier-invite/{token} (public page)
+    const invitationUrl = `${siteUrl}/supplier-invite/${invitation.invitation_token}`;
 
     const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
-    const emailSubject = `Invitation to join ${product.name} supply chain on alkatera`;
-    const supplierDisplayName = supplierName || 'Supplier';
+    const emailSubject = `${organizationName} has invited you to share sustainability data on alkatera`;
+    const greeting = contactPersonName || supplierName || 'there';
 
     const emailHtml = `
       <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
@@ -226,15 +246,19 @@ Deno.serve(async (req: Request) => {
           <h1 style="color: #ccff00; font-size: 14px; text-transform: uppercase; letter-spacing: 3px; margin: 0;">Supplier Invitation</h1>
         </div>
         <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-          Dear ${supplierDisplayName},
+          Dear ${greeting},
         </p>
         <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-          You have been invited to join the alka<strong style="color: #fff;">tera</strong> platform to provide verified product data for <strong style="color: #fff;">${materialName}</strong>.
+          <strong style="color: #fff;">${inviterName}</strong> at <strong style="color: #fff;">${organizationName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to provide verified sustainability data for <strong style="color: #fff;">${materialName}</strong>.
         </p>
-        ${personalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${personalMessage}</p></div>` : ''}
+        ${personalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${inviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${personalMessage}</p></div>` : ''}
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <tr>
-            <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 100px;">Product</td>
+            <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">From</td>
+            <td style="padding: 10px 0; color: #fff; font-size: 14px;">${inviterName}, ${organizationName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Product</td>
             <td style="padding: 10px 0; color: #fff; font-size: 14px;">${product.name}</td>
           </tr>
           <tr>
@@ -243,7 +267,13 @@ Deno.serve(async (req: Request) => {
           </tr>
         </table>
         <div style="margin: 30px 0; text-align: center;">
-          <a href="${invitationUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Complete Your Profile</a>
+          <a href="${invitationUrl}" style="display: inline-block; background: #ccff00; color: #000; font-family: 'Courier New', monospace; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; padding: 16px 32px; text-decoration: none;">Accept Invitation</a>
+        </div>
+        <div style="margin: 24px 0; padding: 20px; background: #111; border: 1px solid #222; border-radius: 4px;">
+          <p style="color: #ccff00; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 12px 0;">Why join alkatera?</p>
+          <p style="color: #ccc; font-size: 13px; line-height: 1.8; margin: 0;">
+            alkatera is <strong style="color: #fff;">completely free for suppliers</strong>. Your account gives you a streamlined portal to manage your sustainability data and share verified product information with your customers. No hidden costs, no commitment &mdash; just a simpler way to share your environmental credentials.
+          </p>
         </div>
         <p style="color: #666; font-size: 12px; line-height: 1.6;">
           This invitation will expire in 30 days. If you have any questions, please contact <a href="mailto:hello@alkatera.com" style="color: #ccff00; text-decoration: none;">hello@alkatera.com</a>
@@ -260,6 +290,9 @@ Deno.serve(async (req: Request) => {
 
     if (resendApiKey) {
       try {
+        // CC the inviting user + alkatera
+        const ccList = [user.email, "sayhello@mail.alkatera.com"].filter(Boolean) as string[];
+
         const resendResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -269,8 +302,8 @@ Deno.serve(async (req: Request) => {
           body: JSON.stringify({
             from: "alkatera <sayhello@mail.alkatera.com>",
             to: [supplierEmail],
-            cc: ["sayhello@mail.alkatera.com"],
-            reply_to: "hello@alkatera.com",
+            cc: ccList,
+            reply_to: user.email || "hello@alkatera.com",
             subject: emailSubject,
             html: emailHtml,
           }),

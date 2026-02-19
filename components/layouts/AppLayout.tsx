@@ -7,6 +7,7 @@ import { useOrganization } from '@/lib/organizationContext'
 import { useSubscription } from '@/hooks/useSubscription'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
+import { SupplierLayout } from './SupplierLayout'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBanner'
@@ -34,7 +35,7 @@ export function AppLayout({ children, requireOrganization = true }: AppLayoutPro
 function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps) {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { currentOrganization, isLoading: isOrganizationLoading } = useOrganization()
+  const { currentOrganization, isLoading: isOrganizationLoading, userRole } = useOrganization()
   const { subscriptionStatus, isLoading: subscriptionLoading } = useSubscription()
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -56,14 +57,38 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
     }
   }, [user, authLoading, router])
 
+  const isSupplier = userRole === 'supplier'
+  const isSupplierRoute = pathname?.startsWith('/supplier-portal')
+
   useEffect(() => {
+    // Suppliers don't need to create an organization — skip this redirect
+    if (isSupplier) return
     if (!authLoading && !isOrganizationLoading && user && requireOrganization && !currentOrganization) {
       router.push('/create-organization')
     }
-  }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router])
+  }, [user, authLoading, isOrganizationLoading, currentOrganization, requireOrganization, router, isSupplier])
 
-  // Payment gate: redirect based on subscription status
+  // Supplier route gating
   useEffect(() => {
+    if (authLoading || isOrganizationLoading) return
+    if (!user) return
+
+    // Supplier users: redirect to /supplier-portal if on a non-supplier route
+    if (isSupplier && !isSupplierRoute) {
+      router.push('/supplier-portal')
+      return
+    }
+
+    // Non-supplier users: block access to /supplier-portal
+    if (!isSupplier && isSupplierRoute) {
+      router.push('/dashboard')
+      return
+    }
+  }, [user, authLoading, isOrganizationLoading, isSupplier, isSupplierRoute, pathname, router])
+
+  // Payment gate: redirect based on subscription status (skip for suppliers)
+  useEffect(() => {
+    if (isSupplier) return
     if (!authLoading && !isOrganizationLoading && !subscriptionLoading && user && currentOrganization) {
       const isAllowedPage = pathname?.startsWith('/settings') || pathname?.startsWith('/create-organization') || pathname?.startsWith('/complete-subscription') || pathname?.startsWith('/contact') || pathname?.startsWith('/suspended')
       if (isAllowedPage) return
@@ -84,7 +109,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
         router.push('/complete-subscription')
       }
     }
-  }, [user, authLoading, isOrganizationLoading, subscriptionLoading, currentOrganization, subscriptionStatus, pathname, router])
+  }, [user, authLoading, isOrganizationLoading, subscriptionLoading, currentOrganization, subscriptionStatus, pathname, router, isSupplier])
 
   if (authLoading || isOrganizationLoading) {
     return (
@@ -101,8 +126,13 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
     return null
   }
 
-  if (requireOrganization && !currentOrganization) {
+  if (requireOrganization && !currentOrganization && !isSupplier) {
     return null
+  }
+
+  // Supplier users get a minimal, isolated layout — no sidebar, no subscription gate
+  if (isSupplier && isSupplierRoute) {
+    return <SupplierLayout>{children}</SupplierLayout>
   }
 
   return (
