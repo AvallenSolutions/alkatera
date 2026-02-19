@@ -125,7 +125,10 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    const { data: orgIdData, error: orgIdError } = await adminClient.rpc(
+    // Use userClient (which carries the user's JWT) so the RPC can read
+    // current_organization_id from request.jwt.claims → user_metadata.
+    // adminClient has no JWT context and would always return null.
+    const { data: orgIdData, error: orgIdError } = await userClient.rpc(
       'get_current_organization_id'
     );
 
