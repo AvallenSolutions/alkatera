@@ -58,17 +58,9 @@ export default function SupplierPortalDashboard() {
         }
       }
 
-      // Get org name via SECURITY DEFINER RPC (bypasses RLS on organizations)
-      const { data: context } = await supabase.rpc('get_supplier_context');
-      const orgName = context?.[0]?.organization_name;
-
-      // Load accepted invitations (data requests) — no organizations join needed
+      // Use SECURITY DEFINER RPC to bypass RLS on supplier_invitations
       const { data: invitations, error: invError } = await supabase
-        .from('supplier_invitations')
-        .select('id, material_name, material_type, invited_at')
-        .eq('supplier_email', user.email?.toLowerCase() || '')
-        .eq('status', 'accepted')
-        .order('invited_at', { ascending: false });
+        .rpc('get_supplier_invitations', { p_status: 'accepted' });
 
       if (invError) {
         console.error('Error loading invitations:', invError);
@@ -77,7 +69,7 @@ export default function SupplierPortalDashboard() {
           id: inv.id,
           material_name: inv.material_name,
           material_type: inv.material_type,
-          organization_name: orgName,
+          organization_name: inv.organization_name,
           invited_at: inv.invited_at,
         })));
       }
