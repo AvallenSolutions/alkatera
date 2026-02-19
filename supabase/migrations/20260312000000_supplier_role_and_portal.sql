@@ -14,7 +14,38 @@ VALUES (
 )
 ON CONFLICT (name) DO NOTHING;
 
--- 1b. Add contact_person_name to supplier_invitations
+-- 1b. RPC to check if the current user is a supplier (used by OrganizationContext)
+-- Uses SECURITY DEFINER to bypass RLS — this is the bootstrap query that runs
+-- before any org context is established.
+-- ==========================================================================
+CREATE OR REPLACE FUNCTION public.get_supplier_context()
+RETURNS TABLE(
+  supplier_id uuid,
+  organization_id uuid,
+  organization_name text,
+  organization_slug text
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    s.id AS supplier_id,
+    o.id AS organization_id,
+    o.name AS organization_name,
+    o.slug AS organization_slug
+  FROM public.suppliers s
+  JOIN public.organizations o ON o.id = s.organization_id
+  WHERE s.user_id = auth.uid()
+  LIMIT 1;
+END;
+$$;
+
+COMMENT ON FUNCTION public.get_supplier_context() IS
+  'Returns supplier context for the current user. SECURITY DEFINER to bypass RLS during bootstrap.';
+
+-- 1c. Add contact_person_name to supplier_invitations
 -- ==========================================================================
 DO $$
 BEGIN

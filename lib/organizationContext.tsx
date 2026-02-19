@@ -105,32 +105,24 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
       // CRITICAL: Check if user is a supplier FIRST (authoritative source).
       // Suppliers are external users — they should NOT be in organization_members.
-      // Their org access comes from the suppliers table (user_id + organization_id).
-      const { data: supplierRecord } = await supabase
-        .from('suppliers')
-        .select('id, organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle()
+      // Uses SECURITY DEFINER RPC to bypass RLS during this bootstrap check.
+      const { data: supplierCtx, error: supplierError } = await supabase
+        .rpc('get_supplier_context')
 
-      if (supplierRecord) {
-        console.log('👤 OrganizationContext: User is a supplier, fetching supplier org...')
+      if (!supplierError && supplierCtx && supplierCtx.length > 0) {
+        const ctx = supplierCtx[0]
+        console.log('👤 OrganizationContext: User is a supplier for org:', ctx.organization_name)
 
-        const { data: supplierOrg } = await supabase
-          .from('organizations')
-          .select('*')
-          .eq('id', supplierRecord.organization_id)
-          .single()
-
-        if (supplierOrg) {
-          setOrganizations([supplierOrg])
-          setCurrentOrganization(supplierOrg)
-          setUserRole('supplier')
-          console.log('✅ OrganizationContext: Supplier org set:', supplierOrg.name)
-        } else {
-          console.error('❌ OrganizationContext: Supplier org not found')
-          setOrganizations([])
+        const supplierOrg: Organization = {
+          id: ctx.organization_id,
+          name: ctx.organization_name,
+          slug: ctx.organization_slug,
+          created_at: '',
         }
+        setOrganizations([supplierOrg])
+        setCurrentOrganization(supplierOrg)
+        setUserRole('supplier')
+        console.log('✅ OrganizationContext: Supplier org set:', ctx.organization_name)
         setIsLoading(false)
         isFetchingRef.current = false
         return
@@ -243,14 +235,9 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
 
     // CRITICAL: Check if user is a supplier first (authoritative check)
-    const { data: supplierRecord } = await supabase
-      .from('suppliers')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle()
+    const { data: supplierCtx } = await supabase.rpc('get_supplier_context')
 
-    if (supplierRecord) {
+    if (supplierCtx && supplierCtx.length > 0) {
       setUserRole('supplier')
     } else {
       // Check for regular membership
