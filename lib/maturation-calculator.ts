@@ -25,15 +25,20 @@ import {
   BARREL_CO2E_DEFAULTS,
 } from './types/maturation';
 
-// ---------------------------------------------------------------------------
-// Grid emission factors (kg CO2e per kWh) — DEFRA 2025
-// ---------------------------------------------------------------------------
+import { getGridFactor, GLOBAL_AVERAGE_GRID_FACTOR } from './grid-emission-factors';
 
-const GRID_EMISSION_FACTORS: Record<EnergySource, number> = {
-  grid_electricity: 0.207,  // UK DEFRA 2025 average
-  natural_gas: 0.183,       // DEFRA 2025 natural gas
-  renewable: 0.0,           // Zero operational emissions
-  mixed: 0.120,             // Approximate 50% renewable blend
+// ---------------------------------------------------------------------------
+// Non-electricity energy emission factors (kg CO2e per kWh) — DEFRA 2025
+// ---------------------------------------------------------------------------
+// Note: grid_electricity factor is NOT stored here — it is resolved at
+// calculation time using the warehouse country code (HIGH FIX #11).
+// Using a hardcoded UK factor for a Kentucky or Speyside warehouse would
+// produce incorrect results (US grid: 0.386 vs UK: 0.207).
+
+const NON_ELECTRIC_ENERGY_FACTORS: Record<Exclude<EnergySource, 'grid_electricity'>, number> = {
+  natural_gas: 0.183,   // DEFRA 2025 natural gas (kg CO2e/kWh)
+  renewable: 0.0,       // Zero operational emissions
+  mixed: 0.120,         // Approximate 50% renewable blend — ~50% renewable
 };
 
 // Angel's share ethanol assumptions
@@ -71,8 +76,19 @@ const REUSED_BARREL_CO2E = 0.5;
 // Main calculator
 // ---------------------------------------------------------------------------
 
+/**
+ * Calculate maturation impacts.
+ *
+ * @param profile - Maturation profile from database
+ * @param warehouseCountryCode - ISO 3166-1 alpha-2 country code for the warehouse
+ *   location. Used to select the correct electricity grid emission factor.
+ *   HIGH FIX #11: Previously used facility country (wrong) or hardcoded UK (wrong).
+ *   Pass the warehouse country explicitly for accuracy. Defaults to global average
+ *   (0.490 kg CO2e/kWh) when not specified.
+ */
 export function calculateMaturationImpacts(
-  profile: MaturationProfile
+  profile: MaturationProfile,
+  warehouseCountryCode?: string | null
 ): MaturationImpactResult {
   const agingYears = profile.aging_duration_months / 12;
   const totalFillVolume = profile.fill_volume_litres * profile.number_of_barrels;
@@ -116,7 +132,33 @@ export function calculateMaturationImpacts(
     profile.number_of_barrels *
     agingYears;
 
-  const gridFactor = GRID_EMISSION_FACTORS[profile.warehouse_energy_source] ?? 0.207;
+  // HIGH FIX #11: Use the warehouse country's grid factor for electricity,
+  // not the facility's production country (which was the previous default).
+  // A Scotch whisky warehouse in Scotland (GB: 0.207) vs a Kentucky bourbon
+  // warehouse (US: 0.386) produce very different electricity emissions.
+  // For non-electric energy sources, use the fuel-specific DEFRA factors.
+  let gridFactor: number;
+  if (profile.warehouse_energy_source === 'grid_electricity') {
+    const gridFactorResult = getGridFactor(warehouseCountryCode ?? null, 'global');
+    gridFactor = gridFactorResult.factor;
+    if (gridFactorResult.isEstimated) {
+      console.warn(
+        `[calculateMaturationImpacts] Warehouse grid factor for ${profile.barrel_type}: ` +
+        `${gridFactorResult.source} (${gridFactor} kg CO2e/kWh). ` +
+        `Set warehouseCountryCode for country-specific accuracy.`
+      );
+    }
+  } else if (profile.warehouse_energy_source === 'renewable') {
+    gridFactor = NON_ELECTRIC_ENERGY_FACTORS.renewable;
+  } else if (profile.warehouse_energy_source === 'natural_gas') {
+    gridFactor = NON_ELECTRIC_ENERGY_FACTORS.natural_gas;
+  } else if (profile.warehouse_energy_source === 'mixed') {
+    gridFactor = NON_ELECTRIC_ENERGY_FACTORS.mixed;
+  } else {
+    // Unknown energy source — use global average as conservative fallback
+    gridFactor = GLOBAL_AVERAGE_GRID_FACTOR;
+    console.warn(`[calculateMaturationImpacts] Unknown warehouse_energy_source '${profile.warehouse_energy_source}', using global average grid factor.`);
+  }
   const warehouseCO2eTotal = warehouseKwhTotal * gridFactor;
   const warehouseCO2ePerLitre = outputVolume > 0 ? warehouseCO2eTotal / outputVolume : 0;
 

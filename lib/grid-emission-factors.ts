@@ -102,17 +102,24 @@ export const GLOBAL_AVERAGE_GRID_FACTOR = 0.490;
 /**
  * Resolve the electricity grid emission factor for a given country code.
  *
+ * HIGH FIX #8: The global average fallback (0.490 kg CO2e/kWh) is significantly
+ * higher than many national grids (e.g. FR 0.052, SE 0.013, NO 0.017) and lower
+ * than some (e.g. IN 0.708, ZA 0.928). Using it silently for unknown countries
+ * can both over- and under-report facility emissions. The returned object now
+ * always includes `isEstimated: true` and a clear `dataGapWarning` field when
+ * a fallback is used, so callers can surface this to the user.
+ *
  * @param countryCode - ISO 3166-1 alpha-2 code (e.g. 'GB', 'DE', 'US')
  * @param fallback - What to fall back to if country not found:
  *   'uk'     → UK DEFRA factor (0.207) — previous hardcoded behaviour
  *   'eu'     → EU-27 average (0.255)
  *   'global' → Global average (0.490) — most conservative for unknown markets
- * @returns kg CO2e per kWh
+ * @returns kg CO2e per kWh with provenance metadata
  */
 export function getGridFactor(
   countryCode: string | null | undefined,
   fallback: 'uk' | 'eu' | 'global' = 'global'
-): { factor: number; source: string; isEstimated: boolean } {
+): { factor: number; source: string; isEstimated: boolean; dataGapWarning?: string } {
   if (countryCode) {
     const normalized = countryCode.toUpperCase().trim();
     const factor = GRID_FACTORS_BY_COUNTRY[normalized];
@@ -123,16 +130,31 @@ export function getGridFactor(
         isEstimated: false,
       };
     }
+    // Country code provided but not in lookup table — warn
+    const warning = `Country code '${normalized}' is not in the grid factor lookup table. ` +
+      `Using ${fallback === 'global' ? `global average (${GLOBAL_AVERAGE_GRID_FACTOR})` : fallback === 'eu' ? `EU average (${EU_AVERAGE_GRID_FACTOR})` : `UK factor (0.207)`}. ` +
+      `Add '${normalized}' to lib/grid-emission-factors.ts for more accurate results.`;
+    switch (fallback) {
+      case 'uk':
+        return { factor: 0.207, source: `DEFRA 2025 UK — fallback (${normalized} not in lookup)`, isEstimated: true, dataGapWarning: warning };
+      case 'eu':
+        return { factor: EU_AVERAGE_GRID_FACTOR, source: `EEA 2022 EU-27 average — fallback (${normalized} not in lookup)`, isEstimated: true, dataGapWarning: warning };
+      case 'global':
+      default:
+        return { factor: GLOBAL_AVERAGE_GRID_FACTOR, source: `IEA 2023 global average — fallback (${normalized} not in lookup)`, isEstimated: true, dataGapWarning: warning };
+    }
   }
 
-  // Fallback
+  // No country code provided at all
+  const noCountryWarning = `No facility country code was set. Using ${fallback === 'global' ? `global average (${GLOBAL_AVERAGE_GRID_FACTOR} kg CO2e/kWh)` : fallback === 'eu' ? `EU average (${EU_AVERAGE_GRID_FACTOR} kg CO2e/kWh)` : `UK factor (0.207 kg CO2e/kWh)`}. ` +
+    `Set location_country_code on the facility record for country-specific accuracy.`;
   switch (fallback) {
     case 'uk':
-      return { factor: 0.207, source: 'DEFRA 2025 UK — fallback (country not specified)', isEstimated: true };
+      return { factor: 0.207, source: 'DEFRA 2025 UK — fallback (country not specified)', isEstimated: true, dataGapWarning: noCountryWarning };
     case 'eu':
-      return { factor: EU_AVERAGE_GRID_FACTOR, source: 'EEA 2022 EU-27 average — fallback (country not in lookup)', isEstimated: true };
+      return { factor: EU_AVERAGE_GRID_FACTOR, source: 'EEA 2022 EU-27 average — fallback (country not specified)', isEstimated: true, dataGapWarning: noCountryWarning };
     case 'global':
     default:
-      return { factor: GLOBAL_AVERAGE_GRID_FACTOR, source: 'IEA 2023 global average — fallback (country unknown)', isEstimated: true };
+      return { factor: GLOBAL_AVERAGE_GRID_FACTOR, source: 'IEA 2023 global average — fallback (country unknown)', isEstimated: true, dataGapWarning: noCountryWarning };
   }
 }

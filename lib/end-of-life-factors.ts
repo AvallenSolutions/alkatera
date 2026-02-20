@@ -6,10 +6,24 @@
  *
  * Sources:
  * - DEFRA 2024: UK emissions factors for waste disposal
- * - Ecoinvent 3.12: Material recycling credits
- * - EU Packaging Waste Directive: Regional recycling rates
- * - EPA 2024: US waste management statistics
+ *   https://www.gov.uk/government/collections/government-conversion-factors-for-greenhouse-gas-reporting
+ * - Ecoinvent 3.12: Material recycling credits (avoided burden method)
+ *   https://ecoinvent.org/
+ * - EU Packaging Waste Directive (94/62/EC as amended): Regional recycling rates
+ *   https://ec.europa.eu/environment/topics/waste-and-recycling/packaging-waste_en
+ * - EPA 2024: US waste management statistics — Advancing Sustainable Materials Management
+ *   https://www.epa.gov/facts-and-figures-about-materials-waste-and-recycling
+ *
+ * Data version: 2024 (review annually — recycling rates change significantly year-to-year)
+ * Next review due: January 2026
+ *
+ * MEDIUM FIX #16: Added data version tracking so it's clear when these factors
+ * were last validated. Recycling rates and EoL emission factors should be
+ * reviewed annually as EU/UK/US recycling infrastructure changes.
  */
+
+/** Year these EoL factors were last validated against primary sources */
+export const EOL_DATA_YEAR = 2024;
 
 // ============================================================================
 // TYPES

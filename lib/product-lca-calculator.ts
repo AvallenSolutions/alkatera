@@ -46,6 +46,58 @@ export interface CalculatePCFResult {
 export type CalculateLCAResult = CalculatePCFResult;
 
 /**
+ * Build a valid ISO 14044 / ISO 14067 functional unit string.
+ *
+ * MEDIUM FIX #21: The functional unit must be unambiguous (ISO 14044 §4.2.3.2).
+ * It defines BOTH the quantitative reference (e.g. "1") AND the reference flow
+ * (e.g. "750 mL bottle of Whisky Brand").
+ *
+ * Rules:
+ *   1. If the caller explicitly passes a functional unit string, use it as-is
+ *      (caller has provided the most specific description).
+ *   2. Otherwise, build it from product.unit_size_value + unit_size_unit + product.name:
+ *      e.g. "1 x 700 mL bottle of Knockando 12-Year Single Malt Whisky"
+ *   3. Fall back to "1 unit of <name>" if size data is absent.
+ *
+ * The resulting string must match the quantity used in impact_climate fields
+ * (i.e. impacts must be per-bottle, not per-litre, when the FU is "1 x 750 mL bottle").
+ * This is verified separately in the aggregation step.
+ */
+function buildFunctionalUnit(
+  explicitFU: string | undefined,
+  product: { name: string; unit?: string | null; unit_size_value?: number | string | null; unit_size_unit?: string | null }
+): string {
+  if (explicitFU && explicitFU.trim().length > 0) {
+    return explicitFU.trim();
+  }
+
+  const sizeValue = product.unit_size_value ? Number(product.unit_size_value) : null;
+  const sizeUnit = product.unit_size_unit || null;
+
+  if (sizeValue && sizeValue > 0 && sizeUnit) {
+    // Format: "1 x 700 mL bottle of Product Name"
+    // Omit "unit" if unit_size_unit is already descriptive (ml, L, g, kg, cl)
+    const sizeLabel = sizeUnit.toLowerCase() === 'l'
+      ? `${sizeValue} L`
+      : sizeUnit.toLowerCase() === 'ml'
+      ? `${sizeValue} mL`
+      : sizeUnit.toLowerCase() === 'cl'
+      ? `${sizeValue} cL`
+      : sizeUnit.toLowerCase() === 'kg'
+      ? `${sizeValue} kg`
+      : sizeUnit.toLowerCase() === 'g'
+      ? `${sizeValue} g`
+      : `${sizeValue} ${sizeUnit}`;
+
+    return `1 × ${sizeLabel} ${product.unit && !['ml', 'l', 'cl', 'kg', 'g'].includes(product.unit.toLowerCase()) ? product.unit + ' ' : ''}of ${product.name}`;
+  }
+
+  // Final fallback — honest about what we don't know
+  const unitLabel = product.unit || 'unit';
+  return `1 ${unitLabel} of ${product.name}`;
+}
+
+/**
  * Calculate Product Carbon Footprint for a product
  * Uses GHG Protocol Product Standard and ISO 14067 methodology
  */
@@ -148,7 +200,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         product_name: product.name,
         product_description: product.product_description,
         product_image_url: product.product_image_url,
-        functional_unit: functionalUnit || `1 ${product.unit || 'unit'} of ${product.name}`,
+        functional_unit: buildFunctionalUnit(functionalUnit, product),
         system_boundary: systemBoundary || 'cradle-to-gate',
         reference_year: referenceYear || new Date().getFullYear(),
         lca_version: '1.0',
@@ -198,6 +250,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           ` (${facilityCountryCode ?? 'unknown'}): ${gridFactorResult.factor} kg CO2e/kWh` +
           ` — ${gridFactorResult.source}${gridFactorResult.isEstimated ? ' [ESTIMATED]' : ''}`
         );
+        if (gridFactorResult.dataGapWarning) {
+          console.warn(`[calculateProductCarbonFootprint] ⚠️ DATA GAP — ${allocation.facilityName}: ${gridFactorResult.dataGapWarning}`);
+        }
 
         const { data: utilityEntries, error: utilityError } = await supabase
           .from('utility_data_entries')
@@ -331,7 +386,24 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: no water data found in either table`);
         }
 
-        const attributionRatio = allocation.productionVolume / allocation.facilityTotalProduction;
+        // CRITICAL FIX: Attribution ratio must be in [0, 1].
+        // productionVolume is the number of units of THIS product made at the facility.
+        // facilityTotalProduction is the total throughput across ALL products.
+        // Both must be in the SAME unit (e.g. litres) before dividing.
+        // An unchecked ratio > 1 means this product is allocated MORE emissions than
+        // the entire facility — an obvious error. We clamp to [0, 1] and warn loudly.
+        const rawAttributionRatio = allocation.facilityTotalProduction > 0
+          ? allocation.productionVolume / allocation.facilityTotalProduction
+          : 0;
+        if (rawAttributionRatio > 1) {
+          console.warn(
+            `[calculateProductCarbonFootprint] ⚠️ ATTRIBUTION RATIO > 1 for ${allocation.facilityName}: ` +
+            `productionVolume=${allocation.productionVolume} > facilityTotalProduction=${allocation.facilityTotalProduction}. ` +
+            `This means more product was attributed to this facility than its total output, which is physically impossible. ` +
+            `Clamping ratio to 1.0. Please verify that productionVolume and facilityTotalProduction use the same unit.`
+          );
+        }
+        const attributionRatio = Math.min(1, Math.max(0, rawAttributionRatio));
         const allocatedEmissions = facilityTotalEmissions * attributionRatio;
         const scope1Emissions = scope1Raw * attributionRatio;
         const scope2Emissions = scope2Raw * attributionRatio;
@@ -574,13 +646,45 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // Secondary/shipment/tertiary packaging serves multiple product units.
         // Divide all impacts by units_per_group to get the per-unit share.
         // Primary packaging (container/label/closure) always has units_per_group=1 (no-op).
-        const unitsPerGroup = (
+        //
+        // CRITICAL FIX #4: Validate units_per_group before dividing.
+        // A zero or NaN value would produce Infinity or NaN in all downstream
+        // impact calculations, silently corrupting the entire carbon footprint.
+        // We guard against this and warn with a recoverable fallback of 1.
+        //
+        // CRITICAL FIX #6: Secondary packaging without units_per_group used to
+        // silently default to 1, meaning the full packaging impact was attributed
+        // to each unit rather than being shared — a systematic over-count.
+        // Now we warn explicitly so the data entry issue is surfaced.
+        const rawUnitsPerGroup = (material as any).units_per_group;
+        const parsedUnitsPerGroup = Number(rawUnitsPerGroup);
+
+        const isSharedPackaging = (
           material.material_type === 'packaging' &&
           material.packaging_category &&
-          ['secondary', 'shipment', 'tertiary'].includes(material.packaging_category) &&
-          (material as any).units_per_group &&
-          Number((material as any).units_per_group) > 1
-        ) ? Number((material as any).units_per_group) : 1;
+          ['secondary', 'shipment', 'tertiary'].includes(material.packaging_category)
+        );
+
+        let unitsPerGroup = 1;
+        if (isSharedPackaging) {
+          if (!rawUnitsPerGroup || isNaN(parsedUnitsPerGroup) || parsedUnitsPerGroup <= 0) {
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠️ PACKAGING ALLOCATION: "${material.material_name}" ` +
+              `(${material.packaging_category}) is shared packaging but has no valid units_per_group ` +
+              `(value: ${rawUnitsPerGroup}). Defaulting to 1 (full impact per unit — likely an over-count). ` +
+              `Please set units_per_group to the number of product units in each ${material.packaging_category} pack.`
+            );
+            unitsPerGroup = 1;
+          } else if (parsedUnitsPerGroup < 1) {
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠️ PACKAGING ALLOCATION: "${material.material_name}" ` +
+              `units_per_group=${parsedUnitsPerGroup} is less than 1 (invalid). Clamping to 1.`
+            );
+            unitsPerGroup = 1;
+          } else {
+            unitsPerGroup = parsedUnitsPerGroup;
+          }
+        }
 
         if (unitsPerGroup > 1) {
           console.log(`[calculateProductCarbonFootprint] Applying packaging allocation: ÷${unitsPerGroup} units for ${material.material_name}`);
@@ -699,15 +803,59 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     // 5b. Check for maturation profile and calculate maturation impacts
+    //
+    // LOW FIX #24: Guard against maturation profile being present for product types
+    // that don't barrel-age (beer, cider, soft drinks). Applying barrel CO2e, angel's
+    // share VOC, and warehouse energy to a beer product would produce nonsensical results.
+    //
+    // Maturation is only valid for aged spirits and wines:
+    //   Spirits  — whisky, rum, brandy, calvados, cognac, armagnac, etc.
+    //   Wine     — barrel-aged wine (Chardonnay, Rioja, Barolo, etc.)
+    //   RTD      — excluded (RTDs are not barrel-aged)
+    //   Beer/Cider — excluded (beer is not barrel-aged; barrel-finishing is rare)
+    //
+    // product.product_type is drawn from PRODUCT_TYPE_OPTIONS in industry-benchmarks.ts:
+    //   'Spirits', 'Beer & Cider', 'Wine', 'Ready-to-Drink & Cocktails', 'Non-Alcoholic'
+    const MATURATION_ELIGIBLE_TYPES = new Set(['spirits', 'wine']);
+    const productTypeLower = (product.product_type || '').toLowerCase();
+    const isMaturationEligible =
+      MATURATION_ELIGIBLE_TYPES.has(productTypeLower) ||
+      productTypeLower.includes('spirit') ||
+      productTypeLower.includes('whisky') ||
+      productTypeLower.includes('whiskey') ||
+      productTypeLower.includes('rum') ||
+      productTypeLower.includes('brandy') ||
+      productTypeLower.includes('cognac') ||
+      productTypeLower.includes('calvados') ||
+      productTypeLower.includes('armagnac') ||
+      productTypeLower.includes('wine') ||
+      // Allow empty/null product_type (don't block when type is not set)
+      !product.product_type;
+
     const { data: maturationProfile } = await supabase
       .from('maturation_profiles')
       .select('*')
       .eq('product_id', parseInt(productId))
       .maybeSingle();
 
-    if (maturationProfile) {
+    if (maturationProfile && !isMaturationEligible) {
+      console.warn(
+        `[calculateProductCarbonFootprint] ⚠️ MATURATION TYPE MISMATCH: Product "${product.name}" has product_type="${product.product_type}" which is not typically barrel-aged. ` +
+        `Maturation profile found (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months) will be SKIPPED to prevent erroneous impacts. ` +
+        `If this product is genuinely barrel-aged, update the product type to "Spirits" or "Wine".`
+      );
+    }
+
+    if (maturationProfile && isMaturationEligible) {
       console.log(`[calculateProductCarbonFootprint] Processing maturation profile (${maturationProfile.barrel_type}, ${maturationProfile.aging_duration_months} months)...`);
-      const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile);
+      // HIGH FIX #11: Pass the primary facility's country code so the maturation
+    // calculator can use the warehouse's grid factor rather than a hardcoded UK value.
+    // The primary facility (first in facilityAllocations) is the best proxy for the
+    // warehouse location when a dedicated warehouse_country_code field doesn't exist yet.
+    const warehouseCountryCode = params.facilityAllocations?.[0]
+      ? (await supabase.from('facilities').select('location_country_code').eq('id', params.facilityAllocations[0].facilityId).single()).data?.location_country_code ?? null
+      : null;
+    const matResult = calculateMaturationImpacts(maturationProfile as MaturationProfile, warehouseCountryCode);
 
       // --- Per-bottle allocation ---
       // Regular materials are already per-functional-unit (per bottle). Maturation
@@ -975,6 +1123,52 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     }
 
     console.log(`[calculateProductCarbonFootprint] ✓ Calculation complete for LCA: ${lca.id}`);
+
+    // 8b. Write to immutable calculation audit log (LOW FIX #23).
+    //
+    // ISO 14067 §6.5.6 and GHG Protocol Product Standard Annex B require that
+    // calculation parameters are retained to enable third-party verification.
+    // The calculation_logs table is append-only (UPDATE/DELETE are blocked by DB triggers).
+    //
+    // factor_ids_used: ideally a list of staging_emission_factor UUIDs consumed.
+    // For now we pass a sentinel placeholder UUID because collecting all factor IDs
+    // during the waterfall resolution would require significant refactoring of
+    // resolveImpactFactors. This audit entry still records the key calculation metadata.
+    // TODO: thread factor UUIDs through resolveImpactFactors → lcaMaterialsWithImpacts
+    //       and collect them here for full traceability.
+    try {
+      const SENTINEL_FACTOR_ID = '00000000-0000-0000-0000-000000000001'; // placeholder until full tracing
+      const { error: auditErr } = await supabase
+        .from('calculation_logs')
+        .insert({
+          organization_id: product.organization_id,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          calculation_id: lca.id,
+          input_data: {
+            product_id: productId,
+            product_name: product.name,
+            system_boundary: systemBoundary || 'cradle-to-gate',
+            reference_year: referenceYear || new Date().getFullYear(),
+            materials_count: lcaMaterialsWithImpacts.length,
+            facility_allocations_count: facilityAllocations?.length || 0,
+          },
+          output_value: aggregationResult.total_carbon_footprint,
+          output_unit: 'kg CO2e per functional unit',
+          methodology_version: 'ISO 14067:2018 / GHG Protocol Product v2.1.0',
+          factor_ids_used: [SENTINEL_FACTOR_ID],
+          data_quality_tier: aggregationResult.impacts?.data_quality?.score >= 80 ? 1
+            : aggregationResult.impacts?.data_quality?.score >= 50 ? 2 : 3,
+          multiplication_proof: `${aggregationResult.total_carbon_footprint.toFixed(6)} kg CO2e = sum of ${lcaMaterialsWithImpacts.length} materials`,
+        });
+      if (auditErr) {
+        // Non-fatal: audit log failure should never abort a successful calculation
+        console.warn(`[calculateProductCarbonFootprint] ⚠️ Audit log write failed (non-fatal): ${auditErr.message}`);
+      } else {
+        console.log(`[calculateProductCarbonFootprint] ✓ Audit log written for LCA ${lca.id}`);
+      }
+    } catch (auditWriteErr: any) {
+      console.warn(`[calculateProductCarbonFootprint] ⚠️ Audit log write exception (non-fatal): ${auditWriteErr.message}`);
+    }
 
     // 9. Auto-generate Life Cycle Interpretation (ISO 14044 Section 4.5)
     try {

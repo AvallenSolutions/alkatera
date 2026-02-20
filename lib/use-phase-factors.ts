@@ -5,12 +5,15 @@
  * Includes refrigeration (domestic + retail) and carbonation CO2 release.
  *
  * Sources:
- * - DEFRA 2024: UK Grid electricity
+ * - DEFRA 2025: UK Grid electricity (default fallback)
+ * - IEA 2023: Country-specific grid factors (via lib/grid-emission-factors.ts)
  * - Estimated from typical refrigerator energy consumption
  * - IPCC: Direct CO2 release from dissolved gas
  *
  * Reuses factors from lib/calculations/scope3-categories.ts
  */
+
+import { getGridFactor } from './grid-emission-factors';
 
 // ============================================================================
 // TYPES
@@ -22,6 +25,14 @@ export interface UsePhaseConfig {
   retailRefrigerationSplit: number; // 0-1 (default 0.5 = 50% retail)
   isCarbonated: boolean;
   carbonationType?: 'beer' | 'sparkling_wine' | 'soft_drink';
+  /**
+   * ISO 3166-1 alpha-2 country code for the consumer market.
+   * Used to select the correct electricity grid emission factor for refrigeration.
+   * When null/undefined, falls back to global average (0.490 kg CO2e/kWh).
+   * Pass the product's primary market country for best accuracy.
+   * Example: 'GB' = UK, 'DE' = Germany, 'US' = USA, 'FR' = France.
+   */
+  consumerCountryCode?: string | null;
 }
 
 export interface UsePhaseResult {
@@ -40,37 +51,48 @@ export interface UsePhaseResult {
 // ============================================================================
 
 /**
- * Refrigeration emission factors (kg CO2e per litre per day)
+ * Refrigeration energy consumption factors (kWh per litre per day)
+ *
+ * These are ENERGY values (not CO2e). They are multiplied by the consumer
+ * country's electricity grid factor at calculation time, so the emissions
+ * correctly reflect where the product is consumed rather than always using
+ * the UK grid factor regardless of market.
  *
  * Derivation:
  *   Domestic fridge: Typical A-rated household fridge (180L) consumes ~130 kWh/year
  *   = 0.356 kWh/day. Usable volume ~100L (accounting for air gaps and non-beverage items).
  *   Energy per litre per day = 0.356 / 100 = 0.00356 kWh/L/day.
- *   CO2e = 0.00356 × 0.207 (UK DEFRA 2025 grid) = 0.000737 kg CO2e/L/day.
- *   Rounded to 0.000686 (≈ 0.0048 / 7) to match prior literature estimate.
  *
  *   Retail display chiller: Commercial open-front chiller units consume ~2–3× more
  *   energy per litre than domestic fridges due to open-front design and higher cycling.
- *   Estimate: ~0.001314 kg CO2e/L/day (≈ 0.0092 / 7).
+ *   Estimate: ~0.00636 kWh/L/day (≈ 0.00356 × 1.79).
  *
  * Sources:
- *   - DEFRA 2025 UK grid factor (0.207 kg CO2e/kWh) applied to energy consumption
  *   - Energy consumption basis: Energy Saving Trust (2023) "Household energy use in UK"
  *     https://energysavingtrust.org.uk/
  *   - Retail chiller energy: Carbon Trust (2012) "Refrigeration in supermarkets"
  *     https://www.carbontrust.com/resources/refrigeration-in-supermarkets
+ *   - Grid emission factor applied at calculation time from lib/grid-emission-factors.ts
+ *     (IEA 2023 / DEFRA 2025). Default fallback: global average 0.490 kg CO2e/kWh.
  *
  * Uncertainty: ±30% — fridge efficiency, fill level, ambient temperature, grid mix vary.
- * For products made/sold outside UK, the grid factor embedded here (UK 0.207) should
- * ideally be replaced with the consumer country's grid factor (future enhancement).
  */
-const REFRIGERATION_FACTORS = {
-  /** Domestic fridge: 0.000686 kg CO2e per litre per day (= 0.0048 kg/L/7 days) */
-  domestic_per_litre_per_day: 0.0048 / 7,
-  /** Retail open-front chiller: 0.001314 kg CO2e per litre per day (= 0.0092 kg/L/7 days) */
-  retail_per_litre_per_day: 0.0092 / 7,
-  source: 'Derived from Energy Saving Trust (2023) energy data × DEFRA 2025 UK grid factor',
+const REFRIGERATION_ENERGY = {
+  /** Domestic fridge: ~0.00356 kWh per litre per day */
+  domestic_kwh_per_litre_per_day: 0.00356,
+  /** Retail open-front chiller: ~0.00636 kWh per litre per day (≈ domestic × 1.79) */
+  retail_kwh_per_litre_per_day: 0.00636,
+  source: 'Energy Saving Trust (2023); Carbon Trust (2012). Grid factor applied per consumer country.',
 };
+
+/**
+ * Default electricity grid factor for refrigeration when consumer country is unknown.
+ * Uses global average (IEA 2023) — conservative choice that avoids underestimating
+ * the use-phase impact of products sold in high-carbon-grid markets.
+ *
+ * Source: IEA (2023) World Energy Outlook — global average grid factor.
+ */
+const DEFAULT_REFRIGERATION_GRID_FACTOR = 0.490; // kg CO2e/kWh, IEA 2023 global average
 
 /**
  * Carbonation CO2 release factors (kg CO2 per container)
@@ -184,9 +206,15 @@ export function getDefaultUsePhaseConfig(productCategory: string): UsePhaseConfi
 // ============================================================================
 
 /**
- * Calculate use-phase emissions for a product
+ * Calculate use-phase emissions for a product.
  *
- * @param config - Use-phase configuration
+ * Refrigeration emissions are calculated using the consumer country's
+ * electricity grid factor (via lib/grid-emission-factors.ts), or the global
+ * average (0.490 kg CO2e/kWh) when the country is not specified.
+ * This corrects the previous behaviour of always using the UK grid factor
+ * (0.207 kg CO2e/kWh) regardless of where the product is sold.
+ *
+ * @param config - Use-phase configuration (include consumerCountryCode for best accuracy)
  * @param volumeLitres - Product volume in litres (functional unit)
  * @returns Emissions breakdown in kg CO2e
  */
@@ -204,10 +232,24 @@ export function calculateUsePhaseEmissions(
     const retailSplit = config.retailRefrigerationSplit ?? 0.5;
     const domesticSplit = 1 - retailSplit;
 
-    domesticRefrigeration =
-      volumeLitres * REFRIGERATION_FACTORS.domestic_per_litre_per_day * days * domesticSplit;
-    retailRefrigeration =
-      volumeLitres * REFRIGERATION_FACTORS.retail_per_litre_per_day * days * retailSplit;
+    // Resolve the consumer country grid factor.
+    // CRITICAL FIX: Previously this used hardcoded UK factor (0.207) regardless
+    // of where the product is sold. Now it uses the consumer country's factor,
+    // falling back to the global average (0.490) when country is unknown.
+    // This can be up to 4× different between low-carbon grids (FR: 0.052) and
+    // high-carbon grids (IN: 0.708), so country matters significantly.
+    const gridFactorResult = config.consumerCountryCode
+      ? getGridFactor(config.consumerCountryCode, 'global')
+      : { factor: DEFAULT_REFRIGERATION_GRID_FACTOR, source: 'IEA 2023 global average (consumer country not specified)', isEstimated: true };
+
+    const gridFactor = gridFactorResult.factor;
+
+    // Convert energy consumption to CO2e using country-specific grid factor
+    const domesticCO2ePerLitrePerDay = REFRIGERATION_ENERGY.domestic_kwh_per_litre_per_day * gridFactor;
+    const retailCO2ePerLitrePerDay = REFRIGERATION_ENERGY.retail_kwh_per_litre_per_day * gridFactor;
+
+    domesticRefrigeration = volumeLitres * domesticCO2ePerLitrePerDay * days * domesticSplit;
+    retailRefrigeration = volumeLitres * retailCO2ePerLitrePerDay * days * retailSplit;
   }
 
   // Carbonation CO2 release

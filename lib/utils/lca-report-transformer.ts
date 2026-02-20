@@ -285,7 +285,14 @@ export function transformLCADataForReport(
   const scope3Pct = totalScopes > 0 ? (scope3 / totalScopes) * 100 : 100;
 
   const materials = lca.product_lca_materials || lca.materials || [];
-  const dqScore = dataQuality.score || 70;
+  // MEDIUM FIX #22: Default DQI score changed from 70 → 40 for transparency.
+  // A score of 70 implied "Good/Fair" quality for assessments with no data quality
+  // information — misleadingly optimistic and a potential ISO 14044 §4.2.3.6 violation.
+  // 40% = "Poor" is the correct honest default when the score is genuinely unknown.
+  // This score is shown in the report's executive summary and data quality section.
+  // Note: the aggregator already computes a real score (product-lca-aggregator.ts).
+  // This 40 is only the last-resort transformer fallback when aggregated_impacts is absent.
+  const dqScore = dataQuality.score ?? 40;
   const dqRating = dataQuality.rating || (dqScore >= 80 ? 'Good' : dqScore >= 50 ? 'Fair' : 'Poor');
 
   const chartBreakdown = [
@@ -301,18 +308,18 @@ export function transformLCADataForReport(
   const packagingMaterials = materials.filter((m: any) =>
     m.category_type === 'packaging' || m.material_type === 'packaging'
   );
+  // LOW FIX #25: Remove hardcoded fallback waste stream.
+  // The old fallback invented specific material quantities (0.253 kg glass, etc.) that
+  // had no relationship to the actual product being assessed — a clear ISO 14044
+  // completeness violation. If no packaging materials exist, show an empty list rather
+  // than fabricating plausible-looking but incorrect data.
   const wasteStream = packagingMaterials.length > 0
     ? packagingMaterials.map((m: any) => ({
         label: m.material_name || 'Packaging material',
         value: `${(m.quantity || 0).toFixed(3)} kg`,
         recycled: (m.recyclability_score || 0) > 50 || m.is_reusable || m.is_compostable,
       }))
-    : [
-        { label: "Glass Bottle", value: "0.253 kg", recycled: true },
-        { label: "Label (Paper)", value: "0.063 kg", recycled: true },
-        { label: "Cap (Aluminium)", value: "0.035 kg", recycled: true },
-        { label: "Process Waste", value: "0.099 kg", recycled: false }
-      ];
+    : []; // Empty rather than fabricated — accurate reflects no packaging data available
 
   // Compute recycling rate — prefer aggregated circularity_percentage from the LCA calculation,
   // fall back to computing from material-level recycled_content_percentage
@@ -617,13 +624,19 @@ export function transformLCADataForReport(
   });
 
   // Assumptions and limitations
+  // LOW FIX #26: Remove hardcoded "UK grid electricity" assumption.
+  // The old default falsely claimed UK grid was used for all factory operations, but
+  // since HIGH FIX #8 the system uses country-specific IEA 2023 grid factors.
+  // Documenting the wrong methodology in the report is an ISO 14044 §4.1 (goal & scope)
+  // accuracy violation. The fallback assumptions are now accurate for international use.
   const assumptionsLimitations = lca.assumptions_limitations && Array.isArray(lca.assumptions_limitations)
     ? lca.assumptions_limitations
     : [
-        { type: "Assumption", text: "Transport distances estimated using supplier origin countries and standard freight routes" },
-        { type: "Assumption", text: "UK grid electricity mix used for factory operations where primary energy data unavailable" },
-        { type: "Limitation", text: "End-of-life scenarios based on UK average recycling rates; actual disposal may vary by region" },
-        { type: "Limitation", text: "Water scarcity factors based on watershed-level data; local conditions may differ" },
+        { type: "Assumption", text: "Transport distances estimated using supplier origin countries and standard freight routes (DEFRA 2025 freight emission factors)." },
+        { type: "Assumption", text: "Country-specific electricity grid factors applied where facility location is known (IEA 2023 data via lib/grid-emission-factors.ts); global average (0.490 kg CO\u2082e/kWh) used when country is unspecified." },
+        { type: "Limitation", text: "End-of-life scenarios based on regional average recycling rates; actual disposal rates may vary by geography and waste management infrastructure." },
+        { type: "Limitation", text: "Water scarcity characterisation factors based on AWARE v1.3 watershed-level averages; local watershed conditions may differ from national averages." },
+        { type: "Limitation", text: "Secondary LCI data (ecoinvent 3.12, AGRIBALYSE 3.2) represents average technology and conditions; site-specific primary data would improve accuracy." },
       ];
 
   return {

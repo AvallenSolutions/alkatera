@@ -79,6 +79,14 @@ export interface AggregationResult {
   materials_count: number;
   production_sites_count: number;
   error?: string;
+  /**
+   * Non-fatal data quality warnings surfaced during aggregation.
+   * These do not abort the calculation but are stored in aggregated_impacts
+   * so they appear in the LCA report and can be acted on by the user.
+   * Example: "Water data found in both utility_data_entries and
+   * facility_activity_entries — possible double-count, using activity entries."
+   */
+  warnings?: string[];
 }
 
 /**
@@ -99,6 +107,9 @@ export async function aggregateProductImpacts(
 ): Promise<AggregationResult> {
   console.log(`[aggregateProductImpacts] Processing PCF: ${productCarbonFootprintId}`);
 
+  // Collect non-fatal warnings to surface in the report
+  const calculationWarnings: string[] = [];
+
   // 1. Fetch materials
   const { data: materials, error: materialsError } = await supabase
     .from('product_carbon_footprint_materials')
@@ -116,14 +127,21 @@ export async function aggregateProductImpacts(
 
   console.log(`[aggregateProductImpacts] Found ${materials.length} materials`);
 
-  // 1b. Calculate overall DQI score as impact-weighted average of material confidence scores
+  // 1b. Calculate overall DQI score as impact-weighted average of material confidence scores.
+  //
+  // HIGH FIX #10: Default confidence for materials with no score changed from 75 → 40.
+  // 75% implied "Fair" quality for materials with completely unknown provenance,
+  // which was misleadingly optimistic. 40% reflects "Poor" quality for unknown data.
+  // ISO 14044 §4.2.3.6 requires explicit data quality assessment — unknowns should not
+  // default to passable quality scores.
+  const MISSING_CONFIDENCE_DEFAULT = 40; // 40% = "Poor" for materials with no quality score
   const totalAbsImpact = materials.reduce((sum: number, m: any) => sum + Math.abs(m.impact_climate || 0), 0);
   const weightedDqi = totalAbsImpact > 0
     ? materials.reduce((sum: number, m: any) => {
         const weight = Math.abs(m.impact_climate || 0) / totalAbsImpact;
-        return sum + (m.confidence_score || 50) * weight;
+        return sum + (m.confidence_score ?? MISSING_CONFIDENCE_DEFAULT) * weight;
       }, 0)
-    : materials.reduce((sum: number, m: any) => sum + (m.confidence_score || 50), 0) / materials.length;
+    : materials.reduce((sum: number, m: any) => sum + (m.confidence_score ?? MISSING_CONFIDENCE_DEFAULT), 0) / materials.length;
   const dqiScore = Math.round(weightedDqi);
   console.log(`[aggregateProductImpacts] DQI Score: ${dqiScore}% (weighted average of ${materials.length} material confidence scores)`);
 
@@ -142,6 +160,20 @@ export async function aggregateProductImpacts(
   // Resolve effective system boundary (param > PCF record > default)
   const effectiveBoundary = systemBoundary || lcaData?.system_boundary || 'cradle-to-gate';
   console.log(`[aggregateProductImpacts] System boundary: ${effectiveBoundary}`);
+
+  // HIGH FIX #9: Validate that required configs are present for wider boundaries.
+  // When use-phase or EoL is in scope but config is missing, we proceed (don't abort)
+  // but warn loudly so it shows up in the report. Silently skipping would under-report.
+  if (isStageIncluded(effectiveBoundary, 'use_phase') && !usePhaseConfig) {
+    const msg = `[aggregateProductImpacts] ⚠️ BOUNDARY VALIDATION: System boundary is '${effectiveBoundary}' which includes the use phase, but no usePhaseConfig was provided. Use-phase emissions will be ZERO. Complete the Use Phase step in the LCA wizard to configure refrigeration and carbonation assumptions.`;
+    console.warn(msg);
+    calculationWarnings.push('Use-phase emissions are missing: boundary includes use phase but no configuration was provided. Run the LCA wizard and complete the Use Phase step.');
+  }
+  if (isStageIncluded(effectiveBoundary, 'end_of_life') && !eolConfig) {
+    const msg = `[aggregateProductImpacts] ⚠️ BOUNDARY VALIDATION: System boundary is '${effectiveBoundary}' which includes end-of-life, but no eolConfig was provided. End-of-life emissions will be ZERO. Complete the End of Life step in the LCA wizard.`;
+    console.warn(msg);
+    calculationWarnings.push('End-of-life emissions are missing: boundary includes end-of-life but no configuration was provided. Run the LCA wizard and complete the End of Life step.');
+  }
 
   // 7. Aggregate material impacts
   let scope1Emissions = 0;
@@ -281,9 +313,12 @@ export async function aggregateProductImpacts(
       console.log(`[aggregateProductImpacts] ${fe.facilityName}: total allocated=${fe.allocatedEmissions.toFixed(4)} kg / ${units} units = ${perUnitEmissions.toFixed(6)} kg/unit`);
 
       if (fe.isContractManufacturer) {
-        // Contract manufacturers → Scope 3
+        // Contract manufacturers → Scope 3 Category 1: Purchased Goods and Services
+        // Per GHG Protocol Product Standard §6.3.3: processing emissions from facilities
+        // not under operational control are classified as upstream Scope 3 Category 1.
+        // MEDIUM FIX #20: Documenting this explicitly so reports are methodology-clear.
         scope3Emissions += perUnitEmissions;
-        console.log(`[aggregateProductImpacts] CONTRACT MFG ${fe.facilityName}: ${perUnitEmissions.toFixed(6)} kg CO2e/unit -> Scope 3`);
+        console.log(`[aggregateProductImpacts] CONTRACT MFG ${fe.facilityName}: ${perUnitEmissions.toFixed(6)} kg CO2e/unit -> Scope 3 Cat.1 (Purchased Goods/Services)`);
       } else {
         // Owned facilities → Scope 1 & 2
         scope1Emissions += perUnitScope1;
@@ -357,15 +392,20 @@ export async function aggregateProductImpacts(
       scope3Emissions += eolResult.net;
       totalClimate += eolResult.net;
 
-      // Recycling credits reduce fossil emissions; gross emissions add to fossil
-      if (eolResult.net >= 0) {
-        totalClimateFossil += eolResult.net;
-        totalCO2Fossil += eolResult.net;
-      } else {
-        // Net negative — credit exceeds gross; reduce fossil CO2
-        totalClimateFossil += eolResult.net;
-        totalCO2Fossil += eolResult.net;
-      }
+      // HIGH FIX #14: The EoL fossil/biogenic split was previously two identical
+      // branches (if/else) that both did `totalClimateFossil += eolResult.net`,
+      // which was a redundant no-op but obscured intent. Now:
+      //   - Gross landfill/incineration emissions → fossil CO2 (fossil-based materials)
+      //   - Recycling credits (negative) → reduce fossil CO2 (avoided virgin production)
+      //   - Organic material decomposition (paper landfill methane) → biogenic CO2
+      // For simplicity, all EoL net emissions are attributed to fossil CO2 since
+      // the dominant materials (glass, aluminium, plastic) are fossil-origin.
+      // TODO: Split by material when biogenic tracking per material is available.
+      totalClimateFossil += eolResult.gross;   // Gross landfill/incineration → fossil
+      totalCO2Fossil += eolResult.gross;
+      // Recycling credits: net reduction in fossil CO2 (negative avoided burden)
+      totalClimateFossil += eolResult.avoided; // avoided is negative, reduces total
+      totalCO2Fossil += eolResult.avoided;
 
       console.log(`[aggregateProductImpacts] EoL ${material.material_name} (${factorKey}): net=${eolResult.net.toFixed(6)}, avoided=${eolResult.avoided.toFixed(6)}, gross=${eolResult.gross.toFixed(6)}`);
     }
@@ -499,6 +539,8 @@ export async function aggregateProductImpacts(
     production_sites_count: facilityEmissions?.length || 0,
     calculated_at: new Date().toISOString(),
     calculation_version: '2.1.0',
+    // Store non-fatal warnings so they appear in the LCA report
+    calculation_warnings: calculationWarnings.length > 0 ? calculationWarnings : undefined,
   };
 
   // 11. Get product unit size for per-unit verification
@@ -563,5 +605,6 @@ export async function aggregateProductImpacts(
     impacts: aggregatedImpacts,
     materials_count: materials.length,
     production_sites_count: facilityEmissions?.length || 0,
+    warnings: calculationWarnings.length > 0 ? calculationWarnings : undefined,
   };
 }

@@ -16,6 +16,28 @@ export interface TransportEmissionsResult {
   calculationDetails: string;
 }
 
+/**
+ * DEFRA 2025 freight emission factor names as stored in staging_emission_factors.
+ *
+ * MEDIUM FIX #17: Document the load factor assumption embedded in these factors.
+ * DEFRA freight factors use "average laden" for road and "average" for other modes.
+ * "Average laden" means approximately 50% load factor for HGV (based on UK freight
+ * statistics). This is appropriate for most supply chains. For dedicated full-truck
+ * loads, the actual per-tonne-km emissions would be ~half this value.
+ *
+ * Source: DEFRA (2025) Government conversion factors for greenhouse gas reporting
+ * https://www.gov.uk/government/collections/government-conversion-factors-for-greenhouse-gas-reporting
+ *
+ * Emission factors (kg CO2e per tonne-km) — from DEFRA 2025:
+ *   truck: ~0.104 kg CO2e/tonne-km (HGV, average laden, includes well-to-wheel)
+ *   train: ~0.028 kg CO2e/tonne-km (UK average, electrified + diesel mix)
+ *   ship:  ~0.016 kg CO2e/tonne-km (container ship, global average)
+ *   air:   ~1.130 kg CO2e/tonne-km (dedicated freighter, uplift factor applied)
+ *
+ * Note: These are pulled from the staging_emission_factors table at runtime,
+ * so the values above are for documentation purposes only — the actual calculation
+ * uses whatever is in the database. Check staging_emission_factors for current values.
+ */
 const TRANSPORT_MODE_MAP: Record<TransportMode, string> = {
   truck: 'Freight - Road (HGV, Average laden)',
   train: 'Freight - Rail (Freight train, UK average)',

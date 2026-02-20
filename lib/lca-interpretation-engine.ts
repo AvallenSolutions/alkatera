@@ -195,6 +195,38 @@ function runCompletenessCheck(
 // Sensitivity Analysis (ISO 14044 Section 4.5.3.2)
 // ============================================================================
 
+/**
+ * Map data quality tag / confidence score to a realistic uncertainty range.
+ *
+ * HIGH FIX #12: The previous implementation used a fixed ±10% variation for all
+ * materials regardless of data quality. This understates uncertainty for materials
+ * with secondary/estimated data (which can have ±50–100% per Weidema et al. 2013)
+ * and overstates it for primary verified data (<±5%). We now use material-specific
+ * uncertainty consistent with GHG Protocol Product Standard Annex 2.
+ *
+ * Sources:
+ *   - Weidema et al. (2013) Overview and methodology: Data quality guideline for
+ *     the ecoinvent database version 3. Swiss Centre for Life Cycle Inventories.
+ *   - GHG Protocol Product Standard (2011) Annex 2: Uncertainty assessment
+ */
+function getMaterialUncertaintyPct(material: MaterialRow): number {
+  // If confidence score is set, derive uncertainty directly:
+  // confidence 95% → ±5%, confidence 50% → ±50%
+  if (material.confidence_score !== null && material.confidence_score !== undefined) {
+    return Math.max(0.05, (100 - material.confidence_score) / 100);
+  }
+
+  // Fallback: derive from data quality tag
+  const tag = (material.data_quality_tag || '').toLowerCase();
+  switch (tag) {
+    case 'primary_verified':   return 0.05;  // ±5%  — verified supplier data
+    case 'regional_standard':  return 0.15;  // ±15% — DEFRA/regional standard factors
+    case 'secondary_modelled': return 0.30;  // ±30% — modelled secondary (Ecoinvent)
+    case 'secondary_estimated': return 0.50; // ±50% — estimated staging factors
+    default:                   return 0.25;  // ±25% — unknown quality
+  }
+}
+
 function runSensitivityAnalysis(
   materials: MaterialRow[],
   aggregatedImpacts: any
@@ -209,21 +241,23 @@ function runSensitivityAnalysis(
     .slice(0, 3);
 
   const results: SensitivityAnalysis[] = [];
-  const variationPct = 0.10; // ±10%
 
   for (const mat of sorted) {
     if (mat.totalClimateContrib <= 0) continue;
+
+    // HIGH FIX #12: Use material-specific uncertainty range, not a fixed ±10%
+    const variationPct = getMaterialUncertaintyPct(mat);
 
     const baselineResult = totalClimate;
     const minResult = totalClimate - mat.totalClimateContrib * variationPct;
     const maxResult = totalClimate + mat.totalClimateContrib * variationPct;
 
     const resultChangePct = ((maxResult - minResult) / baselineResult) * 100;
-    const parameterChangePct = variationPct * 2 * 100; // 20% total range
-    const sensitivityRatio = resultChangePct / parameterChangePct;
+    const parameterChangePct = variationPct * 2 * 100; // total range as %
+    const sensitivityRatio = parameterChangePct > 0 ? resultChangePct / parameterChangePct : 0;
 
     results.push({
-      parameter: `${mat.material_name} emission factor`,
+      parameter: `${mat.material_name} emission factor (±${(variationPct * 100).toFixed(0)}% uncertainty)`,
       material_name: mat.material_name,
       baseline_result: baselineResult,
       variation_range: {
