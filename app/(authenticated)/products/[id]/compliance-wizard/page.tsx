@@ -44,24 +44,24 @@ export default function ComplianceWizardPage() {
 
         setProductName(product.name);
 
-        // Get the PCF for this product
+        // Get the latest PCF for this product
         const { data: pcf, error: pcfError } = await supabase
           .from('product_carbon_footprints')
           .select('id')
           .eq('product_id', productId)
-          .single();
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         if (pcfError) {
-          // If no PCF exists, we could create one or show an error
-          if (pcfError.code === 'PGRST116') {
-            throw new Error(
-              'No carbon footprint data found for this product. Please add materials and packaging first.'
-            );
-          }
           throw pcfError;
         }
 
-        if (!pcf) throw new Error('PCF not found');
+        if (!pcf) {
+          throw new Error(
+            'No carbon footprint data found for this product. Please add materials and packaging first.'
+          );
+        }
 
         setPcfId(pcf.id);
       } catch (err: any) {
