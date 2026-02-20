@@ -21,8 +21,6 @@ export interface PdfShiftOptions {
     bottom?: string;
     left?: string;
   };
-  /** Wait milliseconds for JS/fonts to load before capture (0-10000) */
-  delay?: number;
   /** Zoom factor (0.1 to 2.0, default: 1) */
   zoom?: number;
   /** Use sandbox mode (free, adds watermark) */
@@ -33,6 +31,8 @@ export interface PdfShiftOptions {
   css?: string;
   /** Inject custom JavaScript */
   javascript?: string;
+  /** Disable printing of background graphics */
+  disableBackgrounds?: boolean;
 }
 
 export interface PdfShiftResponse {
@@ -76,10 +76,6 @@ export async function convertHtmlToPdf(
     body.margin = options.margin;
   }
 
-  if (options.delay !== undefined) {
-    body.delay = Math.min(Math.max(options.delay, 0), 10000);
-  }
-
   if (options.zoom !== undefined) {
     body.zoom = options.zoom;
   }
@@ -94,6 +90,10 @@ export async function convertHtmlToPdf(
 
   if (options.javascript) {
     body.javascript = options.javascript;
+  }
+
+  if (options.disableBackgrounds) {
+    body.disable_backgrounds = true;
   }
 
   // Retry up to 2 times on transient failures
