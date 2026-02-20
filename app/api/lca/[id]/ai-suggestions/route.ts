@@ -181,7 +181,7 @@ export async function POST(
     const { data: materials } = await supabase
       .from('product_carbon_footprint_materials')
       .select('material_name, quantity, unit, impact_climate')
-      .eq('pcf_id', pcfId)
+      .eq('product_carbon_footprint_id', pcfId)
       .order('impact_climate', { ascending: false })
       .limit(5);
 

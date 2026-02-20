@@ -110,11 +110,11 @@ export async function POST(
         products!inner(name, category),
         lca_interpretation_results(
           contribution_analysis,
-          sensitivity_analysis,
-          completeness_check,
-          consistency_check,
-          key_findings,
-          executive_summary
+          sensitivity_results,
+          completeness_score,
+          consistency_issues,
+          methodology_consistent,
+          key_findings
         )
       `
       )
@@ -129,7 +129,7 @@ export async function POST(
     const { data: materials } = await supabase
       .from('product_carbon_footprint_materials')
       .select('material_name, quantity, unit, impact_climate, data_source')
-      .eq('pcf_id', pcfId)
+      .eq('product_carbon_footprint_id', pcfId)
       .order('impact_climate', { ascending: false })
       .limit(10);
 

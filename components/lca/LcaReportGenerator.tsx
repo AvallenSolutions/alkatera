@@ -111,14 +111,14 @@ export function LcaReportGenerator({
       const { data: interpretation } = await supabase
         .from('lca_interpretation_results')
         .select('id')
-        .eq('pcf_id', pcfId)
+        .eq('product_carbon_footprint_id', pcfId)
         .maybeSingle();
 
       // Check for critical review
       const { data: review } = await supabase
         .from('lca_critical_reviews')
         .select('id, status, is_approved, reviewers:lca_reviewers(*), reviewer_statement')
-        .eq('pcf_id', pcfId)
+        .eq('product_carbon_footprint_id', pcfId)
         .maybeSingle();
 
       const complianceData: PcfComplianceData = {
