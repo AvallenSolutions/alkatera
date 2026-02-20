@@ -13,8 +13,9 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, Box, ArrowRight, Factory, Truck, Users, Trash2 } from 'lucide-react';
+import { Info, AlertTriangle, Box, ArrowRight, Factory, Truck, Users, Trash2 } from 'lucide-react';
 import { useWizardContext } from '../WizardContext';
+import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife } from '@/lib/system-boundaries';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -23,36 +24,36 @@ import { cn } from '@/lib/utils';
 
 const SYSTEM_BOUNDARY_OPTIONS = [
   {
-    value: 'Cradle-to-gate',
+    value: 'cradle-to-gate',
     label: 'Cradle-to-Gate',
     description: 'Raw materials through to factory gate (most common for manufacturers)',
     icon: Factory,
-    stages: ['Raw Materials', 'Processing', 'Manufacturing'],
+    stages: ['Raw Materials', 'Processing', 'Packaging'],
     enabled: true,
   },
   {
-    value: 'Cradle-to-shelf',
+    value: 'cradle-to-shelf',
     label: 'Cradle-to-Shelf',
-    description: 'Includes distribution to retail',
+    description: 'Includes distribution to point of sale',
     icon: Truck,
-    stages: ['Raw Materials', 'Processing', 'Manufacturing', 'Distribution'],
-    enabled: false,
+    stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution'],
+    enabled: true,
   },
   {
-    value: 'Cradle-to-consumer',
+    value: 'cradle-to-consumer',
     label: 'Cradle-to-Consumer',
-    description: 'Includes consumer use phase',
+    description: 'Includes consumer use phase (refrigeration, carbonation)',
     icon: Users,
-    stages: ['Raw Materials', 'Processing', 'Manufacturing', 'Distribution', 'Use'],
-    enabled: false,
+    stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution', 'Use Phase'],
+    enabled: true,
   },
   {
-    value: 'Cradle-to-grave',
+    value: 'cradle-to-grave',
     label: 'Cradle-to-Grave',
-    description: 'Full lifecycle including end-of-life',
+    description: 'Full lifecycle including end-of-life disposal & recycling credits',
     icon: Trash2,
-    stages: ['Raw Materials', 'Processing', 'Manufacturing', 'Distribution', 'Use', 'End of Life'],
-    enabled: false,
+    stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution', 'Use Phase', 'End of Life'],
+    enabled: true,
   },
 ];
 
@@ -68,7 +69,7 @@ function BoundaryVisualization({ selectedBoundary }: BoundaryVisualizationProps)
   const option = SYSTEM_BOUNDARY_OPTIONS.find((o) => o.value === selectedBoundary);
   if (!option) return null;
 
-  const allStages = ['Raw Materials', 'Processing', 'Manufacturing', 'Distribution', 'Use', 'End of Life'];
+  const allStages = ['Raw Materials', 'Processing', 'Packaging', 'Distribution', 'Use Phase', 'End of Life'];
 
   return (
     <div className="mt-4 rounded-lg border bg-muted/30 p-4">
@@ -244,11 +245,43 @@ export function BoundaryStep() {
         <Info className="h-4 w-4" />
         <AlertDescription>
           <strong>Cradle-to-Gate</strong> is the most common boundary for
-          manufacturers. It covers all impacts from raw material extraction
-          through to your factory gate, but excludes distribution, use, and
-          disposal phases which are often outside your control.
+          manufacturers. Wider boundaries (Shelf, Consumer, Grave) include
+          additional lifecycle stages and may require extra configuration
+          steps in this wizard.
         </AlertDescription>
       </Alert>
+
+      {/* Boundary-specific requirement warnings — shown when a wider boundary is selected */}
+      {(boundaryNeedsUsePhase(formData.systemBoundary) || boundaryNeedsEndOfLife(formData.systemBoundary)) && (
+        <Alert className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="text-amber-700 dark:text-amber-400">
+            <strong>Additional steps required for this boundary:</strong>
+            <ul className="mt-1.5 list-inside list-disc space-y-1 text-sm">
+              {boundaryNeedsUsePhase(formData.systemBoundary) && (
+                <li>
+                  <strong>Use Phase</strong> — you will need to configure refrigeration
+                  and carbonation assumptions for your product. These will appear as an
+                  extra step after this one. The wizard auto-detects defaults from your
+                  product category, but you must confirm them before the calculation is
+                  accepted. An incorrect use-phase configuration will directly affect
+                  the reported carbon footprint.
+                </li>
+              )}
+              {boundaryNeedsEndOfLife(formData.systemBoundary) && (
+                <li>
+                  <strong>End of Life</strong> — you will need to select the disposal
+                  region (EU / UK / US) and can optionally specify recycling pathway
+                  percentages per packaging material. Recycling credits can make a
+                  significant difference to the total (e.g. aluminium gives a large
+                  avoided-burden credit). Defaults are based on regional statistics but
+                  primary data from waste contractors is preferred.
+                </li>
+              )}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

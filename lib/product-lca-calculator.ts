@@ -210,6 +210,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           console.warn(`[calculateProductCarbonFootprint] Failed to query utility_data_entries for ${allocation.facilityName}:`, utilityError);
         }
 
+        // Hoisted here so it is in scope for both the utility loop and the
+        // activity-entries section below where the deduplication logic runs.
+        let waterFromUtilityTable = 0;
+
         if (utilityEntries && utilityEntries.length > 0) {
           console.log(`[calculateProductCarbonFootprint] Found ${utilityEntries.length} utility entries for ${allocation.facilityName}`);
 
@@ -239,9 +243,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           for (const entry of utilityEntries) {
             const config = EMISSION_FACTORS[entry.utility_type];
             if (!config) {
-              // Check for water utility entries
+              // Water entries in utility_data_entries (utility_type: water / water_supply)
+              // are accumulated separately — NOT added to totalWaterFromUtility yet.
+              // We defer the merge until after checking facility_activity_entries so we can
+              // pick the best source and avoid double-counting.
               if (entry.utility_type === 'water' || entry.utility_type === 'water_supply') {
-                totalWaterFromUtility += Number(entry.quantity || 0);
+                let qty = Number(entry.quantity || 0);
+                if (entry.unit === 'litres' || entry.unit === 'L') qty /= 1000; // normalise to m³
+                waterFromUtilityTable += qty;
               }
               continue;
             }
@@ -272,7 +281,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           console.warn(`[calculateProductCarbonFootprint] No utility data entries found for ${allocation.facilityName}`);
         }
 
-        // Query water data from facility_activity_entries (separate table from utilities)
+        // Query water data from facility_activity_entries (separate table from utilities).
+        // IMPORTANT: This table and utility_data_entries can both contain water data for the
+        // same facility/period. We must NOT add both to the same total — that would double-count.
+        // Priority: facility_activity_entries (more granular, activity-specific) > utility_data_entries.
+        // If activity entries exist for water, use them exclusively. If not, fall back to utility entries.
         const { data: waterEntries, error: waterError } = await supabase
           .from('facility_activity_entries')
           .select('activity_category, quantity, unit')
@@ -285,16 +298,37 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           console.warn(`[calculateProductCarbonFootprint] Failed to query water data for ${allocation.facilityName}:`, waterError);
         }
 
+        let waterFromActivityTable = 0;
         if (waterEntries && waterEntries.length > 0) {
           for (const entry of waterEntries) {
             let quantityM3 = Number(entry.quantity || 0);
-            // Convert to m³ if needed (water is typically stored in m³)
             if (entry.unit === 'litres' || entry.unit === 'L') {
               quantityM3 = quantityM3 / 1000;
             }
-            totalWaterFromUtility += quantityM3;
+            waterFromActivityTable += quantityM3;
           }
-          console.log(`[calculateProductCarbonFootprint] Water data for ${allocation.facilityName}: ${totalWaterFromUtility} m³ from ${waterEntries.length} entries`);
+        }
+
+        // Merge water: prefer activity_entries if present (avoids double-counting).
+        // If both sources have data, log a warning — this indicates a data entry issue
+        // where water was recorded in both tables for the same reporting period.
+        if (waterFromActivityTable > 0 && waterFromUtilityTable > 0) {
+          console.warn(
+            `[calculateProductCarbonFootprint] ⚠️ WATER DOUBLE-COUNT RISK for ${allocation.facilityName}: ` +
+            `Both utility_data_entries (${waterFromUtilityTable.toFixed(2)} m³) and ` +
+            `facility_activity_entries (${waterFromActivityTable.toFixed(2)} m³) contain water data. ` +
+            `Using facility_activity_entries only (more specific). ` +
+            `Check that users are not entering water in both places.`
+          );
+          totalWaterFromUtility = waterFromActivityTable;
+        } else if (waterFromActivityTable > 0) {
+          totalWaterFromUtility = waterFromActivityTable;
+          console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: ${waterFromActivityTable.toFixed(2)} m³ from facility_activity_entries`);
+        } else if (waterFromUtilityTable > 0) {
+          totalWaterFromUtility = waterFromUtilityTable;
+          console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: ${waterFromUtilityTable.toFixed(2)} m³ from utility_data_entries (fallback)`);
+        } else {
+          console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: no water data found in either table`);
         }
 
         const attributionRatio = allocation.productionVolume / allocation.facilityTotalProduction;

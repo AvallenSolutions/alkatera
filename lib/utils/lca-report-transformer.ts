@@ -89,6 +89,160 @@ interface OrganizationData {
   name: string;
 }
 
+/**
+ * Calculate a real ISO 14044 pedigree matrix from material-level data.
+ *
+ * The pedigree matrix assesses data quality across 5 dimensions, each scored
+ * 1 (best) to 5 (worst), following the Weidema & Wesnæs (1996) pedigree approach
+ * adopted by ISO 14044 Clause 4.2.3.6.3 and implemented in ecoinvent.
+ *
+ * Scoring logic:
+ *
+ * 1. RELIABILITY — How verified is the data?
+ *    1 = Verified supplier LCA / primary measured data (impact_source: primary_verified)
+ *    2 = Partly verified or calculated from verified primary data
+ *    3 = Non-verified calculated from qualified source (secondary_modelled from ecoinvent)
+ *    4 = Qualified estimate (staging factor / modelled proxy)
+ *    5 = Non-qualified estimate
+ *    Source: Weidema & Wesnæs (1996) Table 1; ecoinvent data quality guidelines.
+ *
+ * 2. COMPLETENESS — What fraction of materials have impact data?
+ *    1 = >90% of materials have data
+ *    2 = 75–90%
+ *    3 = 50–75%
+ *    4 = 25–50%
+ *    5 = <25%
+ *
+ * 3. TEMPORAL REPRESENTATIVENESS — How recent is the data relative to reference year?
+ *    1 = Data ≤3 years old (or reference year matches data year)
+ *    2 = 4–6 years
+ *    3 = 7–10 years
+ *    4 = 11–15 years
+ *    5 = >15 years or unknown
+ *    We estimate from the LCA reference_year vs. the data source publication dates
+ *    embedded in gwp_data_source field (e.g. "DEFRA 2025", "ecoinvent 3.12 (2023)").
+ *
+ * 4. GEOGRAPHIC REPRESENTATIVENESS — How geographically matched is the data?
+ *    1 = Data from same country as facility/origin
+ *    2 = Data from same region (e.g. Western Europe)
+ *    3 = Data from comparable region
+ *    4 = Global or continental average
+ *    5 = Data from different region or unknown
+ *    Estimated from: % of materials with origin_country_code set.
+ *
+ * 5. TECHNOLOGICAL REPRESENTATIVENESS — How matched is the production technology?
+ *    1 = Exact process match (primary supplier data)
+ *    2 = Similar technology, same era
+ *    3 = Related process or similar sector
+ *    4 = Generic sector average
+ *    5 = Proxy from different sector
+ *    Estimated from: data_quality_grade field on materials.
+ */
+function calculatePedigreeMatrix(
+  materials: any[],
+  referenceYear?: number
+): {
+  reliability: number;
+  completeness: number;
+  temporalRepresentativeness: number;
+  geographicRepresentativeness: number;
+  technologicalRepresentativeness: number;
+} {
+  const total = materials.length;
+  if (total === 0) {
+    // No data → worst score across the board
+    return { reliability: 5, completeness: 5, temporalRepresentativeness: 5, geographicRepresentativeness: 5, technologicalRepresentativeness: 5 };
+  }
+
+  // ── 1. RELIABILITY ────────────────────────────────────────────────────────
+  // Score each material by its impact_source and average
+  const reliabilityScores = materials.map((m: any) => {
+    const src = (m.impact_source || '').toLowerCase();
+    const grade = (m.data_quality_grade || '').toUpperCase();
+    if (src === 'primary_verified') return 1;
+    if (src === 'primary_calculated') return 2;
+    if (src === 'secondary_modelled') return 3;
+    if (src === 'hybrid_proxy' || grade === 'MEDIUM') return 4;
+    return 5; // unknown / staging factor
+  });
+  const avgReliability = reliabilityScores.reduce((a: number, b: number) => a + b, 0) / total;
+  const reliability = Math.min(5, Math.max(1, Math.round(avgReliability)));
+
+  // ── 2. COMPLETENESS ───────────────────────────────────────────────────────
+  // Fraction of materials that have a non-zero climate impact (i.e. data was resolved)
+  const withData = materials.filter((m: any) => (m.impact_climate || 0) !== 0).length;
+  const completenessRatio = withData / total;
+  let completeness: number;
+  if (completenessRatio > 0.90) completeness = 1;
+  else if (completenessRatio > 0.75) completeness = 2;
+  else if (completenessRatio > 0.50) completeness = 3;
+  else if (completenessRatio > 0.25) completeness = 4;
+  else completeness = 5;
+
+  // ── 3. TEMPORAL REPRESENTATIVENESS ───────────────────────────────────────
+  // Parse the most recent data year from gwp_data_source strings (e.g. "DEFRA 2025",
+  // "ecoinvent 3.12 (2023)", "AGRIBALYSE 3.2 (2022)").
+  // If we can't parse, assume the data is the global worst-case default year (2010)
+  // to be conservative — better to flag temporal uncertainty than to hide it.
+  const currentYear = referenceYear || new Date().getFullYear();
+  const dataYears: number[] = [];
+  for (const m of materials) {
+    const sources = [m.gwp_data_source || '', m.non_gwp_data_source || '', m.source_reference || ''];
+    for (const src of sources) {
+      // Match 4-digit years between 2000 and current year
+      const matches = src.match(/\b(20\d{2})\b/g);
+      if (matches) {
+        for (const y of matches) {
+          const yr = parseInt(y);
+          if (yr >= 2000 && yr <= currentYear) dataYears.push(yr);
+        }
+      }
+    }
+  }
+  const oldestDataYear = dataYears.length > 0 ? Math.min(...dataYears) : 2010;
+  const dataAge = currentYear - oldestDataYear;
+  let temporalRepresentativeness: number;
+  if (dataAge <= 3) temporalRepresentativeness = 1;
+  else if (dataAge <= 6) temporalRepresentativeness = 2;
+  else if (dataAge <= 10) temporalRepresentativeness = 3;
+  else if (dataAge <= 15) temporalRepresentativeness = 4;
+  else temporalRepresentativeness = 5;
+
+  // ── 4. GEOGRAPHIC REPRESENTATIVENESS ─────────────────────────────────────
+  // Score by: % of materials with a specific country of origin set
+  const withCountry = materials.filter((m: any) =>
+    m.origin_country_code || m.origin_country || m.country_of_origin
+  ).length;
+  const geoRatio = withCountry / total;
+  let geographicRepresentativeness: number;
+  if (geoRatio > 0.80) geographicRepresentativeness = 2; // Most materials have country → regional match
+  else if (geoRatio > 0.50) geographicRepresentativeness = 3;
+  else if (geoRatio > 0.25) geographicRepresentativeness = 4;
+  else geographicRepresentativeness = 5; // Mostly global averages
+
+  // ── 5. TECHNOLOGICAL REPRESENTATIVENESS ──────────────────────────────────
+  // Score from data_quality_grade: HIGH → 2, MEDIUM → 3, LOW → 4, else 5
+  const techScores = materials.map((m: any) => {
+    const src = (m.impact_source || '').toLowerCase();
+    const grade = (m.data_quality_grade || '').toUpperCase();
+    if (src === 'primary_verified') return 1;  // Actual supplier process data
+    if (grade === 'HIGH') return 2;
+    if (grade === 'MEDIUM') return 3;
+    if (grade === 'LOW') return 4;
+    return 5;
+  });
+  const avgTech = techScores.reduce((a: number, b: number) => a + b, 0) / total;
+  const technologicalRepresentativeness = Math.min(5, Math.max(1, Math.round(avgTech)));
+
+  return {
+    reliability,
+    completeness,
+    temporalRepresentativeness,
+    geographicRepresentativeness,
+    technologicalRepresentativeness,
+  };
+}
+
 export function transformLCADataForReport(
   lca: LCADatabaseData,
   calculationLog: CalculationLogData | null,
@@ -111,12 +265,16 @@ export function transformLCADataForReport(
   const packaging = lifecycleStages.packaging_stage || 0;
   const distribution = lifecycleStages.distribution || 0;
   const processing = lifecycleStages.processing || 0;
+  const usePhase = lifecycleStages.use_phase || 0;
+  const endOfLife = lifecycleStages.end_of_life || 0;
 
-  const totalFromStages = rawMaterials + packaging + distribution + processing;
+  const totalFromStages = rawMaterials + packaging + distribution + processing + usePhase + endOfLife;
   const rawMaterialsPct = totalFromStages > 0 ? (rawMaterials / totalFromStages) * 100 : 0;
   const packagingPct = totalFromStages > 0 ? (packaging / totalFromStages) * 100 : 0;
   const distributionPct = totalFromStages > 0 ? (distribution / totalFromStages) * 100 : 0;
   const processingPct = totalFromStages > 0 ? (processing / totalFromStages) * 100 : 0;
+  const usePhasePct = totalFromStages > 0 ? (usePhase / totalFromStages) * 100 : 0;
+  const endOfLifePct = totalFromStages > 0 ? (endOfLife / totalFromStages) * 100 : 0;
 
   const scope1 = scopeBreakdown.scope1 || 0;
   const scope2 = scopeBreakdown.scope2 || 0;
@@ -134,7 +292,9 @@ export function transformLCADataForReport(
     { name: "Raw Materials", value: rawMaterialsPct, color: "#22c55e" },
     { name: "Packaging", value: packagingPct, color: "#eab308" },
     { name: "Distribution", value: distributionPct, color: "#f97316" },
-    { name: "Processing", value: processingPct, color: "#3b82f6" }
+    { name: "Processing", value: processingPct, color: "#3b82f6" },
+    { name: "Use Phase", value: usePhasePct, color: "#8b5cf6" },
+    { name: "End of Life", value: endOfLifePct, color: "#ef4444" },
   ].filter(item => item.value > 0);
 
   // Build waste stream from actual material data where possible
@@ -382,24 +542,40 @@ export function transformLCADataForReport(
     geographicCoverage: m.origin_country || m.country_of_origin || m.geographic_scope || 'Global',
   }));
 
-  // Scope type label
-  const scopeTypeLabel = lca.lca_scope_type === 'cradle-to-grave' ? 'Cradle-to-Grave'
-    : lca.lca_scope_type === 'cradle-to-gate' ? 'Cradle-to-Gate'
-    : lca.lca_scope_type === 'gate-to-gate' ? 'Gate-to-Gate'
-    : 'Cradle-to-Gate';
+  // Scope type label — support all 4 boundary tiers
+  const scopeTypeLabelMap: Record<string, string> = {
+    'cradle-to-gate': 'Cradle-to-Gate',
+    'cradle-to-shelf': 'Cradle-to-Shelf',
+    'cradle-to-consumer': 'Cradle-to-Consumer',
+    'cradle-to-grave': 'Cradle-to-Grave',
+    'gate-to-gate': 'Gate-to-Gate',
+  };
+  // Prefer system_boundary (set by wizard) over lca_scope_type (set at calculation time)
+  const rawBoundary = (lca.system_boundary || lca.lca_scope_type || 'cradle-to-gate').toLowerCase();
+  const scopeTypeLabel = scopeTypeLabelMap[rawBoundary] || 'Cradle-to-Gate';
+  const boundaryType = rawBoundary;
 
-  // Included/excluded stages based on scope type
-  const isCradleToGrave = lca.lca_scope_type === 'cradle-to-grave';
-  const includedStages = [
+  // Included/excluded stages based on scope type — all 4 tiers
+  const baseIncluded = [
     "Raw material extraction & agricultural production",
     "Primary ingredient processing",
     "Packaging material manufacture",
     "Factory operations & energy use",
-    ...(distribution > 0 ? ["Distribution & transport to retail"] : []),
-    ...(isCradleToGrave ? ["Consumer use phase", "End-of-life disposal & recycling"] : []),
   ];
+  const shelfStages = ["Distribution & transport to retail"];
+  const consumerStages = ["Consumer use phase (refrigeration, carbonation)"];
+  const graveStages = ["End-of-life disposal & recycling credits"];
+
+  const includedStages = [
+    ...baseIncluded,
+    ...(boundaryType === 'cradle-to-shelf' || boundaryType === 'cradle-to-consumer' || boundaryType === 'cradle-to-grave' || distribution > 0 ? shelfStages : []),
+    ...(boundaryType === 'cradle-to-consumer' || boundaryType === 'cradle-to-grave' ? consumerStages : []),
+    ...(boundaryType === 'cradle-to-grave' ? graveStages : []),
+  ];
+
+  const allOptionalStages = [...shelfStages, ...consumerStages, ...graveStages];
   const excludedStages = [
-    ...(isCradleToGrave ? [] : ["Distribution to retailers", "Consumer use phase", "End-of-life disposal"]),
+    ...allOptionalStages.filter(s => !includedStages.includes(s)),
     "Capital goods & infrastructure",
     "Employee commuting",
   ];
@@ -529,13 +705,7 @@ export function transformLCADataForReport(
     dataQuality: {
       overallScore: dqScore,
       overallRating: dqRating,
-      pedigreeMatrix: {
-        reliability: Math.min(5, Math.max(1, Math.round(5 - (dqScore / 25)))),
-        completeness: Math.min(5, Math.max(1, Math.round(5 - (dqScore / 25)))),
-        temporalRepresentativeness: 2,
-        geographicRepresentativeness: Math.min(5, Math.max(1, Math.round(5 - (dqScore / 30)))),
-        technologicalRepresentativeness: Math.min(5, Math.max(1, Math.round(5 - (dqScore / 30)))),
-      },
+      pedigreeMatrix: calculatePedigreeMatrix(materials, lca.reference_year),
       coverageSummary: {
         primaryDataShare: Math.round((primaryCount / totalMaterialCount) * 100),
         secondaryDataShare: Math.round((secondaryCount / totalMaterialCount) * 100),
