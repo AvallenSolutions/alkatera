@@ -1,3 +1,6 @@
+export { MaterialValidationStep } from './MaterialValidationStep';
+export { FacilityAllocationStep } from './FacilityAllocationStep';
+export { CalculationStep } from './CalculationStep';
 export { GoalStep } from './GoalStep';
 export { BoundaryStep } from './BoundaryStep';
 export { CutoffStep } from './CutoffStep';

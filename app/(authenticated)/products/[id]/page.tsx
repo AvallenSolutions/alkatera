@@ -16,7 +16,7 @@ import { FacilitiesTab } from "@/components/products/FacilitiesTab";
 import { SettingsTab } from "@/components/products/SettingsTab";
 import { EditProductForm } from "@/components/products/EditProductForm";
 import { RecipeEditorPanel } from "@/components/products/RecipeEditorPanel";
-import { CalculateLCASheet } from "@/components/products/CalculateLCASheet";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
@@ -39,21 +39,16 @@ export default function ProductDashboardPage() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showRecipeEditor, setShowRecipeEditor] = useState(false);
   const [recipeInitialTab, setRecipeInitialTab] = useState<string>("ingredients");
-  const [showCalculateSheet, setShowCalculateSheet] = useState(false);
   const [recipeEditorDirty, setRecipeEditorDirty] = useState(false);
   const [showUnsavedWarning, setShowUnsavedWarning] = useState(false);
 
   // 5.1 URL State Sync: Open sheets from URL params on mount
   useEffect(() => {
     const editorParam = searchParams.get('editor');
-    const calculateParam = searchParams.get('calculate');
 
     if (editorParam === 'ingredients' || editorParam === 'packaging') {
       setRecipeInitialTab(editorParam);
       setShowRecipeEditor(true);
-    }
-    if (calculateParam === 'true') {
-      setShowCalculateSheet(true);
     }
   }, []); // Only run on mount
 
@@ -84,22 +79,12 @@ export default function ProductDashboardPage() {
     updateUrlParams('editor', null);
   }, [updateUrlParams, recipeEditorDirty]);
 
-  const openCalculateSheet = useCallback(() => {
-    setShowCalculateSheet(true);
-    updateUrlParams('calculate', 'true');
-  }, [updateUrlParams]);
-
-  const closeCalculateSheet = useCallback(() => {
-    setShowCalculateSheet(false);
-    updateUrlParams('calculate', null);
-  }, [updateUrlParams]);
-
   const handleCalculate = () => {
     if (!isHealthy) {
       toast.error("Please add ingredients and packaging before calculating");
       return;
     }
-    openCalculateSheet();
+    router.push(`/products/${productId}/compliance-wizard`);
   };
 
   const handleArchive = async () => {
@@ -436,17 +421,6 @@ export default function ProductDashboardPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Calculate LCA Sheet */}
-      <CalculateLCASheet
-        productId={productId}
-        productName={product.name}
-        open={showCalculateSheet}
-        onOpenChange={(open) => { if (!open) closeCalculateSheet(); else setShowCalculateSheet(true); }}
-        onCalculationComplete={() => {
-          closeCalculateSheet();
-          router.push(`/products/${productId}/compliance-wizard`);
-        }}
-      />
     </div>
   );
 }

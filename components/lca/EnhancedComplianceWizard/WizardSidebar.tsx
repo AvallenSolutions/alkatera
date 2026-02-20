@@ -48,6 +48,49 @@ interface TermExplanation {
 const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = {
   1: {
     tips: [
+      'All materials need verified emission factors',
+      'Click "Fix" to search and assign missing factors',
+      'Proxy factors can be used if an exact match is not available',
+    ],
+    terms: [
+      {
+        term: 'Emission Factor',
+        explanation: 'A coefficient that quantifies the environmental impact per unit of a material (e.g., kg CO₂e per kg of barley)',
+      },
+      {
+        term: 'Data Quality Tag',
+        explanation: 'Indicates the reliability of the emission data: Primary (measured), Regional (averages), or Secondary (modelled)',
+      },
+    ],
+  },
+  2: {
+    tips: [
+      'Enter the product volume manufactured at each facility',
+      'Total facility production is used to calculate your product\'s share of emissions',
+      'Select a reporting session to auto-fill facility totals',
+    ],
+    terms: [
+      {
+        term: 'Attribution',
+        explanation: 'The proportion of a facility\'s total emissions allocated to your product, based on production volume share',
+      },
+    ],
+  },
+  3: {
+    tips: [
+      'All materials must be validated before calculating',
+      'The calculation typically takes 10-30 seconds',
+      'Results will be saved as a new carbon footprint record',
+    ],
+    terms: [
+      {
+        term: 'Lifecycle Assessment',
+        explanation: 'A comprehensive method to evaluate the environmental impact of a product across its lifecycle stages',
+      },
+    ],
+  },
+  4: {
+    tips: [
       'Be specific about why this LCA is being conducted',
       'Consider who will use the results',
       'If comparing products, additional review may be required',
@@ -63,7 +106,7 @@ const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = 
       },
     ],
   },
-  2: {
+  5: {
     tips: [
       'The functional unit should be measurable and relevant',
       'System boundary defines what is included in the assessment',
@@ -80,7 +123,7 @@ const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = 
       },
     ],
   },
-  3: {
+  6: {
     tips: [
       'Document any materials or processes excluded',
       'Typical cut-off threshold is 1% of mass or impact',
@@ -97,7 +140,7 @@ const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = 
       },
     ],
   },
-  4: {
+  7: {
     tips: [
       'Higher quality data leads to more reliable results',
       'Primary data from your operations is preferred',
@@ -114,7 +157,7 @@ const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = 
       },
     ],
   },
-  5: {
+  8: {
     tips: [
       'Focus on the hotspots (biggest contributors)',
       'Consider sensitivity to key assumptions',
@@ -131,7 +174,7 @@ const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = 
       },
     ],
   },
-  6: {
+  9: {
     tips: [
       'Internal review is sufficient for internal use',
       'Public claims require external review',
@@ -148,7 +191,7 @@ const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = 
       },
     ],
   },
-  7: {
+  10: {
     tips: [
       'Review all steps before completing',
       'Ensure all mandatory fields are filled',
@@ -347,14 +390,14 @@ export function WizardSidebar() {
   const currentStep = progress.currentStep;
   const stepHelp = STEP_HELP[currentStep] || { tips: [], terms: [] };
 
-  // Map step number to field for AI suggestions
+  // Map step number to field for AI suggestions (only for post-calc steps)
   const getFieldForStep = (step: number): string | null => {
     switch (step) {
-      case 1:
+      case 4:
         return 'intended_application';
-      case 2:
+      case 5:
         return 'functional_unit';
-      case 3:
+      case 6:
         return 'cutoff_criteria';
       default:
         return null;

@@ -18,7 +18,10 @@ import { WizardProvider, useWizardContext } from './WizardContext';
 import { WizardProgress, CompactProgress, WIZARD_STEPS } from './WizardProgress';
 import { WizardSidebar } from './WizardSidebar';
 
-// Step components - will be implemented next
+// Step components
+import { MaterialValidationStep } from './steps/MaterialValidationStep';
+import { FacilityAllocationStep } from './steps/FacilityAllocationStep';
+import { CalculationStep } from './steps/CalculationStep';
 import { GoalStep } from './steps/GoalStep';
 import { BoundaryStep } from './steps/BoundaryStep';
 import { CutoffStep } from './steps/CutoffStep';
@@ -32,7 +35,8 @@ import { SummaryStep } from './steps/SummaryStep';
 // ============================================================================
 
 interface EnhancedComplianceWizardProps {
-  pcfId: string;
+  productId: string;
+  pcfId?: string | null;
   onComplete?: () => void;
   onClose?: () => void;
 }
@@ -46,21 +50,27 @@ function StepContent() {
 
   switch (progress.currentStep) {
     case 1:
-      return <GoalStep />;
+      return <MaterialValidationStep />;
     case 2:
-      return <BoundaryStep />;
+      return <FacilityAllocationStep />;
     case 3:
-      return <CutoffStep />;
+      return <CalculationStep />;
     case 4:
-      return <DataQualityStep />;
+      return <GoalStep />;
     case 5:
-      return <InterpretationStep />;
+      return <BoundaryStep />;
     case 6:
-      return <ReviewStep />;
+      return <CutoffStep />;
     case 7:
+      return <DataQualityStep />;
+    case 8:
+      return <InterpretationStep />;
+    case 9:
+      return <ReviewStep />;
+    case 10:
       return <SummaryStep />;
     default:
-      return <GoalStep />;
+      return <MaterialValidationStep />;
   }
 }
 
@@ -72,6 +82,8 @@ function WizardFooter() {
   const {
     progress,
     saving,
+    pcfId,
+    preCalcState,
     prevStep,
     nextStep,
     markStepComplete,
@@ -81,7 +93,37 @@ function WizardFooter() {
 
   const isFirstStep = progress.currentStep === 1;
   const isLastStep = progress.currentStep === WIZARD_STEPS.length;
-  const currentStepCompleted = progress.completedSteps.includes(progress.currentStep);
+  const currentStepCompleted = progress.completedSteps.includes(
+    progress.currentStep
+  );
+
+  // Step 3 (Calculate) has its own button — hide Next
+  if (progress.currentStep === 3) {
+    return (
+      <div className="flex items-center justify-between border-t bg-background px-6 py-4">
+        <Button variant="outline" onClick={prevStep} disabled={saving}>
+          <ChevronLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+        <div />
+      </div>
+    );
+  }
+
+  // Determine if Next should be disabled
+  let nextDisabled = saving;
+  if (progress.currentStep === 1) {
+    // Step 1: Materials — can only proceed if all materials have data
+    nextDisabled = saving || !preCalcState.canCalculate;
+  } else if (progress.currentStep === 2) {
+    // Step 2: Facilities — can proceed if no facilities or all have volumes
+    const hasFacilitiesMissingVolumes =
+      preCalcState.linkedFacilities.length > 0 &&
+      preCalcState.facilityAllocations.some(
+        (a) => !a.productionVolume || !a.facilityTotalProduction
+      );
+    nextDisabled = saving || hasFacilitiesMissingVolumes;
+  }
 
   const handleNext = () => {
     markStepComplete(progress.currentStep);
@@ -109,19 +151,22 @@ function WizardFooter() {
 
       {/* Right side: Save + Next/Finish */}
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          onClick={saveProgress}
-          disabled={saving}
-          className="text-muted-foreground"
-        >
-          {saving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Save Progress
-        </Button>
+        {/* Save button only visible when pcfId exists (post-calculation) */}
+        {pcfId && (
+          <Button
+            variant="ghost"
+            onClick={saveProgress}
+            disabled={saving}
+            className="text-muted-foreground"
+          >
+            {saving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            Save Progress
+          </Button>
+        )}
 
         {isLastStep ? (
           <Button onClick={handleFinish} disabled={saving}>
@@ -133,7 +178,7 @@ function WizardFooter() {
             Complete Wizard
           </Button>
         ) : (
-          <Button onClick={handleNext} disabled={saving}>
+          <Button onClick={handleNext} disabled={nextDisabled}>
             {currentStepCompleted ? 'Next' : 'Mark Complete & Continue'}
             <ChevronRight className="ml-2 h-4 w-4" />
           </Button>
@@ -243,12 +288,13 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
 // ============================================================================
 
 export function EnhancedComplianceWizard({
+  productId,
   pcfId,
   onComplete,
   onClose,
 }: EnhancedComplianceWizardProps) {
   return (
-    <WizardProvider pcfId={pcfId} onComplete={onComplete}>
+    <WizardProvider productId={productId} pcfId={pcfId} onComplete={onComplete}>
       <WizardLayout onClose={onClose} />
     </WizardProvider>
   );

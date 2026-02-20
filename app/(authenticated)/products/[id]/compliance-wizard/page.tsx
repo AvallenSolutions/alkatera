@@ -23,16 +23,16 @@ export default function ComplianceWizardPage() {
   const [error, setError] = useState<string | null>(null);
 
   // ============================================================================
-  // FETCH PCF DATA
+  // FETCH PRODUCT + OPTIONAL PCF
   // ============================================================================
 
   useEffect(() => {
-    async function fetchPcf() {
+    async function fetchData() {
       setLoading(true);
       setError(null);
 
       try {
-        // First, get the product to find its PCF
+        // Fetch product
         const { data: product, error: productError } = await supabase
           .from('products')
           .select('id, name')
@@ -44,8 +44,8 @@ export default function ComplianceWizardPage() {
 
         setProductName(product.name);
 
-        // Get the latest PCF for this product
-        const { data: pcf, error: pcfError } = await supabase
+        // Optionally find existing PCF (may not exist for new LCAs)
+        const { data: pcf } = await supabase
           .from('product_carbon_footprints')
           .select('id')
           .eq('product_id', productId)
@@ -53,17 +53,7 @@ export default function ComplianceWizardPage() {
           .limit(1)
           .maybeSingle();
 
-        if (pcfError) {
-          throw pcfError;
-        }
-
-        if (!pcf) {
-          throw new Error(
-            'No carbon footprint data found for this product. Please add materials and packaging first.'
-          );
-        }
-
-        setPcfId(pcf.id);
+        setPcfId(pcf?.id || null);
       } catch (err: any) {
         console.error('[ComplianceWizardPage] Error:', err);
         setError(err.message || 'Failed to load product data');
@@ -72,7 +62,7 @@ export default function ComplianceWizardPage() {
       }
     }
 
-    fetchPcf();
+    fetchData();
   }, [productId]);
 
   // ============================================================================
@@ -96,7 +86,7 @@ export default function ComplianceWizardPage() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading compliance wizard...</p>
+          <p className="text-muted-foreground">Loading wizard...</p>
         </div>
       </div>
     );
@@ -106,15 +96,13 @@ export default function ComplianceWizardPage() {
   // ERROR STATE
   // ============================================================================
 
-  if (error || !pcfId) {
+  if (error) {
     return (
       <div className="container mx-auto max-w-2xl py-12">
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error Loading Wizard</AlertTitle>
-          <AlertDescription className="mt-2">
-            {error || 'Could not find carbon footprint data for this product.'}
-          </AlertDescription>
+          <AlertDescription className="mt-2">{error}</AlertDescription>
         </Alert>
         <div className="mt-6 flex gap-3">
           <Button variant="outline" onClick={handleBack}>
@@ -143,7 +131,7 @@ export default function ComplianceWizardPage() {
             </Button>
             <div className="h-6 w-px bg-border" />
             <div>
-              <h1 className="text-lg font-semibold">ISO Compliance Wizard</h1>
+              <h1 className="text-lg font-semibold">LCA Wizard</h1>
               <p className="text-sm text-muted-foreground">{productName}</p>
             </div>
           </div>
@@ -153,6 +141,7 @@ export default function ComplianceWizardPage() {
       {/* Wizard */}
       <main className="h-[calc(100vh-73px)]">
         <EnhancedComplianceWizard
+          productId={productId}
           pcfId={pcfId}
           onComplete={handleComplete}
           onClose={handleBack}
