@@ -173,9 +173,15 @@ export async function POST(
           cutoffCriteria: pcf.cutoff_criteria,
         };
 
-        const narratives = await generateNarratives(context);
+        // Race the narrative generation against a 15-second timeout
+        // to avoid gateway timeouts on Netlify
+        const narrativePromise = generateNarratives(context);
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 15000)
+        );
+        const narratives = await Promise.race([narrativePromise, timeoutPromise]);
 
-        if (narratives.executiveSummary) {
+        if (narratives?.executiveSummary) {
           reportData.executiveSummary.content = narratives.executiveSummary;
         }
       } catch (narrativeError) {

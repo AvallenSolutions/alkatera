@@ -73,7 +73,7 @@ export function LcaReportGenerator({
 }: LcaReportGeneratorProps) {
   const [state, setState] = useState<GeneratorState>('checking');
   const [compliance, setCompliance] = useState<ComplianceResult | null>(null);
-  const [includeNarratives, setIncludeNarratives] = useState(true);
+  const [includeNarratives, setIncludeNarratives] = useState(false);
   const [generationStep, setGenerationStep] = useState<GenerationStep>('fetching-data');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
