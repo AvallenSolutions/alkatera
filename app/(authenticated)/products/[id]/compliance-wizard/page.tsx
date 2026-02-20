@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { EnhancedComplianceWizard } from '@/components/lca/EnhancedComplianceWizard';
 import { Button } from '@/components/ui/button';
@@ -9,19 +9,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, ArrowLeft, AlertTriangle } from 'lucide-react';
 
 // ============================================================================
-// TYPES
-// ============================================================================
-
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
-
-// ============================================================================
 // PAGE COMPONENT
 // ============================================================================
 
-export default function ComplianceWizardPage({ params }: PageProps) {
-  const { id: productId } = use(params);
+export default function ComplianceWizardPage() {
+  const params = useParams();
+  const productId = params?.id as string;
   const router = useRouter();
 
   const [pcfId, setPcfId] = useState<string | null>(null);
