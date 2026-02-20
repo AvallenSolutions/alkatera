@@ -100,7 +100,7 @@ interface CalculateLCASheetProps {
   productName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCalculationComplete: () => void;
+  onCalculationComplete: (pcfId: string) => void;
 }
 
 export function CalculateLCASheet({
@@ -396,7 +396,7 @@ export function CalculateLCASheet({
 
       toast.success('Carbon footprint calculated!');
       await new Promise(resolve => setTimeout(resolve, 500));
-      onCalculationComplete();
+      onCalculationComplete(result.pcfId!);
     } catch (error: any) {
       console.error('Calculation error:', error);
       toast.error(error.message || 'Failed to calculate impact');

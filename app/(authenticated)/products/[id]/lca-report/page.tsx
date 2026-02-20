@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck } from 'lucide-react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
 import { LcaReportGenerator } from '@/components/lca/LcaReportGenerator';
@@ -77,6 +77,12 @@ export default function LcaReportPage() {
           <Button variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to Product
+          </Button>
+        </Link>
+        <Link href={`/products/${productId}/compliance-wizard`}>
+          <Button variant="ghost" size="sm" className="gap-2">
+            <ClipboardCheck className="h-4 w-4" />
+            Compliance Wizard
           </Button>
         </Link>
       </div>

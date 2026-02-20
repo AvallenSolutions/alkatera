@@ -110,6 +110,17 @@ export async function aggregateProductImpacts(
 
   console.log(`[aggregateProductImpacts] Found ${materials.length} materials`);
 
+  // 1b. Calculate overall DQI score as impact-weighted average of material confidence scores
+  const totalAbsImpact = materials.reduce((sum: number, m: any) => sum + Math.abs(m.impact_climate || 0), 0);
+  const weightedDqi = totalAbsImpact > 0
+    ? materials.reduce((sum: number, m: any) => {
+        const weight = Math.abs(m.impact_climate || 0) / totalAbsImpact;
+        return sum + (m.confidence_score || 50) * weight;
+      }, 0)
+    : materials.reduce((sum: number, m: any) => sum + (m.confidence_score || 50), 0) / materials.length;
+  const dqiScore = Math.round(weightedDqi);
+  console.log(`[aggregateProductImpacts] DQI Score: ${dqiScore}% (weighted average of ${materials.length} material confidence scores)`);
+
   // 2. Use facility emissions passed directly from the calculator
   // This bypasses the product_carbon_footprint_production_sites table entirely,
   // which has a broken BEFORE INSERT trigger that silently aborts INSERTs.
@@ -399,6 +410,11 @@ export async function aggregateProductImpacts(
       },
     },
 
+    data_quality: {
+      score: dqiScore,
+      rating: dqiScore >= 80 ? 'Good' : dqiScore >= 50 ? 'Fair' : 'Poor',
+    },
+
     materials_count: materials.length,
     production_sites_count: facilityEmissions?.length || 0,
     calculated_at: new Date().toISOString(),
@@ -425,6 +441,7 @@ export async function aggregateProductImpacts(
     .from('product_carbon_footprints')
     .update({
       aggregated_impacts: aggregatedImpacts,
+      dqi_score: dqiScore,
       per_unit_emissions_verified: true,
       bulk_volume_per_functional_unit: bulkVolumePerUnit,
       volume_unit: 'L',

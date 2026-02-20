@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Info, Box, ArrowRight, Factory, Truck, Users, Trash2 } from 'lucide-react';
 import { useWizardContext } from '../WizardContext';
@@ -27,6 +28,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Raw materials through to factory gate (most common for manufacturers)',
     icon: Factory,
     stages: ['Raw Materials', 'Processing', 'Manufacturing'],
+    enabled: true,
   },
   {
     value: 'Cradle-to-shelf',
@@ -34,6 +36,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Includes distribution to retail',
     icon: Truck,
     stages: ['Raw Materials', 'Processing', 'Manufacturing', 'Distribution'],
+    enabled: false,
   },
   {
     value: 'Cradle-to-consumer',
@@ -41,6 +44,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Includes consumer use phase',
     icon: Users,
     stages: ['Raw Materials', 'Processing', 'Manufacturing', 'Distribution', 'Use'],
+    enabled: false,
   },
   {
     value: 'Cradle-to-grave',
@@ -48,6 +52,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Full lifecycle including end-of-life',
     icon: Trash2,
     stages: ['Raw Materials', 'Processing', 'Manufacturing', 'Distribution', 'Use', 'End of Life'],
+    enabled: false,
   },
 ];
 
@@ -164,24 +169,35 @@ export function BoundaryStep() {
         >
           {SYSTEM_BOUNDARY_OPTIONS.map((option) => {
             const Icon = option.icon;
+            const isDisabled = !option.enabled;
             return (
               <div key={option.value}>
                 <RadioGroupItem
                   value={option.value}
                   id={`boundary-${option.value}`}
                   className="peer sr-only"
+                  disabled={isDisabled}
                 />
                 <Label
                   htmlFor={`boundary-${option.value}`}
                   className={cn(
-                    'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
-                    'hover:bg-muted/50',
-                    'peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5'
+                    'flex items-start gap-3 rounded-lg border p-4 transition-colors',
+                    isDisabled
+                      ? 'cursor-not-allowed opacity-50'
+                      : 'cursor-pointer hover:bg-muted/50',
+                    !isDisabled && 'peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5'
                   )}
                 >
                   <Icon className="mt-0.5 h-5 w-5 text-muted-foreground" />
                   <div className="flex-1">
-                    <p className="font-medium">{option.label}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{option.label}</p>
+                      {isDisabled && (
+                        <Badge variant="secondary" className="text-xs font-normal">
+                          Coming Soon
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {option.description}
                     </p>

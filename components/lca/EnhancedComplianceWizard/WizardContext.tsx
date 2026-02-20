@@ -179,7 +179,8 @@ export function WizardProvider({
             critical_review_justification,
             reference_year,
             dqi_score,
-            wizard_progress
+            wizard_progress,
+            product_name
           `)
           .eq('id', pcfId)
           .single();
@@ -187,15 +188,17 @@ export function WizardProvider({
         if (pcfError) throw pcfError;
 
         if (pcf) {
-          // Update form data
+          const productName = pcf.product_name || 'Product';
+
+          // Update form data with smart defaults for empty fields
           setFormData({
-            intendedApplication: pcf.intended_application || '',
-            reasonsForStudy: pcf.reasons_for_study || '',
-            intendedAudience: pcf.intended_audience || [],
+            intendedApplication: pcf.intended_application || 'Product carbon footprint assessment to identify environmental hotspots and support sustainability reporting.',
+            reasonsForStudy: pcf.reasons_for_study || 'To quantify the carbon footprint and environmental impact of this product in accordance with ISO 14044/14067.',
+            intendedAudience: pcf.intended_audience?.length > 0 ? pcf.intended_audience : [],
             isComparativeAssertion: pcf.is_comparative_assertion || false,
-            functionalUnit: pcf.functional_unit || '',
+            functionalUnit: pcf.functional_unit || `1 unit of ${productName}`,
             systemBoundary: pcf.system_boundary || 'Cradle-to-gate',
-            cutoffCriteria: pcf.cutoff_criteria || '',
+            cutoffCriteria: pcf.cutoff_criteria || 'Mass: <1% of total input mass. Energy: <1% of total energy input. Environmental significance: Any flow contributing >1% to any impact category is included regardless of mass/energy contribution.',
             assumptions: (pcf.assumptions_limitations || []).map((a: any) =>
               typeof a === 'string' ? a : a.text || ''
             ).filter(Boolean),
@@ -210,7 +213,7 @@ export function WizardProvider({
             criticalReviewType: pcf.critical_review_type || 'none',
             criticalReviewJustification: pcf.critical_review_justification || '',
             referenceYear: pcf.reference_year || new Date().getFullYear(),
-            dqiScore: pcf.dqi_score,
+            dqiScore: pcf.dqi_score || 0,
           });
 
           // Restore wizard progress if saved

@@ -358,13 +358,13 @@ export function SummaryStep() {
 
       {/* Ready to complete */}
       {allComplete && (
-        <Alert className="border-green-200 bg-green-50">
+        <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20 dark:border-green-800">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-800">Ready to Complete</AlertTitle>
-          <AlertDescription className="text-green-700">
+          <AlertTitle className="text-green-800 dark:text-green-200">Ready to Complete</AlertTitle>
+          <AlertDescription className="text-green-700 dark:text-green-300">
             All required fields are complete. Click &quot;Complete Wizard&quot;
-            to save your ISO 14044 compliance documentation. You can generate a
-            PDF report from the product page.
+            to save your ISO 14044 compliance documentation and continue to the
+            LCA Report Generator where you can preview and download your PDF.
           </AlertDescription>
         </Alert>
       )}

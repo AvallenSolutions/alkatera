@@ -444,14 +444,7 @@ export default function ProductDashboardPage() {
         onOpenChange={(open) => { if (!open) closeCalculateSheet(); else setShowCalculateSheet(true); }}
         onCalculationComplete={() => {
           closeCalculateSheet();
-          refetch();
-          setActiveTab("overview");
-          toast.success("Carbon footprint calculated!", {
-            action: {
-              label: "View Full Report",
-              onClick: () => router.push(`/products/${productId}/report`),
-            },
-          });
+          router.push(`/products/${productId}/compliance-wizard`);
         }}
       />
     </div>
