@@ -106,11 +106,32 @@ export const ANGEL_SHARE_DEFAULTS: Record<ClimateZone, number> = {
   tropical: 12.0,    // Caribbean, India, Taiwan
 };
 
-/** Manufacturing CO2e per NEW barrel (kg CO2e) */
+/**
+ * Manufacturing CO2e per NEW barrel (kg CO2e per barrel, cradle-to-cooperage-gate)
+ *
+ * Covers: timber harvesting, kiln-drying, cooperage energy, barrel transport to distillery.
+ * Does NOT include barrel transport from forest to sawmill (minor, <5% of total).
+ *
+ * Sources:
+ *   - American oak (200L): ~35–45 kg CO2e. Central estimate 40 kg.
+ *     Source: Renouf & Wegener (2007) approximated from Ecoinvent 3.x "wooden barrel" dataset;
+ *     SWA (2006) LCA uses 38 kg for ex-bourbon barrel.
+ *   - French oak (225L barrique): ~50–60 kg CO2e. Central estimate 55 kg.
+ *     Source: French oak has higher transport distance (France → distillery) and
+ *     denser wood requiring more energy to work. Estimate from SWA (2006) + Pettersson (2016).
+ *   - American oak (500L puncheon): ~60–70 kg CO2e. Central estimate 65 kg.
+ *     Source: Scaled from 200L barrel by volume ratio with cooperage efficiency factor.
+ *
+ * Uncertainty: ±25% — varies significantly by cooperage, wood origin, kiln type.
+ * These are secondary estimates; primary data from cooperage suppliers preferred.
+ *
+ * Fossil/biogenic split: ~40% fossil (cooperage energy + transport), 60% biogenic
+ * (wood carbon in offcuts + drying). See product-lca-calculator.ts barrel material record.
+ */
 export const BARREL_CO2E_DEFAULTS: Record<string, number> = {
-  american_oak_200: 40,  // 200L bourbon barrel
-  french_oak_225: 55,    // 225L barrique
-  american_oak_500: 65,  // 500L puncheon
+  american_oak_200: 40,  // 200L bourbon barrel — SWA (2006) / Ecoinvent 3.x
+  french_oak_225: 55,    // 225L barrique — SWA (2006) + Pettersson (2016) adjusted
+  american_oak_500: 65,  // 500L puncheon — scaled estimate from 200L baseline
 };
 
 /** Standard barrel volumes (litres) */

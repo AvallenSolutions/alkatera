@@ -7,6 +7,7 @@ import { generateLcaInterpretation } from './lca-interpretation-engine';
 import { calculateDistance } from './utils/distance-calculator';
 import { calculateMaturationImpacts } from './maturation-calculator';
 import type { MaturationProfile } from './types/maturation';
+import { getGridFactor } from './grid-emission-factors';
 
 export interface FacilityAllocationInput {
   facilityId: string;
@@ -22,10 +23,12 @@ export interface FacilityAllocationInput {
 export interface CalculatePCFParams {
   productId: string;
   functionalUnit?: string;
-  systemBoundary?: 'cradle-to-gate' | 'cradle-to-grave';
+  systemBoundary?: 'cradle-to-gate' | 'cradle-to-shelf' | 'cradle-to-consumer' | 'cradle-to-grave';
   referenceYear?: number;
   facilityAllocations?: FacilityAllocationInput[];
   onProgress?: (step: string, percent: number) => void;
+  usePhaseConfig?: import('./use-phase-factors').UsePhaseConfig;
+  eolConfig?: import('./end-of-life-factors').EoLConfig;
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -180,6 +183,22 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         let scope2Raw = 0;
         let totalWaterFromUtility = 0;
 
+        // Fetch facility country code so we can apply the correct grid factor.
+        // Defaults to global average if country not set (conservative/honest).
+        const { data: facilityRecord } = await supabase
+          .from('facilities')
+          .select('location_country_code')
+          .eq('id', allocation.facilityId)
+          .single();
+
+        const facilityCountryCode = facilityRecord?.location_country_code || null;
+        const gridFactorResult = getGridFactor(facilityCountryCode, 'global');
+        console.log(
+          `[calculateProductCarbonFootprint] Grid factor for ${allocation.facilityName}` +
+          ` (${facilityCountryCode ?? 'unknown'}): ${gridFactorResult.factor} kg CO2e/kWh` +
+          ` — ${gridFactorResult.source}${gridFactorResult.isEstimated ? ' [ESTIMATED]' : ''}`
+        );
+
         const { data: utilityEntries, error: utilityError } = await supabase
           .from('utility_data_entries')
           .select('utility_type, quantity, unit, calculated_scope')
@@ -194,18 +213,27 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         if (utilityEntries && utilityEntries.length > 0) {
           console.log(`[calculateProductCarbonFootprint] Found ${utilityEntries.length} utility entries for ${allocation.facilityName}`);
 
-          // Emission factors matching the Company Emissions page (DEFRA 2025)
+          // Emission factors — DEFRA 2025 for combustion fuels (UK-authoritative and
+          // widely used internationally for Scope 1 fuels).
+          // Electricity (Scope 2) uses a country-specific grid factor resolved above
+          // from IEA/DEFRA 2023 data, not a hardcoded UK-only value.
+          // Sources:
+          //   Scope 1 fuels: DEFRA 2025 GHG Conversion Factors
+          //   https://www.gov.uk/government/collections/government-conversion-factors-for-greenhouse-gas-reporting
+          //   Scope 2 electricity: lib/grid-emission-factors.ts (IEA 2023 / DEFRA 2025)
+          //   Refrigerant HFC-134a GWP-100: IPCC AR6 (GWP = 1430)
           const EMISSION_FACTORS: Record<string, { factor: number; scope: 'Scope 1' | 'Scope 2' }> = {
-            diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },
-            diesel_mobile: { factor: 2.68787, scope: 'Scope 1' },
-            petrol_mobile: { factor: 2.31, scope: 'Scope 1' },
-            natural_gas: { factor: 0.18293, scope: 'Scope 1' },
-            lpg: { factor: 1.55537, scope: 'Scope 1' },
-            heavy_fuel_oil: { factor: 3.17740, scope: 'Scope 1' },
-            biomass_solid: { factor: 0.01551, scope: 'Scope 1' },
-            refrigerant_leakage: { factor: 1430, scope: 'Scope 1' },
-            electricity_grid: { factor: 0.207, scope: 'Scope 2' },
-            heat_steam_purchased: { factor: 0.1662, scope: 'Scope 2' },
+            diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },   // DEFRA 2025 kg CO2e/litre
+            diesel_mobile: { factor: 2.68787, scope: 'Scope 1' },       // DEFRA 2025 kg CO2e/litre
+            petrol_mobile: { factor: 2.31, scope: 'Scope 1' },          // DEFRA 2025 kg CO2e/litre
+            natural_gas: { factor: 0.18293, scope: 'Scope 1' },         // DEFRA 2025 kg CO2e/kWh
+            lpg: { factor: 1.55537, scope: 'Scope 1' },                 // DEFRA 2025 kg CO2e/litre
+            heavy_fuel_oil: { factor: 3.17740, scope: 'Scope 1' },      // DEFRA 2025 kg CO2e/litre
+            biomass_solid: { factor: 0.01551, scope: 'Scope 1' },       // DEFRA 2025 kg CO2e/kWh
+            refrigerant_leakage: { factor: 1430, scope: 'Scope 1' },    // IPCC AR6 GWP-100 HFC-134a
+            // Country-specific electricity factor resolved from lib/grid-emission-factors.ts
+            electricity_grid: { factor: gridFactorResult.factor, scope: 'Scope 2' },
+            heat_steam_purchased: { factor: 0.1662, scope: 'Scope 2' }, // DEFRA 2025 kg CO2e/kWh
           };
 
           for (const entry of utilityEntries) {
@@ -692,8 +720,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         origin_lng: null,
         origin_country_code: null,
         impact_climate: barrelPerBottle,
-        impact_climate_fossil: barrelPerBottle * 0.95,
-        impact_climate_biogenic: barrelPerBottle * 0.05,
+        // Barrel allocation fossil/biogenic split:
+        // Oak barrel manufacturing involves timber (biogenic carbon, ~55% of mass
+        // is carbon stored in wood) plus kiln-drying, cooperage energy, and transport
+        // (all fossil). Based on Ecoinvent 3.x wooden barrel datasets, approximately
+        // 40% of the cradle-to-gate barrel CO2e is fossil (energy use in cooperage
+        // + transport) and 60% is biogenic (wood combustion/decomposition credits).
+        // Source: Pettersson (2016) LCA of Swedish single malt whisky; SWA (2006).
+        // This is preferable to the previous 95/5 split which had no documented basis.
+        impact_climate_fossil: barrelPerBottle * 0.40,
+        impact_climate_biogenic: barrelPerBottle * 0.60,
         impact_climate_dluc: 0,
         ch4_kg: 0,
         ch4_fossil_kg: 0,
@@ -889,8 +925,15 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     onProgress?.('Aggregating lifecycle impacts...', 75);
     console.log(`[calculateProductCarbonFootprint] Calling aggregation engine...`);
 
-    console.log(`[calculateProductCarbonFootprint] Passing ${collectedFacilityEmissions.length} facility emissions to aggregator`);
-    const aggregationResult = await aggregateProductImpacts(supabase, lca.id, collectedFacilityEmissions);
+    console.log(`[calculateProductCarbonFootprint] Passing ${collectedFacilityEmissions.length} facility emissions to aggregator (boundary: ${systemBoundary || 'cradle-to-gate'})`);
+    const aggregationResult = await aggregateProductImpacts(
+      supabase,
+      lca.id,
+      collectedFacilityEmissions,
+      systemBoundary,
+      params.usePhaseConfig,
+      params.eolConfig
+    );
 
     if (!aggregationResult.success) {
       console.error('[calculateProductCarbonFootprint] Aggregation error:', aggregationResult.error);

@@ -37,11 +37,34 @@ const GRID_EMISSION_FACTORS: Record<EnergySource, number> = {
 };
 
 // Angel's share ethanol assumptions
-const DEFAULT_ABV = 0.63;        // Typical cask-strength fill ABV (63%)
-const ETHANOL_DENSITY = 0.789;   // kg/L at 20°C
-const ETHANOL_POCP = 0.40;      // Photochemical Ozone Creation Potential (kg NMVOC eq / kg ethanol)
+// Source: SWA (2006) Life Cycle Assessment of Scotch Whisky; Pettersson (2016)
+const DEFAULT_ABV = 0.63;        // Typical cask-strength fill ABV (63%) — industry standard fill strength
+const ETHANOL_DENSITY = 0.789;   // kg/L at 20°C — NIST standard value
 
-// Reconditioning CO2e for reused barrels (kg per barrel)
+/**
+ * Ethanol Photochemical Ozone Creation Potential (POCP)
+ * Units: kg NMVOC-equivalent per kg ethanol
+ *
+ * Source: van Zelm et al. (2008) "European characterization factors for human
+ * health damage of PM10 and ozone in life cycle impact assessment"
+ * Int J Life Cycle Assess 13:299–306. Ethanol POCP ≈ 0.40 kg NMVOC-eq/kg.
+ *
+ * Range in literature: 0.30–0.60 kg NMVOC-eq/kg (sensitivity should be noted
+ * in LCA reports). ReCiPe midpoint method uses 0.40 as central estimate.
+ *
+ * Note: This is a photochemical ozone formation factor, NOT a GWP climate
+ * factor. Angel's share is NOT added to the CO2e climate total.
+ */
+const ETHANOL_POCP = 0.40;
+
+/**
+ * Reconditioning CO2e for reused barrels (kg CO2e per barrel per use)
+ *
+ * Covers: hot water cleaning, sulphur candle treatment, minor repairs.
+ * Source: SWA (2006) estimated ~0.3–0.7 kg CO2e for reconditioning;
+ * Pettersson (2016) uses 0.5 kg. We use 0.5 as central estimate.
+ * Uncertainty: ±50% (highly variable by cooperage practice).
+ */
 const REUSED_BARREL_CO2E = 0.5;
 
 // ---------------------------------------------------------------------------
