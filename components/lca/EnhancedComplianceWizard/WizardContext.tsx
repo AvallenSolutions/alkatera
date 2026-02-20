@@ -196,7 +196,9 @@ export function WizardProvider({
             functionalUnit: pcf.functional_unit || '',
             systemBoundary: pcf.system_boundary || 'Cradle-to-gate',
             cutoffCriteria: pcf.cutoff_criteria || '',
-            assumptions: pcf.assumptions_limitations || [],
+            assumptions: (pcf.assumptions_limitations || []).map((a: any) =>
+              typeof a === 'string' ? a : a.text || ''
+            ).filter(Boolean),
             dataQuality: {
               temporal_coverage: pcf.data_quality_requirements?.temporal_coverage || `${pcf.reference_year || new Date().getFullYear()}`,
               geographic_coverage: pcf.data_quality_requirements?.geographic_coverage || '',
@@ -230,7 +232,7 @@ export function WizardProvider({
         const { data: interp } = await supabase
           .from('lca_interpretation_results')
           .select('id')
-          .eq('pcf_id', pcfId)
+          .eq('product_carbon_footprint_id', pcfId)
           .maybeSingle();
 
         if (interp) {
@@ -345,7 +347,9 @@ export function WizardProvider({
           functional_unit: formData.functionalUnit || null,
           system_boundary: formData.systemBoundary || null,
           cutoff_criteria: formData.cutoffCriteria || null,
-          assumptions_limitations: formData.assumptions.length > 0 ? formData.assumptions : null,
+          assumptions_limitations: formData.assumptions.length > 0
+            ? formData.assumptions.map((text) => ({ type: 'Assumption', text }))
+            : null,
           data_quality_requirements: formData.dataQuality,
           critical_review_type: formData.criticalReviewType,
           critical_review_justification: formData.criticalReviewJustification || null,
