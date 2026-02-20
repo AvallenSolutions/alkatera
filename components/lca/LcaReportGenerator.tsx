@@ -210,7 +210,8 @@ export function LcaReportGenerator({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `PDF generation failed (${response.status})`);
+        const msg = errorData.details || errorData.error || `PDF generation failed (${response.status})`;
+        throw new Error(msg);
       }
 
       const blob = await response.blob();

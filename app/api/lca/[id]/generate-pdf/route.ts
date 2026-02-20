@@ -129,7 +129,20 @@ export async function POST(
     // TRANSFORM DATA
     // ========================================================================
 
-    const reportData = transformLCADataForReport(pcf, null, organization);
+    let reportData;
+    try {
+      reportData = transformLCADataForReport(pcf, null, organization);
+    } catch (transformError) {
+      console.error('[generate-pdf] Transform failed:', transformError);
+      return NextResponse.json(
+        {
+          error: 'Failed to transform LCA data',
+          details: transformError instanceof Error ? transformError.message : 'Unknown transform error',
+          step: 'transform',
+        },
+        { status: 500 }
+      );
+    }
 
     // ========================================================================
     // OPTIONAL: GENERATE AI NARRATIVES
@@ -137,7 +150,6 @@ export async function POST(
 
     if (body.includeNarratives) {
       try {
-        // Fetch top contributors for narrative context
         const topMaterials = materials
           ?.sort((a: any, b: any) => (b.impact_climate || 0) - (a.impact_climate || 0))
           .slice(0, 10);
@@ -163,13 +175,12 @@ export async function POST(
 
         const narratives = await generateNarratives(context);
 
-        // Enhance the executive summary with AI narrative
         if (narratives.executiveSummary) {
           reportData.executiveSummary.content = narratives.executiveSummary;
         }
       } catch (narrativeError) {
         // AI narratives are optional — don't fail the entire PDF generation
-        console.warn('Failed to generate AI narratives:', narrativeError);
+        console.warn('[generate-pdf] AI narratives failed (continuing):', narrativeError);
       }
     }
 
@@ -177,18 +188,45 @@ export async function POST(
     // RENDER HTML
     // ========================================================================
 
-    const html = renderLcaReportHtml(reportData);
+    let html: string;
+    try {
+      html = renderLcaReportHtml(reportData);
+    } catch (renderError) {
+      console.error('[generate-pdf] HTML render failed:', renderError);
+      return NextResponse.json(
+        {
+          error: 'Failed to render report HTML',
+          details: renderError instanceof Error ? renderError.message : 'Unknown render error',
+          step: 'render',
+        },
+        { status: 500 }
+      );
+    }
 
     // ========================================================================
     // CONVERT TO PDF
     // ========================================================================
 
-    const { buffer: pdfBuffer } = await convertHtmlToPdf(html, {
-      format: 'A4',
-      landscape: false,
-      margin: { top: '0', right: '0', bottom: '0', left: '0' },
-      removeBlank: true,
-    });
+    let pdfBuffer: Buffer;
+    try {
+      const result = await convertHtmlToPdf(html, {
+        format: 'A4',
+        landscape: false,
+        margin: { top: '0', right: '0', bottom: '0', left: '0' },
+        removeBlank: true,
+      });
+      pdfBuffer = result.buffer;
+    } catch (pdfError) {
+      console.error('[generate-pdf] PDFShift conversion failed:', pdfError);
+      return NextResponse.json(
+        {
+          error: 'PDF conversion failed',
+          details: pdfError instanceof Error ? pdfError.message : 'Unknown PDFShift error',
+          step: 'pdfshift',
+        },
+        { status: 500 }
+      );
+    }
 
     // ========================================================================
     // RETURN PDF
