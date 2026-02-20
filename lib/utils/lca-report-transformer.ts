@@ -66,6 +66,8 @@ interface LCADatabaseData {
   organization_id?: string;
   aggregated_impacts?: AggregatedImpacts;
   product_lca_materials?: any[];
+  /** Alias used by public report page and API route when attaching materials */
+  materials?: any[];
   data_quality_summary?: any;
   reference_year?: number;
   lca_scope_type?: string;
@@ -124,7 +126,7 @@ export function transformLCADataForReport(
   const scope2Pct = totalScopes > 0 ? (scope2 / totalScopes) * 100 : 0;
   const scope3Pct = totalScopes > 0 ? (scope3 / totalScopes) * 100 : 100;
 
-  const materials = lca.product_lca_materials || [];
+  const materials = lca.product_lca_materials || lca.materials || [];
   const dqScore = dataQuality.score || 70;
   const dqRating = dataQuality.rating || (dqScore >= 80 ? 'Good' : dqScore >= 50 ? 'Fair' : 'Poor');
 
@@ -695,7 +697,7 @@ export function transformLCADataForReport(
                 name: m.name,
                 location: materials.find((mat: any) => mat.material_name === m.name)?.origin_country || "Various",
                 distance: `${materials.find((mat: any) => mat.material_name === m.name)?.distance_km || "-"} km`,
-                co2: `${m.emissions.toFixed(3)} kg CO\u2082e`
+                co2: `${(m.emissions ?? 0).toFixed(3)} kg CO\u2082e`
               }))
             : materials.slice(0, 8).map((m: any) => ({
                 name: m.material_name || "Supplier",

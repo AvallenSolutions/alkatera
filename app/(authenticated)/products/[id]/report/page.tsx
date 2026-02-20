@@ -19,7 +19,7 @@ import ComplianceTracker from '@/components/lca/ComplianceTracker';
 import ComplianceWizard from '@/components/lca/ComplianceWizard';
 import { PdfPreviewDialog } from '@/components/lca/PdfPreviewDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { generateEnhancedLcaPdf } from '@/lib/enhanced-pdf-generator';
+// Old jsPDF import removed — now uses new PDFShift-based /api/lca/[id]/generate-pdf endpoint
 
 const MOCK_LCA_REPORT = {
   id: '550e8400-e29b-41d4-a716-446655440000',
@@ -274,72 +274,30 @@ export default function ProductLcaReportPage() {
     setPdfPreviewOpen(true);
   };
 
-  // Generate PDF blob for preview dialog
+  // Generate PDF blob using the new PDFShift-based API
   const generatePdfBlob = async (): Promise<Blob> => {
-    // Prepare data for enhanced PDF generator
-    const pdfData = {
-      productName: displayProductName,
-      version: displayVersion,
-      assessmentPeriod: displayPeriod,
-      publishedDate: lcaData?.updated_at || new Date().toISOString(),
-      functionalUnit: displayFunctionalUnit,
-      systemBoundary: displayBoundary,
-      metrics: {
-        climate_change_gwp100: impacts?.climate_change_gwp100 || 0,
-        water_consumption: impacts?.water_consumption || 0,
-        land_use: impacts?.land_use || 0,
-        circularity_percentage: circularityPercentage || 0,
-      },
-      dataQuality: {
-        averageConfidence: displayDqi,
-        rating: displayDqi >= 80 ? 'Excellent' : displayDqi >= 60 ? 'Good' : 'Fair',
-        highQualityCount: lcaData?.materials?.filter((m: any) => m.quality_grade === 'high').length || 0,
-        mediumQualityCount: lcaData?.materials?.filter((m: any) => m.quality_grade === 'medium').length || 0,
-        lowQualityCount: lcaData?.materials?.filter((m: any) => m.quality_grade === 'low' || !m.quality_grade).length || 0,
-        totalMaterialsCount: lcaData?.materials?.length || 1,
-      },
-      dataProvenance: {
-        hybridSourcesCount: lcaData?.materials?.filter((m: any) => m.data_source === 'hybrid').length || 0,
-        defraGwpCount: lcaData?.materials?.filter((m: any) => m.data_source === 'defra').length || 0,
-        supplierVerifiedCount: lcaData?.materials?.filter((m: any) => m.data_source === 'supplier_epd').length || 0,
-        ecoinventOnlyCount: lcaData?.materials?.filter((m: any) => m.data_source === 'ecoinvent' || m.data_source === 'openlca').length || 0,
-        methodologySummary: 'Hybrid methodology combining UK regulatory data (DEFRA 2025) with comprehensive environmental impact data (Ecoinvent 3.12).',
-      },
-      ghgBreakdown: breakdown?.by_ghg ? {
-        co2Fossil: breakdown.by_ghg.co2_fossil || 0,
-        co2Biogenic: breakdown.by_ghg.co2_biogenic || 0,
-        co2Dluc: breakdown.by_ghg.co2_dluc || 0,
-      } : undefined,
-      complianceFramework: {
-        standards: ['ISO 14044:2006', 'ISO 14067:2018', 'GHG Protocol'],
-        certifications: [],
-      },
-    };
+    const supabaseClient = supabase;
+    const { data: { session } } = await supabaseClient.auth.getSession();
 
-    // Generate PDF using jsPDF (returns void but saves file)
-    // We need to create a blob version instead
-    const { jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
+    if (!session?.access_token) {
+      throw new Error('Not authenticated — please sign in again.');
+    }
 
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4',
+    const response = await fetch(`/api/lca/${lcaData.id}/generate-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ includeNarratives: true, inline: true }),
     });
 
-    // Simplified PDF generation for preview
-    doc.setFontSize(24);
-    doc.text('LCA Report', 20, 30);
-    doc.setFontSize(16);
-    doc.text(displayProductName, 20, 45);
-    doc.setFontSize(12);
-    doc.text(`Version: ${displayVersion}`, 20, 60);
-    doc.text(`Carbon Footprint: ${(impacts?.climate_change_gwp100 || 0).toFixed(3)} kg CO₂e`, 20, 75);
-    doc.text(`Data Quality: ${displayDqi}%`, 20, 90);
-    doc.text(`Functional Unit: ${displayFunctionalUnit}`, 20, 105);
-    doc.text(`System Boundary: ${displayBoundary}`, 20, 120);
+    if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      throw new Error(errBody.error || `PDF generation failed (${response.status})`);
+    }
 
-    return doc.output('blob');
+    return response.blob();
   };
 
   const handleOpenPrintablePage = () => {
