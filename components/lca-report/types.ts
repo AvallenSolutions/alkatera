@@ -119,6 +119,12 @@ export interface LCAReportData {
   ingredientBreakdown: {
     ingredients: Array<{
       name: string;
+      /** The factor name actually used for calculation — may differ from `name` when a proxy was used */
+      calculationFactor: string;
+      /** Whether a proxy factor was used (calculationFactor !== name) */
+      isProxy: boolean;
+      /** Human-readable data source (e.g. "ecoinvent 3.12", "AGRIBALYSE 3.2", "Supplier verified") */
+      factorDatabase: string;
       category: string;
       quantity: string;
       unit: string;
@@ -131,8 +137,12 @@ export interface LCAReportData {
       eutrophication: string;
       dataSource: string;
       dataQualityGrade: string;
+      /** Confidence score 0–100 */
+      confidenceScore: number;
     }>;
     totalClimateImpact: string;
+    /** True if any ingredients use proxy factors */
+    hasProxies: boolean;
   };
   waterFootprint: {
     totalConsumption: string;

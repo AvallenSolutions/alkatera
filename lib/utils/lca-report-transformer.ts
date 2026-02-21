@@ -515,11 +515,45 @@ export function transformLCADataForReport(
   const gwpMethod = materials[0]?.gwp_method || 'IPCC AR6 GWP-100';
 
   // Ingredient-level breakdown
+  // Show both the user's real ingredient name and the factor used for calculation.
+  // When a proxy is used, `matched_source_name` holds the database factor name
+  // and `gwp_data_source` / `non_gwp_data_source` record which database provided it.
   const ingredientRows = materials.map((m: any) => {
     const climateVal = m.impact_climate || 0;
     const climatePct = totalCarbon > 0 ? ((climateVal / totalCarbon) * 100).toFixed(1) : '0.0';
+
+    // Determine the factor name actually used for calculation
+    const calcFactorName: string =
+      m.matched_source_name && m.matched_source_name !== (m.material_name || m.name)
+        ? m.matched_source_name
+        : (m.material_name || m.name || 'Material');
+
+    const userIngredientName: string = m.material_name || m.name || 'Material';
+    const isProxy = calcFactorName !== userIngredientName;
+
+    // Determine which database provided the factor
+    const gwpSrc: string = m.gwp_data_source || '';
+    const nonGwpSrc: string = m.non_gwp_data_source || '';
+    let factorDatabase = 'Secondary database';
+    if (m.impact_source === 'primary_verified' || m.data_priority === 1) {
+      factorDatabase = 'Supplier verified';
+    } else if (gwpSrc.toLowerCase().includes('defra')) {
+      factorDatabase = nonGwpSrc
+        ? `DEFRA + ${nonGwpSrc}`
+        : 'DEFRA Emission Factors';
+    } else if (gwpSrc.toLowerCase().includes('agribalyse') || nonGwpSrc.toLowerCase().includes('agribalyse')) {
+      factorDatabase = 'AGRIBALYSE 3.2';
+    } else if (gwpSrc.toLowerCase().includes('ecoinvent') || nonGwpSrc.toLowerCase().includes('ecoinvent')) {
+      factorDatabase = 'ecoinvent 3.12';
+    } else if (gwpSrc) {
+      factorDatabase = gwpSrc;
+    }
+
     return {
-      name: m.material_name || m.name || 'Material',
+      name: userIngredientName,
+      calculationFactor: calcFactorName,
+      isProxy,
+      factorDatabase,
       category: m.category_type || m.material_type || 'ingredient',
       quantity: (m.quantity || 0).toFixed(3),
       unit: m.unit || m.unit_name || 'kg',
@@ -534,6 +568,7 @@ export function transformLCADataForReport(
         : m.impact_source === 'secondary_modelled' ? 'Secondary'
         : m.impact_source === 'hybrid_proxy' ? 'Proxy' : 'Secondary',
       dataQualityGrade: m.data_quality_grade || 'N/A',
+      confidenceScore: m.confidence_score || 0,
     };
   });
 
@@ -812,6 +847,7 @@ export function transformLCADataForReport(
     ingredientBreakdown: {
       ingredients: ingredientRows,
       totalClimateImpact: totalCarbon.toFixed(4),
+      hasProxies: ingredientRows.some((r) => r.isProxy),
     },
     waterFootprint: {
       totalConsumption: `${waterConsumption.toFixed(3)}L`,

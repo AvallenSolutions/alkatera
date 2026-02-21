@@ -683,6 +683,8 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
   const ingredients = data.ingredientBreakdown.ingredients;
   if (ingredients.length === 0) return '';
 
+  const hasProxies = data.ingredientBreakdown.hasProxies;
+
   // Split into pages of 10 rows
   const perPage = 10;
   const pages: string[] = [];
@@ -692,18 +694,38 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
     const isFirstPage = i === 0;
     const pageNum = 10 + Math.floor(i / perPage);
 
-    const rows = pageIngredients.map(ing =>
-      `<tr>
-        <td style="font-weight: 500; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(ing.name)}</td>
+    const rows = pageIngredients.map(ing => {
+      // Ingredient cell: show real name, then proxy factor below if different
+      const ingredientCell = ing.isProxy
+        ? `<td style="max-width: 110px;">
+            <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(ing.name)}</div>
+            <div style="font-size: 8px; color: #f59e0b; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              &#8627; Proxy: ${escapeHtml(ing.calculationFactor)}
+            </div>
+            <div style="font-size: 7.5px; color: #78716c;">${escapeHtml(ing.factorDatabase)}</div>
+           </td>`
+        : `<td style="font-weight: 500; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${escapeHtml(ing.name)}
+            <div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${escapeHtml(ing.factorDatabase)}</div>
+           </td>`;
+
+      const dataSourceBadge = ing.isProxy
+        ? `<span class="badge badge-high">Proxy</span>`
+        : ing.dataSource === 'Primary'
+          ? `<span class="badge badge-low">Primary</span>`
+          : `<span class="badge badge-medium">Secondary</span>`;
+
+      return `<tr>
+        ${ingredientCell}
         <td>${escapeHtml(ing.quantity)} ${escapeHtml(ing.unit)}</td>
         <td>${escapeHtml(ing.origin)}</td>
         <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}</td>
         <td><span style="color: #ccff00;">${escapeHtml(ing.climatePercentage)}</span></td>
         <td>${escapeHtml(ing.acidification)}</td>
         <td>${escapeHtml(ing.eutrophication)}</td>
-        <td><span class="badge ${ing.dataSource === 'Primary' ? 'badge-low' : ing.dataSource === 'Proxy' ? 'badge-high' : 'badge-medium'}">${escapeHtml(ing.dataSource)}</span></td>
-      </tr>`
-    ).join('');
+        <td>${dataSourceBadge}${ing.confidenceScore > 0 ? `<div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${ing.confidenceScore}%</div>` : ''}</td>
+      </tr>`;
+    }).join('');
 
     pages.push(`
       <div class="page ${isFirstPage ? 'dark-page' : 'light-page'}">
@@ -713,19 +735,27 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
         }
 
         ${isFirstPage ? `
-          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: ${isFirstPage ? '#78716c' : '#78716c'}; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">PER-INGREDIENT ENVIRONMENTAL CONTRIBUTION</div>
+          <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">PER-INGREDIENT ENVIRONMENTAL CONTRIBUTION · REAL INGREDIENT &amp; CALCULATION FACTOR</div>
+        ` : ''}
+
+        ${isFirstPage && hasProxies ? `
+          <div style="margin-bottom: 12px; padding: 10px 14px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; font-size: 9px; color: #b45309; line-height: 1.5;">
+            <strong>Proxy factors in use:</strong> One or more ingredients are calculated using the closest matching dataset from ecoinvent, AGRIBALYSE, or DEFRA.
+            The user's actual ingredient name is shown first; the proxy factor and database are shown beneath it in amber.
+            All proxy selections are documented per ISO 14044 §4.2.3.6.3.
+          </div>
         ` : ''}
 
         <table class="${isFirstPage ? 'data-table-dark' : 'data-table'}" style="font-size: 10px;">
           <thead><tr>
-            <th>Ingredient</th>
+            <th>Ingredient / Calc. Factor</th>
             <th>Qty</th>
             <th>Origin</th>
             <th>GWP (kg CO&#8322;e)</th>
             <th>% Climate</th>
             <th>Acid. (SO&#8322;-eq)</th>
             <th>Eutroph. (P-eq)</th>
-            <th>Data</th>
+            <th>Data / Conf.</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -735,6 +765,7 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
             <div style="font-size: 10px; color: #a8a29e; line-height: 1.6;">
               <strong style="color: #ccff00;">Total Climate Impact:</strong> ${escapeHtml(data.ingredientBreakdown.totalClimateImpact)} kg CO&#8322;e per functional unit.
               Acidification values in kg SO&#8322;-eq (terrestrial). Eutrophication values in kg P-eq (freshwater). Values below detection shown as 0.000e+0.
+              ${hasProxies ? '&#x26A0; Proxy factors are used where a direct dataset match was not available — see Data Quality section.' : ''}
             </div>
           </div>
         ` : ''}

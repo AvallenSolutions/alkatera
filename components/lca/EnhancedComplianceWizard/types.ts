@@ -15,6 +15,12 @@ export interface MaterialWithValidation extends ProductMaterial {
   dataQuality?: string;
   confidenceScore?: number;
   error?: string;
+  /** The resolved factor name used for calculation (may differ from material_name when a proxy is used) */
+  resolvedFactorName?: string;
+  /** Human-readable data source for the resolved factor (e.g. "ecoinvent 3.12", "AGRIBALYSE 3.2", "Supplier verified") */
+  resolvedFactorSource?: string;
+  /** Priority tier used (1=supplier, 2=DEFRA hybrid, 3=ecoinvent/staging) */
+  resolvedPriority?: 1 | 2 | 3;
 }
 
 // ============================================================================

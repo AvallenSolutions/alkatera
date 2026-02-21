@@ -13,6 +13,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   AlertCircle,
   CheckCircle2,
   Loader2,
@@ -21,6 +27,8 @@ import {
   TrendingUp,
   Database,
   Search,
+  ArrowRight,
+  FlaskConical,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { validateMaterialsBeforeCalculation } from '@/lib/impact-waterfall-resolver';
@@ -29,6 +37,7 @@ import { InlineIngredientSearch } from '@/components/lca/InlineIngredientSearch'
 import type { DataSource } from '@/lib/types/lca';
 import type { MaterialWithValidation } from '../types';
 import { useWizardContext } from '../WizardContext';
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // HELPERS
@@ -132,11 +141,20 @@ export function MaterialValidationStep() {
           if (m.id !== materialId) return m;
           const valid = validation.validMaterials[0];
           if (valid) {
+            const r = valid.resolved;
+            // Determine human-readable source label from waterfall result
+            const sourceLabel =
+              r.data_priority === 1 ? 'Supplier verified'
+              : r.is_hybrid_source ? `DEFRA + ${r.non_gwp_data_source || 'ecoinvent'}`
+              : r.gwp_data_source || r.source_reference || 'Database';
             return {
               ...updatedRow,
               hasData: true,
-              dataQuality: valid.resolved.data_quality_tag,
-              confidenceScore: valid.resolved.confidence_score,
+              dataQuality: r.data_quality_tag,
+              confidenceScore: r.confidence_score,
+              resolvedFactorName: updatedRow.matched_source_name || updatedRow.material_name,
+              resolvedFactorSource: sourceLabel,
+              resolvedPriority: r.data_priority,
               error: undefined,
             } as MaterialWithValidation;
           }
@@ -212,112 +230,195 @@ export function MaterialValidationStep() {
         </Alert>
       )}
 
+      {/* Proxy explanation note */}
+      {materials.some(
+        (m) =>
+          m.hasData &&
+          m.matched_source_name &&
+          m.matched_source_name !== m.material_name
+      ) && (
+        <Alert className="border-amber-500/30 bg-amber-500/5">
+          <FlaskConical className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs">
+            <strong>Proxy factors in use.</strong> Some ingredients are
+            calculated using a proxy emission factor (shown in the
+            &quot;Calculation Factor&quot; column below). The proxy is the
+            closest matching dataset from ecoinvent, AGRIBALYSE, or your
+            supplier data. Both your ingredient name and the proxy used are
+            shown in the final LCA report for full transparency.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Materials Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Material</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead className="text-right">Qty</TableHead>
-            <TableHead>Quality</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {materials.map((material) => {
-            const badgeProps = material.dataQuality
-              ? getQualityBadgeProps(material.dataQuality)
-              : null;
-            const Icon = badgeProps?.icon;
-            const isEditing = editingMaterialId === material.id;
-            const isSaving = savingMaterialId === material.id;
+      <TooltipProvider>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Your Ingredient / Material</TableHead>
+              <TableHead>Calculation Factor</TableHead>
+              <TableHead className="text-right">Qty</TableHead>
+              <TableHead>Quality</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {materials.map((material) => {
+              const badgeProps = material.dataQuality
+                ? getQualityBadgeProps(material.dataQuality)
+                : null;
+              const Icon = badgeProps?.icon;
+              const isEditing = editingMaterialId === material.id;
+              const isSaving = savingMaterialId === material.id;
 
-            return (
-              <Fragment key={material.id}>
-                <TableRow>
-                  <TableCell className="font-medium text-sm">
-                    {material.material_name}
-                    {material.matched_source_name &&
-                      material.matched_source_name !==
-                        material.material_name && (
-                        <div className="text-xs text-amber-500 font-normal mt-0.5">
-                          Proxy: {material.matched_source_name}
-                        </div>
-                      )}
-                  </TableCell>
-                  <TableCell className="capitalize text-sm">
-                    {material.material_type}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
-                    {material.quantity} {material.unit}
-                  </TableCell>
-                  <TableCell>
-                    {material.hasData && badgeProps ? (
-                      <Badge
-                        variant={badgeProps.variant}
-                        className={`${badgeProps.className} text-xs`}
-                      >
-                        {Icon && <Icon className="h-3 w-3 mr-1" />}
-                        {material.dataQuality?.replace('_', ' ')}
-                      </Badge>
-                    ) : (
-                      <Badge variant="destructive" className="text-xs">
-                        Missing
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {material.hasData ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    ) : isSaving ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-lime-500" />
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs text-lime-600 hover:text-lime-700 hover:bg-lime-50 dark:text-lime-400 dark:hover:text-lime-300 dark:hover:bg-lime-950/30"
-                        onClick={() =>
-                          setEditingMaterialId(isEditing ? null : material.id)
-                        }
-                      >
-                        <Search className="h-3 w-3 mr-1" />
-                        {isEditing ? 'Cancel' : 'Fix'}
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
+              // Determine what factor name is used for calculation
+              const calcFactorName =
+                material.resolvedFactorName ||
+                material.matched_source_name ||
+                material.material_name;
+              const isProxy =
+                material.hasData &&
+                calcFactorName !== material.material_name;
+              const factorSource = material.resolvedFactorSource || null;
+              const confidenceScore = material.confidenceScore;
 
-                {/* Inline search row for missing materials */}
-                {isEditing && !material.hasData && (
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableCell colSpan={5} className="py-3">
-                      <div className="max-w-lg">
-                        <p className="text-xs text-muted-foreground mb-2">
-                          Search for an emission factor for &quot;
-                          {material.material_name}&quot;:
-                        </p>
-                        <InlineIngredientSearch
-                          organizationId={product.organization_id}
-                          value={material.material_name}
-                          placeholder={`Search emission factor for ${material.material_name}...`}
-                          materialType={
-                            material.material_type as
-                              | 'ingredient'
-                              | 'packaging'
-                          }
-                          onSelect={(selection) =>
-                            handleEmissionFactorSelect(material.id, selection)
-                          }
-                        />
+              return (
+                <Fragment key={material.id}>
+                  <TableRow>
+                    {/* Column 1: User's ingredient name */}
+                    <TableCell className="font-medium text-sm">
+                      {material.material_name}
+                      <div className="text-xs text-muted-foreground capitalize mt-0.5">
+                        {material.material_type}
                       </div>
                     </TableCell>
+
+                    {/* Column 2: What factor is actually used for calculation */}
+                    <TableCell className="text-sm">
+                      {material.hasData ? (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            {isProxy && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex items-center gap-1 rounded-sm bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 cursor-help">
+                                    <FlaskConical className="h-2.5 w-2.5" />
+                                    Proxy
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" className="max-w-[220px] text-xs">
+                                  <p>
+                                    <strong>Proxy factor</strong> — the closest
+                                    matching dataset for &ldquo;
+                                    {material.material_name}&rdquo; found in the
+                                    LCA database. This will be documented in
+                                    the report.
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            <span
+                              className={cn(
+                                'text-xs leading-snug',
+                                isProxy
+                                  ? 'text-amber-700 dark:text-amber-400'
+                                  : 'text-muted-foreground'
+                              )}
+                            >
+                              {calcFactorName}
+                            </span>
+                          </div>
+                          {factorSource && (
+                            <span className="text-xs text-muted-foreground/70">
+                              {factorSource}
+                              {confidenceScore != null &&
+                                ` · ${confidenceScore}% confidence`}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground italic">
+                          No factor assigned
+                        </span>
+                      )}
+                    </TableCell>
+
+                    {/* Column 3: Quantity */}
+                    <TableCell className="text-right font-mono text-sm">
+                      {material.quantity} {material.unit}
+                    </TableCell>
+
+                    {/* Column 4: Quality badge */}
+                    <TableCell>
+                      {material.hasData && badgeProps ? (
+                        <Badge
+                          variant={badgeProps.variant}
+                          className={`${badgeProps.className} text-xs`}
+                        >
+                          {Icon && <Icon className="h-3 w-3 mr-1" />}
+                          {material.dataQuality?.replace(/_/g, ' ')}
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs">
+                          Missing
+                        </Badge>
+                      )}
+                    </TableCell>
+
+                    {/* Column 5: Status / Fix button */}
+                    <TableCell>
+                      {material.hasData ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      ) : isSaving ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-lime-500" />
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-lime-600 hover:text-lime-700 hover:bg-lime-50 dark:text-lime-400 dark:hover:text-lime-300 dark:hover:bg-lime-950/30"
+                          onClick={() =>
+                            setEditingMaterialId(isEditing ? null : material.id)
+                          }
+                        >
+                          <Search className="h-3 w-3 mr-1" />
+                          {isEditing ? 'Cancel' : 'Fix'}
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
-                )}
-              </Fragment>
-            );
-          })}
-        </TableBody>
-      </Table>
+
+                  {/* Inline search row for missing materials */}
+                  {isEditing && !material.hasData && (
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableCell colSpan={5} className="py-3">
+                        <div className="max-w-lg">
+                          <p className="text-xs text-muted-foreground mb-2">
+                            Search for an emission factor for &quot;
+                            {material.material_name}&quot;:
+                          </p>
+                          <InlineIngredientSearch
+                            organizationId={product.organization_id}
+                            value={material.material_name}
+                            placeholder={`Search emission factor for ${material.material_name}...`}
+                            materialType={
+                              material.material_type as
+                                | 'ingredient'
+                                | 'packaging'
+                            }
+                            onSelect={(selection) =>
+                              handleEmissionFactorSelect(material.id, selection)
+                            }
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TooltipProvider>
     </div>
   );
 }
