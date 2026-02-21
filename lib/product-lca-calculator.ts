@@ -593,6 +593,26 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           } else {
             console.log(`[calculateProductCarbonFootprint] ✅ Copied ${newSites.length} owned production sites to new PCF`);
 
+            // HIGH FIX #26: Also populate collectedFacilityEmissions from the copied sites
+            // so that Scope 1/2 processing emissions are included in the aggregation.
+            // Previously the legacy flow left collectedFacilityEmissions empty, causing
+            // all processing emissions to be zero in the aggregated result even when
+            // facility data existed in the DB.
+            for (const site of newSites) {
+              collectedFacilityEmissions.push({
+                facilityId: site.facility_id || '',
+                facilityName: `Facility (legacy copy from ${previousPCF.id.substring(0, 8)})`,
+                isContractManufacturer: false,
+                allocatedEmissions: site.allocated_emissions_kg_co2e || 0,
+                scope1Emissions: site.scope1_emissions_kg_co2e || 0,
+                scope2Emissions: site.scope2_emissions_kg_co2e || 0,
+                allocatedWater: site.allocated_water_litres || 0,
+                allocatedWaste: site.allocated_waste_kg || 0,
+                attributionRatio: site.attribution_ratio || 1,
+                productVolume: site.production_volume || 1,
+              });
+            }
+
             // Log the emissions being carried forward
             const totalCopiedEmissions = newSites.reduce((sum, s) => sum + (s.allocated_emissions_kg_co2e || 0), 0);
             const totalScope1 = newSites.reduce((sum, s) => sum + (s.scope1_emissions_kg_co2e || 0), 0);

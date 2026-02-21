@@ -14,6 +14,7 @@ import {
   type OperationStep,
 } from '@/components/ui/operation-progress';
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
+import { getBoundaryLabel } from '@/lib/system-boundaries';
 import { toast } from 'sonner';
 import { useWizardContext } from '../WizardContext';
 
@@ -27,6 +28,7 @@ export function CalculationStep() {
     preCalcState,
     setPreCalcState,
     onCalculationComplete,
+    formData,
   } = useWizardContext();
 
   const {
@@ -91,13 +93,22 @@ export function CalculationStep() {
           facilityTotalProduction: parseFloat(a.facilityTotalProduction),
         }));
 
+      // Map boundary value to calculator format (lowercase with hyphens)
+      const boundaryValue = (formData.systemBoundary || 'cradle-to-gate') as
+        | 'cradle-to-gate'
+        | 'cradle-to-shelf'
+        | 'cradle-to-consumer'
+        | 'cradle-to-grave';
+
       const result = await calculateProductLCA({
         productId,
         functionalUnit: `1 ${product?.unit || 'unit'} of ${product?.name || 'product'}`,
-        systemBoundary: 'cradle-to-gate',
+        systemBoundary: boundaryValue,
         referenceYear: new Date().getFullYear(),
         facilityAllocations:
           validAllocations.length > 0 ? validAllocations : undefined,
+        usePhaseConfig: formData.usePhaseConfig,
+        eolConfig: formData.eolConfig,
         onProgress: (step: string, percent: number) => {
           setPreCalcState((prev) => ({
             ...prev,
@@ -206,7 +217,7 @@ export function CalculationStep() {
           </div>
           <div>
             <p className="text-muted-foreground">System Boundary</p>
-            <p className="font-medium">Cradle-to-Gate</p>
+            <p className="font-medium">{getBoundaryLabel(formData.systemBoundary)}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Reference Year</p>

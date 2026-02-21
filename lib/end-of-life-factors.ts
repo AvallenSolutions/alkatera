@@ -34,12 +34,23 @@ export type EoLRegion = 'eu' | 'uk' | 'us';
 /**
  * Emission factors per disposal pathway (kg CO2e per kg of material)
  * Negative values represent avoided burden (recycling credits)
+ *
+ * MEDIUM FIX #14: `anaerobic_digestion` is defined here but NOT currently
+ * calculated in `calculateMaterialEoL` because `RegionalDefaults` only
+ * includes the four main pathways (recycling, landfill, incineration, composting).
+ * The AD factor values in `EOL_FACTORS` are accurate but inaccessible.
+ *
+ * TODO: Add `anaerobic_digestion` to `RegionalDefaults` and to the calculation
+ * loop in `calculateMaterialEoL`. AD is particularly relevant for organic materials
+ * (cork, cardboard, organic waste). EU Landfill Directive is shifting waste away from
+ * landfill toward AD for organics. See Biogas Europe (2023) for AD emission factors.
  */
 export interface EoLPathwayFactors {
   recycling: number; // kg CO2e/kg (negative = credit from avoided virgin production)
   landfill: number; // kg CO2e/kg
   incineration: number; // kg CO2e/kg (includes energy recovery credit where applicable)
   composting: number; // kg CO2e/kg
+  /** NOTE: Currently not calculated — see TODO above. Factor values present but unused. */
   anaerobic_digestion: number; // kg CO2e/kg
 }
 

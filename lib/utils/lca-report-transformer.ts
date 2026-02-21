@@ -573,9 +573,14 @@ export function transformLCADataForReport(
   const consumerStages = ["Consumer use phase (refrigeration, carbonation)"];
   const graveStages = ["End-of-life disposal & recycling credits"];
 
+  // MEDIUM FIX #22: Use only boundary type (not `distribution > 0`) to determine
+  // which stages are included. `distribution > 0` caused "Distribution & transport to retail"
+  // to appear in cradle-to-gate reports when ingredient transport emissions were non-zero —
+  // falsely implying outbound distribution is in scope. Inbound ingredient transport
+  // is part of raw materials, not the "distribution to retail" stage.
   const includedStages = [
     ...baseIncluded,
-    ...(boundaryType === 'cradle-to-shelf' || boundaryType === 'cradle-to-consumer' || boundaryType === 'cradle-to-grave' || distribution > 0 ? shelfStages : []),
+    ...(boundaryType === 'cradle-to-shelf' || boundaryType === 'cradle-to-consumer' || boundaryType === 'cradle-to-grave' ? shelfStages : []),
     ...(boundaryType === 'cradle-to-consumer' || boundaryType === 'cradle-to-grave' ? consumerStages : []),
     ...(boundaryType === 'cradle-to-grave' ? graveStages : []),
   ];
@@ -665,11 +670,18 @@ export function transformLCADataForReport(
       intendedAudience: lca.intended_audience || ['Internal stakeholders', 'Supply chain partners', 'Regulatory bodies'],
       isComparativeAssertion: lca.is_comparative_assertion || false,
       systemBoundary: scopeTypeLabel,
+      // HIGH FIX #21: Correct descriptions for all 4 boundary tiers.
+      // Previously Cradle-to-Shelf and Cradle-to-Consumer fell through to a
+      // gate-to-gate fallback ("within the factory gate boundaries") — factually wrong.
       systemBoundaryDescription: scopeTypeLabel === 'Cradle-to-Gate'
         ? 'This assessment covers all processes from raw material extraction through to the factory gate, including agricultural production, primary processing, packaging manufacture, and factory energy use. Distribution, consumer use, and end-of-life are excluded.'
+        : scopeTypeLabel === 'Cradle-to-Shelf'
+        ? 'This assessment covers all processes from raw material extraction through manufacturing and outbound distribution to the point of sale (retailer shelf or equivalent). Consumer use and end-of-life disposal are excluded.'
+        : scopeTypeLabel === 'Cradle-to-Consumer'
+        ? 'This assessment covers all processes from raw material extraction through manufacturing, distribution, and the consumer use phase (including refrigeration and carbonation losses where applicable). End-of-life disposal is excluded.'
         : scopeTypeLabel === 'Cradle-to-Grave'
-        ? 'This assessment covers the complete product lifecycle from raw material extraction through manufacturing, distribution, consumer use, and final disposal or recycling.'
-        : 'This assessment covers the processes within the factory gate boundaries.',
+        ? 'This assessment covers the complete product lifecycle from raw material extraction through manufacturing, distribution, consumer use, and final disposal or recycling, including end-of-life avoided burden credits for recycled packaging materials.'
+        : 'This assessment covers the lifecycle stages defined within the stated system boundary.',
       cutOffCriteria: lca.cutoff_criteria || 'Mass-based cut-off: flows contributing less than 1% of total mass input are excluded. The cumulative excluded flows represent less than 5% of total environmental impact.',
       allocationProcedure: 'Physical allocation by mass is applied for co-products following ISO 14044 Clause 4.3.4 hierarchy. Where physical relationships cannot be established, economic allocation is used as documented per material.',
       assumptionsAndLimitations: assumptionsLimitations,
@@ -735,12 +747,19 @@ export function transformLCADataForReport(
     climateImpact: {
       totalCarbon: totalCarbon.toFixed(3),
       breakdown: chartBreakdown,
+      // LOW FIX #23: Add Use Phase and End of Life to climateImpact.stages so all
+      // 6 possible lifecycle stages are represented in the stages data table.
+      // Previously only 4 stages were listed, so cradle-to-consumer/grave reports
+      // had a mismatch between the pie chart (which included all stages) and the
+      // stages table (which silently omitted use phase and end of life).
       stages: [
         { label: "Raw Materials", value: rawMaterials, unit: "kg CO\u2082eq", percentage: rawMaterialsPct.toFixed(1), color: "green" },
         { label: "Packaging", value: packaging, unit: "kg CO\u2082eq", percentage: packagingPct.toFixed(1), color: "yellow" },
         { label: "Distribution", value: distribution, unit: "kg CO\u2082eq", percentage: distributionPct.toFixed(1), color: "orange" },
-        { label: "Processing", value: processing, unit: "kg CO\u2082eq", percentage: processingPct.toFixed(1), color: "blue" }
-      ].filter(stage => stage.value > 0),
+        { label: "Processing", value: processing, unit: "kg CO\u2082eq", percentage: processingPct.toFixed(1), color: "blue" },
+        { label: "Use Phase", value: usePhase, unit: "kg CO\u2082eq", percentage: usePhasePct.toFixed(1), color: "purple" },
+        { label: "End of Life", value: endOfLife, unit: "kg CO\u2082eq", percentage: endOfLifePct.toFixed(1), color: "red" },
+      ].filter(stage => stage.value !== 0), // include negatives (EoL can be negative via recycling credits)
       scopes: [
         { name: "Scope 1 (Direct)", value: scope1Pct.toFixed(1) },
         { name: "Scope 2 (Energy)", value: scope2Pct.toFixed(1) },

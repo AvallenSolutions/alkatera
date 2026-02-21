@@ -252,7 +252,26 @@ export async function aggregateProductImpacts(
       rawMaterialsEmissions += climateImpact;
     }
 
-    distributionEmissions += transportImpact;
+    // MEDIUM FIX #9: Inbound ingredient transport (from supplier to factory) is
+    // part of the "raw materials" lifecycle stage per ISO 14044, not "distribution".
+    // "Distribution" in LCA refers to outbound distribution from factory to shelf/consumer.
+    // Adding ingredient transport to `distributionEmissions` caused the stage breakdown to
+    // mislabel upstream logistics as downstream distribution in the report.
+    //
+    // Transport in this context = supplier-to-factory (inbound) → raw materials stage.
+    // Outbound distribution (factory to shelf) is only added when isStageIncluded('distribution')
+    // and would come from a separate distribution activity record (not per-material transport).
+    //
+    // Reclassify: add transportImpact to the same stage bucket as the material itself.
+    if (materialType === 'packaging' || materialType === 'packaging_material') {
+      packagingEmissions += transportImpact;
+    } else if ((material.material_name || '').startsWith('[Maturation]')) {
+      processingEmissions += transportImpact;
+    } else {
+      rawMaterialsEmissions += transportImpact;
+    }
+    // Note: distributionEmissions is reserved for outbound distribution activities
+    // (added separately when boundary includes 'distribution' stage).
 
     totalCO2Fossil += climateFossil;
     totalCO2Biogenic += climateBiogenic;
@@ -276,17 +295,23 @@ export async function aggregateProductImpacts(
     totalN2O += n2oFromMaterial;
 
     // Add to per-material breakdown (aggregate by material name)
+    // HIGH FIX #5: Use climateImpact only (NOT + transportImpact) so that
+    // by_material totals match the total_climate headline figure.
+    // Transport is already embedded in climateImpact (included during impact
+    // factor resolution); adding transportImpact separately inflates the per-material
+    // chart vs. the headline number. The by_material breakdown should show the same
+    // basis as total_climate for consistency.
     const materialKey = material.material_name || 'Unknown Material';
     const existingMat = materialBreakdown.find(m => m.name === materialKey);
     if (existingMat) {
       existingMat.quantity += quantity;
-      existingMat.climate += climateImpact + transportImpact;
+      existingMat.climate += climateImpact;
     } else {
       materialBreakdown.push({
         name: materialKey,
         quantity,
         unit: material.unit || 'kg',
-        climate: climateImpact + transportImpact,
+        climate: climateImpact,
         source: (material as any).impact_source || 'Product LCA',
       });
     }
@@ -376,15 +401,30 @@ export async function aggregateProductImpacts(
       const quantity = Number(material.quantity || 0);
       if (quantity <= 0) continue;
 
-      // Determine packaging category for factor lookup
+      // HIGH FIX #6: EoL should only apply to PACKAGING materials and food-waste
+      // ingredients. PRIMARY ingredients (barley, water, hops, grapes, etc.) are
+      // consumed during processing — they have no end-of-life in the product sense.
+      // Applying 'organic' waste factors to 500kg of malt falsely adds large
+      // EoL emissions to the total. Only process materials where:
+      //   (a) material_type is 'packaging' / 'packaging_material', OR
+      //   (b) the material has an explicit packaging_category set (backup guard)
+      // Synthetic maturation rows (named '[Maturation] ...' ) also excluded.
+      const isPackaging = materialType === 'packaging' || materialType === 'packaging_material';
       const packagingCategory = (material as any).packaging_category || '';
-      const factorKey = getMaterialFactorKey(
-        packagingCategory ||
-        (materialType === 'packaging' || materialType === 'packaging_material' ? 'other' : 'organic')
-      );
+      const isMaturationRow = (material.material_name || '').startsWith('[Maturation]');
 
-      // Get user pathway overrides if available
-      const pathwayOverrides = eolConfig?.pathways?.[material.id] || eolConfig?.pathways?.[factorKey];
+      if (!isPackaging || isMaturationRow) {
+        // Skip: ingredients consumed during processing have no meaningful EoL pathway.
+        // Food waste (organic fraction) is typically handled by waste management and
+        // already partially captured in upstream processing emissions.
+        continue;
+      }
+
+      const factorKey = getMaterialFactorKey(packagingCategory || 'other');
+
+      // Get user pathway overrides if available — keyed by factorKey (e.g. 'glass', 'aluminium')
+      // Note: material.id (UUID) is not a valid key in wizard-generated eolConfig
+      const pathwayOverrides = eolConfig?.pathways?.[factorKey];
 
       const eolResult = calculateMaterialEoL(quantity, factorKey, eolRegion, pathwayOverrides);
 

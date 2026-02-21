@@ -3,6 +3,8 @@ export { FacilityAllocationStep } from './FacilityAllocationStep';
 export { CalculationStep } from './CalculationStep';
 export { GoalStep } from './GoalStep';
 export { BoundaryStep } from './BoundaryStep';
+export { UsePhaseStep } from './UsePhaseStep';
+export { EndOfLifeStep } from './EndOfLifeStep';
 export { CutoffStep } from './CutoffStep';
 export { DataQualityStep } from './DataQualityStep';
 export { InterpretationStep } from './InterpretationStep';

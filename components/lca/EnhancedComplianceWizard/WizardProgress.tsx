@@ -3,13 +3,14 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Check, Clock, AlertCircle } from 'lucide-react';
-import { useWizardContext } from './WizardContext';
+import { useWizardContext, getStepIdsForBoundary } from './WizardContext';
 
 // ============================================================================
 // STEP CONFIGURATION
 // ============================================================================
 
 export interface WizardStep {
+  id: string;
   number: number;
   title: string;
   shortTitle: string;
@@ -17,80 +18,41 @@ export interface WizardStep {
   estimatedMinutes: number;
 }
 
-export const WIZARD_STEPS: WizardStep[] = [
-  // Pre-calculation steps (1-3)
-  {
-    number: 1,
-    title: 'Materials',
-    shortTitle: 'Materials',
-    description: 'Verify emission data for all materials',
-    estimatedMinutes: 1,
-  },
-  {
-    number: 2,
-    title: 'Facilities',
-    shortTitle: 'Facilities',
-    description: 'Assign production volumes',
-    estimatedMinutes: 1,
-  },
-  {
-    number: 3,
-    title: 'Calculate',
-    shortTitle: 'Calculate',
-    description: 'Run the lifecycle assessment',
-    estimatedMinutes: 2,
-  },
-  // Post-calculation steps (4-10)
-  {
-    number: 4,
-    title: 'Goal & Purpose',
-    shortTitle: 'Goal',
-    description: 'Define why this LCA is being conducted',
-    estimatedMinutes: 2,
-  },
-  {
-    number: 5,
-    title: 'System Boundary',
-    shortTitle: 'Boundary',
-    description: 'Define what is included in the assessment',
-    estimatedMinutes: 2,
-  },
-  {
-    number: 6,
-    title: 'Cut-off Criteria',
-    shortTitle: 'Cut-off',
-    description: 'Specify what is excluded and why',
-    estimatedMinutes: 2,
-  },
-  {
-    number: 7,
-    title: 'Data Quality',
-    shortTitle: 'Quality',
-    description: 'Assess the quality of your data sources',
-    estimatedMinutes: 1,
-  },
-  {
-    number: 8,
-    title: 'Interpretation',
-    shortTitle: 'Analysis',
-    description: 'Review analysis results and findings',
-    estimatedMinutes: 1,
-  },
-  {
-    number: 9,
-    title: 'Critical Review',
-    shortTitle: 'Review',
-    description: 'Determine review requirements',
-    estimatedMinutes: 1,
-  },
-  {
-    number: 10,
-    title: 'Summary',
-    shortTitle: 'Summary',
-    description: 'Review and complete the wizard',
-    estimatedMinutes: 1,
-  },
-];
+/**
+ * Base step definitions keyed by step ID.
+ * Dynamic steps (use-phase, end-of-life) are included here and
+ * filtered based on the system boundary.
+ */
+const STEP_DEFINITIONS: Record<string, Omit<WizardStep, 'number' | 'id'>> = {
+  'materials': { title: 'Materials', shortTitle: 'Materials', description: 'Verify emission data for all materials', estimatedMinutes: 1 },
+  'facilities': { title: 'Facilities', shortTitle: 'Facilities', description: 'Assign production volumes', estimatedMinutes: 1 },
+  'boundary': { title: 'System Boundary', shortTitle: 'Boundary', description: 'Define scope before running calculation', estimatedMinutes: 2 },
+  'calculate': { title: 'Calculate', shortTitle: 'Calculate', description: 'Run the lifecycle assessment', estimatedMinutes: 2 },
+  'goal': { title: 'Goal & Purpose', shortTitle: 'Goal', description: 'Define why this LCA is being conducted', estimatedMinutes: 2 },
+  'use-phase': { title: 'Use Phase', shortTitle: 'Use', description: 'Configure consumer use parameters', estimatedMinutes: 2 },
+  'end-of-life': { title: 'End of Life', shortTitle: 'End of Life', description: 'Set disposal pathway assumptions', estimatedMinutes: 2 },
+  'cutoff': { title: 'Cut-off Criteria', shortTitle: 'Cut-off', description: 'Specify what is excluded and why', estimatedMinutes: 2 },
+  'data-quality': { title: 'Data Quality', shortTitle: 'Quality', description: 'Assess the quality of your data sources', estimatedMinutes: 1 },
+  'interpretation': { title: 'Interpretation', shortTitle: 'Analysis', description: 'Review analysis results and findings', estimatedMinutes: 1 },
+  'review': { title: 'Critical Review', shortTitle: 'Review', description: 'Determine review requirements', estimatedMinutes: 1 },
+  'summary': { title: 'Summary', shortTitle: 'Summary', description: 'Review and complete the wizard', estimatedMinutes: 1 },
+};
+
+/**
+ * Generate the ordered wizard steps for a given system boundary.
+ * Use-phase and end-of-life steps are dynamically inserted.
+ */
+export function getWizardSteps(systemBoundary: string): WizardStep[] {
+  const stepIds = getStepIdsForBoundary(systemBoundary);
+  return stepIds.map((id, index) => ({
+    id,
+    number: index + 1,
+    ...(STEP_DEFINITIONS[id] || { title: id, shortTitle: id, description: '', estimatedMinutes: 1 }),
+  }));
+}
+
+// Keep a static export for backward compatibility (10-step gate)
+export const WIZARD_STEPS = getWizardSteps('cradle-to-gate');
 
 // ============================================================================
 // PROGRESS TIMER
@@ -195,7 +157,13 @@ interface WizardProgressProps {
 }
 
 export function WizardProgress({ className }: WizardProgressProps) {
-  const { progress, goToStep } = useWizardContext();
+  const { progress, goToStep, formData } = useWizardContext();
+
+  // Dynamic steps based on boundary
+  const steps = React.useMemo(
+    () => getWizardSteps(formData.systemBoundary || 'cradle-to-gate'),
+    [formData.systemBoundary]
+  );
 
   const getStepStatus = (stepNumber: number): 'completed' | 'current' | 'upcoming' => {
     if (progress.completedSteps.includes(stepNumber)) return 'completed';
@@ -203,14 +171,14 @@ export function WizardProgress({ className }: WizardProgressProps) {
     return 'upcoming';
   };
 
-  const currentStepInfo = WIZARD_STEPS.find((s) => s.number === progress.currentStep);
+  const currentStepInfo = steps.find((s) => s.number === progress.currentStep);
 
   return (
     <div className={cn('space-y-4', className)}>
       {/* Progress bar with steps */}
       <div className="flex items-center justify-between">
-        {WIZARD_STEPS.map((step, index) => (
-          <React.Fragment key={step.number}>
+        {steps.map((step, index) => (
+          <React.Fragment key={step.id}>
             <StepIndicator
               step={step}
               status={getStepStatus(step.number)}
@@ -221,7 +189,7 @@ export function WizardProgress({ className }: WizardProgressProps) {
                 }
               }}
             />
-            {index < WIZARD_STEPS.length - 1 && (
+            {index < steps.length - 1 && (
               <ConnectorLine
                 completed={progress.completedSteps.includes(step.number)}
               />
@@ -304,9 +272,8 @@ interface CompactProgressProps {
 }
 
 export function CompactProgress({ className }: CompactProgressProps) {
-  const { progress } = useWizardContext();
+  const { progress, totalSteps } = useWizardContext();
   const completedCount = progress.completedSteps.length;
-  const totalSteps = WIZARD_STEPS.length;
   const percentage = Math.round((completedCount / totalSteps) * 100);
 
   return (
