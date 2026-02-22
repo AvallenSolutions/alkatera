@@ -61,7 +61,7 @@ const LAYER_COLORS = {
   processing: { fill: '#a855f7', glow: 'rgba(168, 85, 247, 0.4)', label: 'Processing' },
   packaging: { fill: '#f97316', glow: 'rgba(249, 115, 22, 0.4)', label: 'Packaging' },
   transport: { fill: '#06b6d4', glow: 'rgba(6, 182, 212, 0.4)', label: 'Transport' },
-  endOfLife: { fill: '#6b7280', glow: 'rgba(107, 114, 128, 0.4)', label: 'End of Life' },
+  endOfLife: { fill: '#3b82f6', glow: 'rgba(59, 130, 246, 0.4)', label: 'End of Life' },
   usePhase: { fill: '#ec4899', glow: 'rgba(236, 72, 153, 0.4)', label: 'Use Phase' },
 };
 
