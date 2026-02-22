@@ -1,9 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -80,6 +78,8 @@ function BottleVisualization({
   const processPct = getPercentage(breakdown.processing);
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
+  const endOfLifePct = getPercentage(breakdown.endOfLife || 0);
+  const usePhasePct = getPercentage(breakdown.usePhase || 0);
 
   // Define fill region for bottle body only (excluding narrow neck)
   const bottleFillTop = 60;  // Below the neck where body widens
@@ -94,12 +94,17 @@ function BottleVisualization({
     return calculatedHeight;
   };
 
+  const endOfLifeHeight = applyMinHeight((endOfLifePct / 100) * fillHeight, endOfLifePct);
+  const usePhaseHeight = applyMinHeight((usePhasePct / 100) * fillHeight, usePhasePct);
   const transportHeight = applyMinHeight((transportPct / 100) * fillHeight, transportPct);
   const packagingHeight = applyMinHeight((packagingPct / 100) * fillHeight, packagingPct);
   const processingHeight = applyMinHeight((processPct / 100) * fillHeight, processPct);
   const rawHeight = applyMinHeight((rawPct / 100) * fillHeight, rawPct);
 
-  const transportY = bottleFillBottom - transportHeight;
+  // Stack layers bottom-to-top: endOfLife → usePhase → transport → packaging → processing → rawMaterials
+  const endOfLifeY = bottleFillBottom - endOfLifeHeight;
+  const usePhaseY = endOfLifeY - usePhaseHeight;
+  const transportY = usePhaseY - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
   const rawY = bottleFillTop;
@@ -132,19 +137,21 @@ function BottleVisualization({
           <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
           <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
           <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
+          {usePhasePct > 0 && <rect x="0" y={usePhaseY} width="100" height={usePhaseHeight} fill={LAYER_COLORS.usePhase.fill} />}
+          {endOfLifePct > 0 && <rect x="0" y={endOfLifeY} width="100" height={endOfLifeHeight} fill={LAYER_COLORS.endOfLife.fill} />}
           <rect x="0" y={bottleFillTop} width="100" height={fillHeight} fill="url(#glassOverlay)" />
         </g>
 
         <path
           d={bottleOutline}
           fill="none"
-          stroke="white"
+          stroke="currentColor"
           strokeWidth="1.5"
-          className="opacity-80"
+          className="opacity-80 text-foreground"
           filter="url(#bottleGlow)"
         />
 
-        <rect x="38" y="2" width="24" height="6" rx="1" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
+        <rect x="38" y="2" width="24" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-80 text-foreground" />
       </svg>
     </div>
   );
@@ -165,6 +172,8 @@ function CanVisualization({
   const processPct = getPercentage(breakdown.processing);
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
+  const endOfLifePct = getPercentage(breakdown.endOfLife || 0);
+  const usePhasePct = getPercentage(breakdown.usePhase || 0);
 
   // Define fill region for can body only (excluding tapered top and curved bottom)
   const canFillTop = 48;  // Where the can body starts (after the lip taper)
@@ -179,12 +188,17 @@ function CanVisualization({
     return calculatedHeight;
   };
 
+  const endOfLifeHeight = applyMinHeight((endOfLifePct / 100) * fillHeight, endOfLifePct);
+  const usePhaseHeight = applyMinHeight((usePhasePct / 100) * fillHeight, usePhasePct);
   const transportHeight = applyMinHeight((transportPct / 100) * fillHeight, transportPct);
   const packagingHeight = applyMinHeight((packagingPct / 100) * fillHeight, packagingPct);
   const processingHeight = applyMinHeight((processPct / 100) * fillHeight, processPct);
   const rawHeight = applyMinHeight((rawPct / 100) * fillHeight, rawPct);
 
-  const transportY = canFillBottom - transportHeight;
+  // Stack layers bottom-to-top: endOfLife → usePhase → transport → packaging → processing → rawMaterials
+  const endOfLifeY = canFillBottom - endOfLifeHeight;
+  const usePhaseY = endOfLifeY - usePhaseHeight;
+  const transportY = usePhaseY - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
   const rawY = canFillTop;
@@ -217,20 +231,22 @@ function CanVisualization({
           <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
           <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
           <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
+          {usePhasePct > 0 && <rect x="0" y={usePhaseY} width="100" height={usePhaseHeight} fill={LAYER_COLORS.usePhase.fill} />}
+          {endOfLifePct > 0 && <rect x="0" y={endOfLifeY} width="100" height={endOfLifeHeight} fill={LAYER_COLORS.endOfLife.fill} />}
           <rect x="0" y={canFillTop} width="100" height={fillHeight} fill="url(#canGlassOverlay)" />
         </g>
 
         <path
           d={canOutline}
           fill="none"
-          stroke="white"
+          stroke="currentColor"
           strokeWidth="1.5"
-          className="opacity-80"
+          className="opacity-80 text-foreground"
           filter="url(#canGlow)"
         />
 
-        <path d="M28,36 L72,36" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
-        <path d="M32,32 C32,38 68,38 68,32" fill="none" stroke="white" strokeWidth="1" className="opacity-50" />
+        <path d="M28,36 L72,36" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-80 text-foreground" />
+        <path d="M32,32 C32,38 68,38 68,32" fill="none" stroke="currentColor" strokeWidth="1" className="opacity-50 text-foreground" />
       </svg>
     </div>
   );
@@ -251,6 +267,8 @@ function KegVisualization({
   const processPct = getPercentage(breakdown.processing);
   const packagingPct = getPercentage(breakdown.packaging);
   const transportPct = getPercentage(breakdown.transport);
+  const endOfLifePct = getPercentage(breakdown.endOfLife || 0);
+  const usePhasePct = getPercentage(breakdown.usePhase || 0);
 
   const kegFillTop = 40;
   const kegFillBottom = 160;
@@ -264,12 +282,17 @@ function KegVisualization({
     return calculatedHeight;
   };
 
+  const endOfLifeHeight = applyMinHeight((endOfLifePct / 100) * kegFillHeight, endOfLifePct);
+  const usePhaseHeight = applyMinHeight((usePhasePct / 100) * kegFillHeight, usePhasePct);
   const transportHeight = applyMinHeight((transportPct / 100) * kegFillHeight, transportPct);
   const packagingHeight = applyMinHeight((packagingPct / 100) * kegFillHeight, packagingPct);
   const processingHeight = applyMinHeight((processPct / 100) * kegFillHeight, processPct);
   const rawHeight = applyMinHeight((rawPct / 100) * kegFillHeight, rawPct);
 
-  const transportY = kegFillBottom - transportHeight;
+  // Stack layers bottom-to-top: endOfLife → usePhase → transport → packaging → processing → rawMaterials
+  const endOfLifeY = kegFillBottom - endOfLifeHeight;
+  const usePhaseY = endOfLifeY - usePhaseHeight;
+  const transportY = usePhaseY - transportHeight;
   const packagingY = transportY - packagingHeight;
   const processingY = packagingY - processingHeight;
   const rawY = kegFillTop;
@@ -302,26 +325,28 @@ function KegVisualization({
           <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
           <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
           <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
+          {usePhasePct > 0 && <rect x="0" y={usePhaseY} width="100" height={usePhaseHeight} fill={LAYER_COLORS.usePhase.fill} />}
+          {endOfLifePct > 0 && <rect x="0" y={endOfLifeY} width="100" height={endOfLifeHeight} fill={LAYER_COLORS.endOfLife.fill} />}
           <rect x="0" y={kegFillTop} width="100" height={kegFillHeight} fill="url(#kegGlassOverlay)" />
         </g>
 
         <path
           d={kegOutline}
           fill="none"
-          stroke="white"
+          stroke="currentColor"
           strokeWidth="1.5"
-          className="opacity-80"
+          className="opacity-80 text-foreground"
           filter="url(#kegGlow)"
         />
 
-        <path d="M15,40 L15,25 C15,20 85,20 85,25 L85,40" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
-        <path d="M15,160 L15,175 C15,180 85,180 85,175 L85,160" fill="none" stroke="white" strokeWidth="1.5" className="opacity-80" />
+        <path d="M15,40 L15,25 C15,20 85,20 85,25 L85,40" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-80 text-foreground" />
+        <path d="M15,160 L15,175 C15,180 85,180 85,175 L85,160" fill="none" stroke="currentColor" strokeWidth="1.5" className="opacity-80 text-foreground" />
 
-        <path d="M15,70 Q50,75 85,70" fill="none" stroke="white" strokeWidth="1" className="opacity-40" />
-        <path d="M15,130 Q50,135 85,130" fill="none" stroke="white" strokeWidth="1" className="opacity-40" />
+        <path d="M15,70 Q50,75 85,70" fill="none" stroke="currentColor" strokeWidth="1" className="opacity-40 text-foreground" />
+        <path d="M15,130 Q50,135 85,130" fill="none" stroke="currentColor" strokeWidth="1" className="opacity-40 text-foreground" />
 
-        <path d="M25,28 L35,28" fill="none" stroke="white" strokeWidth="2" className="opacity-60" strokeLinecap="round" />
-        <path d="M65,28 L75,28" fill="none" stroke="white" strokeWidth="2" className="opacity-60" strokeLinecap="round" />
+        <path d="M25,28 L35,28" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-60 text-foreground" strokeLinecap="round" />
+        <path d="M65,28 L75,28" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-60 text-foreground" strokeLinecap="round" />
       </svg>
     </div>
   );
@@ -367,14 +392,15 @@ export function ProductHeroImpact({
   return (
     <div className={cn(
       'relative overflow-hidden rounded-2xl',
-      'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900',
-      'border border-slate-700/50',
+      'bg-gradient-to-br from-slate-50 via-white to-slate-100',
+      'dark:from-slate-900 dark:via-slate-800 dark:to-slate-900',
+      'border dark:border-slate-700/50',
       className
     )}>
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -right-32 w-64 h-64 bg-lime-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+        <div className="absolute -top-32 -right-32 w-64 h-64 bg-lime-400/10 dark:bg-lime-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-cyan-400/10 dark:bg-cyan-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-300/5 dark:bg-purple-500/5 rounded-full blur-3xl" />
       </div>
 
       <div className="relative z-10 p-6 lg:p-8">
@@ -384,19 +410,19 @@ export function ProductHeroImpact({
               <img
                 src={productImage}
                 alt={productName}
-                className="w-32 h-32 object-cover rounded-xl border border-white/10"
+                className="w-32 h-32 object-cover rounded-xl border border-border"
               />
             ) : (
-              <div className="w-32 h-32 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <div className="w-32 h-32 rounded-xl bg-muted/50 border border-border flex items-center justify-center">
                 <span className="text-4xl opacity-50">📦</span>
               </div>
             )}
 
             <div className="text-center lg:text-left">
-              <h1 className="text-xl font-bold text-white">{productName}</h1>
-              {sku && <p className="text-sm text-white/50">SKU: {sku}</p>}
+              <h1 className="text-xl font-bold text-foreground">{productName}</h1>
+              {sku && <p className="text-sm text-muted-foreground">SKU: {sku}</p>}
               {category && (
-                <Badge variant="secondary" className="mt-2 bg-white/10 text-white/70">
+                <Badge variant="secondary" className="mt-2">
                   {category}
                 </Badge>
               )}
@@ -414,13 +440,13 @@ export function ProductHeroImpact({
                   type="single"
                   value={containerType}
                   onValueChange={handleContainerChange}
-                  className="flex flex-row gap-1 bg-white/10 p-1.5 rounded-lg"
+                  className="flex flex-row gap-1 bg-muted p-1.5 rounded-lg"
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <ToggleGroupItem
                         value="bottle"
-                        className="w-9 h-9 text-lg data-[state=on]:bg-white/20 rounded-md"
+                        className="w-9 h-9 text-lg data-[state=on]:bg-accent rounded-md"
                       >
                         🍾
                       </ToggleGroupItem>
@@ -431,7 +457,7 @@ export function ProductHeroImpact({
                     <TooltipTrigger asChild>
                       <ToggleGroupItem
                         value="can"
-                        className="w-9 h-9 text-lg data-[state=on]:bg-white/20 rounded-md"
+                        className="w-9 h-9 text-lg data-[state=on]:bg-accent rounded-md"
                       >
                         🥫
                       </ToggleGroupItem>
@@ -442,7 +468,7 @@ export function ProductHeroImpact({
                     <TooltipTrigger asChild>
                       <ToggleGroupItem
                         value="keg"
-                        className="w-9 h-9 text-lg data-[state=on]:bg-white/20 rounded-md"
+                        className="w-9 h-9 text-lg data-[state=on]:bg-accent rounded-md"
                       >
                         🛢️
                       </ToggleGroupItem>
@@ -455,14 +481,14 @@ export function ProductHeroImpact({
 
             <div className="flex-1 text-center lg:text-left">
               <div className="mb-6">
-                <p className="text-sm text-white/50 mb-1">Climate Impact</p>
+                <p className="text-sm text-muted-foreground mb-1">Climate Impact</p>
                 <div className="flex items-baseline gap-2 justify-center lg:justify-start">
-                  <span className="text-5xl lg:text-6xl font-bold text-white tabular-nums">
+                  <span className="text-5xl lg:text-6xl font-bold text-foreground tabular-nums">
                     {totalCarbonFootprint.toFixed(2)}
                   </span>
-                  <span className="text-lg text-white/70">kg CO₂e</span>
+                  <span className="text-lg text-muted-foreground">kg CO₂e</span>
                 </div>
-                <p className="text-sm text-white/50 mt-1">per {functionalUnit}</p>
+                <p className="text-sm text-muted-foreground mt-1">per {functionalUnit}</p>
               </div>
 
               {(benchmarkDiff !== null || trend !== undefined) && (
@@ -504,7 +530,7 @@ export function ProductHeroImpact({
 
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start">
                 {lcaReportUrl && (
-                  <Button variant="secondary" asChild className="bg-white/10 hover:bg-white/20 text-white border-0">
+                  <Button variant="secondary" asChild>
                     <Link href={lcaReportUrl}>
                       <FileText className="h-4 w-4 mr-2" />
                       View Full LCA Report
@@ -512,7 +538,7 @@ export function ProductHeroImpact({
                   </Button>
                 )}
                 {onDownloadReport && (
-                  <Button variant="ghost" onClick={onDownloadReport} className="text-white/70 hover:text-white hover:bg-white/10">
+                  <Button variant="ghost" onClick={onDownloadReport}>
                     <Download className="h-4 w-4 mr-2" />
                     Download PDF
                   </Button>
@@ -522,13 +548,13 @@ export function ProductHeroImpact({
           </div>
         </div>
 
-        <div className="mt-6 pt-6 border-t border-white/10">
+        <div className="mt-6 pt-6 border-t border-border">
           <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-sm font-medium text-white/70">Lifecycle Breakdown</h3>
+            <h3 className="text-sm font-medium text-muted-foreground">Lifecycle Breakdown</h3>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger>
-                  <Info className="h-3.5 w-3.5 text-white/40" />
+                  <Info className="h-3.5 w-3.5 text-muted-foreground/60" />
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Emissions by lifecycle stage (ISO 14044)</p>
@@ -562,8 +588,8 @@ export function ProductHeroImpact({
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: config.fill }}
                     />
-                    <span className="text-sm text-white/70">{config.label}</span>
-                    <span className="text-sm font-medium text-white">{adjusted[idx]}%</span>
+                    <span className="text-sm text-muted-foreground">{config.label}</span>
+                    <span className="text-sm font-medium text-foreground">{adjusted[idx]}%</span>
                   </div>
                 );
               });
