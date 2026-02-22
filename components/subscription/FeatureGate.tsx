@@ -487,6 +487,9 @@ const featureNames: Record<FeatureCode, string> = {
   third_party_verification: "Third-Party Verification Support",
   knowledge_bank_read: "Knowledge Bank (Read)",
   knowledge_bank_manage: "Knowledge Bank (Upload & Manage)",
+  lca_distribution: "LCA Distribution (Cradle-to-Shelf)",
+  lca_use_phase: "LCA Use Phase (Cradle-to-Consumer)",
+  lca_end_of_life: "LCA End of Life (Cradle-to-Grave)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {

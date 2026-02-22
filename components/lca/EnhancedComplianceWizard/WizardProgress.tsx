@@ -24,6 +24,7 @@ export interface WizardStep {
  * filtered based on the system boundary.
  */
 const STEP_DEFINITIONS: Record<string, Omit<WizardStep, 'number' | 'id'>> = {
+  'guide': { title: 'LCA Guide', shortTitle: 'Guide', description: 'Learn about lifecycle assessment', estimatedMinutes: 3 },
   'materials': { title: 'Materials', shortTitle: 'Materials', description: 'Verify emission data for all materials', estimatedMinutes: 1 },
   'facilities': { title: 'Facilities', shortTitle: 'Facilities', description: 'Assign production volumes', estimatedMinutes: 1 },
   'boundary': { title: 'System Boundary', shortTitle: 'Boundary', description: 'Define scope before running calculation', estimatedMinutes: 2 },

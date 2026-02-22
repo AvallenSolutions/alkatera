@@ -22,7 +22,6 @@ import {
   Info,
 } from 'lucide-react';
 import { useWizardContext } from './WizardContext';
-import { WIZARD_STEPS } from './WizardProgress';
 import { useToast } from '@/hooks/use-toast';
 
 // ============================================================================
@@ -45,153 +44,144 @@ interface TermExplanation {
 // STEP-SPECIFIC HELP CONTENT
 // ============================================================================
 
-const STEP_HELP: Record<number, { tips: string[]; terms: TermExplanation[] }> = {
-  1: {
+const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = {
+  'guide': {
+    tips: [
+      'Read through each section to understand the LCA process',
+      'Note the data you will need to collect before starting',
+      'You can skip this guide in future by ticking the checkbox below',
+    ],
+    terms: [
+      { term: 'LCA', explanation: 'Lifecycle Assessment — a standardised method (ISO 14040/14044) for measuring the environmental impact of a product across its entire life' },
+      { term: 'ISO 14044', explanation: 'The international standard specifying the requirements and guidelines for lifecycle assessment studies' },
+      { term: 'ISO 14067', explanation: 'The standard for quantifying and reporting the carbon footprint of products, based on the LCA methodology' },
+      { term: 'Functional Unit', explanation: 'A quantified description of the product function (e.g., "1 litre of beer at 5% ABV delivered to retailer")' },
+      { term: 'System Boundary', explanation: 'Defines which life cycle stages are included: from cradle-to-gate (manufacturing) through to cradle-to-grave (full lifecycle)' },
+      { term: 'kg CO₂e', explanation: 'Kilograms of carbon dioxide equivalent — the standard unit for expressing greenhouse gas emissions' },
+    ],
+  },
+  'materials': {
     tips: [
       'All materials need verified emission factors',
       'Click "Fix" to search and assign missing factors',
       'Proxy factors can be used if an exact match is not available',
     ],
     terms: [
-      {
-        term: 'Emission Factor',
-        explanation: 'A coefficient that quantifies the environmental impact per unit of a material (e.g., kg CO₂e per kg of barley)',
-      },
-      {
-        term: 'Data Quality Tag',
-        explanation: 'Indicates the reliability of the emission data: Primary (measured), Regional (averages), or Secondary (modelled)',
-      },
+      { term: 'Emission Factor', explanation: 'A coefficient that quantifies the environmental impact per unit of a material (e.g., kg CO₂e per kg of barley)' },
+      { term: 'Data Quality Tag', explanation: 'Indicates the reliability of the emission data: Primary (measured), Regional (averages), or Secondary (modelled)' },
     ],
   },
-  2: {
+  'facilities': {
     tips: [
       'Enter the product volume manufactured at each facility',
       'Total facility production is used to calculate your product\'s share of emissions',
       'Select a reporting session to auto-fill facility totals',
     ],
     terms: [
-      {
-        term: 'Attribution',
-        explanation: 'The proportion of a facility\'s total emissions allocated to your product, based on production volume share',
-      },
+      { term: 'Attribution', explanation: 'The proportion of a facility\'s total emissions allocated to your product, based on production volume share' },
     ],
   },
-  3: {
+  'calculate': {
     tips: [
       'All materials must be validated before calculating',
       'The calculation typically takes 10-30 seconds',
       'Results will be saved as a new carbon footprint record',
     ],
     terms: [
-      {
-        term: 'Lifecycle Assessment',
-        explanation: 'A comprehensive method to evaluate the environmental impact of a product across its lifecycle stages',
-      },
+      { term: 'Lifecycle Assessment', explanation: 'A comprehensive method to evaluate the environmental impact of a product across its lifecycle stages' },
     ],
   },
-  4: {
+  'goal': {
     tips: [
       'Be specific about why this LCA is being conducted',
       'Consider who will use the results',
       'If comparing products, additional review may be required',
     ],
     terms: [
-      {
-        term: 'Intended Application',
-        explanation: 'How the LCA results will be used (e.g., product improvement, marketing claims, regulatory compliance)',
-      },
-      {
-        term: 'Comparative Assertion',
-        explanation: 'A public claim that your product is environmentally better than a competitor. Requires third-party review.',
-      },
+      { term: 'Intended Application', explanation: 'How the LCA results will be used (e.g., product improvement, marketing claims, regulatory compliance)' },
+      { term: 'Comparative Assertion', explanation: 'A public claim that your product is environmentally better than a competitor. Requires third-party review.' },
     ],
   },
-  5: {
+  'boundary': {
     tips: [
       'The functional unit should be measurable and relevant',
       'System boundary defines what is included in the assessment',
-      'Cradle-to-gate is most common for manufacturing',
+      'Wider boundaries (Shelf, Consumer, Grave) require additional configuration steps',
     ],
     terms: [
-      {
-        term: 'Functional Unit',
-        explanation: 'A quantified description of the product function (e.g., "1 litre of beer at 5% ABV delivered to retailer")',
-      },
-      {
-        term: 'System Boundary',
-        explanation: 'Defines which life cycle stages are included: cradle-to-gate (materials to factory gate), cradle-to-grave (includes use and disposal)',
-      },
+      { term: 'Functional Unit', explanation: 'A quantified description of the product function (e.g., "1 litre of beer at 5% ABV delivered to retailer")' },
+      { term: 'System Boundary', explanation: 'Defines which life cycle stages are included: from cradle-to-gate (manufacturing) through to cradle-to-grave (full lifecycle)' },
     ],
   },
-  6: {
+  'use-phase': {
+    tips: [
+      'Defaults are auto-detected from your product category',
+      'Refrigeration energy is the largest use-phase contributor for beverages',
+      'Retail chillers consume more energy than domestic fridges',
+      'Carbonation CO₂ release is biogenic (not fossil)',
+    ],
+    terms: [
+      { term: 'Use Phase', explanation: 'The lifecycle stage covering consumer use of the product, including storage, refrigeration, and consumption' },
+      { term: 'Biogenic CO₂', explanation: 'CO₂ from biological sources (e.g., fermentation, dissolved gas) — treated differently from fossil CO₂ in LCA' },
+    ],
+  },
+  'end-of-life': {
+    tips: [
+      'Regional defaults reflect published recycling rates for your region',
+      'Pathway percentages must sum to 100% for each material',
+      'Recycling credits reduce your total footprint (avoided burden method)',
+      'Aluminium has the highest recycling credit due to energy-intensive virgin production',
+    ],
+    terms: [
+      { term: 'Avoided Burden', explanation: 'Recycling credits that offset emissions by displacing virgin material production — shown as negative values' },
+      { term: 'End of Life', explanation: 'The disposal phase: how materials are managed after consumer use (recycling, landfill, incineration, composting)' },
+    ],
+  },
+  'cutoff': {
     tips: [
       'Document any materials or processes excluded',
       'Typical cut-off threshold is 1% of mass or impact',
       'Capital goods are often excluded from screening LCAs',
     ],
     terms: [
-      {
-        term: 'Cut-off Criteria',
-        explanation: 'Rules for excluding minor inputs that have negligible impact on the results (e.g., materials <1% by mass)',
-      },
-      {
-        term: 'Mass-based Cut-off',
-        explanation: 'Excluding inputs below a percentage of total product mass',
-      },
+      { term: 'Cut-off Criteria', explanation: 'Rules for excluding minor inputs that have negligible impact on the results (e.g., materials <1% by mass)' },
+      { term: 'Mass-based Cut-off', explanation: 'Excluding inputs below a percentage of total product mass' },
     ],
   },
-  7: {
+  'data-quality': {
     tips: [
       'Higher quality data leads to more reliable results',
       'Primary data from your operations is preferred',
       'Document the age and source of all data used',
     ],
     terms: [
-      {
-        term: 'Pedigree Matrix',
-        explanation: 'A standardised way to score data quality across 5 dimensions: reliability, completeness, temporal, geographical, and technological representativeness',
-      },
-      {
-        term: 'Uncertainty',
-        explanation: 'The range within which the true value is expected to lie, expressed as a percentage or confidence interval',
-      },
+      { term: 'Pedigree Matrix', explanation: 'A standardised way to score data quality across 5 dimensions: reliability, completeness, temporal, geographical, and technological representativeness' },
+      { term: 'Uncertainty', explanation: 'The range within which the true value is expected to lie, expressed as a percentage or confidence interval' },
     ],
   },
-  8: {
+  'interpretation': {
     tips: [
       'Focus on the hotspots (biggest contributors)',
       'Consider sensitivity to key assumptions',
       'Check that results are consistent with the goal',
     ],
     terms: [
-      {
-        term: 'Contribution Analysis',
-        explanation: 'Identifying which materials or processes contribute most to the total impact',
-      },
-      {
-        term: 'Sensitivity Analysis',
-        explanation: 'Testing how changes in key inputs affect the final results',
-      },
+      { term: 'Contribution Analysis', explanation: 'Identifying which materials or processes contribute most to the total impact' },
+      { term: 'Sensitivity Analysis', explanation: 'Testing how changes in key inputs affect the final results' },
     ],
   },
-  9: {
+  'review': {
     tips: [
       'Internal review is sufficient for internal use',
       'Public claims require external review',
       'Panel review is required for comparative assertions',
     ],
     terms: [
-      {
-        term: 'Critical Review',
-        explanation: 'An independent check that the LCA methodology is sound and compliant with ISO standards',
-      },
-      {
-        term: 'Panel Review',
-        explanation: 'Review by a panel of experts, required when making public comparative claims',
-      },
+      { term: 'Critical Review', explanation: 'An independent check that the LCA methodology is sound and compliant with ISO standards' },
+      { term: 'Panel Review', explanation: 'Review by a panel of experts, required when making public comparative claims' },
     ],
   },
-  10: {
+  'summary': {
     tips: [
       'Review all steps before completing',
       'Ensure all mandatory fields are filled',
@@ -380,7 +370,7 @@ function TermsGlossary({ terms }: TermsGlossaryProps) {
 // ============================================================================
 
 export function WizardSidebar() {
-  const { progress, pcfId, formData, updateField } = useWizardContext();
+  const { progress, pcfId, formData, updateField, getStepId } = useWizardContext();
   const { toast } = useToast();
 
   const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
@@ -388,16 +378,17 @@ export function WizardSidebar() {
   const [error, setError] = useState<string | null>(null);
 
   const currentStep = progress.currentStep;
-  const stepHelp = STEP_HELP[currentStep] || { tips: [], terms: [] };
+  const currentStepId = getStepId(currentStep);
+  const stepHelp = STEP_HELP[currentStepId] || { tips: [], terms: [] };
 
-  // Map step number to field for AI suggestions (only for post-calc steps)
-  const getFieldForStep = (step: number): string | null => {
-    switch (step) {
-      case 4:
+  // Map step ID to field for AI suggestions
+  const getFieldForStep = (stepId: string): string | null => {
+    switch (stepId) {
+      case 'goal':
         return 'intended_application';
-      case 5:
+      case 'boundary':
         return 'functional_unit';
-      case 6:
+      case 'cutoff':
         return 'cutoff_criteria';
       default:
         return null;
@@ -405,7 +396,7 @@ export function WizardSidebar() {
   };
 
   const fetchAiSuggestion = useCallback(async () => {
-    const field = getFieldForStep(currentStep);
+    const field = getFieldForStep(currentStepId);
     if (!field) return;
 
     setLoading(true);
@@ -445,10 +436,10 @@ export function WizardSidebar() {
     } finally {
       setLoading(false);
     }
-  }, [currentStep, pcfId, formData]);
+  }, [currentStepId, pcfId, formData]);
 
   const handleApplySuggestion = (value: string) => {
-    const field = getFieldForStep(currentStep);
+    const field = getFieldForStep(currentStepId);
     if (!field) return;
 
     // Map API field names to form field names
@@ -465,7 +456,7 @@ export function WizardSidebar() {
     }
   };
 
-  const canGenerateSuggestion = getFieldForStep(currentStep) !== null;
+  const canGenerateSuggestion = getFieldForStep(currentStepId) !== null;
 
   return (
     <div className="space-y-4">

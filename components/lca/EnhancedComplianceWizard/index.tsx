@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,6 +17,7 @@ import {
 import { WizardProvider, useWizardContext } from './WizardContext';
 import { WizardProgress, CompactProgress, WIZARD_STEPS } from './WizardProgress';
 import { WizardSidebar } from './WizardSidebar';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 // Step components
 import { MaterialValidationStep } from './steps/MaterialValidationStep';
@@ -24,11 +25,14 @@ import { FacilityAllocationStep } from './steps/FacilityAllocationStep';
 import { CalculationStep } from './steps/CalculationStep';
 import { GoalStep } from './steps/GoalStep';
 import { BoundaryStep } from './steps/BoundaryStep';
+import { UsePhaseStep } from './steps/UsePhaseStep';
+import { EndOfLifeStep } from './steps/EndOfLifeStep';
 import { CutoffStep } from './steps/CutoffStep';
 import { DataQualityStep } from './steps/DataQualityStep';
 import { InterpretationStep } from './steps/InterpretationStep';
 import { ReviewStep } from './steps/ReviewStep';
 import { SummaryStep } from './steps/SummaryStep';
+import { GuideStep } from './steps/GuideStep';
 
 // ============================================================================
 // TYPES
@@ -45,33 +49,52 @@ interface EnhancedComplianceWizardProps {
 // STEP RENDERER
 // ============================================================================
 
-function StepContent() {
-  const { progress } = useWizardContext();
+/**
+ * Maps step IDs to React components.
+ * This allows dynamic step insertion (use-phase, end-of-life)
+ * without hardcoding step numbers.
+ */
+const STEP_COMPONENT_MAP: Record<string, React.ComponentType> = {
+  'materials': MaterialValidationStep,
+  'facilities': FacilityAllocationStep,
+  'calculate': CalculationStep,
+  'goal': GoalStep,
+  'boundary': BoundaryStep,
+  'use-phase': UsePhaseStep,
+  'end-of-life': EndOfLifeStep,
+  'cutoff': CutoffStep,
+  'data-quality': DataQualityStep,
+  'interpretation': InterpretationStep,
+  'review': ReviewStep,
+  'summary': SummaryStep,
+};
 
-  switch (progress.currentStep) {
-    case 1:
-      return <MaterialValidationStep />;
-    case 2:
-      return <FacilityAllocationStep />;
-    case 3:
-      return <CalculationStep />;
-    case 4:
-      return <GoalStep />;
-    case 5:
-      return <BoundaryStep />;
-    case 6:
-      return <CutoffStep />;
-    case 7:
-      return <DataQualityStep />;
-    case 8:
-      return <InterpretationStep />;
-    case 9:
-      return <ReviewStep />;
-    case 10:
-      return <SummaryStep />;
-    default:
-      return <MaterialValidationStep />;
+/**
+ * Context for guide step state — shared between StepContent and the outer wrapper.
+ * This avoids prop-drilling through WizardLayout.
+ */
+const GuideStateContext = React.createContext<{
+  skipGuide: boolean;
+  onToggleSkip: (skip: boolean) => void;
+}>({ skipGuide: false, onToggleSkip: () => {} });
+
+function StepContent() {
+  const { progress, getStepId } = useWizardContext();
+  const guideState = React.useContext(GuideStateContext);
+  const stepId = getStepId(progress.currentStep);
+
+  // Guide step is special — it has props for the skip toggle
+  if (stepId === 'guide') {
+    return (
+      <GuideStep
+        skipGuide={guideState.skipGuide}
+        onToggleSkip={guideState.onToggleSkip}
+      />
+    );
   }
+
+  const Component = STEP_COMPONENT_MAP[stepId] || MaterialValidationStep;
+  return <Component />;
 }
 
 // ============================================================================
@@ -84,6 +107,9 @@ function WizardFooter() {
     saving,
     pcfId,
     preCalcState,
+    formData,
+    totalSteps,
+    getStepId,
     prevStep,
     nextStep,
     markStepComplete,
@@ -92,13 +118,14 @@ function WizardFooter() {
   } = useWizardContext();
 
   const isFirstStep = progress.currentStep === 1;
-  const isLastStep = progress.currentStep === WIZARD_STEPS.length;
+  const isLastStep = progress.currentStep === totalSteps;
   const currentStepCompleted = progress.completedSteps.includes(
     progress.currentStep
   );
+  const currentStepId = getStepId(progress.currentStep);
 
-  // Step 3 (Calculate) has its own button — hide Next
-  if (progress.currentStep === 3) {
+  // Calculate step has its own button — hide Next
+  if (currentStepId === 'calculate') {
     return (
       <div className="flex items-center justify-between border-t bg-background px-6 py-4">
         <Button variant="outline" onClick={prevStep} disabled={saving}>
@@ -110,19 +137,51 @@ function WizardFooter() {
     );
   }
 
-  // Determine if Next should be disabled
+  // Determine if Next should be disabled based on step ID
   let nextDisabled = saving;
-  if (progress.currentStep === 1) {
-    // Step 1: Materials — can only proceed if all materials have data
+  if (currentStepId === 'materials') {
     nextDisabled = saving || !preCalcState.canCalculate;
-  } else if (progress.currentStep === 2) {
-    // Step 2: Facilities — can proceed if no facilities or all have volumes
+  } else if (currentStepId === 'facilities') {
     const hasFacilitiesMissingVolumes =
       preCalcState.linkedFacilities.length > 0 &&
       preCalcState.facilityAllocations.some(
         (a) => !a.productionVolume || !a.facilityTotalProduction
       );
     nextDisabled = saving || hasFacilitiesMissingVolumes;
+  } else if (currentStepId === 'goal') {
+    nextDisabled =
+      saving ||
+      !formData.intendedApplication.trim() ||
+      !formData.reasonsForStudy.trim() ||
+      formData.intendedAudience.length === 0;
+  } else if (currentStepId === 'boundary') {
+    nextDisabled =
+      saving ||
+      !formData.functionalUnit.trim() ||
+      !formData.systemBoundary;
+  } else if (currentStepId === 'cutoff') {
+    nextDisabled =
+      saving ||
+      !formData.cutoffCriteria.trim() ||
+      formData.assumptions.length === 0;
+  } else if (currentStepId === 'data-quality') {
+    nextDisabled =
+      saving ||
+      !formData.dataQuality.temporal_coverage.trim() ||
+      !formData.dataQuality.geographic_coverage.trim() ||
+      !formData.dataQuality.technological_coverage.trim();
+  } else if (currentStepId === 'review') {
+    nextDisabled = saving || !formData.criticalReviewType;
+  } else if (currentStepId === 'end-of-life') {
+    // Validate EoL pathway percentages sum to 100
+    const eolConfig = formData.eolConfig;
+    if (eolConfig?.pathways) {
+      const hasInvalid = Object.values(eolConfig.pathways).some((p) => {
+        const sum = p.recycling + p.landfill + p.incineration + p.composting;
+        return Math.abs(sum - 100) > 1;
+      });
+      nextDisabled = saving || hasInvalid;
+    }
   }
 
   const handleNext = () => {
@@ -293,10 +352,78 @@ export function EnhancedComplianceWizard({
   onComplete,
   onClose,
 }: EnhancedComplianceWizardProps) {
+  const [showGuide, setShowGuide] = useState(false);
+  const [skipGuide, setSkipGuide] = useState(false);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+
+  // Fetch user's guide preference on mount
+  useEffect(() => {
+    async function loadPreference() {
+      try {
+        const sb = getSupabaseBrowserClient();
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) { setPrefsLoaded(true); return; }
+
+        const { data: profile } = await sb
+          .from('profiles')
+          .select('ui_preferences')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const prefs = profile?.ui_preferences as Record<string, unknown> | null;
+        const shouldSkip = prefs?.skip_lca_guide === true;
+        setSkipGuide(shouldSkip);
+        setShowGuide(!shouldSkip);
+      } catch {
+        // On error, default to showing the guide
+        setShowGuide(true);
+      } finally {
+        setPrefsLoaded(true);
+      }
+    }
+    loadPreference();
+  }, []);
+
+  // Handle the "Don't show again" toggle
+  const handleToggleSkip = useCallback(async (skip: boolean) => {
+    setSkipGuide(skip);
+    try {
+      const sb = getSupabaseBrowserClient();
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) return;
+
+      // Read current preferences, merge, and update
+      const { data: profile } = await sb
+        .from('profiles')
+        .select('ui_preferences')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const currentPrefs = (profile?.ui_preferences as Record<string, unknown>) || {};
+      await sb
+        .from('profiles')
+        .update({ ui_preferences: { ...currentPrefs, skip_lca_guide: skip } })
+        .eq('id', user.id);
+    } catch (err) {
+      console.error('[LCAWizard] Failed to save guide preference:', err);
+    }
+  }, []);
+
+  // Wait for preferences to load before rendering
+  if (!prefsLoaded) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
-    <WizardProvider productId={productId} pcfId={pcfId} onComplete={onComplete}>
-      <WizardLayout onClose={onClose} />
-    </WizardProvider>
+    <GuideStateContext.Provider value={{ skipGuide, onToggleSkip: handleToggleSkip }}>
+      <WizardProvider productId={productId} pcfId={pcfId} onComplete={onComplete} showGuide={showGuide}>
+        <WizardLayout onClose={onClose} />
+      </WizardProvider>
+    </GuideStateContext.Provider>
   );
 }
 
@@ -317,6 +444,6 @@ export function AiAssistanceBadge() {
 // RE-EXPORTS
 // ============================================================================
 
-export { WizardProvider, useWizardContext } from './WizardContext';
-export { WizardProgress, CompactProgress, WIZARD_STEPS } from './WizardProgress';
+export { WizardProvider, useWizardContext, getTotalSteps, getStepIdsForBoundary } from './WizardContext';
+export { WizardProgress, CompactProgress, WIZARD_STEPS, getWizardSteps } from './WizardProgress';
 export type { WizardFormData, WizardProgress as WizardProgressType } from './WizardContext';

@@ -146,6 +146,9 @@ const INITIAL_PROGRESS: WizardProgress = {
 const BASE_STEP_TIME_ESTIMATES = [1, 1, 2, 2, 2, 2, 1, 1, 1, 1];
 const BASE_TOTAL_STEPS = 10;
 
+// Guide step time estimate
+const GUIDE_STEP_TIME = 3;
+
 // Additional step times for conditional steps
 const USE_PHASE_STEP_TIME = 2;
 const EOL_STEP_TIME = 2;
@@ -185,9 +188,11 @@ const BASE_STEP_IDS = [
 /**
  * Calculate total steps based on system boundary.
  * Use Phase step is added for consumer/grave, EoL step for grave.
+ * When showGuide is true, the guide step is prepended.
  */
-export function getTotalSteps(boundary: string): number {
+export function getTotalSteps(boundary: string, showGuide: boolean = false): number {
   let total = BASE_TOTAL_STEPS;
+  if (showGuide) total += 1;
   if (boundaryNeedsUsePhase(boundary)) total += 1;
   if (boundaryNeedsEndOfLife(boundary)) total += 1;
   return total;
@@ -195,13 +200,15 @@ export function getTotalSteps(boundary: string): number {
 
 /**
  * Get the ordered list of step IDs for a given boundary.
- * Use-phase and EoL steps are inserted after 'boundary' (now at index 2).
+ * Use-phase and EoL steps are inserted after 'boundary'.
  * They appear BEFORE 'calculate' so configs are ready when calculation runs.
+ * When showGuide is true, the 'guide' step is prepended.
  */
-export function getStepIdsForBoundary(boundary: string): string[] {
-  const ids = [...BASE_STEP_IDS];
-  // 'boundary' is at index 2; insert conditional steps at index 3 (after boundary)
-  const insertAt = 3;
+export function getStepIdsForBoundary(boundary: string, showGuide: boolean = false): string[] {
+  const ids = showGuide ? ['guide', ...BASE_STEP_IDS] : [...BASE_STEP_IDS];
+  // 'boundary' index shifts by 1 when guide is present
+  const boundaryIdx = ids.indexOf('boundary');
+  const insertAt = boundaryIdx + 1;
   if (boundaryNeedsEndOfLife(boundary)) {
     ids.splice(insertAt, 0, 'end-of-life');
   }
@@ -209,16 +216,20 @@ export function getStepIdsForBoundary(boundary: string): string[] {
     ids.splice(insertAt, 0, 'use-phase');
   }
   return ids;
-  // Result for cradle-to-grave: materials, facilities, boundary, use-phase, end-of-life, calculate, goal, ...
-  // Result for cradle-to-gate:  materials, facilities, boundary, calculate, goal, ...
+  // Result for cradle-to-grave (with guide): guide, materials, facilities, boundary, use-phase, end-of-life, calculate, goal, ...
+  // Result for cradle-to-gate (no guide):    materials, facilities, boundary, calculate, goal, ...
 }
 
 /**
  * Get time estimates for all steps (including dynamic ones)
  */
-function getStepTimeEstimates(boundary: string): number[] {
-  const times = [...BASE_STEP_TIME_ESTIMATES];
-  const insertAt = 3;
+function getStepTimeEstimates(boundary: string, showGuide: boolean = false): number[] {
+  const times = showGuide
+    ? [GUIDE_STEP_TIME, ...BASE_STEP_TIME_ESTIMATES]
+    : [...BASE_STEP_TIME_ESTIMATES];
+  // 'boundary' is at index 2 (or 3 with guide); insert after it
+  const boundaryIdx = showGuide ? 3 : 2;
+  const insertAt = boundaryIdx + 1;
   if (boundaryNeedsEndOfLife(boundary)) {
     times.splice(insertAt, 0, EOL_STEP_TIME);
   }
@@ -251,6 +262,7 @@ interface WizardProviderProps {
   pcfId?: string | null;
   children: React.ReactNode;
   onComplete?: () => void;
+  showGuide?: boolean;
 }
 
 export function WizardProvider({
@@ -258,6 +270,7 @@ export function WizardProvider({
   pcfId: initialPcfId,
   children,
   onComplete,
+  showGuide = false,
 }: WizardProviderProps) {
   const { toast } = useToast();
 
@@ -537,7 +550,7 @@ export function WizardProvider({
           // so ISO doc steps are offset by (calculateStepNumber).
           // Old saved format stored ISO steps starting at 1.
           const savedBoundary = (pcf.system_boundary || 'cradle-to-gate').toLowerCase();
-          const savedStepIds = getStepIdsForBoundary(savedBoundary);
+          const savedStepIds = getStepIdsForBoundary(savedBoundary, showGuide);
           const calcIdx = savedStepIds.indexOf('calculate'); // 0-indexed
           const isoOffset = calcIdx + 1; // 1-indexed step number of 'calculate'
 
@@ -596,7 +609,7 @@ export function WizardProvider({
       // Determine which step number 'calculate' is for this boundary,
       // then advance to the step after it (the 'goal' step).
       const boundary = formData.systemBoundary || 'cradle-to-gate';
-      const stepIds = getStepIdsForBoundary(boundary);
+      const stepIds = getStepIdsForBoundary(boundary, showGuide);
       const calcStepNumber = stepIds.indexOf('calculate') + 1; // 1-indexed
       const nextStepAfterCalc = calcStepNumber + 1;
 
@@ -618,7 +631,7 @@ export function WizardProvider({
       // Load PCF data for ISO documentation steps
       await loadPcfData(newPcfId);
     },
-    [formData.systemBoundary]
+    [formData.systemBoundary, showGuide]
   );
 
   // ============================================================================
@@ -627,10 +640,10 @@ export function WizardProvider({
 
   function calculateTimeRemaining(completedSteps: number[]): number {
     const boundary = formData.systemBoundary || 'cradle-to-gate';
-    const totalSteps = getTotalSteps(boundary);
-    const timeEstimates = getStepTimeEstimates(boundary);
+    const total = getTotalSteps(boundary, showGuide);
+    const timeEstimates = getStepTimeEstimates(boundary, showGuide);
     let remaining = 0;
-    for (let i = 0; i < totalSteps; i++) {
+    for (let i = 0; i < total; i++) {
       if (!completedSteps.includes(i + 1)) {
         remaining += timeEstimates[i] || 1;
       }
@@ -658,7 +671,7 @@ export function WizardProvider({
       // the new boundary changes what assumptions apply.
       if (field === 'systemBoundary' && typeof value === 'string') {
         const newBoundary = value;
-        const newStepIds = getStepIdsForBoundary(newBoundary);
+        const newStepIds = getStepIdsForBoundary(newBoundary, showGuide);
         const newCalcStepNumber = newStepIds.indexOf('calculate') + 1;
         // Keep steps 1..newCalcStepNumber as completed; clear the rest
         const preCalcCompleted = Array.from({ length: newCalcStepNumber }, (_, i) => i + 1);
@@ -687,19 +700,19 @@ export function WizardProvider({
   );
 
   const goToStep = useCallback((step: number) => {
-    const totalSteps = getTotalSteps(formData.systemBoundary || 'cradle-to-gate');
-    if (step >= 1 && step <= totalSteps) {
+    const total = getTotalSteps(formData.systemBoundary || 'cradle-to-gate', showGuide);
+    if (step >= 1 && step <= total) {
       setProgress((prev) => ({ ...prev, currentStep: step }));
     }
-  }, [formData.systemBoundary]);
+  }, [formData.systemBoundary, showGuide]);
 
   const nextStep = useCallback(() => {
-    const totalSteps = getTotalSteps(formData.systemBoundary || 'cradle-to-gate');
+    const total = getTotalSteps(formData.systemBoundary || 'cradle-to-gate', showGuide);
     setProgress((prev) => {
-      const newStep = Math.min(prev.currentStep + 1, totalSteps);
+      const newStep = Math.min(prev.currentStep + 1, total);
       return { ...prev, currentStep: newStep };
     });
-  }, [formData.systemBoundary]);
+  }, [formData.systemBoundary, showGuide]);
 
   const prevStep = useCallback(() => {
     setProgress((prev) => {
@@ -743,7 +756,7 @@ export function WizardProvider({
       // Save ISO doc step progress (steps after 'calculate') relative to calculate's position.
       // This is boundary-aware: calculate step number varies based on use-phase/EoL insertion.
       const boundary = formData.systemBoundary || 'cradle-to-gate';
-      const stepIds = getStepIdsForBoundary(boundary);
+      const stepIds = getStepIdsForBoundary(boundary, showGuide);
       const calcStepNumber = stepIds.indexOf('calculate') + 1; // 1-indexed
 
       const wizardProgress = {
@@ -818,10 +831,10 @@ export function WizardProvider({
     try {
       await saveProgressInternal();
 
-      const totalSteps = getTotalSteps(formData.systemBoundary || 'cradle-to-gate');
+      const total = getTotalSteps(formData.systemBoundary || 'cradle-to-gate', showGuide);
       setProgress((prev) => ({
         ...prev,
-        completedSteps: Array.from({ length: totalSteps }, (_, i) => i + 1),
+        completedSteps: Array.from({ length: total }, (_, i) => i + 1),
         estimatedTimeRemaining: 0,
       }));
 
@@ -861,14 +874,14 @@ export function WizardProvider({
   // ============================================================================
 
   const boundary = formData.systemBoundary || 'cradle-to-gate';
-  const totalSteps = getTotalSteps(boundary);
-  const stepIds = getStepIdsForBoundary(boundary);
+  const totalSteps = getTotalSteps(boundary, showGuide);
+  const stepIds = getStepIdsForBoundary(boundary, showGuide);
 
   const getStepId = useCallback(
     (stepNumber: number): string => {
       return stepIds[stepNumber - 1] || 'unknown';
     },
-    [boundary]
+    [boundary, showGuide]
   );
 
   const value: WizardContextValue = {
