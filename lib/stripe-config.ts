@@ -77,6 +77,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     features: [
       'Dashboard & Vitality Score',
       'Carbon Footprint (GHG) per product',
+      'LCA: Cradle-to-Gate',
       'Product Passport',
       'Company Emissions (Current Year)',
       'Rosa AI Assistant (25/mo)',
@@ -102,6 +103,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     description: 'For growing businesses ready to expand their environmental impact tracking',
     features: [
       'Everything in Seed, plus:',
+      'LCA: Cradle-to-Shelf (Distribution)',
       'Water, Circularity, Land Use & Resource impacts',
       'Full Scope 3 Categories',
       'Vehicle Registry & Supply Chain Mapping',
@@ -129,6 +131,7 @@ export const TIER_PRICING: Record<SubscriptionTier, TierPricing> = {
     description: 'Comprehensive sustainability management for established organisations',
     features: [
       'Everything in Blossom, plus:',
+      'Full Lifecycle LCA (Cradle-to-Grave)',
       'Year-over-Year Comparisons',
       'Advanced Data Quality Scoring & EF 3.1',
       'All ESG modules including Governance & Ethics',

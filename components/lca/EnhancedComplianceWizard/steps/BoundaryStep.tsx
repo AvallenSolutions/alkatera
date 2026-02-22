@@ -13,8 +13,9 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, AlertTriangle, Box, ArrowRight, Factory, Truck, Users, Trash2 } from 'lucide-react';
+import { Info, AlertTriangle, Lock, Box, ArrowRight, Factory, Truck, Users, Trash2 } from 'lucide-react';
 import { useWizardContext } from '../WizardContext';
+import { useSubscription, type TierName } from '@/hooks/useSubscription';
 import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife } from '@/lib/system-boundaries';
 import { cn } from '@/lib/utils';
 
@@ -29,7 +30,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Raw materials through to factory gate (most common for manufacturers)',
     icon: Factory,
     stages: ['Raw Materials', 'Processing', 'Packaging'],
-    enabled: true,
+    requiredTier: 'seed' as TierName,
   },
   {
     value: 'cradle-to-shelf',
@@ -37,7 +38,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Includes distribution to point of sale',
     icon: Truck,
     stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution'],
-    enabled: true,
+    requiredTier: 'blossom' as TierName,
   },
   {
     value: 'cradle-to-consumer',
@@ -45,7 +46,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Includes consumer use phase (refrigeration, carbonation)',
     icon: Users,
     stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution', 'Use Phase'],
-    enabled: true,
+    requiredTier: 'canopy' as TierName,
   },
   {
     value: 'cradle-to-grave',
@@ -53,9 +54,12 @@ const SYSTEM_BOUNDARY_OPTIONS = [
     description: 'Full lifecycle including end-of-life disposal & recycling credits',
     icon: Trash2,
     stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution', 'Use Phase', 'End of Life'],
-    enabled: true,
+    requiredTier: 'canopy' as TierName,
   },
 ];
+
+const TIER_LEVELS: Record<TierName, number> = { seed: 1, blossom: 2, canopy: 3 };
+const TIER_DISPLAY: Record<TierName, string> = { seed: 'Seed', blossom: 'Blossom', canopy: 'Canopy' };
 
 // ============================================================================
 // BOUNDARY VISUALIZATION
@@ -113,6 +117,8 @@ function BoundaryVisualization({ selectedBoundary }: BoundaryVisualizationProps)
 
 export function BoundaryStep() {
   const { formData, updateField } = useWizardContext();
+  const { tierName } = useSubscription();
+  const currentTierLevel = TIER_LEVELS[tierName] || 1;
 
   return (
     <div className="space-y-6">
@@ -170,32 +176,34 @@ export function BoundaryStep() {
         >
           {SYSTEM_BOUNDARY_OPTIONS.map((option) => {
             const Icon = option.icon;
-            const isDisabled = !option.enabled;
+            const requiredLevel = TIER_LEVELS[option.requiredTier];
+            const isLocked = currentTierLevel < requiredLevel;
             return (
               <div key={option.value}>
                 <RadioGroupItem
                   value={option.value}
                   id={`boundary-${option.value}`}
                   className="peer sr-only"
-                  disabled={isDisabled}
+                  disabled={isLocked}
                 />
                 <Label
                   htmlFor={`boundary-${option.value}`}
                   className={cn(
                     'flex items-start gap-3 rounded-lg border p-4 transition-colors',
-                    isDisabled
+                    isLocked
                       ? 'cursor-not-allowed opacity-50'
                       : 'cursor-pointer hover:bg-muted/50',
-                    !isDisabled && 'peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5'
+                    !isLocked && 'peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5'
                   )}
                 >
                   <Icon className="mt-0.5 h-5 w-5 text-muted-foreground" />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{option.label}</p>
-                      {isDisabled && (
-                        <Badge variant="secondary" className="text-xs font-normal">
-                          Coming Soon
+                      {isLocked && (
+                        <Badge variant="secondary" className="text-xs font-normal gap-1">
+                          <Lock className="h-3 w-3" />
+                          {TIER_DISPLAY[option.requiredTier]}+
                         </Badge>
                       )}
                     </div>

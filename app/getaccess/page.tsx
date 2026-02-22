@@ -71,6 +71,10 @@ const featureSections: FeatureSection[] = [
       { name: "Year-over-Year Comparisons", seed: false, blossom: false, canopy: true },
       { name: "Advanced Data Quality Scoring", seed: false, blossom: false, canopy: true },
       { name: "EF 3.1 Single Score", seed: false, blossom: false, canopy: true },
+      { name: "LCA: Cradle-to-Gate", seed: true, blossom: true, canopy: true },
+      { name: "LCA: Cradle-to-Shelf (Distribution)", seed: false, blossom: true, canopy: true },
+      { name: "LCA: Cradle-to-Consumer (Use Phase)", seed: false, blossom: false, canopy: true },
+      { name: "LCA: Cradle-to-Grave (End of Life)", seed: false, blossom: false, canopy: true },
     ],
   },
   {
@@ -140,6 +144,7 @@ const tiers = [
     features: [
       "Dashboard & Vitality Score",
       "Carbon Footprint (GHG) per product",
+      "LCA: Cradle-to-Gate",
       "Product Passport",
       "Company Emissions (Current Year)",
       "Rosa AI Assistant (25/mo)",
@@ -158,6 +163,7 @@ const tiers = [
     limits: ["20 Products", "20 LCA Calculations", "5 Team Members", "3 Facilities", "25 Suppliers", "50 Reports/mo"],
     features: [
       "Everything in Seed, plus:",
+      "LCA: Cradle-to-Shelf (Distribution)",
       "Water, Circularity, Land Use & Resource impacts",
       "Full Scope 3 Categories",
       "Vehicle Registry & Supply Chain Mapping",
@@ -178,6 +184,7 @@ const tiers = [
     limits: ["50 Products", "50 LCA Calculations", "10 Team Members", "8 Facilities", "100 Suppliers", "200 Reports/mo"],
     features: [
       "Everything in Blossom, plus:",
+      "Full Lifecycle LCA (Cradle-to-Grave)",
       "Year-over-Year Comparisons",
       "Advanced Data Quality Scoring & EF 3.1",
       "All ESG modules including Governance & Ethics",

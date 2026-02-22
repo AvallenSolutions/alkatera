@@ -70,7 +70,11 @@ export type FeatureCode =
   | "audit_packages"
   | "third_party_verification"
   | "knowledge_bank_read"
-  | "knowledge_bank_manage";
+  | "knowledge_bank_manage"
+  // LCA System Boundary tiers
+  | "lca_distribution"
+  | "lca_use_phase"
+  | "lca_end_of_life";
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -467,6 +471,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "sandbox_analytics", "priority_chat", "verified_data", "pef_reports", "api_access",
     // Products & LCA (Canopy only)
     "year_over_year", "advanced_data_quality", "ef_31_single_score",
+    // LCA Boundary (Canopy only)
+    "lca_use_phase", "lca_end_of_life",
     // AI (Canopy only)
     "rosa_ai_unlimited", "greenwash_unlimited",
     // ESG (Canopy only)
@@ -486,6 +492,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "supply_chain_mapping", "full_scope_3",
     // Products & LCA (Blossom+)
     "land_use_impact", "resource_use_tracking",
+    // LCA Boundary (Blossom+)
+    "lca_distribution",
     // AI (Blossom+)
     "rosa_ai_100", "greenwash_documents",
     // ESG (Blossom+)
