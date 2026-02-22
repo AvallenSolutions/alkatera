@@ -142,30 +142,30 @@ export default function ProductDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] relative overflow-hidden">
+      <div className="min-h-screen bg-background relative overflow-hidden">
         <div className="relative z-10">
           {/* Skeleton header */}
           <div className="container mx-auto px-6 pt-8 pb-4">
             <div className="flex items-center gap-4">
-              <Skeleton className="h-16 w-16 rounded-xl bg-white/5" />
+              <Skeleton className="h-16 w-16 rounded-xl" />
               <div className="space-y-2 flex-1">
-                <Skeleton className="h-7 w-64 bg-white/5" />
-                <Skeleton className="h-4 w-40 bg-white/5" />
+                <Skeleton className="h-7 w-64" />
+                <Skeleton className="h-4 w-40" />
               </div>
             </div>
           </div>
           {/* Skeleton content */}
           <div className="container mx-auto px-6 py-6 space-y-6">
             <div className="flex items-center justify-between">
-              <Skeleton className="h-10 w-36 bg-white/5" />
-              <Skeleton className="h-10 w-56 bg-white/5" />
+              <Skeleton className="h-10 w-36" />
+              <Skeleton className="h-10 w-56" />
             </div>
-            <Skeleton className="h-10 w-full max-w-4xl bg-white/5" />
+            <Skeleton className="h-10 w-full max-w-4xl" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Skeleton className="h-64 bg-white/5 rounded-xl" />
-              <Skeleton className="h-64 bg-white/5 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
             </div>
-            <Skeleton className="h-48 bg-white/5 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
           </div>
         </div>
       </div>
@@ -190,12 +190,12 @@ export default function ProductDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] relative overflow-hidden">
+    <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Animated Background Gradient Orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-lime-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-2000" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-lime-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl animate-pulse delay-2000" />
       </div>
 
       {/* Content */}
@@ -220,9 +220,8 @@ export default function ProductDashboardPage() {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={() => router.push("/products")}
-              className="backdrop-blur-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Products
@@ -243,19 +242,19 @@ export default function ProductDashboardPage() {
         </div>
 
         {!isHealthy && (
-          <Alert className="mb-6 backdrop-blur-xl bg-amber-500/10 border border-amber-500/20">
-            <AlertCircle className="h-4 w-4 text-amber-400" />
-            <AlertDescription className="text-amber-200">
+          <Alert className="mb-6 border-amber-500/30 bg-amber-500/10">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
               Please add ingredients and packaging to your product before calculating its environmental impact.
             </AlertDescription>
           </Alert>
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList data-guide="product-tabs" className="grid w-full grid-cols-5 max-w-4xl backdrop-blur-xl bg-white/5 border border-white/10 p-1">
+          <TabsList data-guide="product-tabs" className="grid w-full grid-cols-5 max-w-4xl bg-muted border p-1">
             <TabsTrigger
               value="overview"
-              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-700 dark:data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-muted-foreground hover:text-foreground"
             >
               <Info className="mr-2 h-4 w-4" />
               Overview
@@ -263,14 +262,14 @@ export default function ProductDashboardPage() {
             <TabsTrigger
               value="specification"
               data-guide="product-specification"
-              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-700 dark:data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-muted-foreground hover:text-foreground"
             >
               <FileBarChart className="mr-2 h-4 w-4" />
               Specification
             </TabsTrigger>
             <TabsTrigger
               value="facilities"
-              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-700 dark:data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-muted-foreground hover:text-foreground"
             >
               <Factory className="mr-2 h-4 w-4" />
               Facilities
@@ -278,14 +277,14 @@ export default function ProductDashboardPage() {
             <TabsTrigger
               value="passport"
               data-guide="product-passport-tab"
-              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-700 dark:data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-muted-foreground hover:text-foreground"
             >
               <Globe className="mr-2 h-4 w-4" />
               Passport
             </TabsTrigger>
             <TabsTrigger
               value="settings"
-              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-slate-400 hover:text-white"
+              className="data-[state=active]:bg-lime-500/20 data-[state=active]:text-lime-700 dark:data-[state=active]:text-lime-400 data-[state=active]:shadow-lg text-muted-foreground hover:text-foreground"
             >
               <Settings className="mr-2 h-4 w-4" />
               Settings
