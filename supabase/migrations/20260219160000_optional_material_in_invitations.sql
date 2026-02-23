@@ -42,8 +42,18 @@ BEGIN
     o.name AS organization_name
   FROM public.supplier_invitations si
   JOIN public.organizations o ON o.id = si.organization_id
-  WHERE lower(si.supplier_email) = lower(
-    (SELECT email FROM auth.users WHERE auth.users.id = auth.uid())
+  WHERE (
+    -- Accepted invitations: linked to this user's supplier record(s)
+    si.supplier_id IN (
+      SELECT s.id FROM public.suppliers s WHERE s.user_id = auth.uid()
+    )
+    OR (
+      -- Pending invitations: not yet linked, match by email
+      si.supplier_id IS NULL
+      AND lower(si.supplier_email) = lower(
+        (SELECT email FROM auth.users WHERE auth.users.id = auth.uid())
+      )
+    )
   )
   AND (p_status IS NULL OR si.status::text = p_status)
   ORDER BY si.invited_at DESC;
