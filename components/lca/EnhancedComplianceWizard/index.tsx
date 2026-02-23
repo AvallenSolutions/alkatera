@@ -177,7 +177,7 @@ function WizardFooter() {
     const eolConfig = formData.eolConfig;
     if (eolConfig?.pathways) {
       const hasInvalid = Object.values(eolConfig.pathways).some((p) => {
-        const sum = p.recycling + p.landfill + p.incineration + p.composting;
+        const sum = p.recycling + p.landfill + p.incineration + p.composting + (p.anaerobic_digestion || 0);
         return Math.abs(sum - 100) > 1;
       });
       nextDisabled = saving || hasInvalid;

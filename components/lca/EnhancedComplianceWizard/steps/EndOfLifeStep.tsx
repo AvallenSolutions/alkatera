@@ -242,21 +242,19 @@ export function EndOfLifeStep() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-muted/50 border-b">
-                  <th className="text-left p-3 font-medium">Material</th>
-                  <th className="text-left p-3 font-medium">Mass (kg)</th>
-                  <th className="text-center p-3 font-medium">
-                    <span className="flex items-center justify-center gap-1">
-                      <Recycle className="h-3 w-3" /> Recycling %
+                <tr className="bg-muted/50 border-b text-xs">
+                  <th className="text-left p-2 font-medium">Material</th>
+                  <th className="text-right p-2 font-medium">kg</th>
+                  <th className="text-center p-2 font-medium">
+                    <span className="flex items-center justify-center gap-0.5">
+                      <Recycle className="h-3 w-3" /> Recycle
                     </span>
                   </th>
-                  <th className="text-center p-3 font-medium">Landfill %</th>
-                  <th className="text-center p-3 font-medium">
-                    Incineration %
-                  </th>
-                  <th className="text-center p-3 font-medium">Composting %</th>
-                  <th className="text-center p-3 font-medium">AD %</th>
-                  <th className="text-center p-3 font-medium">Sum</th>
+                  <th className="text-center p-2 font-medium">Landfill</th>
+                  <th className="text-center p-2 font-medium">Incinerate</th>
+                  <th className="text-center p-2 font-medium">Compost</th>
+                  <th className="text-center p-2 font-medium">AD</th>
+                  <th className="text-center p-2 font-medium">Sum</th>
                 </tr>
               </thead>
               <tbody>
@@ -272,16 +270,16 @@ export function EndOfLifeStep() {
                       key={row.id}
                       className="border-b last:border-b-0"
                     >
-                      <td className="p-3">
-                        <div className="font-medium">{row.name}</div>
-                        <div className="text-xs text-muted-foreground">
+                      <td className="p-2">
+                        <div className="font-medium text-xs">{row.name}</div>
+                        <div className="text-[10px] text-muted-foreground">
                           {MATERIAL_TYPE_LABELS[row.factorKey] || row.factorKey}
                         </div>
                       </td>
-                      <td className="p-3 text-muted-foreground">
+                      <td className="p-2 text-right text-xs text-muted-foreground tabular-nums">
                         {row.quantity.toFixed(2)}
                       </td>
-                      <td className="p-2">
+                      <td className="p-1">
                         <Input
                           type="number"
                           min={0}
@@ -295,10 +293,10 @@ export function EndOfLifeStep() {
                               Number(e.target.value)
                             )
                           }
-                          className="h-8 w-20 mx-auto text-center"
+                          className="h-7 w-14 mx-auto text-center text-xs"
                         />
                       </td>
-                      <td className="p-2">
+                      <td className="p-1">
                         <Input
                           type="number"
                           min={0}
@@ -312,10 +310,10 @@ export function EndOfLifeStep() {
                               Number(e.target.value)
                             )
                           }
-                          className="h-8 w-20 mx-auto text-center"
+                          className="h-7 w-14 mx-auto text-center text-xs"
                         />
                       </td>
-                      <td className="p-2">
+                      <td className="p-1">
                         <Input
                           type="number"
                           min={0}
@@ -329,10 +327,10 @@ export function EndOfLifeStep() {
                               Number(e.target.value)
                             )
                           }
-                          className="h-8 w-20 mx-auto text-center"
+                          className="h-7 w-14 mx-auto text-center text-xs"
                         />
                       </td>
-                      <td className="p-2">
+                      <td className="p-1">
                         <Input
                           type="number"
                           min={0}
@@ -346,10 +344,10 @@ export function EndOfLifeStep() {
                               Number(e.target.value)
                             )
                           }
-                          className="h-8 w-20 mx-auto text-center"
+                          className="h-7 w-14 mx-auto text-center text-xs"
                         />
                       </td>
-                      <td className="p-2">
+                      <td className="p-1">
                         <Input
                           type="number"
                           min={0}
@@ -363,11 +361,11 @@ export function EndOfLifeStep() {
                               Number(e.target.value)
                             )
                           }
-                          className="h-8 w-20 mx-auto text-center"
+                          className="h-7 w-14 mx-auto text-center text-xs"
                         />
                       </td>
                       <td
-                        className={`p-3 text-center font-medium ${
+                        className={`p-2 text-center text-xs font-medium tabular-nums ${
                           isValid
                             ? 'text-green-600 dark:text-green-400'
                             : 'text-red-600 dark:text-red-400'
