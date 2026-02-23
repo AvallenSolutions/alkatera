@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -8,8 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Plus, X, AlertTriangle, Lightbulb } from 'lucide-react';
+import { Plus, X, AlertTriangle, Lightbulb, Sparkles, RotateCcw } from 'lucide-react';
 import { useWizardContext } from '../WizardContext';
+import {
+  generateAssumptions,
+  type AssumptionContext,
+} from '@/lib/lca-assumptions-generator';
 
 // ============================================================================
 // COMMON EXCLUSIONS
@@ -131,10 +135,66 @@ function AssumptionInput({ assumptions, onUpdate }: AssumptionInputProps) {
 // ============================================================================
 
 export function CutoffStep() {
-  const { formData, updateField } = useWizardContext();
+  const { formData, updateField, preCalcState } = useWizardContext();
   const [selectedExclusions, setSelectedExclusions] = useState<Set<string>>(
     new Set()
   );
+  const hasSeeded = useRef(false);
+
+  // Build context for the assumption generator from wizard state
+  const assumptionContext = useMemo((): AssumptionContext => {
+    const materials = preCalcState.materials || [];
+    const hasPackaging = materials.some((m) => {
+      const mt = (m.material_type || '').toLowerCase();
+      return mt === 'packaging' || mt === 'packaging_material';
+    });
+    const hasIngredients = materials.some((m) => {
+      const mt = (m.material_type || '').toLowerCase();
+      return mt !== 'packaging' && mt !== 'packaging_material';
+    });
+
+    return {
+      productType: preCalcState.product?.product_type || undefined,
+      systemBoundary: formData.systemBoundary || 'cradle-to-gate',
+      materialCount: materials.length,
+      hasFacilities: preCalcState.linkedFacilities.length > 0,
+      facilityCount: preCalcState.linkedFacilities.length,
+      usePhaseConfig: formData.usePhaseConfig,
+      eolConfig: formData.eolConfig,
+      referenceYear: formData.referenceYear || new Date().getFullYear(),
+      hasPackaging,
+      hasIngredients,
+    };
+  }, [
+    preCalcState.materials,
+    preCalcState.product,
+    preCalcState.linkedFacilities,
+    formData.systemBoundary,
+    formData.usePhaseConfig,
+    formData.eolConfig,
+    formData.referenceYear,
+  ]);
+
+  // Auto-seed assumptions on first mount if the list is empty
+  useEffect(() => {
+    if (hasSeeded.current) return;
+    if (formData.assumptions.length > 0) {
+      hasSeeded.current = true;
+      return;
+    }
+
+    const generated = generateAssumptions(assumptionContext);
+    if (generated.length > 0) {
+      updateField('assumptions', generated);
+      hasSeeded.current = true;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assumptionContext]);
+
+  const handleRegenerateAssumptions = () => {
+    const generated = generateAssumptions(assumptionContext);
+    updateField('assumptions', generated);
+  };
 
   const handleExclusionToggle = (item: string, checked: boolean) => {
     const updated = new Set(selectedExclusions);
@@ -241,13 +301,35 @@ export function CutoffStep() {
 
       {/* Assumptions & Limitations */}
       <div className="space-y-3">
-        <Label>
-          Assumptions & Limitations <span className="text-destructive">*</span>
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label>
+            Assumptions & Limitations <span className="text-destructive">*</span>
+          </Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleRegenerateAssumptions}
+            className="h-7 text-xs gap-1.5"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Regenerate
+          </Button>
+        </div>
         <p className="text-xs text-muted-foreground">
-          Document key assumptions made during the study and any limitations
-          that may affect the results.
+          These assumptions are automatically generated based on your product
+          configuration, system boundary, and the calculation methodology used.
+          You can edit, remove, or add additional items as needed.
         </p>
+        {formData.assumptions.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Sparkles className="h-3 w-3" />
+            <span>
+              {formData.assumptions.length} assumptions auto-filled from your
+              calculation settings
+            </span>
+          </div>
+        )}
         <AssumptionInput
           assumptions={formData.assumptions}
           onUpdate={(assumptions) => updateField('assumptions', assumptions)}
