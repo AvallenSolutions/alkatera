@@ -33,7 +33,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { UserPlus, Loader2, Users, Trash2, AlertCircle, Lock, Mail, Clock, XCircle } from 'lucide-react'
+import { UserPlus, Loader2, Users, Trash2, AlertCircle, Lock, Mail, Clock, XCircle, ShieldCheck } from 'lucide-react'
 import { useTeamMemberLimit } from '@/hooks/useSubscription'
 import {
   AlertDialog,
@@ -79,11 +79,14 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
   const [invitations, setInvitations] = useState<TeamInvitation[]>([])
   const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [roleMap, setRoleMap] = useState<Record<string, string>>({})
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null)
   const { toast } = useToast()
   const { currentCount, maxCount, isUnlimited, checkLimit } = useTeamMemberLimit()
   const atLimit = !isUnlimited && maxCount != null && currentCount >= maxCount
 
   const isAdmin = userRole === 'owner' || userRole === 'admin'
+  const isOwner = userRole === 'owner'
 
   const fetchMembers = async () => {
     if (!currentOrganization) return
@@ -107,6 +110,49 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchRoles = async () => {
+    try {
+      const { data } = await supabase.from('roles').select('id, name')
+      if (data) {
+        const map: Record<string, string> = {}
+        data.forEach((r) => { map[r.name] = r.id })
+        setRoleMap(map)
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error)
+    }
+  }
+
+  const handleRoleChange = async (member: TeamMember, newRole: string) => {
+    const newRoleId = roleMap[newRole]
+    if (!newRoleId || newRoleId === member.role_id) return
+
+    setUpdatingRole(member.membership_id)
+    try {
+      const { error } = await supabase
+        .from('organization_members')
+        .update({ role_id: newRoleId })
+        .eq('id', member.membership_id)
+
+      if (error) throw error
+
+      toast({
+        title: 'Success',
+        description: `Role updated to ${getRoleDisplayName(newRole)}.`,
+      })
+      fetchMembers()
+    } catch (error) {
+      console.error('Error updating role:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to update role. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setUpdatingRole(null)
     }
   }
 
@@ -265,6 +311,7 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
   useEffect(() => {
     fetchMembers()
     fetchInvitations()
+    fetchRoles()
   }, [currentOrganization])
 
   if (!currentOrganization) {
@@ -400,9 +447,30 @@ export function TeamSettings({ showHeader = true }: TeamSettingsProps) {
                       </TableCell>
                       <TableCell>{member.email}</TableCell>
                       <TableCell>
-                        <Badge variant={getRoleBadgeVariant(member.role)}>
-                          {getRoleDisplayName(member.role)}
-                        </Badge>
+                        {isOwner && member.role !== 'owner' ? (
+                          <Select
+                            value={member.role}
+                            onValueChange={(value) => handleRoleChange(member, value)}
+                            disabled={updatingRole === member.membership_id}
+                          >
+                            <SelectTrigger className="w-[130px] h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">
+                                <span className="flex items-center gap-1.5">
+                                  <ShieldCheck className="h-3.5 w-3.5" />
+                                  Admin
+                                </span>
+                              </SelectItem>
+                              <SelectItem value="member">Member</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant={getRoleBadgeVariant(member.role)}>
+                            {getRoleDisplayName(member.role)}
+                          </Badge>
+                        )}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
