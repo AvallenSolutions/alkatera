@@ -197,7 +197,7 @@ function WizardFooter() {
   };
 
   return (
-    <div className="flex items-center justify-between border-t bg-background px-6 py-4">
+    <div className="sticky bottom-0 z-10 flex items-center justify-between border-t bg-background px-6 py-4">
       {/* Left side: Back button */}
       <Button
         variant="outline"
