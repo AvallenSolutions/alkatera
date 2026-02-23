@@ -463,7 +463,7 @@ export function WizardProvider({
   // LOAD PCF DATA (steps 4-10)
   // ============================================================================
 
-  async function loadPcfData(id: string) {
+  async function loadPcfData(id: string, resetStep = true) {
     try {
       const { data: pcf, error: pcfError } = await supabase
         .from('product_carbon_footprints')
@@ -540,41 +540,47 @@ export function WizardProvider({
           dqiScore: pcf.dqi_score || 0,
         });
 
-        // Always start at step 1 so users can review from the beginning,
-        // but restore completed steps so progress bar shows what's done
-        if (pcf.wizard_progress) {
-          const savedCompleted: number[] =
-            pcf.wizard_progress.completedSteps || [];
+        // Only reset step position when loading an existing PCF on initial
+        // mount. After a fresh calculation, onCalculationComplete has already
+        // set the correct step — resetting here would send the user back to
+        // the beginning.
+        if (resetStep) {
+          // Start at step 1 so users can review from the beginning,
+          // but restore completed steps so progress bar shows what's done
+          if (pcf.wizard_progress) {
+            const savedCompleted: number[] =
+              pcf.wizard_progress.completedSteps || [];
 
-          // Determine offset: calculate is now step (3 + use-phase? + end-of-life?),
-          // so ISO doc steps are offset by (calculateStepNumber).
-          // Old saved format stored ISO steps starting at 1.
-          const savedBoundary = (pcf.system_boundary || 'cradle-to-gate').toLowerCase();
-          const savedStepIds = getStepIdsForBoundary(savedBoundary, showGuide);
-          const calcIdx = savedStepIds.indexOf('calculate'); // 0-indexed
-          const isoOffset = calcIdx + 1; // 1-indexed step number of 'calculate'
+            // Determine offset: calculate is now step (3 + use-phase? + end-of-life?),
+            // so ISO doc steps are offset by (calculateStepNumber).
+            // Old saved format stored ISO steps starting at 1.
+            const savedBoundary = (pcf.system_boundary || 'cradle-to-gate').toLowerCase();
+            const savedStepIds = getStepIdsForBoundary(savedBoundary, showGuide);
+            const calcIdx = savedStepIds.indexOf('calculate'); // 0-indexed
+            const isoOffset = calcIdx + 1; // 1-indexed step number of 'calculate'
 
-          const preCalcSteps = Array.from({ length: isoOffset }, (_, i) => i + 1);
-          const remappedCompleted = [
-            ...preCalcSteps,
-            ...savedCompleted.map((s: number) => s + isoOffset),
-          ];
+            const preCalcSteps = Array.from({ length: isoOffset }, (_, i) => i + 1);
+            const remappedCompleted = [
+              ...preCalcSteps,
+              ...savedCompleted.map((s: number) => s + isoOffset),
+            ];
 
-          setProgress({
-            currentStep: 1,
-            completedSteps: remappedCompleted,
-            lastSavedAt: pcf.wizard_progress.lastSavedAt
-              ? new Date(pcf.wizard_progress.lastSavedAt)
-              : undefined,
-            estimatedTimeRemaining: calculateTimeRemaining(remappedCompleted),
-          });
-        } else {
-          // PCF exists but no wizard progress — start at step 1
-          setProgress({
-            currentStep: 1,
-            completedSteps: [1, 2, 3],
-            estimatedTimeRemaining: calculateTimeRemaining([1, 2, 3]),
-          });
+            setProgress({
+              currentStep: 1,
+              completedSteps: remappedCompleted,
+              lastSavedAt: pcf.wizard_progress.lastSavedAt
+                ? new Date(pcf.wizard_progress.lastSavedAt)
+                : undefined,
+              estimatedTimeRemaining: calculateTimeRemaining(remappedCompleted),
+            });
+          } else {
+            // PCF exists but no wizard progress — start at step 1
+            setProgress({
+              currentStep: 1,
+              completedSteps: [1, 2, 3],
+              estimatedTimeRemaining: calculateTimeRemaining([1, 2, 3]),
+            });
+          }
         }
       }
 
@@ -628,8 +634,9 @@ export function WizardProvider({
         ]),
       }));
 
-      // Load PCF data for ISO documentation steps
-      await loadPcfData(newPcfId);
+      // Load PCF data for ISO documentation steps — don't reset step
+      // position since we've already advanced past calculate above
+      await loadPcfData(newPcfId, false);
     },
     [formData.systemBoundary, showGuide]
   );
