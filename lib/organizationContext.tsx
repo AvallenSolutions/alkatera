@@ -103,44 +103,51 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         return
       }
 
-      // CRITICAL: Check if user is a supplier FIRST (authoritative source).
-      // Suppliers are external users — they should NOT be in organization_members.
-      // Uses SECURITY DEFINER RPC to bypass RLS during this bootstrap check.
-      const { data: supplierCtx, error: supplierError } = await supabase
-        .rpc('get_supplier_context')
+      // Check if user has org memberships — org members are NEVER treated as suppliers,
+      // even if they also have a supplier record (e.g. from testing).
+      // Membership takes priority over supplier role.
+      const hasMemberships = memberships && memberships.length > 0
 
-      if (!supplierError && supplierCtx && supplierCtx.length > 0) {
-        const ctx = supplierCtx[0]
-        console.log('👤 OrganizationContext: User is a supplier', ctx.organization_name ? `for org: ${ctx.organization_name}` : '(no org linked)')
+      // Only check supplier status if user has NO org memberships.
+      // Suppliers are external users who should not be in organization_members.
+      if (!hasMemberships) {
+        // Uses SECURITY DEFINER RPC to bypass RLS during this bootstrap check.
+        const { data: supplierCtx, error: supplierError } = await supabase
+          .rpc('get_supplier_context')
 
-        // Suppliers may not have an org link (self-registered).
-        // Set role to 'supplier' regardless — the portal works without an org.
-        if (ctx.organization_id) {
-          const supplierOrg: Organization = {
-            id: ctx.organization_id,
-            name: ctx.organization_name,
-            slug: ctx.organization_slug,
-            created_at: '',
+        if (!supplierError && supplierCtx && supplierCtx.length > 0) {
+          const ctx = supplierCtx[0]
+          console.log('👤 OrganizationContext: User is a supplier', ctx.organization_name ? `for org: ${ctx.organization_name}` : '(no org linked)')
+
+          // Suppliers may not have an org link (self-registered).
+          // Set role to 'supplier' regardless — the portal works without an org.
+          if (ctx.organization_id) {
+            const supplierOrg: Organization = {
+              id: ctx.organization_id,
+              name: ctx.organization_name,
+              slug: ctx.organization_slug,
+              created_at: '',
+            }
+            setOrganizations([supplierOrg])
+            setCurrentOrganization(supplierOrg)
           }
-          setOrganizations([supplierOrg])
-          setCurrentOrganization(supplierOrg)
+          setUserRole('supplier')
+          console.log('✅ OrganizationContext: Supplier role set', ctx.organization_id ? `(org: ${ctx.organization_name})` : '(independent)')
+          setIsLoading(false)
+          isFetchingRef.current = false
+          return
         }
-        setUserRole('supplier')
-        console.log('✅ OrganizationContext: Supplier role set', ctx.organization_id ? `(org: ${ctx.organization_name})` : '(independent)')
-        setIsLoading(false)
-        isFetchingRef.current = false
-        return
-      }
 
-      // Fallback: if get_supplier_context() returned nothing but user metadata
-      // flags them as a supplier (set during registration/invitation acceptance).
-      // This catches timing issues, migration lag, or NULL org_id with old INNER JOIN.
-      if (user.user_metadata?.is_supplier) {
-        console.log('👤 OrganizationContext: User is supplier (from metadata fallback)')
-        setUserRole('supplier')
-        setIsLoading(false)
-        isFetchingRef.current = false
-        return
+        // Fallback: if get_supplier_context() returned nothing but user metadata
+        // flags them as a supplier (set during registration/invitation acceptance).
+        // This catches timing issues, migration lag, or NULL org_id with old INNER JOIN.
+        if (user.user_metadata?.is_supplier) {
+          console.log('👤 OrganizationContext: User is supplier (from metadata fallback)')
+          setUserRole('supplier')
+          setIsLoading(false)
+          isFetchingRef.current = false
+          return
+        }
       }
 
       // Always check advisor access — advisors may also be members of their own org,
