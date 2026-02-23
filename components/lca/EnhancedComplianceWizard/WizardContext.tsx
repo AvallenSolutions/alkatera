@@ -509,7 +509,7 @@ export function WizardProvider({
               : [],
           isComparativeAssertion: pcf.is_comparative_assertion || false,
           functionalUnit:
-            pcf.functional_unit || `1 unit of ${productName}`,
+            pcf.functional_unit || '',
           systemBoundary: (pcf.system_boundary || 'cradle-to-gate').toLowerCase(),
           cutoffCriteria:
             pcf.cutoff_criteria ||

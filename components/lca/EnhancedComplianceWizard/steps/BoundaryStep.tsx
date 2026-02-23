@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -115,10 +115,54 @@ function BoundaryVisualization({ selectedBoundary }: BoundaryVisualizationProps)
 // MAIN COMPONENT
 // ============================================================================
 
+// Map system boundary to a delivery point description for the functional unit
+const BOUNDARY_DELIVERY_POINTS: Record<string, string> = {
+  'cradle-to-gate': 'at factory gate',
+  'cradle-to-shelf': 'delivered to retailer',
+  'cradle-to-consumer': 'delivered to consumer',
+  'cradle-to-grave': 'over full lifecycle including end-of-life',
+};
+
+/**
+ * Compose a default functional unit string from product data.
+ * e.g. "500 ml of Pale Ale at factory gate"
+ */
+function composeFunctionalUnit(product: any, systemBoundary: string): string {
+  const parts: string[] = [];
+
+  // Quantity: "500 ml" or "1 litre" etc.
+  if (product.unit_size_value && product.unit_size_unit) {
+    parts.push(`${product.unit_size_value} ${product.unit_size_unit}`);
+  } else {
+    parts.push('1 unit');
+  }
+
+  // Product name: "of Pale Ale"
+  parts.push(`of ${product.name || 'product'}`);
+
+  // Delivery point from system boundary
+  const deliveryPoint = BOUNDARY_DELIVERY_POINTS[systemBoundary] || 'at factory gate';
+  parts.push(deliveryPoint);
+
+  return parts.join(' ');
+}
+
 export function BoundaryStep() {
-  const { formData, updateField } = useWizardContext();
+  const { formData, updateField, preCalcState } = useWizardContext();
   const { tierName } = useSubscription();
   const currentTierLevel = TIER_LEVELS[tierName] || 1;
+  const hasAutoFilled = useRef(false);
+
+  // Auto-fill functional unit from product data when the field is empty
+  useEffect(() => {
+    if (hasAutoFilled.current) return;
+    if (!preCalcState.product) return;
+    if (formData.functionalUnit) return; // Don't overwrite user input or saved data
+
+    const defaultUnit = composeFunctionalUnit(preCalcState.product, formData.systemBoundary);
+    updateField('functionalUnit', defaultUnit);
+    hasAutoFilled.current = true;
+  }, [preCalcState.product, formData.functionalUnit, formData.systemBoundary]);
 
   return (
     <div className="space-y-6">
