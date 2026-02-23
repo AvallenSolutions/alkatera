@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
-import { ClipboardList, Building2, Package, ArrowRight, Leaf } from 'lucide-react';
+import { ClipboardList, Building2, Package, ArrowRight, Leaf, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { useSupplierOnboarding } from '@/lib/supplier-onboarding';
 
 interface SupplierInfo {
   id: string;
@@ -26,6 +27,7 @@ export default function SupplierPortalDashboard() {
   const [productsCount, setProductsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const { state: onboardingState, shouldShowOnboarding } = useSupplierOnboarding();
 
   useEffect(() => {
     async function loadData() {
@@ -197,19 +199,28 @@ export default function SupplierPortalDashboard() {
         </div>
       )}
 
-      {/* Getting started */}
-      <div className="p-6 rounded-xl border border-[#ccff00]/20 bg-[#ccff00]/5">
-        <div className="flex items-start gap-3">
-          <Leaf className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-foreground mb-1">Getting Started</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Complete your company profile to let your customers know more about your sustainability practices.
-              Then, add your products with verified environmental data to respond to data requests.
-            </p>
+      {/* Getting started — hidden once onboarding is fully completed */}
+      {!onboardingState.completed && (
+        <div className="p-6 rounded-xl border border-[#ccff00]/20 bg-[#ccff00]/5">
+          <div className="flex items-start gap-3">
+            {onboardingState.dismissed ? (
+              <Sparkles className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
+            ) : (
+              <Leaf className="h-5 w-5 text-[#ccff00] flex-shrink-0 mt-0.5" />
+            )}
+            <div>
+              <h3 className="font-semibold text-foreground mb-1">
+                {onboardingState.dismissed ? 'Resume Setup' : 'Getting Started'}
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {onboardingState.dismissed
+                  ? 'You skipped the setup wizard earlier. Complete it to get the most out of your supplier portal.'
+                  : 'Complete your company profile to let your customers know more about your sustainability practices. Then, add your products with verified environmental data to respond to data requests.'}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -111,18 +111,22 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
       if (!supplierError && supplierCtx && supplierCtx.length > 0) {
         const ctx = supplierCtx[0]
-        console.log('👤 OrganizationContext: User is a supplier for org:', ctx.organization_name)
+        console.log('👤 OrganizationContext: User is a supplier', ctx.organization_name ? `for org: ${ctx.organization_name}` : '(no org linked)')
 
-        const supplierOrg: Organization = {
-          id: ctx.organization_id,
-          name: ctx.organization_name,
-          slug: ctx.organization_slug,
-          created_at: '',
+        // Suppliers may not have an org link (self-registered).
+        // Set role to 'supplier' regardless — the portal works without an org.
+        if (ctx.organization_id) {
+          const supplierOrg: Organization = {
+            id: ctx.organization_id,
+            name: ctx.organization_name,
+            slug: ctx.organization_slug,
+            created_at: '',
+          }
+          setOrganizations([supplierOrg])
+          setCurrentOrganization(supplierOrg)
         }
-        setOrganizations([supplierOrg])
-        setCurrentOrganization(supplierOrg)
         setUserRole('supplier')
-        console.log('✅ OrganizationContext: Supplier org set:', ctx.organization_name)
+        console.log('✅ OrganizationContext: Supplier role set', ctx.organization_id ? `(org: ${ctx.organization_name})` : '(independent)')
         setIsLoading(false)
         isFetchingRef.current = false
         return

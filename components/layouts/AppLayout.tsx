@@ -14,6 +14,8 @@ import { PaymentWarningBanner } from '@/components/subscription/PaymentWarningBa
 import { UnreadRepliesBanner } from '@/components/feedback/UnreadRepliesBanner'
 import { OnboardingProvider } from '@/lib/onboarding'
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
+import { SupplierOnboardingProvider } from '@/lib/supplier-onboarding'
+import { SupplierOnboardingWizard } from '@/components/supplier-onboarding/SupplierOnboardingWizard'
 
 interface AppLayoutProps {
   children: React.ReactNode
@@ -132,7 +134,12 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
 
   // Supplier users get a minimal, isolated layout — no sidebar, no subscription gate
   if (isSupplier && isSupplierRoute) {
-    return <SupplierLayout>{children}</SupplierLayout>
+    return (
+      <SupplierOnboardingProvider>
+        <SupplierOnboardingWizard />
+        <SupplierLayout>{children}</SupplierLayout>
+      </SupplierOnboardingProvider>
+    )
   }
 
   if (requireOrganization && !currentOrganization) {

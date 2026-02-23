@@ -55,7 +55,7 @@ interface SupplierProduct {
 
 interface SupplierInfo {
   id: string;
-  organization_id: string;
+  organization_id: string | null;
 }
 
 export default function SupplierProductsPage() {
@@ -130,15 +130,19 @@ export default function SupplierProductsPage() {
     try {
       const supabase = getSupabaseBrowserClient();
 
+      const insertData: Record<string, any> = {
+        supplier_id: supplier.id,
+        name: productName.trim(),
+        unit: unit.trim(),
+        category: category.trim() || null,
+      }
+      if (supplier.organization_id) {
+        insertData.organization_id = supplier.organization_id
+      }
+
       const { data: newProduct, error: insertError } = await supabase
         .from('supplier_products')
-        .insert({
-          supplier_id: supplier.id,
-          organization_id: supplier.organization_id,
-          name: productName.trim(),
-          unit: unit.trim(),
-          category: category.trim() || null,
-        })
+        .insert(insertData)
         .select('id')
         .single();
 
