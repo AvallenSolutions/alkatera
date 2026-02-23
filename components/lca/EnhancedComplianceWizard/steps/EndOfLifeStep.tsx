@@ -49,49 +49,77 @@ export function EndOfLifeStep() {
     pathways: {},
   };
 
-  // Build material rows from pre-calc materials data
+  // Build material rows — one row per packaging material so users can see
+  // exactly which materials are in their product (e.g. "Glass Bottle 500ml").
+  // Ingredients are grouped into a single "Organic Waste" row.
   const materialRows = useMemo((): MaterialRow[] => {
     const materials = preCalcState.materials || [];
-    // Group by factor key to avoid duplicates
-    const grouped = new Map<string, MaterialRow>();
+    const rows: MaterialRow[] = [];
+    let organicTotal = 0;
+    let organicUnit = 'kg';
 
     for (const mat of materials) {
       const packagingCategory = (mat as any).packaging_category || '';
       const materialType = (mat.material_type || '').toLowerCase();
-      const factorKey = getMaterialFactorKey(
-        packagingCategory ||
-          (materialType === 'packaging' || materialType === 'packaging_material'
-            ? 'other'
-            : 'organic')
-      );
+      const quantity = Number(mat.quantity || 0);
+      if (quantity <= 0) continue;
 
-      const existing = grouped.get(factorKey);
-      if (existing) {
-        existing.quantity += Number(mat.quantity || 0);
-      } else {
-        grouped.set(factorKey, {
-          id: factorKey,
-          name: MATERIAL_TYPE_LABELS[factorKey] || factorKey,
-          factorKey,
-          quantity: Number(mat.quantity || 0),
-          unit: mat.unit || 'kg',
-          pathways: getRegionalDefaults(config.region, factorKey),
-        });
+      const isPackaging = materialType === 'packaging' || materialType === 'packaging_material';
+
+      if (!isPackaging) {
+        // Ingredients → aggregate into one "Organic Waste" row
+        organicTotal += quantity;
+        organicUnit = mat.unit || 'kg';
+        continue;
       }
+
+      const factorKey = getMaterialFactorKey(packagingCategory || 'other');
+
+      // Use the material's actual name (e.g. "Glass Bottle 500ml")
+      // with the factor type in parentheses for clarity
+      const label = MATERIAL_TYPE_LABELS[factorKey] || factorKey;
+      const displayName = mat.material_name
+        ? `${mat.material_name}`
+        : label;
+
+      rows.push({
+        id: mat.id || `${factorKey}-${rows.length}`,
+        name: displayName,
+        factorKey,
+        quantity,
+        unit: mat.unit || 'kg',
+        pathways: getRegionalDefaults(config.region, factorKey),
+      });
     }
 
-    return Array.from(grouped.values()).filter((r) => r.quantity > 0);
+    // Add aggregated organic waste row for ingredients
+    if (organicTotal > 0) {
+      rows.push({
+        id: 'organic',
+        name: 'Organic Waste (ingredients)',
+        factorKey: 'organic',
+        quantity: organicTotal,
+        unit: organicUnit,
+        pathways: getRegionalDefaults(config.region, 'organic'),
+      });
+    }
+
+    return rows;
   }, [preCalcState.materials, config.region]);
 
-  // Initialize pathways from regional defaults when region changes or on mount
+  // Initialize pathways from regional defaults when region changes or on mount.
+  // Keyed by material row ID so each material has its own overrides.
   useEffect(() => {
     const pathways: Record<string, RegionalDefaults> = {};
     for (const row of materialRows) {
-      const existingOverride = config.pathways[row.factorKey];
+      // Preserve existing overrides (try row ID first, then fall back to factorKey for backwards compat)
+      const defaults = getRegionalDefaults(config.region, row.factorKey);
+      const existingOverride = config.pathways[row.id] || config.pathways[row.factorKey];
       if (existingOverride) {
-        pathways[row.factorKey] = existingOverride;
+        // Merge with defaults to fill any missing fields (e.g. anaerobic_digestion)
+        pathways[row.id] = { ...defaults, ...existingOverride };
       } else {
-        pathways[row.factorKey] = getRegionalDefaults(config.region, row.factorKey);
+        pathways[row.id] = defaults;
       }
     }
     updateField('eolConfig', { ...config, pathways });
@@ -101,21 +129,22 @@ export function EndOfLifeStep() {
     // Reset all pathways to new region defaults
     const pathways: Record<string, RegionalDefaults> = {};
     for (const row of materialRows) {
-      pathways[row.factorKey] = getRegionalDefaults(region, row.factorKey);
+      pathways[row.id] = getRegionalDefaults(region, row.factorKey);
     }
     updateField('eolConfig', { region, pathways });
   };
 
   const updatePathway = (
+    rowId: string,
     factorKey: string,
     field: keyof RegionalDefaults,
     value: number
   ) => {
-    const current = config.pathways[factorKey] || getRegionalDefaults(config.region, factorKey);
+    const current = config.pathways[rowId] || getRegionalDefaults(config.region, factorKey);
     const updated = { ...current, [field]: value };
     updateField('eolConfig', {
       ...config,
-      pathways: { ...config.pathways, [factorKey]: updated },
+      pathways: { ...config.pathways, [rowId]: updated },
     });
   };
 
@@ -123,9 +152,9 @@ export function EndOfLifeStep() {
   const validationErrors = useMemo(() => {
     const errors: string[] = [];
     for (const row of materialRows) {
-      const p = config.pathways[row.factorKey];
+      const p = config.pathways[row.id];
       if (p) {
-        const sum = p.recycling + p.landfill + p.incineration + p.composting;
+        const sum = p.recycling + p.landfill + p.incineration + p.composting + (p.anaerobic_digestion || 0);
         if (Math.abs(sum - 100) > 1) {
           errors.push(
             `${row.name}: pathways sum to ${sum}% (should be 100%)`
@@ -143,7 +172,7 @@ export function EndOfLifeStep() {
     let totalGross = 0;
 
     for (const row of materialRows) {
-      const pathwayOverrides = config.pathways[row.factorKey];
+      const pathwayOverrides = config.pathways[row.id];
       const result = calculateMaterialEoL(
         row.quantity,
         row.factorKey,
@@ -212,23 +241,29 @@ export function EndOfLifeStep() {
                     Incineration %
                   </th>
                   <th className="text-center p-3 font-medium">Composting %</th>
+                  <th className="text-center p-3 font-medium">AD %</th>
                   <th className="text-center p-3 font-medium">Sum</th>
                 </tr>
               </thead>
               <tbody>
                 {materialRows.map((row) => {
-                  const p = config.pathways[row.factorKey] ||
+                  const p = config.pathways[row.id] ||
                     getRegionalDefaults(config.region, row.factorKey);
                   const sum =
-                    p.recycling + p.landfill + p.incineration + p.composting;
+                    p.recycling + p.landfill + p.incineration + p.composting + (p.anaerobic_digestion || 0);
                   const isValid = Math.abs(sum - 100) <= 1;
 
                   return (
                     <tr
-                      key={row.factorKey}
+                      key={row.id}
                       className="border-b last:border-b-0"
                     >
-                      <td className="p-3 font-medium">{row.name}</td>
+                      <td className="p-3">
+                        <div className="font-medium">{row.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {MATERIAL_TYPE_LABELS[row.factorKey] || row.factorKey}
+                        </div>
+                      </td>
                       <td className="p-3 text-muted-foreground">
                         {row.quantity.toFixed(2)}
                       </td>
@@ -240,6 +275,7 @@ export function EndOfLifeStep() {
                           value={p.recycling}
                           onChange={(e) =>
                             updatePathway(
+                              row.id,
                               row.factorKey,
                               'recycling',
                               Number(e.target.value)
@@ -256,6 +292,7 @@ export function EndOfLifeStep() {
                           value={p.landfill}
                           onChange={(e) =>
                             updatePathway(
+                              row.id,
                               row.factorKey,
                               'landfill',
                               Number(e.target.value)
@@ -272,6 +309,7 @@ export function EndOfLifeStep() {
                           value={p.incineration}
                           onChange={(e) =>
                             updatePathway(
+                              row.id,
                               row.factorKey,
                               'incineration',
                               Number(e.target.value)
@@ -288,8 +326,26 @@ export function EndOfLifeStep() {
                           value={p.composting}
                           onChange={(e) =>
                             updatePathway(
+                              row.id,
                               row.factorKey,
                               'composting',
+                              Number(e.target.value)
+                            )
+                          }
+                          className="h-8 w-20 mx-auto text-center"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={p.anaerobic_digestion || 0}
+                          onChange={(e) =>
+                            updatePathway(
+                              row.id,
+                              row.factorKey,
+                              'anaerobic_digestion',
                               Number(e.target.value)
                             )
                           }
