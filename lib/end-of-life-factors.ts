@@ -190,43 +190,55 @@ export const EOL_FACTORS: Record<string, EoLPathwayFactors> = {
 
 /**
  * Default disposal pathway percentages by region and material type.
- * Based on EU Packaging Waste Directive, DEFRA, and EPA statistics.
- *
  * Each material's percentages must sum to 100%.
+ *
+ * Sources:
+ *   EU  — Eurostat packaging waste statistics 2022/2023; FEVE/Close the Glass
+ *          Loop 2023; European Aluminium 2023; APEAL steel packaging 2023.
+ *          Non-recycled fractions apportioned via EU municipal waste treatment
+ *          split (Eurostat 2023: 48% recycled, 25.2% incineration, 22.5% landfill).
+ *   UK  — DEFRA UK Statistics on Waste 2023/24; WRAP PackFlow Refresh 2023;
+ *          WRAP Metal Flow 2025. UK residual waste split (2023): 63% EfW,
+ *          31% landfill — reflects major shift from landfill to incineration.
+ *   US  — EPA Facts & Figures 2018 (most recent comprehensive); EPA 2019
+ *          recycling rate estimates (Jan 2025). Can-specific rates used for
+ *          aluminium/steel (drinks-industry focus).
+ *
+ * Last verified: February 2026.
  */
 export const REGIONAL_DEFAULTS: Record<EoLRegion, Record<string, RegionalDefaults>> = {
   eu: {
-    glass: { recycling: 76, landfill: 10, incineration: 14, composting: 0, anaerobic_digestion: 0 },
-    aluminium: { recycling: 75, landfill: 10, incineration: 15, composting: 0, anaerobic_digestion: 0 },
-    pet: { recycling: 40, landfill: 25, incineration: 35, composting: 0, anaerobic_digestion: 0 },
-    hdpe: { recycling: 35, landfill: 30, incineration: 35, composting: 0, anaerobic_digestion: 0 },
-    paper: { recycling: 82, landfill: 3, incineration: 10, composting: 3, anaerobic_digestion: 2 },
-    steel: { recycling: 80, landfill: 10, incineration: 10, composting: 0, anaerobic_digestion: 0 },
-    organic: { recycling: 0, landfill: 20, incineration: 10, composting: 50, anaerobic_digestion: 20 },
-    cork: { recycling: 10, landfill: 30, incineration: 20, composting: 30, anaerobic_digestion: 10 },
-    other: { recycling: 30, landfill: 35, incineration: 35, composting: 0, anaerobic_digestion: 0 },
+    glass:     { recycling: 76, landfill: 10, incineration: 14, composting: 0, anaerobic_digestion: 0 },
+    aluminium: { recycling: 76, landfill:  9, incineration: 15, composting: 0, anaerobic_digestion: 0 },
+    pet:       { recycling: 42, landfill: 23, incineration: 35, composting: 0, anaerobic_digestion: 0 },
+    hdpe:      { recycling: 35, landfill: 26, incineration: 39, composting: 0, anaerobic_digestion: 0 },
+    paper:     { recycling: 84, landfill:  3, incineration:  8, composting: 3, anaerobic_digestion: 2 },
+    steel:     { recycling: 82, landfill:  7, incineration: 11, composting: 0, anaerobic_digestion: 0 },
+    organic:   { recycling:  0, landfill: 20, incineration: 10, composting: 50, anaerobic_digestion: 20 },
+    cork:      { recycling: 10, landfill: 30, incineration: 20, composting: 30, anaerobic_digestion: 10 },
+    other:     { recycling: 30, landfill: 35, incineration: 35, composting: 0, anaerobic_digestion: 0 },
   },
   uk: {
-    glass: { recycling: 74, landfill: 12, incineration: 14, composting: 0, anaerobic_digestion: 0 },
-    aluminium: { recycling: 72, landfill: 12, incineration: 16, composting: 0, anaerobic_digestion: 0 },
-    pet: { recycling: 38, landfill: 28, incineration: 34, composting: 0, anaerobic_digestion: 0 },
-    hdpe: { recycling: 32, landfill: 32, incineration: 36, composting: 0, anaerobic_digestion: 0 },
-    paper: { recycling: 68, landfill: 10, incineration: 16, composting: 4, anaerobic_digestion: 2 },
-    steel: { recycling: 78, landfill: 10, incineration: 12, composting: 0, anaerobic_digestion: 0 },
-    organic: { recycling: 0, landfill: 25, incineration: 15, composting: 45, anaerobic_digestion: 15 },
-    cork: { recycling: 8, landfill: 37, incineration: 22, composting: 25, anaerobic_digestion: 8 },
-    other: { recycling: 28, landfill: 38, incineration: 34, composting: 0, anaerobic_digestion: 0 },
+    glass:     { recycling: 74, landfill:  8, incineration: 18, composting: 0, anaerobic_digestion: 0 },
+    aluminium: { recycling: 72, landfill:  8, incineration: 20, composting: 0, anaerobic_digestion: 0 },
+    pet:       { recycling: 38, landfill: 16, incineration: 46, composting: 0, anaerobic_digestion: 0 },
+    hdpe:      { recycling: 32, landfill: 18, incineration: 50, composting: 0, anaerobic_digestion: 0 },
+    paper:     { recycling: 74, landfill:  5, incineration: 15, composting: 4, anaerobic_digestion: 2 },
+    steel:     { recycling: 78, landfill:  6, incineration: 16, composting: 0, anaerobic_digestion: 0 },
+    organic:   { recycling:  0, landfill: 15, incineration: 15, composting: 50, anaerobic_digestion: 20 },
+    cork:      { recycling:  8, landfill: 22, incineration: 30, composting: 30, anaerobic_digestion: 10 },
+    other:     { recycling: 28, landfill: 22, incineration: 50, composting: 0, anaerobic_digestion: 0 },
   },
   us: {
-    glass: { recycling: 33, landfill: 60, incineration: 7, composting: 0, anaerobic_digestion: 0 },
-    aluminium: { recycling: 50, landfill: 40, incineration: 10, composting: 0, anaerobic_digestion: 0 },
-    pet: { recycling: 29, landfill: 60, incineration: 11, composting: 0, anaerobic_digestion: 0 },
-    hdpe: { recycling: 25, landfill: 62, incineration: 13, composting: 0, anaerobic_digestion: 0 },
-    paper: { recycling: 66, landfill: 19, incineration: 10, composting: 4, anaerobic_digestion: 1 },
-    steel: { recycling: 70, landfill: 22, incineration: 8, composting: 0, anaerobic_digestion: 0 },
-    organic: { recycling: 0, landfill: 50, incineration: 10, composting: 32, anaerobic_digestion: 8 },
-    cork: { recycling: 5, landfill: 57, incineration: 15, composting: 20, anaerobic_digestion: 3 },
-    other: { recycling: 20, landfill: 55, incineration: 25, composting: 0, anaerobic_digestion: 0 },
+    glass:     { recycling: 31, landfill: 56, incineration: 13, composting: 0, anaerobic_digestion: 0 },
+    aluminium: { recycling: 50, landfill: 37, incineration: 13, composting: 0, anaerobic_digestion: 0 },
+    pet:       { recycling: 29, landfill: 58, incineration: 13, composting: 0, anaerobic_digestion: 0 },
+    hdpe:      { recycling: 29, landfill: 58, incineration: 13, composting: 0, anaerobic_digestion: 0 },
+    paper:     { recycling: 68, landfill: 20, incineration:  7, composting: 4, anaerobic_digestion: 1 },
+    steel:     { recycling: 71, landfill: 24, incineration:  5, composting: 0, anaerobic_digestion: 0 },
+    organic:   { recycling:  0, landfill: 50, incineration: 10, composting: 32, anaerobic_digestion: 8 },
+    cork:      { recycling:  5, landfill: 57, incineration: 15, composting: 20, anaerobic_digestion: 3 },
+    other:     { recycling: 20, landfill: 55, incineration: 25, composting: 0, anaerobic_digestion: 0 },
   },
 };
 
