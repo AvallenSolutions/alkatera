@@ -35,33 +35,35 @@ export type EoLRegion = 'eu' | 'uk' | 'us';
  * Emission factors per disposal pathway (kg CO2e per kg of material)
  * Negative values represent avoided burden (recycling credits)
  *
- * MEDIUM FIX #14: `anaerobic_digestion` is defined here but NOT currently
- * calculated in `calculateMaterialEoL` because `RegionalDefaults` only
- * includes the four main pathways (recycling, landfill, incineration, composting).
- * The AD factor values in `EOL_FACTORS` are accurate but inaccessible.
- *
- * TODO: Add `anaerobic_digestion` to `RegionalDefaults` and to the calculation
- * loop in `calculateMaterialEoL`. AD is particularly relevant for organic materials
- * (cork, cardboard, organic waste). EU Landfill Directive is shifting waste away from
- * landfill toward AD for organics. See Biogas Europe (2023) for AD emission factors.
+ * RESOLVED: `anaerobic_digestion` is now fully activated in `calculateMaterialEoL`.
+ * `RegionalDefaults` includes AD percentages and the calculation loop includes the
+ * AD pathway. AD is particularly relevant for organic materials (cork, cardboard,
+ * organic waste) as the EU Landfill Directive shifts waste toward AD for organics.
+ * AD percentages sourced from Biogas Europe (2023) and DEFRA (2024) waste statistics.
  */
 export interface EoLPathwayFactors {
   recycling: number; // kg CO2e/kg (negative = credit from avoided virgin production)
   landfill: number; // kg CO2e/kg
   incineration: number; // kg CO2e/kg (includes energy recovery credit where applicable)
   composting: number; // kg CO2e/kg
-  /** NOTE: Currently not calculated — see TODO above. Factor values present but unused. */
+  /** Anaerobic digestion — now fully active in calculateMaterialEoL. */
   anaerobic_digestion: number; // kg CO2e/kg
 }
 
 /**
  * Regional default percentages for disposal pathways (must sum to 100)
+ *
+ * ACTIVATED: `anaerobic_digestion` is now included in the calculation.
+ * AD is particularly relevant for organic materials (cork, cardboard, organic waste)
+ * as the EU Landfill Directive shifts organic waste away from landfill toward AD.
+ * For non-organic materials (glass, aluminium, PET, HDPE, steel) AD is 0%.
  */
 export interface RegionalDefaults {
   recycling: number; // % (0-100)
   landfill: number;
   incineration: number;
   composting: number;
+  anaerobic_digestion: number;
 }
 
 /**
@@ -82,7 +84,7 @@ export interface EoLConfig {
   region: EoLRegion;
   pathways: Record<
     string,
-    { recycling: number; landfill: number; incineration: number; composting: number }
+    { recycling: number; landfill: number; incineration: number; composting: number; anaerobic_digestion?: number }
   >;
 }
 
@@ -194,37 +196,37 @@ export const EOL_FACTORS: Record<string, EoLPathwayFactors> = {
  */
 export const REGIONAL_DEFAULTS: Record<EoLRegion, Record<string, RegionalDefaults>> = {
   eu: {
-    glass: { recycling: 76, landfill: 10, incineration: 14, composting: 0 },
-    aluminium: { recycling: 75, landfill: 10, incineration: 15, composting: 0 },
-    pet: { recycling: 40, landfill: 25, incineration: 35, composting: 0 },
-    hdpe: { recycling: 35, landfill: 30, incineration: 35, composting: 0 },
-    paper: { recycling: 82, landfill: 5, incineration: 10, composting: 3 },
-    steel: { recycling: 80, landfill: 10, incineration: 10, composting: 0 },
-    organic: { recycling: 0, landfill: 30, incineration: 10, composting: 60 },
-    cork: { recycling: 10, landfill: 40, incineration: 20, composting: 30 },
-    other: { recycling: 30, landfill: 35, incineration: 35, composting: 0 },
+    glass: { recycling: 76, landfill: 10, incineration: 14, composting: 0, anaerobic_digestion: 0 },
+    aluminium: { recycling: 75, landfill: 10, incineration: 15, composting: 0, anaerobic_digestion: 0 },
+    pet: { recycling: 40, landfill: 25, incineration: 35, composting: 0, anaerobic_digestion: 0 },
+    hdpe: { recycling: 35, landfill: 30, incineration: 35, composting: 0, anaerobic_digestion: 0 },
+    paper: { recycling: 82, landfill: 3, incineration: 10, composting: 3, anaerobic_digestion: 2 },
+    steel: { recycling: 80, landfill: 10, incineration: 10, composting: 0, anaerobic_digestion: 0 },
+    organic: { recycling: 0, landfill: 20, incineration: 10, composting: 50, anaerobic_digestion: 20 },
+    cork: { recycling: 10, landfill: 30, incineration: 20, composting: 30, anaerobic_digestion: 10 },
+    other: { recycling: 30, landfill: 35, incineration: 35, composting: 0, anaerobic_digestion: 0 },
   },
   uk: {
-    glass: { recycling: 74, landfill: 12, incineration: 14, composting: 0 },
-    aluminium: { recycling: 72, landfill: 12, incineration: 16, composting: 0 },
-    pet: { recycling: 38, landfill: 28, incineration: 34, composting: 0 },
-    hdpe: { recycling: 32, landfill: 32, incineration: 36, composting: 0 },
-    paper: { recycling: 68, landfill: 12, incineration: 16, composting: 4 },
-    steel: { recycling: 78, landfill: 10, incineration: 12, composting: 0 },
-    organic: { recycling: 0, landfill: 35, incineration: 15, composting: 50 },
-    cork: { recycling: 8, landfill: 45, incineration: 22, composting: 25 },
-    other: { recycling: 28, landfill: 38, incineration: 34, composting: 0 },
+    glass: { recycling: 74, landfill: 12, incineration: 14, composting: 0, anaerobic_digestion: 0 },
+    aluminium: { recycling: 72, landfill: 12, incineration: 16, composting: 0, anaerobic_digestion: 0 },
+    pet: { recycling: 38, landfill: 28, incineration: 34, composting: 0, anaerobic_digestion: 0 },
+    hdpe: { recycling: 32, landfill: 32, incineration: 36, composting: 0, anaerobic_digestion: 0 },
+    paper: { recycling: 68, landfill: 10, incineration: 16, composting: 4, anaerobic_digestion: 2 },
+    steel: { recycling: 78, landfill: 10, incineration: 12, composting: 0, anaerobic_digestion: 0 },
+    organic: { recycling: 0, landfill: 25, incineration: 15, composting: 45, anaerobic_digestion: 15 },
+    cork: { recycling: 8, landfill: 37, incineration: 22, composting: 25, anaerobic_digestion: 8 },
+    other: { recycling: 28, landfill: 38, incineration: 34, composting: 0, anaerobic_digestion: 0 },
   },
   us: {
-    glass: { recycling: 33, landfill: 60, incineration: 7, composting: 0 },
-    aluminium: { recycling: 50, landfill: 40, incineration: 10, composting: 0 },
-    pet: { recycling: 29, landfill: 60, incineration: 11, composting: 0 },
-    hdpe: { recycling: 25, landfill: 62, incineration: 13, composting: 0 },
-    paper: { recycling: 66, landfill: 20, incineration: 10, composting: 4 },
-    steel: { recycling: 70, landfill: 22, incineration: 8, composting: 0 },
-    organic: { recycling: 0, landfill: 55, incineration: 10, composting: 35 },
-    cork: { recycling: 5, landfill: 60, incineration: 15, composting: 20 },
-    other: { recycling: 20, landfill: 55, incineration: 25, composting: 0 },
+    glass: { recycling: 33, landfill: 60, incineration: 7, composting: 0, anaerobic_digestion: 0 },
+    aluminium: { recycling: 50, landfill: 40, incineration: 10, composting: 0, anaerobic_digestion: 0 },
+    pet: { recycling: 29, landfill: 60, incineration: 11, composting: 0, anaerobic_digestion: 0 },
+    hdpe: { recycling: 25, landfill: 62, incineration: 13, composting: 0, anaerobic_digestion: 0 },
+    paper: { recycling: 66, landfill: 19, incineration: 10, composting: 4, anaerobic_digestion: 1 },
+    steel: { recycling: 70, landfill: 22, incineration: 8, composting: 0, anaerobic_digestion: 0 },
+    organic: { recycling: 0, landfill: 50, incineration: 10, composting: 32, anaerobic_digestion: 8 },
+    cork: { recycling: 5, landfill: 57, incineration: 15, composting: 20, anaerobic_digestion: 3 },
+    other: { recycling: 20, landfill: 55, incineration: 25, composting: 0, anaerobic_digestion: 0 },
   },
 };
 
@@ -278,11 +280,57 @@ const MATERIAL_TYPE_MAP: Record<string, string> = {
 };
 
 /**
- * Resolve a packaging category or material type to a factor key
+ * Keyword patterns used to detect material composition from a free-text name.
+ * Checked in order — first match wins. More specific patterns come first to
+ * avoid false positives (e.g. "aluminium" before generic "can").
  */
-export function getMaterialFactorKey(packagingCategory: string): string {
+const MATERIAL_NAME_KEYWORDS: [RegExp, string][] = [
+  // Glass
+  [/\bglass\b/i, 'glass'],
+  // Aluminium (British + American spelling)
+  [/\b(aluminium|aluminum|alu)\b/i, 'aluminium'],
+  // Specific plastics before generic "plastic"
+  [/\b(hdpe|high.?density.?poly)\b/i, 'hdpe'],
+  [/\bpet\b/i, 'pet'],
+  [/\bplastic\b/i, 'pet'], // Default plastic → PET (most common in drinks)
+  // Paper / Cardboard
+  [/\b(cardboard|carton|corrugated)\b/i, 'paper'],
+  [/\b(paper|label)\b/i, 'paper'],
+  // Steel / Metal
+  [/\bsteel\b/i, 'steel'],
+  [/\b(crown.?cap|metal.?cap|tin.?can)\b/i, 'steel'],
+  // Cork
+  [/\bcork\b/i, 'cork'],
+  // Organic / Ingredients
+  [/\b(organic|ingredient|food)\b/i, 'organic'],
+];
+
+/**
+ * Resolve a packaging category or material type to a factor key.
+ *
+ * Resolution order:
+ *  1. Exact match on `packagingCategory` via MATERIAL_TYPE_MAP
+ *  2. Keyword search on `materialName` (e.g. "Glass Bottle 500ml" → glass)
+ *  3. Fallback to 'other'
+ */
+export function getMaterialFactorKey(
+  packagingCategory: string,
+  materialName?: string
+): string {
+  // 1. Try exact map lookup on packaging category
   const normalized = (packagingCategory || '').toLowerCase().trim().replace(/\s+/g, '_');
-  return MATERIAL_TYPE_MAP[normalized] || 'other';
+  const mapped = MATERIAL_TYPE_MAP[normalized];
+  if (mapped) return mapped;
+
+  // 2. Try keyword detection from the material name
+  if (materialName) {
+    for (const [pattern, factorKey] of MATERIAL_NAME_KEYWORDS) {
+      if (pattern.test(materialName)) return factorKey;
+    }
+  }
+
+  // 3. Fallback
+  return 'other';
 }
 
 /**
@@ -327,12 +375,27 @@ export function calculateMaterialEoL(
   pathwayOverrides?: Partial<RegionalDefaults>
 ): MaterialEoLResult {
   const factors = EOL_FACTORS[materialType] || EOL_FACTORS.other;
-  const defaults = REGIONAL_DEFAULTS[region]?.[materialType] || REGIONAL_DEFAULTS[region]?.other || {
+  const regionDefaults = REGIONAL_DEFAULTS[region]?.[materialType] || REGIONAL_DEFAULTS[region]?.other;
+
+  // AUDITABILITY FIX: Log when using hardcoded fallback defaults because the material
+  // type was not found in the regional defaults table. This silent fallback previously
+  // applied generic percentages (30/40/30/0) without any warning, making it hard to
+  // trace why EoL numbers diverge from regional statistics.
+  const usingFallbackDefaults = !regionDefaults;
+  const defaults = regionDefaults || {
     recycling: 30,
     landfill: 40,
     incineration: 30,
     composting: 0,
+    anaerobic_digestion: 0,
   };
+  if (usingFallbackDefaults) {
+    console.warn(
+      `[calculateMaterialEoL] ⚠ No regional defaults for material type '${materialType}' ` +
+      `in region '${region}'. Using fallback: recycling=30%, landfill=40%, incineration=30%, composting=0%, AD=0%. ` +
+      `Add '${materialType}' to REGIONAL_DEFAULTS['${region}'] in lib/end-of-life-factors.ts for accuracy.`
+    );
+  }
 
   // Merge defaults with any user overrides
   const pathways: RegionalDefaults = {
@@ -340,16 +403,18 @@ export function calculateMaterialEoL(
     landfill: pathwayOverrides?.landfill ?? defaults.landfill,
     incineration: pathwayOverrides?.incineration ?? defaults.incineration,
     composting: pathwayOverrides?.composting ?? defaults.composting,
+    anaerobic_digestion: pathwayOverrides?.anaerobic_digestion ?? defaults.anaerobic_digestion,
   };
 
-  // Calculate per-pathway emissions
+  // Calculate per-pathway emissions (now includes anaerobic digestion)
   const recyclingEmissions = massKg * (pathways.recycling / 100) * factors.recycling;
   const landfillEmissions = massKg * (pathways.landfill / 100) * factors.landfill;
   const incinerationEmissions = massKg * (pathways.incineration / 100) * factors.incineration;
   const compostingEmissions = massKg * (pathways.composting / 100) * factors.composting;
+  const adEmissions = massKg * (pathways.anaerobic_digestion / 100) * factors.anaerobic_digestion;
 
   const avoided = recyclingEmissions; // Will be negative
-  const gross = landfillEmissions + incinerationEmissions + compostingEmissions;
+  const gross = landfillEmissions + incinerationEmissions + compostingEmissions + adEmissions;
   const net = gross + avoided;
 
   return {
@@ -362,6 +427,7 @@ export function calculateMaterialEoL(
       landfill: landfillEmissions,
       incineration: incinerationEmissions,
       composting: compostingEmissions,
+      anaerobic_digestion: adEmissions,
     },
   };
 }

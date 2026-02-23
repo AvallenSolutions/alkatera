@@ -73,7 +73,7 @@ export function EndOfLifeStep() {
         continue;
       }
 
-      const factorKey = getMaterialFactorKey(packagingCategory || 'other');
+      const factorKey = getMaterialFactorKey(packagingCategory || 'other', mat.material_name);
 
       // Use the material's actual name (e.g. "Glass Bottle 500ml")
       // with the factor type in parentheses for clarity
@@ -105,25 +105,39 @@ export function EndOfLifeStep() {
     }
 
     return rows;
-  }, [preCalcState.materials, config.region]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preCalcState.materials]);
 
-  // Initialize pathways from regional defaults when region changes or on mount.
-  // Keyed by material row ID so each material has its own overrides.
+  // Seed pathways for any materials that don't yet have overrides (e.g. on
+  // first mount or when new materials are added). Does NOT run on region
+  // change — `updateRegion` handles that to avoid overwriting user edits.
   useEffect(() => {
+    const existing = config.pathways;
     const pathways: Record<string, RegionalDefaults> = {};
+    let changed = false;
+
+    // Copy existing entries, ensuring anaerobic_digestion is always present
+    for (const [key, val] of Object.entries(existing)) {
+      pathways[key] = { anaerobic_digestion: 0, ...val };
+    }
+
     for (const row of materialRows) {
-      // Preserve existing overrides (try row ID first, then fall back to factorKey for backwards compat)
-      const defaults = getRegionalDefaults(config.region, row.factorKey);
-      const existingOverride = config.pathways[row.id] || config.pathways[row.factorKey];
-      if (existingOverride) {
-        // Merge with defaults to fill any missing fields (e.g. anaerobic_digestion)
-        pathways[row.id] = { ...defaults, ...existingOverride };
-      } else {
-        pathways[row.id] = defaults;
+      if (!pathways[row.id]) {
+        // Try backwards-compat key (factorKey), then fall back to defaults
+        const legacy = existing[row.factorKey];
+        const defaults = getRegionalDefaults(config.region, row.factorKey);
+        pathways[row.id] = legacy
+          ? { ...defaults, ...legacy }
+          : defaults;
+        changed = true;
       }
     }
-    updateField('eolConfig', { ...config, pathways });
-  }, [config.region, materialRows.length]);
+
+    if (changed) {
+      updateField('eolConfig', { ...config, pathways });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [materialRows.length]);
 
   const updateRegion = (region: EoLRegion) => {
     // Reset all pathways to new region defaults

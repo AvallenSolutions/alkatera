@@ -14,12 +14,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
 import { calculateMaterialEoL, getMaterialFactorKey, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { isStageIncluded } from './system-boundaries';
-
-const IPCC_AR6_GWP = {
-  CH4: 27.9,
-  N2O: 273,
-  CO2: 1,
-};
+import { IPCC_AR6_GWP } from './ghg-constants';
 
 interface Material {
   id: string;
@@ -420,11 +415,10 @@ export async function aggregateProductImpacts(
         continue;
       }
 
-      const factorKey = getMaterialFactorKey(packagingCategory || 'other');
+      const factorKey = getMaterialFactorKey(packagingCategory || 'other', material.material_name);
 
-      // Get user pathway overrides if available — keyed by factorKey (e.g. 'glass', 'aluminium')
-      // Note: material.id (UUID) is not a valid key in wizard-generated eolConfig
-      const pathwayOverrides = eolConfig?.pathways?.[factorKey];
+      // Get user pathway overrides if available — keyed by material ID or factorKey
+      const pathwayOverrides = eolConfig?.pathways?.[material.id] || eolConfig?.pathways?.[factorKey];
 
       const eolResult = calculateMaterialEoL(quantity, factorKey, eolRegion, pathwayOverrides);
 
@@ -458,17 +452,35 @@ export async function aggregateProductImpacts(
   const totalCarbonFootprint = totalClimate;
 
   // Fallback: if no scope allocation, put everything in Scope 3
+  // CONSISTENCY FIX: Log when this fallback fires so auditors can see the assumption
   const totalScopeSum = scope1Emissions + scope2Emissions + scope3Emissions;
   if (totalScopeSum === 0 && totalCarbonFootprint > 0) {
+    console.warn(
+      `[aggregateProductImpacts] ⚠ Scope allocation fallback: no materials were classified into ` +
+      `Scope 1/2/3. Assigning full total (${totalCarbonFootprint.toFixed(6)} kg CO2e) to Scope 3. ` +
+      `This usually means all materials are category_type=MANUFACTURING_MATERIAL with no ` +
+      `facility energy split. Review scope allocation logic if this is unexpected.`
+    );
     scope3Emissions = totalCarbonFootprint;
   }
 
-  // GHG reconciliation
+  // GHG reconciliation — ISO 14067 §6.4.3 requires by-gas breakdown to sum to total
   const ghgSum = totalCO2Fossil + totalCO2Biogenic + (totalCH4 * IPCC_AR6_GWP.CH4) + (totalN2O * IPCC_AR6_GWP.N2O) + totalHFCs;
   const ghgDiscrepancy = Math.abs(ghgSum - totalClimate);
   if (ghgDiscrepancy > totalClimate * 0.1 && totalClimate > 0) {
     const unallocatedCO2 = totalClimate - ghgSum;
     if (unallocatedCO2 > 0) {
+      // CONSISTENCY FIX: Log silent CO₂ reallocation so auditors can see the adjustment.
+      // This fires when the by-gas breakdown doesn't sum to the total (>10% discrepancy),
+      // typically because some emission factors don't provide a fossil/biogenic/CH₄/N₂O split.
+      // The unallocated remainder is assigned to fossil CO₂ as a conservative assumption.
+      console.warn(
+        `[aggregateProductImpacts] ⚠ GHG reconciliation: by-gas sum (${ghgSum.toFixed(6)}) differs from ` +
+        `total climate (${totalClimate.toFixed(6)}) by ${ghgDiscrepancy.toFixed(6)} kg CO2e ` +
+        `(${((ghgDiscrepancy / totalClimate) * 100).toFixed(1)}%). Reallocating ${unallocatedCO2.toFixed(6)} kg ` +
+        `to fossil CO₂. This is a conservative assumption — improve by using emission factors ` +
+        `with explicit GHG gas breakdowns.`
+      );
       totalCO2Fossil += unallocatedCO2;
     }
   }
@@ -486,6 +498,26 @@ export async function aggregateProductImpacts(
     scope2: scope2Emissions.toFixed(4),
     scope3: scope3Emissions.toFixed(4),
   });
+
+  // CONSISTENCY FIX: Surface the known discrepancy between stage sum and total.
+  // Stage buckets include inbound transport (reclassified to raw_materials/packaging per
+  // ISO 14044), but totalClimate only counts impact_climate (transport is embedded in
+  // per-material impact_climate but also tracked separately in impact_transport).
+  // The stage sum will exceed totalClimate by ~totalTransport. This is an architectural
+  // note, not a bug — the stage breakdown is additive-approximate for display purposes.
+  if (totalTransport > 0) {
+    const stageSum = rawMaterialsEmissions + processingEmissions + packagingEmissions +
+      distributionEmissions + usePhaseEmissions + endOfLifeEmissions;
+    const discrepancy = Math.abs(stageSum - totalCarbonFootprint);
+    if (discrepancy > 0.001) {
+      calculationWarnings.push(
+        `Lifecycle stage sum (${stageSum.toFixed(4)} kg CO2e) differs from headline total ` +
+        `(${totalCarbonFootprint.toFixed(4)} kg CO2e) by ${discrepancy.toFixed(4)} kg CO2e. ` +
+        `This is because inbound transport (${totalTransport.toFixed(4)} kg CO2e) is included ` +
+        `in stage buckets (per ISO 14044) but not double-counted in the headline total.`
+      );
+    }
+  }
 
   // 10. Build aggregated impacts object
   const aggregatedImpacts = {
