@@ -142,6 +142,11 @@ export default function SupplierRegisterPage() {
         }
       }
 
+      // Step 4: Refresh session to pick up is_supplier metadata set by the
+      // accept route. Without this, the session token from signIn/signUp
+      // won't include the metadata, and OrganizationContext's fallback fails.
+      await supabase.auth.refreshSession();
+
       setSuccess(true);
       setTimeout(() => {
         router.push('/supplier-portal');

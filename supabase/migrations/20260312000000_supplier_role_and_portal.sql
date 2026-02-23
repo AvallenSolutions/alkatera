@@ -36,7 +36,7 @@ BEGIN
     o.name AS organization_name,
     o.slug AS organization_slug
   FROM public.suppliers s
-  JOIN public.organizations o ON o.id = s.organization_id
+  LEFT JOIN public.organizations o ON o.id = s.organization_id
   WHERE s.user_id = auth.uid()
   LIMIT 1;
 END;
