@@ -132,6 +132,17 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         return
       }
 
+      // Fallback: if get_supplier_context() returned nothing but user metadata
+      // flags them as a supplier (set during registration/invitation acceptance).
+      // This catches timing issues, migration lag, or NULL org_id with old INNER JOIN.
+      if (user.user_metadata?.is_supplier) {
+        console.log('👤 OrganizationContext: User is supplier (from metadata fallback)')
+        setUserRole('supplier')
+        setIsLoading(false)
+        isFetchingRef.current = false
+        return
+      }
+
       // Always check advisor access — advisors may also be members of their own org,
       // so we must check regardless of whether memberships exist.
       const { data: advisorAccess, error: advisorError } = await supabase

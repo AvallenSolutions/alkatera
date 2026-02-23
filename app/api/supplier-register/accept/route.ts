@@ -115,6 +115,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Flag user as a supplier in auth metadata — this acts as a reliable
+    // fallback signal for OrganizationContext if the get_supplier_context()
+    // RPC hasn't propagated yet (timing, migration lag, etc.)
+    await adminClient.auth.admin.updateUserById(user_id, {
+      user_metadata: {
+        is_supplier: true,
+      },
+    })
+
     return NextResponse.json(
       {
         success: true,
