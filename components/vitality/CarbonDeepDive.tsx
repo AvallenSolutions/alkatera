@@ -19,6 +19,11 @@ import {
 interface CarbonDeepDiveProps {
   scopeBreakdown: ScopeBreakdown | null;
   totalCO2: number;
+  /** Product LCA total (sum of per-product climate_change_gwp100 × volume).
+   *  Used as the comparison denominator for ISO 14067 carbon origin validation
+   *  and GHG gas inventory percentages, because ghgBreakdown comes from product
+   *  LCA data — NOT from the broader corporate emissions total. */
+  productLcaTotalCO2?: number;
   materialBreakdown?: MaterialBreakdownItem[];
   ghgBreakdown?: GHGBreakdown | null;
   lifecycleStageBreakdown?: LifecycleStageBreakdown[];
@@ -36,6 +41,7 @@ interface CarbonDeepDiveProps {
 export function CarbonDeepDive({
   scopeBreakdown,
   totalCO2,
+  productLcaTotalCO2,
   materialBreakdown,
   ghgBreakdown,
   lifecycleStageBreakdown,
@@ -249,12 +255,21 @@ export function CarbonDeepDive({
             </CardContent>
           </Card>
 
-          {/* Data Quality Validation Banner */}
+          {/* Data Quality Validation Banner — ISO 14067 §6.4.2
+              Compare carbon origin (fossil + biogenic + dLUC) against the product
+              LCA total, NOT the corporate emissions total. The corporate total
+              includes business travel, commuting, fleet, and other overhead
+              emissions that are not in any product LCA ghg_breakdown. */}
           {ghgBreakdown && (
             (() => {
+              // Use product LCA total as the comparison denominator (same data
+              // source as carbon_origin). Fall back to totalCO2 if unavailable.
+              const comparisonTotal = (productLcaTotalCO2 && productLcaTotalCO2 > 0)
+                ? productLcaTotalCO2
+                : totalCO2;
               const fossilBiogenicLuc = ghgBreakdown.carbon_origin.fossil + ghgBreakdown.carbon_origin.biogenic + ghgBreakdown.carbon_origin.land_use_change;
-              const variance = Math.abs(fossilBiogenicLuc - totalCO2);
-              const variancePercent = totalCO2 > 0 ? (variance / totalCO2) * 100 : 0;
+              const variance = Math.abs(fossilBiogenicLuc - comparisonTotal);
+              const variancePercent = comparisonTotal > 0 ? (variance / comparisonTotal) * 100 : 0;
               const isValid = variancePercent <= 5;
 
               if (!isValid) {
@@ -265,7 +280,7 @@ export function CarbonDeepDive({
                       <div className="space-y-1">
                         <p className="text-sm font-semibold text-amber-900">Data Quality Warning</p>
                         <p className="text-xs text-amber-700">
-                          Carbon origin sum ({(fossilBiogenicLuc / 1000).toFixed(3)} t) deviates {variancePercent.toFixed(1)}% from total ({(totalCO2 / 1000).toFixed(3)} t).
+                          Carbon origin sum ({(fossilBiogenicLuc / 1000).toFixed(3)} t) deviates {variancePercent.toFixed(1)}% from product LCA total ({(comparisonTotal / 1000).toFixed(3)} t).
                           ISO 14067 recommends &lt;5% variance.
                         </p>
                       </div>
@@ -692,7 +707,7 @@ export function CarbonDeepDive({
                               {ghgBreakdown.gas_inventory.co2_fossil.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.co2_fossil / totalCO2) * 100).toFixed(1)}%
+                              {((ghgBreakdown.gas_inventory.co2_fossil / (productLcaTotalCO2 || totalCO2)) * 100).toFixed(1)}%
                             </TableCell>
                           </TableRow>
 
@@ -711,7 +726,7 @@ export function CarbonDeepDive({
                               {ghgBreakdown.gas_inventory.co2_biogenic.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.co2_biogenic / totalCO2) * 100).toFixed(1)}%
+                              {((ghgBreakdown.gas_inventory.co2_biogenic / (productLcaTotalCO2 || totalCO2)) * 100).toFixed(1)}%
                             </TableCell>
                           </TableRow>
 
@@ -734,7 +749,7 @@ export function CarbonDeepDive({
                               {(ghgBreakdown.gas_inventory.methane_fossil ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {(((ghgBreakdown.gas_inventory.methane_fossil ?? 0) / totalCO2) * 100).toFixed(2)}%
+                              {(((ghgBreakdown.gas_inventory.methane_fossil ?? 0) / (productLcaTotalCO2 || totalCO2)) * 100).toFixed(2)}%
                             </TableCell>
                           </TableRow>
 
@@ -757,7 +772,7 @@ export function CarbonDeepDive({
                               {(ghgBreakdown.gas_inventory.methane_biogenic ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {(((ghgBreakdown.gas_inventory.methane_biogenic ?? 0) / totalCO2) * 100).toFixed(2)}%
+                              {(((ghgBreakdown.gas_inventory.methane_biogenic ?? 0) / (productLcaTotalCO2 || totalCO2)) * 100).toFixed(2)}%
                             </TableCell>
                           </TableRow>
 
@@ -780,7 +795,7 @@ export function CarbonDeepDive({
                               {ghgBreakdown.gas_inventory.nitrous_oxide.toLocaleString('en-GB', { minimumFractionDigits: 6, maximumFractionDigits: 6 })}
                             </TableCell>
                             <TableCell className="text-right">
-                              {((ghgBreakdown.gas_inventory.nitrous_oxide / totalCO2) * 100).toFixed(2)}%
+                              {((ghgBreakdown.gas_inventory.nitrous_oxide / (productLcaTotalCO2 || totalCO2)) * 100).toFixed(2)}%
                             </TableCell>
                           </TableRow>
 
@@ -798,7 +813,7 @@ export function CarbonDeepDive({
                                 {ghgBreakdown.gas_inventory.hfc_pfc.toLocaleString('en-GB', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
                               </TableCell>
                               <TableCell className="text-right">
-                                {((ghgBreakdown.gas_inventory.hfc_pfc / totalCO2) * 100).toFixed(1)}%
+                                {((ghgBreakdown.gas_inventory.hfc_pfc / (productLcaTotalCO2 || totalCO2)) * 100).toFixed(1)}%
                               </TableCell>
                             </TableRow>
                           )}
@@ -819,7 +834,7 @@ export function CarbonDeepDive({
                             All emissions converted to 100-year CO₂ equivalents per IPCC methodology.
                           </p>
                           {((ghgBreakdown.gas_inventory.methane > 0 || ghgBreakdown.gas_inventory.nitrous_oxide > 0) &&
-                            (ghgBreakdown.gas_inventory.methane + ghgBreakdown.gas_inventory.nitrous_oxide) / totalCO2 > 0.04) && (
+                            (ghgBreakdown.gas_inventory.methane + ghgBreakdown.gas_inventory.nitrous_oxide) / (productLcaTotalCO2 || totalCO2) > 0.04) && (
                             <p className="text-xs text-blue-700 mt-2 bg-blue-100 p-2 rounded">
                               <strong>Note:</strong> CH₄ and N₂O values estimated using typical GHG composition ratios (~3% CH₄, ~2% N₂O in CO₂eq)
                               as material-specific gas breakdowns are not available. CO₂ values are actual measured data.

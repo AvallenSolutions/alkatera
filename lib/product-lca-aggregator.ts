@@ -485,6 +485,22 @@ export async function aggregateProductImpacts(
     }
   }
 
+  // Carbon origin reconciliation — ISO 14067 §6.4.2 requires the fossil + biogenic +
+  // dLUC split to sum to the total carbon footprint. If some emission factors (e.g.
+  // from OpenLCA/Ecoinvent) don't provide explicit fossil/biogenic splits, the origin
+  // sum can fall short. Reallocate the gap to fossil as a conservative assumption.
+  const carbonOriginSum = totalClimateFossil + totalClimateBiogenic + totalClimateDluc;
+  const carbonOriginGap = totalClimate - carbonOriginSum;
+  if (Math.abs(carbonOriginGap) > totalClimate * 0.05 && totalClimate > 0 && carbonOriginGap > 0) {
+    console.warn(
+      `[aggregateProductImpacts] ⚠ Carbon origin reconciliation: origin sum (${carbonOriginSum.toFixed(6)}) differs from ` +
+      `total climate (${totalClimate.toFixed(6)}) by ${carbonOriginGap.toFixed(6)} kg CO2e ` +
+      `(${((carbonOriginGap / totalClimate) * 100).toFixed(1)}%). Reallocating ${carbonOriginGap.toFixed(6)} kg ` +
+      `to fossil origin as conservative assumption.`
+    );
+    totalClimateFossil += carbonOriginGap;
+  }
+
   console.log('[aggregateProductImpacts] Aggregated totals:', {
     totalClimate: totalClimate.toFixed(4),
     totalWater: totalWater.toFixed(4),

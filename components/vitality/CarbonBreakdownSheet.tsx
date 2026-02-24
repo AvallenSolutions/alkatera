@@ -64,6 +64,7 @@ interface CarbonBreakdownSheetProps {
   onOpenChange: (open: boolean) => void;
   scopeBreakdown: ScopeBreakdown | null;
   totalCO2: number;
+  productLcaTotalCO2?: number;
   materialBreakdown?: MaterialBreakdownItem[];
   ghgBreakdown?: GHGBreakdown | null;
   lifecycleStageBreakdown?: LifecycleStageBreakdown[];
@@ -83,6 +84,7 @@ export function CarbonBreakdownSheet({
   onOpenChange,
   scopeBreakdown,
   totalCO2,
+  productLcaTotalCO2,
   materialBreakdown,
   ghgBreakdown,
   lifecycleStageBreakdown,
@@ -132,6 +134,7 @@ export function CarbonBreakdownSheet({
           <CarbonDeepDive
             scopeBreakdown={scopeBreakdown}
             totalCO2={totalCO2}
+            productLcaTotalCO2={productLcaTotalCO2}
             materialBreakdown={materialBreakdown}
             ghgBreakdown={ghgBreakdown}
             lifecycleStageBreakdown={lifecycleStageBreakdown}

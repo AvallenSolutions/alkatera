@@ -727,6 +727,7 @@ export default function PerformancePage() {
           <CarbonDeepDive
             scopeBreakdown={scopeBreakdown}
             totalCO2={totalCO2}
+            productLcaTotalCO2={productLcaTotalCO2}
             materialBreakdown={materialBreakdown}
             ghgBreakdown={ghgBreakdown}
             lifecycleStageBreakdown={lifecycleStageBreakdown}
@@ -989,6 +990,7 @@ export default function PerformancePage() {
         onOpenChange={setCarbonSheetOpen}
         scopeBreakdown={scopeBreakdown}
         totalCO2={totalCO2}
+        productLcaTotalCO2={productLcaTotalCO2}
         materialBreakdown={materialBreakdown}
         ghgBreakdown={ghgBreakdown}
         lifecycleStageBreakdown={lifecycleStageBreakdown}
