@@ -3,6 +3,12 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import PassportView from '@/components/passport/PassportView';
 
+// Ensure passport page always fetches fresh data from the database.
+// Without this, Next.js can serve cached responses, causing the passport
+// to show a stale carbon footprint after the user recalculates the LCA.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 interface PassportPageProps {
   params: {
     token: string;
@@ -38,12 +44,15 @@ async function getProductByToken(token: string) {
 
   console.log('Product with organization:', JSON.stringify(product, null, 2));
 
+  // Use created_at (not updated_at) to ensure the newest calculation is always
+  // selected. updated_at can be bumped by wizard auto-save on older records,
+  // causing a stale PCF to appear "newer" than the latest calculation.
   const { data: lca } = await supabase
     .from('product_carbon_footprints')
     .select('*')
     .eq('product_id', product.id)
     .eq('status', 'completed')
-    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 

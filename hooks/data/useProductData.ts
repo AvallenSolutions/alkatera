@@ -154,14 +154,17 @@ export function useProductData(productId: string | undefined) {
 
       if (packagingError) throw packagingError;
 
-      // Fetch LCA reports - filter by completed status and order by updated_at
-      // to match passport fetch behavior and ensure consistency
+      // Fetch LCA reports - filter by completed status and order by created_at
+      // to match passport fetch behavior and ensure consistency.
+      // Use created_at (not updated_at) to ensure the newest calculation is always
+      // selected. updated_at can be bumped by wizard auto-save on older records,
+      // causing a stale PCF to appear "newer" than the latest calculation.
       const { data: lcaData, error: lcaError } = await supabase
         .from("product_carbon_footprints")
         .select("id, created_at, updated_at, system_boundary, aggregated_impacts, status")
         .eq("product_id", productId)
         .eq("status", "completed")
-        .order("updated_at", { ascending: false });
+        .order("created_at", { ascending: false });
 
       // LCA error is non-critical
       if (lcaError) {
