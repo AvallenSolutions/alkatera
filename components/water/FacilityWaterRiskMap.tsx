@@ -19,18 +19,18 @@ interface FacilityWaterRiskMapProps {
   className?: string;
 }
 
-/** Dark-mode map style */
+/** Dark-mode map style — neutral greys with subtle brand warmth */
 const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
-  { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a2e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#8a8a9a" }] },
-  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#2a2a3e" }] },
+  { elementType: "geometry", stylers: [{ color: "#1a1a1a" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a1a" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#2a2a2a" }] },
   { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
-  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2a3e" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2a2a" }] },
   { featureType: "road", elementType: "labels", stylers: [{ visibility: "off" }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e1a2b" }] },
-  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4a5568" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0a1210" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4a5e56" }] },
 ];
 
 const riskColors = {
