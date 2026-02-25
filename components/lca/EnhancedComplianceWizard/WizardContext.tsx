@@ -800,36 +800,46 @@ export function WizardProvider({
         lastSavedAt: new Date().toISOString(),
       };
 
+      // Build update payload — only include lifecycle columns when they have
+      // values, so saves still succeed if the DB migration hasn't been applied yet.
+      const updatePayload: Record<string, unknown> = {
+        intended_application: formData.intendedApplication || null,
+        reasons_for_study: formData.reasonsForStudy || null,
+        intended_audience:
+          formData.intendedAudience.length > 0
+            ? formData.intendedAudience
+            : null,
+        is_comparative_assertion: formData.isComparativeAssertion,
+        functional_unit: formData.functionalUnit || null,
+        system_boundary: formData.systemBoundary || null,
+        lca_scope_type: formData.systemBoundary || null,
+        cutoff_criteria: formData.cutoffCriteria || null,
+        assumptions_limitations:
+          formData.assumptions.length > 0
+            ? formData.assumptions.map((text) => ({
+                type: 'Assumption',
+                text,
+              }))
+            : null,
+        data_quality_requirements: formData.dataQuality,
+        critical_review_type: formData.criticalReviewType,
+        critical_review_justification:
+          formData.criticalReviewJustification || null,
+        wizard_progress: wizardProgress,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Lifecycle columns added in migration 20260313 — include only when set
+      if (formData.usePhaseConfig) {
+        updatePayload.use_phase_config = formData.usePhaseConfig;
+      }
+      if (formData.eolConfig) {
+        updatePayload.eol_config = formData.eolConfig;
+      }
+
       const { error: updateError } = await supabase
         .from('product_carbon_footprints')
-        .update({
-          intended_application: formData.intendedApplication || null,
-          reasons_for_study: formData.reasonsForStudy || null,
-          intended_audience:
-            formData.intendedAudience.length > 0
-              ? formData.intendedAudience
-              : null,
-          is_comparative_assertion: formData.isComparativeAssertion,
-          functional_unit: formData.functionalUnit || null,
-          system_boundary: formData.systemBoundary || null,
-          lca_scope_type: formData.systemBoundary || null,
-          cutoff_criteria: formData.cutoffCriteria || null,
-          assumptions_limitations:
-            formData.assumptions.length > 0
-              ? formData.assumptions.map((text) => ({
-                  type: 'Assumption',
-                  text,
-                }))
-              : null,
-          data_quality_requirements: formData.dataQuality,
-          critical_review_type: formData.criticalReviewType,
-          critical_review_justification:
-            formData.criticalReviewJustification || null,
-          use_phase_config: formData.usePhaseConfig || null,
-          eol_config: formData.eolConfig || null,
-          wizard_progress: wizardProgress,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', pcfId);
 
       if (updateError) throw updateError;
@@ -841,7 +851,9 @@ export function WizardProvider({
       }));
     } catch (err: any) {
       console.error('[WizardContext] Save error:', err);
-      sonnerToast.error('Failed to save progress');
+      sonnerToast.error('Failed to save progress', {
+        description: err?.message || 'Check your connection and try again',
+      });
     } finally {
       setSaving(false);
     }
