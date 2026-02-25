@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 
-/**
- * Returns the Google Maps API key at runtime.
- *
- * We can't use NEXT_PUBLIC_ env vars or next.config.js env aliases because
- * Netlify's secret scanner detects the AIza* pattern in the built JS bundle
- * and aborts the deploy. Loading the key at runtime via this API route keeps
- * it out of the static build output entirely.
- */
+// Force runtime evaluation so the API key is never baked into static build output.
+// Without this, Next.js pre-renders the route at build time and Netlify's secrets
+// scanner detects the AIza* pattern in the .body file and aborts the deploy.
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   return NextResponse.json({
     apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
