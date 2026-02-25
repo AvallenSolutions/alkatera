@@ -6,6 +6,7 @@ import { Package, Droplets, Factory, Mail, CheckCircle2 } from "lucide-react";
 import type { ProductIngredient, ProductPackaging } from "@/hooks/data/useProductData";
 import type { FacilityLocation } from "@/hooks/data/useFacilityLocation";
 import { InviteSupplierModal } from "./InviteSupplierModal";
+import { useGoogleMapsKey } from "@/hooks/useGoogleMapsKey";
 
 interface SupplyChainMapProps {
   facility: FacilityLocation | null;
@@ -31,7 +32,26 @@ const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
 
 const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
 
-export function SupplyChainMap({ facility, ingredients, packaging, productId, productName }: SupplyChainMapProps) {
+/**
+ * Outer wrapper: fetches the API key at runtime, then renders the actual map.
+ * useJsApiLoader can't react to key changes, so we must only mount the inner
+ * component once the key is available.
+ */
+export function SupplyChainMap(props: SupplyChainMapProps) {
+  const { apiKey, loading } = useGoogleMapsKey();
+
+  if (loading || !apiKey) {
+    return (
+      <div className="w-full h-[450px] bg-muted/20 rounded-lg flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Loading map...</p>
+      </div>
+    );
+  }
+
+  return <SupplyChainMapInner {...props} apiKey={apiKey} />;
+}
+
+function SupplyChainMapInner({ facility, ingredients, packaging, productId, productName, apiKey }: SupplyChainMapProps & { apiKey: string }) {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [selectedMaterial, setSelectedMaterial] = useState<{
     id: string;
@@ -41,7 +61,7 @@ export function SupplyChainMap({ facility, ingredients, packaging, productId, pr
   const [activeInfoWindow, setActiveInfoWindow] = useState<string | null>(null);
 
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: apiKey,
   });
 
   const ingredientsWithLocation = useMemo(

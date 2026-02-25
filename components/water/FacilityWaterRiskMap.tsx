@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertTriangle, MapPin, Maximize2 } from 'lucide-react';
 import type { FacilityWaterSummary } from '@/hooks/data/useFacilityWaterData';
+import { useGoogleMapsKey } from '@/hooks/useGoogleMapsKey';
 
 interface FacilityWaterRiskMapProps {
   facilities: FacilityWaterSummary[];
@@ -49,19 +50,44 @@ function getRiskBadgeVariant(riskLevel: 'high' | 'medium' | 'low') {
   }
 }
 
-export function FacilityWaterRiskMap({
+/**
+ * Outer wrapper: fetches the API key at runtime before mounting the map.
+ */
+export function FacilityWaterRiskMap(props: FacilityWaterRiskMapProps) {
+  const { apiKey, loading: keyLoading } = useGoogleMapsKey();
+
+  // Wait for the API key before mounting the inner component, since
+  // useJsApiLoader won't re-initialise if the key changes after mount.
+  if (keyLoading || !apiKey) {
+    return (
+      <Card className={props.className}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Facility Water Risk Map</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="w-full rounded-lg" style={{ height: props.height || 400 }} />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <FacilityWaterRiskMapInner {...props} apiKey={apiKey} />;
+}
+
+function FacilityWaterRiskMapInner({
   facilities,
   loading = false,
   height = 400,
   onFacilityClick,
   selectedFacilityId,
   className,
-}: FacilityWaterRiskMapProps) {
+  apiKey,
+}: FacilityWaterRiskMapProps & { apiKey: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeInfoWindow, setActiveInfoWindow] = useState<string | null>(null);
 
   const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+    googleMapsApiKey: apiKey,
   });
 
   const validFacilities = useMemo(() => {
