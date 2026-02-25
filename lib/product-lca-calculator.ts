@@ -215,6 +215,16 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       throw new Error(`Failed to create LCA: ${lcaError?.message || 'Unknown error'}`);
     }
 
+    // Increment LCA count for subscription tracking
+    try {
+      await supabase.rpc('increment_lca_count', {
+        p_organization_id: product.organization_id,
+      });
+    } catch (err) {
+      // Non-critical — live COUNT(*) in get_organization_usage is the source of truth
+      console.warn('[calculateProductCarbonFootprint] Failed to increment LCA count:', err);
+    }
+
     console.log(`[calculateProductCarbonFootprint] Created LCA record: ${lca.id}`);
     onProgress?.('Processing facility allocations...', 50);
 
@@ -838,7 +848,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     //   'Spirits', 'Beer & Cider', 'Wine', 'Ready-to-Drink & Cocktails', 'Non-Alcoholic'
     const MATURATION_ELIGIBLE_TYPES = new Set(['spirits', 'wine']);
     const productTypeLower = (product.product_type || '').toLowerCase();
-    const isMaturationEligible =
+    // CRITICAL FIX: Previously allowed empty/null product_type (!product.product_type)
+    // which silently applied barrel impacts (5–20 kg CO₂e) to non-aged products.
+    // Now requires explicit product type match. If product_type is not set and a
+    // maturation profile exists, the profile is SKIPPED with a warning.
+    const isMaturationEligible = !!product.product_type && (
       MATURATION_ELIGIBLE_TYPES.has(productTypeLower) ||
       productTypeLower.includes('spirit') ||
       productTypeLower.includes('whisky') ||
@@ -848,9 +862,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       productTypeLower.includes('cognac') ||
       productTypeLower.includes('calvados') ||
       productTypeLower.includes('armagnac') ||
-      productTypeLower.includes('wine') ||
-      // Allow empty/null product_type (don't block when type is not set)
-      !product.product_type;
+      productTypeLower.includes('wine')
+    );
 
     const { data: maturationProfile } = await supabase
       .from('maturation_profiles')
@@ -880,9 +893,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       // --- Per-bottle allocation ---
       // Regular materials are already per-functional-unit (per bottle). Maturation
       // impacts must be normalized the same way so the aggregator sums correctly.
-      const bottleSizeLitres = product.unit_size_unit === 'ml'
+      const rawBottleSize = product.unit_size_unit === 'ml'
         ? Number(product.unit_size_value) / 1000.0
         : Number(product.unit_size_value || 0.75); // fallback 750ml
+      // ACCURACY FIX: Guard against zero/negative bottle size which would cause
+      // division-by-zero in per-bottle allocation (Infinity CO2e per bottle).
+      const bottleSizeLitres = rawBottleSize > 0 ? rawBottleSize : 0.75;
+      if (rawBottleSize <= 0) {
+        console.warn(
+          `[calculateProductCarbonFootprint] ⚠ Bottle size resolved to ${rawBottleSize}L ` +
+          `(unit_size_value: ${product.unit_size_value}, unit: ${product.unit_size_unit}). ` +
+          `Using default 0.75L to avoid division-by-zero in maturation allocation.`
+        );
+      }
 
       // Use user-specified bottle count if set, otherwise derive from output volume
       const totalBottles = maturationProfile.bottles_produced
@@ -1150,14 +1173,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     // calculation parameters are retained to enable third-party verification.
     // The calculation_logs table is append-only (UPDATE/DELETE are blocked by DB triggers).
     //
-    // factor_ids_used: ideally a list of staging_emission_factor UUIDs consumed.
-    // For now we pass a sentinel placeholder UUID because collecting all factor IDs
-    // during the waterfall resolution would require significant refactoring of
-    // resolveImpactFactors. This audit entry still records the key calculation metadata.
-    // TODO: thread factor UUIDs through resolveImpactFactors → lcaMaterialsWithImpacts
-    //       and collect them here for full traceability.
+    // AUDITABILITY FIX: Collect resolved_factor_id from each material's waterfall
+    // result for full factor traceability. Every return path in resolveImpactFactors
+    // now sets resolved_factor_id to the actual DB record UUID used, eliminating
+    // the previous sentinel placeholder.
     try {
-      const SENTINEL_FACTOR_ID = '00000000-0000-0000-0000-000000000001'; // placeholder until full tracing
+      const factorIdsUsed = lcaMaterialsWithImpacts
+        .map((m: any) => m.resolved?.resolved_factor_id || m.resolved_factor_id)
+        .filter((id: string | undefined): id is string => !!id);
+      // Deduplicate and fall back to a descriptive marker if no IDs were collected
+      const uniqueFactorIds = Array.from(new Set(factorIdsUsed));
+      if (uniqueFactorIds.length === 0) {
+        console.warn(`[calculateProductCarbonFootprint] ⚠ No resolved_factor_id found on any material — factor traceability gap`);
+      }
       const { error: auditErr } = await supabase
         .from('calculation_logs')
         .insert({
@@ -1175,7 +1203,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           output_value: aggregationResult.total_carbon_footprint,
           output_unit: 'kg CO2e per functional unit',
           methodology_version: 'ISO 14067:2018 / GHG Protocol Product v2.1.0',
-          factor_ids_used: [SENTINEL_FACTOR_ID],
+          factor_ids_used: uniqueFactorIds.length > 0 ? uniqueFactorIds : ['no-factor-ids-resolved'],
           data_quality_tier: aggregationResult.impacts?.data_quality?.score >= 80 ? 1
             : aggregationResult.impacts?.data_quality?.score >= 50 ? 2 : 3,
           multiplication_proof: `${aggregationResult.total_carbon_footprint.toFixed(6)} kg CO2e = sum of ${lcaMaterialsWithImpacts.length} materials`,

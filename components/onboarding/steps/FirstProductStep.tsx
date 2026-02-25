@@ -58,6 +58,11 @@ export function FirstProductStep() {
 
       if (error) throw error
 
+      // Increment product count for subscription tracking
+      await supabase.rpc('increment_product_count', {
+        p_organization_id: currentOrganization.id,
+      })
+
       setSaved(true)
       toast({
         title: 'Product added!',

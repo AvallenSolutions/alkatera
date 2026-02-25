@@ -39,7 +39,6 @@ interface ProductFormData {
   product_category: string;
   unit_size_value: string;
   unit_size_unit: string;
-  system_boundary: string;
   product_image_url: string;
 }
 
@@ -51,18 +50,6 @@ const UNIT_OPTIONS = [
   { value: "units", label: "Units" },
 ];
 
-const SYSTEM_BOUNDARY_OPTIONS = [
-  {
-    value: "cradle-to-gate",
-    label: "Cradle-to-Gate",
-    description: "From raw material extraction to finished product leaving the factory gate"
-  },
-  {
-    value: "cradle-to-grave",
-    label: "Cradle-to-Grave",
-    description: "Complete lifecycle from raw material extraction through end-of-life disposal"
-  },
-];
 
 export default function NewProductLCAPage() {
   const router = useRouter();
@@ -105,7 +92,6 @@ export default function NewProductLCAPage() {
     product_category: "",
     unit_size_value: "",
     unit_size_unit: "",
-    system_boundary: "cradle-to-gate",
     product_image_url: "",
   });
   const [isSavingDraft, setIsSavingDraft] = useState(false);
@@ -269,7 +255,6 @@ export default function NewProductLCAPage() {
         product_description: formData.product_description || undefined,
         product_category: formData.product_category || undefined,
         product_image_url: imageUrl || undefined,
-        system_boundary: formData.system_boundary,
         components: selectedComponents.map((c) => ({
           component_product_id: c.product.id,
           quantity: c.quantity,
@@ -353,7 +338,6 @@ export default function NewProductLCAPage() {
         functional_unit: functionalUnit,
         unit_size_value: formData.unit_size_value ? parseFloat(formData.unit_size_value) : null,
         unit_size_unit: formData.unit_size_unit || null,
-        system_boundary: formData.system_boundary,
       }
 
       const { data, error } = await supabase
@@ -878,51 +862,6 @@ export default function NewProductLCAPage() {
           />
         </>
       )}
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <CardTitle>System Boundary</CardTitle>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>From raw material extraction to finished product leaving the factory gate</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <CardDescription>
-            Define the scope of your LCA assessment
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="system_boundary">Boundary Scope *</Label>
-            <Select
-              value={formData.system_boundary}
-              onValueChange={(value) => handleInputChange("system_boundary", value)}
-              disabled={isSubmitting || isSavingDraft}
-            >
-              <SelectTrigger id="system_boundary">
-                <SelectValue placeholder="Select system boundary" />
-              </SelectTrigger>
-              <SelectContent>
-                {SYSTEM_BOUNDARY_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    <div>
-                      <div className="font-medium">{option.label}</div>
-                      <div className="text-xs text-muted-foreground">{option.description}</div>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="flex items-center justify-between pt-6 border-t">
         <Link href="/products">

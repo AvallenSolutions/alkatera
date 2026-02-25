@@ -788,8 +788,11 @@ describe('calculateProductCarbonFootprint', () => {
       expect(result.success).toBe(true);
       expect(mockAggregateProductImpacts).toHaveBeenCalledWith(
         expect.anything(), // supabase client
-        'lca-789',        // lca.id
-        [],               // collectedFacilityEmissions (empty when no facility allocations)
+        'lca-789',         // lca.id
+        [],                // collectedFacilityEmissions (empty when no facility allocations)
+        undefined,         // systemBoundary (not set in params)
+        undefined,         // usePhaseConfig (not set in params)
+        undefined,         // eolConfig (not set in params)
       );
     });
 

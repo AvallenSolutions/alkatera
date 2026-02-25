@@ -3,6 +3,12 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Check, Clock, AlertCircle } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useWizardContext, getStepIdsForBoundary } from './WizardContext';
 
 // ============================================================================
@@ -36,15 +42,15 @@ const STEP_DEFINITIONS: Record<string, Omit<WizardStep, 'number' | 'id'>> = {
   'data-quality': { title: 'Data Quality', shortTitle: 'Quality', description: 'Assess the quality of your data sources', estimatedMinutes: 1 },
   'interpretation': { title: 'Interpretation', shortTitle: 'Analysis', description: 'Review analysis results and findings', estimatedMinutes: 1 },
   'review': { title: 'Critical Review', shortTitle: 'Review', description: 'Determine review requirements', estimatedMinutes: 1 },
-  'summary': { title: 'Summary', shortTitle: 'Summary', description: 'Review and complete the wizard', estimatedMinutes: 1 },
+  'summary': { title: 'Report', shortTitle: 'Report', description: 'Review compliance and generate PDF report', estimatedMinutes: 2 },
 };
 
 /**
  * Generate the ordered wizard steps for a given system boundary.
  * Use-phase and end-of-life steps are dynamically inserted.
  */
-export function getWizardSteps(systemBoundary: string): WizardStep[] {
-  const stepIds = getStepIdsForBoundary(systemBoundary);
+export function getWizardSteps(systemBoundary: string, showGuide: boolean = false): WizardStep[] {
+  const stepIds = getStepIdsForBoundary(systemBoundary, showGuide);
   return stepIds.map((id, index) => ({
     id,
     number: index + 1,
@@ -158,12 +164,12 @@ interface WizardProgressProps {
 }
 
 export function WizardProgress({ className }: WizardProgressProps) {
-  const { progress, goToStep, formData } = useWizardContext();
+  const { progress, goToStep, formData, showGuide } = useWizardContext();
 
-  // Dynamic steps based on boundary
+  // Dynamic steps based on boundary (includes guide step when shown)
   const steps = React.useMemo(
-    () => getWizardSteps(formData.systemBoundary || 'cradle-to-gate'),
-    [formData.systemBoundary]
+    () => getWizardSteps(formData.systemBoundary || 'cradle-to-gate', showGuide),
+    [formData.systemBoundary, showGuide]
   );
 
   const getStepStatus = (stepNumber: number): 'completed' | 'current' | 'upcoming' => {
@@ -177,27 +183,55 @@ export function WizardProgress({ className }: WizardProgressProps) {
   return (
     <div className={cn('space-y-4', className)}>
       {/* Progress bar with steps */}
-      <div className="flex items-center justify-between">
-        {steps.map((step, index) => (
-          <React.Fragment key={step.id}>
-            <StepIndicator
-              step={step}
-              status={getStepStatus(step.number)}
-              onClick={() => {
-                // Only allow navigation to completed steps or current step
-                if (getStepStatus(step.number) !== 'upcoming') {
-                  goToStep(step.number);
-                }
-              }}
-            />
-            {index < steps.length - 1 && (
-              <ConnectorLine
-                completed={progress.completedSteps.includes(step.number)}
+      <TooltipProvider delayDuration={300}>
+        <div className="flex items-center justify-between">
+          {steps.map((step, index) => {
+            const status = getStepStatus(step.number);
+            const indicator = (
+              <StepIndicator
+                step={step}
+                status={status}
+                onClick={() => {
+                  if (status !== 'upcoming') {
+                    goToStep(step.number);
+                  }
+                }}
               />
-            )}
-          </React.Fragment>
-        ))}
-      </div>
+            );
+
+            return (
+              <React.Fragment key={step.id}>
+                {status === 'upcoming' ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>{indicator}</div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Complete Step {progress.currentStep} first
+                    </TooltipContent>
+                  </Tooltip>
+                ) : status === 'completed' ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>{indicator}</div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                      Jump to {step.title}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  indicator
+                )}
+                {index < steps.length - 1 && (
+                  <ConnectorLine
+                    completed={progress.completedSteps.includes(step.number)}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </TooltipProvider>
 
       {/* Current step info + time estimate */}
       <div className="flex items-center justify-between border-t pt-4">

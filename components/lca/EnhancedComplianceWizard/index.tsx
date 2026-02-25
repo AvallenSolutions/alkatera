@@ -17,6 +17,13 @@ import {
 import { WizardProvider, useWizardContext } from './WizardContext';
 import { WizardProgress, CompactProgress, WIZARD_STEPS } from './WizardProgress';
 import { WizardSidebar } from './WizardSidebar';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from '@/components/ui/drawer';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 // Step components
@@ -208,6 +215,11 @@ function WizardFooter() {
         Back
       </Button>
 
+      {/* Centre: Save status indicator */}
+      <div className="hidden sm:flex items-center">
+        <FooterSaveStatus />
+      </div>
+
       {/* Right side: Save + Next/Finish */}
       <div className="flex items-center gap-3">
         {/* Save button only visible when pcfId exists (post-calculation) */}
@@ -227,16 +239,7 @@ function WizardFooter() {
           </Button>
         )}
 
-        {isLastStep ? (
-          <Button onClick={handleFinish} disabled={saving}>
-            {saving ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-            )}
-            Complete Wizard
-          </Button>
-        ) : (
+        {isLastStep ? null : (
           <Button onClick={handleNext} disabled={nextDisabled}>
             {currentStepCompleted ? 'Next' : 'Mark Complete & Continue'}
             <ChevronRight className="ml-2 h-4 w-4" />
@@ -245,6 +248,45 @@ function WizardFooter() {
       </div>
     </div>
   );
+}
+
+// ============================================================================
+// FOOTER SAVE STATUS
+// ============================================================================
+
+function FooterSaveStatus() {
+  const { saving, progress, error, pcfId } = useWizardContext();
+
+  if (!pcfId) return null;
+
+  if (error) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-destructive">
+        <AlertTriangle className="h-3 w-3" />
+        Save failed
+      </span>
+    );
+  }
+
+  if (saving) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Saving...
+      </span>
+    );
+  }
+
+  if (progress.lastSavedAt) {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+        <CheckCircle2 className="h-3 w-3" />
+        Saved
+      </span>
+    );
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -293,14 +335,52 @@ function ErrorDisplay() {
 // ============================================================================
 
 function WizardLayout({ onClose }: { onClose?: () => void }) {
-  const { loading, error } = useWizardContext();
+  const { loading, error, resumeAvailable, resumeStep, dismissResume, goToStep, getStepId, totalSteps } = useWizardContext();
 
   if (loading || error) {
     return <ErrorDisplay />;
   }
 
+  const resumeStepId = getStepId(Math.min(resumeStep, totalSteps));
+  const resumeStepTitle =
+    WIZARD_STEPS.find((s) => s.id === resumeStepId)?.title || `Step ${resumeStep}`;
+
   return (
     <div className="flex h-full flex-col bg-background">
+      {/* Resume banner */}
+      {resumeAvailable && (
+        <div className="border-b bg-primary/5 px-6 py-3">
+          <div className="mx-auto flex max-w-6xl items-center justify-between">
+            <p className="text-sm">
+              <Sparkles className="mr-1.5 inline h-4 w-4 text-primary" />
+              You have saved progress. Resume from{' '}
+              <strong>
+                Step {resumeStep} ({resumeStepTitle})
+              </strong>
+              ?
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={dismissResume}
+              >
+                Start from beginning
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  goToStep(resumeStep);
+                  dismissResume();
+                }}
+              >
+                Resume
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header with progress */}
       <header className="border-b bg-background px-6 py-4">
         <div className="mx-auto max-w-6xl">
@@ -338,6 +418,26 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
 
       {/* Footer with navigation */}
       <WizardFooter />
+
+      {/* Mobile sidebar drawer */}
+      <Drawer>
+        <DrawerTrigger asChild>
+          <Button
+            size="icon"
+            className="fixed bottom-20 right-4 z-20 h-10 w-10 rounded-full shadow-lg lg:hidden"
+          >
+            <Sparkles className="h-4 w-4" />
+          </Button>
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[80vh]">
+          <DrawerHeader>
+            <DrawerTitle>AI Assistant</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-auto px-4 pb-6">
+            <WizardSidebar />
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

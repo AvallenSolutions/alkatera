@@ -235,6 +235,24 @@ export async function POST(
     }
 
     // ========================================================================
+    // INCREMENT REPORT COUNT
+    // ========================================================================
+
+    try {
+      const serviceClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      await serviceClient.rpc('increment_report_count', {
+        p_organization_id: pcf.organization_id,
+        p_user_id: user.id,
+      });
+    } catch (reportCountErr) {
+      // Non-critical — don't fail the PDF delivery
+      console.warn('[generate-pdf] Failed to increment report count:', reportCountErr);
+    }
+
+    // ========================================================================
     // RETURN PDF
     // ========================================================================
 

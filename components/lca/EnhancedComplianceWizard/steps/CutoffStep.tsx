@@ -245,6 +245,23 @@ export function CutoffStep() {
           rows={4}
           className="resize-none"
         />
+        {!formData.cutoffCriteria.trim() && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs text-muted-foreground"
+            onClick={() =>
+              updateField(
+                'cutoffCriteria',
+                'Processes contributing less than 1% to total impact individually and less than 5% cumulatively were excluded from the assessment in accordance with ISO 14044 requirements.'
+              )
+            }
+          >
+            <Lightbulb className="mr-1.5 h-3 w-3" />
+            Use ISO 14044 default
+          </Button>
+        )}
       </div>
 
       {/* Quick-select common exclusions */}

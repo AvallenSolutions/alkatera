@@ -375,7 +375,7 @@ export default function ProductLcaReportPage() {
             Use our new LCA Report Generator for ISO-compliant PDF reports with AI-enhanced narratives.
           </p>
         </div>
-        <Link href={`/products/${productId}/lca-report`}>
+        <Link href={`/products/${productId}/compliance-wizard`}>
           <Button size="sm" className="bg-[#ccff00] hover:bg-[#b8e600] text-black font-semibold gap-1.5">
             <FileText className="h-4 w-4" />
             Generate PDF Report

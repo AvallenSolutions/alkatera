@@ -183,11 +183,14 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
   },
   'summary': {
     tips: [
-      'Review all steps before completing',
-      'Ensure all mandatory fields are filled',
+      'Review all compliance fields before generating',
+      'Toggle AI narratives for richer reports',
+      'Download or regenerate your PDF at any time',
       'You can return to edit any step later',
     ],
-    terms: [],
+    terms: [
+      { term: 'AI Narratives', explanation: 'AI-generated executive summary, key findings, and recommendations included in the PDF report' },
+    ],
   },
 };
 

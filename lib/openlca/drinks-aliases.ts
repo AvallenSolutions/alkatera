@@ -608,14 +608,18 @@ export function matchesAtWordBoundary(haystack: string, needle: string): boolean
   const idx = haystack.indexOf(needle);
   if (idx === -1) return false;
 
-  // Check character BEFORE the match is a word boundary
-  const charBefore = idx > 0 ? haystack[idx - 1] : ' ';
-  const isBoundaryBefore = charBefore === ' ' || charBefore === '-';
+  // Word boundary characters: whitespace, punctuation, or start/end of string
+  const isBoundaryChar = (ch: string) =>
+    ch === ' ' || ch === '-' || ch === ',' || ch === '.' || ch === '_' || ch === '/' || ch === '(' || ch === ')';
 
-  // Check character AFTER the match is a word boundary
+  // Check character BEFORE the match is a word boundary (or start of string)
+  const charBefore = idx > 0 ? haystack[idx - 1] : null;
+  const isBoundaryBefore = charBefore === null || isBoundaryChar(charBefore);
+
+  // Check character AFTER the match is a word boundary (or end of string)
   const afterIdx = idx + needle.length;
-  const charAfter = afterIdx < haystack.length ? haystack[afterIdx] : ' ';
-  const isBoundaryAfter = charAfter === ' ' || charAfter === '-';
+  const charAfter = afterIdx < haystack.length ? haystack[afterIdx] : null;
+  const isBoundaryAfter = charAfter === null || isBoundaryChar(charAfter);
 
   return isBoundaryBefore && isBoundaryAfter;
 }

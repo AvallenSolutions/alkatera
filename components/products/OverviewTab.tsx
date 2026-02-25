@@ -6,7 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Package, Droplets, Zap, Wind, MapPin, AlertTriangle, FileText, CheckCircle2, ArrowRight, Map, Factory, Layers } from "lucide-react";
 import type { Product, ProductIngredient, ProductPackaging, ProductLCA } from "@/hooks/data/useProductData";
 import { useProductFacility } from "@/hooks/data/useProductFacility";
-import { SupplyChainMap } from "./SupplyChainMap";
+import dynamic from "next/dynamic";
+
+const SupplyChainMap = dynamic(() => import("./SupplyChainMap").then(mod => ({ default: mod.SupplyChainMap })), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[450px] bg-muted/20 rounded-lg flex items-center justify-center">
+      <p className="text-sm text-muted-foreground">Loading map...</p>
+    </div>
+  ),
+});
 import { ProductHeroImpact, ContainerType } from "./ProductHeroImpact";
 import { QuickImpactBar, ImpactCategory, ImpactSummaryCard } from "./QuickImpactBar";
 import { ImpactAccordion, ImpactAccordionGroup, SimpleBreakdownTable } from "./ImpactAccordion";
@@ -75,11 +84,11 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
   };
 
   const breakdown = calculateMaterialBreakdown();
-  const totalCarbon = hasLCAData && latestLCA.aggregated_impacts?.climate_change_gwp100 ? latestLCA.aggregated_impacts.climate_change_gwp100 : 0;
-  const waterConsumption = hasLCAData && latestLCA.aggregated_impacts?.water_consumption ? latestLCA.aggregated_impacts.water_consumption : 0;
-  const waterScarcity = hasLCAData && latestLCA.aggregated_impacts?.water_scarcity_aware ? latestLCA.aggregated_impacts.water_scarcity_aware : 0;
-  const landUse = hasLCAData && latestLCA.aggregated_impacts?.land_use ? latestLCA.aggregated_impacts.land_use : 0;
-  const circularityRate = hasLCAData && latestLCA.aggregated_impacts?.circularity_percentage !== undefined ? latestLCA.aggregated_impacts.circularity_percentage : 0;
+  const totalCarbon = hasLCAData ? (latestLCA.aggregated_impacts?.climate_change_gwp100 ?? 0) : 0;
+  const waterConsumption = hasLCAData ? (latestLCA.aggregated_impacts?.water_consumption ?? 0) : 0;
+  const waterScarcity = hasLCAData ? (latestLCA.aggregated_impacts?.water_scarcity_aware ?? 0) : 0;
+  const landUse = hasLCAData ? (latestLCA.aggregated_impacts?.land_use ?? 0) : 0;
+  const circularityRate = hasLCAData ? (latestLCA.aggregated_impacts?.circularity_percentage ?? 0) : 0;
 
   const quickImpacts: Array<{
     category: ImpactCategory;
@@ -207,7 +216,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         functionalUnit={product.functional_unit || 'unit'}
         carbonBreakdown={breakdown}
         containerType="bottle"
-        lcaReportUrl={`/products/${product.id}/lca-report`}
+        lcaReportUrl={`/products/${product.id}/compliance-wizard`}
       />
 
       {/* Multipack Contents Card - only shown for multipacks */}
@@ -235,7 +244,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Total GHG emissions by lifecycle stage"
           value={totalCarbon}
           unit="kg CO₂e"
-          detailsLink={`/products/${product.id}/lca-report`}
+          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <SimpleBreakdownTable
             data={[
@@ -257,7 +266,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Water consumption and scarcity footprint"
           value={waterScarcity}
           unit="m³ world eq"
-          detailsLink={`/products/${product.id}/lca-report`}
+          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -292,7 +301,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Material circularity and resource efficiency"
           value={circularityRate}
           unit="%"
-          detailsLink={`/products/${product.id}/lca-report`}
+          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <div className="space-y-4">
             <div className="flex items-center gap-4">
@@ -333,7 +342,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Land use and biodiversity impact"
           value={landUse}
           unit="m²a"
-          detailsLink={`/products/${product.id}/lca-report`}
+          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
@@ -417,7 +426,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           </CardHeader>
           <CardContent className="space-y-3">
             {lcaReports.slice(0, 3).map((lca) => (
-              <Link key={lca.id} href={`/products/${product.id}/lca-report`}>
+              <Link key={lca.id} href={`/products/${product.id}/compliance-wizard`}>
                 <div className="p-3 rounded-lg bg-muted/50 border hover:bg-accent transition-all cursor-pointer">
                   <div className="flex items-center justify-between mb-2">
                     <Badge className={`${lca.status === 'completed' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>

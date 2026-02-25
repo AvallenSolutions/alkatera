@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -13,7 +13,17 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Info, AlertTriangle, Lock, Box, ArrowRight, Factory, Truck, Users, Trash2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Info, AlertTriangle, Lock, Box, ArrowRight, Factory, Truck, Users, Trash2, Lightbulb } from 'lucide-react';
 import { useWizardContext } from '../WizardContext';
 import { useSubscription, type TierName } from '@/hooks/useSubscription';
 import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife } from '@/lib/system-boundaries';
@@ -27,6 +37,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
   {
     value: 'cradle-to-gate',
     label: 'Cradle-to-Gate',
+    subtitle: 'Manufacturing only',
     description: 'Raw materials through to factory gate (most common for manufacturers)',
     icon: Factory,
     stages: ['Raw Materials', 'Processing', 'Packaging'],
@@ -35,6 +46,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
   {
     value: 'cradle-to-shelf',
     label: 'Cradle-to-Shelf',
+    subtitle: 'Manufacturing + delivery to store',
     description: 'Includes distribution to point of sale',
     icon: Truck,
     stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution'],
@@ -43,6 +55,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
   {
     value: 'cradle-to-consumer',
     label: 'Cradle-to-Consumer',
+    subtitle: 'Including customer use',
     description: 'Includes consumer use phase (refrigeration, carbonation)',
     icon: Users,
     stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution', 'Use Phase'],
@@ -51,6 +64,7 @@ const SYSTEM_BOUNDARY_OPTIONS = [
   {
     value: 'cradle-to-grave',
     label: 'Cradle-to-Grave',
+    subtitle: 'Full lifecycle including disposal',
     description: 'Full lifecycle including end-of-life disposal & recycling credits',
     icon: Trash2,
     stages: ['Raw Materials', 'Processing', 'Packaging', 'Distribution', 'Use Phase', 'End of Life'],
@@ -147,10 +161,37 @@ function composeFunctionalUnit(product: any, systemBoundary: string): string {
   return parts.join(' ');
 }
 
+// ============================================================================
+// FUNCTIONAL UNIT HINT LOGIC
+// ============================================================================
+
+const UNIT_PATTERN = /\d+\s*(ml|l|litre|liter|kg|g|gram|oz|bottle|can|pack|unit|case|keg|cask)/i;
+
+const PRODUCT_TYPE_EXAMPLES: Record<string, string> = {
+  wine: '1 × 750ml bottle',
+  beer: '1 × 330ml can',
+  spirits: '1 × 700ml bottle',
+  cider: '1 × 330ml bottle',
+  'ready-to-drink': '1 × 250ml can',
+  kombucha: '1 × 330ml bottle',
+  'non-alcoholic': '1 × 330ml bottle',
+};
+
+function getFunctionalUnitHint(value: string, productType?: string): string | null {
+  if (!value.trim()) return null;
+  if (UNIT_PATTERN.test(value)) return null;
+  const example = (productType && PRODUCT_TYPE_EXAMPLES[productType.toLowerCase()]) || '1 × 750ml bottle';
+  return `Consider specifying a measurable quantity (e.g., '${example}')`;
+}
+
 export function BoundaryStep() {
-  const { formData, updateField, preCalcState } = useWizardContext();
+  const { formData, updateField, preCalcState, pcfId } = useWizardContext();
   const { tierName } = useSubscription();
   const currentTierLevel = TIER_LEVELS[tierName] || 1;
+
+  // Boundary change confirmation state
+  const [pendingBoundary, setPendingBoundary] = useState<string | null>(null);
+  const [showBoundaryWarning, setShowBoundaryWarning] = useState(false);
 
   // Track whether the functional unit was auto-generated (safe to update)
   // vs. manually edited by the user (don't overwrite).
@@ -220,6 +261,23 @@ export function BoundaryStep() {
             <li>The delivery point matching your system boundary</li>
           </ul>
         </div>
+
+        {/* Functional unit validation hint */}
+        {(() => {
+          const hint = getFunctionalUnitHint(
+            formData.functionalUnit,
+            preCalcState.product?.product_type
+          );
+          if (!hint) return null;
+          return (
+            <Alert className="border-amber-500/30 bg-amber-500/5">
+              <Lightbulb className="h-4 w-4 text-amber-500" />
+              <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs">
+                {hint}
+              </AlertDescription>
+            </Alert>
+          );
+        })()}
       </div>
 
       {/* System Boundary Selection */}
@@ -233,7 +291,15 @@ export function BoundaryStep() {
 
         <RadioGroup
           value={formData.systemBoundary}
-          onValueChange={(value) => updateField('systemBoundary', value)}
+          onValueChange={(value) => {
+            // If a calculation already exists, confirm before changing
+            if (pcfId && value !== formData.systemBoundary) {
+              setPendingBoundary(value);
+              setShowBoundaryWarning(true);
+            } else {
+              updateField('systemBoundary', value);
+            }
+          }}
           className="grid gap-3"
         >
           {SYSTEM_BOUNDARY_OPTIONS.map((option) => {
@@ -262,6 +328,9 @@ export function BoundaryStep() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">{option.label}</p>
+                      <span className="text-xs text-muted-foreground">
+                        — {option.subtitle}
+                      </span>
                       {isLocked && (
                         <Badge variant="secondary" className="text-xs font-normal gap-1">
                           <Lock className="h-3 w-3" />
@@ -278,6 +347,40 @@ export function BoundaryStep() {
             );
           })}
         </RadioGroup>
+
+        {/* Boundary change confirmation dialog */}
+        <AlertDialog open={showBoundaryWarning} onOpenChange={setShowBoundaryWarning}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Change System Boundary?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Changing to{' '}
+                <strong>
+                  {SYSTEM_BOUNDARY_OPTIONS.find((o) => o.value === pendingBoundary)?.label || pendingBoundary}
+                </strong>{' '}
+                will require re-validating steps after the Calculate step (Goal,
+                Cut-off, Data Quality, Interpretation, Review, and Report).
+                Your calculation data will be preserved.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setPendingBoundary(null)}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  if (pendingBoundary) {
+                    updateField('systemBoundary', pendingBoundary);
+                  }
+                  setPendingBoundary(null);
+                  setShowBoundaryWarning(false);
+                }}
+              >
+                Continue
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Visualization */}
         <BoundaryVisualization selectedBoundary={formData.systemBoundary} />

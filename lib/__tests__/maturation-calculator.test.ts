@@ -259,8 +259,8 @@ describe('calculateMaturationImpacts', () => {
 
       const result = calculateMaturationImpacts(profile);
 
-      // 15 kWh × 5 barrels × 12 years × 0.207 = 186.3 kg CO2e
-      expect(result.warehouse_co2e_total).toBeCloseTo(15 * 5 * 12 * 0.207, 1);
+      // 15 kWh × 5 barrels × 12 years × 0.490 (global avg, no country code) = 441.0 kg CO2e
+      expect(result.warehouse_co2e_total).toBeCloseTo(15 * 5 * 12 * 0.490, 1);
     });
 
     it('should calculate warehouse CO2e with natural gas factor (0.183)', () => {

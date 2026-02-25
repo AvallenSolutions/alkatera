@@ -70,7 +70,7 @@ export default function ComplianceWizardPage() {
   // ============================================================================
 
   const handleComplete = () => {
-    router.push(`/products/${productId}/lca-report`);
+    router.push(`/products/${productId}`);
   };
 
   const handleBack = () => {

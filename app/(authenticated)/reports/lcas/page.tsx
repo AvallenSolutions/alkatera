@@ -299,13 +299,13 @@ export default function LcasPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Link href={`/products/${report.product_id}/lca-report`}>
+                      <Link href={`/products/${report.product_id}/compliance-wizard`}>
                         <Button variant="outline" size="sm" className="gap-2">
                           <Eye className="h-4 w-4" />
                           View Report
                         </Button>
                       </Link>
-                      <Link href={`/products/${report.product_id}/lca-report`}>
+                      <Link href={`/products/${report.product_id}/compliance-wizard`}>
                         <Button variant="outline" size="sm" className="gap-2">
                           <Download className="h-4 w-4" />
                           Download

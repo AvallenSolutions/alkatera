@@ -88,6 +88,7 @@ interface WizardContextValue {
   // Dynamic step count based on boundary
   totalSteps: number;
   getStepId: (stepNumber: number) => string; // Maps step number to logical step ID
+  showGuide: boolean;
 
   // Post-calculation state (steps 4-10)
   formData: WizardFormData;
@@ -102,6 +103,11 @@ interface WizardContextValue {
   loading: boolean;
   saving: boolean;
   error: string | null;
+
+  // Resume prompt
+  resumeAvailable: boolean;
+  resumeStep: number;
+  dismissResume: () => void;
 
   // Actions
   goToStep: (step: number) => void;
@@ -227,8 +233,9 @@ function getStepTimeEstimates(boundary: string, showGuide: boolean = false): num
   const times = showGuide
     ? [GUIDE_STEP_TIME, ...BASE_STEP_TIME_ESTIMATES]
     : [...BASE_STEP_TIME_ESTIMATES];
-  // 'boundary' is at index 2 (or 3 with guide); insert after it
-  const boundaryIdx = showGuide ? 3 : 2;
+  // Use dynamic lookup (matching getStepIdsForBoundary) instead of hardcoded index
+  const stepIds = showGuide ? ['guide', ...BASE_STEP_IDS] : [...BASE_STEP_IDS];
+  const boundaryIdx = stepIds.indexOf('boundary');
   const insertAt = boundaryIdx + 1;
   if (boundaryNeedsEndOfLife(boundary)) {
     times.splice(insertAt, 0, EOL_STEP_TIME);
@@ -284,6 +291,10 @@ export function WizardProvider({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Resume prompt state
+  const [resumeAvailable, setResumeAvailable] = useState(false);
+  const [resumeStep, setResumeStep] = useState(1);
 
   // Auto-save debounce ref
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -573,6 +584,13 @@ export function WizardProvider({
                 : undefined,
               estimatedTimeRemaining: calculateTimeRemaining(remappedCompleted),
             });
+
+            // Offer to resume if there are completed steps beyond the first
+            const maxCompleted = Math.max(...remappedCompleted, 0);
+            if (maxCompleted > 1) {
+              setResumeStep(maxCompleted);
+              setResumeAvailable(true);
+            }
           } else {
             // PCF exists but no wizard progress — start at step 1
             setProgress({
@@ -580,6 +598,10 @@ export function WizardProvider({
               completedSteps: [1, 2, 3],
               estimatedTimeRemaining: calculateTimeRemaining([1, 2, 3]),
             });
+
+            // Offer to resume from step 3 (boundary)
+            setResumeStep(3);
+            setResumeAvailable(true);
           }
         }
       }
@@ -745,6 +767,10 @@ export function WizardProvider({
     setError(null);
   }, []);
 
+  const dismissResume = useCallback(() => {
+    setResumeAvailable(false);
+  }, []);
+
   // ============================================================================
   // SAVE PROGRESS (only when pcfId exists)
   // ============================================================================
@@ -815,6 +841,7 @@ export function WizardProvider({
       }));
     } catch (err: any) {
       console.error('[WizardContext] Save error:', err);
+      sonnerToast.error('Failed to save progress');
     } finally {
       setSaving(false);
     }
@@ -849,8 +876,6 @@ export function WizardProvider({
         title: 'Compliance wizard complete!',
         description: 'All required ISO 14044 fields have been documented.',
       });
-
-      onComplete?.();
     } catch (err: any) {
       console.error('[WizardContext] Finish error:', err);
       setError(err.message || 'Failed to complete wizard');
@@ -899,6 +924,7 @@ export function WizardProvider({
     onCalculationComplete,
     totalSteps,
     getStepId,
+    showGuide,
     formData,
     setFormData,
     updateField,
@@ -906,6 +932,9 @@ export function WizardProvider({
     loading,
     saving,
     error,
+    resumeAvailable,
+    resumeStep,
+    dismissResume,
     goToStep,
     nextStep,
     prevStep,

@@ -16,7 +16,7 @@ import {
 import { calculateProductLCA } from '@/lib/product-lca-calculator';
 import { getBoundaryLabel } from '@/lib/system-boundaries';
 import { toast } from 'sonner';
-import { useWizardContext } from '../WizardContext';
+import { useWizardContext, getStepIdsForBoundary } from '../WizardContext';
 
 // ============================================================================
 // MAIN COMPONENT
@@ -29,7 +29,14 @@ export function CalculationStep() {
     setPreCalcState,
     onCalculationComplete,
     formData,
+    goToStep,
+    showGuide,
   } = useWizardContext();
+
+  // Compute step numbers for navigation links
+  const stepIds = getStepIdsForBoundary(formData.systemBoundary || 'cradle-to-gate', showGuide);
+  const materialsStepNumber = stepIds.indexOf('materials') + 1;
+  const facilitiesStepNumber = stepIds.indexOf('facilities') + 1;
 
   const {
     materials,
@@ -229,9 +236,17 @@ export function CalculationStep() {
       {!canCalculate && (
         <Alert variant="destructive">
           <Info className="h-4 w-4" />
-          <AlertDescription>
-            Please go back to the Materials step and fix all missing emission
-            factors before calculating.
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              Some materials are missing emission factors.
+            </span>
+            <Button
+              variant="link"
+              className="h-auto p-0 text-destructive-foreground underline"
+              onClick={() => goToStep(materialsStepNumber)}
+            >
+              Go to Materials step →
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -239,9 +254,17 @@ export function CalculationStep() {
       {hasFacilitiesMissingVolumes && (
         <Alert variant="destructive">
           <Info className="h-4 w-4" />
-          <AlertDescription>
-            Please go back to the Facilities step and enter production
-            volumes for all linked facilities.
+          <AlertDescription className="flex items-center justify-between">
+            <span>
+              Production volumes are missing for some linked facilities.
+            </span>
+            <Button
+              variant="link"
+              className="h-auto p-0 text-destructive-foreground underline"
+              onClick={() => goToStep(facilitiesStepNumber)}
+            >
+              Go to Facilities step →
+            </Button>
           </AlertDescription>
         </Alert>
       )}
@@ -276,7 +299,7 @@ export function CalculationStep() {
         title="Creating Lifecycle Assessment"
         steps={calcSteps}
         progress={calcProgress}
-        message="ISO 14067 compliant lifecycle assessment"
+        message="ISO 14067 compliant lifecycle assessment · usually takes 5–10 seconds"
       />
     </div>
   );

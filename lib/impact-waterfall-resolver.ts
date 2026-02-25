@@ -95,6 +95,14 @@ export interface WaterfallResult {
   // Optional IDs
   supplier_lca_id?: string;
   category_type: MaterialCategoryType;
+
+  /**
+   * The primary emission factor ID used for this resolution.
+   * ISO 14067 §6.5.6 requires factor traceability for third-party verification.
+   * This is the UUID of the staging_emission_factors, ecoinvent_material_proxies,
+   * supplier_products, or platform_supplier_products record used.
+   */
+  resolved_factor_id?: string;
 }
 
 /**
@@ -235,23 +243,88 @@ function buildSupplierProductResult(
     non_gwp_reference_id: product.id,
     is_hybrid_source: false,
     supplier_lca_id: product.id,
+    resolved_factor_id: product.id,
     category_type: category,
   };
 }
 
+/**
+ * Normalise a quantity + unit pair to kilograms.
+ *
+ * CRITICAL FIX: Previously missing conversions for 'tonnes', 'lbs', 'oz'.
+ * Materials entered in tonnes were silently treated as kg — a 1,000× error.
+ * Materials entered in lbs were also treated as kg — a 2.2× error.
+ *
+ * Supported units:
+ *   kg, g/grams, mg/milligrams, tonnes/t/metric_tons,
+ *   lbs/lb/pounds, oz/ounces,
+ *   ml/millilitres, l/litres (assumed density ≈ 1 kg/L for liquids)
+ *
+ * Unknown units are logged with a warning and treated as kg (passthrough).
+ */
 export function normalizeToKg(quantity: string | number, unit: string): number {
-  let qty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
-  const unitLower = unit?.toLowerCase() || 'kg';
-
-  if (unitLower === 'g' || unitLower === 'grams') {
-    return qty / 1000;
-  } else if (unitLower === 'ml' || unitLower === 'millilitres' || unitLower === 'milliliters') {
-    return qty / 1000;
-  } else if (unitLower === 'l' || unitLower === 'litres' || unitLower === 'liters') {
-    return qty;
+  const qty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
+  if (isNaN(qty) || qty < 0) {
+    console.warn(`[normalizeToKg] Invalid quantity: ${quantity} — returning 0`);
+    return 0;
   }
 
-  return qty;
+  const unitLower = (unit || 'kg').toLowerCase().trim();
+
+  switch (unitLower) {
+    // --- Mass units ---
+    case 'kg':
+    case 'kilogram':
+    case 'kilograms':
+      return qty;
+    case 'g':
+    case 'gram':
+    case 'grams':
+      return qty / 1000;
+    case 'mg':
+    case 'milligram':
+    case 'milligrams':
+      return qty / 1_000_000;
+    case 't':
+    case 'tonne':
+    case 'tonnes':
+    case 'metric_ton':
+    case 'metric_tons':
+    case 'metric ton':
+    case 'metric tons':
+      return qty * 1000;
+    case 'lb':
+    case 'lbs':
+    case 'pound':
+    case 'pounds':
+      return qty * 0.453592;
+    case 'oz':
+    case 'ounce':
+    case 'ounces':
+      return qty * 0.0283495;
+
+    // --- Volume units (assumed density ≈ 1 kg/L for water-based liquids) ---
+    case 'ml':
+    case 'millilitre':
+    case 'millilitres':
+    case 'milliliter':
+    case 'milliliters':
+      return qty / 1000;
+    case 'l':
+    case 'litre':
+    case 'litres':
+    case 'liter':
+    case 'liters':
+      return qty;
+
+    default:
+      // Unknown unit — passthrough as kg with warning
+      console.warn(
+        `[normalizeToKg] Unknown unit '${unit}' for quantity ${qty} — treating as kg. ` +
+        `Add this unit to normalizeToKg() in impact-waterfall-resolver.ts for correct conversion.`
+      );
+      return qty;
+  }
 }
 
 /**
@@ -430,10 +503,22 @@ export async function resolveImpactFactors(
             non_gwp_reference_id: supplierLca.id,
             is_hybrid_source: false,
             supplier_lca_id: supplierLca.id,
+            resolved_factor_id: supplierLca.id,
             category_type: category,
           };
         }
       }
+      // AUDITABILITY FIX: Log when all three supplier lookups fail.
+      // If we reach this point inside the try block, none of the three supplier
+      // tables (supplier_products, platform_supplier_products, product_carbon_footprints)
+      // had usable impact data for this material. This is an important data gap:
+      // the user linked a supplier but the supplier has no LCA data on file.
+      console.warn(
+        `[Waterfall] ⚠ Supplier data miss for '${material.material_name}' ` +
+        `(supplier_product_id: ${material.supplier_product_id}). ` +
+        `Checked: supplier_products, platform_supplier_products, product_carbon_footprints — ` +
+        `none had impact data. Falling through to Priority 2/3 generic factors.`
+      );
     } catch (error) {
       console.warn(`[Waterfall] Priority 1 failed for ${material.material_name}:`, error);
     }
@@ -533,6 +618,7 @@ export async function resolveImpactFactors(
           non_gwp_data_source: 'Ecoinvent 3.12',
           gwp_reference_id: defraFactor.id?.toString(),
           non_gwp_reference_id: ecoinventProxy.id,
+          resolved_factor_id: defraFactor.id?.toString(),
           is_hybrid_source: true,
           category_type: category,
         };
@@ -644,6 +730,7 @@ export async function resolveImpactFactors(
               non_gwp_data_source: gwpSource,
               gwp_reference_id: material.data_source_id,
               non_gwp_reference_id: material.data_source_id,
+              resolved_factor_id: material.data_source_id,
               is_hybrid_source: false,
               category_type: category,
             };
@@ -742,6 +829,7 @@ export async function resolveImpactFactors(
         non_gwp_data_source: 'Ecoinvent 3.12',
         gwp_reference_id: directProxy.id,
         non_gwp_reference_id: directProxy.id,
+        resolved_factor_id: directProxy.id,
         is_hybrid_source: false,
         category_type: category,
       };
@@ -887,6 +975,7 @@ export async function resolveImpactFactors(
       gwp_data_source: stagingFactor.source || 'Staging Factors',
       non_gwp_data_source: stagingFactor.source || 'Staging Factors',
       gwp_reference_id: stagingFactor.id?.toString(),
+      resolved_factor_id: stagingFactor.id?.toString(),
       is_hybrid_source: false,
       // ISO 14044 Pedigree Matrix data
       pedigree_reliability: stagingFactor.pedigree_reliability ?? 3,
@@ -963,6 +1052,7 @@ export async function resolveImpactFactors(
       non_gwp_data_source: 'Ecoinvent 3.12',
       gwp_reference_id: ecoinventProxy.id,
       non_gwp_reference_id: ecoinventProxy.id,
+      resolved_factor_id: ecoinventProxy.id,
       is_hybrid_source: false,
       category_type: category,
     };

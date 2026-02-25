@@ -101,6 +101,7 @@ function createMockProduct(overrides: Record<string, unknown> = {}) {
     name: 'Test Whisky',
     organization_id: 'org-456',
     unit: 'kg',
+    product_type: 'Spirits', // Required: maturation guard now requires explicit type match
     product_description: 'A test spirit product',
     product_image_url: null,
     unit_size_value: 700,
@@ -434,12 +435,13 @@ describe('calculateProductCarbonFootprint — Maturation Integration', () => {
         (m: any) => m.material_name === '[Maturation] Warehouse Energy'
       );
 
-      // 15 kWh × 5 barrels × 12 years × 0.207 = 186.3 kg total
+      // 15 kWh × 5 barrels × 12 years × 0.490 (global avg, no country code) = 441.0 kg total
       // Output volume: 1000L × (1-0.02)^12 ≈ 784.7L → 784.7/0.7 ≈ 1121 bottles
-      // Per bottle: 186.3 / 1121 ≈ 0.1662 kg
+      // Per bottle: 441.0 / 1121 ≈ 0.3934 kg
+      const warehouseTotalCO2e = 15 * 5 * 12 * 0.490;
       const outputVolume = 1000 * Math.pow(0.98, 12);
       const totalBottles = outputVolume / 0.7;
-      expect(warehouseEnergy.impact_climate).toBeCloseTo(186.3 / totalBottles, 2);
+      expect(warehouseEnergy.impact_climate).toBeCloseTo(warehouseTotalCO2e / totalBottles, 2);
     });
 
     it('should set correct metadata on maturation materials', async () => {
@@ -543,8 +545,10 @@ describe('calculateProductCarbonFootprint — Maturation Integration', () => {
       // 200 kg total ÷ 287 bottles = 0.6969 kg/bottle
       expect(barrelAllocation.impact_climate).toBeCloseTo(200 / 287, 3);
 
-      // Warehouse: 186.3 kg total ÷ 287 bottles = 0.6494 kg/bottle
-      expect(warehouseEnergy.impact_climate).toBeCloseTo(186.3 / 287, 2);
+      // Warehouse: 15 kWh × 5 barrels × 12 years × 0.490 (global avg) = 441.0 kg total
+      // 441.0 ÷ 287 bottles = 1.537 kg/bottle
+      const warehouseTotalCO2e = 15 * 5 * 12 * 0.490;
+      expect(warehouseEnergy.impact_climate).toBeCloseTo(warehouseTotalCO2e / 287, 2);
     });
 
     it('should fall back to 0.75L bottle size when product has no unit_size_value', async () => {

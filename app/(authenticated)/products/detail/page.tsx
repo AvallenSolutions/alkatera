@@ -154,31 +154,31 @@ export default function ProductDetailPage() {
               <CardDescription>Scope of the LCA assessment</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                {product.system_boundary === "cradle-to-grave" ? (
-                  <>
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+              {(() => {
+                const boundaryLabels: Record<string, { label: string; description: string; icon: 'check' | 'warn' }> = {
+                  'cradle-to-gate': { label: 'Cradle-to-Gate', description: 'Raw materials through factory gate', icon: 'warn' },
+                  'cradle-to-shelf': { label: 'Cradle-to-Shelf', description: 'Includes distribution to point of sale', icon: 'warn' },
+                  'cradle-to-consumer': { label: 'Cradle-to-Consumer', description: 'Includes consumer use phase', icon: 'check' },
+                  'cradle-to-grave': { label: 'Cradle-to-Grave', description: 'Full lifecycle including end-of-life', icon: 'check' },
+                };
+                const boundary = product.system_boundary || 'cradle-to-gate';
+                const info = boundaryLabels[boundary] || boundaryLabels['cradle-to-gate'];
+                return (
+                  <div className="flex items-center gap-3">
+                    {info.icon === 'check' ? (
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    ) : (
+                      <AlertTriangle className="h-6 w-6 text-amber-600" />
+                    )}
                     <div>
-                      <p className="font-semibold">Cradle-to-Grave</p>
-                      <p className="text-sm text-muted-foreground">
-                        Complete lifecycle from raw material extraction through end-of-life disposal
-                      </p>
+                      <p className="font-semibold">{info.label}</p>
+                      <p className="text-sm text-muted-foreground">{info.description}</p>
                     </div>
-                  </>
-                ) : (
-                  <>
-                    <AlertTriangle className="h-6 w-6 text-amber-600" />
-                    <div>
-                      <p className="font-semibold">Cradle-to-Gate</p>
-                      <p className="text-sm text-muted-foreground">
-                        From raw material extraction to factory gate
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                );
+              })()}
 
-              {product.system_boundary === "cradle-to-gate" && (
+              {(product.system_boundary === "cradle-to-gate" || !product.system_boundary) && (
                 <Alert variant="destructive" className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-amber-900 dark:text-amber-200">
@@ -190,55 +190,51 @@ export default function ProductDetailPage() {
             </CardContent>
           </Card>
 
-          {product.system_boundary === "cradle-to-grave" && (
+          {product.system_boundary && product.system_boundary !== "cradle-to-gate" && (
             <Card>
               <CardHeader>
-                <CardTitle>Lifecycle Stages</CardTitle>
+                <CardTitle>Additional Lifecycle Stages</CardTitle>
                 <CardDescription>
-                  Data collection sections for comprehensive assessment
+                  Stages beyond cradle-to-gate included in this assessment
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Distribution</p>
-                      <p className="text-sm text-muted-foreground">
-                        Transport and logistics data
-                      </p>
+                  {["cradle-to-shelf", "cradle-to-consumer", "cradle-to-grave"].includes(product.system_boundary) && (
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <p className="font-medium">Distribution</p>
+                        <p className="text-sm text-muted-foreground">
+                          Transport and logistics data
+                        </p>
+                      </div>
+                      <Badge variant="outline">Included</Badge>
                     </div>
-                    <Badge variant="outline">Not started</Badge>
-                  </div>
+                  )}
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Retail</p>
-                      <p className="text-sm text-muted-foreground">
-                        Storage and refrigeration requirements
-                      </p>
+                  {["cradle-to-consumer", "cradle-to-grave"].includes(product.system_boundary) && (
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <p className="font-medium">Use Phase</p>
+                        <p className="text-sm text-muted-foreground">
+                          Consumer refrigeration and carbonation emissions
+                        </p>
+                      </div>
+                      <Badge variant="outline">Included</Badge>
                     </div>
-                    <Badge variant="outline">Not started</Badge>
-                  </div>
+                  )}
 
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Consumer Use</p>
-                      <p className="text-sm text-muted-foreground">
-                        Usage patterns and energy consumption
-                      </p>
+                  {product.system_boundary === "cradle-to-grave" && (
+                    <div className="flex items-center justify-between p-4 border rounded-lg">
+                      <div>
+                        <p className="font-medium">End of Life</p>
+                        <p className="text-sm text-muted-foreground">
+                          Disposal pathways, recycling, and waste management
+                        </p>
+                      </div>
+                      <Badge variant="outline">Included</Badge>
                     </div>
-                    <Badge variant="outline">Not started</Badge>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">End of Life</p>
-                      <p className="text-sm text-muted-foreground">
-                        Disposal, recycling, and waste management
-                      </p>
-                    </div>
-                    <Badge variant="outline">Not started</Badge>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

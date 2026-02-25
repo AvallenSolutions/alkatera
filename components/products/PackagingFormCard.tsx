@@ -42,6 +42,7 @@ import type {
 } from "@/lib/types/lca";
 import { PackagingComponentEditor } from "./PackagingComponentEditor";
 import { calculateDistance } from "@/lib/utils/distance-calculator";
+import { getTransportModeWarning } from "@/lib/utils/transport-emissions-calculator";
 
 export interface PackagingFormData {
   tempId: string;
@@ -834,6 +835,18 @@ export function PackagingFormCard({
                       )}
                     </div>
                   </div>
+
+                  {(() => {
+                    const warning = getTransportModeWarning(packaging.transport_mode, Number(packaging.distance_km));
+                    return warning ? (
+                      <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                        <Info className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                          <strong>Transport Mode Check:</strong> {warning}
+                        </AlertDescription>
+                      </Alert>
+                    ) : null;
+                  })()}
 
                   {packaging.origin_lat && packaging.origin_lng && productionFacilities.length > 0 && (
                     <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">

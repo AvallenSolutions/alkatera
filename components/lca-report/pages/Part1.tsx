@@ -127,7 +127,7 @@ export const ExecSummaryPage = ({ data }: { data: LCAReportData }) => (
         <div className="flex justify-between items-center text-xs font-mono text-neutral-500 bg-neutral-50 p-3 rounded-lg border border-neutral-200">
           <div className="flex gap-6">
             <span className="uppercase tracking-widest text-neutral-400">Assessment Scope</span>
-            <span className="font-bold text-neutral-700">Cradle-to-Gate</span>
+            <span className="font-bold text-neutral-700">{data.meta.lcaScopeType || 'Cradle-to-Gate'}</span>
           </div>
           <div className="flex gap-6">
             <span className="text-neutral-400">Period: <span className="text-neutral-700 font-bold">{data.meta.assessmentPeriod}</span></span>
@@ -146,7 +146,7 @@ export const MethodologyPage = ({ data }: { data: LCAReportData }) => (
 
     <div className="mb-12">
       <h3 className="text-2xl font-serif mb-2">System Boundary</h3>
-      <p className="text-neutral-500 font-mono text-sm">cradle-to-gate</p>
+      <p className="text-neutral-500 font-mono text-sm">{data.goalAndScope?.systemBoundary?.toLowerCase() || 'cradle-to-gate'}</p>
     </div>
 
     <div className="grid grid-cols-2 gap-8 mb-16">

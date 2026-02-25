@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * @deprecated PDF generation has been merged into the LCA Wizard's Report step
+ * (SummaryStep.tsx). This component is kept for reference only.
+ * All links now point to /products/[id]/compliance-wizard.
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

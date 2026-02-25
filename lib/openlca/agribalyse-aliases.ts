@@ -91,14 +91,6 @@ export const AGRIBALYSE_PREFERRED_ALIASES: AgribalyseAlias[] = [
     category: 'ingredient',
     rationale: 'Agribalyse has specific "Syrup, Maple" process data',
   },
-  {
-    searchTerms: ['liquorice', 'licorice', 'liquorice root', 'réglisse'],
-    agribalysePatterns: ['liquorice', 'licorice', 'réglisse'],
-    ecoinventPatterns: [],
-    preferredDatabase: 'agribalyse',
-    category: 'ingredient',
-    rationale: 'Agribalyse has botanical/spice processes applicable to liquorice',
-  },
 
   // Dairy & Plant Milks
   {
@@ -252,7 +244,7 @@ export const AGRIBALYSE_PREFERRED_ALIASES: AgribalyseAlias[] = [
     rationale: 'Gentian is a classic French bitter herb (Suze, Salers); Agribalyse covers it',
   },
   {
-    searchTerms: ['liquorice', 'licorice', 'réglisse'],
+    searchTerms: ['liquorice', 'licorice', 'liquorice root', 'réglisse'],
     agribalysePatterns: ['liquorice', 'licorice', 'réglisse', 'reglisse'],
     ecoinventPatterns: [],
     preferredDatabase: 'agribalyse',

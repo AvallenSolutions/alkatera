@@ -127,6 +127,59 @@ export function validateTransportData(
   };
 }
 
+/**
+ * Distance thresholds for transport mode plausibility checks.
+ * Based on GHG Protocol Scope 3 Category 4 guidance and real-world logistics constraints.
+ */
+export const TRANSPORT_DISTANCE_THRESHOLDS = {
+  /** Max credible single truck leg — beyond this, sea or rail should be used */
+  TRUCK_MAX_KM: 1500,
+  /** Max credible rail freight distance — beyond this, sea is more realistic */
+  TRAIN_MAX_KM: 5000,
+  /** Min credible air freight distance — below this, truck is more appropriate */
+  AIR_MIN_KM: 300,
+  /** Min credible sea freight distance — below this, truck is more appropriate */
+  SHIP_MIN_KM: 50,
+} as const;
+
+/**
+ * Returns a warning message if the transport mode is implausible for the given distance.
+ *
+ * These are soft warnings — the calculation still runs, but the user is alerted that
+ * their mode selection may be incorrect and could significantly over- or under-estimate
+ * transport emissions (truck vs ship factors differ by ~6×).
+ *
+ * Based on:
+ * - GHG Protocol Scope 3 Category 4 Technical Guidance (upstream transport)
+ * - ISO 14067:2018 §6.4 (system boundary for transport)
+ * - DEFRA 2025 freight factors (truck: 0.062, ship: 0.011 kg CO₂e/tonne-km)
+ *
+ * @returns Warning string if implausible, null if OK
+ */
+export function getTransportModeWarning(
+  transportMode: string | null | undefined,
+  distanceKm: number | null | undefined
+): string | null {
+  if (!transportMode || !distanceKm || distanceKm <= 0) return null;
+
+  const dist = Number(distanceKm);
+  if (isNaN(dist)) return null;
+
+  if (transportMode === 'truck' && dist > TRANSPORT_DISTANCE_THRESHOLDS.TRUCK_MAX_KM) {
+    return `${dist.toLocaleString()} km is too far for a single truck leg. For transoceanic or intercontinental routes, select Ship instead (or Rail for long overland routes). Using Truck at this distance overestimates transport emissions by ~6×.`;
+  }
+  if (transportMode === 'train' && dist > TRANSPORT_DISTANCE_THRESHOLDS.TRAIN_MAX_KM) {
+    return `${dist.toLocaleString()} km is unusually long for rail freight. Intercontinental distances are typically served by sea. Consider switching to Ship.`;
+  }
+  if (transportMode === 'air' && dist < TRANSPORT_DISTANCE_THRESHOLDS.AIR_MIN_KM) {
+    return `${dist.toLocaleString()} km is a very short distance for air freight. Road (Truck) is typically used for distances under 300 km.`;
+  }
+  if (transportMode === 'ship' && dist < TRANSPORT_DISTANCE_THRESHOLDS.SHIP_MIN_KM) {
+    return `${dist.toLocaleString()} km is very short for sea freight. Road (Truck) is typically more appropriate for distances under 50 km.`;
+  }
+  return null;
+}
+
 export function formatTransportMode(mode: TransportMode): string {
   const labels: Record<TransportMode, string> = {
     truck: 'Road (HGV)',

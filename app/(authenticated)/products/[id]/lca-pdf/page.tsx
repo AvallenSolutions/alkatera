@@ -15,7 +15,7 @@ export default function LCAPDFPage() {
 
   useEffect(() => {
     if (productId) {
-      router.replace(`/products/${productId}/lca-report`);
+      router.replace(`/products/${productId}/compliance-wizard`);
     }
   }, [productId, router]);
 
