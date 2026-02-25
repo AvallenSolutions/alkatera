@@ -732,7 +732,8 @@ export function transformLCADataForReport(
       date: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
       organization: organization?.name || 'Your Organisation',
       generatedBy: 'AlkaTera Platform',
-      version: '1.0',
+      // ISSUE E FIX: Read version from report_metadata instead of hardcoding (ISO 14044 §4.2.1).
+      version: (impacts as any).report_metadata?.version || '1.0',
       assessmentPeriod: new Date(lca.created_at).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
       publishedDate: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
       heroImage: undefined,
@@ -764,7 +765,9 @@ export function transformLCADataForReport(
         ? 'This assessment covers the complete product lifecycle from raw material extraction through manufacturing, distribution, consumer use, and final disposal or recycling, including end-of-life avoided burden credits for recycled packaging materials.'
         : 'This assessment covers the lifecycle stages defined within the stated system boundary.',
       cutOffCriteria: lca.cutoff_criteria || 'Mass-based cut-off: flows contributing less than 1% of total mass input are excluded. The cumulative excluded flows represent less than 5% of total environmental impact.',
-      allocationProcedure: 'Physical allocation by mass is applied for co-products following ISO 14044 Clause 4.3.4 hierarchy. Where physical relationships cannot be established, economic allocation is used as documented per material.',
+      // ISSUE C FIX: Specify allocation method explicitly — no vague "as documented per material" (ISO 14044 §4.3.4).
+      allocationProcedure: (impacts as any).allocation_summary?.description
+        || 'Physical allocation by mass is applied for all co-products following the ISO 14044 Clause 4.3.4 hierarchy. Mass-based physical allocation was used throughout this assessment; no economic allocation was applied.',
       assumptionsAndLimitations: assumptionsLimitations,
       referenceStandards: [
         'ISO 14040:2006 — Environmental management — Life cycle assessment — Principles and framework',

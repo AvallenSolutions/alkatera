@@ -130,10 +130,21 @@ export function generateInterpretation(
 
   // Summary sentence
   const topHotspotNames = hotspots.slice(0, 3).map(h => h.name).join(', ');
+  const topThreeSum = hotspots.slice(0, 3).reduce((s, h) => s + h.contribution_pct, 0);
+
+  // ISSUE F FIX: Explain when hotspot contributions sum >100% due to EoL avoided-burden credits.
+  // Negative end-of-life credits reduce the total denominator while positive material contributions
+  // remain unchanged, causing percentage shares to exceed 100%.
+  const exceedsExplanation = topThreeSum > 100
+    ? ` Note: contributions sum to more than 100% because end-of-life avoided-burden credits ` +
+      `reduce the net total; individual material percentages are calculated against this net figure.`
+    : '';
+
   const significantSummary = hotspots.length > 0
     ? `The most significant contributors to the carbon footprint are ${topHotspotNames}, ` +
-      `collectively accounting for ${hotspots.slice(0, 3).reduce((s, h) => s + h.contribution_pct, 0).toFixed(1)}% ` +
-      `of the total impact. The ${dominantStage.name.toLowerCase()} stage dominates at ${dominantStagePct}%.`
+      `collectively accounting for ${topThreeSum.toFixed(1)}% ` +
+      `of the total impact. The ${dominantStage.name.toLowerCase()} stage dominates at ${dominantStagePct}%.` +
+      exceedsExplanation
     : `No individual material contributes more than 5% of the total footprint. ` +
       `Impacts are distributed across multiple inputs.`;
 

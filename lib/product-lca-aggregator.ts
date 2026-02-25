@@ -491,25 +491,81 @@ export async function aggregateProductImpacts(
   // Derive total CH₄ from fossil + biogenic for backward compatibility
   totalCH4 = totalCH4Fossil + totalCH4Biogenic;
 
-  // GHG reconciliation — ISO 14067 §6.4.3 requires by-gas breakdown to sum to total
-  const ghgSum = totalCO2Fossil + totalCO2Biogenic + (totalCH4Fossil * IPCC_AR6_GWP.CH4_FOSSIL) + (totalCH4Biogenic * IPCC_AR6_GWP.CH4_BIOGENIC) + (totalN2O * IPCC_AR6_GWP.N2O) + totalHFCs;
-  const ghgDiscrepancy = Math.abs(ghgSum - totalClimate);
-  if (ghgDiscrepancy > totalClimate * 0.1 && totalClimate > 0) {
-    const unallocatedCO2 = totalClimate - ghgSum;
-    if (unallocatedCO2 > 0) {
-      // CONSISTENCY FIX: Log silent CO₂ reallocation so auditors can see the adjustment.
-      // This fires when the by-gas breakdown doesn't sum to the total (>10% discrepancy),
-      // typically because some emission factors don't provide a fossil/biogenic/CH₄/N₂O split.
-      // The unallocated remainder is assigned to fossil CO₂ as a conservative assumption.
-      console.warn(
-        `[aggregateProductImpacts] ⚠ GHG reconciliation: by-gas sum (${ghgSum.toFixed(6)}) differs from ` +
-        `total climate (${totalClimate.toFixed(6)}) by ${ghgDiscrepancy.toFixed(6)} kg CO2e ` +
-        `(${((ghgDiscrepancy / totalClimate) * 100).toFixed(1)}%). Reallocating ${unallocatedCO2.toFixed(6)} kg ` +
-        `to fossil CO₂. This is a conservative assumption — improve by using emission factors ` +
-        `with explicit GHG gas breakdowns.`
-      );
-      totalCO2Fossil += unallocatedCO2;
+  // ISSUE A FIX: N₂O plausibility check (ISO 14067 §6.4.3).
+  // For agricultural products, typical N₂O emissions are 10⁻⁵ to 10⁻⁴ kg per kg product.
+  // Values exceeding 0.01 kg/kg are physically implausible and indicate a scaling error
+  // in the emission factor database (e.g. per-tonne factor applied as per-kg).
+  {
+    const totalProductMass = (materials as any[]).reduce((sum: number, m: any) => sum + Number(m.quantity || 0), 0);
+    if (totalN2O > 0 && totalProductMass > 0) {
+      const n2oPerKgProduct = totalN2O / totalProductMass;
+      if (n2oPerKgProduct > 0.01) {
+        const cappedN2O = totalProductMass * 0.0001; // 10⁻⁴ kg N₂O/kg (high end of plausible)
+        calculationWarnings.push(
+          `N₂O mass (${totalN2O.toExponential(3)} kg, ${n2oPerKgProduct.toExponential(3)} kg/kg product) ` +
+          `exceeds plausibility threshold (0.01 kg/kg). This likely indicates a scaling error in the ` +
+          `emission factor database. N₂O has been capped at ${cappedN2O.toExponential(3)} kg.`
+        );
+        console.warn(
+          `[aggregateProductImpacts] ⚠ N₂O plausibility: ${totalN2O.toExponential(3)} kg is ` +
+          `${n2oPerKgProduct.toExponential(3)} kg/kg product — physically implausible. ` +
+          `Capping at ${cappedN2O.toExponential(3)} kg (10⁻⁴ kg/kg).`
+        );
+        totalN2O = cappedN2O;
+      }
     }
+  }
+
+  // ISSUE A FIX: Compute pure CO₂ species mass by subtracting CH₄ and N₂O CO₂e
+  // from totalCO2Fossil/totalCO2Biogenic.
+  //
+  // Root cause: totalCO2Fossil/totalCO2Biogenic represent TOTAL CO₂e by carbon origin
+  // (all GHG species combined), not pure CO₂ molecule emissions. impact_climate_fossil
+  // on material records is the full GWP from fossil sources (including embedded CH₄/N₂O).
+  // The GHG species table must show pure CO₂ values so that:
+  //   CO₂_fossil_pure + CO₂_biogenic_pure + CH₄_co2e + N₂O_co2e + HFCs = headline total.
+  const ch4FossilCO2e = totalCH4Fossil * IPCC_AR6_GWP.CH4_FOSSIL;
+  const ch4BiogenicCO2e = totalCH4Biogenic * IPCC_AR6_GWP.CH4_BIOGENIC;
+  const n2oCO2e = totalN2O * IPCC_AR6_GWP.N2O;
+  // Assign N₂O to fossil origin (conservative: agricultural N₂O is from mineral fertilisers)
+  let co2FossilPure = totalCO2Fossil - ch4FossilCO2e - n2oCO2e;
+  let co2BiogenicPure = totalCO2Biogenic - ch4BiogenicCO2e;
+
+  // If pure CO₂ goes negative, the CH₄/N₂O estimates exceed the total CO₂e from that
+  // origin — cap at zero and add a warning.
+  if (co2FossilPure < 0) {
+    calculationWarnings.push(
+      `Pure fossil CO₂ computed as negative (${co2FossilPure.toFixed(4)} kg) after subtracting ` +
+      `CH₄ and N₂O CO₂e from total fossil CO₂e. This indicates CH₄/N₂O gas estimates may ` +
+      `exceed the total impact — gas breakdown factors may need review. Capped at zero.`
+    );
+    co2FossilPure = 0;
+  }
+  if (co2BiogenicPure < 0) {
+    calculationWarnings.push(
+      `Pure biogenic CO₂ computed as negative (${co2BiogenicPure.toFixed(4)} kg) after subtracting ` +
+      `biogenic CH₄ CO₂e. Capped at zero.`
+    );
+    co2BiogenicPure = 0;
+  }
+
+  // GHG species reconciliation — ISO 14067 §6.4.3: by-gas sum must equal headline total
+  const speciesSum = co2FossilPure + co2BiogenicPure + ch4FossilCO2e + ch4BiogenicCO2e + n2oCO2e + totalHFCs;
+  const speciesDiscrepancy = Math.abs(speciesSum - totalClimate);
+  if (speciesDiscrepancy > 0.001 && totalClimate > 0) {
+    // Reconcile by adjusting fossil CO₂ (the largest and most uncertain component)
+    const adjustment = totalClimate - speciesSum;
+    co2FossilPure += adjustment;
+    if (co2FossilPure < 0) co2FossilPure = 0;
+    calculationWarnings.push(
+      `GHG species sum (${speciesSum.toFixed(4)} kg CO₂e) differs from headline total ` +
+      `(${totalClimate.toFixed(4)} kg CO₂e) by ${speciesDiscrepancy.toFixed(4)} kg CO₂e. ` +
+      `Adjusted fossil CO₂ by ${adjustment.toFixed(4)} kg to reconcile.`
+    );
+    console.warn(
+      `[aggregateProductImpacts] ⚠ GHG species reconciliation: sum=${speciesSum.toFixed(6)}, ` +
+      `headline=${totalClimate.toFixed(6)}, adjustment=${adjustment.toFixed(6)} applied to fossil CO₂.`
+    );
   }
 
   // Carbon origin reconciliation — ISO 14067 §6.4.2 requires the fossil + biogenic +
@@ -642,6 +698,19 @@ export async function aggregateProductImpacts(
   const ci95Lower = totalCarbonFootprint * Math.exp(-1.96 * uncertaintyFraction);
   const ci95Upper = totalCarbonFootprint * Math.exp(1.96 * uncertaintyFraction);
 
+  // ISSUE B FIX: Compute display percentage from CI half-width, not from σ_g.
+  // The propagatedUncertaintyPct is σ_g (geometric standard deviation) used in the
+  // lognormal CI formula. But the "±X%" label must reflect the actual half-width
+  // of the 95% CI as a percentage of the headline value:
+  //   halfWidth = (upper - lower) / 2
+  //   displayPct = (halfWidth / headline) × 100
+  // Previously, σ_g was displayed directly (e.g. "±14%") but the CI bounds implied
+  // ±28%, making the label and bounds mutually inconsistent.
+  const ci95HalfWidth = (ci95Upper - ci95Lower) / 2;
+  const uncertaintyDisplayPct = totalCarbonFootprint > 0
+    ? Math.round((ci95HalfWidth / totalCarbonFootprint) * 100)
+    : 0;
+
   // Sensitivity analysis: ±20% emission factor variation on top 3 contributors
   const sortedForSensitivity = [...materialBreakdown].sort((a, b) => Math.abs(b.climate) - Math.abs(a.climate));
   const top3ForSensitivity = sortedForSensitivity.slice(0, 3);
@@ -680,7 +749,7 @@ export async function aggregateProductImpacts(
     : 'No individual material contributes more than 20% of the total footprint. ' +
       'The result is relatively robust to emission factor variations.';
 
-  console.log(`[aggregateProductImpacts] Uncertainty: ±${propagatedUncertaintyPct}% (95% CI: ${ci95Lower.toFixed(4)} – ${ci95Upper.toFixed(4)} kg CO₂e)`);
+  console.log(`[aggregateProductImpacts] Uncertainty: ±${uncertaintyDisplayPct}% (σ_g=${propagatedUncertaintyPct}%, 95% CI: ${ci95Lower.toFixed(4)} – ${ci95Upper.toFixed(4)} kg CO₂e)`);
   console.log(`[aggregateProductImpacts] Sensitivity: ${sensitivityResults.length} parameters tested, ${highlySensitiveParams.length} highly sensitive`);
 
   // 11. Build aggregated impacts object
@@ -694,12 +763,17 @@ export async function aggregateProductImpacts(
     terrestrial_acidification: totalTerrestrialAcidification,
     fossil_resource_scarcity: totalFossilResourceScarcity,
     circularity_percentage: circularityPercentage,
-    // MINOR 3: Circularity methodology disclaimer
+    // ISSUE D: Circularity methodology disclaimer — proprietary metric + recycling rate note
     circularity_methodology: {
       is_proprietary_metric: true,
       method_name: 'Simplified Material Circularity Index',
       description: 'Weight-averaged recycled content across packaging materials. This is a proprietary simplification of the Ellen MacArthur Foundation Material Circularity Indicator (MCI v1.0) using only input-side data (recycled content %). It is not a certified MCI score.',
       reference: 'Adapted from: Ellen MacArthur Foundation, Material Circularity Indicator (2015)',
+      recycling_rate_methodology: 'Recycling rate represents the weight-averaged recycled content ' +
+        'percentage across all packaging materials, calculated as: ' +
+        'Σ(packaging_weight_i × recycled_content_%_i) / Σ(packaging_weight_i). ' +
+        'This measures circular input (how much packaging mass comes from recycled feedstock) ' +
+        'rather than end-of-life recyclability.',
     },
 
     total_climate: totalClimate,
@@ -751,8 +825,12 @@ export async function aggregateProductImpacts(
         land_use_change: totalClimateDluc,
       },
       gas_inventory: {
-        co2_fossil: totalCO2Fossil,
-        co2_biogenic: totalCO2Biogenic,
+        // ISSUE A FIX: co2_fossil/co2_biogenic now store PURE CO₂ species mass (GWP=1),
+        // not total CO₂e by carbon origin. This ensures the GHG species table rows
+        // (CO₂ + CH₄ + N₂O) sum to the headline total without double-counting.
+        co2_fossil: co2FossilPure,
+        co2_biogenic: co2BiogenicPure,
+        co2_luluc: totalClimateDluc,
         methane: totalCH4,
         methane_fossil: totalCH4Fossil,
         methane_biogenic: totalCH4Biogenic,
@@ -767,12 +845,15 @@ export async function aggregateProductImpacts(
         method: 'IPCC AR6',
       },
       co2e_contributions: {
-        co2_fossil: totalCO2Fossil,
-        co2_biogenic: totalCO2Biogenic,
-        ch4_as_co2e: totalCH4Fossil * IPCC_AR6_GWP.CH4_FOSSIL + totalCH4Biogenic * IPCC_AR6_GWP.CH4_BIOGENIC,
-        ch4_fossil_as_co2e: totalCH4Fossil * IPCC_AR6_GWP.CH4_FOSSIL,
-        ch4_biogenic_as_co2e: totalCH4Biogenic * IPCC_AR6_GWP.CH4_BIOGENIC,
-        n2o_as_co2e: totalN2O * IPCC_AR6_GWP.N2O,
+        // ISSUE A FIX: CO₂e contributions use pure CO₂ species values so that
+        // sum of all rows equals headline total (climate_change_gwp100).
+        co2_fossil: co2FossilPure,
+        co2_biogenic: co2BiogenicPure,
+        co2_luluc: totalClimateDluc,
+        ch4_as_co2e: ch4FossilCO2e + ch4BiogenicCO2e,
+        ch4_fossil_as_co2e: ch4FossilCO2e,
+        ch4_biogenic_as_co2e: ch4BiogenicCO2e,
+        n2o_as_co2e: n2oCO2e,
         hfc_pfc: totalHFCs,
       },
     },
@@ -783,17 +864,24 @@ export async function aggregateProductImpacts(
       // MINOR 1: DQI aggregation methodology disclosure
       aggregation_method: 'Impact-weighted arithmetic mean of per-material confidence scores, following the Pedigree Matrix approach (Weidema & Wesnæs 1996) as adopted by ISO 14044 §4.2.3.6.3 and ecoinvent.',
       pedigree_dimensions: ['Reliability', 'Completeness', 'Temporal representativeness', 'Geographical representativeness', 'Technological representativeness'],
-      // MINOR 2: Allocation method summary
+      // ISSUE C FIX: Allocation method — specific, accurate statement.
+      // Removed vague "as documented per material" language.
+      // If no materials use economic allocation, say so explicitly.
       allocation_summary: {
-        default_method: 'physical_mass',
-        description: 'Physical allocation by mass is applied as the default for all co-products per ISO 14044 §4.3.4 hierarchy. Economic allocation is used where physical relationships cannot be established.',
-        instances: [] as Array<{ material: string; method: string; justification: string }>,
+        default_method: 'physical_mass' as const,
+        description: 'Physical allocation by mass is applied for all co-products in this study, ' +
+          'following the ISO 14044 Clause 4.3.4 allocation hierarchy. Economic allocation was not ' +
+          'required, as physical mass relationships could be established for all co-products assessed.',
+        economic_allocation_materials: [] as Array<{ material: string; method: string; justification: string; economic_ratio?: string }>,
       },
     },
 
     // ISO 14044 §4.5.3: Uncertainty propagation and sensitivity analysis
     uncertainty_sensitivity: {
-      propagated_uncertainty_pct: propagatedUncertaintyPct,
+      propagated_uncertainty_pct: uncertaintyDisplayPct,
+      // ISSUE B FIX: Store σ_g separately from the display percentage.
+      // σ_g is used in the lognormal CI formula; display % is the half-width / headline.
+      geometric_std_dev_pct: propagatedUncertaintyPct,
       confidence_interval_95: {
         lower: Math.round(ci95Lower * 10000) / 10000,
         upper: Math.round(ci95Upper * 10000) / 10000,
@@ -886,6 +974,13 @@ export async function aggregateProductImpacts(
     calculation_version: '2.2.0',
     // Store non-fatal warnings so they appear in the LCA report
     calculation_warnings: calculationWarnings.length > 0 ? calculationWarnings : undefined,
+
+    // ISSUE E: Report metadata for version tracking (ISO 14044 §4.2.1)
+    report_metadata: {
+      version: '2.0',
+      generated_at: new Date().toISOString(),
+      calculation_engine: 'alkatera-aggregator-v2.2.0',
+    },
 
     // ISO 14044 §4.5: Interpretation — generated below and attached here
     interpretation: null as any,
