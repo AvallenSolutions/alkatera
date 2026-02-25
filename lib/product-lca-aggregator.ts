@@ -16,6 +16,13 @@ import { calculateMaterialEoL, getMaterialFactorKey, type EoLRegion, type Region
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded } from './system-boundaries';
 import { IPCC_AR6_GWP } from './ghg-constants';
+import {
+  assessMaterialDataQuality,
+  assessAggregateDataQuality,
+  propagateUncertainty,
+  type MaterialDataQuality,
+} from './data-quality-assessment';
+import { generateInterpretation } from './lca-interpretation';
 
 interface Material {
   id: string;
@@ -205,7 +212,9 @@ export async function aggregateProductImpacts(
 
   let totalCO2Fossil = 0;
   let totalCO2Biogenic = 0;
-  let totalCH4 = 0;
+  let totalCH4 = 0;        // Derived: totalCH4Fossil + totalCH4Biogenic (set after loop)
+  let totalCH4Fossil = 0;  // kg CH₄ from fossil sources (GWP-100 = 29.8)
+  let totalCH4Biogenic = 0; // kg CH₄ from biogenic sources (GWP-100 = 27.0)
   let totalN2O = 0;
   let totalHFCs = 0;
 
@@ -254,46 +263,34 @@ export async function aggregateProductImpacts(
       rawMaterialsEmissions += climateImpact;
     }
 
-    // MEDIUM FIX #9: Inbound ingredient transport (from supplier to factory) is
-    // part of the "raw materials" lifecycle stage per ISO 14044, not "distribution".
-    // "Distribution" in LCA refers to outbound distribution from factory to shelf/consumer.
-    // Adding ingredient transport to `distributionEmissions` caused the stage breakdown to
-    // mislabel upstream logistics as downstream distribution in the report.
-    //
-    // Transport in this context = supplier-to-factory (inbound) → raw materials stage.
-    // Outbound distribution (factory to shelf) is only added when isStageIncluded('distribution')
-    // and would come from a separate distribution activity record (not per-material transport).
-    //
-    // Reclassify: add transportImpact to the same stage bucket as the material itself.
-    if (materialType === 'packaging' || materialType === 'packaging_material') {
-      packagingEmissions += transportImpact;
-    } else if ((material.material_name || '').startsWith('[Maturation]')) {
-      processingEmissions += transportImpact;
-    } else {
-      rawMaterialsEmissions += transportImpact;
-    }
-    // Note: distributionEmissions is reserved for outbound distribution activities
-    // (added separately when boundary includes 'distribution' stage).
+    // ISO COMPLIANCE FIX: Removed duplicate transport addition to stage buckets.
+    // Transport is already embedded in impact_climate on each material record
+    // (see NOTE at line ~227). The climateImpact added to stage buckets above
+    // already includes inbound transport. Adding transportImpact again was
+    // double-counting, causing stage sum to exceed headline total by ~totalTransport.
+    // Outbound distribution is handled separately by the distribution stage.
 
     totalCO2Fossil += climateFossil;
     totalCO2Biogenic += climateBiogenic;
 
-    // CH4 and N2O gas breakdown:
-    // These values should come from primary supplier data or verified LCI datasets
-    // (e.g. Ecoinvent material records that include individual gas inventories).
-    // We do NOT estimate CH4/N2O using fixed percentage ratios of biogenic carbon
-    // or total climate impact — those ratios (previously 2% and 0.5%) had no
-    // scientific basis and introduced inaccuracy into the gas inventory.
-    //
-    // If material records include ch4_kg / n2o_kg fields (from primary LCI data),
-    // those are used. Otherwise the gas inventory will show 0 for CH4/N2O, which
-    // is honest — unknown is better than fabricated.
-    //
-    // TODO: When Ecoinvent integration is built, pull per-gas values from the
-    // LCI dataset rather than estimating from CO2e totals.
-    const ch4FromMaterial = Number((material as any).ch4_kg || 0);
+    // CH₄ and N₂O gas breakdown (ISO 14067 §6.4.3):
+    // Read per-gas masses from material records when available (populated by the
+    // waterfall resolver from ecoinvent/DEFRA LCI data). Separate fossil and
+    // biogenic CH₄ to apply distinct IPCC AR6 GWP-100 factors (29.8 vs 27.0).
+    // If the fossil/biogenic split is not available, assign total CH₄ to fossil
+    // as a conservative assumption (higher GWP).
+    const ch4FossilFromMaterial = Number((material as any).ch4_fossil_kg || 0);
+    const ch4BiogenicFromMaterial = Number((material as any).ch4_biogenic_kg || 0);
+    const ch4TotalFromMaterial = Number((material as any).ch4_kg || 0);
     const n2oFromMaterial = Number((material as any).n2o_kg || 0);
-    totalCH4 += ch4FromMaterial;
+
+    if (ch4FossilFromMaterial > 0 || ch4BiogenicFromMaterial > 0) {
+      totalCH4Fossil += ch4FossilFromMaterial;
+      totalCH4Biogenic += ch4BiogenicFromMaterial;
+    } else {
+      // No fossil/biogenic split — assign total to fossil (conservative: higher GWP)
+      totalCH4Fossil += ch4TotalFromMaterial;
+    }
     totalN2O += n2oFromMaterial;
 
     // Add to per-material breakdown (aggregate by material name)
@@ -491,8 +488,11 @@ export async function aggregateProductImpacts(
     scope3Emissions = totalCarbonFootprint;
   }
 
+  // Derive total CH₄ from fossil + biogenic for backward compatibility
+  totalCH4 = totalCH4Fossil + totalCH4Biogenic;
+
   // GHG reconciliation — ISO 14067 §6.4.3 requires by-gas breakdown to sum to total
-  const ghgSum = totalCO2Fossil + totalCO2Biogenic + (totalCH4 * IPCC_AR6_GWP.CH4) + (totalN2O * IPCC_AR6_GWP.N2O) + totalHFCs;
+  const ghgSum = totalCO2Fossil + totalCO2Biogenic + (totalCH4Fossil * IPCC_AR6_GWP.CH4_FOSSIL) + (totalCH4Biogenic * IPCC_AR6_GWP.CH4_BIOGENIC) + (totalN2O * IPCC_AR6_GWP.N2O) + totalHFCs;
   const ghgDiscrepancy = Math.abs(ghgSum - totalClimate);
   if (ghgDiscrepancy > totalClimate * 0.1 && totalClimate > 0) {
     const unallocatedCO2 = totalClimate - ghgSum;
@@ -542,22 +542,18 @@ export async function aggregateProductImpacts(
     scope3: scope3Emissions.toFixed(4),
   });
 
-  // CONSISTENCY FIX: Surface the known discrepancy between stage sum and total.
-  // Stage buckets include inbound transport (reclassified to raw_materials/packaging per
-  // ISO 14044), but totalClimate only counts impact_climate (transport is embedded in
-  // per-material impact_climate but also tracked separately in impact_transport).
-  // The stage sum will exceed totalClimate by ~totalTransport. This is an architectural
-  // note, not a bug — the stage breakdown is additive-approximate for display purposes.
-  if (totalTransport > 0) {
+  // ISO 14044 integrity check: lifecycle stage sum should equal headline total.
+  // Transport is embedded in impact_climate per material, so stage buckets and
+  // headline total should reconcile. Any discrepancy indicates a data issue.
+  {
     const stageSum = rawMaterialsEmissions + processingEmissions + packagingEmissions +
       distributionEmissions + usePhaseEmissions + endOfLifeEmissions;
     const discrepancy = Math.abs(stageSum - totalCarbonFootprint);
     if (discrepancy > 0.001) {
       calculationWarnings.push(
-        `Lifecycle stage sum (${stageSum.toFixed(4)} kg CO2e) differs from headline total ` +
-        `(${totalCarbonFootprint.toFixed(4)} kg CO2e) by ${discrepancy.toFixed(4)} kg CO2e. ` +
-        `This is because inbound transport (${totalTransport.toFixed(4)} kg CO2e) is included ` +
-        `in stage buckets (per ISO 14044) but not double-counted in the headline total.`
+        `Lifecycle stage sum (${stageSum.toFixed(4)} kg CO₂e) differs from headline total ` +
+        `(${totalCarbonFootprint.toFixed(4)} kg CO₂e) by ${discrepancy.toFixed(4)} kg CO₂e. ` +
+        `This may indicate a rounding or allocation issue. Review material stage assignments.`
       );
     }
   }
@@ -600,6 +596,93 @@ export async function aggregateProductImpacts(
     }
   }
 
+  // 10b. Automatic uncertainty and sensitivity analysis (ISO 14044 §4.5.3)
+  // Assess each material's data quality using the pedigree matrix approach,
+  // propagate uncertainties via root-sum-of-squares, and run ±20% sensitivity
+  // analysis on the top 3 contributors.
+  const materialAssessments: MaterialDataQuality[] = [];
+  for (const material of materials as any[]) {
+    const impactSource = (material.impact_source || '').toLowerCase();
+    const qualityGrade = (material.data_quality_grade || '').toUpperCase();
+
+    const tier = impactSource === 'primary_verified' ? 'primary_verified' as const
+      : impactSource === 'secondary_modelled' ? 'secondary_modelled' as const
+      : 'secondary_estimated' as const;
+
+    const grade = qualityGrade === 'HIGH' ? 'HIGH' as const
+      : qualityGrade === 'MEDIUM' ? 'MEDIUM' as const
+      : 'LOW' as const;
+
+    // Parse data year from source reference
+    let dataYear: number | null = null;
+    const yearMatch = (material.gwp_data_source || '').match(/\b(20\d{2})\b/);
+    if (yearMatch) dataYear = parseInt(yearMatch[1]);
+
+    materialAssessments.push(assessMaterialDataQuality({
+      materialName: material.material_name || 'Unknown',
+      materialId: material.id || '',
+      impactValue: Math.abs(Number(material.impact_climate || 0)),
+      impactUnit: 'kg CO₂e',
+      dataSource: material.gwp_data_source || 'Unknown',
+      dataSourceTier: tier,
+      qualityGrade: grade,
+      uncertaintyPercent: material.uncertainty_percent,
+      dataYear,
+      dataRegion: material.origin_country_code || 'GLO',
+      studyRegion: 'GLO',
+      referenceYear: new Date().getFullYear(),
+    }));
+  }
+
+  const aggregateQuality = assessAggregateDataQuality(materialAssessments);
+  const propagatedUncertaintyPct = propagateUncertainty(materialAssessments, totalCarbonFootprint);
+
+  // 95% confidence interval for total footprint (lognormal distribution)
+  const uncertaintyFraction = propagatedUncertaintyPct / 100;
+  const ci95Lower = totalCarbonFootprint * Math.exp(-1.96 * uncertaintyFraction);
+  const ci95Upper = totalCarbonFootprint * Math.exp(1.96 * uncertaintyFraction);
+
+  // Sensitivity analysis: ±20% emission factor variation on top 3 contributors
+  const sortedForSensitivity = [...materialBreakdown].sort((a, b) => Math.abs(b.climate) - Math.abs(a.climate));
+  const top3ForSensitivity = sortedForSensitivity.slice(0, 3);
+  const sensitivityResults = top3ForSensitivity.map(mat => {
+    const materialImpact = mat.climate;
+    const variationAmount = Math.abs(materialImpact) * 0.20;
+    const resultLower = totalCarbonFootprint - variationAmount;
+    const resultUpper = totalCarbonFootprint + variationAmount;
+    const sensitivityRatio = totalCarbonFootprint > 0
+      ? Math.abs(materialImpact) / totalCarbonFootprint
+      : 0;
+
+    return {
+      material_name: mat.name,
+      baseline_impact_kg_co2e: Math.round(materialImpact * 10000) / 10000,
+      baseline_contribution_pct: totalCarbonFootprint > 0
+        ? Math.round((Math.abs(materialImpact) / totalCarbonFootprint) * 1000) / 10
+        : 0,
+      variation_pct: 20,
+      result_range: {
+        lower: Math.round(resultLower * 10000) / 10000,
+        upper: Math.round(resultUpper * 10000) / 10000,
+      },
+      sensitivity_ratio: Math.round(sensitivityRatio * 1000) / 1000,
+      is_highly_sensitive: sensitivityRatio > 0.2,
+    };
+  });
+
+  // Generate conclusion text
+  const highlySensitiveParams = sensitivityResults.filter(r => r.is_highly_sensitive);
+  const sensitivityConclusion = highlySensitiveParams.length > 0
+    ? `The total carbon footprint is most sensitive to ${highlySensitiveParams.map(r => r.material_name).join(', ')}. ` +
+      `A ±20% variation in ${highlySensitiveParams.length === 1 ? 'this emission factor changes' : 'these emission factors changes'} ` +
+      `the total result by up to ±${Math.round(highlySensitiveParams.reduce((sum, r) => sum + r.sensitivity_ratio, 0) * 20)}%. ` +
+      `Priority should be given to improving data quality for these materials.`
+    : 'No individual material contributes more than 20% of the total footprint. ' +
+      'The result is relatively robust to emission factor variations.';
+
+  console.log(`[aggregateProductImpacts] Uncertainty: ±${propagatedUncertaintyPct}% (95% CI: ${ci95Lower.toFixed(4)} – ${ci95Upper.toFixed(4)} kg CO₂e)`);
+  console.log(`[aggregateProductImpacts] Sensitivity: ${sensitivityResults.length} parameters tested, ${highlySensitiveParams.length} highly sensitive`);
+
   // 11. Build aggregated impacts object
   const aggregatedImpacts = {
     climate_change_gwp100: totalCarbonFootprint,
@@ -611,6 +694,13 @@ export async function aggregateProductImpacts(
     terrestrial_acidification: totalTerrestrialAcidification,
     fossil_resource_scarcity: totalFossilResourceScarcity,
     circularity_percentage: circularityPercentage,
+    // MINOR 3: Circularity methodology disclaimer
+    circularity_methodology: {
+      is_proprietary_metric: true,
+      method_name: 'Simplified Material Circularity Index',
+      description: 'Weight-averaged recycled content across packaging materials. This is a proprietary simplification of the Ellen MacArthur Foundation Material Circularity Indicator (MCI v1.0) using only input-side data (recycled content %). It is not a certified MCI score.',
+      reference: 'Adapted from: Ellen MacArthur Foundation, Material Circularity Indicator (2015)',
+    },
 
     total_climate: totalClimate,
     total_climate_fossil: totalClimateFossil,
@@ -642,6 +732,8 @@ export async function aggregateProductImpacts(
         co2_fossil: totalCO2Fossil,
         co2_biogenic: totalCO2Biogenic,
         ch4: totalCH4,
+        ch4_fossil: totalCH4Fossil,
+        ch4_biogenic: totalCH4Biogenic,
         n2o: totalN2O,
         hfc_pfc: totalHFCs,
       },
@@ -662,18 +754,24 @@ export async function aggregateProductImpacts(
         co2_fossil: totalCO2Fossil,
         co2_biogenic: totalCO2Biogenic,
         methane: totalCH4,
+        methane_fossil: totalCH4Fossil,
+        methane_biogenic: totalCH4Biogenic,
         nitrous_oxide: totalN2O,
         hfc_pfc: totalHFCs,
       },
       gwp_factors: {
         methane_gwp100: IPCC_AR6_GWP.CH4,
+        methane_fossil_gwp100: IPCC_AR6_GWP.CH4_FOSSIL,
+        methane_biogenic_gwp100: IPCC_AR6_GWP.CH4_BIOGENIC,
         n2o_gwp100: IPCC_AR6_GWP.N2O,
         method: 'IPCC AR6',
       },
       co2e_contributions: {
         co2_fossil: totalCO2Fossil,
         co2_biogenic: totalCO2Biogenic,
-        ch4_as_co2e: totalCH4 * IPCC_AR6_GWP.CH4,
+        ch4_as_co2e: totalCH4Fossil * IPCC_AR6_GWP.CH4_FOSSIL + totalCH4Biogenic * IPCC_AR6_GWP.CH4_BIOGENIC,
+        ch4_fossil_as_co2e: totalCH4Fossil * IPCC_AR6_GWP.CH4_FOSSIL,
+        ch4_biogenic_as_co2e: totalCH4Biogenic * IPCC_AR6_GWP.CH4_BIOGENIC,
         n2o_as_co2e: totalN2O * IPCC_AR6_GWP.N2O,
         hfc_pfc: totalHFCs,
       },
@@ -682,15 +780,123 @@ export async function aggregateProductImpacts(
     data_quality: {
       score: dqiScore,
       rating: dqiScore >= 80 ? 'Good' : dqiScore >= 50 ? 'Fair' : 'Poor',
+      // MINOR 1: DQI aggregation methodology disclosure
+      aggregation_method: 'Impact-weighted arithmetic mean of per-material confidence scores, following the Pedigree Matrix approach (Weidema & Wesnæs 1996) as adopted by ISO 14044 §4.2.3.6.3 and ecoinvent.',
+      pedigree_dimensions: ['Reliability', 'Completeness', 'Temporal representativeness', 'Geographical representativeness', 'Technological representativeness'],
+      // MINOR 2: Allocation method summary
+      allocation_summary: {
+        default_method: 'physical_mass',
+        description: 'Physical allocation by mass is applied as the default for all co-products per ISO 14044 §4.3.4 hierarchy. Economic allocation is used where physical relationships cannot be established.',
+        instances: [] as Array<{ material: string; method: string; justification: string }>,
+      },
+    },
+
+    // ISO 14044 §4.5.3: Uncertainty propagation and sensitivity analysis
+    uncertainty_sensitivity: {
+      propagated_uncertainty_pct: propagatedUncertaintyPct,
+      confidence_interval_95: {
+        lower: Math.round(ci95Lower * 10000) / 10000,
+        upper: Math.round(ci95Upper * 10000) / 10000,
+      },
+      data_quality_assessment: {
+        overall_dqi: aggregateQuality.overallDqi,
+        overall_confidence: aggregateQuality.overallConfidence,
+        weighted_pedigree: aggregateQuality.pedigreeAggregate,
+        data_source_breakdown: aggregateQuality.dataSourceBreakdown,
+        temporal_coverage: aggregateQuality.temporalCoverage,
+        quality_flags: aggregateQuality.qualityFlags,
+        iso_compliant: aggregateQuality.isoCompliant,
+        compliance_gaps: aggregateQuality.complianceGaps,
+      },
+      sensitivity_analysis: {
+        method: '±20% emission factor variation on top 3 contributors',
+        variation_pct: 20,
+        parameters: sensitivityResults,
+        conclusion: sensitivityConclusion,
+      },
+    },
+
+    // MAJOR 1: LULUC CO₂e justification note (ISO 14067 §6.4.9.4)
+    // When LULUC (land use and land use change) is zero, explain why
+    luluc_note: totalClimateDluc === 0
+      ? 'Land use and land use change (LULUC) emissions are reported as zero. ' +
+        'The current emission factor databases (ecoinvent 3.12, AGRIBALYSE 3.2, DEFRA) ' +
+        'do not provide separate LULUC characterisation factors for all input materials. ' +
+        'Where country-specific LULUC data becomes available, it will be incorporated in future assessments.'
+      : undefined,
+
+    // MAJOR 2: Zero-impact categories — list categories assessed but reporting zero
+    zero_impact_categories: (() => {
+      const sumField = (field: string) => (materials as any[]).reduce((sum: number, m: any) => sum + (Number(m[field]) || 0), 0);
+      const zeroCategories: Array<{ category: string; reason: string }> = [];
+      const checks: Array<[string, number, string]> = [
+        ['Marine Eutrophication', sumField('impact_marine_eutrophication'), 'No marine eutrophication characterisation factors available in the applied emission factor datasets for these input materials.'],
+        ['Ozone Depletion', sumField('impact_ozone_depletion'), 'No ozone-depleting substances identified in the product system.'],
+        ['Photochemical Ozone Formation', sumField('impact_photochemical_ozone_formation'), 'No photochemical ozone formation characterisation factors available for these input materials.'],
+        ['Particulate Matter', sumField('impact_particulate_matter'), 'No particulate matter characterisation factors available for these input materials.'],
+        ['Human Toxicity (Cancer)', sumField('impact_human_toxicity_carcinogenic'), 'No carcinogenic toxicity characterisation factors available for these input materials.'],
+        ['Human Toxicity (Non-cancer)', sumField('impact_human_toxicity_non_carcinogenic'), 'No non-carcinogenic toxicity characterisation factors available for these input materials.'],
+      ];
+      for (const [name, value, reason] of checks) {
+        if (value === 0) zeroCategories.push({ category: name, reason });
+      }
+      return zeroCategories.length > 0 ? zeroCategories : undefined;
+    })(),
+
+    // MAJOR 3: Critical review disclosure (ISO 14044 §6)
+    critical_review: {
+      status: 'not_conducted' as const,
+      disclosure: 'This LCA study has not undergone an independent critical review per ISO 14044 §6. ' +
+        'A critical review by an external expert or panel is recommended before this study is used ' +
+        'for public comparative assertions (ISO 14044 §5.3). The AlkaTera platform provides automated ' +
+        'compliance checks but these do not constitute a formal critical review.',
+      recommendation: 'Engage a qualified independent reviewer with expertise in beverage product LCA ' +
+        'to conduct a critical review per ISO 14044 §6.2 (external expert review) before publication.',
+    },
+
+    // MAJOR 4: Scope 1/2/3 attribution methodology note
+    scope_methodology: {
+      standard: 'GHG Protocol Product Life Cycle Accounting and Reporting Standard',
+      attribution_method: 'Operational control approach',
+      note: 'Scope 1 emissions are allocated from facilities under operational control using ' +
+        'physical allocation by production volume. Scope 2 emissions reflect purchased electricity ' +
+        'and heat using the location-based method with country-specific IEA grid emission factors. ' +
+        'Scope 3 emissions include upstream raw material extraction, processing, inbound transport, ' +
+        'and contract manufacturing. ' +
+        (facilityEmissions && facilityEmissions.some(fe => fe.isContractManufacturer)
+          ? 'Contract manufacturer emissions are classified as Scope 3 Category 1 (Purchased Goods and Services) per GHG Protocol §6.3.3.'
+          : 'No contract manufacturers are included in this assessment.'),
+    },
+
+    // MAJOR 5: Transport emissions accounting note
+    transport_note: {
+      method: 'Transport emissions are calculated using DEFRA freight emission factors and embedded ' +
+        'in per-material impact_climate values during the waterfall impact resolution step. ' +
+        'Inbound transport (supplier to factory) is allocated to the raw materials/packaging lifecycle ' +
+        'stage per ISO 14044. Outbound distribution (factory to retail/consumer) is only included ' +
+        'when the system boundary extends to Cradle-to-Shelf or beyond.',
+      total_transport_kg_co2e: totalTransport,
+      is_embedded_in_materials: true,
+      outbound_included: isStageIncluded(effectiveBoundary, 'distribution'),
     },
 
     materials_count: materials.length,
     production_sites_count: facilityEmissions?.length || 0,
     calculated_at: new Date().toISOString(),
-    calculation_version: '2.1.0',
+    calculation_version: '2.2.0',
     // Store non-fatal warnings so they appear in the LCA report
     calculation_warnings: calculationWarnings.length > 0 ? calculationWarnings : undefined,
+
+    // ISO 14044 §4.5: Interpretation — generated below and attached here
+    interpretation: null as any,
   };
+
+  // 11a. Generate ISO 14044 §4.5 Interpretation chapter
+  // Must run after aggregatedImpacts is built since it reads from it
+  (aggregatedImpacts as any).interpretation = generateInterpretation(
+    aggregatedImpacts,
+    effectiveBoundary
+  );
 
   // 11. Get product unit size for per-unit verification
   const { data: productData } = await supabase

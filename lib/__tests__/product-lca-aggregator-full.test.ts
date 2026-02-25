@@ -264,8 +264,8 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      // raw_materials includes impact_climate + impact_transport for ingredients
-      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate + MALT.impact_transport, 4);
+      // Transport is already embedded in impact_climate — no separate addition
+      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate, 4);
     });
 
     it('packaging goes to packaging', async () => {
@@ -279,8 +279,8 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      // packaging includes climate + transport for packaging materials
-      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
+      // Transport is already embedded in impact_climate — no separate addition
+      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate, 4);
     });
 
     it('raw_materials and packaging are segregated correctly', async () => {
@@ -294,8 +294,9 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate + MALT.impact_transport, 4);
-      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
+      // Transport is already embedded in impact_climate — no separate addition
+      expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate, 4);
+      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate, 4);
     });
 
     it('[Maturation] rows go to processing stage', async () => {
@@ -317,7 +318,8 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      expect(stages.processing).toBeCloseTo(0.050 + 0.003, 4);
+      // Transport is already embedded in impact_climate — no separate addition
+      expect(stages.processing).toBeCloseTo(0.050, 4);
       expect(stages.raw_materials).toBe(0);
     });
   });

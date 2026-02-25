@@ -14,7 +14,7 @@
  *     Used when the fossil/biogenic split is unknown.
  *   - CH4_FOSSIL (29.8): Fossil-origin methane includes a CO₂ oxidation
  *     product credit. Used when the source is known to be fossil.
- *   - CH4_BIOGENIC (27.2): Biogenic methane (e.g. fermentation, landfill
+ *   - CH4_BIOGENIC (27.0): Biogenic methane (e.g. fermentation, landfill
  *     of organic waste). CO₂ product is biogenic-neutral.
  *
  * Update cadence: Review when a new IPCC Assessment Report is published
@@ -40,7 +40,7 @@ export const IPCC_AR6_GWP = {
   /** Methane — fossil origin (includes CO₂ oxidation product) */
   CH4_FOSSIL: 29.8,
   /** Methane — biogenic origin */
-  CH4_BIOGENIC: 27.2,
+  CH4_BIOGENIC: 27.0,
   /** Nitrous oxide */
   N2O: 273,
 } as const;

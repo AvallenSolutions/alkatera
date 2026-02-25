@@ -171,10 +171,10 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
     const rawMats = breakdown?.by_lifecycle_stage?.raw_materials ?? 0;
     const packaging = breakdown?.by_lifecycle_stage?.packaging ?? 0;
 
-    // Malt: 0.450 climate + 0.010 transport (reclassified to raw_materials)
-    expect(rawMats).toBeCloseTo(0.460, 3);
-    // Aluminium can: 0.225 climate + 0.005 transport (reclassified to packaging)
-    expect(packaging).toBeCloseTo(0.230, 3);
+    // Transport is already embedded in impact_climate — no separate addition
+    expect(rawMats).toBeCloseTo(0.450, 3);
+    // Aluminium can: impact_climate only (transport embedded)
+    expect(packaging).toBeCloseTo(0.225, 3);
   });
 
   it('includes use-phase emissions for cradle-to-consumer boundary', async () => {

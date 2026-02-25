@@ -42,6 +42,8 @@ interface AggregatedImpacts {
       co2_fossil?: number;
       co2_biogenic?: number;
       ch4?: number;
+      ch4_fossil?: number;
+      ch4_biogenic?: number;
       n2o?: number;
     };
     by_material?: Array<{
@@ -52,6 +54,33 @@ interface AggregatedImpacts {
       percentage: number;
       unit?: string;
     }>;
+  };
+  ghg_breakdown?: {
+    gas_inventory?: {
+      co2_fossil?: number;
+      co2_biogenic?: number;
+      methane?: number;
+      methane_fossil?: number;
+      methane_biogenic?: number;
+      nitrous_oxide?: number;
+      hfc_pfc?: number;
+    };
+    gwp_factors?: {
+      methane_gwp100?: number;
+      methane_fossil_gwp100?: number;
+      methane_biogenic_gwp100?: number;
+      n2o_gwp100?: number;
+      method?: string;
+    };
+    co2e_contributions?: {
+      co2_fossil?: number;
+      co2_biogenic?: number;
+      ch4_as_co2e?: number;
+      ch4_fossil_as_co2e?: number;
+      ch4_biogenic_as_co2e?: number;
+      n2o_as_co2e?: number;
+      hfc_pfc?: number;
+    };
   };
 }
 
@@ -498,19 +527,35 @@ export function transformLCADataForReport(
     });
   }
 
-  // GHG detailed breakdown from material-level data
-  const co2Fossil = ghgBreakdown.co2_fossil || impacts.climate_fossil || 0;
-  const co2Biogenic = ghgBreakdown.co2_biogenic || impacts.climate_biogenic || 0;
+  // GHG detailed breakdown — prefer pre-computed CO₂e from aggregated_impacts.
+  // Previously this code read ch4_fossil_kg_co2e / n2o_kg_co2e from material records,
+  // but those fields don't exist on material rows — only raw mass fields (ch4_fossil_kg,
+  // n2o_kg) are populated. The CO₂e equivalents are correctly computed in the aggregator
+  // and stored in ghg_breakdown.co2e_contributions.
+  const ghgFull = impacts.ghg_breakdown || {};
+  const co2eContrib = ghgFull.co2e_contributions || {};
+  const gasInv = ghgFull.gas_inventory || {};
+
+  const co2Fossil = co2eContrib.co2_fossil || ghgBreakdown.co2_fossil || impacts.climate_fossil || 0;
+  const co2Biogenic = co2eContrib.co2_biogenic || ghgBreakdown.co2_biogenic || impacts.climate_biogenic || 0;
   const co2Dluc = impacts.climate_dluc || 0;
-  const ch4FossilKg = sumMaterialImpact('ch4_fossil_kg');
-  const ch4FossilKgCo2e = sumMaterialImpact('ch4_fossil_kg_co2e');
-  const ch4BiogenicKg = sumMaterialImpact('ch4_biogenic_kg');
-  const ch4BiogenicKgCo2e = sumMaterialImpact('ch4_biogenic_kg_co2e');
-  const n2oKg = sumMaterialImpact('n2o_kg');
-  const n2oKgCo2e = sumMaterialImpact('n2o_kg_co2e');
-  const hfcPfc = sumMaterialImpact('hfc_pfc_kg_co2e');
-  const ch4Total = ghgBreakdown.ch4 || (ch4FossilKgCo2e + ch4BiogenicKgCo2e);
-  const n2oTotal = ghgBreakdown.n2o || n2oKgCo2e;
+
+  // CH₄: read raw mass from gas_inventory, CO₂e from co2e_contributions
+  // Fallback: compute from raw mass × GWP for backward compatibility with older records
+  const ch4FossilKg = gasInv.methane_fossil || sumMaterialImpact('ch4_fossil_kg');
+  const ch4FossilKgCo2e = co2eContrib.ch4_fossil_as_co2e || (ch4FossilKg * 29.8);
+  const ch4BiogenicKg = gasInv.methane_biogenic || sumMaterialImpact('ch4_biogenic_kg');
+  const ch4BiogenicKgCo2e = co2eContrib.ch4_biogenic_as_co2e || (ch4BiogenicKg * 27.0);
+
+  // N₂O: read raw mass from gas_inventory, CO₂e from co2e_contributions
+  const n2oKg = gasInv.nitrous_oxide || sumMaterialImpact('n2o_kg');
+  const n2oKgCo2e = co2eContrib.n2o_as_co2e || (n2oKg * 273);
+
+  const hfcPfc = co2eContrib.hfc_pfc || sumMaterialImpact('hfc_pfc_kg_co2e');
+
+  // Total CH₄ and N₂O in CO₂e for the summary GHG breakdown table
+  const ch4Total = co2eContrib.ch4_as_co2e || (ch4FossilKgCo2e + ch4BiogenicKgCo2e);
+  const n2oTotal = co2eContrib.n2o_as_co2e || n2oKgCo2e;
 
   // Determine GWP method from materials
   const gwpMethod = materials[0]?.gwp_method || 'IPCC AR6 GWP-100';
@@ -949,6 +994,82 @@ export function transformLCADataForReport(
     },
     commitment: {
       text: `This environmental assessment demonstrates our commitment to understanding and reducing the environmental impact of ${lca.product_name}. By measuring and reporting our footprint in accordance with ISO 14044 and ISO 14067 standards, we establish a transparent baseline for continuous improvement across our value chain.`
-    }
+    },
+
+    // ── ISO Compliance Additions (pass through from aggregated_impacts) ────
+
+    interpretation: (impacts as any).interpretation || undefined,
+
+    uncertaintySensitivity: (() => {
+      const us = (impacts as any).uncertainty_sensitivity;
+      if (!us) return undefined;
+      const sa = us.sensitivity_analysis || {};
+      return {
+        propagatedUncertaintyPct: us.propagated_uncertainty_pct || 0,
+        confidenceInterval95: {
+          lower: (us.confidence_interval_95?.lower || 0).toFixed(4),
+          upper: (us.confidence_interval_95?.upper || 0).toFixed(4),
+        },
+        sensitivityAnalysis: {
+          method: sa.method || '',
+          parameters: (sa.parameters || []).map((p: any) => ({
+            materialName: p.material_name,
+            baselineContributionPct: p.baseline_contribution_pct,
+            variationPct: p.variation_pct,
+            resultRange: {
+              lower: (p.result_range?.lower || 0).toFixed(4),
+              upper: (p.result_range?.upper || 0).toFixed(4),
+            },
+            sensitivityRatio: p.sensitivity_ratio,
+            isHighlySensitive: p.is_highly_sensitive,
+          })),
+          conclusion: sa.conclusion || '',
+        },
+      };
+    })(),
+
+    criticalReview: (impacts as any).critical_review
+      ? {
+          status: (impacts as any).critical_review.status,
+          disclosure: (impacts as any).critical_review.disclosure,
+          recommendation: (impacts as any).critical_review.recommendation,
+        }
+      : undefined,
+
+    lulucNote: (impacts as any).luluc_note || undefined,
+
+    zeroImpactCategories: (impacts as any).zero_impact_categories || undefined,
+
+    scopeMethodology: (() => {
+      const sm = (impacts as any).scope_methodology;
+      if (!sm) return undefined;
+      return {
+        standard: sm.standard,
+        attributionMethod: sm.attribution_method,
+        note: sm.note,
+      };
+    })(),
+
+    transportNote: (() => {
+      const tn = (impacts as any).transport_note;
+      if (!tn) return undefined;
+      return {
+        method: tn.method,
+        totalTransportKgCo2e: tn.total_transport_kg_co2e,
+        isEmbeddedInMaterials: tn.is_embedded_in_materials,
+        outboundIncluded: tn.outbound_included,
+      };
+    })(),
+
+    circularityMethodology: (() => {
+      const cm = (impacts as any).circularity_methodology;
+      if (!cm) return undefined;
+      return {
+        isProprietaryMetric: cm.is_proprietary_metric,
+        methodName: cm.method_name,
+        description: cm.description,
+        reference: cm.reference,
+      };
+    })(),
   };
 }

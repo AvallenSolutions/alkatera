@@ -968,6 +968,194 @@ function renderCommitmentPage(data: LCAReportData): string {
 }
 
 // ============================================================================
+// ISO COMPLIANCE PAGES
+// ============================================================================
+
+function renderInterpretationPage(data: LCAReportData): string {
+  const interp = data.interpretation;
+  if (!interp) return '';
+
+  const hotspotsHtml = interp.significant_issues.hotspots.length > 0
+    ? `<table class="data-table">
+        <thead><tr><th>Material</th><th>Impact (kg CO₂e)</th><th>Contribution</th></tr></thead>
+        <tbody>
+          ${interp.significant_issues.hotspots.map(h => `
+            <tr>
+              <td style="font-weight: 500;">${escapeHtml(h.name)}</td>
+              <td>${h.impact_kg_co2e.toFixed(4)}</td>
+              <td>${h.contribution_pct.toFixed(1)}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`
+    : '<p style="font-size: 13px; color: #78716c;">No individual material exceeds the 5% significance threshold.</p>';
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)')}
+
+      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Significant Issues</h3>
+      <p style="font-size: 13px; line-height: 1.6; margin-bottom: 16px; color: #44403c;">
+        ${escapeHtml(interp.significant_issues.summary)}
+      </p>
+      ${hotspotsHtml}
+
+      <div style="display: flex; gap: 16px; margin: 20px 0;">
+        <div class="metric-card" style="flex: 1; text-align: center;">
+          <div class="metric-label">Dominant Stage</div>
+          <div style="font-size: 18px; font-weight: 700;">${escapeHtml(interp.significant_issues.dominant_lifecycle_stage)}</div>
+          <div style="font-size: 12px; color: #78716c;">${interp.significant_issues.dominant_stage_pct}% of total</div>
+        </div>
+        <div class="metric-card" style="flex: 1; text-align: center;">
+          <div class="metric-label">Dominant Scope</div>
+          <div style="font-size: 18px; font-weight: 700;">${escapeHtml(interp.significant_issues.dominant_scope)}</div>
+          <div style="font-size: 12px; color: #78716c;">${interp.significant_issues.dominant_scope_pct}% of total</div>
+        </div>
+      </div>
+
+      <h3 style="font-size: 16px; font-weight: 600; margin: 20px 0 12px;">Key Findings</h3>
+      <ul style="font-size: 13px; line-height: 1.6; color: #44403c; padding-left: 20px; margin-bottom: 16px;">
+        ${interp.conclusions.key_findings.map(f => `<li style="margin-bottom: 6px;">${escapeHtml(f)}</li>`).join('')}
+      </ul>
+
+      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Limitations</h3>
+      <ul style="font-size: 13px; line-height: 1.6; color: #44403c; padding-left: 20px; margin-bottom: 16px;">
+        ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 6px;">${escapeHtml(l)}</li>`).join('')}
+      </ul>
+
+      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Recommendations</h3>
+      <ul style="font-size: 13px; line-height: 1.6; color: #44403c; padding-left: 20px;">
+        ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 6px;">${escapeHtml(r)}</li>`).join('')}
+      </ul>
+
+      ${renderPageFooter(15)}
+    </div>`;
+}
+
+function renderUncertaintySensitivityPage(data: LCAReportData): string {
+  const us = data.uncertaintySensitivity;
+  if (!us) return '';
+
+  const paramsHtml = us.sensitivityAnalysis.parameters.length > 0
+    ? `<table class="data-table">
+        <thead><tr><th>Material</th><th>Contribution</th><th>±20% Range</th><th>Sensitivity</th></tr></thead>
+        <tbody>
+          ${us.sensitivityAnalysis.parameters.map(p => `
+            <tr>
+              <td style="font-weight: 500;">${escapeHtml(p.materialName)}</td>
+              <td>${p.baselineContributionPct.toFixed(1)}%</td>
+              <td>${p.resultRange.lower} – ${p.resultRange.upper} kg CO₂e</td>
+              <td>${p.sensitivityRatio.toFixed(3)}${p.isHighlySensitive ? ' <span style="color: #dc2626; font-weight: 600;">HIGH</span>' : ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`
+    : '';
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('14', 'Uncertainty & Sensitivity (ISO 14044 §4.5.3)')}
+
+      <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+        <div class="metric-card" style="flex: 1; text-align: center;">
+          <div class="metric-label">Propagated Uncertainty</div>
+          <div class="metric-value">±${us.propagatedUncertaintyPct}%</div>
+          <div style="font-size: 11px; color: #78716c;">95% confidence interval</div>
+        </div>
+        <div class="metric-card" style="flex: 1; text-align: center;">
+          <div class="metric-label">Result Range (95% CI)</div>
+          <div style="font-size: 18px; font-weight: 700;">${us.confidenceInterval95.lower} – ${us.confidenceInterval95.upper}</div>
+          <div style="font-size: 11px; color: #78716c;">kg CO₂e per functional unit</div>
+        </div>
+      </div>
+
+      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Sensitivity Analysis</h3>
+      <p style="font-size: 13px; color: #78716c; margin-bottom: 16px;">${escapeHtml(us.sensitivityAnalysis.method)}</p>
+      ${paramsHtml}
+
+      <div style="margin-top: 20px; padding: 16px; background: #fafaf9; border-radius: 8px; border: 1px solid #e7e5e4;">
+        <p style="font-size: 13px; line-height: 1.6; color: #44403c;">
+          <strong>Conclusion:</strong> ${escapeHtml(us.sensitivityAnalysis.conclusion)}
+        </p>
+      </div>
+
+      <div style="margin-top: 20px; padding: 12px 16px; background: #fffbeb; border-radius: 8px; border: 1px solid #fde68a;">
+        <p style="font-size: 12px; line-height: 1.5; color: #92400e;">
+          <strong>Methodology:</strong> Uncertainty propagation follows the root-sum-of-squares approach
+          for geometric standard deviation per Frischknecht et al. (2007), using the Pedigree Matrix
+          (Weidema &amp; Wesnæs, 1996) for data quality scoring. Sensitivity analysis applies ±20%
+          variation to emission factors of the top three contributors.
+        </p>
+      </div>
+
+      ${renderPageFooter(16)}
+    </div>`;
+}
+
+function renderCriticalReviewDisclosure(data: LCAReportData): string {
+  const cr = data.criticalReview;
+  if (!cr) return '';
+
+  // Additional notes from other compliance fields
+  const notes: string[] = [];
+  if (data.lulucNote) notes.push(data.lulucNote);
+  if (data.transportNote) notes.push(data.transportNote.method);
+  if (data.scopeMethodology) notes.push(data.scopeMethodology.note);
+
+  const zeroCategories = data.zeroImpactCategories || [];
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('15', 'Critical Review & Compliance Notes')}
+
+      <div style="padding: 20px; background: #fef3c7; border-radius: 8px; border: 1px solid #fde68a; margin-bottom: 24px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #92400e;">Critical Review Status: ${escapeHtml(cr.status.replace(/_/g, ' ').toUpperCase())}</h3>
+        <p style="font-size: 13px; line-height: 1.6; color: #78350f;">${escapeHtml(cr.disclosure)}</p>
+        <p style="font-size: 12px; line-height: 1.5; color: #92400e; margin-top: 12px;">
+          <strong>Recommendation:</strong> ${escapeHtml(cr.recommendation)}
+        </p>
+      </div>
+
+      ${zeroCategories.length > 0 ? `
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Zero-Impact Categories</h3>
+        <p style="font-size: 12px; color: #78716c; margin-bottom: 12px;">
+          The following environmental impact categories were assessed but report zero values. Justification per ISO 14044 §4.4.2.2:
+        </p>
+        <table class="data-table">
+          <thead><tr><th>Category</th><th>Reason</th></tr></thead>
+          <tbody>
+            ${zeroCategories.map(c => `
+              <tr>
+                <td style="font-weight: 500; white-space: nowrap;">${escapeHtml(c.category)}</td>
+                <td style="font-size: 12px;">${escapeHtml(c.reason)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : ''}
+
+      ${notes.length > 0 ? `
+        <h3 style="font-size: 16px; font-weight: 600; margin: 20px 0 12px;">Methodological Notes</h3>
+        ${notes.map(n => `
+          <div style="padding: 12px 16px; background: #fafaf9; border-radius: 6px; border: 1px solid #e7e5e4; margin-bottom: 10px;">
+            <p style="font-size: 12px; line-height: 1.5; color: #44403c;">${escapeHtml(n)}</p>
+          </div>
+        `).join('')}
+      ` : ''}
+
+      ${data.circularityMethodology ? `
+        <div style="margin-top: 16px; padding: 12px 16px; background: #f0f9ff; border-radius: 6px; border: 1px solid #bae6fd;">
+          <p style="font-size: 12px; line-height: 1.5; color: #0c4a6e;">
+            <strong>Circularity Score Disclaimer:</strong> ${escapeHtml(data.circularityMethodology.description)}
+          </p>
+        </div>
+      ` : ''}
+
+      ${renderPageFooter(17)}
+    </div>`;
+}
+
+// ============================================================================
 // SHARED ELEMENTS
 // ============================================================================
 
@@ -1022,8 +1210,12 @@ export function renderLcaReportHtml(data: LCAReportData): string {
     renderCircularityPage(data),
     renderLandUsePage(data),
     renderSupplyChainPage(data),
+    // ISO compliance additions
+    renderInterpretationPage(data),
+    renderUncertaintySensitivityPage(data),
+    renderCriticalReviewDisclosure(data),
     renderCommitmentPage(data),
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 
   return `<!DOCTYPE html>
 <html lang="en">

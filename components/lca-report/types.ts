@@ -197,6 +197,85 @@ export interface LCAReportData {
   commitment: {
     text: string;
   };
+
+  // ── ISO Compliance Additions ──────────────────────────────────────────
+
+  /** ISO 14044 §4.5 Interpretation chapter */
+  interpretation?: {
+    significant_issues: {
+      hotspots: Array<{ name: string; impact_kg_co2e: number; contribution_pct: number; category: string }>;
+      dominant_lifecycle_stage: string;
+      dominant_stage_pct: number;
+      dominant_scope: string;
+      dominant_scope_pct: number;
+      summary: string;
+    };
+    evaluation: {
+      completeness: { is_complete: boolean; coverage_pct: number; missing_stages: string[]; notes: string[] };
+      sensitivity: { has_analysis: boolean; highly_sensitive_count: number; max_sensitivity_ratio: number; conclusion: string };
+      consistency: { is_consistent: boolean; issues: string[]; notes: string[] };
+    };
+    conclusions: {
+      key_findings: string[];
+      limitations: string[];
+      recommendations: string[];
+      improvement_opportunities: string[];
+    };
+  };
+
+  /** ISO 14044 §4.5.3 Uncertainty and sensitivity analysis */
+  uncertaintySensitivity?: {
+    propagatedUncertaintyPct: number;
+    confidenceInterval95: { lower: string; upper: string };
+    sensitivityAnalysis: {
+      method: string;
+      parameters: Array<{
+        materialName: string;
+        baselineContributionPct: number;
+        variationPct: number;
+        resultRange: { lower: string; upper: string };
+        sensitivityRatio: number;
+        isHighlySensitive: boolean;
+      }>;
+      conclusion: string;
+    };
+  };
+
+  /** ISO 14044 §6 Critical review disclosure */
+  criticalReview?: {
+    status: string;
+    disclosure: string;
+    recommendation: string;
+  };
+
+  /** LULUC justification note */
+  lulucNote?: string;
+
+  /** Zero-impact categories with justification */
+  zeroImpactCategories?: Array<{ category: string; reason: string }>;
+
+  /** Scope 1/2/3 methodology note */
+  scopeMethodology?: {
+    standard: string;
+    attributionMethod: string;
+    note: string;
+  };
+
+  /** Transport emissions accounting note */
+  transportNote?: {
+    method: string;
+    totalTransportKgCo2e: number;
+    isEmbeddedInMaterials: boolean;
+    outboundIncluded: boolean;
+  };
+
+  /** Circularity methodology disclaimer */
+  circularityMethodology?: {
+    isProprietaryMetric: boolean;
+    methodName: string;
+    description: string;
+    reference: string;
+  };
 }
 
 export interface PageWrapperProps {
