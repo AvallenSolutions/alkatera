@@ -517,7 +517,7 @@ Deno.serve(async (req: Request) => {
         by_lifecycle_stage: {
           raw_materials: rawMaterialsEmissions,
           processing: processingEmissions,
-          packaging_stage: packagingEmissions,
+          packaging: packagingEmissions,
           distribution: distributionEmissions,
           use_phase: usePhaseEmissions,
           end_of_life: endOfLifeEmissions,

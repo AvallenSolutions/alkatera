@@ -14,7 +14,7 @@ export type SystemBoundary =
 export const ALL_LIFECYCLE_STAGES = [
   'raw_materials',
   'processing',
-  'packaging_stage',
+  'packaging',
   'distribution',
   'use_phase',
   'end_of_life',
@@ -36,21 +36,21 @@ export const SYSTEM_BOUNDARIES: SystemBoundaryDefinition[] = [
     label: 'Cradle-to-Gate',
     shortLabel: 'Gate',
     description: 'Raw materials through factory gate',
-    includedStages: ['raw_materials', 'processing', 'packaging_stage'],
+    includedStages: ['raw_materials', 'processing', 'packaging'],
   },
   {
     value: 'cradle-to-shelf',
     label: 'Cradle-to-Shelf',
     shortLabel: 'Shelf',
     description: 'Includes distribution to point of sale',
-    includedStages: ['raw_materials', 'processing', 'packaging_stage', 'distribution'],
+    includedStages: ['raw_materials', 'processing', 'packaging', 'distribution'],
   },
   {
     value: 'cradle-to-consumer',
     label: 'Cradle-to-Consumer',
     shortLabel: 'Consumer',
     description: 'Includes consumer use phase (refrigeration, carbonation)',
-    includedStages: ['raw_materials', 'processing', 'packaging_stage', 'distribution', 'use_phase'],
+    includedStages: ['raw_materials', 'processing', 'packaging', 'distribution', 'use_phase'],
   },
   {
     value: 'cradle-to-grave',
@@ -60,7 +60,7 @@ export const SYSTEM_BOUNDARIES: SystemBoundaryDefinition[] = [
     includedStages: [
       'raw_materials',
       'processing',
-      'packaging_stage',
+      'packaging',
       'distribution',
       'use_phase',
       'end_of_life',
@@ -74,7 +74,7 @@ export const SYSTEM_BOUNDARIES: SystemBoundaryDefinition[] = [
 export const STAGE_LABELS: Record<LifecycleStage, string> = {
   raw_materials: 'Raw Materials',
   processing: 'Processing',
-  packaging_stage: 'Packaging',
+  packaging: 'Packaging',
   distribution: 'Distribution',
   use_phase: 'Use Phase',
   end_of_life: 'End of Life',

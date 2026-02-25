@@ -222,7 +222,7 @@ describe('aggregateProductImpacts — Maturation Routing', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.impacts.breakdown.by_lifecycle_stage.packaging_stage).toBe(10);
+      expect(result.impacts.breakdown.by_lifecycle_stage.packaging).toBe(10);
     });
 
     it('should correctly separate all three material types in mixed product', async () => {
@@ -252,8 +252,8 @@ describe('aggregateProductImpacts — Maturation Routing', () => {
       // Regular ingredient → raw_materials
       expect(stages.raw_materials).toBeCloseTo(ingredientImpact, 1);
 
-      // Packaging → packaging_stage
-      expect(stages.packaging_stage).toBeCloseTo(packagingImpact, 1);
+      // Packaging → packaging
+      expect(stages.packaging).toBeCloseTo(packagingImpact, 1);
 
       // Maturation (barrel + warehouse) → processing
       expect(stages.processing).toBeCloseTo(barrelImpact + warehouseImpact, 1);

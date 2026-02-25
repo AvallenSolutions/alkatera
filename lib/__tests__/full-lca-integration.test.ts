@@ -370,7 +370,7 @@ describe('Scenario 4: Full cradle-to-grave beer', () => {
     // Raw materials > 0 (barley, hops, water)
     expect(stages.raw_materials).toBeGreaterThan(0);
     // Packaging > 0 (can + label)
-    expect(stages.packaging_stage).toBeGreaterThan(0);
+    expect(stages.packaging).toBeGreaterThan(0);
     // Use phase > 0 (refrigeration + carbonation)
     expect(stages.use_phase).toBeGreaterThan(0);
     // EoL: aluminium recycling credit → should be negative or small
@@ -456,7 +456,7 @@ describe('Scenario 5: All packaging, no ingredients', () => {
     );
 
     expect(result.impacts.breakdown.by_lifecycle_stage.raw_materials).toBe(0);
-    expect(result.impacts.breakdown.by_lifecycle_stage.packaging_stage).toBeGreaterThan(0);
+    expect(result.impacts.breakdown.by_lifecycle_stage.packaging).toBeGreaterThan(0);
   });
 
   it('EoL applies to all materials (all are packaging)', async () => {

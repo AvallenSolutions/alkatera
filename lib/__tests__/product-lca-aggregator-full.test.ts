@@ -268,7 +268,7 @@ describe('Product LCA Aggregator', () => {
       expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate + MALT.impact_transport, 4);
     });
 
-    it('packaging goes to packaging_stage', async () => {
+    it('packaging goes to packaging', async () => {
       setupFromMock([ALU_CAN]);
       const { aggregateProductImpacts } = await import('../product-lca-aggregator');
       const result = await aggregateProductImpacts(
@@ -279,8 +279,8 @@ describe('Product LCA Aggregator', () => {
       );
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
-      // packaging_stage includes climate + transport for packaging materials
-      expect(stages.packaging_stage).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
+      // packaging includes climate + transport for packaging materials
+      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
     });
 
     it('raw_materials and packaging are segregated correctly', async () => {
@@ -295,7 +295,7 @@ describe('Product LCA Aggregator', () => {
 
       const stages = result.impacts.breakdown.by_lifecycle_stage;
       expect(stages.raw_materials).toBeCloseTo(MALT.impact_climate + MALT.impact_transport, 4);
-      expect(stages.packaging_stage).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
+      expect(stages.packaging).toBeCloseTo(ALU_CAN.impact_climate + ALU_CAN.impact_transport, 4);
     });
 
     it('[Maturation] rows go to processing stage', async () => {

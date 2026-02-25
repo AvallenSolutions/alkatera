@@ -153,8 +153,11 @@ function runCompletenessCheck(
   const breakdown = aggregatedImpacts?.breakdown?.by_lifecycle_stage || {};
 
   const stages = LIFECYCLE_STAGES.map((stage) => {
-    const value = Number(breakdown[stage] || 0);
-    const hasData = value > 0;
+    // Look up by canonical key, falling back to legacy 'packaging_stage' alias
+    // for PCF records aggregated before the key was normalised.
+    const raw = breakdown[stage] ?? (stage === 'packaging' ? breakdown['packaging_stage'] : undefined);
+    const value = Number(raw || 0);
+    const hasData = value !== 0; // Negative values (e.g. EoL recycling credits) are valid data
     const missingFlags: string[] = [];
 
     if (!hasData) {

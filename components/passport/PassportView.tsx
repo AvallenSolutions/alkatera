@@ -56,7 +56,8 @@ interface PassportViewProps {
           by_lifecycle_stage?: {
             raw_materials?: number;
             processing?: number;
-            packaging_stage?: number;
+            packaging?: number;
+            packaging_stage?: number; // Legacy alias
             distribution?: number;
             use_phase?: number;
             end_of_life?: number;

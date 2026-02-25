@@ -342,13 +342,15 @@ export default function ProductLcaReportPage() {
   const hasFacilityData = hasOwnedFacilityData || hasContractMfgData || productionSitesCount > 0;
 
   // Lifecycle stage breakdowns (use real data)
-  const lifecycleStagesRaw = breakdown?.by_lifecycle_stage || {
-    raw_materials: 0,
-    processing: 0,
-    packaging_stage: 0,
-    distribution: 0,
-    use_phase: 0,
-    end_of_life: 0,
+  // Normalise: new records use 'packaging', legacy records use 'packaging_stage'
+  const rawStages = breakdown?.by_lifecycle_stage || {};
+  const lifecycleStagesRaw = {
+    raw_materials: Number(rawStages.raw_materials || 0),
+    processing: Number(rawStages.processing || 0),
+    packaging: Number(rawStages.packaging ?? rawStages.packaging_stage ?? 0),
+    distribution: Number(rawStages.distribution || 0),
+    use_phase: Number(rawStages.use_phase || 0),
+    end_of_life: Number(rawStages.end_of_life || 0),
   };
 
   // Filter out Use Phase and sort by size (descending)
@@ -359,7 +361,7 @@ export default function ProductLcaReportPage() {
       value: Number(value),
       label: key === 'raw_materials' ? 'Raw Materials' :
              key === 'processing' ? 'Processing' :
-             key === 'packaging_stage' ? 'Packaging' :
+             key === 'packaging' ? 'Packaging' :
              key === 'distribution' ? 'Distribution' :
              key === 'end_of_life' ? 'End of Life' : key
     }))

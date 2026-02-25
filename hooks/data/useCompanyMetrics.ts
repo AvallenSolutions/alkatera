@@ -50,7 +50,8 @@ function formatStageName(stage: string): string {
     'raw_materials': 'Raw Materials',
     'material_production': 'Material Production',
     'processing': 'Processing',
-    'packaging_stage': 'Packaging',
+    'packaging': 'Packaging',
+    'packaging_stage': 'Packaging', // Legacy alias
     'distribution': 'Distribution',
     'use_phase': 'Use Phase',
     'end_of_life': 'End of Life',

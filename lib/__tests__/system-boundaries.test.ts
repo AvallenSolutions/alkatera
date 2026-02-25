@@ -72,7 +72,7 @@ describe('System Boundaries', () => {
     it('includes all expected stages', () => {
       expect(ALL_LIFECYCLE_STAGES).toContain('raw_materials');
       expect(ALL_LIFECYCLE_STAGES).toContain('processing');
-      expect(ALL_LIFECYCLE_STAGES).toContain('packaging_stage');
+      expect(ALL_LIFECYCLE_STAGES).toContain('packaging');
       expect(ALL_LIFECYCLE_STAGES).toContain('distribution');
       expect(ALL_LIFECYCLE_STAGES).toContain('use_phase');
       expect(ALL_LIFECYCLE_STAGES).toContain('end_of_life');
@@ -95,11 +95,11 @@ describe('System Boundaries', () => {
 describe('Cradle-to-Gate boundary', () => {
   const boundary = 'cradle-to-gate';
 
-  it('includes raw_materials, processing, packaging_stage', () => {
+  it('includes raw_materials, processing, packaging', () => {
     const stages = getBoundaryIncludedStages(boundary);
     expect(stages).toContain('raw_materials');
     expect(stages).toContain('processing');
-    expect(stages).toContain('packaging_stage');
+    expect(stages).toContain('packaging');
   });
 
   it('excludes distribution, use_phase, end_of_life', () => {
@@ -125,7 +125,7 @@ describe('Cradle-to-Shelf boundary', () => {
     const stages = getBoundaryIncludedStages(boundary);
     expect(stages).toContain('raw_materials');
     expect(stages).toContain('processing');
-    expect(stages).toContain('packaging_stage');
+    expect(stages).toContain('packaging');
     expect(stages).toContain('distribution');
   });
 

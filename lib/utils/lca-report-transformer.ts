@@ -26,7 +26,8 @@ interface AggregatedImpacts {
   breakdown?: {
     by_lifecycle_stage?: {
       raw_materials?: number;
-      packaging_stage?: number;
+      packaging?: number;
+      packaging_stage?: number; // Legacy alias
       distribution?: number;
       processing?: number;
       use_phase?: number;
@@ -262,7 +263,7 @@ export function transformLCADataForReport(
   const landUse = impacts.land_use || 0;
 
   const rawMaterials = lifecycleStages.raw_materials || 0;
-  const packaging = lifecycleStages.packaging_stage || 0;
+  const packaging = lifecycleStages.packaging ?? lifecycleStages.packaging_stage ?? 0;
   const distribution = lifecycleStages.distribution || 0;
   const processing = lifecycleStages.processing || 0;
   const usePhase = lifecycleStages.use_phase || 0;

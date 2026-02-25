@@ -169,7 +169,7 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
 
     // Raw materials should be malt only
     const rawMats = breakdown?.by_lifecycle_stage?.raw_materials ?? 0;
-    const packaging = breakdown?.by_lifecycle_stage?.packaging_stage ?? 0;
+    const packaging = breakdown?.by_lifecycle_stage?.packaging ?? 0;
 
     // Malt: 0.450 climate + 0.010 transport (reclassified to raw_materials)
     expect(rawMats).toBeCloseTo(0.460, 3);
@@ -269,7 +269,7 @@ describe('Cradle-to-Grave LCA Aggregator', () => {
 
     // Raw materials and packaging should be positive (they have emissions)
     expect(stages!.raw_materials).toBeGreaterThan(0);
-    expect(stages!.packaging_stage).toBeGreaterThan(0);
+    expect(stages!.packaging).toBeGreaterThan(0);
 
     // Use phase should be positive (refrigeration for 7 days)
     expect(stages!.use_phase).toBeGreaterThan(0);

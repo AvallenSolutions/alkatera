@@ -48,7 +48,8 @@ export interface TransformInput {
         by_lifecycle_stage?: {
           raw_materials?: number;
           processing?: number;
-          packaging_stage?: number;
+          packaging?: number;
+          packaging_stage?: number; // Legacy alias
           distribution?: number;
           use_phase?: number;
           end_of_life?: number;
@@ -208,7 +209,7 @@ function buildCarbonBreakdown(lca: TransformInput['lca']): LCADataBreakdownItem[
   // Use by_lifecycle_stage (current structure) if available, fallback to by_category (legacy)
   if (byLifecycle) {
     const rawMaterials = Number(byLifecycle.raw_materials || 0);
-    const packaging = Number(byLifecycle.packaging_stage || 0);
+    const packaging = Number(byLifecycle.packaging ?? byLifecycle.packaging_stage ?? 0);
     const processing = Number(byLifecycle.processing || 0);
     const distribution = Number(byLifecycle.distribution || 0);
     const endOfLife = Number(byLifecycle.end_of_life || 0);

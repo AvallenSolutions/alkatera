@@ -64,7 +64,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
     }
 
     const rawMaterialsTotal = stages.raw_materials || 0;
-    const packagingTotal = stages.packaging_stage || 0;
+    const packagingTotal = stages.packaging ?? stages.packaging_stage ?? 0;
     const processingTotal = stages.processing || 0;
     const transportationTotal = stages.distribution || 0;
     const endOfLifeTotal = stages.end_of_life || 0;
