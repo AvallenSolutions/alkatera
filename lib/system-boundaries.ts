@@ -134,6 +134,13 @@ export function boundaryNeedsEndOfLife(boundary: string): boolean {
 }
 
 /**
+ * Whether the boundary requires distribution configuration
+ */
+export function boundaryNeedsDistribution(boundary: string): boolean {
+  return boundary === 'cradle-to-shelf' || boundary === 'cradle-to-consumer' || boundary === 'cradle-to-grave';
+}
+
+/**
  * Convert between DB enum format (underscores) and code format (hyphens)
  */
 export function boundaryToDbEnum(boundary: string): string {

@@ -34,6 +34,7 @@ const STEP_DEFINITIONS: Record<string, Omit<WizardStep, 'number' | 'id'>> = {
   'materials': { title: 'Materials', shortTitle: 'Materials', description: 'Verify emission data for all materials', estimatedMinutes: 1 },
   'facilities': { title: 'Facilities', shortTitle: 'Facilities', description: 'Assign production volumes', estimatedMinutes: 1 },
   'boundary': { title: 'System Boundary', shortTitle: 'Boundary', description: 'Define scope before running calculation', estimatedMinutes: 2 },
+  'distribution': { title: 'Distribution', shortTitle: 'Distribution', description: 'Configure outbound transport to point of sale', estimatedMinutes: 2 },
   'calculate': { title: 'Calculate', shortTitle: 'Calculate', description: 'Run the lifecycle assessment', estimatedMinutes: 2 },
   'goal': { title: 'Goal & Purpose', shortTitle: 'Goal', description: 'Define why this LCA is being conducted', estimatedMinutes: 2 },
   'use-phase': { title: 'Use Phase', shortTitle: 'Use', description: 'Configure consumer use parameters', estimatedMinutes: 2 },

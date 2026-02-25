@@ -3,7 +3,7 @@
  *
  * Tests the exported pure functions from WizardContext and WizardProgress:
  *   - Step ID ordering for all 4 system boundaries
- *   - Dynamic step insertion (use-phase, end-of-life)
+ *   - Dynamic step insertion (distribution, use-phase, end-of-life)
  *   - Guide step prepending
  *   - Total step counts
  *   - Time estimates alignment with step IDs
@@ -65,8 +65,9 @@ describe('getStepIdsForBoundary', () => {
       expect(boundaryIdx).toBeLessThan(calculateIdx);
     });
 
-    it('does NOT include use-phase or end-of-life', () => {
+    it('does NOT include distribution, use-phase or end-of-life', () => {
       const ids = getStepIdsForBoundary('cradle-to-gate');
+      expect(ids).not.toContain('distribution');
       expect(ids).not.toContain('use-phase');
       expect(ids).not.toContain('end-of-life');
     });
@@ -88,10 +89,15 @@ describe('getStepIdsForBoundary', () => {
     });
   });
 
-  describe('cradle-to-shelf (no dynamic steps)', () => {
-    it('returns exactly 10 step IDs (same as gate)', () => {
+  describe('cradle-to-shelf (adds distribution)', () => {
+    it('returns exactly 11 step IDs', () => {
       const ids = getStepIdsForBoundary('cradle-to-shelf');
-      expect(ids).toHaveLength(10);
+      expect(ids).toHaveLength(11);
+    });
+
+    it('includes distribution', () => {
+      const ids = getStepIdsForBoundary('cradle-to-shelf');
+      expect(ids).toContain('distribution');
     });
 
     it('does NOT include use-phase or end-of-life', () => {
@@ -99,16 +105,26 @@ describe('getStepIdsForBoundary', () => {
       expect(ids).not.toContain('use-phase');
       expect(ids).not.toContain('end-of-life');
     });
+
+    it('inserts distribution between boundary and calculate', () => {
+      const ids = getStepIdsForBoundary('cradle-to-shelf');
+      const boundaryIdx = ids.indexOf('boundary');
+      const distIdx = ids.indexOf('distribution');
+      const calculateIdx = ids.indexOf('calculate');
+      expect(distIdx).toBe(boundaryIdx + 1);
+      expect(calculateIdx).toBe(distIdx + 1);
+    });
   });
 
-  describe('cradle-to-consumer (adds use-phase)', () => {
-    it('returns 11 step IDs', () => {
+  describe('cradle-to-consumer (adds distribution and use-phase)', () => {
+    it('returns 12 step IDs', () => {
       const ids = getStepIdsForBoundary('cradle-to-consumer');
-      expect(ids).toHaveLength(11);
+      expect(ids).toHaveLength(12);
     });
 
-    it('includes use-phase', () => {
+    it('includes distribution and use-phase', () => {
       const ids = getStepIdsForBoundary('cradle-to-consumer');
+      expect(ids).toContain('distribution');
       expect(ids).toContain('use-phase');
     });
 
@@ -117,35 +133,40 @@ describe('getStepIdsForBoundary', () => {
       expect(ids).not.toContain('end-of-life');
     });
 
-    it('inserts use-phase between boundary and calculate', () => {
+    it('inserts distribution then use-phase between boundary and calculate', () => {
       const ids = getStepIdsForBoundary('cradle-to-consumer');
       const boundaryIdx = ids.indexOf('boundary');
+      const distIdx = ids.indexOf('distribution');
       const usePhaseIdx = ids.indexOf('use-phase');
       const calculateIdx = ids.indexOf('calculate');
-      expect(usePhaseIdx).toBe(boundaryIdx + 1);
+      expect(distIdx).toBe(boundaryIdx + 1);
+      expect(usePhaseIdx).toBe(distIdx + 1);
       expect(calculateIdx).toBe(usePhaseIdx + 1);
     });
   });
 
-  describe('cradle-to-grave (adds use-phase AND end-of-life)', () => {
-    it('returns 12 step IDs', () => {
+  describe('cradle-to-grave (adds distribution, use-phase AND end-of-life)', () => {
+    it('returns 13 step IDs', () => {
       const ids = getStepIdsForBoundary('cradle-to-grave');
-      expect(ids).toHaveLength(12);
+      expect(ids).toHaveLength(13);
     });
 
-    it('includes both use-phase and end-of-life', () => {
+    it('includes distribution, use-phase and end-of-life', () => {
       const ids = getStepIdsForBoundary('cradle-to-grave');
+      expect(ids).toContain('distribution');
       expect(ids).toContain('use-phase');
       expect(ids).toContain('end-of-life');
     });
 
-    it('inserts use-phase then end-of-life between boundary and calculate', () => {
+    it('inserts distribution, use-phase then end-of-life between boundary and calculate', () => {
       const ids = getStepIdsForBoundary('cradle-to-grave');
       const boundaryIdx = ids.indexOf('boundary');
+      const distIdx = ids.indexOf('distribution');
       const usePhaseIdx = ids.indexOf('use-phase');
       const eolIdx = ids.indexOf('end-of-life');
       const calculateIdx = ids.indexOf('calculate');
-      expect(usePhaseIdx).toBe(boundaryIdx + 1);
+      expect(distIdx).toBe(boundaryIdx + 1);
+      expect(usePhaseIdx).toBe(distIdx + 1);
       expect(eolIdx).toBe(usePhaseIdx + 1);
       expect(calculateIdx).toBe(eolIdx + 1);
     });
@@ -156,6 +177,7 @@ describe('getStepIdsForBoundary', () => {
         'materials',
         'facilities',
         'boundary',
+        'distribution',
         'use-phase',
         'end-of-life',
         'calculate',
@@ -197,16 +219,18 @@ describe('getStepIdsForBoundary', () => {
     it('prepends guide step for cradle-to-grave', () => {
       const ids = getStepIdsForBoundary('cradle-to-grave', true);
       expect(ids[0]).toBe('guide');
-      expect(ids).toHaveLength(13);
+      expect(ids).toHaveLength(14);
     });
 
-    it('still places use-phase/end-of-life after boundary', () => {
+    it('still places distribution/use-phase/end-of-life after boundary', () => {
       const ids = getStepIdsForBoundary('cradle-to-grave', true);
       const boundaryIdx = ids.indexOf('boundary');
+      const distIdx = ids.indexOf('distribution');
       const usePhaseIdx = ids.indexOf('use-phase');
       const eolIdx = ids.indexOf('end-of-life');
       const calculateIdx = ids.indexOf('calculate');
-      expect(usePhaseIdx).toBe(boundaryIdx + 1);
+      expect(distIdx).toBe(boundaryIdx + 1);
+      expect(usePhaseIdx).toBe(distIdx + 1);
       expect(eolIdx).toBe(usePhaseIdx + 1);
       expect(calculateIdx).toBe(eolIdx + 1);
     });
@@ -222,6 +246,7 @@ describe('getStepIdsForBoundary', () => {
     it('treats unknown boundary as cradle-to-gate', () => {
       const ids = getStepIdsForBoundary('some-unknown-value');
       expect(ids).toHaveLength(10);
+      expect(ids).not.toContain('distribution');
       expect(ids).not.toContain('use-phase');
       expect(ids).not.toContain('end-of-life');
     });
@@ -237,24 +262,24 @@ describe('getTotalSteps', () => {
     expect(getTotalSteps('cradle-to-gate')).toBe(10);
   });
 
-  it('returns 10 for cradle-to-shelf', () => {
-    expect(getTotalSteps('cradle-to-shelf')).toBe(10);
+  it('returns 11 for cradle-to-shelf', () => {
+    expect(getTotalSteps('cradle-to-shelf')).toBe(11);
   });
 
-  it('returns 11 for cradle-to-consumer', () => {
-    expect(getTotalSteps('cradle-to-consumer')).toBe(11);
+  it('returns 12 for cradle-to-consumer', () => {
+    expect(getTotalSteps('cradle-to-consumer')).toBe(12);
   });
 
-  it('returns 12 for cradle-to-grave', () => {
-    expect(getTotalSteps('cradle-to-grave')).toBe(12);
+  it('returns 13 for cradle-to-grave', () => {
+    expect(getTotalSteps('cradle-to-grave')).toBe(13);
   });
 
   it('returns 11 for cradle-to-gate with guide', () => {
     expect(getTotalSteps('cradle-to-gate', true)).toBe(11);
   });
 
-  it('returns 13 for cradle-to-grave with guide', () => {
-    expect(getTotalSteps('cradle-to-grave', true)).toBe(13);
+  it('returns 14 for cradle-to-grave with guide', () => {
+    expect(getTotalSteps('cradle-to-grave', true)).toBe(14);
   });
 
   it('matches getStepIdsForBoundary length for all boundaries', () => {
@@ -294,7 +319,7 @@ describe('getWizardSteps', () => {
   });
 
   it('step IDs match getStepIdsForBoundary output', () => {
-    const boundaries = ['cradle-to-gate', 'cradle-to-consumer', 'cradle-to-grave'];
+    const boundaries = ['cradle-to-gate', 'cradle-to-shelf', 'cradle-to-consumer', 'cradle-to-grave'];
     for (const boundary of boundaries) {
       const stepIds = getStepIdsForBoundary(boundary);
       const steps = getWizardSteps(boundary);
@@ -339,7 +364,7 @@ describe('Step ID integrity', () => {
 
   it('every step ID has a title in STEP_DEFINITIONS', () => {
     const allIds = new Set<string>();
-    const boundaries = ['cradle-to-gate', 'cradle-to-consumer', 'cradle-to-grave'];
+    const boundaries = ['cradle-to-gate', 'cradle-to-shelf', 'cradle-to-consumer', 'cradle-to-grave'];
     for (const boundary of boundaries) {
       for (const id of getStepIdsForBoundary(boundary, true)) {
         allIds.add(id);
@@ -396,18 +421,41 @@ describe('Wizard invariants', () => {
     }
   });
 
+  it('distribution always comes before use-phase when both present', () => {
+    const boundaries = ['cradle-to-consumer', 'cradle-to-grave'];
+    for (const boundary of boundaries) {
+      const ids = getStepIdsForBoundary(boundary);
+      expect(ids.indexOf('distribution')).toBeLessThan(ids.indexOf('use-phase'));
+    }
+  });
+
   it('use-phase always comes before end-of-life when both present', () => {
     const ids = getStepIdsForBoundary('cradle-to-grave');
     expect(ids.indexOf('use-phase')).toBeLessThan(ids.indexOf('end-of-life'));
+  });
+
+  it('distribution is always between boundary and calculate when present', () => {
+    const boundaries = ['cradle-to-shelf', 'cradle-to-consumer', 'cradle-to-grave'];
+    for (const boundary of boundaries) {
+      for (const showGuide of [false, true]) {
+        const ids = getStepIdsForBoundary(boundary, showGuide);
+        const distIdx = ids.indexOf('distribution');
+        expect(distIdx).toBeGreaterThan(ids.indexOf('boundary'));
+        expect(distIdx).toBeLessThan(ids.indexOf('calculate'));
+      }
+    }
   });
 
   it('dynamic steps are always between boundary and calculate', () => {
     const ids = getStepIdsForBoundary('cradle-to-grave', true);
     const boundaryIdx = ids.indexOf('boundary');
     const calculateIdx = ids.indexOf('calculate');
+    const distIdx = ids.indexOf('distribution');
     const usePhaseIdx = ids.indexOf('use-phase');
     const eolIdx = ids.indexOf('end-of-life');
 
+    expect(distIdx).toBeGreaterThan(boundaryIdx);
+    expect(distIdx).toBeLessThan(calculateIdx);
     expect(usePhaseIdx).toBeGreaterThan(boundaryIdx);
     expect(usePhaseIdx).toBeLessThan(calculateIdx);
     expect(eolIdx).toBeGreaterThan(boundaryIdx);

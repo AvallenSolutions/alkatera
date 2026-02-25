@@ -793,6 +793,7 @@ describe('calculateProductCarbonFootprint', () => {
         undefined,         // systemBoundary (not set in params)
         undefined,         // usePhaseConfig (not set in params)
         undefined,         // eolConfig (not set in params)
+        undefined,         // distributionConfig (not set in params)
       );
     });
 

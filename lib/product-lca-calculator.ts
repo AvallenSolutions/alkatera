@@ -29,6 +29,7 @@ export interface CalculatePCFParams {
   onProgress?: (step: string, percent: number) => void;
   usePhaseConfig?: import('./use-phase-factors').UsePhaseConfig;
   eolConfig?: import('./end-of-life-factors').EoLConfig;
+  distributionConfig?: import('./distribution-factors').DistributionConfig;
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -1157,7 +1158,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       collectedFacilityEmissions,
       systemBoundary,
       params.usePhaseConfig,
-      params.eolConfig
+      params.eolConfig,
+      params.distributionConfig
     );
 
     if (!aggregationResult.success) {

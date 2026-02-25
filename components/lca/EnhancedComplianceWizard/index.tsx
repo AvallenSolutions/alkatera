@@ -33,6 +33,7 @@ import { CalculationStep } from './steps/CalculationStep';
 import { GoalStep } from './steps/GoalStep';
 import { BoundaryStep } from './steps/BoundaryStep';
 import { UsePhaseStep } from './steps/UsePhaseStep';
+import { DistributionStep } from './steps/DistributionStep';
 import { EndOfLifeStep } from './steps/EndOfLifeStep';
 import { CutoffStep } from './steps/CutoffStep';
 import { DataQualityStep } from './steps/DataQualityStep';
@@ -67,6 +68,7 @@ const STEP_COMPONENT_MAP: Record<string, React.ComponentType> = {
   'calculate': CalculationStep,
   'goal': GoalStep,
   'boundary': BoundaryStep,
+  'distribution': DistributionStep,
   'use-phase': UsePhaseStep,
   'end-of-life': EndOfLifeStep,
   'cutoff': CutoffStep,
@@ -179,6 +181,13 @@ function WizardFooter() {
       !formData.dataQuality.technological_coverage.trim();
   } else if (currentStepId === 'review') {
     nextDisabled = saving || !formData.criticalReviewType;
+  } else if (currentStepId === 'distribution') {
+    // Require at least one valid leg with a transport mode and positive distance
+    const distConfig = formData.distributionConfig;
+    const hasValidLeg = distConfig?.legs?.some(
+      (leg) => leg.transportMode && leg.distanceKm > 0
+    );
+    nextDisabled = saving || !hasValidLeg;
   } else if (currentStepId === 'end-of-life') {
     // Validate EoL pathway percentages sum to 100
     const eolConfig = formData.eolConfig;

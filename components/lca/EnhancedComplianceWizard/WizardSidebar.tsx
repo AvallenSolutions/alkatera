@@ -113,6 +113,19 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
       { term: 'System Boundary', explanation: 'Defines which life cycle stages are included: from cradle-to-gate (manufacturing) through to cradle-to-grave (full lifecycle)' },
     ],
   },
+  'distribution': {
+    tips: [
+      'Select a scenario preset to auto-fill typical distribution routes',
+      'Add multiple transport legs for multi-stage distribution (e.g. factory to warehouse, then warehouse to retail)',
+      'Product weight is auto-calculated from your materials — adjust if the total shipped weight differs',
+      'Use Ship mode for intercontinental routes — using Truck overestimates emissions by ~6×',
+    ],
+    terms: [
+      { term: 'Distribution Leg', explanation: 'A single segment of the outbound transport chain, defined by transport mode (truck, train, ship, air) and distance' },
+      { term: 'Tonne-km', explanation: 'The standard unit for freight transport: weight (tonnes) multiplied by distance (km). Used with DEFRA emission factors to calculate transport CO₂e' },
+      { term: 'Outbound Distribution', explanation: 'Transport from the factory gate to the point of sale (shelf) or consumer. Distinct from inbound transport (supplier to factory), which is already included in raw material impacts' },
+    ],
+  },
   'use-phase': {
     tips: [
       'Defaults are auto-detected from your product category',

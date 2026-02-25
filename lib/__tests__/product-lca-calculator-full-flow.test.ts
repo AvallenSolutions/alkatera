@@ -481,6 +481,7 @@ describe('calculateProductCarbonFootprint', () => {
         'cradle-to-grave',
         undefined, // usePhaseConfig
         undefined, // eolConfig
+        undefined, // distributionConfig
       );
     });
 
@@ -512,6 +513,7 @@ describe('calculateProductCarbonFootprint', () => {
         'cradle-to-grave',
         usePhaseConfig,
         eolConfig,
+        undefined, // distributionConfig
       );
     });
   });

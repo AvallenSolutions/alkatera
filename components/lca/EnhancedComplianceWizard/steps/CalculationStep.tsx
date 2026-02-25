@@ -116,6 +116,7 @@ export function CalculationStep() {
           validAllocations.length > 0 ? validAllocations : undefined,
         usePhaseConfig: formData.usePhaseConfig,
         eolConfig: formData.eolConfig,
+        distributionConfig: formData.distributionConfig,
         onProgress: (step: string, percent: number) => {
           setPreCalcState((prev) => ({
             ...prev,

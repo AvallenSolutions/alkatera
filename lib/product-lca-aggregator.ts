@@ -13,6 +13,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
 import { calculateMaterialEoL, getMaterialFactorKey, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
+import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded } from './system-boundaries';
 import { IPCC_AR6_GWP } from './ghg-constants';
 
@@ -98,7 +99,8 @@ export async function aggregateProductImpacts(
   facilityEmissions?: FacilityEmissionsData[],
   systemBoundary?: string,
   usePhaseConfig?: UsePhaseConfig,
-  eolConfig?: EoLConfig
+  eolConfig?: EoLConfig,
+  distributionConfig?: DistributionConfig
 ): Promise<AggregationResult> {
   console.log(`[aggregateProductImpacts] Processing PCF: ${productCarbonFootprintId}`);
 
@@ -168,6 +170,11 @@ export async function aggregateProductImpacts(
     const msg = `[aggregateProductImpacts] ⚠️ BOUNDARY VALIDATION: System boundary is '${effectiveBoundary}' which includes end-of-life, but no eolConfig was provided. End-of-life emissions will be ZERO. Complete the End of Life step in the LCA wizard.`;
     console.warn(msg);
     calculationWarnings.push('End-of-life emissions are missing: boundary includes end-of-life but no configuration was provided. Run the LCA wizard and complete the End of Life step.');
+  }
+  if (isStageIncluded(effectiveBoundary, 'distribution') && !distributionConfig) {
+    const msg = `[aggregateProductImpacts] ⚠️ BOUNDARY VALIDATION: System boundary is '${effectiveBoundary}' which includes distribution, but no distributionConfig was provided. Distribution emissions will be ZERO. Complete the Distribution step in the LCA wizard.`;
+    console.warn(msg);
+    calculationWarnings.push('Distribution emissions are missing: boundary includes distribution but no configuration was provided. Run the LCA wizard and complete the Distribution step.');
   }
 
   // 7. Aggregate material impacts
@@ -384,6 +391,26 @@ export async function aggregateProductImpacts(
       console.log(`[aggregateProductImpacts] Use phase: ${useResult.total.toFixed(6)} kg CO2e (refrigeration: ${useResult.refrigeration.toFixed(6)}, carbonation: ${useResult.carbonation.toFixed(6)})`);
     } else {
       console.log('[aggregateProductImpacts] Use phase: skipped (no volume data)');
+    }
+  }
+
+  // 9a-bis. Distribution emissions (Cradle-to-Shelf, Cradle-to-Consumer, Cradle-to-Grave)
+  if (isStageIncluded(effectiveBoundary, 'distribution') && distributionConfig) {
+    try {
+      const distResult = await calculateDistributionEmissions(distributionConfig);
+      distributionEmissions = distResult.total;
+      scope3Emissions += distResult.total;
+      totalClimate += distResult.total;
+      totalClimateFossil += distResult.total; // Transport is fossil-fuel based
+      totalCO2Fossil += distResult.total;
+
+      console.log(`[aggregateProductImpacts] Distribution: ${distResult.total.toFixed(6)} kg CO2e (${distResult.perLeg.length} legs)`);
+      for (const leg of distResult.perLeg) {
+        console.log(`[aggregateProductImpacts]   Leg "${leg.label}": ${leg.emissions.toFixed(6)} kg CO2e (${leg.mode}, ${leg.distanceKm} km)`);
+      }
+    } catch (err: any) {
+      console.warn(`[aggregateProductImpacts] Distribution calculation failed: ${err.message}`);
+      calculationWarnings.push(`Distribution calculation failed: ${err.message}. Distribution emissions will be zero.`);
     }
   }
 

@@ -25,9 +25,10 @@ import type {
   MaterialWithValidation,
 } from './types';
 import { INITIAL_PRE_CALC_STATE } from './types';
-import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife } from '@/lib/system-boundaries';
+import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife, boundaryNeedsDistribution } from '@/lib/system-boundaries';
 import type { UsePhaseConfig } from '@/lib/use-phase-factors';
 import type { EoLConfig } from '@/lib/end-of-life-factors';
+import type { DistributionConfig } from '@/lib/distribution-factors';
 
 // ============================================================================
 // TYPES
@@ -60,6 +61,7 @@ export interface WizardFormData {
   criticalReviewJustification: string;
 
   // Conditional steps (appear based on boundary)
+  distributionConfig?: DistributionConfig;
   usePhaseConfig?: UsePhaseConfig;
   eolConfig?: EoLConfig;
 
@@ -156,6 +158,7 @@ const BASE_TOTAL_STEPS = 10;
 const GUIDE_STEP_TIME = 3;
 
 // Additional step times for conditional steps
+const DISTRIBUTION_STEP_TIME = 2;
 const USE_PHASE_STEP_TIME = 2;
 const EOL_STEP_TIME = 2;
 
@@ -199,6 +202,7 @@ const BASE_STEP_IDS = [
 export function getTotalSteps(boundary: string, showGuide: boolean = false): number {
   let total = BASE_TOTAL_STEPS;
   if (showGuide) total += 1;
+  if (boundaryNeedsDistribution(boundary)) total += 1;
   if (boundaryNeedsUsePhase(boundary)) total += 1;
   if (boundaryNeedsEndOfLife(boundary)) total += 1;
   return total;
@@ -215,14 +219,19 @@ export function getStepIdsForBoundary(boundary: string, showGuide: boolean = fal
   // 'boundary' index shifts by 1 when guide is present
   const boundaryIdx = ids.indexOf('boundary');
   const insertAt = boundaryIdx + 1;
+  // Insert in reverse order at the same index so the final ordering is:
+  // boundary → distribution → use-phase → end-of-life → calculate
   if (boundaryNeedsEndOfLife(boundary)) {
     ids.splice(insertAt, 0, 'end-of-life');
   }
   if (boundaryNeedsUsePhase(boundary)) {
     ids.splice(insertAt, 0, 'use-phase');
   }
+  if (boundaryNeedsDistribution(boundary)) {
+    ids.splice(insertAt, 0, 'distribution');
+  }
   return ids;
-  // Result for cradle-to-grave (with guide): guide, materials, facilities, boundary, use-phase, end-of-life, calculate, goal, ...
+  // Result for cradle-to-grave (with guide): guide, materials, facilities, boundary, distribution, use-phase, end-of-life, calculate, goal, ...
   // Result for cradle-to-gate (no guide):    materials, facilities, boundary, calculate, goal, ...
 }
 
@@ -237,11 +246,15 @@ function getStepTimeEstimates(boundary: string, showGuide: boolean = false): num
   const stepIds = showGuide ? ['guide', ...BASE_STEP_IDS] : [...BASE_STEP_IDS];
   const boundaryIdx = stepIds.indexOf('boundary');
   const insertAt = boundaryIdx + 1;
+  // Same reverse-order insertion as getStepIdsForBoundary
   if (boundaryNeedsEndOfLife(boundary)) {
     times.splice(insertAt, 0, EOL_STEP_TIME);
   }
   if (boundaryNeedsUsePhase(boundary)) {
     times.splice(insertAt, 0, USE_PHASE_STEP_TIME);
+  }
+  if (boundaryNeedsDistribution(boundary)) {
+    times.splice(insertAt, 0, DISTRIBUTION_STEP_TIME);
   }
   return times;
 }
@@ -496,7 +509,8 @@ export function WizardProvider({
           wizard_progress,
           product_name,
           use_phase_config,
-          eol_config
+          eol_config,
+          distribution_config
         `
         )
         .eq('id', id)
@@ -545,6 +559,7 @@ export function WizardProvider({
           criticalReviewType: pcf.critical_review_type || 'none',
           criticalReviewJustification:
             pcf.critical_review_justification || '',
+          distributionConfig: pcf.distribution_config || undefined,
           usePhaseConfig: pcf.use_phase_config || undefined,
           eolConfig: pcf.eol_config || undefined,
           referenceYear: pcf.reference_year || new Date().getFullYear(),
@@ -829,7 +844,10 @@ export function WizardProvider({
         updated_at: new Date().toISOString(),
       };
 
-      // Lifecycle columns added in migration 20260313 — include only when set
+      // Lifecycle columns added in migrations 20260313/20260325 — include only when set
+      if (formData.distributionConfig) {
+        updatePayload.distribution_config = formData.distributionConfig;
+      }
       if (formData.usePhaseConfig) {
         updatePayload.use_phase_config = formData.usePhaseConfig;
       }
