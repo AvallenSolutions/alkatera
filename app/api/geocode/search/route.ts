@@ -1,3 +1,8 @@
+/**
+ * @deprecated This Nominatim/OpenStreetMap geocoding route is deprecated.
+ * Use `/api/places/autocomplete` and `/api/places/details` (Google Places API) instead.
+ * Kept only for legacy compatibility with business travel `location-autocomplete.tsx`.
+ */
 import { NextRequest, NextResponse } from 'next/server';
 
 // Rate limiting - track requests per IP

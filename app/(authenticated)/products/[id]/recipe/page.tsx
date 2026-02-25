@@ -56,6 +56,7 @@ export default function ProductRecipePage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [productionFacilities, setProductionFacilities] = useState<ProductionFacility[]>([]);
+  const [totalLinkedFacilities, setTotalLinkedFacilities] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || "overview");
@@ -144,6 +145,9 @@ export default function ProductRecipePage() {
         .eq("assignment_status", "active");
 
       if (assignmentsData && assignmentsData.length > 0) {
+        // Track total linked facilities (before coordinate filtering)
+        setTotalLinkedFacilities(assignmentsData.filter((a: any) => a.facilities).length);
+
         const assignedFacilities = assignmentsData
           .filter((a: any) => a.facilities && a.facilities.address_lat && a.facilities.address_lng)
           .map((a: any) => {
@@ -1229,6 +1233,7 @@ export default function ProductRecipePage() {
                     index={index}
                     organizationId={currentOrganization?.id || ''}
                     productionFacilities={productionFacilities}
+                    totalLinkedFacilities={totalLinkedFacilities}
                     organizationLat={currentOrganization?.address_lat}
                     organizationLng={currentOrganization?.address_lng}
                     onUpdate={updateIngredient}
@@ -1303,6 +1308,7 @@ export default function ProductRecipePage() {
                     index={index}
                     organizationId={currentOrganization?.id || ''}
                     productionFacilities={productionFacilities}
+                    totalLinkedFacilities={totalLinkedFacilities}
                     organizationLat={currentOrganization?.address_lat}
                     organizationLng={currentOrganization?.address_lng}
                     onUpdate={updatePackaging}

@@ -761,7 +761,7 @@ export async function resolveImpactFactors(
   // If data_source_id is set, try direct ID lookup first (most reliable)
   let stagingFactor: any = null;
 
-  if (material.data_source_id && (material.data_source === 'staging' || material.data_source === 'defra')) {
+  if (material.data_source_id && (material.data_source === 'staging' || material.data_source === 'defra' || material.data_source === 'openlca')) {
     const { data: directMatch } = await supabase
       .from('staging_emission_factors')
       .select('*')
@@ -773,7 +773,7 @@ export async function resolveImpactFactors(
     }
   }
 
-  if (material.data_source_id && material.data_source === 'ecoinvent') {
+  if (material.data_source_id && (material.data_source === 'ecoinvent' || material.data_source === 'openlca')) {
     // Try ecoinvent_material_proxies by ID first
     const { data: directProxy } = await supabase
       .from('ecoinvent_material_proxies')

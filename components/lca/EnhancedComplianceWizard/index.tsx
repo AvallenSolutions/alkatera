@@ -417,7 +417,7 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
               </Card>
             </div>
 
-            {/* Sidebar with AI suggestions */}
+            {/* Sidebar with Rosa suggestions */}
             <div className="hidden lg:block">
               <WizardSidebar />
             </div>
@@ -440,7 +440,7 @@ function WizardLayout({ onClose }: { onClose?: () => void }) {
         </DrawerTrigger>
         <DrawerContent className="max-h-[80vh]">
           <DrawerHeader>
-            <DrawerTitle>AI Assistant</DrawerTitle>
+            <DrawerTitle>Rosa</DrawerTitle>
           </DrawerHeader>
           <div className="overflow-auto px-4 pb-6">
             <WizardSidebar />
@@ -537,14 +537,14 @@ export function EnhancedComplianceWizard({
 }
 
 // ============================================================================
-// AI ASSISTANCE BADGE
+// ROSA ASSISTANCE BADGE
 // ============================================================================
 
 export function AiAssistanceBadge() {
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
       <Sparkles className="h-3 w-3" />
-      <span>AI-Assisted</span>
+      <span>Rosa-Assisted</span>
     </div>
   );
 }

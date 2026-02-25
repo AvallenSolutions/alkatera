@@ -70,6 +70,14 @@ interface FacilityAssignment {
   // Computed from facility emissions
   allocated_emissions?: number;
   allocation_status: "pending" | "calculated" | "verified";
+  // LCA-derived allocation data (from PCF production sites / CM allocations)
+  lca_allocation?: {
+    allocated_emissions: number;
+    reporting_period_start: string;
+    reporting_period_end: string;
+    status: string;
+    attribution_ratio: number;
+  } | null;
 }
 
 const VOLUME_UNITS = [
@@ -147,10 +155,87 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
           reporting_session_id: a.reporting_session_id,
           allocation_status: a.production_volume ? "calculated" as const : "pending" as const,
         }));
-        setAssignments(assignmentsList);
+
+        // Load LCA-derived allocation data from PCF production sites & CM allocations
+        // This is where the LCA wizard stores actual allocation results
+        const facilityIds = assignmentsList.map((a: FacilityAssignment) => a.facility_id);
+
+        // Get all PCF IDs for this product
+        const { data: peiData } = await supabase
+          .from("product_carbon_footprints")
+          .select("id")
+          .eq("product_id", productId);
+
+        const peiIds = (peiData || []).map((p: any) => p.id);
+
+        // Build a map of facility_id → latest LCA allocation
+        const lcaAllocationMap: Record<string, FacilityAssignment["lca_allocation"]> = {};
+
+        if (peiIds.length > 0 && facilityIds.length > 0) {
+          // Owned facility production sites
+          const { data: prodSites } = await supabase
+            .from("product_carbon_footprint_production_sites")
+            .select("facility_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
+            .in("product_carbon_footprint_id", peiIds)
+            .in("facility_id", facilityIds)
+            .order("reporting_period_end", { ascending: false });
+
+          if (prodSites) {
+            for (const site of prodSites) {
+              if (!lcaAllocationMap[site.facility_id]) {
+                lcaAllocationMap[site.facility_id] = {
+                  allocated_emissions: site.allocated_emissions_kg_co2e || 0,
+                  reporting_period_start: site.reporting_period_start,
+                  reporting_period_end: site.reporting_period_end,
+                  status: site.status || "draft",
+                  attribution_ratio: site.attribution_ratio || 0,
+                };
+              }
+            }
+          }
+        }
+
+        // Contract manufacturer allocations
+        if (facilityIds.length > 0) {
+          const { data: cmAllocations } = await supabase
+            .from("contract_manufacturer_allocations")
+            .select("facility_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
+            .eq("product_id", productId)
+            .eq("organization_id", organizationId)
+            .in("facility_id", facilityIds)
+            .order("reporting_period_end", { ascending: false });
+
+          if (cmAllocations) {
+            for (const alloc of cmAllocations) {
+              if (!lcaAllocationMap[alloc.facility_id]) {
+                lcaAllocationMap[alloc.facility_id] = {
+                  allocated_emissions: alloc.allocated_emissions_kg_co2e || 0,
+                  reporting_period_start: alloc.reporting_period_start,
+                  reporting_period_end: alloc.reporting_period_end,
+                  status: alloc.status || "draft",
+                  attribution_ratio: alloc.attribution_ratio || 0,
+                };
+              }
+            }
+          }
+        }
+
+        // Merge LCA allocation data into assignments
+        const enrichedAssignments = assignmentsList.map((a) => {
+          const lcaAlloc = lcaAllocationMap[a.facility_id];
+          return {
+            ...a,
+            lca_allocation: lcaAlloc || null,
+            allocated_emissions: lcaAlloc?.allocated_emissions || a.allocated_emissions,
+            allocation_status: lcaAlloc
+              ? (lcaAlloc.status === "verified" ? "verified" as const : "calculated" as const)
+              : a.allocation_status,
+          };
+        });
+
+        setAssignments(enrichedAssignments);
 
         // Load reporting sessions for each assigned facility
-        const facilityIds = assignmentsList.map((a: FacilityAssignment) => a.facility_id);
         if (facilityIds.length > 0) {
           const { data: sessions } = await supabase
             .from("facility_reporting_sessions")
@@ -170,7 +255,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
             setReportingSessions(sessionsByFacility);
 
             // Load emission intensities for each session
-            await loadEmissionIntensities(assignmentsList, sessionsByFacility);
+            await loadEmissionIntensities(enrichedAssignments, sessionsByFacility);
           }
         }
       }
@@ -331,7 +416,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
     0
   );
 
-  const allHaveVolumes = assignments.every((a) => a.production_volume && a.production_volume > 0);
+  const allHaveVolumes = assignments.every((a) => (a.production_volume && a.production_volume > 0) || a.lca_allocation);
   const allVerified = assignments.every((a) => a.allocation_status === "verified");
 
   if (loading) {
@@ -575,20 +660,24 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
                           <p className="text-white font-medium">
                             {assignment.production_volume
                               ? `${assignment.production_volume.toLocaleString()} ${assignment.production_volume_unit}`
-                              : "—"}
+                              : assignment.lca_allocation?.attribution_ratio
+                                ? `${(assignment.lca_allocation.attribution_ratio * 100).toFixed(1)}% attribution`
+                                : "—"}
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-400">Period</p>
                           <p className="text-white font-medium">
-                            {assignment.reporting_session_id
-                              ? sessions.find((s) => s.id === assignment.reporting_session_id)
-                                ? `${new Date(
-                                    sessions.find((s) => s.id === assignment.reporting_session_id)!
-                                      .reporting_period_start
-                                  ).getFullYear()}`
-                                : "Selected"
-                              : "—"}
+                            {assignment.lca_allocation?.reporting_period_start
+                              ? `${new Date(assignment.lca_allocation.reporting_period_start).toLocaleDateString("en-GB", { month: "short", year: "numeric" })} – ${new Date(assignment.lca_allocation.reporting_period_end).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}`
+                              : assignment.reporting_session_id
+                                ? sessions.find((s) => s.id === assignment.reporting_session_id)
+                                  ? `${new Date(
+                                      sessions.find((s) => s.id === assignment.reporting_session_id)!
+                                        .reporting_period_start
+                                    ).getFullYear()}`
+                                  : "Selected"
+                                : "—"}
                           </p>
                         </div>
                         <div>
@@ -603,7 +692,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
                         </div>
                         <div>
                           <p className="text-slate-400">Status</p>
-                          {!assignment.production_volume ? (
+                          {!assignment.production_volume && !assignment.lca_allocation ? (
                             <Badge className="bg-amber-500/20 text-amber-300">Missing</Badge>
                           ) : assignment.allocation_status === "verified" ? (
                             <Badge className="bg-lime-500/20 text-lime-300">Verified</Badge>

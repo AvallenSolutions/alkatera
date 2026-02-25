@@ -24,7 +24,13 @@ export async function GET(request: NextRequest) {
     const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
     url.searchParams.append('input', input);
     url.searchParams.append('key', apiKey);
-    url.searchParams.append('types', '(cities)');
+
+    // Allow callers to specify types (e.g. '(cities)' for city-only search).
+    // Default: no type restriction — returns cities, addresses, establishments, etc.
+    const types = searchParams.get('types');
+    if (types) {
+      url.searchParams.append('types', types);
+    }
 
     const response = await fetch(url.toString());
     const data = await response.json();

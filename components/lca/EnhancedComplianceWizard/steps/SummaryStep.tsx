@@ -42,7 +42,7 @@ type GenerationStep =
 
 const STEP_LABELS: Record<GenerationStep, string> = {
   'fetching-data': 'Fetching LCA data...',
-  'generating-narratives': 'Generating AI narrative content...',
+  'generating-narratives': 'Rosa is generating narrative content...',
   'building-pdf': 'Building PDF report...',
   'complete': 'Report ready!',
 };
@@ -543,14 +543,14 @@ export function SummaryStep() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* AI Narrative Toggle */}
+            {/* Rosa Narrative Toggle */}
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
               <div className="flex items-start gap-3">
                 <Sparkles className="h-5 w-5 text-amber-500 mt-0.5" />
                 <div>
-                  <div className="font-medium text-sm">AI-Enhanced Narratives</div>
+                  <div className="font-medium text-sm">Rosa-Enhanced Narratives</div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    Generate executive summary, key findings, and recommendations using AI
+                    Generate executive summary, key findings, and recommendations using Rosa
                   </div>
                 </div>
               </div>

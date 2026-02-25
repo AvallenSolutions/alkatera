@@ -197,18 +197,18 @@ const STEP_HELP: Record<string, { tips: string[]; terms: TermExplanation[] }> = 
   'summary': {
     tips: [
       'Review all compliance fields before generating',
-      'Toggle AI narratives for richer reports',
+      'Toggle Rosa narratives for richer reports',
       'Download or regenerate your PDF at any time',
       'You can return to edit any step later',
     ],
     terms: [
-      { term: 'AI Narratives', explanation: 'AI-generated executive summary, key findings, and recommendations included in the PDF report' },
+      { term: 'Rosa Narratives', explanation: 'Rosa-generated executive summary, key findings, and recommendations included in the PDF report' },
     ],
   },
 };
 
 // ============================================================================
-// AI SUGGESTION CARD
+// ROSA SUGGESTION CARD
 // ============================================================================
 
 interface AiSuggestionCardProps {
@@ -233,7 +233,7 @@ function AiSuggestionCard({ suggestion, onApply, loading }: AiSuggestionCardProp
       <CardContent className="p-4">
         <div className="mb-3 flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-primary">AI Suggestion</span>
+          <span className="text-sm font-medium text-primary">Rosa Suggestion</span>
         </div>
 
         <p className="mb-3 text-sm leading-relaxed">{suggestion.suggestion}</p>
@@ -476,14 +476,14 @@ export function WizardSidebar() {
 
   return (
     <div className="space-y-4">
-      {/* AI Suggestions */}
+      {/* Rosa Suggestions */}
       {canGenerateSuggestion && (
         <Card className="border-primary/20">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Sparkles className="h-4 w-4 text-primary" />
-                AI Assistant
+                Rosa
               </CardTitle>
               <Button
                 variant="ghost"
@@ -514,7 +514,7 @@ export function WizardSidebar() {
             ) : (
               <div className="text-center">
                 <p className="mb-3 text-sm text-muted-foreground">
-                  Get AI-powered suggestions for this step
+                  Get Rosa's suggestions for this step
                 </p>
                 <Button
                   variant="outline"

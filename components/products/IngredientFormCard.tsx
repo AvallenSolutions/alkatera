@@ -59,6 +59,7 @@ interface IngredientFormCardProps {
   index: number;
   organizationId: string;
   productionFacilities: ProductionFacility[];
+  totalLinkedFacilities?: number;
   organizationLat?: number | null;
   organizationLng?: number | null;
   onUpdate: (tempId: string, updates: Partial<IngredientFormData>) => void;
@@ -71,6 +72,7 @@ export function IngredientFormCard({
   index,
   organizationId,
   productionFacilities,
+  totalLinkedFacilities = 0,
   organizationLat,
   organizationLng,
   onUpdate,
@@ -408,13 +410,22 @@ export function IngredientFormCard({
                       Automatically calculated from origin to your production facility
                     </p>
                   )}
-                  {productionFacilities.length === 0 && (
+                  {productionFacilities.length === 0 && totalLinkedFacilities > 0 && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      Your linked facilities don&apos;t have location coordinates.{' '}
+                      <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                        Update facility locations
+                      </Link>{' '}
+                      to enable automatic distance calculation.
+                    </p>
+                  )}
+                  {productionFacilities.length === 0 && totalLinkedFacilities === 0 && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                       No facilities linked.{' '}
-                      <Link href="/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                      <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
                         Add a facility with location
                       </Link>{' '}
-                      and link facilities to this product to enable automatic distance calculation.
+                      and link it to this product to enable automatic distance calculation.
                     </p>
                   )}
                 </div>

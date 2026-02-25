@@ -1,7 +1,10 @@
 /**
- * Geocoding Service using Nominatim (OpenStreetMap)
+ * @deprecated This Nominatim/OpenStreetMap geocoding service is deprecated.
+ * The main `LocationPicker` component now uses Google Places API via
+ * `/api/places/autocomplete` and `/api/places/details`.
+ * This service is kept only for legacy compatibility with business travel features.
  *
- * Features:
+ * Original features:
  * - Worldwide location search
  * - Automatic distance calculation using Haversine formula
  * - Intelligent caching (localStorage + memory)
