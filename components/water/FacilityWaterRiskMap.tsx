@@ -1,16 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import { useCallback, useMemo, useState } from 'react';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Droplets, AlertTriangle, MapPin, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { AlertTriangle, MapPin, Maximize2 } from 'lucide-react';
 import type { FacilityWaterSummary } from '@/hooks/data/useFacilityWaterData';
-
-import 'leaflet/dist/leaflet.css';
 
 interface FacilityWaterRiskMapProps {
   facilities: FacilityWaterSummary[];
@@ -21,76 +18,25 @@ interface FacilityWaterRiskMapProps {
   className?: string;
 }
 
-function MapBounds({ facilities }: { facilities: FacilityWaterSummary[] }) {
-  const map = useMap();
+/** Dark-mode map style */
+const DARK_MAP_STYLE: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a2e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8a8a9a" }] },
+  { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#2a2a3e" }] },
+  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2a2a3e" }] },
+  { featureType: "road", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0e1a2b" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#4a5568" }] },
+];
 
-  useEffect(() => {
-    const validFacilities = facilities.filter(f => f.latitude && f.longitude);
-    if (validFacilities.length === 0) return;
-
-    if (validFacilities.length === 1) {
-      map.setView([validFacilities[0].latitude!, validFacilities[0].longitude!], 10);
-    } else {
-      const bounds = L.latLngBounds(
-        validFacilities.map(f => [f.latitude!, f.longitude!])
-      );
-      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
-    }
-  }, [facilities, map]);
-
-  return null;
-}
-
-function createRiskIcon(riskLevel: 'high' | 'medium' | 'low', isSelected: boolean = false): L.DivIcon {
-  const colors = {
-    high: { bg: '#ef4444', border: '#dc2626' },
-    medium: { bg: '#f59e0b', border: '#d97706' },
-    low: { bg: '#22c55e', border: '#16a34a' },
-  };
-
-  const { bg, border } = colors[riskLevel];
-  const size = isSelected ? 40 : 32;
-  const borderWidth = isSelected ? 4 : 3;
-
-  const iconHtml = `
-    <div style="position: relative;">
-      <div style="
-        background-color: ${bg};
-        width: ${size}px;
-        height: ${size}px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: ${borderWidth}px solid ${isSelected ? 'white' : 'rgba(255, 255, 255, 0.9)'};
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3)${isSelected ? ', 0 0 0 3px ' + border : ''};
-        transition: all 0.2s ease;
-      ">
-        <svg
-          width="${size * 0.5}"
-          height="${size * 0.5}"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="white"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z" />
-          <path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97" />
-        </svg>
-      </div>
-    </div>
-  `;
-
-  return L.divIcon({
-    html: iconHtml,
-    className: '',
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    popupAnchor: [0, -size / 2],
-  });
-}
+const riskColors = {
+  high: "#ef4444",
+  medium: "#f59e0b",
+  low: "#22c55e",
+};
 
 function getRiskBadgeVariant(riskLevel: 'high' | 'medium' | 'low') {
   switch (riskLevel) {
@@ -112,6 +58,11 @@ export function FacilityWaterRiskMap({
   className,
 }: FacilityWaterRiskMapProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [activeInfoWindow, setActiveInfoWindow] = useState<string | null>(null);
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+  });
 
   const validFacilities = useMemo(() => {
     return facilities.filter(f => f.latitude && f.longitude);
@@ -125,7 +76,42 @@ export function FacilityWaterRiskMap({
     };
   }, [facilities]);
 
-  const defaultCenter: [number, number] = [51.5074, -0.1278];
+  const center = useMemo(() => {
+    if (validFacilities.length > 0) {
+      return { lat: validFacilities[0].latitude!, lng: validFacilities[0].longitude! };
+    }
+    return { lat: 51.5074, lng: -0.1278 };
+  }, [validFacilities]);
+
+  const mapOptions = useMemo((): google.maps.MapOptions => ({
+    styles: DARK_MAP_STYLE,
+    disableDefaultUI: true,
+    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    backgroundColor: "#0a0a0b",
+  }), []);
+
+  /** Fit map bounds to all facility markers */
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    if (validFacilities.length === 0) return;
+
+    if (validFacilities.length === 1) {
+      map.setCenter({ lat: validFacilities[0].latitude!, lng: validFacilities[0].longitude! });
+      map.setZoom(10);
+    } else {
+      const bounds = new google.maps.LatLngBounds();
+      validFacilities.forEach(f => {
+        bounds.extend({ lat: f.latitude!, lng: f.longitude! });
+      });
+      map.fitBounds(bounds, 50);
+      const listener = google.maps.event.addListener(map, 'idle', () => {
+        if ((map.getZoom() || 0) > 12) map.setZoom(12);
+        google.maps.event.removeListener(listener);
+      });
+    }
+  }, [validFacilities]);
 
   if (loading) {
     return (
@@ -200,83 +186,102 @@ export function FacilityWaterRiskMap({
       </CardHeader>
       <CardContent className="pt-0">
         <div className="rounded-lg overflow-hidden border" style={{ height: mapHeight }}>
-          <MapContainer
-            center={defaultCenter}
-            zoom={5}
-            style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom={true}
-            zoomControl={false}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapBounds facilities={validFacilities} />
+          {!isLoaded ? (
+            <div className="flex items-center justify-center h-full bg-muted/20">
+              <p className="text-sm text-muted-foreground">Loading map...</p>
+            </div>
+          ) : (
+            <GoogleMap
+              mapContainerStyle={{ width: '100%', height: '100%' }}
+              center={center}
+              zoom={5}
+              options={mapOptions}
+              onLoad={onMapLoad}
+              onClick={() => setActiveInfoWindow(null)}
+            >
+              {validFacilities.map((facility) => {
+                const isSelected = facility.facility_id === selectedFacilityId;
+                const markerId = `facility-${facility.facility_id}`;
 
-            {validFacilities.map((facility) => (
-              <Marker
-                key={facility.facility_id}
-                position={[facility.latitude!, facility.longitude!]}
-                icon={createRiskIcon(facility.risk_level, facility.facility_id === selectedFacilityId)}
-                eventHandlers={{
-                  click: () => onFacilityClick?.(facility),
-                }}
-              >
-                <Popup>
-                  <div className="min-w-[200px] p-1">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <h3 className="font-semibold text-sm">{facility.facility_name}</h3>
-                      <Badge variant="outline" className={`text-xs ${getRiskBadgeVariant(facility.risk_level)}`}>
-                        {facility.risk_level.charAt(0).toUpperCase() + facility.risk_level.slice(1)}
-                      </Badge>
-                    </div>
-
-                    <div className="text-xs text-muted-foreground mb-3">
-                      {facility.city && `${facility.city}, `}{facility.country}
-                    </div>
-
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Water Consumption:</span>
-                        <span className="font-medium">
-                          {facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">AWARE Factor:</span>
-                        <span className="font-medium">{facility.aware_factor.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Scarcity Impact:</span>
-                        <span className="font-medium">
-                          {facility.scarcity_weighted_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³ eq
-                        </span>
-                      </div>
-                      {facility.recycling_rate_percent > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Recycling Rate:</span>
-                          <span className="font-medium text-green-600">
-                            {facility.recycling_rate_percent.toFixed(1)}%
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {onFacilityClick && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full mt-3 h-7 text-xs"
-                        onClick={() => onFacilityClick(facility)}
+                return (
+                  <div key={facility.facility_id}>
+                    <Marker
+                      position={{ lat: facility.latitude!, lng: facility.longitude! }}
+                      icon={{
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: riskColors[facility.risk_level],
+                        fillOpacity: 1,
+                        strokeColor: "#ffffff",
+                        strokeWeight: isSelected ? 4 : 3,
+                        scale: isSelected ? 12 : 10,
+                      }}
+                      onClick={() => {
+                        setActiveInfoWindow(markerId);
+                        onFacilityClick?.(facility);
+                      }}
+                    />
+                    {activeInfoWindow === markerId && (
+                      <InfoWindow
+                        position={{ lat: facility.latitude!, lng: facility.longitude! }}
+                        onCloseClick={() => setActiveInfoWindow(null)}
                       >
-                        View Details
-                      </Button>
+                        <div className="min-w-[200px] p-1">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <h3 className="font-semibold text-sm text-slate-800">{facility.facility_name}</h3>
+                            <Badge variant="outline" className={`text-xs ${getRiskBadgeVariant(facility.risk_level)}`}>
+                              {facility.risk_level.charAt(0).toUpperCase() + facility.risk_level.slice(1)}
+                            </Badge>
+                          </div>
+
+                          <div className="text-xs text-slate-500 mb-3">
+                            {facility.city && `${facility.city}, `}{facility.country}
+                          </div>
+
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Water Consumption:</span>
+                              <span className="font-medium text-slate-700">
+                                {facility.total_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">AWARE Factor:</span>
+                              <span className="font-medium text-slate-700">{facility.aware_factor.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Scarcity Impact:</span>
+                              <span className="font-medium text-slate-700">
+                                {facility.scarcity_weighted_consumption_m3.toLocaleString('en-GB', { maximumFractionDigits: 0 })} m³ eq
+                              </span>
+                            </div>
+                            {facility.recycling_rate_percent > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Recycling Rate:</span>
+                                <span className="font-medium text-green-600">
+                                  {facility.recycling_rate_percent.toFixed(1)}%
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {onFacilityClick && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full mt-3 h-7 text-xs"
+                              onClick={() => onFacilityClick(facility)}
+                            >
+                              View Details
+                            </Button>
+                          )}
+                        </div>
+                      </InfoWindow>
                     )}
                   </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
+                );
+              })}
+            </GoogleMap>
+          )}
         </div>
 
         <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">

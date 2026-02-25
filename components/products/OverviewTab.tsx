@@ -244,7 +244,6 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Total GHG emissions by lifecycle stage"
           value={totalCarbon}
           unit="kg CO₂e"
-          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <SimpleBreakdownTable
             data={[
@@ -266,7 +265,6 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Water consumption and scarcity footprint"
           value={waterScarcity}
           unit="m³ world eq"
-          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -301,7 +299,6 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Material circularity and resource efficiency"
           value={circularityRate}
           unit="%"
-          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <div className="space-y-4">
             <div className="flex items-center gap-4">
@@ -342,7 +339,6 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
           summary="Land use and biodiversity impact"
           value={landUse}
           unit="m²a"
-          detailsLink={`/products/${product.id}/compliance-wizard`}
         >
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">

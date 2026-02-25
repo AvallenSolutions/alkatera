@@ -825,7 +825,10 @@ export function WizardProvider({
             ? formData.intendedAudience
             : null,
         is_comparative_assertion: formData.isComparativeAssertion,
-        functional_unit: formData.functionalUnit || null,
+        // Only update functional_unit when the user has actually entered a value.
+        // An empty string means the field was never edited — preserve the original
+        // value set during calculation to avoid NOT NULL constraint violations.
+        ...(formData.functionalUnit ? { functional_unit: formData.functionalUnit } : {}),
         system_boundary: formData.systemBoundary || null,
         lca_scope_type: formData.systemBoundary || null,
         cutoff_criteria: formData.cutoffCriteria || null,

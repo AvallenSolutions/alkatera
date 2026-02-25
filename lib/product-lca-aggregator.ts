@@ -562,7 +562,45 @@ export async function aggregateProductImpacts(
     }
   }
 
-  // 10. Build aggregated impacts object
+  // 10. Calculate circularity percentage from packaging recycled content.
+  //
+  // Simplified Material Circularity Index: weight-averaged recycled content
+  // across all packaging materials. This measures the "circular input" fraction
+  // — how much of the packaging mass comes from recycled feedstock.
+  //
+  // Formula: Σ(weight_i × recycled_content_i) / Σ(weight_i) for packaging materials
+  //
+  // This is a defensible simplification of the Ellen MacArthur MCI when only
+  // input-side data (recycled content %) is available. Output-side recyclability
+  // rates could be incorporated later for a full MCI score.
+  let circularityPercentage: number | null = null;
+  {
+    let totalPackagingWeight = 0;
+    let weightedRecycledContent = 0;
+
+    for (const material of materials as any[]) {
+      const matType = (material.material_type || '').toLowerCase();
+      if (matType !== 'packaging' && matType !== 'packaging_material') continue;
+
+      const weight = Number(material.quantity || 0);
+      const recycledPct = Number(material.recycled_content_percentage || 0);
+
+      totalPackagingWeight += weight;
+      weightedRecycledContent += weight * recycledPct;
+    }
+
+    if (totalPackagingWeight > 0) {
+      circularityPercentage = Math.round((weightedRecycledContent / totalPackagingWeight) * 10) / 10;
+      console.log(
+        `[aggregateProductImpacts] Circularity: ${circularityPercentage}% ` +
+        `(weight-averaged recycled content across ${totalPackagingWeight.toFixed(3)} kg packaging)`
+      );
+    } else {
+      console.log('[aggregateProductImpacts] Circularity: no packaging materials found, defaulting to null');
+    }
+  }
+
+  // 11. Build aggregated impacts object
   const aggregatedImpacts = {
     climate_change_gwp100: totalCarbonFootprint,
     water_consumption: totalWater,
@@ -572,11 +610,7 @@ export async function aggregateProductImpacts(
     freshwater_eutrophication: totalFreshwaterEutrophication,
     terrestrial_acidification: totalTerrestrialAcidification,
     fossil_resource_scarcity: totalFossilResourceScarcity,
-    // circularity_percentage is not yet calculated — set to null rather than
-    // a meaningless hardcoded value. Will require packaging recycled-content
-    // and recovery rate data to compute properly (ISO 14044 / Ellen MacArthur
-    // circularity index). TODO: implement when packaging data is richer.
-    circularity_percentage: null,
+    circularity_percentage: circularityPercentage,
 
     total_climate: totalClimate,
     total_climate_fossil: totalClimateFossil,
