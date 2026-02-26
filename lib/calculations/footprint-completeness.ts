@@ -170,10 +170,12 @@ export function calculateDataCompleteness(params: {
       key: 'use_phase',
       label: 'Use of Products',
       shortLabel: 'Use Phase',
-      hasData: (scope3Breakdown?.use_phase || 0) > 0,
+      // Use phase is auto-calculated. If products have data, use phase has been
+      // assessed too — a result of 0 is valid (e.g. still wine needs no refrigeration).
+      hasData: (scope3Breakdown?.use_phase || 0) > 0 || (scope3Breakdown?.products || 0) > 0,
       emissions: scope3Breakdown?.use_phase || 0,
-      isAutoCalculated: false,
-      isComingSoon: true,
+      isAutoCalculated: true,
+      isComingSoon: false,
       scope: 3,
     },
   ];

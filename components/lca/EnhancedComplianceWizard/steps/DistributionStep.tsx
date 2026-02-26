@@ -41,10 +41,61 @@ const TRANSPORT_MODES: { value: TransportMode; label: string }[] = [
 ];
 
 /**
- * Calculate total product weight from all materials.
- * Sums all material quantities, assuming they are in kg.
+ * Calculate total shipped product weight.
+ *
+ * Uses the product's declared liquid volume (unit_size_value / unit_size_unit)
+ * for the beverage weight (density ≈ 1.0 kg/L), then adds only packaging
+ * materials.  This avoids the old approach of summing raw ingredient inputs
+ * (grapes, water, sugar …) which overstates the shipped weight because raw
+ * agricultural inputs ≠ finished product weight.
+ *
+ * Falls back to summing all materials only when no product volume is available.
  */
-function getProductWeightKg(materials: any[]): number {
+function getProductWeightKg(
+  materials: any[],
+  product?: { unit_size_value?: number; unit_size_unit?: string } | null
+): number {
+  // 1. Liquid content weight from product volume (density ≈ 1.0 for beverages)
+  let liquidKg = 0;
+  if (product?.unit_size_value) {
+    const val = Number(product.unit_size_value);
+    const unit = (product.unit_size_unit || 'ml').toLowerCase();
+    if (unit === 'ml') {
+      liquidKg = val / 1000;
+    } else if (unit === 'l' || unit === 'litre' || unit === 'liter') {
+      liquidKg = val;
+    } else {
+      liquidKg = val / 1000; // default assume ml
+    }
+  }
+
+  // 2. Packaging materials weight
+  let packagingKg = 0;
+  for (const mat of materials || []) {
+    if (mat.material_type !== 'packaging') continue;
+    const qty = Number(mat.quantity || 0);
+    const unit = (mat.unit || 'kg').toLowerCase();
+    if (unit === 'g') {
+      packagingKg += qty / 1000;
+    } else if (unit === 'mg') {
+      packagingKg += qty / 1_000_000;
+    } else if (unit === 'tonne' || unit === 't') {
+      packagingKg += qty * 1000;
+    } else if (unit === 'ml') {
+      packagingKg += qty / 1000;
+    } else if (unit === 'l' || unit === 'litre' || unit === 'liter') {
+      packagingKg += qty;
+    } else {
+      packagingKg += qty; // default assume kg
+    }
+  }
+
+  // If we have a product volume, use liquid + packaging
+  if (liquidKg > 0) {
+    return Math.max(liquidKg + packagingKg, 0.001);
+  }
+
+  // Fallback: sum all materials (legacy behaviour for products without volume)
   if (!materials || materials.length === 0) return 1;
   let totalKg = 0;
   for (const mat of materials) {
@@ -57,14 +108,14 @@ function getProductWeightKg(materials: any[]): number {
     } else if (unit === 'tonne' || unit === 't') {
       totalKg += qty * 1000;
     } else if (unit === 'ml') {
-      totalKg += qty / 1000; // Approximate: 1 ml ≈ 1 g for liquids
+      totalKg += qty / 1000;
     } else if (unit === 'l' || unit === 'litre' || unit === 'liter') {
-      totalKg += qty; // Approximate: 1 L ≈ 1 kg for water-based beverages
+      totalKg += qty;
     } else {
-      totalKg += qty; // Default: assume kg
+      totalKg += qty;
     }
   }
-  return Math.max(totalKg, 0.001); // Minimum 1g to avoid division by zero
+  return Math.max(totalKg, 0.001);
 }
 
 // ============================================================================
@@ -81,11 +132,11 @@ export function DistributionStep() {
   // Auto-detect product weight on mount if no config exists
   useEffect(() => {
     if (!formData.distributionConfig) {
-      const weightKg = getProductWeightKg(preCalcState.materials || []);
+      const weightKg = getProductWeightKg(preCalcState.materials || [], preCalcState.product);
       const defaults = getDefaultDistributionConfig(weightKg);
       updateField('distributionConfig', defaults);
     }
-  }, [preCalcState.materials]);
+  }, [preCalcState.materials, preCalcState.product]);
 
   const config: DistributionConfig = formData.distributionConfig || {
     legs: [],

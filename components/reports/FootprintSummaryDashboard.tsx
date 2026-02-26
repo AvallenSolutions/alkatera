@@ -286,7 +286,8 @@ export function FootprintSummaryDashboard({
     // New categories
     if (scope3Breakdown?.upstream_transport && scope3Breakdown.upstream_transport > 0) completed += 1;
     if (scope3Breakdown?.downstream_transport && scope3Breakdown.downstream_transport > 0) completed += 1;
-    if (scope3Breakdown?.use_phase && scope3Breakdown.use_phase > 0) completed += 1;
+    // Use phase: if products have data, use phase has been assessed (0 is valid for still wines etc.)
+    if ((scope3Breakdown?.use_phase && scope3Breakdown.use_phase > 0) || (scope3Breakdown?.products && scope3Breakdown.products > 0)) completed += 1;
     return Math.round((completed / totalCategories) * 100);
   }, [operationsEmissions, fleetEmissions, scope3Breakdown]);
 

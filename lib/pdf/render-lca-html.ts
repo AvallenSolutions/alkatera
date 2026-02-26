@@ -1280,6 +1280,7 @@ export function renderLcaReportHtml(data: LCAReportData): string {
       display: flex;
       flex-direction: column;
       padding: 48px;
+      padding-bottom: 96px; /* Extra clearance for the absolute-positioned footer */
       overflow: hidden;
       page-break-after: always;
       break-after: page;
