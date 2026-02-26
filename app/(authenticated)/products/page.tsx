@@ -68,7 +68,8 @@ export default function ProductsPage() {
         .from("products")
         .select("*")
         .eq("organization_id", currentOrganization!.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(200);
 
       if (error) throw error;
 

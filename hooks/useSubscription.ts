@@ -4,6 +4,27 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 
+// ── Module-level cache for subscription_tier_limits (static reference data) ──
+let _cachedTiers: TierLimits[] | null = null;
+let _tiersCacheExpiry = 0;
+const TIERS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getCachedTierLimits(): Promise<TierLimits[]> {
+  if (_cachedTiers && Date.now() < _tiersCacheExpiry) {
+    return _cachedTiers;
+  }
+  const { data, error } = await supabase
+    .from("subscription_tier_limits")
+    .select("*")
+    .eq("is_active", true)
+    .order("tier_level");
+  if (!error && data) {
+    _cachedTiers = data as TierLimits[];
+    _tiersCacheExpiry = Date.now() + TIERS_CACHE_TTL_MS;
+  }
+  return (_cachedTiers || []) as TierLimits[];
+}
+
 export type FeatureCode =
   // Legacy codes (kept for backward compat)
   | "recipe_2016"
@@ -162,15 +183,13 @@ export function useSubscription() {
     }
 
     try {
-      const [usageResult, tiersResult] = await Promise.all([
+      // Tier limits are static reference data — use module-level cache.
+      // Only the per-org usage RPC needs to run on every org switch.
+      const [usageResult, tiers] = await Promise.all([
         supabase.rpc("get_organization_usage", {
           p_organization_id: currentOrganization.id,
         }),
-        supabase
-          .from("subscription_tier_limits")
-          .select("*")
-          .eq("is_active", true)
-          .order("tier_level"),
+        getCachedTierLimits(),
       ]);
 
       if (usageResult.error) {
@@ -185,7 +204,7 @@ export function useSubscription() {
 
       setState({
         usage: usageResult.data as OrganizationUsage,
-        allTiers: (tiersResult.data as TierLimits[]) || [],
+        allTiers: tiers,
         isLoading: false,
         error: null,
       });

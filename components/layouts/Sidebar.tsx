@@ -486,42 +486,39 @@ export function Sidebar({ className }: SidebarProps) {
     return true
   })
 
+  // Fetch admin status and pending approvals in parallel.
+  // No need for a separate getUser() call — the user is already in context.
+  // No need for an onAuthStateChange listener — org context handles re-renders.
   useEffect(() => {
-    async function checkAlkateraAdmin() {
+    if (!currentOrganization?.id) {
+      setIsAlkateraAdmin(false)
+      setPendingCount(0)
+      return
+    }
+
+    async function fetchSidebarData() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          setIsAlkateraAdmin(false)
-          return
+        const adminPromise = supabase.rpc('is_alkatera_admin')
+        const pendingPromise = isOrgAdmin
+          ? supabase.rpc('get_pending_approval_count')
+          : null
+
+        const [adminResult, pendingResult] = await Promise.all([
+          adminPromise,
+          ...(pendingPromise ? [pendingPromise] : []),
+        ])
+
+        setIsAlkateraAdmin(adminResult.data === true)
+        if (pendingResult) {
+          setPendingCount(pendingResult.data || 0)
         }
-        const { data } = await supabase.rpc('is_alkatera_admin')
-        setIsAlkateraAdmin(data === true)
-      } catch (err) {
-        console.error('Error checking admin status:', err)
+      } catch (err: any) {
+        console.error('Error fetching sidebar data:', err)
         setIsAlkateraAdmin(false)
       }
     }
-    checkAlkateraAdmin()
-
-    // Re-check when auth state changes (e.g. session switch, sign-out/sign-in)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      checkAlkateraAdmin()
-    })
-    return () => subscription.unsubscribe()
-  }, [currentOrganization?.id])
-
-  useEffect(() => {
-    async function fetchPendingCount() {
-      if (!isOrgAdmin || !currentOrganization?.id) return
-      try {
-        const { data } = await supabase.rpc('get_pending_approval_count')
-        setPendingCount(data || 0)
-      } catch (err) {
-        console.error('Error fetching pending count:', err)
-      }
-    }
-    fetchPendingCount()
-  }, [isOrgAdmin, currentOrganization?.id])
+    fetchSidebarData()
+  }, [currentOrganization?.id, isOrgAdmin])
 
   const isActive = (path: string) => {
     if (!pathname) return false

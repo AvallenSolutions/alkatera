@@ -89,17 +89,33 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     isFetchingRef.current = true
     setIsLoading(true)
     try {
-      // Use the supabase client directly - it already has the session from AuthProvider
-      const { data: memberships, error: membershipsError } = await supabase
-        .from('organization_members')
-        .select('organization_id, role_id')
-        .eq('user_id', user.id)
+      // ── Parallel Group 1: memberships (with role join) + advisor access ──
+      const [membershipsResult, advisorResult] = await Promise.all([
+        supabase
+          .from('organization_members')
+          .select('organization_id, role_id, roles!inner(name)')
+          .eq('user_id', user.id),
+        supabase
+          .from('advisor_organization_access')
+          .select('organization_id')
+          .eq('advisor_user_id', user.id)
+          .eq('is_active', true),
+      ])
 
-      console.log('📊 OrganizationContext: Memberships result:', { memberships, error: membershipsError })
+      const memberships = membershipsResult.data
+      const membershipsError = membershipsResult.error
+      const advisorAccess = advisorResult.data
+      const advisorError = advisorResult.error
+
+      console.log('📊 OrganizationContext: Parallel fetch complete', {
+        memberships: memberships?.length ?? 0,
+        advisorOrgs: advisorAccess?.length ?? 0,
+      })
 
       if (membershipsError) {
         console.error('❌ OrganizationContext: Error fetching memberships:', membershipsError)
         setIsLoading(false)
+        isFetchingRef.current = false
         return
       }
 
@@ -132,7 +148,6 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
             setCurrentOrganization(supplierOrg)
           }
           setUserRole('supplier')
-          console.log('✅ OrganizationContext: Supplier role set', ctx.organization_id ? `(org: ${ctx.organization_name})` : '(independent)')
           setIsLoading(false)
           isFetchingRef.current = false
           return
@@ -150,22 +165,8 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         }
       }
 
-      // Always check advisor access — advisors may also be members of their own org,
-      // so we must check regardless of whether memberships exist.
-      const { data: advisorAccess, error: advisorError } = await supabase
-        .from('advisor_organization_access')
-        .select('organization_id')
-        .eq('advisor_user_id', user.id)
-        .eq('is_active', true)
-
-      console.log('📊 OrganizationContext: Advisor access result:', { advisorAccess, error: advisorError })
-
       const advisorOrgIds = (!advisorError && advisorAccess) ? advisorAccess.map(a => a.organization_id) : []
       const memberOrgIds = memberships ? memberships.map(m => m.organization_id) : []
-
-      if (advisorOrgIds.length > 0) {
-        console.log('✅ OrganizationContext: Found advisor access to', advisorOrgIds.length, 'organization(s)')
-      }
 
       // Merge and deduplicate membership + advisor org IDs
       const allOrgIds = Array.from(new Set([...memberOrgIds, ...advisorOrgIds]))
@@ -178,15 +179,11 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         return
       }
 
-      const orgIds = allOrgIds
-
-      // Then fetch the organizations
+      // ── Group 2: Fetch org details (depends on merged IDs) ──
       const { data: orgs, error: orgsError } = await supabase
         .from('organizations')
         .select('*')
-        .in('id', orgIds)
-
-      console.log('🏢 OrganizationContext: Organizations result:', { orgs, error: orgsError })
+        .in('id', allOrgIds)
 
       if (orgsError) {
         console.error('❌ OrganizationContext: Error fetching organizations:', orgsError)
@@ -202,36 +199,25 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         const orgToSet = orgs.find((o: any) => o.id === currentOrgIdFromSession) || orgs[0]
         setCurrentOrganization(orgToSet)
-        console.log('✅ OrganizationContext: Set current organization:', orgToSet.name)
 
         if (orgToSet.id !== currentOrgIdFromSession) {
             console.log('🔧 OrganizationContext: Syncing session with default organization.')
             await supabase.auth.updateUser({ data: { current_organization_id: orgToSet.id } })
         }
 
-        // Set role based on whether user is a member or advisor for the CURRENT org.
-        // If user is a member of this org, use their membership role.
-        // If user only has advisor access to this org, set role to 'advisor'.
+        // Set role from the already-fetched membership data (includes role name via join).
+        // No separate roles query needed.
         const membership = memberships?.find((m: any) => m.organization_id === orgToSet.id)
         const isAdvisorForThisOrg = advisorOrgIds.includes(orgToSet.id)
 
         if (membership) {
-          // User is a regular member of this org — use their membership role
-          const { data: roleData } = await supabase
-            .from('roles')
-            .select('name')
-            .eq('id', membership.role_id)
-            .single()
-
-          setUserRole(roleData?.name || null)
-          console.log('👤 OrganizationContext: User role:', roleData?.name)
+          setUserRole((membership as any)?.roles?.name || null)
+          console.log('👤 OrganizationContext: User role:', (membership as any)?.roles?.name)
         } else if (isAdvisorForThisOrg) {
-          // User only has advisor access to this org
           setUserRole('advisor')
           console.log('👤 OrganizationContext: User role: advisor')
         } else {
           setUserRole(null)
-          console.log('👤 OrganizationContext: No role found for this org')
         }
       }
     } catch (error) {

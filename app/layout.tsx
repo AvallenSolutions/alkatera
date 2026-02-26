@@ -32,7 +32,7 @@ const playfairDisplay = Playfair_Display({
   variable: '--font-serif',
   display: 'swap',
   style: ['normal', 'italic'],
-  weight: ['400', '500', '600', '700', '800', '900'],
+  weight: ['400', '700'],
 });
 
 export const metadata: Metadata = {
