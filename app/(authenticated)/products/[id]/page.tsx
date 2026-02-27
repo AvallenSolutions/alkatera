@@ -19,9 +19,17 @@ import { RecipeEditorPanel } from "@/components/products/RecipeEditorPanel";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import dynamic from "next/dynamic";
 import PassportManagementPanel from "@/components/passport/PassportManagementPanel";
-import { ProductGuide, ProductGuideTrigger } from "@/components/products/ProductGuide";
+import { ProductGuideTrigger } from "@/components/products/ProductGuide";
 import { useProductData } from "@/hooks/data/useProductData";
+
+// Lazy-load ProductGuide — uses framer-motion (~60KB) and only shows
+// for users who haven't dismissed the guide.
+const ProductGuide = dynamic(
+  () => import("@/components/products/ProductGuide").then(mod => ({ default: mod.ProductGuide })),
+  { ssr: false }
+);
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
 import { toast } from "sonner";

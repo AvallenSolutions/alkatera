@@ -18,9 +18,15 @@ import { ArrowLeft, Save, Send, AlertTriangle, Loader2, Archive } from "lucide-r
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RichTextEditor } from "@/components/blog/RichTextEditor";
 import { ImageUpload } from "@/components/blog/ImageUpload";
+
+// Lazy-load Tiptap rich text editor (~90KB)
+const RichTextEditor = dynamic(
+  () => import("@/components/blog/RichTextEditor").then(mod => ({ default: mod.RichTextEditor })),
+  { ssr: false, loading: () => <Skeleton className="h-64 w-full rounded-xl" /> }
+);
 
 interface BlogPost {
   id: string;

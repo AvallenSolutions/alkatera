@@ -18,8 +18,15 @@ import { ArrowLeft, Save, Send, AlertTriangle, Loader2 } from "lucide-react";
 import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { RichTextEditor } from "@/components/blog/RichTextEditor";
+import dynamic from "next/dynamic";
 import { ImageUpload } from "@/components/blog/ImageUpload";
+
+// Lazy-load Tiptap rich text editor (~90KB) — only needed when user
+// starts editing content, not on initial page load.
+const RichTextEditor = dynamic(
+  () => import("@/components/blog/RichTextEditor").then(mod => ({ default: mod.RichTextEditor })),
+  { ssr: false, loading: () => <div className="h-64 w-full rounded-xl border bg-muted animate-pulse" /> }
+);
 
 interface BlogPostFormData {
   title: string;

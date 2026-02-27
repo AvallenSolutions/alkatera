@@ -492,23 +492,30 @@ export async function aggregateProductImpacts(
   totalCH4 = totalCH4Fossil + totalCH4Biogenic;
 
   // ISSUE A FIX: N₂O plausibility check (ISO 14067 §6.4.3).
-  // For agricultural products, typical N₂O emissions are 10⁻⁵ to 10⁻⁴ kg per kg product.
-  // Values exceeding 0.01 kg/kg are physically implausible and indicate a scaling error
-  // in the emission factor database (e.g. per-tonne factor applied as per-kg).
+  // Two checks:
+  // 1. Per-kg threshold: N₂O > 0.01 kg per kg product is physically implausible
+  //    (typical agricultural N₂O is 10⁻⁵ to 10⁻⁴ kg per kg product).
+  // 2. Proportion check: N₂O CO₂e > 30% of total climate impact is implausible
+  //    for beverage products (indicates scaling error in emission factor database).
   {
     const totalProductMass = (materials as any[]).reduce((sum: number, m: any) => sum + Number(m.quantity || 0), 0);
     if (totalN2O > 0 && totalProductMass > 0) {
       const n2oPerKgProduct = totalN2O / totalProductMass;
-      if (n2oPerKgProduct > 0.01) {
+      const n2oCo2eEstimate = totalN2O * IPCC_AR6_GWP.N2O;
+      const n2oProportionOfTotal = totalClimate > 0 ? (n2oCo2eEstimate / totalClimate) : 0;
+
+      if (n2oPerKgProduct > 0.01 || (n2oProportionOfTotal > 0.30 && totalClimate > 0)) {
         const cappedN2O = totalProductMass * 0.0001; // 10⁻⁴ kg N₂O/kg (high end of plausible)
+        const reason = n2oPerKgProduct > 0.01
+          ? `exceeds per-kg threshold (${n2oPerKgProduct.toExponential(3)} kg/kg > 0.01)`
+          : `N₂O CO₂e (${n2oCo2eEstimate.toFixed(4)} kg) is ${(n2oProportionOfTotal * 100).toFixed(0)}% of total (${totalClimate.toFixed(4)} kg)`;
         calculationWarnings.push(
-          `N₂O mass (${totalN2O.toExponential(3)} kg, ${n2oPerKgProduct.toExponential(3)} kg/kg product) ` +
-          `exceeds plausibility threshold (0.01 kg/kg). This likely indicates a scaling error in the ` +
-          `emission factor database. N₂O has been capped at ${cappedN2O.toExponential(3)} kg.`
+          `N₂O mass (${totalN2O.toExponential(3)} kg) ${reason}. ` +
+          `This likely indicates a scaling error in the emission factor database. ` +
+          `N₂O has been capped at ${cappedN2O.toExponential(3)} kg.`
         );
         console.warn(
-          `[aggregateProductImpacts] ⚠ N₂O plausibility: ${totalN2O.toExponential(3)} kg is ` +
-          `${n2oPerKgProduct.toExponential(3)} kg/kg product — physically implausible. ` +
+          `[aggregateProductImpacts] ⚠ N₂O plausibility: ${totalN2O.toExponential(3)} kg — ${reason}. ` +
           `Capping at ${cappedN2O.toExponential(3)} kg (10⁻⁴ kg/kg).`
         );
         totalN2O = cappedN2O;

@@ -10,7 +10,6 @@ import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useFacilityWaterData } from '@/hooks/data/useFacilityWaterData';
 import { useVitalityBenchmarks } from '@/hooks/data/useVitalityBenchmarks';
 import type { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
-import { DashboardCustomiseModal } from '@/components/dashboard/DashboardCustomiseModal';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,10 +29,11 @@ import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
 import { RAGStatusCard, RAGStatusCardGrid } from '@/components/dashboard/RAGStatusCard';
 import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
-import { DashboardGuide, DashboardGuideTrigger } from '@/components/dashboard/DashboardGuide';
+import { DashboardGuideTrigger } from '@/components/dashboard/DashboardGuide';
 import { SetupProgressBanner } from '@/components/dashboard/SetupProgressBanner';
 import { useSetupProgress } from '@/hooks/data/useSetupProgress';
 import { Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { InlineErrorBoundary } from '@/components/ErrorBoundary';
 
 import {
@@ -47,6 +47,18 @@ import {
   WaterRiskWidget,
   ComplianceStatusWidget,
 } from '@/components/dashboard/widgets';
+
+// Lazy-load heavy/conditional components to reduce initial bundle size.
+// DashboardGuide uses framer-motion (~60KB) and only shows for new users.
+// DashboardCustomiseModal only opens on button click.
+const DashboardGuide = dynamic(
+  () => import('@/components/dashboard/DashboardGuide').then(mod => ({ default: mod.DashboardGuide })),
+  { ssr: false }
+);
+const DashboardCustomiseModal = dynamic(
+  () => import('@/components/dashboard/DashboardCustomiseModal').then(mod => ({ default: mod.DashboardCustomiseModal })),
+  { ssr: false }
+);
 
 function DashboardSkeleton() {
   return (

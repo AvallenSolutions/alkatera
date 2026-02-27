@@ -19,12 +19,19 @@ import {
 } from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
 import { supabase } from "@/lib/supabaseClient";
+import dynamic from "next/dynamic";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { FleetOverviewCards } from "@/components/fleet/FleetOverviewCards";
 import { FleetVehicleRegistry } from "@/components/fleet/FleetVehicleRegistry";
 import { FleetActivityEntry } from "@/components/fleet/FleetActivityEntry";
-import { FleetEmissionsChart } from "@/components/fleet/FleetEmissionsChart";
 import { FleetActivityTable } from "@/components/fleet/FleetActivityTable";
+
+// Lazy-load chart component — pulls in recharts (~200KB) only when the
+// Analytics tab is viewed, not on initial fleet page load.
+const FleetEmissionsChart = dynamic(
+  () => import("@/components/fleet/FleetEmissionsChart").then(mod => ({ default: mod.FleetEmissionsChart })),
+  { ssr: false, loading: () => <Skeleton className="h-64 w-full rounded-xl" /> }
+);
 
 interface FleetSummary {
   totalVehicles: number;

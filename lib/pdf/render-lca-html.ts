@@ -1002,29 +1002,37 @@ function renderInterpretationPage(data: LCAReportData): string {
           `).join('')}
         </tbody>
       </table>`
-    : '<p style="font-size: 13px; color: #78716c;">No individual material exceeds the 5% significance threshold.</p>';
+    : '<p style="font-size: 12px; color: #78716c;">No individual material exceeds the 5% significance threshold.</p>';
 
   // ISSUE F FIX: Show footnote when hotspot contributions exceed 100% due to EoL credits.
   const hotspotSum = interp.significant_issues.hotspots.reduce((s, h) => s + h.contribution_pct, 0);
   const exceedsNote = hotspotSum > 100
-    ? `<p style="font-size: 11px; font-style: italic; color: #78716c; margin-top: 8px;">
+    ? `<p style="font-size: 10px; font-style: italic; color: #78716c; margin-top: 6px;">
         * Contributions sum to ${hotspotSum.toFixed(1)}% because end-of-life avoided-burden credits
         reduce the net total carbon footprint, against which individual percentages are calculated.
       </p>`
     : '';
 
-  return `
+  // Split across two pages when there are many bullet points to avoid footer overflow.
+  // Page 1: Significant issues, hotspots table, metric cards, key findings
+  // Page 2: Limitations and recommendations
+  const totalBullets = interp.conclusions.key_findings.length +
+    interp.conclusions.limitations.length +
+    interp.conclusions.recommendations.length;
+  const needsSplit = totalBullets > 8 || interp.significant_issues.hotspots.length > 3;
+
+  const page1 = `
     <div class="page light-page">
       ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)')}
 
-      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Significant Issues</h3>
-      <p style="font-size: 13px; line-height: 1.6; margin-bottom: 16px; color: #44403c;">
+      <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Significant Issues</h3>
+      <p style="font-size: 12px; line-height: 1.5; margin-bottom: 12px; color: #44403c;">
         ${escapeHtml(interp.significant_issues.summary)}
       </p>
       ${hotspotsHtml}
       ${exceedsNote}
 
-      <div style="display: flex; gap: 16px; margin: 20px 0;">
+      <div style="display: flex; gap: 16px; margin: 16px 0;">
         <div class="metric-card" style="flex: 1; text-align: center;">
           <div class="metric-label">Dominant Stage</div>
           <div style="font-size: 18px; font-weight: 700;">${escapeHtml(interp.significant_issues.dominant_lifecycle_stage)}</div>
@@ -1037,23 +1045,46 @@ function renderInterpretationPage(data: LCAReportData): string {
         </div>
       </div>
 
-      <h3 style="font-size: 16px; font-weight: 600; margin: 20px 0 12px;">Key Findings</h3>
-      <ul style="font-size: 13px; line-height: 1.6; color: #44403c; padding-left: 20px; margin-bottom: 16px;">
-        ${interp.conclusions.key_findings.map(f => `<li style="margin-bottom: 6px;">${escapeHtml(f)}</li>`).join('')}
+      <h3 style="font-size: 15px; font-weight: 600; margin: 16px 0 10px;">Key Findings</h3>
+      <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px; margin-bottom: 12px;">
+        ${interp.conclusions.key_findings.map(f => `<li style="margin-bottom: 4px;">${escapeHtml(f)}</li>`).join('')}
       </ul>
 
-      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Limitations</h3>
-      <ul style="font-size: 13px; line-height: 1.6; color: #44403c; padding-left: 20px; margin-bottom: 16px;">
-        ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 6px;">${escapeHtml(l)}</li>`).join('')}
-      </ul>
+      ${!needsSplit ? `
+        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Limitations</h3>
+        <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px; margin-bottom: 12px;">
+          ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 4px;">${escapeHtml(l)}</li>`).join('')}
+        </ul>
 
-      <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Recommendations</h3>
-      <ul style="font-size: 13px; line-height: 1.6; color: #44403c; padding-left: 20px;">
-        ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 6px;">${escapeHtml(r)}</li>`).join('')}
-      </ul>
+        <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Recommendations</h3>
+        <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px;">
+          ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 4px;">${escapeHtml(r)}</li>`).join('')}
+        </ul>
+      ` : ''}
 
       ${renderPageFooter(15)}
     </div>`;
+
+  if (!needsSplit) return page1;
+
+  const page2 = `
+    <div class="page light-page">
+      ${renderSectionHeader('13', 'Interpretation (ISO 14044 §4.5)', false, true)}
+
+      <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Limitations</h3>
+      <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px; margin-bottom: 16px;">
+        ${interp.conclusions.limitations.map(l => `<li style="margin-bottom: 4px;">${escapeHtml(l)}</li>`).join('')}
+      </ul>
+
+      <h3 style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Recommendations</h3>
+      <ul style="font-size: 12px; line-height: 1.5; color: #44403c; padding-left: 20px;">
+        ${interp.conclusions.recommendations.map(r => `<li style="margin-bottom: 4px;">${escapeHtml(r)}</li>`).join('')}
+      </ul>
+
+      ${renderPageFooter(16)}
+    </div>`;
+
+  return page1 + page2;
 }
 
 function renderUncertaintySensitivityPage(data: LCAReportData): string {
@@ -1128,7 +1159,12 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
 
   const zeroCategories = data.zeroImpactCategories || [];
 
-  return `
+  // Determine if we need a second page for methodological notes.
+  // Zero-impact categories table + critical review box take most of page 1;
+  // methodological notes and circularity disclaimer go on page 2 if present.
+  const hasOverflowContent = (notes.length > 0 || data.circularityMethodology) && zeroCategories.length > 3;
+
+  const page1 = `
     <div class="page light-page">
       ${renderSectionHeader('15', 'Critical Review & Compliance Notes')}
 
@@ -1158,8 +1194,35 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
         </table>
       ` : ''}
 
-      ${notes.length > 0 ? `
+      ${!hasOverflowContent && notes.length > 0 ? `
         <h3 style="font-size: 16px; font-weight: 600; margin: 20px 0 12px;">Methodological Notes</h3>
+        ${notes.map(n => `
+          <div style="padding: 12px 16px; background: #fafaf9; border-radius: 6px; border: 1px solid #e7e5e4; margin-bottom: 10px;">
+            <p style="font-size: 12px; line-height: 1.5; color: #44403c;">${escapeHtml(n)}</p>
+          </div>
+        `).join('')}
+      ` : ''}
+
+      ${!hasOverflowContent && data.circularityMethodology ? `
+        <div style="margin-top: 16px; padding: 12px 16px; background: #f0f9ff; border-radius: 6px; border: 1px solid #bae6fd;">
+          <p style="font-size: 12px; line-height: 1.5; color: #0c4a6e;">
+            <strong>Circularity Score Disclaimer:</strong> ${escapeHtml(data.circularityMethodology.description)}
+          </p>
+        </div>
+      ` : ''}
+
+      ${renderPageFooter(17)}
+    </div>`;
+
+  // If content overflows, put methodological notes on a continuation page
+  if (!hasOverflowContent) return page1;
+
+  const page2 = `
+    <div class="page light-page">
+      ${renderSectionHeader('15', 'Critical Review & Compliance Notes', false, true)}
+
+      ${notes.length > 0 ? `
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">Methodological Notes</h3>
         ${notes.map(n => `
           <div style="padding: 12px 16px; background: #fafaf9; border-radius: 6px; border: 1px solid #e7e5e4; margin-bottom: 10px;">
             <p style="font-size: 12px; line-height: 1.5; color: #44403c;">${escapeHtml(n)}</p>
@@ -1175,8 +1238,10 @@ function renderCriticalReviewDisclosure(data: LCAReportData): string {
         </div>
       ` : ''}
 
-      ${renderPageFooter(17)}
+      ${renderPageFooter(18)}
     </div>`;
+
+  return page1 + page2;
 }
 
 // ============================================================================
@@ -1198,16 +1263,22 @@ function renderSectionHeader(number: string, title: string, dark = false, contin
 // eliminating hardcoded page counts that become stale when pages are added/removed.
 function renderPageFooter(pageNumber?: number, dark = false): string {
   const color = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)';
+  const bgColor = dark ? '#1c1917' : '#f5f5f4';
   const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
+  // The footer uses a solid background that extends upward (padding-top: 24px) to
+  // cover any page content that might overflow into the footer zone. Combined with
+  // z-index: 10, this ensures the footer always sits cleanly on top of content.
   return `
-    <div style="position: absolute; bottom: 48px; left: 48px; right: 48px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'Fira Code', monospace; color: ${color}; text-transform: uppercase; letter-spacing: 3px; border-top: 1px solid ${color}; padding-top: 16px;">
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span>Generated by</span>
-        ${alkateraLogo(14, dark)}
+    <div style="position: absolute; bottom: 0; left: 0; right: 0; z-index: 10; background: ${bgColor}; padding: 0 48px 48px 48px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 9px; font-family: 'Fira Code', monospace; color: ${color}; text-transform: uppercase; letter-spacing: 3px; border-top: 1px solid ${color}; padding-top: 16px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span>Generated by</span>
+          ${alkateraLogo(14, dark)}
+        </div>
+        ${pageNumber ? `<div style="font-weight: 700; font-size: 12px;">__PAGE_NUM__</div>` : ''}
+        <div>ISO 14040/44 &amp; 14067 | ${dateStr}</div>
       </div>
-      ${pageNumber ? `<div style="font-weight: 700; font-size: 12px;">__PAGE_NUM__</div>` : ''}
-      <div>ISO 14040/44 &amp; 14067 | ${dateStr}</div>
     </div>`;
 }
 

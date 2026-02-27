@@ -33,7 +33,9 @@ import { fetchAssessmentWithClaims, deleteAssessment, getRiskLevelColor, getJuri
 import type { GreenwashAssessmentWithClaims, GreenwashAssessmentClaim } from "@/lib/types/greenwash";
 import { toast } from "sonner";
 import { PageLoader } from "@/components/ui/page-loader";
-import jsPDF from "jspdf";
+// jsPDF is dynamically imported in handleExportPDF() to avoid loading
+// the ~100KB library in the initial bundle. It's only needed when the
+// user clicks "Export PDF".
 
 export default function AssessmentReportPage() {
   const router = useRouter();
@@ -96,9 +98,10 @@ export default function AssessmentReportPage() {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!assessment) return;
 
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF();
     const pageWidth = pdf.internal.pageSize.getWidth();
     let yPos = 20;

@@ -536,26 +536,48 @@ export function transformLCADataForReport(
   const co2eContrib = ghgFull.co2e_contributions || {};
   const gasInv = ghgFull.gas_inventory || {};
 
-  const co2Fossil = co2eContrib.co2_fossil || ghgBreakdown.co2_fossil || impacts.climate_fossil || 0;
-  const co2Biogenic = co2eContrib.co2_biogenic || ghgBreakdown.co2_biogenic || impacts.climate_biogenic || 0;
-  const co2Dluc = impacts.climate_dluc || 0;
+  // CRITICAL: Use ?? (nullish coalescing) instead of || for all gas values.
+  // The aggregator can legitimately compute 0 for pure CO₂ species (e.g. when N₂O CO₂e
+  // exceeds the total fossil CO₂e). Using || treats 0 as falsy and falls through to the
+  // UN-decomposed carbon-origin totals (which include embedded CH₄/N₂O), causing
+  // double-counting and a species sum that exceeds the headline total.
+  const co2Fossil = co2eContrib.co2_fossil ?? ghgBreakdown.co2_fossil ?? impacts.climate_fossil ?? 0;
+  const co2Biogenic = co2eContrib.co2_biogenic ?? ghgBreakdown.co2_biogenic ?? impacts.climate_biogenic ?? 0;
+  const co2Dluc = impacts.climate_dluc ?? 0;
 
   // CH₄: read raw mass from gas_inventory, CO₂e from co2e_contributions
   // Fallback: compute from raw mass × GWP for backward compatibility with older records
-  const ch4FossilKg = gasInv.methane_fossil || sumMaterialImpact('ch4_fossil_kg');
-  const ch4FossilKgCo2e = co2eContrib.ch4_fossil_as_co2e || (ch4FossilKg * 29.8);
-  const ch4BiogenicKg = gasInv.methane_biogenic || sumMaterialImpact('ch4_biogenic_kg');
-  const ch4BiogenicKgCo2e = co2eContrib.ch4_biogenic_as_co2e || (ch4BiogenicKg * 27.0);
+  const ch4FossilKg = gasInv.methane_fossil ?? sumMaterialImpact('ch4_fossil_kg');
+  const ch4FossilKgCo2e = co2eContrib.ch4_fossil_as_co2e ?? (ch4FossilKg * 29.8);
+  const ch4BiogenicKg = gasInv.methane_biogenic ?? sumMaterialImpact('ch4_biogenic_kg');
+  const ch4BiogenicKgCo2e = co2eContrib.ch4_biogenic_as_co2e ?? (ch4BiogenicKg * 27.0);
 
   // N₂O: read raw mass from gas_inventory, CO₂e from co2e_contributions
-  const n2oKg = gasInv.nitrous_oxide || sumMaterialImpact('n2o_kg');
-  const n2oKgCo2e = co2eContrib.n2o_as_co2e || (n2oKg * 273);
+  const n2oKg = gasInv.nitrous_oxide ?? sumMaterialImpact('n2o_kg');
+  const n2oKgCo2e = co2eContrib.n2o_as_co2e ?? (n2oKg * 273);
 
-  const hfcPfc = co2eContrib.hfc_pfc || sumMaterialImpact('hfc_pfc_kg_co2e');
+  const hfcPfc = co2eContrib.hfc_pfc ?? sumMaterialImpact('hfc_pfc_kg_co2e');
 
-  // Total CH₄ and N₂O in CO₂e for the summary GHG breakdown table
-  const ch4Total = co2eContrib.ch4_as_co2e || (ch4FossilKgCo2e + ch4BiogenicKgCo2e);
-  const n2oTotal = co2eContrib.n2o_as_co2e || n2oKgCo2e;
+  // Final species-sum reconciliation for the GHG table (ISO 14067 §6.4.3):
+  // Ensure the species rows (CO₂ + CH₄ + N₂O + HFC) sum exactly to the headline total.
+  // If they don't match (due to rounding, capping, or data inconsistencies), scale all
+  // positive species proportionally so the table is internally consistent.
+  const speciesSum = co2Fossil + co2Biogenic + co2Dluc + ch4FossilKgCo2e + ch4BiogenicKgCo2e + n2oKgCo2e + hfcPfc;
+  const needsReconciliation = totalCarbon > 0 && speciesSum > 0 && Math.abs(speciesSum - totalCarbon) > 0.0005;
+  const reconScale = needsReconciliation ? (totalCarbon / speciesSum) : 1;
+
+  // Reconciled CO₂e values for the GHG species table
+  const rCo2Fossil = co2Fossil * reconScale;
+  const rCo2Biogenic = co2Biogenic * reconScale;
+  const rCo2Dluc = co2Dluc * reconScale;
+  const rCh4FossilKgCo2e = ch4FossilKgCo2e * reconScale;
+  const rCh4BiogenicKgCo2e = ch4BiogenicKgCo2e * reconScale;
+  const rN2oKgCo2e = n2oKgCo2e * reconScale;
+  const rHfcPfc = hfcPfc * reconScale;
+  // Scale raw masses to stay consistent with their CO₂e values
+  const rCh4FossilKg = ch4FossilKg * reconScale;
+  const rCh4BiogenicKg = ch4BiogenicKg * reconScale;
+  const rN2oKg = n2oKg * reconScale;
 
   // Determine GWP method from materials
   const gwpMethod = materials[0]?.gwp_method || 'IPCC AR6 GWP-100';
@@ -851,10 +873,10 @@ export function transformLCADataForReport(
       ],
       methodology: {
         ghgBreakdown: [
-          { label: "CO\u2082 Fossil", value: co2Fossil.toFixed(4), unit: "kg CO\u2082e", gwp: "1" },
-          { label: "CO\u2082 Biogenic", value: co2Biogenic.toFixed(4), unit: "kg CO\u2082e", gwp: "1*" },
-          { label: "CH\u2084", value: ch4Total.toFixed(4), unit: "kg CO\u2082e", gwp: "29.8 / 27.0" },
-          { label: "N\u2082O", value: n2oTotal.toFixed(4), unit: "kg CO\u2082e", gwp: "273" }
+          { label: "CO\u2082 Fossil", value: rCo2Fossil.toFixed(4), unit: "kg CO\u2082e", gwp: "1" },
+          { label: "CO\u2082 Biogenic", value: rCo2Biogenic.toFixed(4), unit: "kg CO\u2082e", gwp: "1*" },
+          { label: "CH\u2084", value: (rCh4FossilKgCo2e + rCh4BiogenicKgCo2e).toFixed(4), unit: "kg CO\u2082e", gwp: "29.8 / 27.0" },
+          { label: "N\u2082O", value: rN2oKgCo2e.toFixed(4), unit: "kg CO\u2082e", gwp: "273" }
         ],
         standards: [
           "ISO 14067:2018 — Greenhouse gases — Carbon footprint of products",
@@ -866,16 +888,16 @@ export function transformLCADataForReport(
     },
     ghgDetailed: {
       totalGwp100: totalCarbon.toFixed(4),
-      fossilCo2: co2Fossil.toFixed(4),
-      biogenicCo2: co2Biogenic.toFixed(4),
-      dlucCo2: co2Dluc.toFixed(4),
-      ch4Fossil: ch4FossilKg.toExponential(3),
-      ch4FossilKgCo2e: ch4FossilKgCo2e.toFixed(4),
-      ch4Biogenic: ch4BiogenicKg.toExponential(3),
-      ch4BiogenicKgCo2e: ch4BiogenicKgCo2e.toFixed(4),
-      n2o: n2oKg.toExponential(3),
-      n2oKgCo2e: n2oKgCo2e.toFixed(4),
-      hfcPfc: hfcPfc.toFixed(4),
+      fossilCo2: rCo2Fossil.toFixed(4),
+      biogenicCo2: rCo2Biogenic.toFixed(4),
+      dlucCo2: rCo2Dluc.toFixed(4),
+      ch4Fossil: rCh4FossilKg.toExponential(3),
+      ch4FossilKgCo2e: rCh4FossilKgCo2e.toFixed(4),
+      ch4Biogenic: rCh4BiogenicKg.toExponential(3),
+      ch4BiogenicKgCo2e: rCh4BiogenicKgCo2e.toFixed(4),
+      n2o: rN2oKg.toExponential(3),
+      n2oKgCo2e: rN2oKgCo2e.toFixed(4),
+      hfcPfc: rHfcPfc.toFixed(4),
       gwpMethod,
       gwpFactors: [
         { gas: 'CO\u2082 (fossil)', gwp100: '1', source: 'IPCC AR6 (2021)' },

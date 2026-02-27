@@ -74,8 +74,15 @@ import type {
   RosaNavigatePayload,
   RosaUserContext,
 } from '@/lib/types/gaia';
-import { RosaChartRenderer } from './GaiaChartRenderer';
+import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+
+// Lazy-load chart renderer — pulls in recharts (~200KB) only when the AI
+// response contains a chart, not on initial Gaia chat page load.
+const RosaChartRenderer = dynamic(
+  () => import('./GaiaChartRenderer').then(mod => ({ default: mod.RosaChartRenderer })),
+  { ssr: false }
+);
 import Image from 'next/image';
 
 // Helper function to render message content with images

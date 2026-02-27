@@ -51,59 +51,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    async function getInitialSession() {
-      try {
-        console.log('🔐 AuthProvider: Fetching initial session...')
+    // Performance fix: Use ONLY onAuthStateChange for initialisation.
+    // Previously, getInitialSession() AND onAuthStateChange(INITIAL_SESSION) both
+    // fired on mount, causing two full React render cycles of the entire provider
+    // subtree (Auth → Organization → Subscription → AppLayout → page).
+    // onAuthStateChange fires INITIAL_SESSION synchronously on setup, so we get
+    // the session in a single render pass.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      if (!mounted) return
 
-        const {
-          data: { session: initialSession },
-          error,
-        } = await supabase.auth.getSession()
-
-        if (error) {
-          console.error('❌ AuthProvider: Error fetching session:', error.message)
-          throw error
-        }
-
-        if (!mounted) return
-
-        if (initialSession) {
+      if (event === 'INITIAL_SESSION') {
+        // Single-pass initialisation — replaces the old getInitialSession() call
+        if (currentSession) {
           console.log('✅ AuthProvider: Session found', {
-            userId: initialSession.user.id,
-            email: initialSession.user.email,
+            userId: currentSession.user.id,
+            email: currentSession.user.email,
           })
-          currentUserIdRef.current = initialSession.user.id
-          setSession(initialSession)
-          setUser(initialSession.user)
+          currentUserIdRef.current = currentSession.user.id
+          setSession(currentSession)
+          setUser(currentSession.user)
         } else {
           console.log('ℹ️ AuthProvider: No active session')
           currentUserIdRef.current = null
           setSession(null)
           setUser(null)
         }
-      } catch (error) {
-        console.error('❌ AuthProvider: Fatal error during initialization:', error)
-        if (mounted) {
-          setSession(null)
-          setUser(null)
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    getInitialSession()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('🔐 AuthProvider: Auth state changed:', event)
-
-      if (!mounted) return
-
-      if (event === 'SIGNED_IN' && currentSession) {
+        setLoading(false)
+      } else if (event === 'SIGNED_IN' && currentSession) {
         console.log('✅ User signed in:', currentSession.user.email)
         const userChanged = updateUserIfChanged(currentSession.user, currentSession)
         setLoading(false)
