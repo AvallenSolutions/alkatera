@@ -91,27 +91,23 @@ export function InviteSupplierModal({
         throw new Error("Not authenticated");
       }
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/invite-supplier`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            productId,
-            materialId,
-            materialName,
-            materialType,
-            supplierEmail: supplierEmail.toLowerCase().trim(),
-            contactPersonName: contactPersonName.trim() || undefined,
-            supplierName: supplierName.trim() || undefined,
-            personalMessage: personalMessage.trim() || undefined,
-          }),
-        }
-      );
+      const response = await fetch('/api/invite-supplier', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          productId,
+          materialId,
+          materialName,
+          materialType,
+          supplierEmail: supplierEmail.toLowerCase().trim(),
+          contactPersonName: contactPersonName.trim() || undefined,
+          supplierName: supplierName.trim() || undefined,
+          personalMessage: personalMessage.trim() || undefined,
+        }),
+      });
 
       const result = await response.json();
 

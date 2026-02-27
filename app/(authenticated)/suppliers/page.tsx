@@ -295,23 +295,19 @@ export default function SuppliersPage() {
         throw new Error('Not authenticated');
       }
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/invite-supplier`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            supplierEmail: inviteEmail.toLowerCase().trim(),
-            contactPersonName: inviteContactName.trim() || undefined,
-            supplierName: inviteCompanyName.trim() || undefined,
-            personalMessage: inviteMessage.trim() || undefined,
-          }),
-        }
-      );
+      const response = await fetch('/api/invite-supplier', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          supplierEmail: inviteEmail.toLowerCase().trim(),
+          contactPersonName: inviteContactName.trim() || undefined,
+          supplierName: inviteCompanyName.trim() || undefined,
+          personalMessage: inviteMessage.trim() || undefined,
+        }),
+      });
 
       const result = await response.json();
 
