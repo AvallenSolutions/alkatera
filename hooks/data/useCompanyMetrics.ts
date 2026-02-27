@@ -335,7 +335,55 @@ export function useCompanyMetrics(year?: number) {
       }
 
       // Attach production volume to each LCA
-      // Priority: production_logs > product_carbon_footprint_production_sites > 1 unit fallback
+      // Priority: production_logs > product_carbon_footprint_production_sites > contract_manufacturer_allocations > 1 unit fallback
+      //
+      // Performance: Batch-fetch all fallback data in 2 queries instead of 2 per LCA (N+1 fix).
+      const lcasNeedingFallback = lcas.filter(
+        lca => !(productionMap.get(String(lca.product_id)) || 0)
+      );
+
+      let prodSitesMap = new Map<string, number>(); // lcaId -> max production_volume
+      let cmAllocsMap = new Map<string, number>();  // productId -> max client_production_volume
+
+      if (lcasNeedingFallback.length > 0) {
+        const fallbackLcaIds = lcasNeedingFallback.map(lca => lca.id).filter(Boolean);
+        const fallbackProductIds = lcasNeedingFallback.map(lca => lca.product_id).filter(Boolean);
+
+        const [prodSitesResult, cmAllocsResult] = await Promise.allSettled([
+          fallbackLcaIds.length > 0
+            ? supabase
+                .from('product_carbon_footprint_production_sites')
+                .select('product_carbon_footprint_id, production_volume')
+                .in('product_carbon_footprint_id', fallbackLcaIds)
+            : Promise.resolve({ data: [] as any[], error: null }),
+          fallbackProductIds.length > 0
+            ? supabase
+                .from('contract_manufacturer_allocations')
+                .select('product_id, client_production_volume')
+                .in('product_id', fallbackProductIds)
+                .eq('organization_id', currentOrganization.id)
+            : Promise.resolve({ data: [] as any[], error: null }),
+        ]);
+
+        if (prodSitesResult.status === 'fulfilled' && prodSitesResult.value.data) {
+          for (const site of prodSitesResult.value.data) {
+            const key = String(site.product_carbon_footprint_id);
+            const vol = Number(site.production_volume || 0);
+            const current = prodSitesMap.get(key) || 0;
+            if (vol > current) prodSitesMap.set(key, vol);
+          }
+        }
+
+        if (cmAllocsResult.status === 'fulfilled' && cmAllocsResult.value.data) {
+          for (const alloc of cmAllocsResult.value.data) {
+            const key = String(alloc.product_id);
+            const vol = Number(alloc.client_production_volume || 0);
+            const current = cmAllocsMap.get(key) || 0;
+            if (vol > current) cmAllocsMap.set(key, vol);
+          }
+        }
+      }
+
       for (const lca of lcas) {
         const fromLogs = productionMap.get(String(lca.product_id)) || 0;
         if (fromLogs > 0) {
@@ -343,35 +391,14 @@ export function useCompanyMetrics(year?: number) {
           continue;
         }
 
-        // Fallback: get volume from facility allocation (production sites linked to LCA)
-        const { data: prodSites } = await supabase
-          .from('product_carbon_footprint_production_sites')
-          .select('production_volume')
-          .eq('product_carbon_footprint_id', lca.id);
-
-        let siteVolume = 0;
-        if (prodSites && prodSites.length > 0) {
-          siteVolume = Math.max(...prodSites.map((s: any) => Number(s.production_volume || 0)));
-        }
-
-        if (siteVolume > 0) {
-          (lca as any).production_volume = siteVolume;
+        const fromSites = prodSitesMap.get(String(lca.id)) || 0;
+        if (fromSites > 0) {
+          (lca as any).production_volume = fromSites;
           continue;
         }
 
-        // Also check contract manufacturer allocations
-        const { data: cmAllocs } = await supabase
-          .from('contract_manufacturer_allocations')
-          .select('client_production_volume')
-          .eq('product_id', lca.product_id)
-          .eq('organization_id', currentOrganization.id);
-
-        let cmVolume = 0;
-        if (cmAllocs && cmAllocs.length > 0) {
-          cmVolume = Math.max(...cmAllocs.map((a: any) => Number(a.client_production_volume || 0)));
-        }
-
-        (lca as any).production_volume = cmVolume > 0 ? cmVolume : 1;
+        const fromCM = cmAllocsMap.get(String(lca.product_id)) || 0;
+        (lca as any).production_volume = fromCM > 0 ? fromCM : 1;
       }
 
       if (!lcas || lcas.length === 0) {
@@ -540,80 +567,73 @@ export function useCompanyMetrics(year?: number) {
         // Non-fatal: breakdown extraction failed; primary metrics still available
       }
 
-      // Fetch facility water risks
-      try {
-        await fetchFacilityWaterRisks();
-      } catch (_) {
-        // Non-fatal: water risk enrichment failed; logged inside fetchFacilityWaterRisks
-      }
+      // Performance: Run all independent enrichment queries in parallel.
+      // Each sets different state variables; none depends on another's results.
+      // All are non-fatal (failures logged but don't block primary metrics).
+      const enrichmentPromises: Promise<void>[] = [];
 
-      // Fetch material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
-      // IMPORTANT: Check that the array has actual items, not just that it exists (empty array is truthy)
+      // 1. Facility water risks (always runs)
+      enrichmentPromises.push(
+        fetchFacilityWaterRisks().catch(() => {
+          // Non-fatal: water risk enrichment failed; logged inside fetchFacilityWaterRisks
+        })
+      );
+
+      // 2. Material and GHG breakdown - FALLBACK (if not in aggregated_impacts)
       const hasMaterialBreakdown = lcas.some(lca =>
         lca.aggregated_impacts?.breakdown?.by_material &&
         Array.isArray(lca.aggregated_impacts.breakdown.by_material) &&
         lca.aggregated_impacts.breakdown.by_material.length > 0
       );
-
-      // Check if lifecycle stage breakdown was extracted from aggregated_impacts
       const hasLifecycleStageBreakdown = lcas.some(lca =>
         lca.aggregated_impacts?.breakdown?.by_lifecycle_stage &&
         (Array.isArray(lca.aggregated_impacts.breakdown.by_lifecycle_stage)
           ? lca.aggregated_impacts.breakdown.by_lifecycle_stage.length > 0
           : Object.keys(lca.aggregated_impacts.breakdown.by_lifecycle_stage).length > 0)
       );
-
-      // Check if there's ACTUAL non-zero GHG BREAKDOWN data (require biogenic/fossil split)
       const hasGHGBreakdown = lcas.some(lca => {
         const ghg = lca.aggregated_impacts?.ghg_breakdown;
         if (!ghg) return false;
-
-        // STRICT CHECK: Require breakdown data (biogenic/fossil), not just totals
-        // We need either:
-        // 1. CH4 breakdown: methane_fossil > 0 OR methane_biogenic > 0 (not just total methane)
-        // 2. N2O data: n2o_kg > 0 OR nitrous_oxide > 0
-        // 3. CO2e contributions: ch4_biogenic_kg > 0 OR ch4_fossil_kg > 0
-
         const hasCH4Breakdown =
           (ghg.gas_inventory?.methane_fossil || 0) > 0 ||
           (ghg.gas_inventory?.methane_biogenic || 0) > 0 ||
           (ghg.physical_mass?.ch4_fossil_kg || 0) > 0 ||
           (ghg.physical_mass?.ch4_biogenic_kg || 0) > 0;
-
         const hasN2OData =
           (ghg.gas_inventory?.nitrous_oxide || 0) > 0 ||
           (ghg.physical_mass?.n2o_kg || 0) > 0;
-
         return hasCH4Breakdown || hasN2OData;
       });
 
-      // Fetch from database if material, GHG, or lifecycle stage data is missing from aggregated_impacts
       console.log('[useCompanyMetrics] Breakdown check:', { hasMaterialBreakdown, hasGHGBreakdown, hasLifecycleStageBreakdown, lcaCount: lcas.length });
       if (!hasMaterialBreakdown || !hasGHGBreakdown || !hasLifecycleStageBreakdown) {
-        try {
-          // Pass LCA IDs, product ID mapping, and production volumes directly
-          const lcaIds = lcas.map((lca: any) => lca.id).filter(Boolean);
-          const lcaToProductId = new Map<string, any>();
-          const lcaToProductionVolume = new Map<string, number>();
-          lcas.forEach((lca: any) => {
-            lcaToProductId.set(lca.id, lca.product_id);
-            lcaToProductionVolume.set(lca.id, (lca as any).production_volume || 0);
-          });
-          await fetchMaterialAndGHGBreakdown(yearStart, yearEnd, lcaIds, lcaToProductId, lcaToProductionVolume);
-        } catch (err) {
-          console.error('[useCompanyMetrics] Material/GHG breakdown fallback failed:', err);
-        }
+        const lcaIds = lcas.map((lca: any) => lca.id).filter(Boolean);
+        const lcaToProductId = new Map<string, any>();
+        const lcaToProductionVolume = new Map<string, number>();
+        lcas.forEach((lca: any) => {
+          lcaToProductId.set(lca.id, lca.product_id);
+          lcaToProductionVolume.set(lca.id, (lca as any).production_volume || 0);
+        });
+        enrichmentPromises.push(
+          fetchMaterialAndGHGBreakdown(yearStart, yearEnd, lcaIds, lcaToProductId, lcaToProductionVolume)
+            .catch(err => {
+              console.error('[useCompanyMetrics] Material/GHG breakdown fallback failed:', err);
+            })
+        );
       }
 
-      // Fetch facility emissions breakdown - FALLBACK
+      // 3. Facility emissions breakdown - FALLBACK
       const hasFacilityBreakdown = lcas.some(lca => lca.aggregated_impacts?.breakdown?.by_facility);
       if (!hasFacilityBreakdown) {
-        try {
-          await fetchFacilityEmissions();
-        } catch (_) {
-          // Non-fatal: facility emissions fallback failed
-        }
+        enrichmentPromises.push(
+          fetchFacilityEmissions().catch(() => {
+            // Non-fatal: facility emissions fallback failed
+          })
+        );
       }
+
+      // Wait for all enrichment queries to complete in parallel
+      await Promise.allSettled(enrichmentPromises);
 
       // Calculate total production volume across all products
       const totalProductionVolume = lcas.reduce((sum, lca) => {
@@ -1289,29 +1309,51 @@ export function useCompanyMetrics(year?: number) {
 
       const totalEmissions = Array.from(facilityMap.values()).reduce((sum, f) => sum + f.total_emissions, 0);
 
-      const currentYear = new Date().getFullYear();
-      const yearStart = `${currentYear}-01-01`;
-      const yearEnd = `${currentYear}-12-31`;
+      // Performance: Batch-fetch all facility scope breakdowns in a single query
+      // instead of 1 query per facility (N+1 fix).
+      const scopeYearStart = `${selectedYear}-01-01`;
+      const scopeYearEnd = `${selectedYear}-12-31`;
+      const allFacilityIds = Array.from(facilityMap.keys());
+      const scopeByFacility = new Map<string, { scope1: number; scope2: number }>();
 
-      const facilityBreakdownPromises = Array.from(facilityMap.entries()).map(async ([facility_id, data]) => {
-        const scopeBreakdown = await getFacilityScopeBreakdown(facility_id, yearStart, yearEnd);
+      if (allFacilityIds.length > 0) {
+        const { data: allEmissions, error: emissionsError } = await supabase
+          .from('calculated_emissions')
+          .select('facility_id, scope, total_co2e')
+          .in('facility_id', allFacilityIds)
+          .gte('date', scopeYearStart)
+          .lte('date', scopeYearEnd);
 
-        return {
-          facility_id,
-          facility_name: data.facility_name,
-          location_city: data.location_city,
-          location_country_code: data.location_country_code,
-          total_emissions: data.total_emissions,
-          percentage: totalEmissions > 0 ? (data.total_emissions / totalEmissions) * 100 : 0,
-          production_volume: data.production_volume,
-          share_of_production: 0,
-          facility_intensity: data.facility_intensity,
-          scope1_emissions: scopeBreakdown.scope1,
-          scope2_emissions: scopeBreakdown.scope2,
-        };
-      });
+        if (!emissionsError && allEmissions) {
+          for (const emission of allEmissions) {
+            const fid = emission.facility_id;
+            if (!scopeByFacility.has(fid)) {
+              scopeByFacility.set(fid, { scope1: 0, scope2: 0 });
+            }
+            const entry = scopeByFacility.get(fid)!;
+            if (emission.scope === 1) entry.scope1 += (emission.total_co2e || 0);
+            if (emission.scope === 2) entry.scope2 += (emission.total_co2e || 0);
+          }
+        }
+      }
 
-      const facilityBreakdown = (await Promise.all(facilityBreakdownPromises))
+      const facilityBreakdown = Array.from(facilityMap.entries())
+        .map(([facility_id, data]) => {
+          const scopeBreakdown = scopeByFacility.get(facility_id) || { scope1: 0, scope2: 0 };
+          return {
+            facility_id,
+            facility_name: data.facility_name,
+            location_city: data.location_city,
+            location_country_code: data.location_country_code,
+            total_emissions: data.total_emissions,
+            percentage: totalEmissions > 0 ? (data.total_emissions / totalEmissions) * 100 : 0,
+            production_volume: data.production_volume,
+            share_of_production: 0,
+            facility_intensity: data.facility_intensity,
+            scope1_emissions: scopeBreakdown.scope1,
+            scope2_emissions: scopeBreakdown.scope2,
+          };
+        })
         .sort((a, b) => b.total_emissions - a.total_emissions);
 
       setFacilityEmissionsBreakdown(facilityBreakdown);

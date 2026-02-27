@@ -126,127 +126,134 @@ export function useWasteMetrics(year?: number) {
     try {
       const currentYear = year || new Date().getFullYear();
 
-      let wasteData: any[] | null;
-      let circularityData: any | null;
-      let eolData: any[] | null;
-      let targetsData: any | null;
-      let productionData: any[] | null;
+      // Performance: Fire all 5 independent queries in parallel.
+      // Q1 (waste entries → facility lookup) has an internal sub-dependency
+      // but is independent of Q2–Q5. All 5 run concurrently via Promise.allSettled.
+      const [wasteSettled, circularitySettled, eolSettled, targetsSettled, productionSettled] =
+        await Promise.allSettled([
+          // Q1: Waste data + facility enrichment (internal sequential dependency)
+          (async () => {
+            const wasteResult = await supabase
+              .from('facility_activity_entries')
+              .select(`
+                id,
+                facility_id,
+                quantity,
+                waste_category,
+                waste_treatment_method,
+                hazard_classification,
+                waste_recovery_percentage,
+                calculated_emissions_kg_co2e,
+                data_provenance,
+                confidence_score,
+                activity_date
+              `)
+              .eq('organization_id', currentOrganization.id)
+              .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
+              .gte('activity_date', `${currentYear}-01-01`)
+              .lte('activity_date', `${currentYear}-12-31`);
 
-      // Query 1: Waste data (without facilities join to avoid RLS issues)
-      try {
-        const wasteResult = await supabase
-          .from('facility_activity_entries')
-          .select(`
-            id,
-            facility_id,
-            quantity,
-            waste_category,
-            waste_treatment_method,
-            hazard_classification,
-            waste_recovery_percentage,
-            calculated_emissions_kg_co2e,
-            data_provenance,
-            confidence_score,
-            activity_date
-          `)
-          .eq('organization_id', currentOrganization.id)
-          .in('activity_category', ['waste_general', 'waste_hazardous', 'waste_recycling'])
-          .gte('activity_date', `${currentYear}-01-01`)
-          .lte('activity_date', `${currentYear}-12-31`);
+            if (wasteResult.error) throw wasteResult.error;
 
-        if (wasteResult.error) throw wasteResult.error;
+            // Fetch facilities separately to avoid RLS join issues
+            const facilityIds = Array.from(new Set(wasteResult.data?.map(w => w.facility_id).filter(Boolean) || []));
 
-        // Fetch facilities separately to avoid RLS join issues
-        const facilityIds = Array.from(new Set(wasteResult.data?.map(w => w.facility_id).filter(Boolean) || []));
+            let facilitiesMap: Record<string, any> = {};
+            if (facilityIds.length > 0) {
+              const facilitiesResult = await supabase
+                .from('facilities')
+                .select('id, name, operational_control')
+                .in('id', facilityIds);
 
-        let facilitiesMap: Record<string, any> = {};
-        if (facilityIds.length > 0) {
-          const facilitiesResult = await supabase
-            .from('facilities')
-            .select('id, name, operational_control')
-            .in('id', facilityIds);
+              if (!facilitiesResult.error && facilitiesResult.data) {
+                facilitiesMap = facilitiesResult.data.reduce((acc, f) => {
+                  acc[f.id] = f;
+                  return acc;
+                }, {} as Record<string, any>);
+              }
+            }
 
-          if (!facilitiesResult.error && facilitiesResult.data) {
-            facilitiesMap = facilitiesResult.data.reduce((acc, f) => {
-              acc[f.id] = f;
-              return acc;
-            }, {} as Record<string, any>);
-          }
-        }
+            return wasteResult.data?.map(entry => ({
+              ...entry,
+              facilities: entry.facility_id ? facilitiesMap[entry.facility_id] : null,
+            })) || [];
+          })(),
 
-        // Merge facility data into waste data
-        wasteData = wasteResult.data?.map(entry => ({
-          ...entry,
-          facilities: entry.facility_id ? facilitiesMap[entry.facility_id] : null
-        })) || [];
-      } catch (err: any) {
-        console.error('[useWasteMetrics] Waste data query failed:', err);
-        throw err;
+          // Q2: Circularity metrics (independent)
+          (async () => {
+            const result = await supabase
+              .from('circularity_metrics_summary')
+              .select('*')
+              .eq('organization_id', currentOrganization.id)
+              .maybeSingle();
+            if (result.error) throw result.error;
+            return result.data;
+          })(),
+
+          // Q3: End-of-life scenarios (independent)
+          (async () => {
+            const result = await supabase
+              .from('product_end_of_life_scenarios')
+              .select(`
+                *,
+                products!inner(id, name)
+              `)
+              .eq('organization_id', currentOrganization.id)
+              .eq('is_primary_scenario', true);
+            if (result.error) throw result.error;
+            return result.data;
+          })(),
+
+          // Q4: Circularity targets (independent)
+          (async () => {
+            const result = await supabase
+              .from('circularity_targets')
+              .select('*')
+              .eq('organization_id', currentOrganization.id)
+              .eq('target_year', currentYear)
+              .maybeSingle();
+            if (result.error) throw result.error;
+            return result.data;
+          })(),
+
+          // Q5: Production logs (independent, non-critical)
+          (async () => {
+            const result = await supabase
+              .from('production_logs')
+              .select('quantity')
+              .eq('organization_id', currentOrganization.id)
+              .gte('production_date', `${currentYear}-01-01`)
+              .lte('production_date', `${currentYear}-12-31`);
+            return result.data;
+          })(),
+        ]);
+
+      // Extract results — Q1–Q4 are critical (re-throw on failure), Q5 is non-critical
+      if (wasteSettled.status === 'rejected') {
+        console.error('[useWasteMetrics] Waste data query failed:', wasteSettled.reason);
+        throw wasteSettled.reason;
+      }
+      if (circularitySettled.status === 'rejected') {
+        console.error('[useWasteMetrics] Circularity query failed:', circularitySettled.reason);
+        throw circularitySettled.reason;
+      }
+      if (eolSettled.status === 'rejected') {
+        console.error('[useWasteMetrics] End-of-life query failed:', eolSettled.reason);
+        throw eolSettled.reason;
+      }
+      if (targetsSettled.status === 'rejected') {
+        console.error('[useWasteMetrics] Targets query failed:', targetsSettled.reason);
+        throw targetsSettled.reason;
+      }
+      if (productionSettled.status === 'rejected') {
+        console.warn('[useWasteMetrics] Production query failed (non-critical):', productionSettled.reason);
       }
 
-      // Query 2: Circularity metrics
-      try {
-        const result = await supabase
-          .from('circularity_metrics_summary')
-          .select('*')
-          .eq('organization_id', currentOrganization.id)
-          .maybeSingle();
-
-        if (result.error) throw result.error;
-        circularityData = result.data;
-      } catch (err) {
-        console.error('[useWasteMetrics] Circularity query failed:', err);
-        throw err;
-      }
-
-      // Query 3: End-of-life scenarios
-      try {
-        const result = await supabase
-          .from('product_end_of_life_scenarios')
-          .select(`
-            *,
-            products!inner(id, name)
-          `)
-          .eq('organization_id', currentOrganization.id)
-          .eq('is_primary_scenario', true);
-
-        if (result.error) throw result.error;
-        eolData = result.data;
-      } catch (err) {
-        console.error('[useWasteMetrics] End-of-life query failed:', err);
-        throw err;
-      }
-
-      // Query 4: Circularity targets
-      try {
-        const result = await supabase
-          .from('circularity_targets')
-          .select('*')
-          .eq('organization_id', currentOrganization.id)
-          .eq('target_year', currentYear)
-          .maybeSingle();
-
-        if (result.error) throw result.error;
-        targetsData = result.data;
-      } catch (err) {
-        console.error('[useWasteMetrics] Targets query failed:', err);
-        throw err;
-      }
-
-      // Query 5: Production logs
-      try {
-        const result = await supabase
-          .from('production_logs')
-          .select('quantity')
-          .eq('organization_id', currentOrganization.id)
-          .gte('production_date', `${currentYear}-01-01`)
-          .lte('production_date', `${currentYear}-12-31`);
-
-        productionData = result.data;
-      } catch (err) {
-        console.warn('[useWasteMetrics] Production query failed (non-critical):', err);
-        productionData = [];
-      }
+      const wasteData = wasteSettled.value;
+      const circularityData = circularitySettled.value;
+      const eolData = eolSettled.value;
+      const targetsData = targetsSettled.value;
+      const productionData = productionSettled.status === 'fulfilled' ? productionSettled.value : [];
 
       const totalProduction = productionData?.reduce((sum, p) => sum + (p.quantity || 0), 0) || 1;
 

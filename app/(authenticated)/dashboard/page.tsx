@@ -180,7 +180,11 @@ export default function DashboardPage() {
     [currentOrganization?.product_type, productCategories]
   );
 
-  const isLoading = prefsLoading || footprintLoading || wasteLoading || supplierLoading || metricsLoading;
+  // Progressive rendering: Only block page chrome on preferences loading (~50ms).
+  // Vitality hero + RAG cards show their own skeletons until their data arrives.
+  // All other widgets render immediately with their own internal loading states.
+  const isVitalityLoading = metricsLoading || footprintLoading || wasteLoading;
+  const isAnyDataLoading = footprintLoading || wasteLoading || supplierLoading || metricsLoading;
 
   const waterConsumption = useMemo(() => {
     // Use facility scarcity-weighted water as primary source (consistent with Company Vitality)
@@ -324,7 +328,7 @@ export default function DashboardPage() {
     setLastUpdated(new Date());
   };
 
-  if (isLoading) {
+  if (prefsLoading) {
     return (
       <div className="p-6">
         <DashboardSkeleton />
@@ -397,67 +401,80 @@ export default function DashboardPage() {
       )}
 
       <div data-guide="vitality-score">
-        <VitalityScoreHero
-          overallScore={vitalityScores.overall}
-          climateScore={vitalityScores.climate}
-          waterScore={vitalityScores.water}
-          circularityScore={vitalityScores.circularity}
-          natureScore={vitalityScores.nature}
-          hasData={vitalityScores.hasData}
-          benchmarkData={getBenchmarkForPillar('overall')}
-          lastUpdated={companyMetrics?.last_updated
-            ? new Date(companyMetrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-            : undefined
-          }
-          onRefresh={handleRefresh}
-          loading={isLoading}
-          calculationInputs={scoreCalculationInputs}
-        />
+        {isVitalityLoading ? (
+          <Skeleton className="h-64 w-full rounded-2xl" />
+        ) : (
+          <VitalityScoreHero
+            overallScore={vitalityScores.overall}
+            climateScore={vitalityScores.climate}
+            waterScore={vitalityScores.water}
+            circularityScore={vitalityScores.circularity}
+            natureScore={vitalityScores.nature}
+            hasData={vitalityScores.hasData}
+            benchmarkData={getBenchmarkForPillar('overall')}
+            lastUpdated={companyMetrics?.last_updated
+              ? new Date(companyMetrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+              : undefined
+            }
+            onRefresh={handleRefresh}
+            loading={isAnyDataLoading}
+            calculationInputs={scoreCalculationInputs}
+          />
+        )}
       </div>
 
       <div data-guide="kpi-cards">
-      <RAGStatusCardGrid>
-        <RAGStatusCard
-          title="Carbon Emissions"
-          status={getStatusFromScore(scores.climateScore)}
-          value={footprint?.total_emissions ? (footprint.total_emissions / 1000).toFixed(1) : '--'}
-          unit="tCO₂e"
-          trend={carbonTrend.value}
-          trendDirection={carbonTrend.direction}
-          category="climate"
-          href="/reports/company-footprint"
-        />
-        <RAGStatusCard
-          title="Water Impact"
-          status={getStatusFromScore(scores.waterScore)}
-          value={waterConsumption > 0
-            ? (waterConsumption >= 1000
-              ? `${(waterConsumption / 1000).toFixed(1)}k`
-              : waterConsumption.toFixed(0))
-            : '--'}
-          unit="m³"
-          category="water"
-          href="/performance"
-        />
-        <RAGStatusCard
-          title="Waste Diversion"
-          status={getStatusFromScore(scores.circularityScore)}
-          value={wasteMetrics?.waste_diversion_rate?.toFixed(0) || '0'}
-          unit="%"
-          trend={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 5 : undefined}
-          trendDirection={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 'up' : 'stable'}
-          category="waste"
-          href="/performance"
-        />
-        <RAGStatusCard
-          title="Nature & Biodiversity"
-          status={getStatusFromScore(scores.natureScore)}
-          value={landUse > 0 ? formatValue(landUse) : '--'}
-          unit="m² crop eq"
-          category="suppliers"
-          href="/performance"
-        />
-      </RAGStatusCardGrid>
+      {isVitalityLoading ? (
+        <RAGStatusCardGrid>
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+          <Skeleton className="h-36 rounded-xl" />
+        </RAGStatusCardGrid>
+      ) : (
+        <RAGStatusCardGrid>
+          <RAGStatusCard
+            title="Carbon Emissions"
+            status={getStatusFromScore(scores.climateScore)}
+            value={footprint?.total_emissions ? (footprint.total_emissions / 1000).toFixed(1) : '--'}
+            unit="tCO₂e"
+            trend={carbonTrend.value}
+            trendDirection={carbonTrend.direction}
+            category="climate"
+            href="/reports/company-footprint"
+          />
+          <RAGStatusCard
+            title="Water Impact"
+            status={getStatusFromScore(scores.waterScore)}
+            value={waterConsumption > 0
+              ? (waterConsumption >= 1000
+                ? `${(waterConsumption / 1000).toFixed(1)}k`
+                : waterConsumption.toFixed(0))
+              : '--'}
+            unit="m³"
+            category="water"
+            href="/performance"
+          />
+          <RAGStatusCard
+            title="Waste Diversion"
+            status={getStatusFromScore(scores.circularityScore)}
+            value={wasteMetrics?.waste_diversion_rate?.toFixed(0) || '0'}
+            unit="%"
+            trend={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 5 : undefined}
+            trendDirection={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 'up' : 'stable'}
+            category="waste"
+            href="/performance"
+          />
+          <RAGStatusCard
+            title="Nature & Biodiversity"
+            status={getStatusFromScore(scores.natureScore)}
+            value={landUse > 0 ? formatValue(landUse) : '--'}
+            unit="m² crop eq"
+            category="suppliers"
+            href="/performance"
+          />
+        </RAGStatusCardGrid>
+      )}
       </div>
 
       {/* Getting Started - Interactive checklist with real progress tracking */}
