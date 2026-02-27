@@ -3,6 +3,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   TrendingUp,
   TrendingDown,
@@ -34,6 +35,7 @@ interface RAGStatusCardProps {
   onClick?: () => void;
   className?: string;
   compact?: boolean;
+  loading?: boolean;
 }
 
 const statusConfig: Record<RAGStatus, {
@@ -99,9 +101,41 @@ export function RAGStatusCard({
   onClick,
   className,
   compact = false,
+  loading = false,
 }: RAGStatusCardProps) {
-  const config = statusConfig[status];
+  const config = statusConfig[loading ? 'neutral' : status];
   const Icon = icon || (category ? categoryIcons[category] : Leaf);
+
+  // Show card outline with skeleton content while data is loading
+  if (loading) {
+    return (
+      <Card
+        className={cn(
+          'relative overflow-hidden border transition-all duration-200',
+          statusConfig.neutral.bgClass,
+          statusConfig.neutral.borderClass,
+          compact ? 'p-3' : 'p-4',
+          className
+        )}
+      >
+        <div className="flex items-start justify-between">
+          <div className={cn('rounded-xl p-2', statusConfig.neutral.iconBgClass)}>
+            <Icon className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
+          </div>
+          <Skeleton className="h-6 w-20 rounded-full" />
+        </div>
+        <div className={cn('mt-3', compact && 'mt-2')}>
+          <h3 className={cn(
+            'font-semibold text-gray-900 dark:text-gray-100',
+            compact ? 'text-sm' : 'text-base'
+          )}>
+            {title}
+          </h3>
+          <Skeleton className={cn('mt-1', compact ? 'h-6 w-20' : 'h-8 w-24')} />
+        </div>
+      </Card>
+    );
+  }
 
   const TrendIcon = trendDirection === 'up' ? TrendingUp :
                     trendDirection === 'down' ? TrendingDown : Minus;

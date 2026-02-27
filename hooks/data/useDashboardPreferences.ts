@@ -50,18 +50,24 @@ export function useDashboardPreferences(): UseDashboardPreferencesResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
 
   useEffect(() => {
     async function getUser() {
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id || null);
+      setAuthResolved(true);
     }
     getUser();
   }, []);
 
   const fetchData = useCallback(async () => {
     if (!userId || !currentOrganization?.id) {
-      setLoading(false);
+      // Only mark loading complete once we've confirmed there's no user/org —
+      // not while the async auth check is still in flight.
+      if (authResolved) {
+        setLoading(false);
+      }
       return;
     }
 
@@ -113,7 +119,7 @@ export function useDashboardPreferences(): UseDashboardPreferencesResult {
     } finally {
       setLoading(false);
     }
-  }, [userId, currentOrganization?.id]);
+  }, [userId, currentOrganization?.id, authResolved]);
 
   useEffect(() => {
     fetchData();

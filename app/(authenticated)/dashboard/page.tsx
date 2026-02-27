@@ -402,7 +402,18 @@ export default function DashboardPage() {
 
       <div data-guide="vitality-score">
         {isVitalityLoading ? (
-          <Skeleton className="h-64 w-full rounded-2xl" />
+          <Card className="h-64 w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/50 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <Skeleton className="h-16 w-16 rounded-full" />
+              <Skeleton className="h-5 w-36" />
+              <div className="flex gap-6 mt-1">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-16" />
+              </div>
+            </div>
+          </Card>
         ) : (
           <VitalityScoreHero
             overallScore={vitalityScores.overall}
@@ -426,10 +437,10 @@ export default function DashboardPage() {
       <div data-guide="kpi-cards">
       {isVitalityLoading ? (
         <RAGStatusCardGrid>
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
-          <Skeleton className="h-36 rounded-xl" />
+          <RAGStatusCard title="Carbon Emissions" status="neutral" category="climate" loading />
+          <RAGStatusCard title="Water Impact" status="neutral" category="water" loading />
+          <RAGStatusCard title="Waste Diversion" status="neutral" category="waste" loading />
+          <RAGStatusCard title="Nature & Biodiversity" status="neutral" category="suppliers" loading />
         </RAGStatusCardGrid>
       ) : (
         <RAGStatusCardGrid>
