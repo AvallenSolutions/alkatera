@@ -181,6 +181,14 @@ const config: Config = {
             transform: 'rotate(-2deg)',
           },
         },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
+        'loading-bar': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -190,6 +198,8 @@ const config: Config = {
         'fade-in-up': 'fade-in-up 0.4s ease-out',
         float: 'float 6s ease-in-out infinite',
         sway: 'sway 4s ease-in-out infinite',
+        shimmer: 'shimmer 2s linear infinite',
+        'loading-bar': 'loading-bar 1.5s ease-in-out infinite',
       },
     },
   },

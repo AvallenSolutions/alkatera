@@ -65,23 +65,42 @@ function DashboardSkeleton() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-48" />
+          <ShimmerBlock className="h-8 w-64" />
+          <ShimmerBlock className="h-4 w-48" />
         </div>
-        <Skeleton className="h-9 w-28" />
+        <ShimmerBlock className="h-9 w-28" />
       </div>
-      <Skeleton className="h-64 w-full rounded-2xl" />
+      <DashboardLoadingBar />
+      <ShimmerBlock className="h-64 w-full rounded-2xl" />
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Skeleton className="h-36 rounded-xl" />
-        <Skeleton className="h-36 rounded-xl" />
-        <Skeleton className="h-36 rounded-xl" />
-        <Skeleton className="h-36 rounded-xl" />
+        <ShimmerBlock className="h-36 rounded-xl" />
+        <ShimmerBlock className="h-36 rounded-xl" />
+        <ShimmerBlock className="h-36 rounded-xl" />
+        <ShimmerBlock className="h-36 rounded-xl" />
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
-        <Skeleton className="h-80 rounded-xl lg:col-span-2" />
-        <Skeleton className="h-80 rounded-xl" />
+        <ShimmerBlock className="h-80 rounded-xl lg:col-span-2" />
+        <ShimmerBlock className="h-80 rounded-xl" />
       </div>
     </div>
+  );
+}
+
+/** Thin brand-coloured progress bar shown while dashboard data is streaming in. */
+function DashboardLoadingBar() {
+  return (
+    <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-800/60">
+      <div className="h-full w-1/3 animate-loading-bar rounded-full bg-[#ccff00]" />
+    </div>
+  );
+}
+
+/** Shimmer skeleton — gradient sweep instead of basic pulse. */
+function ShimmerBlock({ className }: { className?: string }) {
+  return (
+    <div
+      className={`rounded-md bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%] animate-shimmer ${className ?? ''}`}
+    />
   );
 }
 
@@ -389,11 +408,14 @@ export default function DashboardPage() {
           </select>
           <DashboardGuideTrigger />
           <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh dashboard">
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className={`h-4 w-4 transition-transform ${isAnyDataLoading ? 'animate-spin' : ''}`} />
           </Button>
           <DashboardCustomiseModal onPreferencesChanged={refetch} />
         </div>
       </div>
+
+      {/* Animated loading bar — brand-coloured sweep while data streams in */}
+      {isAnyDataLoading && <DashboardLoadingBar />}
 
       {/* Setup Progress Banner — shows for new users until all milestones are done */}
       {!setupProgress.isLoading && !setupProgress.isDismissed && (
@@ -404,13 +426,13 @@ export default function DashboardPage() {
         {isVitalityLoading ? (
           <Card className="h-64 w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/50 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
-              <Skeleton className="h-16 w-16 rounded-full" />
-              <Skeleton className="h-5 w-36" />
+              <ShimmerBlock className="h-16 w-16 rounded-full" />
+              <ShimmerBlock className="h-5 w-36" />
               <div className="flex gap-6 mt-1">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
+                <ShimmerBlock className="h-4 w-16" />
+                <ShimmerBlock className="h-4 w-16" />
+                <ShimmerBlock className="h-4 w-16" />
+                <ShimmerBlock className="h-4 w-16" />
               </div>
             </div>
           </Card>

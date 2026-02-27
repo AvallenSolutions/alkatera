@@ -3,7 +3,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   TrendingUp,
   TrendingDown,
@@ -106,8 +105,9 @@ export function RAGStatusCard({
   const config = statusConfig[loading ? 'neutral' : status];
   const Icon = icon || (category ? categoryIcons[category] : Leaf);
 
-  // Show card outline with skeleton content while data is loading
+  // Show card outline with shimmer content while data is loading
   if (loading) {
+    const shimmerClass = 'rounded-md bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%] animate-shimmer';
     return (
       <Card
         className={cn(
@@ -122,7 +122,7 @@ export function RAGStatusCard({
           <div className={cn('rounded-xl p-2', statusConfig.neutral.iconBgClass)}>
             <Icon className={compact ? 'h-5 w-5' : 'h-6 w-6'} />
           </div>
-          <Skeleton className="h-6 w-20 rounded-full" />
+          <div className={cn(shimmerClass, 'h-6 w-20 rounded-full')} />
         </div>
         <div className={cn('mt-3', compact && 'mt-2')}>
           <h3 className={cn(
@@ -131,7 +131,7 @@ export function RAGStatusCard({
           )}>
             {title}
           </h3>
-          <Skeleton className={cn('mt-1', compact ? 'h-6 w-20' : 'h-8 w-24')} />
+          <div className={cn(shimmerClass, 'mt-1', compact ? 'h-6 w-20' : 'h-8 w-24')} />
         </div>
       </Card>
     );
