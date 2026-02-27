@@ -160,8 +160,9 @@ INSERT INTO public.organization_suppliers (organization_id, platform_supplier_id
 SELECT s.organization_id, ps.id
 FROM public.suppliers s
 JOIN public.platform_suppliers ps ON lower(ps.contact_email) = lower(s.contact_email)
-WHERE NOT EXISTS (
-  SELECT 1 FROM public.organization_suppliers os
-  WHERE os.organization_id = s.organization_id
-    AND os.platform_supplier_id = ps.id
-);
+WHERE s.organization_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM public.organization_suppliers os
+    WHERE os.organization_id = s.organization_id
+      AND os.platform_supplier_id = ps.id
+  );

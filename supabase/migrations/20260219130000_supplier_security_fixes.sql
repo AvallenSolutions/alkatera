@@ -147,6 +147,7 @@ COMMENT ON FUNCTION public.get_supplier_context() IS
 -- 3. Fix supplier_invitations RLS: use suppliers table instead of JWT email
 -- ==========================================================================
 DROP POLICY IF EXISTS "Suppliers can view own invitations by email" ON public.supplier_invitations;
+DROP POLICY IF EXISTS "Suppliers can view own invitations" ON public.supplier_invitations;
 
 CREATE POLICY "Suppliers can view own invitations"
 ON public.supplier_invitations FOR SELECT TO authenticated
@@ -187,6 +188,7 @@ WHERE id = 'supplier-product-evidence';
 DROP POLICY IF EXISTS "Anyone can view supplier evidence" ON storage.objects;
 
 -- Replace with authenticated-only policy scoped to own supplier or org
+DROP POLICY IF EXISTS "Authenticated users can view supplier evidence" ON storage.objects;
 CREATE POLICY "Authenticated users can view supplier evidence"
 ON storage.objects FOR SELECT TO authenticated
 USING (
@@ -208,6 +210,7 @@ USING (
 
 -- Restrict evidence upload policy to own supplier path
 DROP POLICY IF EXISTS "Authenticated users can upload supplier evidence" ON storage.objects;
+DROP POLICY IF EXISTS "Suppliers can upload own evidence" ON storage.objects;
 
 CREATE POLICY "Suppliers can upload own evidence"
 ON storage.objects FOR INSERT TO authenticated
@@ -227,6 +230,7 @@ WHERE id = 'supplier-product-images';
 DROP POLICY IF EXISTS "Anyone can view supplier product images" ON storage.objects;
 
 -- Replace with authenticated-only policy
+DROP POLICY IF EXISTS "Authenticated users can view supplier product images" ON storage.objects;
 CREATE POLICY "Authenticated users can view supplier product images"
 ON storage.objects FOR SELECT TO authenticated
 USING (
@@ -246,6 +250,7 @@ USING (
 
 -- Restrict product images upload to own supplier path
 DROP POLICY IF EXISTS "Authenticated users can upload supplier product images" ON storage.objects;
+DROP POLICY IF EXISTS "Suppliers can upload own product images" ON storage.objects;
 
 CREATE POLICY "Suppliers can upload own product images"
 ON storage.objects FOR INSERT TO authenticated

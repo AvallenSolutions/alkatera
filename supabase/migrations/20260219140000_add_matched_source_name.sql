@@ -7,7 +7,7 @@
 -- ==========================================================================
 
 ALTER TABLE product_materials
-ADD COLUMN matched_source_name text;
+ADD COLUMN IF NOT EXISTS matched_source_name text;
 
 COMMENT ON COLUMN product_materials.matched_source_name IS
   'The database emission factor name when a proxy was used. NULL means material_name is the exact match.';
