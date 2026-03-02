@@ -73,7 +73,7 @@ const CHUNK_OVERLAP = 200; // Token overlap between chunks
 const EMBEDDING_MODEL = 'text-embedding-004'; // Google's embedding model (kept for embeddings)
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
 /**
  * Initialize the Google AI client for embeddings ONLY

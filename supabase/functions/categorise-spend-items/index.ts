@@ -9,7 +9,7 @@ const corsHeaders = {
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
 interface SpendItem {
   id: string;

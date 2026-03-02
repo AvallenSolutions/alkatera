@@ -13,7 +13,7 @@ type SupabaseClient = ReturnType<typeof createClient>;
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
 // Field mapping patterns for different document types
 const DOCUMENT_FIELD_PATTERNS: Record<RosaDocumentType, {
