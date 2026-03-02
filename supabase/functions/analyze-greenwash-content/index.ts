@@ -6,7 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
 
 interface AnalysisRequest {
   assessment_id: string;
@@ -42,7 +45,7 @@ interface AnalysisResult {
   claims: ClaimAnalysis[];
 }
 
-const ANALYSIS_PROMPT = `You are a legal compliance expert specializing in environmental marketing claims and anti-greenwashing legislation. Analyze the following content for potential greenwashing risks.
+const SYSTEM_PROMPT = `You are a legal compliance expert specializing in environmental marketing claims and anti-greenwashing legislation. You analyze content for potential greenwashing risks.
 
 ## LEGISLATION FRAMEWORK
 
@@ -77,10 +80,6 @@ const ANALYSIS_PROMPT = `You are a legal compliance expert specializing in envir
 - carbon_offset_claim: Climate neutrality based only on offsets
 - absolute_claim: Blanket claims like "100% sustainable"
 - future_promise: Unverifiable future commitments
-
-## CONTENT TO ANALYZE
-
-{CONTENT}
 
 ## RESPONSE REQUIREMENTS
 
@@ -137,8 +136,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('assessment_id and content are required');
     }
 
-    if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 10) {
-      console.error('GEMINI_API_KEY not configured properly');
+    if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.length < 10) {
+      console.error('ANTHROPIC_API_KEY not configured properly');
 
       await supabase
         .from('greenwash_assessments')
@@ -166,47 +165,38 @@ Deno.serve(async (req: Request) => {
       })
       .eq('id', assessmentId);
 
-    // Build the prompt with content
-    const prompt = ANALYSIS_PROMPT.replace('{CONTENT}', body.content.substring(0, 30000));
-    // Call Gemini API
+    // Call Anthropic API
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for complex analysis
 
     let response: Response;
 
     try {
-      response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: prompt,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              temperature: 0.2, // Low temperature for consistent analysis
-              topK: 20,
-              topP: 0.9,
-              maxOutputTokens: 8192,
-              responseMimeType: 'application/json',
+      response = await fetch(ANTHROPIC_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': ANTHROPIC_VERSION,
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: ANTHROPIC_MODEL,
+          max_tokens: 8192,
+          temperature: 0.2,
+          system: SYSTEM_PROMPT,
+          messages: [
+            {
+              role: 'user',
+              content: `Analyse the following content for greenwashing risks:\n\n${body.content.substring(0, 30000)}`,
             },
-          }),
-        }
-      );
+          ],
+        }),
+      });
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
-        console.error('Gemini API call timed out after 60 seconds');
+        console.error('Anthropic API call timed out after 60 seconds');
         throw new Error('Analysis timed out - content may be too complex');
       }
       throw fetchError;
@@ -216,23 +206,28 @@ Deno.serve(async (req: Request) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`Gemini API error ${response.status}:`, errorText);
+      console.error(`Anthropic API error ${response.status}:`, errorText);
       throw new Error(`AI analysis error: ${response.status}`);
     }
     const data = await response.json();
 
-    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-      console.error('Unexpected Gemini response structure');
+    if (!data.content || !data.content[0] || !data.content[0].text) {
+      console.error('Unexpected Anthropic response structure');
       throw new Error('Unexpected AI response format');
     }
 
-    const content = data.candidates[0].content.parts[0].text;
+    const content = data.content[0].text;
     let analysisResult: AnalysisResult;
 
     try {
-      analysisResult = JSON.parse(content);
+      // Extract JSON from the response (in case Claude wraps it in markdown)
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in response');
+      }
+      analysisResult = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
-      console.error('Failed to parse Gemini response:', content?.substring(0, 500));
+      console.error('Failed to parse Anthropic response:', content?.substring(0, 500));
       throw new Error('Failed to parse AI analysis results');
     }
     // Update the assessment with results
@@ -318,7 +313,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         error: errorMessage,
-        needsSetup: !GEMINI_API_KEY
+        needsSetup: !ANTHROPIC_API_KEY
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

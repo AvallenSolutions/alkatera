@@ -4,6 +4,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
+
 interface FacilityData {
   facility_name: string;
   country: string;
@@ -32,12 +36,12 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-    
-    if (!GEMINI_API_KEY) {
+    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+
+    if (!ANTHROPIC_API_KEY) {
       return new Response(
-        JSON.stringify({ 
-          error: 'Gemini API not configured',
+        JSON.stringify({
+          error: 'AI API not configured',
           recommendations: getDefaultRecommendations('medium'),
           analysis: 'AI analysis unavailable - using default recommendations',
           priority_action: 'Configure AI integration for personalised insights'
@@ -49,27 +53,33 @@ Deno.serve(async (req: Request) => {
     const facility: FacilityData = await req.json();
 
     const prompt = buildPrompt(facility);
-    
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024,
+
+    const response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1024,
+        temperature: 0.7,
+        system: 'You are a water sustainability expert. You analyse facility water data and provide actionable recommendations. Always respond in the exact format requested.',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
           },
-        }),
-      }
-    );
+        ],
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Gemini API error:', errorText);
+      console.error('Anthropic API error:', errorText);
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'AI service temporarily unavailable',
           recommendations: getDefaultRecommendations(facility.risk_level),
           analysis: 'AI analysis unavailable - using default recommendations based on risk level',
@@ -80,19 +90,19 @@ Deno.serve(async (req: Request) => {
     }
 
     const data = await response.json();
-    const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    
-    const parsedResponse = parseGeminiResponse(textContent, facility.risk_level);
+    const textContent = data.content?.[0]?.text || '';
+
+    const parsedResponse = parseClaudeResponse(textContent, facility.risk_level);
 
     return new Response(
       JSON.stringify(parsedResponse),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating recommendations:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message,
         recommendations: getDefaultRecommendations('medium'),
         analysis: 'Error generating AI recommendations',
@@ -112,8 +122,8 @@ function buildPrompt(facility: FacilityData): string {
   const operationalDischarge = facility.operational_water_discharge_m3 || 0;
   const operationalNet = operationalIntake - operationalDischarge;
   const productLcaWater = facility.product_lca_water_m3 || 0;
-  
-  return `You are a water sustainability expert. Analyse this facility's water data and provide actionable recommendations.
+
+  return `Analyse this facility's water data and provide actionable recommendations.
 
 FACILITY DATA:
 - Name: ${facility.facility_name}
@@ -141,7 +151,7 @@ IMPORTANT DISTINCTIONS:
 
 CONTEXT:
 - AWARE factors > 10 indicate extreme water stress
-- AWARE factors 1-10 indicate moderate water stress  
+- AWARE factors 1-10 indicate moderate water stress
 - AWARE factors < 1 indicate low water stress
 - The beverage/food industry typically uses 2-5 m³ water per m³ product
 
@@ -158,7 +168,7 @@ RECOMMENDATION_4: [Specific, actionable recommendation]
 Base your recommendations on the actual data provided. ${!hasOperationalData ? 'Since no operational data is available, recommend logging water intake and discharge data as a first step.' : ''} Focus on practical, implementable actions appropriate for a ${facility.risk_level} risk facility.`;
 }
 
-function parseGeminiResponse(text: string, fallbackRiskLevel: string): RecommendationResponse {
+function parseClaudeResponse(text: string, fallbackRiskLevel: string): RecommendationResponse {
   const recommendations: string[] = [];
   let analysis = '';
   let priority_action = '';

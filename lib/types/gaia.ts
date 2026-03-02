@@ -172,7 +172,7 @@ export interface RosaStreamChunk {
   error?: string;
 }
 
-// Context types for building Gemini prompts
+// Context types for building Claude prompts
 export interface RosaOrganizationContext {
   organization: {
     id: string;

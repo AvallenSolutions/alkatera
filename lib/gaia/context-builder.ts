@@ -1,5 +1,5 @@
 // Rosa Context Builder
-// Assembles context for Gemini API calls
+// Assembles context for Claude API calls
 
 import { createClient } from '@supabase/supabase-js';
 import { ROSA_SYSTEM_PROMPT, ROSA_CONTEXT_TEMPLATE } from './system-prompt';

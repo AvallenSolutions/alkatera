@@ -6,7 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
 
 interface SpendItem {
   id: string;
@@ -42,8 +45,8 @@ Deno.serve(async (req: Request) => {
       throw new Error('batch_id is required');
     }
 
-    if (!GEMINI_API_KEY || GEMINI_API_KEY.length < 10) {
-      console.error('GEMINI_API_KEY not configured properly');
+    if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY.length < 10) {
+      console.error('ANTHROPIC_API_KEY not configured properly');
 
       await supabase
         .from('spend_import_batches')
@@ -194,9 +197,9 @@ Deno.serve(async (req: Request) => {
 
     if (errorMessage.includes('batch_id is required')) {
       userFriendlyMessage = 'Invalid request - batch ID missing.';
-    } else if (errorMessage.includes('Gemini API error') || errorMessage.includes('timeout')) {
-      const apiKeyStatus = GEMINI_API_KEY ? 'configured' : 'not configured';
-      console.error(`Gemini API error - API key is ${apiKeyStatus}:`, errorMessage);
+    } else if (errorMessage.includes('Anthropic API error') || errorMessage.includes('timeout')) {
+      const apiKeyStatus = ANTHROPIC_API_KEY ? 'configured' : 'not configured';
+      console.error(`Anthropic API error - API key is ${apiKeyStatus}:`, errorMessage);
       userFriendlyMessage = 'AI categorization failed. The data has been uploaded - manual categorization required.';
     } else {
       userFriendlyMessage += errorMessage;
@@ -223,7 +226,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         error: userFriendlyMessage,
         technicalError: errorMessage,
-        needsSetup: !GEMINI_API_KEY
+        needsSetup: !ANTHROPIC_API_KEY
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -238,39 +241,32 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
   let response: Response;
 
   try {
-    response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            topK: 20,
-            topP: 0.9,
-            maxOutputTokens: 4096,
-            responseMimeType: 'application/json',
+    response = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY!,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 4096,
+        temperature: 0.1,
+        system: 'You are an expense categorization expert specializing in GHG Protocol Scope 3 categories. You return ONLY valid JSON arrays, with no additional text or markdown.',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
           },
-        }),
-      }
-    );
+        ],
+      }),
+    });
   } catch (fetchError: any) {
     clearTimeout(timeoutId);
     if (fetchError.name === 'AbortError') {
-      console.error('Gemini API call timed out after 25 seconds');
-      throw new Error('Gemini API timeout - request took too long');
+      console.error('Anthropic API call timed out after 25 seconds');
+      throw new Error('Anthropic API timeout - request took too long');
     }
     console.error('Fetch error:', fetchError);
     throw fetchError;
@@ -280,13 +276,13 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error(`Gemini API error ${response.status}:`, errorText);
-    throw new Error(`Gemini API error ${response.status}: ${errorText}`);
+    console.error(`Anthropic API error ${response.status}:`, errorText);
+    throw new Error(`Anthropic API error ${response.status}: ${errorText}`);
   }
   const data = await response.json();
 
-  if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-    console.error('Unexpected Gemini response structure:', JSON.stringify(data).substring(0, 500));
+  if (!data.content || !data.content[0] || !data.content[0].text) {
+    console.error('Unexpected Anthropic response structure:', JSON.stringify(data).substring(0, 500));
     return items.map(() => ({
       category: 'other',
       confidence: 50,
@@ -294,10 +290,21 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
     }));
   }
 
-  const content = data.candidates[0].content.parts[0].text;
+  const content = data.content[0].text;
 
   try {
-    const results = JSON.parse(content);
+    // Extract JSON array from the response (in case Claude wraps it in markdown)
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error('No JSON array found in response:', content?.substring(0, 500));
+      return items.map(() => ({
+        category: 'other',
+        confidence: 50,
+        reasoning: 'Failed to categorise automatically - no JSON array in response',
+      }));
+    }
+
+    const results = JSON.parse(jsonMatch[0]);
 
     if (!Array.isArray(results)) {
       console.error('Results is not an array:', typeof results);
@@ -325,7 +332,7 @@ async function categoriseBatch(items: SpendItem[]): Promise<CategoryResult[]> {
     });
     return normalizedResults;
   } catch (parseError) {
-    console.error('Failed to parse Gemini response:', content?.substring(0, 500), parseError);
+    console.error('Failed to parse Anthropic response:', content?.substring(0, 500), parseError);
     return items.map(() => ({
       category: 'other',
       confidence: 50,

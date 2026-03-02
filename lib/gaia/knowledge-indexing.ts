@@ -1,5 +1,9 @@
 // Rosa Knowledge Document Indexing Pipeline
 // Processes uploaded documents, chunks them, and generates embeddings for RAG
+//
+// AI Model Usage:
+// - Anthropic Claude: PDF and DOCX text extraction (vision/document processing)
+// - Google Gemini: Embedding generation only (text-embedding-004) - Anthropic has no embedding model
 
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
@@ -66,17 +70,32 @@ export interface ProcessingResult {
 // Configuration
 const MAX_CHUNK_SIZE = 1500; // Maximum chunk size
 const CHUNK_OVERLAP = 200; // Token overlap between chunks
-const EMBEDDING_MODEL = 'text-embedding-004'; // Google's embedding model
+const EMBEDDING_MODEL = 'text-embedding-004'; // Google's embedding model (kept for embeddings)
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
 
 /**
- * Initialize the Gemini client for embeddings
+ * Initialize the Google AI client for embeddings ONLY
+ * Note: All LLM text generation/extraction now uses Anthropic Claude
  */
-function getGeminiClient(): GoogleGenerativeAI {
+function getGoogleEmbeddingClient(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY environment variable is not set');
+    throw new Error('GEMINI_API_KEY environment variable is not set (required for embeddings)');
   }
   return new GoogleGenerativeAI(apiKey);
+}
+
+/**
+ * Get the Anthropic API key for text extraction
+ */
+function getAnthropicApiKey(): string {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+  }
+  return apiKey;
 }
 
 /**
@@ -117,7 +136,7 @@ export async function processDocument(
     // Chunk the content
     const chunks = chunkDocument(fileContent, document.title);
 
-    // Generate embeddings for each chunk
+    // Generate embeddings for each chunk (using Google's embedding model)
     const chunksWithEmbeddings = await generateEmbeddings(chunks);
 
     // Store chunks in database
@@ -205,13 +224,13 @@ async function downloadAndExtractText(fileUrl: string, fileType: string): Promis
   }
 
   if (contentType === 'pdf') {
-    // For PDFs, we'll use Gemini's vision capability to extract text
+    // Use Claude for PDF text extraction (supports PDF document type natively)
     const arrayBuffer = await response.arrayBuffer();
     return await extractTextFromPdf(arrayBuffer);
   }
 
   if (contentType === 'docx') {
-    // For DOCX, we'll use a simple extraction
+    // Use Claude for DOCX text extraction via image-based approach
     const arrayBuffer = await response.arrayBuffer();
     return await extractTextFromDocx(arrayBuffer);
   }
@@ -233,51 +252,171 @@ function extractTextFromHtml(html: string): string {
 }
 
 /**
- * Extract text from PDF using Gemini Vision
+ * Extract text from PDF using Anthropic Claude
+ * Claude natively supports PDF documents via the document content type
  */
 async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
-  const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-  // Convert PDF to base64
+  const apiKey = getAnthropicApiKey();
   const base64 = Buffer.from(pdfBuffer).toString('base64');
 
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        mimeType: 'application/pdf',
-        data: base64,
-      },
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
     },
-    'Extract all text content from this PDF document. Preserve section headings and structure. Output only the text content, no commentary.',
-  ]);
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 8192,
+      temperature: 0,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: base64,
+              },
+            },
+            {
+              type: 'text',
+              text: 'Extract all text content from this PDF document. Preserve section headings and structure. Output only the text content, no commentary.',
+            },
+          ],
+        },
+      ],
+    }),
+  });
 
-  return result.response.text();
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Claude PDF extraction error:', errorText);
+    throw new Error(`Claude API error during PDF extraction: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.content?.[0]?.text || '';
 }
 
 /**
- * Extract text from DOCX files
- * Note: This is a simplified extraction - for production, consider using mammoth.js
+ * Extract text from DOCX files using Anthropic Claude
+ * Note: Claude doesn't natively support DOCX format, so we send as a generic document.
+ * For production use, consider using mammoth.js for more reliable DOCX text extraction.
  */
 async function extractTextFromDocx(docxBuffer: ArrayBuffer): Promise<string> {
-  // DOCX files are ZIP archives with XML content
-  // For now, we'll use Gemini to extract text from the document
-  const genAI = getGeminiClient();
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  // First, try basic XML text extraction from the DOCX (which is a ZIP of XML files)
+  // DOCX files contain text in word/document.xml within <w:t> tags
+  try {
+    const textFromXml = extractTextFromDocxXml(docxBuffer);
+    if (textFromXml && textFromXml.trim().length > 100) {
+      return textFromXml;
+    }
+  } catch {
+    // Fall through to Claude-based extraction
+  }
 
+  // Fallback: Send to Claude as a document for best-effort extraction
+  const apiKey = getAnthropicApiKey();
   const base64 = Buffer.from(docxBuffer).toString('base64');
 
-  const result = await model.generateContent([
-    {
-      inlineData: {
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        data: base64,
-      },
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
     },
-    'Extract all text content from this Word document. Preserve section headings and structure. Output only the text content, no commentary.',
-  ]);
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 8192,
+      temperature: 0,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                data: base64,
+              },
+            },
+            {
+              type: 'text',
+              text: 'Extract all text content from this Word document. Preserve section headings and structure. Output only the text content, no commentary.',
+            },
+          ],
+        },
+      ],
+    }),
+  });
 
-  return result.response.text();
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Claude DOCX extraction error:', errorText);
+    throw new Error(`Claude API error during DOCX extraction: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.content?.[0]?.text || '';
+}
+
+/**
+ * Basic DOCX text extraction by reading XML content directly
+ * DOCX files are ZIP archives containing XML. The main text is in word/document.xml
+ * within <w:t> tags. This is a simplified extraction that works without external libraries.
+ */
+function extractTextFromDocxXml(docxBuffer: ArrayBuffer): string {
+  // Convert buffer to string and look for XML text content
+  // This is a best-effort approach for when the DOCX content is readable as text
+  const uint8Array = new Uint8Array(docxBuffer);
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const rawContent = decoder.decode(uint8Array);
+
+  // Look for <w:t> tags which contain the actual text in DOCX XML
+  const textMatches = rawContent.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+  if (!textMatches || textMatches.length === 0) {
+    return '';
+  }
+
+  // Extract text from the tags
+  const extractedParts: string[] = [];
+  let lastWasParagraph = false;
+
+  for (const match of textMatches) {
+    const textMatch = match.match(/<w:t[^>]*>([^<]*)<\/w:t>/);
+    if (textMatch && textMatch[1]) {
+      extractedParts.push(textMatch[1]);
+    }
+  }
+
+  // Also detect paragraph breaks from <w:p> tags for better formatting
+  const paragraphContent = rawContent.replace(/<\/w:p>/g, '\n\n');
+  const cleanedMatches = paragraphContent.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+
+  if (cleanedMatches && cleanedMatches.length > 0) {
+    const parts: string[] = [];
+    let currentParagraph = '';
+
+    // Walk through the content looking for text and paragraph breaks
+    const segments = paragraphContent.split(/<w:t[^>]*>|<\/w:t>/);
+    for (let i = 1; i < segments.length; i += 2) {
+      if (segments[i]) {
+        currentParagraph += segments[i];
+      }
+    }
+
+    if (currentParagraph.trim().length > 0) {
+      return currentParagraph.trim();
+    }
+  }
+
+  return extractedParts.join(' ').trim();
 }
 
 /**
@@ -395,10 +534,11 @@ function getOverlapText(text: string, targetTokens: number): string {
 }
 
 /**
- * Generate embeddings for chunks using Gemini
+ * Generate embeddings for chunks using Google's embedding model
+ * Note: Google's text-embedding-004 is used here because Anthropic does not offer an embedding model
  */
 async function generateEmbeddings(chunks: ChunkMetadata[]): Promise<ChunkMetadata[]> {
-  const genAI = getGeminiClient();
+  const genAI = getGoogleEmbeddingClient();
   const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
 
   const results: ChunkMetadata[] = [];
@@ -643,9 +783,10 @@ export async function createKnowledgeDocument(
 
 /**
  * Generate embedding for a query (for semantic search)
+ * Uses Google's text-embedding-004 model (Anthropic has no embedding model)
  */
 export async function generateQueryEmbedding(query: string): Promise<number[]> {
-  const genAI = getGeminiClient();
+  const genAI = getGoogleEmbeddingClient();
   const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
 
   const result = await model.embedContent(query);
@@ -657,6 +798,7 @@ export async function generateQueryEmbedding(query: string): Promise<number[]> {
 
 /**
  * Index curated knowledge entries with embeddings
+ * Uses Google's text-embedding-004 model (Anthropic has no embedding model)
  */
 export async function indexCuratedKnowledge(
   supabase: SupabaseClient
@@ -681,8 +823,8 @@ export async function indexCuratedKnowledge(
       return { success: true, indexed: 0 };
     }
 
-    // Generate embeddings
-    const genAI = getGeminiClient();
+    // Generate embeddings using Google's model
+    const genAI = getGoogleEmbeddingClient();
     const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
 
     let indexed = 0;

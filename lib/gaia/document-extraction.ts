@@ -1,5 +1,5 @@
 // Rosa Document Extraction Module
-// Feature 4: Smart Document Data Extraction using AI
+// Feature 4: Smart Document Data Extraction using AI (Anthropic Claude)
 
 import { createClient } from '@supabase/supabase-js';
 import type {
@@ -10,6 +10,10 @@ import type {
 } from '@/lib/types/gaia';
 
 type SupabaseClient = ReturnType<typeof createClient>;
+
+const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_VERSION = '2023-06-01';
+const ANTHROPIC_MODEL = 'claude-sonnet-4-6-20250219';
 
 // Field mapping patterns for different document types
 const DOCUMENT_FIELD_PATTERNS: Record<RosaDocumentType, {
@@ -178,13 +182,13 @@ export async function createDocumentExtraction(
 }
 
 /**
- * Process a document for extraction using Gemini Vision
+ * Process a document for extraction using Anthropic Claude Vision
  * This function would be called from an edge function or background job
  */
 export async function processDocumentExtraction(
   supabase: SupabaseClient,
   extractionId: string,
-  geminiApiKey: string
+  anthropicApiKey: string
 ): Promise<RosaDocumentExtraction> {
   // Fetch the extraction record
   const { data: extractionData, error: fetchError } = await supabase
@@ -211,11 +215,11 @@ export async function processDocumentExtraction(
     const prompt = EXTRACTION_PROMPTS[documentType];
     const fieldPatterns = DOCUMENT_FIELD_PATTERNS[documentType];
 
-    // Call Gemini Vision API for extraction
-    const extractedData = await callGeminiVision(
+    // Call Claude Vision API for extraction
+    const extractedData = await callClaudeVision(
       extraction.file_url,
       prompt,
-      geminiApiKey
+      anthropicApiKey
     );
 
     // Parse and validate extracted fields
@@ -283,55 +287,60 @@ export async function processDocumentExtraction(
 }
 
 /**
- * Call Gemini Vision API for document extraction
+ * Call Anthropic Claude Vision API for document extraction
  */
-async function callGeminiVision(
+async function callClaudeVision(
   imageUrl: string,
   prompt: string,
   apiKey: string
 ): Promise<Record<string, unknown>> {
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt,
+  const base64Data = await fetchImageAsBase64(imageUrl);
+
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': ANTHROPIC_VERSION,
+    },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 2048,
+      temperature: 0.1,
+      system: 'You are a document data extraction specialist. Extract structured data from documents and return ONLY valid JSON with no additional text or markdown.',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: base64Data,
               },
-              {
-                inline_data: {
-                  mime_type: 'image/jpeg',
-                  data: await fetchImageAsBase64(imageUrl),
-                },
-              },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 2048,
+            },
+            {
+              type: 'text',
+              text: prompt,
+            },
+          ],
         },
-      }),
-    }
-  );
+      ],
+    }),
+  });
 
   if (!response.ok) {
-    throw new Error(`Gemini API error: ${response.status}`);
+    throw new Error(`Anthropic API error: ${response.status}`);
   }
 
   const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const text = data.content?.[0]?.text || '';
 
   // Extract JSON from the response
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error('Could not parse JSON from Gemini response');
+    throw new Error('Could not parse JSON from Claude response');
   }
 
   return JSON.parse(jsonMatch[0]);

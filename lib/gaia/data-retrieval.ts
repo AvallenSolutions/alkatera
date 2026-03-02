@@ -355,7 +355,7 @@ async function fetchVitalityScores(supabase: SupabaseClient, organizationId: str
 }
 
 /**
- * Format context for Gemini prompt
+ * Format context for Claude prompt
  */
 export function formatContextForPrompt(result: DataRetrievalResult): string {
   const { context } = result;
