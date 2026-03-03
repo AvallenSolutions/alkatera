@@ -13,8 +13,11 @@ import {
   Sparkles,
   Lightbulb,
   Clock,
+  Lock,
+  TrendingUp,
 } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { useSubscription, type FeatureCode } from '@/hooks/useSubscription';
 import type { ReportConfig, SectionDefinition } from '@/types/report-builder';
 import { AVAILABLE_SECTIONS, SECTION_CATEGORIES } from '@/types/report-builder';
 
@@ -35,6 +38,7 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
   const [loading, setLoading] = useState(true);
   const [recommendations, setRecommendations] = useState<Record<string, SectionRecommendation>>({});
   const supabase = getSupabaseBrowserClient();
+  const { hasFeature } = useSubscription();
 
   useEffect(() => {
     loadRecommendations();
@@ -114,6 +118,19 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
       recs['regulatory'] = { id: 'regulatory', priority: config.standards.includes('csrd') ? 'high' : 'medium', dataCompleteness: 100, rationale: config.standards.includes('csrd') ? 'Required for CSRD compliance' : 'Standards alignment' };
       recs['appendix'] = { id: 'appendix', priority: 'low', dataCompleteness: 100, rationale: 'Supplementary data and assumptions' };
 
+      // Impact Valuation — check if a cached result exists
+      const { data: ivResult } = await supabase
+        .from('impact_valuation_results')
+        .select('id, grand_total')
+        .eq('organization_id', orgId)
+        .eq('reporting_year', year)
+        .maybeSingle();
+      if (ivResult && ivResult.grand_total > 0) {
+        recs['impact-valuation'] = { id: 'impact-valuation', priority: 'medium', dataCompleteness: 100, rationale: 'Impact valuation data available' };
+      } else {
+        recs['impact-valuation'] = { id: 'impact-valuation', priority: 'low', dataCompleteness: 0, rationale: 'No impact valuation calculated yet' };
+      }
+
       setRecommendations(recs);
     } catch (error) {
       console.error('Error loading recommendations:', error);
@@ -132,7 +149,7 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
   }
 
   function handleSelectAll() {
-    const allIds = AVAILABLE_SECTIONS.filter(s => !s.comingSoon).map(s => s.id);
+    const allIds = AVAILABLE_SECTIONS.filter(s => !s.comingSoon && (!s.requiresFeature || hasFeature(s.requiresFeature as FeatureCode))).map(s => s.id);
     onChange({ sections: allIds });
   }
 
@@ -203,19 +220,22 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
               const isSelected = config.sections.includes(section.id);
               const rec = recommendations[section.id];
               const isComingSoon = section.comingSoon;
+              const isFeatureLocked = section.requiresFeature ? !hasFeature(section.requiresFeature as FeatureCode) : false;
+              const isDisabled = isComingSoon || isFeatureLocked;
 
               return (
                 <div
                   key={section.id}
                   className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                    isComingSoon ? 'opacity-50 cursor-not-allowed' :
+                    isDisabled ? 'opacity-50 cursor-not-allowed' :
                     isSelected ? 'border-primary bg-primary/5' : 'hover:bg-accent/50 cursor-pointer'
                   }`}
-                  onClick={() => !isComingSoon && handleToggle(section.id, !isSelected)}
+                  onClick={() => !isDisabled && handleToggle(section.id, !isSelected)}
+                  title={isFeatureLocked ? 'Beta access required' : undefined}
                 >
                   <Checkbox
-                    checked={isSelected}
-                    disabled={section.required || isComingSoon}
+                    checked={isSelected && !isFeatureLocked}
+                    disabled={section.required || isDisabled}
                     onCheckedChange={(checked) => handleToggle(section.id, checked as boolean)}
                     onClick={(e) => e.stopPropagation()}
                   />
@@ -229,14 +249,29 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
                           Coming Soon
                         </Badge>
                       )}
-                      {!isComingSoon && getPriorityBadge(rec)}
+                      {isFeatureLocked && (
+                        <Badge variant="outline" className="text-xs text-muted-foreground">
+                          <Lock className="h-3 w-3 mr-1" />
+                          Beta access required
+                        </Badge>
+                      )}
+                      {section.requiresFeature && !isFeatureLocked && (
+                        <Badge
+                          variant="outline"
+                          className="text-amber-600 border-amber-400 bg-amber-50 text-xs font-semibold"
+                        >
+                          BETA
+                        </Badge>
+                      )}
+                      {!isDisabled && !section.requiresFeature && getPriorityBadge(rec)}
+                      {!isDisabled && section.requiresFeature && !isFeatureLocked && getPriorityBadge(rec)}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{section.description}</p>
-                    {rec && !isComingSoon && (
+                    {rec && !isDisabled && (
                       <p className="text-xs text-muted-foreground italic mt-0.5">{rec.rationale}</p>
                     )}
                   </div>
-                  {rec && !isComingSoon && (
+                  {rec && !isDisabled && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <div className="w-16 bg-gray-200 rounded-full h-1.5">
                         <div

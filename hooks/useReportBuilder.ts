@@ -87,6 +87,37 @@ export function useReportBuilder() {
 
       const organizationId = currentOrganization.id;
 
+      // If impact-valuation section is selected, ensure a calculation exists
+      if (config.sections.includes('impact-valuation')) {
+        try {
+          const { data: ivCheck } = await supabase
+            .from('impact_valuation_results')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .eq('reporting_year', config.reportYear)
+            .limit(1)
+            .maybeSingle();
+
+          if (!ivCheck) {
+            // No cached result — trigger a calculation first
+            console.log('[ReportBuilder] Triggering impact valuation calculation before report generation');
+            const calcResponse = await fetch('/api/impact-valuation/calculate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ reportingYear: config.reportYear }),
+            });
+
+            if (!calcResponse.ok) {
+              console.warn('[ReportBuilder] Impact valuation calculation failed, proceeding without it');
+            }
+          }
+        } catch (ivError) {
+          console.warn('[ReportBuilder] Error checking impact valuation data:', ivError);
+          // Non-blocking — proceed with report generation anyway
+        }
+      }
+
       // Create report record
       const { data: reportRecord, error: insertError } = await supabase
         .from('generated_reports')

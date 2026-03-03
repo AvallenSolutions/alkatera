@@ -490,6 +490,7 @@ const featureNames: Record<FeatureCode, string> = {
   lca_distribution: "LCA Distribution (Cradle-to-Shelf)",
   lca_use_phase: "LCA Use Phase (Cradle-to-Consumer)",
   lca_end_of_life: "LCA End of Life (Cradle-to-Grave)",
+  impact_valuation_beta: "Impact Valuation (Beta)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {
@@ -508,21 +509,21 @@ const tierPrices: Record<TierName, number> = {
 const tierHighlights: Record<TierName, string[]> = {
   seed: [],
   blossom: [
-    "Water, Circularity, Land Use & Resource impacts",
     "Full Scope 3 Categories",
-    "Vehicle Registry & Supply Chain Mapping",
+    "Water, Circularity, Land Use & Resource impacts",
     "People & Culture and Community Impact ESG modules",
+    "Vehicle Registry & Supply Chain Mapping",
     "B Corp & CDP certification tracking",
     "Rosa AI (100/mo) & Greenwash Guardian (5 docs/mo)",
     "Knowledge Bank (Upload & Manage)",
     "Up to 20 products, 5 team members, 3 facilities",
   ],
   canopy: [
+    "Impact Valuation: Monetise Your Sustainability Impact",
+    "Gap Analysis, Audit Packages & Verification Support",
+    "Governance & Ethics module",
     "Year-over-Year Comparisons",
     "Advanced Data Quality Scoring & EF 3.1",
-    "Governance & Ethics module",
-    "All certifications: CSRD, GRI, ISO, SBTi",
-    "Gap Analysis, Audit Packages & Verification Support",
     "Unlimited Rosa AI & Greenwash Guardian",
     "Up to 50 products, 10 team members, 8 facilities",
   ],

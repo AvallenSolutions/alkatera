@@ -167,7 +167,7 @@ export async function calculateScope3Cat4(
       unit,
       transport_mode,
       distance_km,
-      product_carbon_footprints!inner(
+      product_carbon_footprints!product_lca_materials_lca_id_fkey!inner(
         organization_id,
         status,
         created_at

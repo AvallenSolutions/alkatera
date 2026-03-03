@@ -28,6 +28,7 @@ import {
   Target,
   Droplet,
   TrendingDown,
+  TrendingUp,
   ShieldCheck,
   Check,
   X,
@@ -46,6 +47,7 @@ const iconMap: Record<string, any> = {
   Target,
   Droplet,
   TrendingDown,
+  TrendingUp,
   ShieldCheck,
 };
 

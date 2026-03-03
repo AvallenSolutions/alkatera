@@ -95,7 +95,9 @@ export type FeatureCode =
   // LCA System Boundary tiers
   | "lca_distribution"
   | "lca_use_phase"
-  | "lca_end_of_life";
+  | "lca_end_of_life"
+  // Impact Valuation (beta)
+  | "impact_valuation_beta";
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -517,6 +519,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "csrd_compliance", "gri_standards",
     "iso_14001", "iso_50001", "sbti_targets",
     "gap_analysis", "audit_packages", "third_party_verification",
+    // Impact Valuation — canopy tier OR admin-granted via feature_flags
+    "impact_valuation_beta",
   ];
 
   const blossomFeatures: FeatureCode[] = [

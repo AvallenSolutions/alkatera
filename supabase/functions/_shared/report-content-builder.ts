@@ -69,6 +69,31 @@ export interface DataQualityMetrics {
   confidenceScore: number;
 }
 
+export interface ImpactValuationItem {
+  key: string;
+  label: string;
+  value: number;
+  raw_input: number | null;
+  unit: string;
+  has_data: boolean;
+}
+
+export interface ImpactValuationCapital {
+  total: number;
+  items: ImpactValuationItem[];
+}
+
+export interface ImpactValuationData {
+  natural: ImpactValuationCapital;
+  human: ImpactValuationCapital;
+  social: ImpactValuationCapital;
+  governance: ImpactValuationCapital;
+  grand_total: number;
+  data_coverage: number;
+  confidence_level: string;
+  reporting_year: number;
+}
+
 export interface ReportData {
   organization: OrganizationInfo;
   emissions: EmissionsData;
@@ -78,12 +103,14 @@ export interface ReportData {
   suppliers?: SupplierData[];
   standards: StandardStatus[];
   dataQuality?: DataQualityMetrics;
+  impactValuation?: ImpactValuationData;
   dataAvailability: {
     hasOrganization: boolean;
     hasEmissions: boolean;
     hasProducts: boolean;
     hasFacilities: boolean;
     hasSuppliers?: boolean;
+    hasImpactValuation?: boolean;
   };
 }
 
@@ -529,6 +556,98 @@ ${data.dataQuality ? `
 }
 
 /**
+ * Formats a GBP currency value with thousand separators and no decimals
+ */
+function formatGBP(value: number): string {
+  if (value === null || value === undefined || isNaN(value)) {
+    return 'N/A';
+  }
+  return `£${value.toLocaleString('en-GB', { maximumFractionDigits: 0 })}`;
+}
+
+/**
+ * Generates Impact Valuation overview and breakdown slides
+ */
+function buildImpactValuationSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  const slides: SlideContent[] = [];
+
+  if (!data.dataAvailability.hasImpactValuation || !data.impactValuation) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Impact Valuation',
+      content: `
+# Impact Valuation
+
+## No Data Available
+
+No impact valuation calculation has been completed for ${config.reportYear}.
+
+Run an Impact Valuation calculation in the platform to include this section.
+`.trim(),
+    });
+    return slides;
+  }
+
+  const iv = data.impactValuation;
+  const coveragePct = Math.round(iv.data_coverage * 100);
+
+  // Slide 1 — Impact Value Overview
+  slides.push({
+    slideNumber: 0,
+    title: `Total Impact Value: ${formatGBP(iv.grand_total)}`,
+    content: `
+# Total Impact Value: ${formatGBP(iv.grand_total)}
+
+## ${iv.reporting_year} | ${iv.confidence_level.charAt(0).toUpperCase() + iv.confidence_level.slice(1)} confidence | ${coveragePct}% data coverage
+
+### Impact by Capital
+
+| Capital | Monetised Value |
+|---------|----------------|
+| **Natural Capital** | ${formatGBP(iv.natural.total)} |
+| **Human Capital** | ${formatGBP(iv.human.total)} |
+| **Social Capital** | ${formatGBP(iv.social.total)} |
+| **Governance Capital** | ${formatGBP(iv.governance.total)} |
+| **Total** | **${formatGBP(iv.grand_total)}** |
+
+---
+
+*Monetised using Defra shadow prices, HM Treasury Green Book, Social Value Bank proxies (v1.0)*
+`.trim(),
+  });
+
+  // Slide 2 — Impact Value Breakdown (only items with data)
+  const allItems = [
+    ...iv.natural.items.filter(i => i.has_data).map(i => ({ ...i, capital: 'Natural' })),
+    ...iv.human.items.filter(i => i.has_data).map(i => ({ ...i, capital: 'Human' })),
+    ...iv.social.items.filter(i => i.has_data).map(i => ({ ...i, capital: 'Social' })),
+    ...iv.governance.items.filter(i => i.has_data).map(i => ({ ...i, capital: 'Governance' })),
+  ];
+
+  if (allItems.length > 0) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Impact Value: Detailed Breakdown',
+      content: `
+# Impact Value: Detailed Breakdown
+
+## Metrics with Available Data
+
+| Capital | Metric | Raw Input | Monetised Value |
+|---------|--------|-----------|----------------|
+${allItems.map(item => `| ${item.capital} | ${item.label} | ${item.raw_input !== null ? item.raw_input.toLocaleString('en-GB') : '—'} ${item.unit} | ${formatGBP(item.value)} |`).join('\n')}
+
+---
+
+*alkatera Impact Valuation Module | proxy version 1.0*
+`.trim(),
+    });
+  }
+
+  return slides;
+}
+
+/**
  * Generates closing/contact slide
  */
 function buildClosingSlide(config: ReportConfig, data: ReportData): SlideContent {
@@ -862,6 +981,11 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
     slides.push(...buildProductSlides(config, data));
   }
 
+  // Impact Valuation
+  if (config.sections.includes('impact-valuation')) {
+    slides.push(...buildImpactValuationSlides(config, data));
+  }
+
   // Supply chain
   if (config.sections.includes('supply-chain')) {
     slides.push(...buildSupplyChainSlides(config, data));
@@ -955,6 +1079,7 @@ export function calculateSlideCount(sections: string[]): number {
     'scope-1-2-3': 3,
     'ghg-inventory': 1,
     'product-footprints': 2,
+    'impact-valuation': 2,
     'supply-chain': 1,
     'facilities': 1,
     'trends': 1,

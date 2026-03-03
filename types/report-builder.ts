@@ -33,6 +33,7 @@ export interface SectionDefinition {
   required: boolean;
   category: string;
   comingSoon?: boolean;
+  requiresFeature?: string;
 }
 
 export const AVAILABLE_SECTIONS: SectionDefinition[] = [
@@ -86,6 +87,14 @@ export const AVAILABLE_SECTIONS: SectionDefinition[] = [
     required: false,
     category: 'Environmental Impacts',
     comingSoon: true,
+  },
+  {
+    id: 'impact-valuation',
+    label: 'Impact Valuation',
+    description: 'Monetised £ value of sustainability impact across four capitals',
+    required: false,
+    category: 'Impact',
+    requiresFeature: 'impact_valuation_beta',
   },
   {
     id: 'supply-chain',
@@ -143,6 +152,7 @@ export const SECTION_CATEGORIES = [
   'Emissions',
   'Products',
   'Environmental Impacts',
+  'Impact',
   'Value Chain',
   'Operations',
   'Performance',
@@ -179,6 +189,7 @@ export const SECTION_LABELS: Record<string, string> = {
   'carbon-origin': 'Carbon Origin Breakdown',
   'product-footprints': 'Product Environmental Impacts',
   'multi-capital': 'Multi-capital Impacts',
+  'impact-valuation': 'Impact Valuation',
   'supply-chain': 'Supply Chain Analysis',
   facilities: 'Facility Emissions Breakdown',
   trends: 'Year-over-Year Trends',

@@ -99,11 +99,7 @@ WHERE organization_id = get_current_organization_id();
 DELETE FROM public.lca_workflow_audit
 WHERE organization_id = get_current_organization_id();
 
-DELETE FROM public.lca_social_indicators
-WHERE organization_id = get_current_organization_id();
-
-DELETE FROM public.lca_reports
-WHERE organization_id = get_current_organization_id();
+-- lca_social_indicators and lca_reports tables dropped (migration 20260322)
 
 DELETE FROM public.lca_methodology_audit_log
 WHERE organization_id = get_current_organization_id();

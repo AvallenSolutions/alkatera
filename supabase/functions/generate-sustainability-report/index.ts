@@ -624,6 +624,70 @@ async function aggregateReportData(
     }
   }
 
+  // Fetch impact valuation data if section is included
+  if (sections.includes('impact-valuation')) {
+    try {
+      const { data: ivResult, error: ivError } = await supabaseClient
+        .from('impact_valuation_results')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('reporting_year', reportYear)
+        .order('calculated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ivError) {
+        console.error('[Data] Error fetching impact valuation:', ivError.message);
+      } else if (ivResult && ivResult.grand_total > 0) {
+        // Reconstruct item arrays from stored column values
+        // data_coverage is stored as percentage (0–100), convert to 0–1 for display
+        const dataCoverage = (ivResult.data_coverage || 0) / 100;
+        const snapshot = ivResult.input_snapshot as any;
+
+        data.impactValuation = {
+          natural: {
+            total: ivResult.natural_total || 0,
+            items: [
+              { key: 'carbon_tonne', label: 'Carbon (GHG)', value: ivResult.natural_carbon_value || 0, raw_input: snapshot?.natural?.total_emissions_tco2e ?? null, unit: 'per tCO2e', has_data: (ivResult.natural_carbon_value || 0) > 0 },
+              { key: 'water_m3', label: 'Water Use', value: ivResult.natural_water_value || 0, raw_input: snapshot?.natural?.water_consumption_m3 ?? null, unit: 'per m³', has_data: (ivResult.natural_water_value || 0) > 0 },
+              { key: 'land_ha', label: 'Land Use', value: ivResult.natural_land_value || 0, raw_input: snapshot?.natural?.land_use_ha ?? null, unit: 'per ha/yr', has_data: (ivResult.natural_land_value || 0) > 0 },
+              { key: 'waste_tonne', label: 'Waste to Landfill', value: ivResult.natural_waste_value || 0, raw_input: snapshot?.natural?.waste_to_landfill_tonnes ?? null, unit: 'per tonne', has_data: snapshot?.natural?.waste_to_landfill_tonnes !== null && snapshot?.natural?.waste_to_landfill_tonnes !== undefined },
+            ],
+          },
+          human: {
+            total: ivResult.human_total || 0,
+            items: [
+              { key: 'living_wage_gap_gbp', label: 'Living Wage Uplift', value: ivResult.human_living_wage_value || 0, raw_input: snapshot?.human?.living_wage_gap_annual_gbp ?? null, unit: 'per £1 gap/yr', has_data: (ivResult.human_living_wage_value || 0) > 0 },
+              { key: 'training_hour', label: 'Employee Training', value: ivResult.human_training_value || 0, raw_input: snapshot?.human?.total_training_hours ?? null, unit: 'per hour', has_data: (ivResult.human_training_value || 0) > 0 },
+              { key: 'wellbeing_score_point', label: 'Employee Wellbeing', value: ivResult.human_wellbeing_value || 0, raw_input: snapshot?.human?.wellbeing_score ?? null, unit: 'per 1pt score improvement', has_data: (ivResult.human_wellbeing_value || 0) > 0 },
+            ],
+          },
+          social: {
+            total: ivResult.social_total || 0,
+            items: [
+              { key: 'volunteering_hour', label: 'Volunteering Hours', value: ivResult.social_volunteering_value || 0, raw_input: snapshot?.social?.volunteering_hours_total ?? null, unit: 'per hour', has_data: (ivResult.social_volunteering_value || 0) > 0 },
+              { key: 'charitable_giving_gbp', label: 'Charitable Giving', value: ivResult.social_giving_value || 0, raw_input: snapshot?.social?.charitable_giving_total_gbp ?? null, unit: 'per £1 donated', has_data: (ivResult.social_giving_value || 0) > 0 },
+              { key: 'local_multiplier', label: 'Local Supply Chain Spend', value: ivResult.social_local_multiplier_value || 0, raw_input: snapshot?.social?.local_supply_spend_gbp ?? null, unit: 'per £1 local spend', has_data: (ivResult.social_local_multiplier_value || 0) > 0 },
+            ],
+          },
+          governance: {
+            total: ivResult.governance_total || 0,
+            items: [
+              { key: 'governance_score_point', label: 'Governance Quality', value: ivResult.governance_total || 0, raw_input: snapshot?.governance?.governance_score ?? null, unit: 'per 1pt score (0–100)', has_data: (ivResult.governance_total || 0) > 0 },
+            ],
+          },
+          grand_total: ivResult.grand_total,
+          data_coverage: dataCoverage,
+          confidence_level: ivResult.confidence_level || 'low',
+          reporting_year: ivResult.reporting_year,
+        };
+        data.dataAvailability.hasImpactValuation = true;
+      }
+    } catch (error) {
+      console.error('[Data] Exception fetching impact valuation:', error);
+    }
+  }
+
   // Populate standards compliance status
   if (sections.includes('methodology') || true) {
     data.standards = [];

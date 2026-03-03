@@ -1,128 +1,74 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useOrganization } from '@/lib/organizationContext';
-import { useDashboardPreferences } from '@/hooks/data/useDashboardPreferences';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
-import { useSupplierEngagement } from '@/hooks/data/useSupplierEngagement';
 import { useCompanyMetrics } from '@/hooks/data/useCompanyMetrics';
+import type { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
 import { useFacilityWaterData } from '@/hooks/data/useFacilityWaterData';
 import { useVitalityBenchmarks } from '@/hooks/data/useVitalityBenchmarks';
-import type { NatureMetrics } from '@/hooks/data/useCompanyMetrics';
+import { usePeopleCultureScore } from '@/hooks/data/usePeopleCultureScore';
+import { useProductSpotlight } from '@/hooks/data/useProductSpotlight';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
-  Settings2,
-  RefreshCw,
-} from 'lucide-react';
+import { RefreshCw, Package, ArrowRight } from 'lucide-react';
 
 import { VitalityScoreHero, calculateVitalityScores } from '@/components/vitality/VitalityScoreHero';
 import { getBenchmarkForProductType } from '@/lib/industry-benchmarks';
 import { fetchProducts } from '@/lib/products';
-import { RAGStatusCard, RAGStatusCardGrid } from '@/components/dashboard/RAGStatusCard';
 import { PriorityActionsList, generatePriorityActions } from '@/components/dashboard/PriorityActionCard';
-import { DashboardGuideTrigger } from '@/components/dashboard/DashboardGuide';
 import { SetupProgressBanner } from '@/components/dashboard/SetupProgressBanner';
 import { useSetupProgress } from '@/hooks/data/useSetupProgress';
-import { Suspense } from 'react';
-import dynamic from 'next/dynamic';
+import { StatCard } from '@/components/dashboard/StatCard';
 import { InlineErrorBoundary } from '@/components/ErrorBoundary';
 
 import {
-  QuickActionsWidget,
-  GHGEmissionsSummaryWidget,
-  SupplierEngagementWidget,
   RecentActivityWidget,
-  DataQualityWidget,
-  ProductLCAStatusWidget,
-  GettingStartedWidget,
-  WaterRiskWidget,
-  ComplianceStatusWidget,
+  ImpactValueWidget,
 } from '@/components/dashboard/widgets';
 
-// Lazy-load heavy/conditional components to reduce initial bundle size.
-// DashboardGuide uses framer-motion (~60KB) and only shows for new users.
-// DashboardCustomiseModal only opens on button click.
-const DashboardGuide = dynamic(
-  () => import('@/components/dashboard/DashboardGuide').then(mod => ({ default: mod.DashboardGuide })),
-  { ssr: false }
-);
-const DashboardCustomiseModal = dynamic(
-  () => import('@/components/dashboard/DashboardCustomiseModal').then(mod => ({ default: mod.DashboardCustomiseModal })),
-  { ssr: false }
-);
-
-function DashboardSkeleton() {
+/** Animated loading visual shown while dashboard data is streaming in. */
+function DashboardLoadingVisual() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <ShimmerBlock className="h-8 w-64" />
-          <ShimmerBlock className="h-4 w-48" />
+    <div className="relative flex flex-col items-center justify-center py-16 overflow-hidden rounded-2xl border border-slate-200/50 dark:border-slate-800/50 bg-gradient-to-br from-slate-50 via-white to-slate-50 dark:from-slate-900/80 dark:via-slate-900 dark:to-slate-800/80">
+      {/* Ambient glow */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="h-40 w-40 rounded-full bg-[#ccff00]/10 dark:bg-[#ccff00]/5 blur-3xl animate-pulse" />
+      </div>
+
+      {/* Concentric animated rings */}
+      <div className="relative h-24 w-24 mb-5">
+        {/* Outer ring — slow spin */}
+        <div className="absolute inset-0 rounded-full border-2 border-dashed border-[#ccff00]/30 animate-[spin_8s_linear_infinite]" />
+        {/* Middle ring — reverse spin */}
+        <div className="absolute inset-2 rounded-full border-2 border-[#ccff00]/20 animate-[spin_6s_linear_infinite_reverse]" />
+        {/* Inner ring — fast spin, thicker arc */}
+        <div className="absolute inset-4 rounded-full border-2 border-transparent border-t-[#ccff00] border-r-[#ccff00]/40 animate-[spin_1.5s_ease-in-out_infinite]" />
+        {/* Centre dot — pulsing */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-3 w-3 rounded-full bg-[#ccff00] animate-pulse shadow-[0_0_12px_rgba(204,255,0,0.5)]" />
         </div>
-        <ShimmerBlock className="h-9 w-28" />
       </div>
-      <DashboardLoadingBar />
-      <ShimmerBlock className="h-64 w-full rounded-2xl" />
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <ShimmerBlock className="h-36 rounded-xl" />
-        <ShimmerBlock className="h-36 rounded-xl" />
-        <ShimmerBlock className="h-36 rounded-xl" />
-        <ShimmerBlock className="h-36 rounded-xl" />
-      </div>
-      <div className="grid gap-6 lg:grid-cols-3">
-        <ShimmerBlock className="h-80 rounded-xl lg:col-span-2" />
-        <ShimmerBlock className="h-80 rounded-xl" />
-      </div>
-    </div>
-  );
-}
 
-/** Thin brand-coloured progress bar shown while dashboard data is streaming in. */
-function DashboardLoadingBar() {
-  return (
-    <div className="h-1 w-full overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-800/60">
-      <div className="h-full w-1/3 animate-loading-bar rounded-full bg-[#ccff00]" />
-    </div>
-  );
-}
-
-/** Shimmer skeleton — gradient sweep instead of basic pulse. */
-function ShimmerBlock({ className }: { className?: string }) {
-  return (
-    <div
-      className={`rounded-md bg-gradient-to-r from-muted via-muted-foreground/10 to-muted bg-[length:200%_100%] animate-shimmer ${className ?? ''}`}
-    />
-  );
-}
-
-function EmptyDashboard({ onRefetch }: { onRefetch: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="h-16 w-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-        <Settings2 className="h-8 w-8 text-slate-400" />
-      </div>
-      <h3 className="text-lg font-semibold mb-2">No Widgets Enabled</h3>
-      <p className="text-sm text-muted-foreground mb-4 max-w-md">
-        You have hidden all dashboard widgets. Click customise to enable the widgets you want to see.
+      {/* Text */}
+      <p className="text-sm font-medium text-slate-600 dark:text-slate-300 tracking-wide mb-1">
+        Data Loading
       </p>
-      <DashboardCustomiseModal onPreferencesChanged={onRefetch}>
-        <Button>
-          <Settings2 className="h-4 w-4 mr-2" />
-          Customise Dashboard
-        </Button>
-      </DashboardCustomiseModal>
+      <p className="text-xs text-slate-400 dark:text-slate-500">
+        Crunching your sustainability numbers…
+      </p>
+
+      {/* Bottom progress track */}
+      <div className="mt-5 h-1 w-48 overflow-hidden rounded-full bg-slate-200/60 dark:bg-slate-800/60">
+        <div className="h-full w-1/3 animate-loading-bar rounded-full bg-[#ccff00]" />
+      </div>
     </div>
   );
 }
+
 
 function deriveBiodiversityRisk(natureMetrics: NatureMetrics | null): 'high' | 'medium' | 'low' | undefined {
   if (!natureMetrics) return undefined;
@@ -130,11 +76,10 @@ function deriveBiodiversityRisk(natureMetrics: NatureMetrics | null): 'high' | '
 
   const pu = natureMetrics.per_unit;
 
-  // Score each metric: 3 = excellent, 2 = good, 1 = needs work
   function rateMetric(value: number, excellent: number, good: number): number {
-    if (value <= excellent) return 3; // Excellent
-    if (value <= good) return 2;     // Good
-    return 1;                         // Needs work
+    if (value <= excellent) return 3;
+    if (value <= good) return 2;
+    return 1;
   }
 
   const scores = [
@@ -146,43 +91,47 @@ function deriveBiodiversityRisk(natureMetrics: NatureMetrics | null): 'high' | '
 
   const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
 
-  // Map average metric score to risk level
-  if (avgScore >= 2.5) return 'low';    // Mostly excellent → low risk
-  if (avgScore >= 1.5) return 'medium'; // Mixed performance → medium risk
-  return 'high';                         // Mostly needs work → high risk
+  if (avgScore >= 2.5) return 'low';
+  if (avgScore >= 1.5) return 'medium';
+  return 'high';
 }
 
-function getStatusFromScore(score: number | null): 'good' | 'warning' | 'critical' | 'neutral' {
-  if (score === null) return 'neutral';
-  if (score >= 70) return 'good';
-  if (score >= 50) return 'warning';
+function getStatusFromValue(value: number | null, thresholds: { good: number; warning: number }, higherIsBetter: boolean): 'good' | 'warning' | 'critical' | 'neutral' {
+  if (value === null || value === undefined) return 'neutral';
+  if (higherIsBetter) {
+    if (value >= thresholds.good) return 'good';
+    if (value >= thresholds.warning) return 'warning';
+    return 'critical';
+  }
+  // Lower is better (not used currently but for completeness)
+  if (value <= thresholds.good) return 'good';
+  if (value <= thresholds.warning) return 'warning';
   return 'critical';
-}
-
-function formatValue(value: number): string {
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  if (value < 0.1 && value > 0) return value.toExponential(1);
-  return value.toFixed(1);
 }
 
 const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
 
+// ── LCA status badge colours ────────────────────────────────────────
+const LCA_BADGE: Record<string, { label: string; className: string }> = {
+  completed: { label: 'LCA Complete', className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300' },
+  in_progress: { label: 'In Progress', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300' },
+  draft: { label: 'No LCA', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
+};
+
 export default function DashboardPage() {
   const { currentOrganization } = useOrganization();
-  const { enabledWidgets, loading: prefsLoading, error: prefsError, refetch } = useDashboardPreferences();
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const { footprint, loading: footprintLoading } = useCompanyFootprint(selectedYear);
   const { footprint: previousYearFootprint } = useCompanyFootprint(selectedYear - 1);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
-  const { data: supplierData, isLoading: supplierLoading } = useSupplierEngagement();
   const companyMetricsResult = useCompanyMetrics(selectedYear);
   const { metrics: companyMetrics, natureMetrics, loading: metricsLoading } = companyMetricsResult;
   const { companyOverview: waterCompanyOverview } = useFacilityWaterData(selectedYear);
   const { getBenchmarkForPillar } = useVitalityBenchmarks();
+  const { score: peopleCultureScore, loading: pcLoading } = usePeopleCultureScore(selectedYear);
+  const { products: spotlightProducts, loading: spotlightLoading } = useProductSpotlight();
 
   const setupProgress = useSetupProgress();
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch product categories for industry benchmark lookup
@@ -199,14 +148,10 @@ export default function DashboardPage() {
     [currentOrganization?.product_type, productCategories]
   );
 
-  // Progressive rendering: Only block page chrome on preferences loading (~50ms).
-  // Vitality hero + RAG cards show their own skeletons until their data arrives.
-  // All other widgets render immediately with their own internal loading states.
   const isVitalityLoading = metricsLoading || footprintLoading || wasteLoading;
-  const isAnyDataLoading = footprintLoading || wasteLoading || supplierLoading || metricsLoading;
+  const isAnyDataLoading = footprintLoading || wasteLoading || metricsLoading || pcLoading;
 
   const waterConsumption = useMemo(() => {
-    // Use facility scarcity-weighted water as primary source (consistent with Company Vitality)
     const facilityScarcity = waterCompanyOverview?.total_scarcity_weighted_m3
       || waterCompanyOverview?.scarcity_weighted_consumption_m3
       || 0;
@@ -220,8 +165,6 @@ export default function DashboardPage() {
   const landUse = companyMetrics?.total_impacts?.land_use || 0;
   const circularityRate = wasteMetrics?.waste_diversion_rate || companyMetrics?.circularity_percentage || 0;
 
-  // Estimate total industry benchmark from category-specific per-litre data.
-  // Assumes ~50,000 litres production volume per product assessed (calibration constant).
   const estimatedLitresPerProduct = 50000;
   const industryBenchmarkTotal = industryBenchmarkData.kgCO2ePerLitre * estimatedLitresPerProduct
     * (companyMetrics?.total_products_assessed || 1);
@@ -246,14 +189,6 @@ export default function DashboardPage() {
       hasWasteData,
     });
   }, [totalCO2, waterConsumption, companyMetrics, wasteMetrics, circularityRate, landUse, natureMetrics, industryBenchmarkTotal]);
-
-  // Keep scores object for RAG status cards
-  const scores = useMemo(() => ({
-    climateScore: vitalityScores.climate,
-    waterScore: vitalityScores.water,
-    circularityScore: vitalityScores.circularity,
-    natureScore: vitalityScores.nature,
-  }), [vitalityScores]);
 
   const emissionsIntensity = totalCO2 / (companyMetrics?.total_products_assessed || 1);
   const industryBenchmarkPerProduct = industryBenchmarkTotal / (companyMetrics?.total_products_assessed || 1);
@@ -286,7 +221,7 @@ export default function DashboardPage() {
   }), [totalCO2, emissionsIntensity, industryBenchmarkPerProduct, intensityRatio, companyMetrics, waterConsumption, circularityRate, natureMetrics, landUse, industryBenchmarkData, dominantCategory]);
 
   const scopeBreakdown = useMemo(() => {
-    if (!footprint?.breakdown) return { scope1: 0, scope2: 0, scope3: 0 };
+    if (!footprint?.breakdown) return { scope1Pct: 0, scope2Pct: 0, scope3Pct: 0 };
     const total = footprint.total_emissions || 1;
     return {
       scope1Pct: ((footprint.breakdown.scope1 || 0) / total) * 100,
@@ -296,31 +231,21 @@ export default function DashboardPage() {
   }, [footprint]);
 
   const priorityActions = useMemo(() => {
-    let supplierEngagementRate: number | undefined;
-    if (supplierData && supplierData.length > 0) {
-      const total = supplierData[0]?.total_suppliers || 1;
-      const activeEntry = supplierData.find(s => s.status === 'active');
-      const engaged = activeEntry?.supplier_count || 0;
-      supplierEngagementRate = (engaged / total) * 100;
-    }
     return generatePriorityActions({
-      // Setup progress
       hasFacilities: setupProgress.hasFacilities,
       hasProducts: setupProgress.hasProducts,
       hasSuppliers: setupProgress.hasSuppliers,
       hasTeamMembers: setupProgress.hasTeamMembers,
       facilitiesCount: setupProgress.facilitiesCount,
       productsCount: setupProgress.productsCount,
-      // Emissions & performance data
       totalEmissions: footprint?.total_emissions,
       scope1Percentage: scopeBreakdown.scope1Pct,
       scope2Percentage: scopeBreakdown.scope2Pct,
       scope3Percentage: scopeBreakdown.scope3Pct,
       circularityRate: wasteMetrics?.waste_diversion_rate,
       hasWasteData: wasteMetrics !== null && wasteMetrics !== undefined,
-      supplierEngagementRate,
     });
-  }, [scopeBreakdown, wasteMetrics, supplierData, footprint, setupProgress]);
+  }, [scopeBreakdown, wasteMetrics, footprint, setupProgress]);
 
   const carbonTrend = useMemo(() => {
     if (!footprint?.total_emissions || !previousYearFootprint?.total_emissions) {
@@ -336,62 +261,48 @@ export default function DashboardPage() {
     };
   }, [footprint, previousYearFootprint]);
 
-
-  useEffect(() => {
-    setLastUpdated(new Date());
-  }, [enabledWidgets]);
-
   const handleRefresh = () => {
-    refetch();
     setRefreshKey(prev => prev + 1);
-    setLastUpdated(new Date());
   };
 
-  if (prefsLoading) {
-    return (
-      <div className="p-6">
-        <DashboardSkeleton />
-      </div>
-    );
-  }
+  // ── Stat card values ──────────────────────────────────────────────
+  const carbonValue = footprint?.total_emissions
+    ? (footprint.total_emissions / 1000).toFixed(1)
+    : '--';
+  const waterValue = waterConsumption > 0
+    ? (waterConsumption >= 1000 ? `${(waterConsumption / 1000).toFixed(1)}k` : waterConsumption.toFixed(0))
+    : '--';
+  const livingWageValue = peopleCultureScore?.living_wage_compliance != null
+    ? Math.round(peopleCultureScore.living_wage_compliance).toString()
+    : '--';
+  const wasteValue = wasteMetrics?.waste_diversion_rate != null
+    ? wasteMetrics.waste_diversion_rate.toFixed(0)
+    : '--';
 
-  if (prefsError) {
-    return (
-      <div className="p-6">
-        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-xl p-6 text-center">
-          <p className="text-red-600 dark:text-red-400 mb-4">{prefsError}</p>
-          <Button variant="outline" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  // Check if widget is enabled
-  const isWidgetEnabled = (widgetId: string) => {
-    return enabledWidgets.some(w => w.widget_id === widgetId);
-  };
-
-  // Show empty state if no widgets enabled
-  if (enabledWidgets.length === 0) {
-    return (
-      <div className="p-6">
-        <EmptyDashboard onRefetch={refetch} />
-      </div>
-    );
-  }
+  // Status colouring: emerald ≥70, amber 40–69, red <40
+  const carbonStatus = footprint?.total_emissions != null
+    ? getStatusFromValue(vitalityScores.climate, { good: 70, warning: 40 }, true)
+    : 'neutral';
+  const waterStatus = waterConsumption > 0
+    ? getStatusFromValue(vitalityScores.water, { good: 70, warning: 40 }, true)
+    : 'neutral';
+  const livingWageStatus = peopleCultureScore?.living_wage_compliance != null
+    ? getStatusFromValue(peopleCultureScore.living_wage_compliance, { good: 70, warning: 40 }, true)
+    : 'neutral';
+  const wasteStatus = wasteMetrics?.waste_diversion_rate != null
+    ? getStatusFromValue(wasteMetrics.waste_diversion_rate, { good: 70, warning: 40 }, true)
+    : 'neutral';
 
   return (
     <div className="space-y-6 animate-fade-in-up">
+      {/* ── COMMAND STRIP ─────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-heading font-bold tracking-tight">
-            Sustainability Overview
+            {currentOrganization?.name || 'Dashboard'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Welcome back! Here&apos;s how {currentOrganization?.name || 'your organization'} is performing.
+            Sustainability Overview &middot; {selectedYear}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -401,247 +312,221 @@ export default function DashboardPage() {
             className="px-3 py-2 text-sm font-medium rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           >
             {AVAILABLE_YEARS.map((year) => (
-              <option key={year} value={year}>
-                {year}
-              </option>
+              <option key={year} value={year}>{year}</option>
             ))}
           </select>
-          <DashboardGuideTrigger />
           <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh dashboard">
             <RefreshCw className={`h-4 w-4 transition-transform ${isAnyDataLoading ? 'animate-spin' : ''}`} />
           </Button>
-          <DashboardCustomiseModal onPreferencesChanged={refetch} />
         </div>
       </div>
-
-      {/* Animated loading bar — brand-coloured sweep while data streams in */}
-      {isAnyDataLoading && <DashboardLoadingBar />}
 
       {/* Setup Progress Banner — shows for new users until all milestones are done */}
       {!setupProgress.isLoading && !setupProgress.isDismissed && (
         <SetupProgressBanner progress={setupProgress} />
       )}
 
-      <div data-guide="vitality-score">
-        {isVitalityLoading ? (
-          <Card className="h-64 w-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/50 dark:to-slate-800/50 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3">
-              <ShimmerBlock className="h-16 w-16 rounded-full" />
-              <ShimmerBlock className="h-5 w-36" />
-              <div className="flex gap-6 mt-1">
-                <ShimmerBlock className="h-4 w-16" />
-                <ShimmerBlock className="h-4 w-16" />
-                <ShimmerBlock className="h-4 w-16" />
-                <ShimmerBlock className="h-4 w-16" />
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <VitalityScoreHero
-            overallScore={vitalityScores.overall}
-            climateScore={vitalityScores.climate}
-            waterScore={vitalityScores.water}
-            circularityScore={vitalityScores.circularity}
-            natureScore={vitalityScores.nature}
-            hasData={vitalityScores.hasData}
-            benchmarkData={getBenchmarkForPillar('overall')}
-            lastUpdated={companyMetrics?.last_updated
-              ? new Date(companyMetrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-              : undefined
-            }
-            onRefresh={handleRefresh}
-            loading={isAnyDataLoading}
-            calculationInputs={scoreCalculationInputs}
-          />
-        )}
-      </div>
+      {/* Loading visual — replaces zone skeletons while data streams in */}
+      {isAnyDataLoading && <DashboardLoadingVisual />}
 
-      <div data-guide="kpi-cards">
-      {isVitalityLoading ? (
-        <RAGStatusCardGrid>
-          <RAGStatusCard title="Carbon Emissions" status="neutral" category="climate" loading />
-          <RAGStatusCard title="Water Impact" status="neutral" category="water" loading />
-          <RAGStatusCard title="Waste Diversion" status="neutral" category="waste" loading />
-          <RAGStatusCard title="Nature & Biodiversity" status="neutral" category="suppliers" loading />
-        </RAGStatusCardGrid>
-      ) : (
-        <RAGStatusCardGrid>
-          <RAGStatusCard
-            title="Carbon Emissions"
-            status={getStatusFromScore(scores.climateScore)}
-            value={footprint?.total_emissions ? (footprint.total_emissions / 1000).toFixed(1) : '--'}
-            unit="tCO₂e"
-            trend={carbonTrend.value}
-            trendDirection={carbonTrend.direction}
-            category="climate"
-            href="/reports/company-footprint"
-          />
-          <RAGStatusCard
-            title="Water Impact"
-            status={getStatusFromScore(scores.waterScore)}
-            value={waterConsumption > 0
-              ? (waterConsumption >= 1000
-                ? `${(waterConsumption / 1000).toFixed(1)}k`
-                : waterConsumption.toFixed(0))
-              : '--'}
-            unit="m³"
-            category="water"
-            href="/performance"
-          />
-          <RAGStatusCard
-            title="Waste Diversion"
-            status={getStatusFromScore(scores.circularityScore)}
-            value={wasteMetrics?.waste_diversion_rate?.toFixed(0) || '0'}
-            unit="%"
-            trend={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 5 : undefined}
-            trendDirection={wasteMetrics?.waste_diversion_rate && wasteMetrics.waste_diversion_rate > 50 ? 'up' : 'stable'}
-            category="waste"
-            href="/performance"
-          />
-          <RAGStatusCard
-            title="Nature & Biodiversity"
-            status={getStatusFromScore(scores.natureScore)}
-            value={landUse > 0 ? formatValue(landUse) : '--'}
-            unit="m² crop eq"
-            category="suppliers"
-            href="/performance"
-          />
-        </RAGStatusCardGrid>
+      {/* ── ZONE 1 — Vitality Score (full width) ─────────────────── */}
+      {!isAnyDataLoading && (
+        <VitalityScoreHero
+          overallScore={vitalityScores.overall}
+          climateScore={vitalityScores.climate}
+          waterScore={vitalityScores.water}
+          circularityScore={vitalityScores.circularity}
+          natureScore={vitalityScores.nature}
+          hasData={vitalityScores.hasData}
+          benchmarkData={getBenchmarkForPillar('overall')}
+          lastUpdated={companyMetrics?.last_updated
+            ? new Date(companyMetrics.last_updated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+            : undefined
+          }
+          onRefresh={handleRefresh}
+          loading={isAnyDataLoading}
+          calculationInputs={scoreCalculationInputs}
+        />
       )}
-      </div>
 
-      {/* Getting Started - Interactive checklist with real progress tracking */}
-      {isWidgetEnabled('getting-started') && <InlineErrorBoundary><GettingStartedWidget /></InlineErrorBoundary>}
-
-      {/* Main Content Grid - Responsive layout based on enabled widgets */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        {/* Primary Content Area */}
-        <div className="lg:col-span-8 space-y-6">
-          <div data-guide="priority-actions">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    Priority Actions
-                    {priorityActions.filter(a => a.priority === 'high').length > 0 && (
-                      <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-500 dark:text-red-400 rounded-full font-medium">
-                        {priorityActions.filter(a => a.priority === 'high').length} urgent
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-sm font-normal text-muted-foreground">
-                    {priorityActions.length} action{priorityActions.length !== 1 ? 's' : ''}
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PriorityActionsList
-                  actions={priorityActions}
-                  maxVisible={4}
-                />
-              </CardContent>
-            </Card>
+      {/* ── ZONE 2 + ZONE 3 — Headlines + Impact Value ────────────── */}
+      {!isAnyDataLoading && (
+        <div className="grid gap-6 lg:grid-cols-12">
+          {/* Zone 2 — People & Planet Headlines (4 stat cards) */}
+          <div className="lg:col-span-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <StatCard
+                label="Carbon Footprint"
+                value={carbonValue}
+                unit="tCO₂e"
+                trend={carbonTrend.value}
+                trendDirection={carbonTrend.direction}
+                status={carbonStatus}
+                href="/reports/company-footprint"
+                loading={footprintLoading}
+                higherIsBetter={false}
+              />
+              <StatCard
+                label="Water Impact"
+                value={waterValue}
+                unit="m³"
+                status={waterStatus}
+                href="/performance"
+                loading={metricsLoading}
+                higherIsBetter={false}
+              />
+              <StatCard
+                label="Living Wage Compliance"
+                value={livingWageValue}
+                unit="% compliant"
+                status={livingWageStatus}
+                href="/people-culture/fair-work"
+                loading={pcLoading}
+                higherIsBetter={true}
+              />
+              <StatCard
+                label="Waste Diversion"
+                value={wasteValue}
+                unit="% diverted"
+                status={wasteStatus}
+                href="/performance"
+                loading={wasteLoading}
+                higherIsBetter={true}
+              />
+            </div>
           </div>
 
-          <Accordion type="single" collapsible className="space-y-2">
-            {isWidgetEnabled('ghg-summary') && (
-              <AccordionItem value="emissions" className="border rounded-xl overflow-hidden">
-                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                  <span className="flex items-center gap-2 flex-1">
-                    <span className="text-lg">📊</span>
-                    <span>Emissions Breakdown</span>
-                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                      {footprint?.total_emissions
-                        ? `${(footprint.total_emissions / 1000).toFixed(1)} tCO₂e total`
-                        : 'No data yet'}
-                    </span>
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  <InlineErrorBoundary>
-                    <GHGEmissionsSummaryWidget
-                      footprint={footprint}
-                      isLoading={footprintLoading}
-                    />
-                  </InlineErrorBoundary>
-                </AccordionContent>
-              </AccordionItem>
-            )}
-
-            {isWidgetEnabled('product-lca-status') && (
-              <AccordionItem value="products" className="border rounded-xl overflow-hidden">
-                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                  <span className="flex items-center gap-2 flex-1">
-                    <span className="text-lg">📦</span>
-                    <span>Product Environmental Impact Status</span>
-                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                      View details
-                    </span>
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  <InlineErrorBoundary><ProductLCAStatusWidget /></InlineErrorBoundary>
-                </AccordionContent>
-              </AccordionItem>
-            )}
-
-            {isWidgetEnabled('data-quality') && (
-              <AccordionItem value="quality" className="border rounded-xl overflow-hidden">
-                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                  <span className="flex items-center gap-2 flex-1">
-                    <span className="text-lg">📈</span>
-                    <span>Data Quality</span>
-                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                      {scores.climateScore !== null || scores.waterScore !== null
-                        ? 'Active'
-                        : 'Needs setup'}
-                    </span>
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  <InlineErrorBoundary><DataQualityWidget /></InlineErrorBoundary>
-                </AccordionContent>
-              </AccordionItem>
-            )}
-
-            {isWidgetEnabled('compliance-status') && (
-              <AccordionItem value="compliance" className="border rounded-xl overflow-hidden">
-                <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&>svg]:ml-auto">
-                  <span className="flex items-center gap-2 flex-1">
-                    <span className="text-lg">✅</span>
-                    <span>Compliance Status</span>
-                    <span className="ml-auto mr-2 text-xs text-muted-foreground font-normal">
-                      View requirements
-                    </span>
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="px-4 pb-4">
-                  <InlineErrorBoundary><ComplianceStatusWidget /></InlineErrorBoundary>
-                </AccordionContent>
-              </AccordionItem>
-            )}
-          </Accordion>
-        </div>
-
-        {/* Secondary Content Area - Sidebar Widgets */}
-        <div className="lg:col-span-4 space-y-6">
-          {isWidgetEnabled('quick-actions') && <div data-guide="quick-actions"><InlineErrorBoundary><QuickActionsWidget /></InlineErrorBoundary></div>}
-          {isWidgetEnabled('recent-activity') && <InlineErrorBoundary><RecentActivityWidget /></InlineErrorBoundary>}
-        </div>
-      </div>
-
-      {/* Full-width bottom row — Supplier + Water widgets side by side */}
-      {(isWidgetEnabled('supplier-engagement') || isWidgetEnabled('water-risk')) && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {isWidgetEnabled('supplier-engagement') && <InlineErrorBoundary><SupplierEngagementWidget /></InlineErrorBoundary>}
-          {isWidgetEnabled('water-risk') && <InlineErrorBoundary><WaterRiskWidget /></InlineErrorBoundary>}
+          {/* Zone 3 — Impact Value (beta feature gate) */}
+          <div className="lg:col-span-4">
+            <InlineErrorBoundary>
+              <ImpactValueWidget />
+            </InlineErrorBoundary>
+          </div>
         </div>
       )}
 
-      <Suspense fallback={null}>
-        <DashboardGuide />
-      </Suspense>
+      {/* ── PRODUCT SPOTLIGHT ─────────────────────────────────────── */}
+      {!isAnyDataLoading && <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Product Spotlight</CardTitle>
+            <Link
+              href="/products"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              View all products <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {spotlightLoading ? (
+            <div className="flex gap-4 overflow-hidden">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="min-w-[220px] space-y-2">
+                  <Skeleton className="h-28 w-full rounded-lg" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : spotlightProducts.length === 0 ? (
+            <Link
+              href="/products/new"
+              className="flex flex-col items-center justify-center py-8 text-center rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+            >
+              <div className="h-12 w-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                <Package className="h-6 w-6 text-slate-400" />
+              </div>
+              <p className="text-sm font-medium mb-1">Add your first product</p>
+              <p className="text-xs text-muted-foreground">Start tracking product-level environmental impact</p>
+            </Link>
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {spotlightProducts.map((product) => {
+                const badge = LCA_BADGE[product.lca_status];
+                const co2Display = product.co2e_per_unit != null
+                  ? product.co2e_per_unit >= 1000
+                    ? `${(product.co2e_per_unit / 1000).toFixed(2)} tCO₂e`
+                    : `${product.co2e_per_unit.toFixed(2)} kg CO₂e`
+                  : '--';
+
+                return (
+                  <Link
+                    key={product.id}
+                    href={`/products/${product.id}`}
+                    className="group min-w-[220px] max-w-[220px] flex-shrink-0 rounded-xl border border-slate-200 dark:border-slate-800 p-3 transition-shadow hover:shadow-md"
+                  >
+                    {/* Product image or placeholder */}
+                    <div className="h-24 w-full rounded-lg bg-slate-100 dark:bg-slate-800 mb-2 overflow-hidden flex items-center justify-center">
+                      {product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+                      )}
+                    </div>
+                    {/* Name */}
+                    <p className="text-sm font-medium truncate mb-1">{product.name}</p>
+                    {/* LCA badge */}
+                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-1.5 ${badge.className}`}>
+                      {badge.label}
+                    </span>
+                    {/* CO₂e per unit */}
+                    <p className="text-xs text-muted-foreground">
+                      {co2Display}{product.declared_unit ? ` / ${product.declared_unit}` : ''}
+                    </p>
+                  </Link>
+                );
+              })}
+
+              {/* "View all" card at the end */}
+              <Link
+                href="/products"
+                className="min-w-[140px] flex-shrink-0 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 p-3 flex flex-col items-center justify-center text-muted-foreground hover:text-foreground hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+              >
+                <ArrowRight className="h-5 w-5 mb-2" />
+                <span className="text-sm font-medium">View all</span>
+              </Link>
+            </div>
+          )}
+        </CardContent>
+      </Card>}
+
+      {/* ── BOTTOM ROW ────────────────────────────────────────────── */}
+      {!isAnyDataLoading && <div className="grid gap-6 lg:grid-cols-2">
+        {/* Priority Actions */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                Priority Actions
+                {priorityActions.filter(a => a.priority === 'high').length > 0 && (
+                  <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-500 dark:text-red-400 rounded-full font-medium">
+                    {priorityActions.filter(a => a.priority === 'high').length} urgent
+                  </span>
+                )}
+              </span>
+              <span className="text-sm font-normal text-muted-foreground">
+                {priorityActions.length} action{priorityActions.length !== 1 ? 's' : ''}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PriorityActionsList
+              actions={priorityActions}
+              maxVisible={4}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
+        <InlineErrorBoundary>
+          <RecentActivityWidget />
+        </InlineErrorBoundary>
+      </div>}
     </div>
   );
 }
-

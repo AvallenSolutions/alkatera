@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { analyzeLivingWageCompliance } from '@/lib/calculations/people-culture-score';
 
 /**
  * Build the People & Culture summary by querying raw data tables directly.
@@ -102,6 +103,7 @@ async function buildPeopleCultureSummary(
 
   // Living wage compliance
   let livingWageCompliance = 0;
+  let livingWageGapAnnual: number | null = null;
   if (compRecords.length > 0) {
     const { data: benchmarks } = await supabase
       .from('people_living_wage_benchmarks')
@@ -116,6 +118,20 @@ async function buildPeopleCultureSummary(
         return salary >= (benchmark.annual_rate || 0);
       });
       livingWageCompliance = (compliant.length / compRecords.length) * 100;
+
+      // Calculate living wage gap using the existing analyzeLivingWageCompliance helper
+      const mappedRecords = compRecords.map((c: any) => ({
+        hourly_rate: c.hourly_rate ?? null,
+        annual_salary: c.annual_salary ?? null,
+        work_country: c.work_country || 'United Kingdom',
+        work_region: c.work_region ?? null,
+        gender: c.gender ?? null,
+        employment_type: c.employment_type || 'full_time',
+        role_level: c.role_level ?? null,
+      }));
+      const analysis = analyzeLivingWageCompliance(mappedRecords);
+      // Annualise: 37.5 hrs/week × 52 weeks = 1,950 hrs/yr (B Corp standard)
+      livingWageGapAnnual = Math.round(analysis.living_wage_gap * 1950);
     } else {
       livingWageCompliance = 50;
     }
@@ -160,6 +176,7 @@ async function buildPeopleCultureSummary(
     dei_total_actions: deiTotalActions,
     dei_completed_actions: deiCompletedActions,
     living_wage_compliance: Math.round(livingWageCompliance * 10) / 10,
+    living_wage_gap_annual: livingWageGapAnnual,
     gender_pay_gap_mean: Math.round(genderPayGapMean * 10) / 10,
     wellbeing_score: wellbeingScore,
   };
@@ -340,6 +357,7 @@ export async function POST(request: NextRequest) {
           total_employees: summary.total_employees,
           dei_actions: summary.dei_total_actions,
           training_hours: summary.total_training_hours,
+          living_wage_gap_total: summary.living_wage_gap_annual ?? null,
         },
         weights,
       },

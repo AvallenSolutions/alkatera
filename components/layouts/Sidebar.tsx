@@ -16,6 +16,7 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   FileBarChart,
   Award,
   ShieldCheck,
@@ -58,22 +59,31 @@ import { Badge } from '@/components/ui/badge'
 import { useSubscription } from '@/hooks/useSubscription'
 import { TierBadge } from '@/components/subscription/TierBadge'
 import { UsageMeterCompact } from '@/components/subscription/UsageMeter'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface NavItem {
   name: string
   href: string
-  icon: any
+  icon?: any
   children?: NavItem[]
   badge?: number
   minTier?: number // Minimum tier level required (1=Seed, 2=Blossom, 3=Canopy)
   featureCode?: string // Optional feature code requirement
   locked?: boolean // Set dynamically when user's tier is insufficient
   requiredTierName?: string // Display name of the required tier
+  type?: 'link' | 'divider' // Non-clickable section dividers
 }
 
 // Navigation configuration with tier requirements
-// Order: Core workflow first, then reporting/compliance, then ESG, then tools
+// Grouped into four job-based sections: Work, Impact, Prove, Workspace
 const navigationStructure: NavItem[] = [
+  // ─── WORK ───────────────────────────────────────────────────────────────
+  { type: 'divider', name: 'WORK', href: '' },
   {
     name: 'Dashboard',
     href: '/dashboard/',
@@ -81,49 +91,16 @@ const navigationStructure: NavItem[] = [
     minTier: 1,
   },
   {
-    name: 'Company',
+    name: 'Capture Data',
     href: '/company/facilities/',
     icon: Building2,
     minTier: 1,
     children: [
-      {
-        name: 'Facilities',
-        href: '/company/facilities/',
-        icon: Warehouse,
-        minTier: 1,
-      },
-      {
-        name: 'Fleet',
-        href: '/company/fleet/',
-        icon: Truck,
-        minTier: 2,
-        featureCode: 'vehicle_registry',
-      },
-      {
-        name: 'Company Vitality',
-        href: '/performance/',
-        icon: Sparkles,
-        minTier: 2,
-      },
-      {
-        name: 'Log Data',
-        href: '/company/log-data/',
-        icon: ClipboardCheck,
-        minTier: 1,
-      },
+      { name: 'Facilities',   href: '/company/facilities/', icon: Warehouse,      minTier: 1 },
+      { name: 'Fleet',        href: '/company/fleet/',      icon: Truck,          minTier: 2, featureCode: 'vehicle_registry' },
+      { name: 'Log Data',     href: '/company/log-data/',   icon: ClipboardCheck, minTier: 1 },
+      { name: 'Suppliers',    href: '/suppliers/',          icon: Users,          minTier: 1 },
     ],
-  },
-  {
-    name: 'Products',
-    href: '/products/',
-    icon: Package,
-    minTier: 1,
-  },
-  {
-    name: 'Suppliers',
-    href: '/suppliers/',
-    icon: Users,
-    minTier: 1,
   },
   {
     name: 'Emissions Data',
@@ -131,236 +108,110 @@ const navigationStructure: NavItem[] = [
     icon: Flame,
     minTier: 1,
     children: [
-      {
-        name: 'Company Emissions',
-        href: '/data/scope-1-2/',
-        icon: Flame,
-        minTier: 1,
-      },
-      {
-        name: 'Data Quality',
-        href: '/data/quality/',
-        icon: BarChart3,
-        minTier: 1,
-      },
-      {
-        name: 'Data Sources',
-        href: '/data/sources/',
-        icon: BookOpen,
-        minTier: 1,
-      },
+      { name: 'Company Emissions', href: '/data/scope-1-2/', icon: Flame,     minTier: 1 },
+      { name: 'Data Quality',      href: '/data/quality/',   icon: BarChart3, minTier: 1 },
+      { name: 'Data Sources',      href: '/data/sources/',   icon: BookOpen,  minTier: 1 },
+    ],
+  },
+
+  // ─── IMPACT ─────────────────────────────────────────────────────────────
+  { type: 'divider', name: 'IMPACT', href: '' },
+  {
+    name: 'Environmental',
+    href: '/performance/',
+    icon: Leaf,
+    minTier: 1,
+    children: [
+      { name: 'Company Vitality', href: '/performance/',  icon: Sparkles, minTier: 2 },
+      { name: 'Products',         href: '/products/',     icon: Package,  minTier: 1 },
+      { name: 'LCA Reports',      href: '/reports/lcas/', icon: Award,    minTier: 2 },
     ],
   },
   {
-    name: 'Reports',
+    name: 'Social Impact',
+    href: '/people-culture/',
+    icon: Users,
+    minTier: 2,
+    children: [
+      {
+        name: 'People & Culture',
+        href: '/people-culture/',
+        icon: UserCheck,
+        minTier: 2,
+        children: [
+          { name: 'Fair Work',            href: '/people-culture/fair-work/',           icon: Briefcase,     minTier: 2 },
+          { name: 'Diversity & Inclusion', href: '/people-culture/diversity-inclusion/', icon: Users,         minTier: 2 },
+          { name: 'Wellbeing',            href: '/people-culture/wellbeing/',           icon: Heart,         minTier: 2 },
+          { name: 'Training',             href: '/people-culture/training/',            icon: GraduationCap, minTier: 2 },
+        ],
+      },
+      {
+        name: 'Community Impact',
+        href: '/community-impact/',
+        icon: Heart,
+        minTier: 2,
+        children: [
+          { name: 'Charitable Giving', href: '/community-impact/charitable-giving/', icon: Gift,        minTier: 2 },
+          { name: 'Local Impact',      href: '/community-impact/local-impact/',      icon: MapPin,      minTier: 2 },
+          { name: 'Volunteering',      href: '/community-impact/volunteering/',      icon: HandHelping, minTier: 2 },
+          { name: 'Impact Stories',    href: '/community-impact/stories/',           icon: FileHeart,   minTier: 2 },
+        ],
+      },
+      {
+        name: 'Governance',
+        href: '/governance/',
+        icon: Scale,
+        minTier: 3,
+        children: [
+          { name: 'Policies',      href: '/governance/policies/',      icon: FileText,  minTier: 3 },
+          { name: 'Stakeholders',  href: '/governance/stakeholders/',  icon: Handshake, minTier: 3 },
+          { name: 'Board',         href: '/governance/board/',         icon: Users,     minTier: 3 },
+          { name: 'Transparency',  href: '/governance/transparency/',  icon: Eye,       minTier: 3 },
+        ],
+      },
+    ],
+  },
+
+  // ─── PROVE ──────────────────────────────────────────────────────────────
+  { type: 'divider', name: 'PROVE', href: '' },
+  {
+    name: 'Reports & Valuation',
     href: '/reports/',
     icon: FileText,
     minTier: 1,
     children: [
-      {
-        name: 'Sustainability Reports',
-        href: '/reports/sustainability/',
-        icon: TrendingUp,
-        minTier: 1,
-      },
-      {
-        name: "LCA Reports",
-        href: '/reports/lcas/',
-        icon: Award,
-        minTier: 2,
-      },
+      { name: 'Sustainability Reports', href: '/reports/sustainability/',   icon: TrendingUp, minTier: 1 },
+      { name: 'Impact Valuation',       href: '/reports/impact-valuation/', icon: TrendingUp, minTier: 3 },
+      { name: 'LCA Reports',            href: '/reports/lcas/',             icon: Award,      minTier: 2 },
     ],
   },
   {
-    name: 'EPR Compliance',
+    name: 'Compliance',
     href: '/epr/',
     icon: ShieldCheck,
     minTier: 1,
     children: [
       {
-        name: 'Setup Wizard',
-        href: '/epr/wizard/',
-        icon: Sparkles,
-        minTier: 1,
-      },
-      {
-        name: 'Dashboard',
+        name: 'EPR',
         href: '/epr/',
-        icon: LayoutDashboard,
+        icon: ShieldCheck,
         minTier: 1,
+        children: [
+          { name: 'Setup Wizard',  href: '/epr/wizard/',       icon: Sparkles,        minTier: 1 },
+          { name: 'Dashboard',     href: '/epr/',              icon: LayoutDashboard, minTier: 1 },
+          { name: 'Submissions',   href: '/epr/submissions/',  icon: FileBarChart,    minTier: 1 },
+          { name: 'Cost Estimator', href: '/epr/costs/',       icon: Calculator,      minTier: 3 },
+          { name: 'PRN Tracker',   href: '/epr/prn/',          icon: ClipboardCheck,  minTier: 3 },
+          { name: 'Settings',      href: '/epr/settings/',     icon: Settings,        minTier: 1 },
+          { name: 'Audit Trail',   href: '/epr/audit/',        icon: Activity,        minTier: 1 },
+        ],
       },
-      {
-        name: 'Submissions',
-        href: '/epr/submissions/',
-        icon: FileBarChart,
-        minTier: 1,
-      },
-      {
-        name: 'Cost Estimator',
-        href: '/epr/costs/',
-        icon: Calculator,
-        minTier: 3,
-      },
-      {
-        name: 'PRN Tracker',
-        href: '/epr/prn/',
-        icon: ClipboardCheck,
-        minTier: 3,
-      },
-      {
-        name: 'Settings',
-        href: '/epr/settings/',
-        icon: Settings,
-        minTier: 1,
-      },
-      {
-        name: 'Audit Trail',
-        href: '/epr/audit/',
-        icon: Activity,
-        minTier: 1,
-      },
+      { name: 'Certifications', href: '/certifications/', icon: Award, minTier: 2 },
     ],
   },
-  {
-    name: 'Certifications',
-    href: '/certifications/',
-    icon: Award,
-    minTier: 2,
-  },
-  {
-    name: 'People & Culture',
-    href: '/people-culture/',
-    icon: UserCheck,
-    minTier: 2,
-    children: [
-      {
-        name: 'Overview',
-        href: '/people-culture/',
-        icon: UserCheck,
-        minTier: 2,
-      },
-      {
-        name: 'Fair Work',
-        href: '/people-culture/fair-work/',
-        icon: Briefcase,
-        minTier: 2,
-      },
-      {
-        name: 'Diversity & Inclusion',
-        href: '/people-culture/diversity-inclusion/',
-        icon: Users,
-        minTier: 2,
-      },
-      {
-        name: 'Wellbeing',
-        href: '/people-culture/wellbeing/',
-        icon: Heart,
-        minTier: 2,
-      },
-      {
-        name: 'Training',
-        href: '/people-culture/training/',
-        icon: GraduationCap,
-        minTier: 2,
-      },
-    ],
-  },
-  {
-    name: 'Community Impact',
-    href: '/community-impact/',
-    icon: Heart,
-    minTier: 2,
-    children: [
-      {
-        name: 'Overview',
-        href: '/community-impact/',
-        icon: Heart,
-        minTier: 2,
-      },
-      {
-        name: 'Charitable Giving',
-        href: '/community-impact/charitable-giving/',
-        icon: Gift,
-        minTier: 2,
-      },
-      {
-        name: 'Local Impact',
-        href: '/community-impact/local-impact/',
-        icon: MapPin,
-        minTier: 2,
-      },
-      {
-        name: 'Volunteering',
-        href: '/community-impact/volunteering/',
-        icon: HandHelping,
-        minTier: 2,
-      },
-      {
-        name: 'Impact Stories',
-        href: '/community-impact/stories/',
-        icon: FileHeart,
-        minTier: 2,
-      },
-    ],
-  },
-  {
-    name: 'Governance',
-    href: '/governance/',
-    icon: Scale,
-    minTier: 3,
-    children: [
-      {
-        name: 'Overview',
-        href: '/governance/',
-        icon: Scale,
-        minTier: 3,
-      },
-      {
-        name: 'Policies',
-        href: '/governance/policies/',
-        icon: FileText,
-        minTier: 3,
-      },
-      {
-        name: 'Stakeholders',
-        href: '/governance/stakeholders/',
-        icon: Handshake,
-        minTier: 3,
-      },
-      {
-        name: 'Board',
-        href: '/governance/board/',
-        icon: Users,
-        minTier: 3,
-      },
-      {
-        name: 'Transparency',
-        href: '/governance/transparency/',
-        icon: Eye,
-        minTier: 3,
-      },
-    ],
-  },
-  {
-    name: 'Resources',
-    href: '/knowledge-bank/',
-    icon: Library,
-    minTier: 1,
-    children: [
-      {
-        name: 'Knowledge Bank',
-        href: '/knowledge-bank/',
-        icon: GraduationCap,
-        minTier: 1,
-      },
-      {
-        name: 'Greenwash Guardian',
-        href: '/greenwash-guardian/',
-        icon: Leaf,
-        minTier: 2,
-      },
-    ],
-  },
+
+  // ─── WORKSPACE ──────────────────────────────────────────────────────────
+  { type: 'divider', name: 'WORKSPACE', href: '' },
   {
     name: 'Rosa',
     href: '/rosa/',
@@ -368,22 +219,25 @@ const navigationStructure: NavItem[] = [
     minTier: 2,
   },
   {
-    name: 'Support',
-    href: '/settings/feedback/',
-    icon: MessageSquare,
+    name: 'Resources',
+    href: '/knowledge-bank/',
+    icon: Library,
     minTier: 1,
+    children: [
+      { name: 'Knowledge Bank',     href: '/knowledge-bank/',     icon: GraduationCap, minTier: 1 },
+      { name: 'Greenwash Guardian', href: '/greenwash-guardian/', icon: Leaf,          minTier: 2 },
+    ],
   },
   {
-    name: 'Messages',
-    href: '/settings/messages/',
-    icon: Mail,
-    minTier: 1,
-  },
-  {
-    name: 'Settings',
+    name: 'Settings & Support',
     href: '/settings/',
     icon: Settings,
     minTier: 1,
+    children: [
+      { name: 'Settings', href: '/settings/',           icon: Settings,      minTier: 1 },
+      { name: 'Messages', href: '/settings/messages/',  icon: Mail,          minTier: 1 },
+      { name: 'Support',  href: '/settings/feedback/',  icon: MessageSquare, minTier: 1 },
+    ],
   },
 ]
 
@@ -457,6 +311,21 @@ export function Sidebar({ className }: SidebarProps) {
   const [pendingCount, setPendingCount] = useState(0)
   const { usage, tierName, tierLevel, hasFeature, isLoading: subscriptionLoading } = useSubscription()
 
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar_collapsed') === 'true'
+    }
+    return false
+  })
+
+  const toggleCollapse = () => {
+    const next = !isCollapsed
+    setIsCollapsed(next)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebar_collapsed', String(next))
+    }
+  }
+
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
 
   const tierDisplayNames: Record<number, string> = { 1: 'Seed', 2: 'Blossom', 3: 'Canopy' }
@@ -464,6 +333,9 @@ export function Sidebar({ className }: SidebarProps) {
   // Mark navigation items as locked instead of hiding them
   const filterNavItems = (items: NavItem[]): NavItem[] => {
     return items.map((item) => {
+      // Dividers pass through unchanged
+      if (item.type === 'divider') return item
+
       const isLocked = (item.minTier && tierLevel < item.minTier) ||
         (item.featureCode && !hasFeature(item.featureCode as any))
       const requiredTierName = item.minTier ? tierDisplayNames[item.minTier] : undefined
@@ -481,7 +353,7 @@ export function Sidebar({ className }: SidebarProps) {
   // Build final navigation structure (all items are now in the main array)
   const isAdvisor = userRole === 'advisor'
   const filteredNavigation = filterNavItems(navigationStructure).filter(item => {
-    // Hide Settings from advisors — they don't manage org settings
+    // Hide Settings & Support from advisors — they don't manage org settings
     if (isAdvisor && item.href === '/settings/') return false
     return true
   })
@@ -577,342 +449,255 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'flex flex-col gap-2 border-r border-border bg-sidebar px-3 py-4 transition-colors h-screen',
+        'flex flex-col gap-2 border-r border-border bg-sidebar py-4 transition-all duration-200 h-screen',
+        isCollapsed ? 'px-2 w-14' : 'px-3 w-64',
         className
       )}
     >
-      <div className="mb-6 px-2">
-        <div className="flex items-center mb-1">
+      <div className={cn('mb-6', isCollapsed ? 'px-0 flex flex-col items-center' : 'px-2')}>
+        {isCollapsed ? (
           <img
-            src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
+            src="/logos/alkatera-stacked.png"
             alt="AlkaTera"
-            className="h-10 w-auto object-contain dark:invert-0 invert"
+            className="h-10 w-auto object-contain"
           />
-        </div>
-        <p className="text-xs text-muted-foreground">Sustainability, Distilled</p>
+        ) : (
+          <>
+            <div className="flex items-center mb-1">
+              <img
+                src="https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png"
+                alt="AlkaTera"
+                className="h-10 w-auto object-contain dark:invert-0 invert"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Sustainability, Distilled</p>
+          </>
+        )}
+        <button
+          onClick={toggleCollapse}
+          className="mt-2 flex items-center justify-center h-6 w-6 rounded hover:bg-secondary/60 transition-colors"
+          aria-label={isCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+        >
+          {isCollapsed
+            ? <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            : <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+          }
+        </button>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto" data-guide="sidebar-nav">
-        {filteredNavigation.map((item) => {
-          const IconComponent = item.icon
-          const active = !item.locked && isActive(item.href)
-          const hasChildren = item.children && item.children.length > 0
-          const expanded = !item.locked && isExpanded(item.name)
-
-          // Locked top-level item (no children) — show greyed out with lock
-          if (item.locked && !hasChildren) {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
-                title={`Upgrade to ${item.requiredTierName} to unlock`}
-              >
-                <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                <span className="truncate flex-1">{item.name}</span>
-                <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
-              </Link>
-            )
-          }
-
-          // Locked parent item with children — show collapsed with lock, click goes to feature page
-          if (item.locked && hasChildren) {
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
-                title={`Upgrade to ${item.requiredTierName} to unlock`}
-              >
-                <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                <span className="truncate flex-1">{item.name}</span>
-                <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
-              </Link>
-            )
-          }
-
-          if (hasChildren) {
-            return (
-              <div key={item.href}>
-                <button
-                  onClick={() => toggleMenu(item.name)}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    active || hasActiveChild(item)
-                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                      : 'text-sidebar-foreground hover:bg-secondary/50'
-                  )}
-                >
-                  <IconComponent className={cn(
-                    'h-4 w-4 flex-shrink-0 transition-colors',
-                    active || hasActiveChild(item) ? 'text-neon-lime' : ''
-                  )} />
-                  <span className="truncate flex-1 text-left">{item.name}</span>
-                  {expanded ? (
-                    <ChevronDown className="h-4 w-4 flex-shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 flex-shrink-0" />
-                  )}
-                </button>
-
-                {expanded && (
-                  <div className="ml-6 mt-1 space-y-1">
-                    {item.children?.map((child) => {
-                      const ChildIcon = child.icon
-                      const childActive = isActive(child.href)
-                      const childHasChildren = child.children && child.children.length > 0
-                      const childExpanded = isExpanded(child.name)
-
-                      // If child has its own children (e.g., Social Impact subsections)
-                      if (childHasChildren) {
-                        return (
-                          <div key={child.href} className="mt-1">
-                            <button
-                              onClick={() => toggleMenu(child.name)}
-                              className={cn(
-                                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
-                                childActive || hasActiveChild(child)
-                                  ? 'bg-secondary/50 text-foreground font-medium'
-                                  : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-                              )}
-                            >
-                              <ChildIcon className={cn(
-                                'h-3.5 w-3.5 flex-shrink-0',
-                                childActive || hasActiveChild(child) ? 'text-neon-lime' : ''
-                              )} />
-                              <span className="truncate flex-1 text-left">{child.name}</span>
-                              {childExpanded ? (
-                                <ChevronDown className="h-3 w-3 flex-shrink-0" />
-                              ) : (
-                                <ChevronRight className="h-3 w-3 flex-shrink-0" />
-                              )}
-                            </button>
-
-                            {childExpanded && (
-                              <div className="ml-6 mt-1 space-y-1">
-                                {child.children?.map((grandchild) => {
-                                  const GrandchildIcon = grandchild.icon
-                                  const grandchildActive = isActive(grandchild.href)
-
-                                  return (
-                                    <Link
-                                      key={grandchild.href}
-                                      href={grandchild.href}
-                                      className={cn(
-                                        'flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-xs transition-all',
-                                        grandchildActive
-                                          ? 'bg-secondary text-foreground font-medium'
-                                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-                                      )}
-                                    >
-                                      <GrandchildIcon className={cn(
-                                        'h-3 w-3 flex-shrink-0',
-                                        grandchildActive ? 'text-neon-lime' : ''
-                                      )} />
-                                      <span className="truncate">{grandchild.name}</span>
-                                    </Link>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      }
-
-                      // Regular child without nested children
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={cn(
-                            'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
-                            childActive
-                              ? 'bg-secondary text-foreground font-medium'
-                              : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
-                          )}
-                        >
-                          <ChildIcon className={cn(
-                            'h-3.5 w-3.5 flex-shrink-0',
-                            childActive ? 'text-neon-lime' : ''
-                          )} />
-                          <span className="truncate">{child.name}</span>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          }
-
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                active
-                  ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                  : 'text-sidebar-foreground hover:bg-secondary/50'
-              )}
-              {...(item.href === '/rosa/' ? { 'data-guide': 'rosa-link' } : {})}
-            >
-              <IconComponent className={cn(
-                'h-4 w-4 flex-shrink-0 transition-colors',
-                active ? 'text-neon-lime' : ''
-              )} />
-              <span className="truncate">{item.name}</span>
-            </Link>
-          )
-        })}
-
-        {/* Admin Section - Only visible to admins */}
-        {(isOrgAdmin || isAlkateraAdmin) && (
-          <div className="pt-4 mt-4 border-t border-border">
-            <div className="px-3 mb-2">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Admin
-              </h3>
-            </div>
-
-            {/* Approval Queue - For Org Admins */}
-            {isOrgAdmin && (
-              <Link
-                href="/admin/approvals/"
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                  isActive('/admin/approvals/')
-                    ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                    : 'text-sidebar-foreground hover:bg-secondary/50'
-                )}
-              >
-                <CheckSquare className={cn(
-                  'h-4 w-4 flex-shrink-0 transition-colors',
-                  isActive('/admin/approvals/') ? 'text-neon-lime' : ''
-                )} />
-                <span className="truncate flex-1">Approval Queue</span>
-                {pendingCount > 0 && (
-                  <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                    {pendingCount}
-                  </Badge>
-                )}
-              </Link>
-            )}
-
-            {/* Alkatera Admin Only Links */}
-            {isAlkateraAdmin && (
-              <>
-                <Link
-                  href="/admin/platform/"
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/platform/')
-                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                      : 'text-sidebar-foreground hover:bg-secondary/50'
-                  )}
-                >
-                  <Activity className={cn(
-                    'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/platform/') ? 'text-neon-lime' : ''
-                  )} />
-                  <span className="truncate">Platform Dashboard</span>
-                </Link>
-
-                <Link
-                  href="/admin/suppliers/"
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/suppliers/')
-                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                      : 'text-sidebar-foreground hover:bg-secondary/50'
-                  )}
-                >
-                  <Handshake className={cn(
-                    'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/suppliers/') ? 'text-neon-lime' : ''
-                  )} />
-                  <span className="truncate">Platform Suppliers</span>
-                </Link>
-
-                <Link
-                  href="/admin/blog/"
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/blog/')
-                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                      : 'text-sidebar-foreground hover:bg-secondary/50'
-                  )}
-                >
-                  <FileEdit className={cn(
-                    'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/blog/') ? 'text-neon-lime' : ''
-                  )} />
-                  <span className="truncate">Blog CMS</span>
-                </Link>
-
-                <Link
-                  href="/admin/feedback/"
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/feedback/')
-                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                      : 'text-sidebar-foreground hover:bg-secondary/50'
-                  )}
-                >
-                  <MessageSquare className={cn(
-                    'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/feedback/') ? 'text-neon-lime' : ''
-                  )} />
-                  <span className="truncate">User Feedback</span>
-                </Link>
-
-                <Link
-                  href="/admin/rosa/"
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/rosa/')
-                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                      : 'text-sidebar-foreground hover:bg-secondary/50'
-                  )}
-                >
-                  <Dog className={cn(
-                    'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/rosa/') ? 'text-neon-lime' : ''
-                  )} />
-                  <span className="truncate">Rosa Admin</span>
-                </Link>
-
-                <Link
-                  href="/admin/factors/"
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
-                    isActive('/admin/factors/')
-                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
-                      : 'text-sidebar-foreground hover:bg-secondary/50'
-                  )}
-                >
-                  <Database className={cn(
-                    'h-4 w-4 flex-shrink-0 transition-colors',
-                    isActive('/admin/factors/') ? 'text-neon-lime' : ''
-                  )} />
-                  <span className="truncate">Emission Factors</span>
-                </Link>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Development Section - Admin or Dev Mode */}
-        {isAlkateraAdmin && (
-        <div className="pt-4 mt-4 border-t border-border">
-          <div className="px-3 mb-2">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Development
-            </h3>
-          </div>
-          {developmentStructure.map((item) => {
+      <TooltipProvider delayDuration={0}>
+        <nav className="flex-1 space-y-1 overflow-y-auto" data-guide="sidebar-nav">
+          {filteredNavigation.map((item) => {
             const IconComponent = item.icon
-            const active = isActive(item.href)
+            const active = !item.locked && isActive(item.href)
+            const hasChildren = item.children && item.children.length > 0
+            const expanded = !item.locked && isExpanded(item.name)
+
+            // Handle section dividers — non-clickable visual labels
+            if (item.type === 'divider') {
+              if (isCollapsed) return null
+              return (
+                <div key={`divider-${item.name}`} className="pt-4 pb-1 px-3" role="separator" aria-hidden="true">
+                  <p className="text-[10px] font-semibold tracking-widest text-muted-foreground/60 uppercase select-none">
+                    {item.name}
+                  </p>
+                </div>
+              )
+            }
+
+            // ── Collapsed state — icon only with tooltip ──
+            if (isCollapsed) {
+              // Locked items (collapsed)
+              if (item.locked) {
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={item.href}
+                        className="flex w-full items-center justify-center rounded-lg p-2 transition-all opacity-40 hover:opacity-60"
+                      >
+                        {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="flex items-center gap-1.5">
+                        {item.name}
+                        <Lock className="h-3 w-3" />
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              }
+
+              // Unlocked items (collapsed) — navigate to href
+              return (
+                <Tooltip key={item.href}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        'flex w-full items-center justify-center rounded-lg p-2 transition-all',
+                        active || hasActiveChild(item)
+                          ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                          : 'text-sidebar-foreground hover:bg-secondary/50'
+                      )}
+                      {...(item.href === '/rosa/' ? { 'data-guide': 'rosa-link' } : {})}
+                    >
+                      {IconComponent && <IconComponent className={cn('h-4 w-4 flex-shrink-0', active || hasActiveChild(item) ? 'text-neon-lime' : '')} />}
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{item.name}</TooltipContent>
+                </Tooltip>
+              )
+            }
+
+            // ── Expanded state (existing behaviour) ──
+
+            // Locked top-level item (no children) — show greyed out with lock
+            if (item.locked && !hasChildren) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
+                  title={`Upgrade to ${item.requiredTierName} to unlock`}
+                >
+                  {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                  <span className="truncate flex-1">{item.name}</span>
+                  <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                </Link>
+              )
+            }
+
+            // Locked parent item with children — show collapsed with lock, click goes to feature page
+            if (item.locked && hasChildren) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative opacity-40 hover:opacity-60 cursor-pointer"
+                  title={`Upgrade to ${item.requiredTierName} to unlock`}
+                >
+                  {IconComponent && <IconComponent className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+                  <span className="truncate flex-1">{item.name}</span>
+                  <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                </Link>
+              )
+            }
+
+            if (hasChildren) {
+              return (
+                <div key={item.href}>
+                  <button
+                    onClick={() => toggleMenu(item.name)}
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                      active || hasActiveChild(item)
+                        ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                        : 'text-sidebar-foreground hover:bg-secondary/50'
+                    )}
+                  >
+                    {IconComponent && <IconComponent className={cn(
+                      'h-4 w-4 flex-shrink-0 transition-colors',
+                      active || hasActiveChild(item) ? 'text-neon-lime' : ''
+                    )} />}
+                    <span className="truncate flex-1 text-left">{item.name}</span>
+                    {expanded ? (
+                      <ChevronDown className="h-4 w-4 flex-shrink-0" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                    )}
+                  </button>
+
+                  {expanded && (
+                    <div className="ml-6 mt-1 space-y-1">
+                      {item.children?.map((child) => {
+                        const ChildIcon = child.icon
+                        const childActive = isActive(child.href)
+                        const childHasChildren = child.children && child.children.length > 0
+                        const childExpanded = isExpanded(child.name)
+
+                        // If child has its own children (e.g., Social Impact subsections)
+                        if (childHasChildren) {
+                          return (
+                            <div key={child.href} className="mt-1">
+                              <button
+                                onClick={() => toggleMenu(child.name)}
+                                className={cn(
+                                  'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
+                                  childActive || hasActiveChild(child)
+                                    ? 'bg-secondary/50 text-foreground font-medium'
+                                    : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                                )}
+                              >
+                                {ChildIcon && <ChildIcon className={cn(
+                                  'h-3.5 w-3.5 flex-shrink-0',
+                                  childActive || hasActiveChild(child) ? 'text-neon-lime' : ''
+                                )} />}
+                                <span className="truncate flex-1 text-left">{child.name}</span>
+                                {childExpanded ? (
+                                  <ChevronDown className="h-3 w-3 flex-shrink-0" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3 flex-shrink-0" />
+                                )}
+                              </button>
+
+                              {childExpanded && (
+                                <div className="ml-6 mt-1 space-y-1">
+                                  {child.children?.map((grandchild) => {
+                                    const GrandchildIcon = grandchild.icon
+                                    const grandchildActive = isActive(grandchild.href)
+
+                                    return (
+                                      <Link
+                                        key={grandchild.href}
+                                        href={grandchild.href}
+                                        className={cn(
+                                          'flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-xs transition-all',
+                                          grandchildActive
+                                            ? 'bg-secondary text-foreground font-medium'
+                                            : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                                        )}
+                                      >
+                                        {GrandchildIcon && <GrandchildIcon className={cn(
+                                          'h-3 w-3 flex-shrink-0',
+                                          grandchildActive ? 'text-neon-lime' : ''
+                                        )} />}
+                                        <span className="truncate">{grandchild.name}</span>
+                                      </Link>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        }
+
+                        // Regular child without nested children
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={cn(
+                              'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
+                              childActive
+                                ? 'bg-secondary text-foreground font-medium'
+                                : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                            )}
+                          >
+                            {ChildIcon && <ChildIcon className={cn(
+                              'h-3.5 w-3.5 flex-shrink-0',
+                              childActive ? 'text-neon-lime' : ''
+                            )} />}
+                            <span className="truncate">{child.name}</span>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            }
 
             return (
               <Link
@@ -924,21 +709,197 @@ export function Sidebar({ className }: SidebarProps) {
                     ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
                     : 'text-sidebar-foreground hover:bg-secondary/50'
                 )}
+                {...(item.href === '/rosa/' ? { 'data-guide': 'rosa-link' } : {})}
               >
-                <IconComponent className={cn(
+                {IconComponent && <IconComponent className={cn(
                   'h-4 w-4 flex-shrink-0 transition-colors',
                   active ? 'text-neon-lime' : ''
-                )} />
+                )} />}
                 <span className="truncate">{item.name}</span>
               </Link>
             )
           })}
-        </div>
-        )}
-      </nav>
 
-      {/* Subscription Status Footer */}
-      {!subscriptionLoading && usage && (
+          {/* Admin Section - Only visible to admins */}
+          {(isOrgAdmin || isAlkateraAdmin) && (
+            <div className="pt-4 mt-4 border-t border-border">
+              {!isCollapsed && (
+                <div className="px-3 mb-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Admin
+                  </h3>
+                </div>
+              )}
+
+              {/* Approval Queue - For Org Admins */}
+              {isOrgAdmin && (
+                isCollapsed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href="/admin/approvals/"
+                        className={cn(
+                          'flex w-full items-center justify-center rounded-lg p-2 transition-all',
+                          isActive('/admin/approvals/')
+                            ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                            : 'text-sidebar-foreground hover:bg-secondary/50'
+                        )}
+                      >
+                        <CheckSquare className={cn(
+                          'h-4 w-4 flex-shrink-0 transition-colors',
+                          isActive('/admin/approvals/') ? 'text-neon-lime' : ''
+                        )} />
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      Approval Queue{pendingCount > 0 ? ` (${pendingCount})` : ''}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Link
+                    href="/admin/approvals/"
+                    className={cn(
+                      'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                      isActive('/admin/approvals/')
+                        ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                        : 'text-sidebar-foreground hover:bg-secondary/50'
+                    )}
+                  >
+                    <CheckSquare className={cn(
+                      'h-4 w-4 flex-shrink-0 transition-colors',
+                      isActive('/admin/approvals/') ? 'text-neon-lime' : ''
+                    )} />
+                    <span className="truncate flex-1">Approval Queue</span>
+                    {pendingCount > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                        {pendingCount}
+                      </Badge>
+                    )}
+                  </Link>
+                )
+              )}
+
+              {/* Alkatera Admin Only Links */}
+              {isAlkateraAdmin && (
+                <>
+                  {[
+                    { href: '/admin/platform/', icon: Activity, label: 'Platform Dashboard' },
+                    { href: '/admin/suppliers/', icon: Handshake, label: 'Platform Suppliers' },
+                    { href: '/admin/blog/', icon: FileEdit, label: 'Blog CMS' },
+                    { href: '/admin/feedback/', icon: MessageSquare, label: 'User Feedback' },
+                    { href: '/admin/rosa/', icon: Dog, label: 'Rosa Admin' },
+                    { href: '/admin/factors/', icon: Database, label: 'Emission Factors' },
+                    { href: '/admin/impact-proxy-values/', icon: TrendingUp, label: 'Impact Proxy Values' },
+                    { href: '/admin/beta-access/', icon: FlaskConical, label: 'Beta Access' },
+                  ].map(({ href, icon: AdminIcon, label }) => (
+                    isCollapsed ? (
+                      <Tooltip key={href}>
+                        <TooltipTrigger asChild>
+                          <Link
+                            href={href}
+                            className={cn(
+                              'flex w-full items-center justify-center rounded-lg p-2 transition-all',
+                              isActive(href)
+                                ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                                : 'text-sidebar-foreground hover:bg-secondary/50'
+                            )}
+                          >
+                            <AdminIcon className={cn(
+                              'h-4 w-4 flex-shrink-0 transition-colors',
+                              isActive(href) ? 'text-neon-lime' : ''
+                            )} />
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{label}</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <Link
+                        key={href}
+                        href={href}
+                        className={cn(
+                          'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                          isActive(href)
+                            ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                            : 'text-sidebar-foreground hover:bg-secondary/50'
+                        )}
+                      >
+                        <AdminIcon className={cn(
+                          'h-4 w-4 flex-shrink-0 transition-colors',
+                          isActive(href) ? 'text-neon-lime' : ''
+                        )} />
+                        <span className="truncate">{label}</span>
+                      </Link>
+                    )
+                  ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Development Section - Admin or Dev Mode */}
+          {isAlkateraAdmin && (
+          <div className="pt-4 mt-4 border-t border-border">
+            {!isCollapsed && (
+              <div className="px-3 mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Development
+                </h3>
+              </div>
+            )}
+            {developmentStructure.map((item) => {
+              const DevIcon = item.icon
+              const active = isActive(item.href)
+
+              if (isCollapsed) {
+                return (
+                  <Tooltip key={item.href}>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          'flex w-full items-center justify-center rounded-lg p-2 transition-all',
+                          active
+                            ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                            : 'text-sidebar-foreground hover:bg-secondary/50'
+                        )}
+                      >
+                        <DevIcon className={cn(
+                          'h-4 w-4 flex-shrink-0 transition-colors',
+                          active ? 'text-neon-lime' : ''
+                        )} />
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{item.name}</TooltipContent>
+                  </Tooltip>
+                )
+              }
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all relative',
+                    active
+                      ? 'bg-secondary text-foreground border-l-4 border-neon-lime'
+                      : 'text-sidebar-foreground hover:bg-secondary/50'
+                  )}
+                >
+                  <DevIcon className={cn(
+                    'h-4 w-4 flex-shrink-0 transition-colors',
+                    active ? 'text-neon-lime' : ''
+                  )} />
+                  <span className="truncate">{item.name}</span>
+                </Link>
+              )
+            })}
+          </div>
+          )}
+        </nav>
+      </TooltipProvider>
+
+      {/* Subscription Status Footer — hidden when collapsed */}
+      {!isCollapsed && !subscriptionLoading && usage && (
         <div className="mt-auto border-t border-border pt-4 px-3">
           <Link
             href="/settings/"

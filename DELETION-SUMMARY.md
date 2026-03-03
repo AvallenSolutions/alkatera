@@ -62,7 +62,7 @@
 ### Product & LCA Data
 - `product_lcas`, `product_lca_materials`, `product_lca_inputs`, `product_lca_results`
 - `product_lca_production_sites`, `product_lca_calculation_logs`
-- `lca_production_mix`, `lca_reports`, `lca_social_indicators`
+- `lca_production_mix` (note: `lca_reports` and `lca_social_indicators` tables dropped in migration 20260322)
 - `lca_workflow_audit`, `lca_methodology_audit_log`
 - `lca_recalculation_queue`, `lca_recalculation_batches`
 - `ingredient_selection_audit`, `passport_views`
