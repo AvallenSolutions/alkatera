@@ -154,36 +154,45 @@ export async function POST(request: NextRequest) {
  * Rebuild an ImpactValuationResult from a cached database row.
  */
 function rebuildResultFromRow(row: Record<string, unknown>): ImpactValuationResult {
+  // Use input_snapshot to determine has_data accurately.
+  // The assembler returns null for "no data" and 0 for "data exists but value is zero",
+  // so we check !== null on the raw input rather than checking if the computed value > 0.
+  const snapshot = (row.input_snapshot ?? {}) as Record<string, Record<string, unknown>>;
+  const nat = snapshot.natural ?? {};
+  const hum = snapshot.human ?? {};
+  const soc = snapshot.social ?? {};
+  const gov = snapshot.governance ?? {};
+
   return {
     natural: {
       total: Number(row.natural_total) || 0,
       items: [
-        { key: 'carbon_tonne', label: 'Carbon (GHG)', value: Number(row.natural_carbon_value) || 0, raw_input: null, proxy_used: 0, unit: 'per tCO2e', has_data: (Number(row.natural_carbon_value) || 0) > 0 },
-        { key: 'water_m3', label: 'Water Use', value: Number(row.natural_water_value) || 0, raw_input: null, proxy_used: 0, unit: 'per m³ world-eq', has_data: (Number(row.natural_water_value) || 0) > 0 },
-        { key: 'land_ha', label: 'Land Use', value: Number(row.natural_land_value) || 0, raw_input: null, proxy_used: 0, unit: 'per ha/yr', has_data: (Number(row.natural_land_value) || 0) > 0 },
-        { key: 'waste_tonne', label: 'Waste to Landfill', value: Number(row.natural_waste_value) || 0, raw_input: null, proxy_used: 0, unit: 'per tonne', has_data: (Number(row.natural_waste_value) || 0) > 0 },
+        { key: 'carbon_tonne', label: 'Carbon (GHG)', value: Number(row.natural_carbon_value) || 0, raw_input: nat.total_emissions_tco2e as number | null ?? null, proxy_used: 0, unit: 'per tCO2e', has_data: nat.total_emissions_tco2e !== null && nat.total_emissions_tco2e !== undefined },
+        { key: 'water_m3', label: 'Water Use', value: Number(row.natural_water_value) || 0, raw_input: nat.water_consumption_m3 as number | null ?? null, proxy_used: 0, unit: 'per m³ world-eq', has_data: nat.water_consumption_m3 !== null && nat.water_consumption_m3 !== undefined },
+        { key: 'land_ha', label: 'Land Use', value: Number(row.natural_land_value) || 0, raw_input: nat.land_use_ha as number | null ?? null, proxy_used: 0, unit: 'per ha/yr', has_data: nat.land_use_ha !== null && nat.land_use_ha !== undefined },
+        { key: 'waste_tonne', label: 'Waste to Landfill', value: Number(row.natural_waste_value) || 0, raw_input: nat.waste_to_landfill_tonnes as number | null ?? null, proxy_used: 0, unit: 'per tonne', has_data: nat.waste_to_landfill_tonnes !== null && nat.waste_to_landfill_tonnes !== undefined },
       ],
     },
     human: {
       total: Number(row.human_total) || 0,
       items: [
-        { key: 'living_wage_gap_gbp', label: 'Living Wage Uplift', value: Number(row.human_living_wage_value) || 0, raw_input: null, proxy_used: 0, unit: 'per £1 gap/yr', has_data: (Number(row.human_living_wage_value) || 0) > 0 },
-        { key: 'training_hour', label: 'Employee Training', value: Number(row.human_training_value) || 0, raw_input: null, proxy_used: 0, unit: 'per hour', has_data: (Number(row.human_training_value) || 0) > 0 },
-        { key: 'wellbeing_score_point', label: 'Employee Wellbeing', value: Number(row.human_wellbeing_value) || 0, raw_input: null, proxy_used: 0, unit: 'per 1pt score improvement', has_data: (Number(row.human_wellbeing_value) || 0) > 0 },
+        { key: 'living_wage_gap_gbp', label: 'Living Wage Uplift', value: Number(row.human_living_wage_value) || 0, raw_input: hum.living_wage_gap_annual_gbp as number | null ?? null, proxy_used: 0, unit: 'per £1 gap/yr', has_data: hum.living_wage_gap_annual_gbp !== null && hum.living_wage_gap_annual_gbp !== undefined },
+        { key: 'training_hour', label: 'Employee Training', value: Number(row.human_training_value) || 0, raw_input: hum.total_training_hours as number | null ?? null, proxy_used: 0, unit: 'per hour', has_data: hum.total_training_hours !== null && hum.total_training_hours !== undefined },
+        { key: 'wellbeing_score_point', label: 'Employee Wellbeing', value: Number(row.human_wellbeing_value) || 0, raw_input: hum.wellbeing_score as number | null ?? null, proxy_used: 0, unit: 'per 1pt score improvement', has_data: hum.wellbeing_score !== null && hum.wellbeing_score !== undefined },
       ],
     },
     social: {
       total: Number(row.social_total) || 0,
       items: [
-        { key: 'volunteering_hour', label: 'Volunteering Hours', value: Number(row.social_volunteering_value) || 0, raw_input: null, proxy_used: 0, unit: 'per hour', has_data: (Number(row.social_volunteering_value) || 0) > 0 },
-        { key: 'charitable_giving_gbp', label: 'Charitable Giving', value: Number(row.social_giving_value) || 0, raw_input: null, proxy_used: 0, unit: 'per £1 donated', has_data: (Number(row.social_giving_value) || 0) > 0 },
-        { key: 'local_multiplier', label: 'Local Supply Chain Spend', value: Number(row.social_local_multiplier_value) || 0, raw_input: null, proxy_used: 0, unit: 'per £1 local spend', has_data: (Number(row.social_local_multiplier_value) || 0) > 0 },
+        { key: 'volunteering_hour', label: 'Volunteering Hours', value: Number(row.social_volunteering_value) || 0, raw_input: soc.volunteering_hours_total as number | null ?? null, proxy_used: 0, unit: 'per hour', has_data: soc.volunteering_hours_total !== null && soc.volunteering_hours_total !== undefined },
+        { key: 'charitable_giving_gbp', label: 'Charitable Giving', value: Number(row.social_giving_value) || 0, raw_input: soc.charitable_giving_total_gbp as number | null ?? null, proxy_used: 0, unit: 'per £1 donated', has_data: soc.charitable_giving_total_gbp !== null && soc.charitable_giving_total_gbp !== undefined },
+        { key: 'local_multiplier', label: 'Local Supply Chain Spend', value: Number(row.social_local_multiplier_value) || 0, raw_input: soc.local_supply_spend_gbp as number | null ?? null, proxy_used: 0, unit: 'per £1 local spend', has_data: soc.local_supply_spend_gbp !== null && soc.local_supply_spend_gbp !== undefined },
       ],
     },
     governance: {
       total: Number(row.governance_total) || 0,
       items: [
-        { key: 'governance_score_point', label: 'Governance Quality', value: Number(row.governance_total) || 0, raw_input: null, proxy_used: 0, unit: 'per 1pt score (0–100)', has_data: (Number(row.governance_total) || 0) > 0 },
+        { key: 'governance_score_point', label: 'Governance Quality', value: Number(row.governance_total) || 0, raw_input: gov.governance_score as number | null ?? null, proxy_used: 0, unit: 'per 1pt score (0–100)', has_data: gov.governance_score !== null && gov.governance_score !== undefined },
       ],
     },
     grand_total: Number(row.grand_total) || 0,

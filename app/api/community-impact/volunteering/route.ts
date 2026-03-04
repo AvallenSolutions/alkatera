@@ -95,8 +95,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Calculate total volunteer hours
-    const totalHours = (body.duration_hours || 0) * (body.participant_count || 1);
+    const validTypes = ['team_volunteering', 'individual', 'skills_based', 'board_service'];
+    if (!validTypes.includes(body.activity_type)) {
+      return NextResponse.json(
+        { error: `activity_type must be one of: ${validTypes.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Accept total_volunteer_hours directly, or calculate from duration_hours * participant_count
+    const participantCount = body.participant_count || 1;
+    const totalHours = body.total_volunteer_hours
+      ? Number(body.total_volunteer_hours)
+      : (body.duration_hours || 0) * participantCount;
+    const durationHours = body.duration_hours
+      ? Number(body.duration_hours)
+      : participantCount > 0 ? totalHours / participantCount : totalHours;
 
     const { data, error } = await supabase
       .from('community_volunteer_activities')
@@ -104,18 +118,20 @@ export async function POST(request: NextRequest) {
         organization_id: body.organization_id || organizationId,
         activity_name: body.activity_name,
         activity_type: body.activity_type,
-        description: body.description,
-        partner_organization: body.partner_organization,
-        partner_cause: body.partner_cause,
+        description: body.description || null,
+        partner_organization: body.partner_organization || null,
+        partner_cause: body.partner_cause || null,
         activity_date: body.activity_date,
-        duration_hours: body.duration_hours,
-        participant_count: body.participant_count,
+        duration_hours: durationHours,
+        participant_count: participantCount,
         total_volunteer_hours: totalHours,
-        beneficiaries_reached: body.beneficiaries_reached,
-        impact_description: body.impact_description,
+        beneficiaries_reached: body.beneficiaries_reached || null,
+        impact_description: body.impact_description || null,
         is_paid_time: body.is_paid_time || false,
-        volunteer_policy_hours: body.volunteer_policy_hours,
-        evidence_url: body.evidence_url,
+        volunteer_policy_hours: body.volunteer_policy_hours || null,
+        evidence_url: body.evidence_url || null,
+        location: body.location || null,
+        photo_urls: body.photo_urls || [],
       })
       .select()
       .single();

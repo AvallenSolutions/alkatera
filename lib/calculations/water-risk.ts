@@ -270,10 +270,12 @@ export async function calculateFacilityWaterRisks(
   const awareFactorsMap = await getAwareFactors(supabase, countryCodes);
 
   // Fetch operational water data from facility_activity_entries
+  // Water data is stored as rows with activity_category enum values and a quantity column
   const { data: activityEntries, error: activityError } = await supabase
     .from('facility_activity_entries')
-    .select('facility_id, water_intake, water_discharge, water_recycled')
-    .in('facility_id', facilities.map(f => f.id));
+    .select('facility_id, activity_category, quantity')
+    .in('facility_id', facilities.map(f => f.id))
+    .in('activity_category', ['water_intake', 'water_discharge', 'water_recycled']);
 
   if (activityError) {
     console.error('Error fetching facility activity entries:', activityError);
@@ -296,9 +298,18 @@ export async function calculateFacilityWaterRisks(
       recycled: 0,
     };
 
-    current.intake += Number(entry.water_intake || 0);
-    current.discharge += Number(entry.water_discharge || 0);
-    current.recycled += Number(entry.water_recycled || 0);
+    const qty = Number(entry.quantity || 0);
+    switch (entry.activity_category) {
+      case 'water_intake':
+        current.intake += qty;
+        break;
+      case 'water_discharge':
+        current.discharge += qty;
+        break;
+      case 'water_recycled':
+        current.recycled += qty;
+        break;
+    }
 
     operationalWaterMap.set(entry.facility_id, current);
   });
@@ -308,15 +319,15 @@ export async function calculateFacilityWaterRisks(
     .from('product_carbon_footprint_production_sites')
     .select(`
       facility_id,
-      share_of_production_percent,
+      share_of_production,
       production_volume,
-      production_unit,
+      production_volume_unit,
       product_carbon_footprints!inner(
         id,
         status,
         organization_id,
         aggregated_impacts,
-        products(name)
+        products!product_lcas_product_id_fkey(name)
       )
     `)
     .eq('product_carbon_footprints.organization_id', organizationId)
@@ -365,7 +376,7 @@ export async function calculateFacilityWaterRisks(
     const lca = site.product_carbon_footprints;
     const waterPerUnit = lca?.aggregated_impacts?.water_consumption || 0;
     const prodVolume = Number(site.production_volume || 0);
-    const sharePercent = (Number(site.share_of_production_percent || 100)) / 100;
+    const sharePercent = (Number(site.share_of_production || 100)) / 100;
     const productName = lca?.products?.name || 'Unknown';
 
     const waterForFacility = waterPerUnit * prodVolume * sharePercent;
@@ -448,7 +459,7 @@ export async function calculateFacilityWaterRisks(
       impact_water,
       origin_country_code,
       product_carbon_footprint_id,
-      product_carbon_footprints!inner(
+      product_carbon_footprints!product_lca_materials_lca_id_fkey!inner(
         id,
         status,
         organization_id,

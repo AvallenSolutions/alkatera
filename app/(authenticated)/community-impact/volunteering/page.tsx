@@ -1,20 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, PlusCircle, Trash2, Calendar, Clock } from 'lucide-react';
+import { Users, PlusCircle, Trash2, Calendar, Clock, MapPin, Camera, X, Image as ImageIcon } from 'lucide-react';
+import { PlacesAutocomplete } from '@/components/ui/places-autocomplete';
 import { useOrganization } from '@/lib/organizationContext';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient';
+
+const ACTIVITY_TYPES = [
+  { value: 'team_volunteering', label: 'Team Volunteering' },
+  { value: 'individual', label: 'Individual' },
+  { value: 'skills_based', label: 'Skills-Based' },
+  { value: 'board_service', label: 'Board Service' },
+] as const;
+
+const ACTIVITY_TYPE_LABELS: Record<string, string> = {
+  team_volunteering: 'Team Volunteering',
+  individual: 'Individual',
+  skills_based: 'Skills-Based',
+  board_service: 'Board Service',
+};
 
 interface VolunteerActivity {
   id: string;
@@ -22,10 +39,12 @@ interface VolunteerActivity {
   activity_type: string;
   activity_date: string;
   total_volunteer_hours: number;
-  participants_count: number;
-  beneficiaries_count: number | null;
+  participant_count: number;
+  beneficiaries_reached: number | null;
   partner_organization: string | null;
   description: string | null;
+  location: string | null;
+  photo_urls: string[] | null;
 }
 
 export default function VolunteeringPage() {
@@ -42,15 +61,20 @@ function VolunteeringPageContent() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [open, setOpen] = useState(false);
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     activity_name: '',
     activity_type: '',
     activity_date: '',
     total_volunteer_hours: '',
-    participants_count: '',
-    beneficiaries_count: '',
+    participant_count: '',
+    beneficiaries_reached: '',
     partner_organization: '',
     description: '',
+    location: '',
   });
 
   useEffect(() => {
@@ -58,6 +82,13 @@ function VolunteeringPageContent() {
       fetchActivities();
     }
   }, [currentOrganization?.id]);
+
+  // Clean up preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [photoPreviewUrls]);
 
   const fetchActivities = async () => {
     try {
@@ -74,14 +105,89 @@ function VolunteeringPageContent() {
     }
   };
 
+  const handlePhotosSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Limit to 5 photos total
+    const remaining = 5 - selectedPhotos.length;
+    const newFiles = files.slice(0, remaining);
+
+    if (files.length > remaining) {
+      toast.error(`Maximum 5 photos allowed. Only the first ${remaining} were added.`);
+    }
+
+    setSelectedPhotos((prev) => [...prev, ...newFiles]);
+    const newUrls = newFiles.map((f) => URL.createObjectURL(f));
+    setPhotoPreviewUrls((prev) => [...prev, ...newUrls]);
+
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removePhoto = (index: number) => {
+    URL.revokeObjectURL(photoPreviewUrls[index]);
+    setSelectedPhotos((prev) => prev.filter((_, i) => i !== index));
+    setPhotoPreviewUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadPhotos = async (orgId: string): Promise<string[]> => {
+    if (selectedPhotos.length === 0) return [];
+
+    setUploadingPhotos(true);
+    const urls: string[] = [];
+
+    try {
+      for (const file of selectedPhotos) {
+        const timestamp = Date.now();
+        const sanitised = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${orgId}/${timestamp}-${sanitised}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('volunteer-photos')
+          .upload(path, file);
+
+        if (uploadError) {
+          console.error('Photo upload error:', uploadError);
+          continue;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('volunteer-photos')
+          .getPublicUrl(path);
+
+        urls.push(publicUrl);
+      }
+    } finally {
+      setUploadingPhotos(false);
+    }
+
+    return urls;
+  };
+
+  const resetForm = () => {
+    setFormData({
+      activity_name: '',
+      activity_type: '',
+      activity_date: '',
+      total_volunteer_hours: '',
+      participant_count: '',
+      beneficiaries_reached: '',
+      partner_organization: '',
+      description: '',
+      location: '',
+    });
+    photoPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    setSelectedPhotos([]);
+    setPhotoPreviewUrls([]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentOrganization?.id) return;
     setIsSubmitting(true);
 
     try {
-      // Get the current session to pass to API
-      const { supabase } = await import('@/lib/supabaseClient');
       const { data: { session } } = await supabase.auth.getSession();
 
       const headers: Record<string, string> = {
@@ -92,37 +198,40 @@ function VolunteeringPageContent() {
         headers['Authorization'] = `Bearer ${session.access_token}`;
       }
 
+      // Upload photos first
+      const photoUrls = await uploadPhotos(currentOrganization.id);
+
       const response = await fetch('/api/community-impact/volunteering', {
         method: 'POST',
         headers,
         credentials: 'include',
         body: JSON.stringify({
-          ...formData,
           organization_id: currentOrganization.id,
+          activity_name: formData.activity_name,
+          activity_type: formData.activity_type,
+          activity_date: formData.activity_date,
           total_volunteer_hours: parseFloat(formData.total_volunteer_hours),
-          participants_count: parseInt(formData.participants_count),
-          beneficiaries_count: formData.beneficiaries_count ? parseInt(formData.beneficiaries_count) : null,
+          participant_count: parseInt(formData.participant_count),
+          beneficiaries_reached: formData.beneficiaries_reached ? parseInt(formData.beneficiaries_reached) : null,
+          partner_organization: formData.partner_organization || null,
+          description: formData.description || null,
+          location: formData.location || null,
+          photo_urls: photoUrls.length > 0 ? photoUrls : [],
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to add volunteer activity');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to add volunteer activity');
+      }
 
       toast.success('Volunteer activity logged successfully');
       setOpen(false);
-      setFormData({
-        activity_name: '',
-        activity_type: '',
-        activity_date: '',
-        total_volunteer_hours: '',
-        participants_count: '',
-        beneficiaries_count: '',
-        partner_organization: '',
-        description: '',
-      });
+      resetForm();
       fetchActivities();
     } catch (error) {
       console.error('Error adding volunteer activity:', error);
-      toast.error('Failed to add volunteer activity');
+      toast.error(error instanceof Error ? error.message : 'Failed to add volunteer activity');
     } finally {
       setIsSubmitting(false);
     }
@@ -146,9 +255,9 @@ function VolunteeringPageContent() {
     }
   };
 
-  const totalHours = activities.reduce((sum, a) => sum + a.total_volunteer_hours, 0);
-  const totalParticipants = activities.reduce((sum, a) => sum + a.participants_count, 0);
-  const totalBeneficiaries = activities.reduce((sum, a) => sum + (a.beneficiaries_count || 0), 0);
+  const totalHours = activities.reduce((sum, a) => sum + (a.total_volunteer_hours || 0), 0);
+  const totalParticipants = activities.reduce((sum, a) => sum + (a.participant_count || 0), 0);
+  const totalBeneficiaries = activities.reduce((sum, a) => sum + (a.beneficiaries_reached || 0), 0);
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -169,14 +278,14 @@ function VolunteeringPageContent() {
             Track employee volunteer activities and community service
           </p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (!isOpen) resetForm(); }}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="h-4 w-4 mr-2" />
               Log Activity
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Log Volunteer Activity</DialogTitle>
               <DialogDescription>Record an employee volunteer activity</DialogDescription>
@@ -196,12 +305,22 @@ function VolunteeringPageContent() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Activity Type *</Label>
-                    <Input
+                    <Select
                       value={formData.activity_type}
-                      onChange={(e) => setFormData({ ...formData, activity_type: e.target.value })}
-                      placeholder="e.g., Environmental"
+                      onValueChange={(value) => setFormData({ ...formData, activity_type: value })}
                       required
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ACTIVITY_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Date *</Label>
@@ -230,8 +349,8 @@ function VolunteeringPageContent() {
                     <Label>Participants *</Label>
                     <Input
                       type="number"
-                      value={formData.participants_count}
-                      onChange={(e) => setFormData({ ...formData, participants_count: e.target.value })}
+                      value={formData.participant_count}
+                      onChange={(e) => setFormData({ ...formData, participant_count: e.target.value })}
                       placeholder="e.g., 10"
                       required
                     />
@@ -242,9 +361,21 @@ function VolunteeringPageContent() {
                   <Label>Beneficiaries Reached</Label>
                   <Input
                     type="number"
-                    value={formData.beneficiaries_count}
-                    onChange={(e) => setFormData({ ...formData, beneficiaries_count: e.target.value })}
+                    value={formData.beneficiaries_reached}
+                    onChange={(e) => setFormData({ ...formData, beneficiaries_reached: e.target.value })}
                     placeholder="e.g., 200"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5" />
+                    Location
+                  </Label>
+                  <PlacesAutocomplete
+                    value={formData.location}
+                    onChange={(value) => setFormData({ ...formData, location: value })}
+                    placeholder="e.g., Porthmeor Beach, St Ives"
                   />
                 </div>
 
@@ -266,13 +397,66 @@ function VolunteeringPageContent() {
                     rows={2}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Camera className="h-3.5 w-3.5" />
+                    Photos
+                  </Label>
+                  <div className="space-y-3">
+                    {photoPreviewUrls.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {photoPreviewUrls.map((url, i) => (
+                          <div key={i} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Photo ${i + 1}`}
+                              className="h-20 w-20 object-cover rounded-lg border border-border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removePhoto(i)}
+                              className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedPhotos.length < 5 && (
+                      <div>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handlePhotosSelected}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <ImageIcon className="h-4 w-4 mr-2" />
+                          {selectedPhotos.length > 0 ? 'Add More Photos' : 'Upload Photos'}
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Up to 5 photos. JPG, PNG or WebP.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : 'Log Activity'}
+                <Button type="submit" disabled={isSubmitting || uploadingPhotos}>
+                  {uploadingPhotos ? 'Uploading photos...' : isSubmitting ? 'Saving...' : 'Log Activity'}
                 </Button>
               </DialogFooter>
             </form>
@@ -360,10 +544,26 @@ function VolunteeringPageContent() {
                             with {activity.partner_organization}
                           </p>
                         )}
+                        {activity.location && (
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {activity.location}
+                          </p>
+                        )}
+                        {activity.photo_urls && activity.photo_urls.length > 0 && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Camera className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {activity.photo_urls.length} photo{activity.photo_urls.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{activity.activity_type}</Badge>
+                      <Badge variant="outline">
+                        {ACTIVITY_TYPE_LABELS[activity.activity_type] || activity.activity_type}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-sm">
@@ -372,8 +572,8 @@ function VolunteeringPageContent() {
                       </div>
                     </TableCell>
                     <TableCell>{activity.total_volunteer_hours} hrs</TableCell>
-                    <TableCell>{activity.participants_count}</TableCell>
-                    <TableCell>{activity.beneficiaries_count?.toLocaleString() || '—'}</TableCell>
+                    <TableCell>{activity.participant_count}</TableCell>
+                    <TableCell>{activity.beneficiaries_reached?.toLocaleString() || '—'}</TableCell>
                     <TableCell>
                       <Button
                         variant="ghost"

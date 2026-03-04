@@ -208,6 +208,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         const mappedIngredients = ingredientItems.map(item => ({
           tempId: item.id,
           name: item.material_name,
+          matched_source_name: item.matched_source_name || undefined,
           data_source: item.data_source as any,
           data_source_id: item.data_source_id,
           supplier_product_id: item.supplier_product_id,
@@ -260,6 +261,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           return {
             tempId: item.id,
             name: item.material_name,
+            matched_source_name: item.matched_source_name || undefined,
             data_source: item.data_source as any,
             data_source_id: item.data_source_id,
             supplier_product_id: item.supplier_product_id,
@@ -393,6 +395,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
+          matched_source_name: form.matched_source_name || null,
           quantity: Number(form.amount),
           unit: form.unit,
           material_type: 'ingredient',
@@ -506,6 +509,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
+          matched_source_name: form.matched_source_name || null,
           quantity: Number(form.amount),
           unit: form.unit,
           material_type: 'packaging',
