@@ -95,7 +95,7 @@ interface PlatformSupplier {
 
 export default function SuppliersPage() {
   const { currentOrganization } = useOrganization();
-  const { canCreateSuppliers, canDeleteSuppliers } = useSupplierPermissions();
+  const { canInviteSuppliers, canCreateSuppliers, canDeleteSuppliers } = useSupplierPermissions();
   const [suppliers, setSuppliers] = useState<OrganizationSupplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -377,17 +377,17 @@ export default function SuppliersPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {canInviteSuppliers && (
+            <Button variant="outline" size="lg" onClick={handleOpenInviteDialog}>
+              <Mail className="h-5 w-5 mr-2" />
+              Invite Supplier
+            </Button>
+          )}
           {canCreateSuppliers ? (
-            <>
-              <Button variant="outline" size="lg" onClick={handleOpenInviteDialog}>
-                <Mail className="h-5 w-5 mr-2" />
-                Invite Supplier
-              </Button>
-              <Button size="lg" onClick={handleOpenAddDialog}>
-                <Plus className="h-5 w-5 mr-2" />
-                Add Supplier
-              </Button>
-            </>
+            <Button size="lg" onClick={handleOpenAddDialog}>
+              <Plus className="h-5 w-5 mr-2" />
+              Add Supplier
+            </Button>
           ) : (
             <TooltipProvider>
               <Tooltip>
@@ -445,10 +445,17 @@ export default function SuppliersPage() {
             <p className="text-muted-foreground text-center max-w-md mb-6">
               Your suppliers contribute to your Scope 3 emissions. Adding them here lets you track supply chain impact and even invite them to share their own data.
             </p>
-            <Button onClick={handleOpenAddDialog} size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
-              <Plus className="h-5 w-5" />
-              Add Your First Supplier
-            </Button>
+            {canCreateSuppliers ? (
+              <Button onClick={handleOpenAddDialog} size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
+                <Plus className="h-5 w-5" />
+                Add Your First Supplier
+              </Button>
+            ) : (
+              <Button onClick={handleOpenInviteDialog} size="lg" className="gap-2 bg-neon-lime text-black hover:bg-neon-lime/90">
+                <Mail className="h-5 w-5" />
+                Invite Your First Supplier
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : filteredSuppliers.length === 0 ? (

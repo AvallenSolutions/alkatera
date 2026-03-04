@@ -34,7 +34,7 @@ export async function assembleImpactValuationInputs(
     proxies,
   ] = await Promise.all([
     assembleNaturalCapital(supabase, organizationId, reportingYear),
-    assembleHumanCapital(supabase, organizationId),
+    assembleHumanCapital(supabase, organizationId, reportingYear),
     assembleSocialCapital(supabase, organizationId, reportingYear),
     assembleGovernanceCapital(supabase, organizationId),
     assembleProxyValues(supabase),
@@ -448,55 +448,73 @@ async function getLandUseHa(
 
 async function assembleHumanCapital(
   supabase: SupabaseClient,
-  organizationId: string
+  organizationId: string,
+  reportingYear: number
 ): Promise<HumanCapitalInputs> {
   try {
-    // Get the most recent people & culture score
-    const { data: pcScore, error } = await supabase
-      .from('people_culture_scores')
-      .select('wellbeing_score, training_hours_per_employee, calculation_metadata')
-      .eq('organization_id', organizationId)
-      .order('calculation_date', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Query source tables directly (like volunteering/donations) rather than
+    // depending on the intermediate people_culture_scores record existing.
+    const [trainingResult, demographicsResult, pcScoreResult] = await Promise.all([
+      // Training hours — read directly from source records
+      supabase
+        .from('people_training_records')
+        .select('total_hours')
+        .eq('organization_id', organizationId)
+        .eq('reporting_year', reportingYear),
+      // Employee count — latest demographics record
+      supabase
+        .from('people_workforce_demographics')
+        .select('total_employees')
+        .eq('organization_id', organizationId)
+        .order('reporting_period', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      // Wellbeing score + living wage gap — still from people_culture_scores
+      supabase
+        .from('people_culture_scores')
+        .select('wellbeing_score, calculation_metadata')
+        .eq('organization_id', organizationId)
+        .order('calculation_date', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    if (error || !pcScore) {
-      if (error) console.warn('[impact-valuation] Failed to get people culture score:', error.message);
-      return {
-        living_wage_gap_annual_gbp: null,
-        total_training_hours: null,
-        employee_count: null,
-        wellbeing_score: null,
-      };
+    // Training hours — sum all records for the reporting year
+    let totalTrainingHours: number | null = null;
+    if (!trainingResult.error && trainingResult.data && trainingResult.data.length > 0) {
+      const sum = trainingResult.data.reduce(
+        (acc, row) => acc + (row.total_hours || 0), 0
+      );
+      totalTrainingHours = sum > 0 ? sum : null;
+    } else if (trainingResult.error) {
+      console.warn('[impact-valuation] Failed to get training data:', trainingResult.error.message);
     }
 
-    const metadata = pcScore.calculation_metadata as Record<string, unknown> | null;
-    const dataSources = metadata?.data_sources as Record<string, unknown> | null;
+    // Employee count
+    let totalEmployees: number | null = null;
+    if (!demographicsResult.error && demographicsResult.data?.total_employees) {
+      totalEmployees = Number(demographicsResult.data.total_employees);
+    } else if (demographicsResult.error) {
+      console.warn('[impact-valuation] Failed to get demographics data:', demographicsResult.error.message);
+    }
 
-    const totalEmployees = dataSources?.total_employees
-      ? Number(dataSources.total_employees)
-      : null;
-
-    const trainingHoursPerEmployee = pcScore.training_hours_per_employee
-      ? Number(pcScore.training_hours_per_employee)
-      : null;
-
-    const totalTrainingHours =
-      trainingHoursPerEmployee !== null && totalEmployees !== null && totalEmployees > 0
-        ? trainingHoursPerEmployee * totalEmployees
+    // Wellbeing score + living wage gap from people_culture_scores (if calculated)
+    let wellbeingScore: number | null = null;
+    let livingWageGapTotal: number | null = null;
+    if (!pcScoreResult.error && pcScoreResult.data) {
+      wellbeingScore = pcScoreResult.data.wellbeing_score ?? null;
+      const metadata = pcScoreResult.data.calculation_metadata as Record<string, unknown> | null;
+      const dataSources = metadata?.data_sources as Record<string, unknown> | null;
+      livingWageGapTotal = dataSources?.living_wage_gap_total
+        ? Number(dataSources.living_wage_gap_total)
         : null;
-
-    // living_wage_gap_total is not currently calculated by the people-culture score route
-    // It will be null until a future update adds that computation
-    const livingWageGapTotal = dataSources?.living_wage_gap_total
-      ? Number(dataSources.living_wage_gap_total)
-      : null;
+    }
 
     return {
       living_wage_gap_annual_gbp: livingWageGapTotal,
       total_training_hours: totalTrainingHours,
       employee_count: totalEmployees,
-      wellbeing_score: pcScore.wellbeing_score ?? null,
+      wellbeing_score: wellbeingScore,
     };
   } catch (err) {
     console.warn('[impact-valuation] Failed to get human capital data:', err);

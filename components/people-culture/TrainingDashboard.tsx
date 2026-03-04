@@ -67,7 +67,7 @@ function StatCard({
               <div className="mt-2">
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="text-muted-foreground">{target.label}</span>
-                  <span>{target.value}%</span>
+                  <span>{Math.round(target.value)}%</span>
                 </div>
                 <Progress value={target.value} className="h-1.5" />
               </div>

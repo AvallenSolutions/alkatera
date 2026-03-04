@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 
 interface SupplierPermissions {
+  canInviteSuppliers: boolean;
   canCreateSuppliers: boolean;
   canEditSuppliers: boolean;
   canDeleteSuppliers: boolean;
@@ -12,6 +13,7 @@ interface SupplierPermissions {
 export function useSupplierPermissions(): SupplierPermissions {
   const { currentOrganization } = useOrganization();
   const [permissions, setPermissions] = useState<SupplierPermissions>({
+    canInviteSuppliers: false,
     canCreateSuppliers: false,
     canEditSuppliers: false,
     canDeleteSuppliers: false,
@@ -22,6 +24,7 @@ export function useSupplierPermissions(): SupplierPermissions {
     async function checkPermissions() {
       if (!currentOrganization?.id) {
         setPermissions({
+          canInviteSuppliers: false,
           canCreateSuppliers: false,
           canEditSuppliers: false,
           canDeleteSuppliers: false,
@@ -35,6 +38,7 @@ export function useSupplierPermissions(): SupplierPermissions {
 
         if (!user) {
           setPermissions({
+            canInviteSuppliers: false,
             canCreateSuppliers: false,
             canEditSuppliers: false,
             canDeleteSuppliers: false,
@@ -51,6 +55,7 @@ export function useSupplierPermissions(): SupplierPermissions {
         if (roleError) {
           console.error("Error checking organization role:", roleError);
           setPermissions({
+            canInviteSuppliers: true,
             canCreateSuppliers: false,
             canEditSuppliers: false,
             canDeleteSuppliers: false,
@@ -74,6 +79,7 @@ export function useSupplierPermissions(): SupplierPermissions {
         const hasAdminAccess = isOrgAdmin || isAlkateraAdmin;
 
         setPermissions({
+          canInviteSuppliers: true,
           canCreateSuppliers: hasAdminAccess,
           canEditSuppliers: hasAdminAccess,
           canDeleteSuppliers: hasAdminAccess,
@@ -82,6 +88,7 @@ export function useSupplierPermissions(): SupplierPermissions {
       } catch (error) {
         console.error("Error checking supplier permissions:", error);
         setPermissions({
+          canInviteSuppliers: false,
           canCreateSuppliers: false,
           canEditSuppliers: false,
           canDeleteSuppliers: false,
