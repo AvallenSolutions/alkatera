@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import {
   Briefcase,
   Users,
@@ -13,13 +14,17 @@ import {
   CheckCircle2,
   Coins,
   Scale,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { FairWorkMetrics, PayGapAnalysis, PayRatioAnalysis, LivingWageAnalysis } from '@/hooks/data/useFairWorkMetrics';
+import type { FairWorkMetrics, CompensationRecord, PayGapAnalysis, PayRatioAnalysis, LivingWageAnalysis } from '@/hooks/data/useFairWorkMetrics';
 
 interface FairWorkDashboardProps {
   metrics: FairWorkMetrics | null;
   isLoading?: boolean;
+  onEditRecord?: (record: CompensationRecord) => void;
+  onDeleteRecord?: (record: CompensationRecord) => void;
 }
 
 function StatCard({
@@ -265,7 +270,110 @@ function PayRatioCard({ analysis }: { analysis: PayRatioAnalysis }) {
   );
 }
 
-export function FairWorkDashboard({ metrics, isLoading }: FairWorkDashboardProps) {
+function CompensationRecordsTable({
+  records,
+  onEdit,
+  onDelete,
+}: {
+  records: CompensationRecord[];
+  onEdit?: (record: CompensationRecord) => void;
+  onDelete?: (record: CompensationRecord) => void;
+}) {
+  if (records.length === 0) return null;
+
+  const formatSalary = (value: number | null) =>
+    value != null ? `£${value.toLocaleString()}` : '—';
+
+  const formatRate = (value: number | null) =>
+    value != null ? `£${value.toFixed(2)}/hr` : '—';
+
+  const formatDate = (date: string) => {
+    try {
+      return new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch { return date; }
+  };
+
+  const employmentTypeLabels: Record<string, string> = {
+    full_time: 'Full Time',
+    part_time: 'Part Time',
+    contractor: 'Contractor',
+    intern: 'Intern',
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Users className="h-4 w-4 text-blue-600" />
+          Compensation Records
+        </CardTitle>
+        <CardDescription>Individual employee compensation data</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="pb-2 font-medium text-muted-foreground">Role</th>
+                <th className="pb-2 font-medium text-muted-foreground">Department</th>
+                <th className="pb-2 font-medium text-muted-foreground">Type</th>
+                <th className="pb-2 font-medium text-muted-foreground text-right">Annual Salary</th>
+                <th className="pb-2 font-medium text-muted-foreground text-right">Hourly Rate</th>
+                <th className="pb-2 font-medium text-muted-foreground">Gender</th>
+                <th className="pb-2 font-medium text-muted-foreground">Effective Date</th>
+                {(onEdit || onDelete) && (
+                  <th className="pb-2 font-medium text-muted-foreground text-right">Actions</th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record) => (
+                <tr key={record.id} className="border-b last:border-0 hover:bg-muted/50">
+                  <td className="py-3">
+                    <div>
+                      <p className="font-medium">{record.role_title || '—'}</p>
+                      {record.role_level && (
+                        <p className="text-xs text-muted-foreground capitalize">{record.role_level.replace('_', ' ')}</p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-3 text-muted-foreground">{record.department || '—'}</td>
+                  <td className="py-3">
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      {employmentTypeLabels[record.employment_type] || record.employment_type}
+                    </Badge>
+                  </td>
+                  <td className="py-3 text-right font-medium">{formatSalary(record.annual_salary)}</td>
+                  <td className="py-3 text-right text-muted-foreground">{formatRate(record.hourly_rate)}</td>
+                  <td className="py-3 text-muted-foreground capitalize">{record.gender?.replace('_', ' ') || '—'}</td>
+                  <td className="py-3 text-muted-foreground">{formatDate(record.effective_date)}</td>
+                  {(onEdit || onDelete) && (
+                    <td className="py-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {onEdit && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(record)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(record)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function FairWorkDashboard({ metrics, isLoading, onEditRecord, onDeleteRecord }: FairWorkDashboardProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -381,6 +489,15 @@ export function FairWorkDashboard({ metrics, isLoading }: FairWorkDashboardProps
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Individual Compensation Records */}
+      {metrics.compensation_records.length > 0 && (
+        <CompensationRecordsTable
+          records={metrics.compensation_records}
+          onEdit={onEditRecord}
+          onDelete={onDeleteRecord}
+        />
       )}
     </div>
   );
