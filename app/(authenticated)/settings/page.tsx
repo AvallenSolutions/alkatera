@@ -14,6 +14,7 @@ import { TierBadge } from '@/components/subscription/TierBadge'
 import { UsageMeter } from '@/components/subscription/UsageMeter'
 import { GracePeriodBanner } from '@/components/subscription/GracePeriodBanner'
 import { DowngradeConfirmationModal } from '@/components/subscription/DowngradeConfirmationModal'
+import { CancelSubscriptionModal } from '@/components/subscription/CancelSubscriptionModal'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabaseClient'
@@ -73,6 +74,7 @@ export default function SettingsPage() {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [downgradeModalOpen, setDowngradeModalOpen] = useState(false)
   const [selectedDowngradeTier, setSelectedDowngradeTier] = useState<string | null>(null)
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
 
   useEffect(() => {
     if (searchParams.get('success') === 'true') {
@@ -322,6 +324,31 @@ export default function SettingsPage() {
           organizationId={currentOrganization.id}
           priceId={getPriceIdForTier(selectedDowngradeTier)}
           isProcessing={processingCheckout}
+        />
+      )}
+
+      {/* Cancel Subscription Modal */}
+      {currentOrganization && (
+        <CancelSubscriptionModal
+          isOpen={cancelModalOpen}
+          onClose={() => setCancelModalOpen(false)}
+          onCancelled={() => {
+            setCancelModalOpen(false)
+            fetchOrganizationData()
+            fetchSubscriptionHistory()
+          }}
+          onDowngradeInstead={() => {
+            // Find the next lower tier to suggest
+            const tierLevels: Record<string, number> = { seed: 1, blossom: 2, canopy: 3 }
+            const currentLevel = tierLevels[tierName] || 1
+            const lowerTier = currentLevel === 3 ? 'blossom' : currentLevel === 2 ? 'seed' : null
+            if (lowerTier) {
+              handleDowngrade(lowerTier)
+            }
+          }}
+          organizationId={currentOrganization.id}
+          currentTierDisplayName={tierDisplayName}
+          canDowngrade={tierName !== 'seed'}
         />
       )}
 
@@ -647,6 +674,27 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Cancel Subscription */}
+          {tierName !== 'seed' && subscriptionStatus === 'active' && (
+            <Card className="border-red-200 dark:border-red-900/50">
+              <CardContent className="flex items-center justify-between py-6">
+                <div>
+                  <p className="text-sm font-medium">Cancel Subscription</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cancel your plan and revert to the free Seed tier at the end of your billing period.
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/30"
+                  onClick={() => setCancelModalOpen(true)}
+                >
+                  Cancel Plan
+                </Button>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>}
 
         {isOrgAdmin && <TabsContent value="billing" className="space-y-4">
