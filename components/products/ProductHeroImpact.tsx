@@ -70,20 +70,28 @@ function BottleVisualization({
   breakdown: CarbonBreakdown;
   className?: string;
 }) {
-  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0) + (breakdown.usePhase || 0);
+  // Only use positive values for visual display (negative values like end-of-life credits can't be shown as fill)
+  const positiveRaw = Math.max(0, breakdown.rawMaterials);
+  const positiveProcessing = Math.max(0, breakdown.processing);
+  const positivePackaging = Math.max(0, breakdown.packaging);
+  const positiveTransport = Math.max(0, breakdown.transport);
+  const positiveEndOfLife = Math.max(0, breakdown.endOfLife || 0);
+  const positiveUsePhase = Math.max(0, breakdown.usePhase || 0);
 
-  const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
+  const positiveTotal = positiveRaw + positiveProcessing + positivePackaging + positiveTransport + positiveEndOfLife + positiveUsePhase;
 
-  const rawPct = getPercentage(breakdown.rawMaterials);
-  const processPct = getPercentage(breakdown.processing);
-  const packagingPct = getPercentage(breakdown.packaging);
-  const transportPct = getPercentage(breakdown.transport);
-  const endOfLifePct = getPercentage(breakdown.endOfLife || 0);
-  const usePhasePct = getPercentage(breakdown.usePhase || 0);
+  const getPercentage = (value: number) => positiveTotal > 0 ? (value / positiveTotal) * 100 : 0;
+
+  const rawPct = getPercentage(positiveRaw);
+  const processPct = getPercentage(positiveProcessing);
+  const packagingPct = getPercentage(positivePackaging);
+  const transportPct = getPercentage(positiveTransport);
+  const endOfLifePct = getPercentage(positiveEndOfLife);
+  const usePhasePct = getPercentage(positiveUsePhase);
 
   // Define fill region for bottle body only (excluding narrow neck)
   const bottleFillTop = 60;  // Below the neck where body widens
-  const bottleFillBottom = 195;  // Just above bottom curve
+  const bottleFillBottom = 198;  // Match bottle outline bottom (mask clips overflow)
   const fillHeight = bottleFillBottom - bottleFillTop;
 
   const minVisibleHeight = 3;
@@ -94,20 +102,31 @@ function BottleVisualization({
     return calculatedHeight;
   };
 
-  const endOfLifeHeight = applyMinHeight((endOfLifePct / 100) * fillHeight, endOfLifePct);
-  const usePhaseHeight = applyMinHeight((usePhasePct / 100) * fillHeight, usePhasePct);
-  const transportHeight = applyMinHeight((transportPct / 100) * fillHeight, transportPct);
-  const packagingHeight = applyMinHeight((packagingPct / 100) * fillHeight, packagingPct);
-  const processingHeight = applyMinHeight((processPct / 100) * fillHeight, processPct);
-  const rawHeight = applyMinHeight((rawPct / 100) * fillHeight, rawPct);
+  // Build layers, filter to positive, sort by size descending (biggest at bottom)
+  const layers = [
+    { key: 'rawMaterials' as const, pct: rawPct },
+    { key: 'processing' as const, pct: processPct },
+    { key: 'packaging' as const, pct: packagingPct },
+    { key: 'transport' as const, pct: transportPct },
+    { key: 'endOfLife' as const, pct: endOfLifePct },
+    { key: 'usePhase' as const, pct: usePhasePct },
+  ].filter(l => l.pct > 0).sort((a, b) => b.pct - a.pct);
 
-  // Stack layers bottom-to-top: endOfLife → usePhase → transport → packaging → processing → rawMaterials
-  const endOfLifeY = bottleFillBottom - endOfLifeHeight;
-  const usePhaseY = endOfLifeY - usePhaseHeight;
-  const transportY = usePhaseY - transportHeight;
-  const packagingY = transportY - packagingHeight;
-  const processingY = packagingY - processingHeight;
-  const rawY = bottleFillTop;
+  // Calculate heights with min visible height, then normalise to fit exactly
+  const layerData = layers.map(layer => ({
+    ...layer,
+    rawHeight: applyMinHeight((layer.pct / 100) * fillHeight, layer.pct),
+  }));
+  const totalRawHeight = layerData.reduce((sum, l) => sum + l.rawHeight, 0);
+
+  // Stack bottom-to-top: biggest at bottom, smallest at top
+  const layerRects: { key: string; y: number; height: number; fill: string }[] = [];
+  let currentY = bottleFillBottom;
+  for (const layer of layerData) {
+    const height = totalRawHeight > 0 ? (layer.rawHeight / totalRawHeight) * fillHeight : 0;
+    currentY -= height;
+    layerRects.push({ key: layer.key, y: currentY, height, fill: LAYER_COLORS[layer.key].fill });
+  }
 
   const bottleOutline = "M38,10 L62,10 L62,55 C62,75 80,85 80,110 L80,185 C80,193 75,198 65,198 L35,198 C25,198 20,193 20,185 L20,110 C20,85 38,75 38,55 Z";
 
@@ -133,12 +152,9 @@ function BottleVisualization({
         </defs>
 
         <g mask="url(#bottleMask)">
-          <rect x="0" y={rawY} width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
-          <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
-          <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
-          <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
-          {usePhasePct > 0 && <rect x="0" y={usePhaseY} width="100" height={usePhaseHeight} fill={LAYER_COLORS.usePhase.fill} />}
-          {endOfLifePct > 0 && <rect x="0" y={endOfLifeY} width="100" height={endOfLifeHeight} fill={LAYER_COLORS.endOfLife.fill} />}
+          {layerRects.map(layer => (
+            <rect key={layer.key} x="0" y={layer.y} width="100" height={layer.height} fill={layer.fill} />
+          ))}
           <rect x="0" y={bottleFillTop} width="100" height={fillHeight} fill="url(#glassOverlay)" />
         </g>
 
@@ -164,20 +180,28 @@ function CanVisualization({
   breakdown: CarbonBreakdown;
   className?: string;
 }) {
-  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0) + (breakdown.usePhase || 0);
+  // Only use positive values for visual display (negative values like end-of-life credits can't be shown as fill)
+  const positiveRaw = Math.max(0, breakdown.rawMaterials);
+  const positiveProcessing = Math.max(0, breakdown.processing);
+  const positivePackaging = Math.max(0, breakdown.packaging);
+  const positiveTransport = Math.max(0, breakdown.transport);
+  const positiveEndOfLife = Math.max(0, breakdown.endOfLife || 0);
+  const positiveUsePhase = Math.max(0, breakdown.usePhase || 0);
 
-  const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
+  const positiveTotal = positiveRaw + positiveProcessing + positivePackaging + positiveTransport + positiveEndOfLife + positiveUsePhase;
 
-  const rawPct = getPercentage(breakdown.rawMaterials);
-  const processPct = getPercentage(breakdown.processing);
-  const packagingPct = getPercentage(breakdown.packaging);
-  const transportPct = getPercentage(breakdown.transport);
-  const endOfLifePct = getPercentage(breakdown.endOfLife || 0);
-  const usePhasePct = getPercentage(breakdown.usePhase || 0);
+  const getPercentage = (value: number) => positiveTotal > 0 ? (value / positiveTotal) * 100 : 0;
+
+  const rawPct = getPercentage(positiveRaw);
+  const processPct = getPercentage(positiveProcessing);
+  const packagingPct = getPercentage(positivePackaging);
+  const transportPct = getPercentage(positiveTransport);
+  const endOfLifePct = getPercentage(positiveEndOfLife);
+  const usePhasePct = getPercentage(positiveUsePhase);
 
   // Define fill region for can body only (excluding tapered top and curved bottom)
   const canFillTop = 48;  // Where the can body starts (after the lip taper)
-  const canFillBottom = 175;  // Just above the bottom curve
+  const canFillBottom = 185;  // Match can outline bottom (mask clips overflow)
   const fillHeight = canFillBottom - canFillTop;
 
   const minVisibleHeight = 3;
@@ -188,20 +212,31 @@ function CanVisualization({
     return calculatedHeight;
   };
 
-  const endOfLifeHeight = applyMinHeight((endOfLifePct / 100) * fillHeight, endOfLifePct);
-  const usePhaseHeight = applyMinHeight((usePhasePct / 100) * fillHeight, usePhasePct);
-  const transportHeight = applyMinHeight((transportPct / 100) * fillHeight, transportPct);
-  const packagingHeight = applyMinHeight((packagingPct / 100) * fillHeight, packagingPct);
-  const processingHeight = applyMinHeight((processPct / 100) * fillHeight, processPct);
-  const rawHeight = applyMinHeight((rawPct / 100) * fillHeight, rawPct);
+  // Build layers, filter to positive, sort by size descending (biggest at bottom)
+  const layers = [
+    { key: 'rawMaterials' as const, pct: rawPct },
+    { key: 'processing' as const, pct: processPct },
+    { key: 'packaging' as const, pct: packagingPct },
+    { key: 'transport' as const, pct: transportPct },
+    { key: 'endOfLife' as const, pct: endOfLifePct },
+    { key: 'usePhase' as const, pct: usePhasePct },
+  ].filter(l => l.pct > 0).sort((a, b) => b.pct - a.pct);
 
-  // Stack layers bottom-to-top: endOfLife → usePhase → transport → packaging → processing → rawMaterials
-  const endOfLifeY = canFillBottom - endOfLifeHeight;
-  const usePhaseY = endOfLifeY - usePhaseHeight;
-  const transportY = usePhaseY - transportHeight;
-  const packagingY = transportY - packagingHeight;
-  const processingY = packagingY - processingHeight;
-  const rawY = canFillTop;
+  // Calculate heights with min visible height, then normalise to fit exactly
+  const layerData = layers.map(layer => ({
+    ...layer,
+    rawHeight: applyMinHeight((layer.pct / 100) * fillHeight, layer.pct),
+  }));
+  const totalRawHeight = layerData.reduce((sum, l) => sum + l.rawHeight, 0);
+
+  // Stack bottom-to-top: biggest at bottom, smallest at top
+  const layerRects: { key: string; y: number; height: number; fill: string }[] = [];
+  let currentY = canFillBottom;
+  for (const layer of layerData) {
+    const height = totalRawHeight > 0 ? (layer.rawHeight / totalRawHeight) * fillHeight : 0;
+    currentY -= height;
+    layerRects.push({ key: layer.key, y: currentY, height, fill: LAYER_COLORS[layer.key].fill });
+  }
 
   const canOutline = "M28,32 L72,32 L72,36 L80,48 L80,170 C80,180 72,185 50,185 C28,185 20,180 20,170 L20,48 L28,36 Z";
 
@@ -227,12 +262,9 @@ function CanVisualization({
         </defs>
 
         <g mask="url(#canMask)">
-          <rect x="0" y={rawY} width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
-          <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
-          <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
-          <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
-          {usePhasePct > 0 && <rect x="0" y={usePhaseY} width="100" height={usePhaseHeight} fill={LAYER_COLORS.usePhase.fill} />}
-          {endOfLifePct > 0 && <rect x="0" y={endOfLifeY} width="100" height={endOfLifeHeight} fill={LAYER_COLORS.endOfLife.fill} />}
+          {layerRects.map(layer => (
+            <rect key={layer.key} x="0" y={layer.y} width="100" height={layer.height} fill={layer.fill} />
+          ))}
           <rect x="0" y={canFillTop} width="100" height={fillHeight} fill="url(#canGlassOverlay)" />
         </g>
 
@@ -259,19 +291,27 @@ function KegVisualization({
   breakdown: CarbonBreakdown;
   className?: string;
 }) {
-  const total = breakdown.rawMaterials + breakdown.processing + breakdown.packaging + breakdown.transport + (breakdown.endOfLife || 0) + (breakdown.usePhase || 0);
+  // Only use positive values for visual display (negative values like end-of-life credits can't be shown as fill)
+  const positiveRaw = Math.max(0, breakdown.rawMaterials);
+  const positiveProcessing = Math.max(0, breakdown.processing);
+  const positivePackaging = Math.max(0, breakdown.packaging);
+  const positiveTransport = Math.max(0, breakdown.transport);
+  const positiveEndOfLife = Math.max(0, breakdown.endOfLife || 0);
+  const positiveUsePhase = Math.max(0, breakdown.usePhase || 0);
 
-  const getPercentage = (value: number) => total > 0 ? (value / total) * 100 : 0;
+  const positiveTotal = positiveRaw + positiveProcessing + positivePackaging + positiveTransport + positiveEndOfLife + positiveUsePhase;
 
-  const rawPct = getPercentage(breakdown.rawMaterials);
-  const processPct = getPercentage(breakdown.processing);
-  const packagingPct = getPercentage(breakdown.packaging);
-  const transportPct = getPercentage(breakdown.transport);
-  const endOfLifePct = getPercentage(breakdown.endOfLife || 0);
-  const usePhasePct = getPercentage(breakdown.usePhase || 0);
+  const getPercentage = (value: number) => positiveTotal > 0 ? (value / positiveTotal) * 100 : 0;
+
+  const rawPct = getPercentage(positiveRaw);
+  const processPct = getPercentage(positiveProcessing);
+  const packagingPct = getPercentage(positivePackaging);
+  const transportPct = getPercentage(positiveTransport);
+  const endOfLifePct = getPercentage(positiveEndOfLife);
+  const usePhasePct = getPercentage(positiveUsePhase);
 
   const kegFillTop = 40;
-  const kegFillBottom = 160;
+  const kegFillBottom = 180;  // Match keg bottom curve (mask clips overflow)
   const kegFillHeight = kegFillBottom - kegFillTop;
 
   const minVisibleHeight = 3;
@@ -282,22 +322,34 @@ function KegVisualization({
     return calculatedHeight;
   };
 
-  const endOfLifeHeight = applyMinHeight((endOfLifePct / 100) * kegFillHeight, endOfLifePct);
-  const usePhaseHeight = applyMinHeight((usePhasePct / 100) * kegFillHeight, usePhasePct);
-  const transportHeight = applyMinHeight((transportPct / 100) * kegFillHeight, transportPct);
-  const packagingHeight = applyMinHeight((packagingPct / 100) * kegFillHeight, packagingPct);
-  const processingHeight = applyMinHeight((processPct / 100) * kegFillHeight, processPct);
-  const rawHeight = applyMinHeight((rawPct / 100) * kegFillHeight, rawPct);
+  // Build layers, filter to positive, sort by size descending (biggest at bottom)
+  const layers = [
+    { key: 'rawMaterials' as const, pct: rawPct },
+    { key: 'processing' as const, pct: processPct },
+    { key: 'packaging' as const, pct: packagingPct },
+    { key: 'transport' as const, pct: transportPct },
+    { key: 'endOfLife' as const, pct: endOfLifePct },
+    { key: 'usePhase' as const, pct: usePhasePct },
+  ].filter(l => l.pct > 0).sort((a, b) => b.pct - a.pct);
 
-  // Stack layers bottom-to-top: endOfLife → usePhase → transport → packaging → processing → rawMaterials
-  const endOfLifeY = kegFillBottom - endOfLifeHeight;
-  const usePhaseY = endOfLifeY - usePhaseHeight;
-  const transportY = usePhaseY - transportHeight;
-  const packagingY = transportY - packagingHeight;
-  const processingY = packagingY - processingHeight;
-  const rawY = kegFillTop;
+  // Calculate heights with min visible height, then normalise to fit exactly
+  const layerData = layers.map(layer => ({
+    ...layer,
+    rawHeight: applyMinHeight((layer.pct / 100) * kegFillHeight, layer.pct),
+  }));
+  const totalRawHeight = layerData.reduce((sum, l) => sum + l.rawHeight, 0);
 
-  const kegOutline = "M15,40 L85,40 L85,160 L15,160 Z";
+  // Stack bottom-to-top: biggest at bottom, smallest at top
+  const layerRects: { key: string; y: number; height: number; fill: string }[] = [];
+  let currentY = kegFillBottom;
+  for (const layer of layerData) {
+    const height = totalRawHeight > 0 ? (layer.rawHeight / totalRawHeight) * kegFillHeight : 0;
+    currentY -= height;
+    layerRects.push({ key: layer.key, y: currentY, height, fill: LAYER_COLORS[layer.key].fill });
+  }
+
+  // Include bottom curve in outline so mask covers the full keg shape
+  const kegOutline = "M15,40 L85,40 L85,175 C85,180 15,180 15,175 Z";
 
   return (
     <div className={cn('relative w-[100px] h-[200px]', className)}>
@@ -321,12 +373,9 @@ function KegVisualization({
         </defs>
 
         <g mask="url(#kegMask)">
-          <rect x="0" y={rawY} width="100" height={rawHeight} fill={LAYER_COLORS.rawMaterials.fill} />
-          <rect x="0" y={processingY} width="100" height={processingHeight} fill={LAYER_COLORS.processing.fill} />
-          <rect x="0" y={packagingY} width="100" height={packagingHeight} fill={LAYER_COLORS.packaging.fill} />
-          <rect x="0" y={transportY} width="100" height={transportHeight} fill={LAYER_COLORS.transport.fill} />
-          {usePhasePct > 0 && <rect x="0" y={usePhaseY} width="100" height={usePhaseHeight} fill={LAYER_COLORS.usePhase.fill} />}
-          {endOfLifePct > 0 && <rect x="0" y={endOfLifeY} width="100" height={endOfLifeHeight} fill={LAYER_COLORS.endOfLife.fill} />}
+          {layerRects.map(layer => (
+            <rect key={layer.key} x="0" y={layer.y} width="100" height={layer.height} fill={layer.fill} />
+          ))}
           <rect x="0" y={kegFillTop} width="100" height={kegFillHeight} fill="url(#kegGlassOverlay)" />
         </g>
 
