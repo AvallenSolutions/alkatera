@@ -79,6 +79,7 @@ export function WasteDataEntry({
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     activity_category: "",
+    activity_date: "",
     quantity: "",
     unit: "kg",
     waste_category: "",
@@ -124,7 +125,7 @@ export function WasteDataEntry({
             facility_id: facilityId,
             organization_id: organizationId,
             activity_category: formData.activity_category,
-            activity_date: periodStart,
+            activity_date: formData.activity_date || periodStart,
             reporting_period_start: periodStart,
             reporting_period_end: periodEnd,
             quantity: parseFloat(formData.quantity),
@@ -153,6 +154,7 @@ export function WasteDataEntry({
       toast.success("Waste data entry added successfully");
       setFormData({
         activity_category: "",
+        activity_date: "",
         quantity: "",
         unit: "kg",
         waste_category: "",
@@ -209,6 +211,21 @@ export function WasteDataEntry({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="activity_date">Date</Label>
+              <Input
+                id="activity_date"
+                type="date"
+                value={formData.activity_date}
+                onChange={(e) => setFormData({ ...formData, activity_date: e.target.value })}
+                min={periodStart}
+                max={periodEnd}
+              />
+              <p className="text-xs text-muted-foreground">
+                When was this reading taken? Defaults to reporting period start.
+              </p>
             </div>
 
             <div className="space-y-2">

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { format, parseISO, differenceInDays, addMonths, startOfMonth } from "date-fns";
+import { useReportingPeriod } from "@/hooks/useReportingPeriod";
 
 interface ReportingPeriodTimelineProps {
   organizationId: string;
@@ -43,10 +44,11 @@ export function ReportingPeriodTimeline({
   viewType = "all",
 }: ReportingPeriodTimelineProps) {
   const supabase = getSupabaseBrowserClient();
+  const { selectableYears, getYearRange, currentLabelYear } = useReportingPeriod();
 
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
-  const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
+  const [selectedYear, setSelectedYear] = useState<string>(currentLabelYear.toString());
   const [filterType, setFilterType] = useState<"all" | "facilities" | "products">(viewType);
 
   useEffect(() => {
@@ -57,8 +59,7 @@ export function ReportingPeriodTimeline({
     try {
       setLoading(true);
 
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
+      const { yearStart, yearEnd } = getYearRange(parseInt(selectedYear));
 
       // Load facility reporting sessions
       const { data: facilitySessions, error: facilityError } = await supabase
@@ -155,22 +156,23 @@ export function ReportingPeriodTimeline({
   }, [entries, filterType]);
 
   const { timelineStart, timelineEnd, monthsInRange } = useMemo(() => {
-    const yearStart = new Date(parseInt(selectedYear), 0, 1);
-    const yearEnd = new Date(parseInt(selectedYear), 11, 31);
+    const { yearStart, yearEnd } = getYearRange(parseInt(selectedYear));
+    const start = parseISO(yearStart);
+    const end = parseISO(yearEnd);
 
     const months = [];
-    let currentMonth = startOfMonth(yearStart);
-    while (currentMonth <= yearEnd) {
+    let currentMonth = startOfMonth(start);
+    while (currentMonth <= end) {
       months.push(currentMonth);
       currentMonth = addMonths(currentMonth, 1);
     }
 
     return {
-      timelineStart: yearStart,
-      timelineEnd: yearEnd,
+      timelineStart: start,
+      timelineEnd: end,
       monthsInRange: months,
     };
-  }, [selectedYear]);
+  }, [selectedYear, getYearRange]);
 
   const calculatePosition = (date: Date) => {
     const totalDays = differenceInDays(timelineEnd, timelineStart);
@@ -245,13 +247,13 @@ export function ReportingPeriodTimeline({
               </SelectContent>
             </Select>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[120px]">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[2026, 2025, 2024, 2023].map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
+                {selectableYears.map((sy) => (
+                  <SelectItem key={sy.year} value={sy.year.toString()}>
+                    {sy.label}
                   </SelectItem>
                 ))}
               </SelectContent>

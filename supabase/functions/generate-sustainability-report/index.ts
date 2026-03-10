@@ -377,7 +377,7 @@ async function aggregateReportData(
             .select('quantity, unit, utility_type, facility_id')
             .in('facility_id', facilityIds)
             .gte('reporting_period_start', yearStart)
-            .lte('reporting_period_end', yearEnd);
+            .lte('reporting_period_start', yearEnd);
 
           if (utilityData) {
             for (const entry of utilityData) {
@@ -403,7 +403,7 @@ async function aggregateReportData(
           .eq('organization_id', organizationId)
           .eq('scope', 'Scope 1')
           .gte('reporting_period_start', yearStart)
-          .lte('reporting_period_end', yearEnd);
+          .lte('reporting_period_start', yearEnd);
         if (fleetS1) fleetS1.forEach((f: any) => { scope1 += (f.emissions_tco2e || 0) * 1000; });
 
         const { data: fleetS2 } = await supabaseClient
@@ -412,7 +412,7 @@ async function aggregateReportData(
           .eq('organization_id', organizationId)
           .eq('scope', 'Scope 2')
           .gte('reporting_period_start', yearStart)
-          .lte('reporting_period_end', yearEnd);
+          .lte('reporting_period_start', yearEnd);
         if (fleetS2) fleetS2.forEach((f: any) => { scope2 += (f.emissions_tco2e || 0) * 1000; });
 
         // Scope 3 from corporate overheads
@@ -527,7 +527,7 @@ async function aggregateReportData(
         .select('facility_id, total_co2e, units_produced')
         .in('facility_id', facilityIds)
         .gte('reporting_period_start', yearStart)
-        .lte('reporting_period_end', yearEnd);
+        .lte('reporting_period_start', yearEnd);
 
       // Get utility data per facility for breakdown
       const { data: utilityData } = await supabaseClient
@@ -535,7 +535,7 @@ async function aggregateReportData(
         .select('facility_id, quantity, utility_type')
         .in('facility_id', facilityIds)
         .gte('reporting_period_start', yearStart)
-        .lte('reporting_period_end', yearEnd);
+        .lte('reporting_period_start', yearEnd);
 
       const emissionsMap = new Map<string, number>();
       const unitsMap = new Map<string, number>();

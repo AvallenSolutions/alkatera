@@ -42,7 +42,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  getAvailablePeriods,
   getFinancialYearLabel,
   getFinancialYearRange,
   periodMonths,
@@ -56,78 +55,17 @@ import {
   getConfidenceDots,
   type AnnualisedResult,
 } from "@/lib/log-data/annualisation";
-
-// ============================================================================
-// Constants — reused from AddUtilityToSession.tsx
-// ============================================================================
-
-const UTILITY_TYPES = [
-  { value: "electricity_grid", label: "Purchased Electricity", defaultUnit: "kWh", fuelType: "grid_electricity", scope: "2" },
-  { value: "heat_steam_purchased", label: "Purchased Heat / Steam", defaultUnit: "kWh", fuelType: "heat_steam", scope: "2" },
-  { value: "natural_gas", label: "Natural Gas", defaultUnit: "kWh", fuelType: "natural_gas_kwh", scope: "1" },
-  { value: "natural_gas_m3", label: "Natural Gas (by m³)", defaultUnit: "m3", fuelType: "natural_gas_m3", scope: "1" },
-  { value: "lpg", label: "LPG (Propane/Butane)", defaultUnit: "litre", fuelType: "lpg_litre", scope: "1" },
-  { value: "diesel_stationary", label: "Diesel (Generators/Stationary)", defaultUnit: "litre", fuelType: "diesel_stationary", scope: "1" },
-  { value: "heavy_fuel_oil", label: "Heavy Fuel Oil", defaultUnit: "litre", fuelType: "heavy_fuel_oil", scope: "1" },
-  { value: "biomass_solid", label: "Biogas / Biomass", defaultUnit: "kg", fuelType: "biomass_wood_chips", scope: "1" },
-  { value: "refrigerant_leakage", label: "Refrigerants (Leakage)", defaultUnit: "kg", fuelType: "refrigerant_r410a", scope: "1" },
-  { value: "diesel_mobile", label: "Company Fleet (Diesel)", defaultUnit: "litre", fuelType: "diesel_stationary", scope: "1" },
-  { value: "petrol_mobile", label: "Company Fleet (Petrol/Gasoline)", defaultUnit: "litre", fuelType: "petrol", scope: "1" },
-];
-
-const WATER_CATEGORIES = [
-  { value: "water_intake", label: "Water Intake" },
-  { value: "water_discharge", label: "Wastewater Discharge" },
-  { value: "water_recycled", label: "Recycled Water" },
-];
-
-const WATER_SOURCES = [
-  { value: "municipal", label: "Municipal Supply" },
-  { value: "groundwater", label: "Groundwater / Borehole" },
-  { value: "surface_water", label: "Surface Water" },
-  { value: "recycled", label: "Recycled / Reclaimed" },
-  { value: "rainwater", label: "Rainwater Harvesting" },
-  { value: "other", label: "Other" },
-];
-
-const WATER_TREATMENT_METHODS = [
-  { value: "primary_treatment", label: "Primary Treatment" },
-  { value: "secondary_treatment", label: "Secondary Treatment" },
-  { value: "tertiary_treatment", label: "Tertiary Treatment" },
-  { value: "none", label: "No Treatment" },
-  { value: "unknown", label: "Unknown" },
-];
-
-const WASTE_CATEGORIES = [
-  { value: "waste_general", label: "General Waste" },
-  { value: "waste_hazardous", label: "Hazardous Waste" },
-  { value: "waste_recycling", label: "Recycling Stream" },
-];
-
-const WASTE_TREATMENT_METHODS = [
-  { value: "landfill", label: "Landfill" },
-  { value: "recycling", label: "Recycling" },
-  { value: "composting", label: "Composting" },
-  { value: "incineration_with_recovery", label: "Incineration (Energy Recovery)" },
-  { value: "incineration_without_recovery", label: "Incineration (No Recovery)" },
-  { value: "anaerobic_digestion", label: "Anaerobic Digestion" },
-  { value: "reuse", label: "Reuse" },
-  { value: "other", label: "Other" },
-];
-
-const DATA_QUALITY_OPTIONS = [
-  { value: "primary_measured_onsite", label: "Measured On-site" },
-  { value: "primary_supplier_verified", label: "Supplier Verified" },
-  { value: "secondary_calculated_allocation", label: "Allocated from Facility Total" },
-  { value: "secondary_modelled_industry_average", label: "Industry Average (Estimated)" },
-];
-
-// Water stress countries (AWARE protocol, WRI Aqueduct)
-const WATER_STRESSED_COUNTRIES = [
-  'AE', 'AF', 'BH', 'DJ', 'DZ', 'EG', 'ER', 'IL', 'IN', 'IQ', 'IR', 'JO',
-  'KW', 'LB', 'LY', 'MA', 'OM', 'PK', 'PS', 'QA', 'SA', 'SD', 'SY', 'TN',
-  'YE', 'CN', 'MN', 'ES', 'GR', 'IT', 'MX', 'ZA',
-];
+import { useReportingPeriod } from "@/hooks/useReportingPeriod";
+import {
+  UTILITY_TYPES,
+  WATER_CATEGORIES,
+  WATER_SOURCES,
+  WATER_TREATMENT_METHODS,
+  WASTE_CATEGORIES,
+  WASTE_TREATMENT_METHODS,
+  DATA_QUALITY_OPTIONS,
+  WATER_STRESSED_COUNTRIES,
+} from "@/lib/constants/utility-types";
 
 // ============================================================================
 // Interfaces
@@ -189,11 +127,12 @@ interface ExistingEntry {
 export default function LogDataPage() {
   const { currentOrganization } = useOrganization();
   const { user } = useAuth();
+  const { defaultCadence, getAvailablePeriods } = useReportingPeriod();
 
   // Selection state
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacilityId, setSelectedFacilityId] = useState<string>("");
-  const [cadence, setCadence] = useState<Cadence>("monthly");
+  const [cadence, setCadence] = useState<Cadence>(defaultCadence);
   const [selectedPeriodIndex, setSelectedPeriodIndex] = useState<string>("0");
 
   // Data state
@@ -236,7 +175,7 @@ export default function LogDataPage() {
   const selectedPeriod: Period | null = periods[parseInt(selectedPeriodIndex)] || null;
   const selectedFacility = facilities.find((f) => f.id === selectedFacilityId) || null;
   const isWaterStressed = selectedFacility?.location_country_code
-    ? WATER_STRESSED_COUNTRIES.includes(selectedFacility.location_country_code)
+    ? (WATER_STRESSED_COUNTRIES as readonly string[]).includes(selectedFacility.location_country_code)
     : false;
 
   // ============================================================================

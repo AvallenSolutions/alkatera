@@ -66,7 +66,7 @@ export function UpstreamTransportCard({
           unit,
           transport_mode,
           distance_km,
-          product_carbon_footprints!inner(
+          product_carbon_footprints!product_carbon_footprint_id!inner(
             organization_id,
             status
           )
@@ -77,7 +77,7 @@ export function UpstreamTransportCard({
         .not('distance_km', 'is', null);
 
       if (error) {
-        console.error('Error fetching transport data:', error);
+        console.error('Error fetching transport data:', error.message, error.details);
         return;
       }
 

@@ -46,6 +46,7 @@ import {
 import { supabase } from '@/lib/supabaseClient';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
+import { useReportingPeriod } from '@/hooks/useReportingPeriod';
 import { BusinessTravelCard } from '@/components/reports/BusinessTravelCard';
 import { ServicesOverheadCard } from '@/components/reports/ServicesOverheadCard';
 import { TeamCommutingCard } from '@/components/reports/TeamCommutingCard';
@@ -67,6 +68,7 @@ const EMISSION_FACTORS: Record<string, { factor: number; unit: string; scope: 'S
   diesel_mobile: { factor: 2.68787, unit: 'kgCO2e/litre', scope: 'Scope 1' },
   petrol_mobile: { factor: 2.31, unit: 'kgCO2e/litre', scope: 'Scope 1' },
   natural_gas: { factor: 0.18293, unit: 'kgCO2e/kWh', scope: 'Scope 1' },
+  natural_gas_m3: { factor: 0.18293 * 10.55, unit: 'kgCO2e/m³', scope: 'Scope 1' }, // 1 m³ ≈ 10.55 kWh
   lpg: { factor: 1.55537, unit: 'kgCO2e/litre', scope: 'Scope 1' },
   heavy_fuel_oil: { factor: 3.17740, unit: 'kgCO2e/litre', scope: 'Scope 1' },
   biomass_solid: { factor: 0.01551, unit: 'kgCO2e/kg', scope: 'Scope 1' },
@@ -80,6 +82,7 @@ const UTILITY_TYPE_LABELS: Record<string, string> = {
   electricity_grid: 'Purchased Electricity',
   heat_steam_purchased: 'Purchased Heat / Steam',
   natural_gas: 'Natural Gas',
+  natural_gas_m3: 'Natural Gas (by m³)',
   lpg: 'LPG (Propane/Butane)',
   diesel_stationary: 'Diesel (Generators/Stationary)',
   heavy_fuel_oil: 'Heavy Fuel Oil',
@@ -156,23 +159,26 @@ interface SourceBreakdown {
   total_co2e: number;
 }
 
-const currentYear = new Date().getFullYear();
-const availableYears = [currentYear, currentYear - 1, currentYear - 2];
-
 export default function CompanyEmissionsPage() {
   const { currentOrganization } = useOrganization();
+  const { selectableYears, getYearRange, currentLabelYear } = useReportingPeriod();
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [isLoadingFacilities, setIsLoadingFacilities] = useState(true);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [activeTab, setActiveTab] = useState('footprint');
 
-  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedYear, setSelectedYear] = useState(currentLabelYear);
+
+  // Derive date range from the selected year (FY-aware)
+  const { yearStart: selectedYearStart, yearEnd: selectedYearEnd } = getYearRange(selectedYear);
   const [report, setReport] = useState<CorporateReport | null>(null);
   const [overheads, setOverheads] = useState<OverheadEntry[]>([]);
   const [scope1CO2e, setScope1CO2e] = useState(0);
   const [scope2CO2e, setScope2CO2e] = useState(0);
   const [productsCO2e, setProductsCO2e] = useState(0);
-  const [fleetCO2e, setFleetCO2e] = useState(0);
+  const [fleetScope1CO2e, setFleetScope1CO2e] = useState(0);
+  const [fleetScope2CO2e, setFleetScope2CO2e] = useState(0);
+  const [fleetScope3CO2e, setFleetScope3CO2e] = useState(0);
   const [scope3Cat1CO2e, setScope3Cat1CO2e] = useState(0);
   const [scope3Cat1Breakdown, setScope3Cat1Breakdown] = useState<Array<{
     product_name: string;
@@ -232,8 +238,8 @@ export default function CompanyEmissionsPage() {
     try {
       setIsLoadingData(true);
       const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
+      const yearStart = selectedYearStart;
+      const yearEnd = selectedYearEnd;
 
       // Fetch utility data from all facilities
       const { data, error } = await browserSupabase
@@ -255,7 +261,7 @@ export default function CompanyEmissionsPage() {
         `)
         .eq('facilities.organization_id', currentOrganization.id)
         .gte('reporting_period_start', yearStart)
-        .lte('reporting_period_end', yearEnd)
+        .lte('reporting_period_start', yearEnd)
         .order('reporting_period_start', { ascending: false });
 
       if (error) {
@@ -368,14 +374,14 @@ export default function CompanyEmissionsPage() {
     console.log('🔍 [SCOPE 3 CAT 1] Starting fetch', {
       orgId: currentOrganization.id,
       selectedYear,
-      yearStart: `${selectedYear}-01-01`,
-      yearEnd: `${selectedYear}-12-31`
+      yearStart: selectedYearStart,
+      yearEnd: selectedYearEnd
     });
 
     try {
       const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
+      const yearStart = selectedYearStart;
+      const yearEnd = selectedYearEnd;
 
       const { data: productionLogs, error: productionError } = await browserSupabase
         .from('production_logs')
@@ -606,7 +612,7 @@ export default function CompanyEmissionsPage() {
           .eq('product_id', log.product_id)
           .eq('status', 'completed')
           .gte('updated_at', yearStart)
-          .lte('updated_at', `${selectedYear}-12-31T23:59:59.999Z`)
+          .lte('updated_at', `${selectedYearEnd}T23:59:59.999Z`)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -819,8 +825,8 @@ export default function CompanyEmissionsPage() {
 
     try {
       const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
+      const yearStart = selectedYearStart;
+      const yearEnd = selectedYearEnd;
 
       const { data: productionData, error } = await browserSupabase
         .from('production_logs')
@@ -881,20 +887,28 @@ export default function CompanyEmissionsPage() {
 
     try {
       const browserSupabase = getSupabaseBrowserClient();
-      const yearStart = `${selectedYear}-01-01`;
-      const yearEnd = `${selectedYear}-12-31`;
+      const yearStart = selectedYearStart;
+      const yearEnd = selectedYearEnd;
 
       const { data, error } = await browserSupabase
         .from('fleet_activities')
-        .select('emissions_tco2e')
+        .select('emissions_tco2e, scope')
         .eq('organization_id', currentOrganization.id)
         .gte('activity_date', yearStart)
         .lte('activity_date', yearEnd);
 
       if (error) throw error;
 
-      const total = data?.reduce((sum, item) => sum + (item.emissions_tco2e || 0), 0) || 0;
-      setFleetCO2e(total);
+      let s1 = 0, s2 = 0, s3 = 0;
+      for (const item of data || []) {
+        const val = item.emissions_tco2e || 0;
+        if (item.scope === 'Scope 1') s1 += val;
+        else if (item.scope === 'Scope 2') s2 += val;
+        else if (item.scope === 'Scope 3 Cat 6') s3 += val;
+      }
+      setFleetScope1CO2e(s1);
+      setFleetScope2CO2e(s2);
+      setFleetScope3CO2e(s3);
     } catch (error: any) {
       console.error('Error fetching fleet emissions:', error);
     }
@@ -1025,25 +1039,29 @@ export default function CompanyEmissionsPage() {
       if (!report?.id || !currentOrganization?.id) return;
 
       // Calculate total emissions (matching the display logic)
-      const totalEmissionsTonnes =
-        (scope1CO2e / 1000) +       // Scope 1 in tonnes
-        fleetCO2e +                  // Fleet already in tonnes
-        (scope2CO2e / 1000) +       // Scope 2 in tonnes
-        scope3Cat1CO2e +            // Scope 3 Cat 1 (products) in tonnes
-        (calculatedScope3OverheadsCO2e / 1000); // Scope 3 overheads in tonnes
+      // Fleet values are in tCO2e, utility values are in kgCO2e
+      const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e;
+      const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e;
+      const totalScope3Tonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e;
+      const totalEmissionsTonnes = totalScope1Tonnes + totalScope2Tonnes + totalScope3Tonnes;
 
       // Only persist if we have actual data
       if (totalEmissionsTonnes <= 0) return;
 
       const breakdownJson = {
-        scope1: scope1CO2e / 1000,           // in tonnes
-        scope2: scope2CO2e / 1000,           // in tonnes
-        fleet: fleetCO2e,                     // already in tonnes
+        scope1: totalScope1Tonnes,            // in tonnes (utilities + fleet Scope 1)
+        scope2: totalScope2Tonnes,            // in tonnes (utilities + fleet Scope 2)
+        fleet: {
+          scope1: fleetScope1CO2e,
+          scope2: fleetScope2CO2e,
+          scope3: fleetScope3CO2e,
+        },
         scope3: {
           products: scope3Cat1CO2e,          // in tonnes
           products_breakdown: scope3Cat1Breakdown,
           overheads: calculatedScope3OverheadsCO2e / 1000, // in tonnes
-          total: scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000),
+          business_travel_fleet: fleetScope3CO2e,           // in tonnes (grey fleet)
+          total: totalScope3Tonnes,
         },
         total: totalEmissionsTonnes,
         calculated_at: new Date().toISOString(),
@@ -1067,7 +1085,7 @@ export default function CompanyEmissionsPage() {
     // Debounce to avoid too many updates
     const timeoutId = setTimeout(persistEmissions, 1000);
     return () => clearTimeout(timeoutId);
-  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetCO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, scope3Cat1Breakdown]);
+  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, scope3Cat1Breakdown]);
 
   return (
     <div className="space-y-6">
@@ -1091,9 +1109,9 @@ export default function CompanyEmissionsPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {availableYears.map((year) => (
-                  <SelectItem key={year} value={year.toString()}>
-                    {year}
+                {selectableYears.map((y) => (
+                  <SelectItem key={y.year} value={y.year.toString()}>
+                    {y.label}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1174,13 +1192,13 @@ export default function CompanyEmissionsPage() {
                   <div className="space-y-6">
                     {(() => {
                       // CRITICAL: Always calculate LIVE total emissions from real-time data (in tonnes)
-                      // Fleet emissions are included in scope1CO2e already, so no need to add separately
+                      // Fleet emissions split by scope for correct assignment
                       const totalLiveEmissionsTonnes =
-                        (scope1CO2e / 1000) +       // Scope 1 in tonnes
-                        (fleetCO2e) +                // Fleet already in tonnes
-                        (scope2CO2e / 1000) +       // Scope 2 in tonnes
-                        scope3Cat1CO2e +            // Scope 3 Cat 1 already in tonnes
-                        (calculatedScope3OverheadsCO2e / 1000); // Scope 3 other categories in tonnes
+                        (scope1CO2e / 1000) + fleetScope1CO2e +       // Scope 1 (utilities + fleet)
+                        (scope2CO2e / 1000) + fleetScope2CO2e +       // Scope 2 (utilities + fleet)
+                        scope3Cat1CO2e +                               // Scope 3 Cat 1 (products)
+                        (calculatedScope3OverheadsCO2e / 1000) +      // Scope 3 other categories
+                        fleetScope3CO2e;                               // Scope 3 Cat 6 (grey fleet)
 
                       const hasLiveData = totalLiveEmissionsTonnes > 0;
 
@@ -1217,9 +1235,8 @@ export default function CompanyEmissionsPage() {
                           </div>
                           <div className="text-2xl font-bold">
                             {(() => {
-                              // CRITICAL: Scope 1 = Operations + Fleet
-                              // scope1CO2e is in kg, fleetCO2e is in tonnes
-                              const totalScope1Tonnes = (scope1CO2e / 1000) + fleetCO2e;
+                              // Scope 1 = facility utilities (kg) + company-owned fleet (tonnes)
+                              const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e;
                               return totalScope1Tonnes > 0
                                 ? `${totalScope1Tonnes.toFixed(3)} tCO₂e`
                                 : 'No data';
@@ -1236,11 +1253,15 @@ export default function CompanyEmissionsPage() {
                             <span className="font-medium">Scope 2</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {scope2CO2e > 0
-                              ? `${(scope2CO2e / 1000).toFixed(3)} tCO₂e`
-                              : 'No data'}
+                            {(() => {
+                              // Scope 2 = purchased energy (kg) + electric fleet (tonnes)
+                              const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e;
+                              return totalScope2Tonnes > 0
+                                ? `${totalScope2Tonnes.toFixed(3)} tCO₂e`
+                                : 'No data';
+                            })()}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Indirect emissions (purchased electricity, heat, steam)</p>
+                          <p className="text-sm text-muted-foreground mt-1">Indirect emissions (purchased electricity, heat, steam, electric fleet)</p>
                         </CardContent>
                       </Card>
 
@@ -1325,13 +1346,13 @@ export default function CompanyEmissionsPage() {
                     <div className="text-center py-6 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 rounded-lg border border-orange-200 dark:border-orange-800">
                       <div className="text-sm text-muted-foreground mb-2">Total Scope 1 Emissions ({selectedYear})</div>
                       <div className="text-4xl font-bold text-orange-900 dark:text-orange-100 mb-2">
-                        {((scope1CO2e / 1000) + fleetCO2e) > 0
-                          ? `${((scope1CO2e / 1000) + fleetCO2e).toFixed(3)} tCO2e`
+                        {((scope1CO2e / 1000) + fleetScope1CO2e) > 0
+                          ? `${((scope1CO2e / 1000) + fleetScope1CO2e).toFixed(3)} tCO2e`
                           : 'No data'}
                       </div>
                       {scope1CO2e > 0 && (
                         <div className="text-xs text-muted-foreground">
-                          Utilities: {(scope1CO2e / 1000).toFixed(3)} tCO2e | Fleet: {fleetCO2e.toFixed(3)} tCO2e
+                          Utilities: {(scope1CO2e / 1000).toFixed(3)} tCO2e | Fleet: {fleetScope1CO2e.toFixed(3)} tCO2e
                         </div>
                       )}
                     </div>

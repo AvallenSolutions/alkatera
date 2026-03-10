@@ -110,7 +110,12 @@ const SCOPE3_CATEGORIES = [
   { category: 15, name: 'Investments', description: 'Emissions from investments' },
 ];
 
-export function useScope3GranularData(organizationId: string | undefined, year: number) {
+export function useScope3GranularData(
+  organizationId: string | undefined,
+  year: number,
+  yearStartOverride?: string,
+  yearEndOverride?: string,
+) {
   const [categories, setCategories] = useState<Scope3CategoryData[]>([]);
   const [productDetails, setProductDetails] = useState<ProductEmissionDetail[]>([]);
   const [travelDetails, setTravelDetails] = useState<BusinessTravelDetail[]>([]);
@@ -131,8 +136,9 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
       setIsLoading(true);
       setError(null);
       const supabase = getSupabaseBrowserClient();
-      const yearStart = `${year}-01-01`;
-      const yearEnd = `${year}-12-31`;
+      // Use provided FY-aware date ranges, or fall back to calendar year
+      const yearStart = yearStartOverride || `${year}-01-01`;
+      const yearEnd = yearEndOverride || `${year}-12-31`;
 
       const categoryData: Map<number, Scope3CategoryData> = new Map();
       SCOPE3_CATEGORIES.forEach(cat => {
@@ -457,7 +463,7 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
         .eq('organization_id', organizationId)
         .eq('scope', 'Scope 3 Cat 6')
         .gte('reporting_period_start', yearStart)
-        .lte('reporting_period_end', yearEnd);
+        .lte('reporting_period_start', yearEnd);
 
       if (fleetScope3 && fleetScope3.length > 0) {
         const cat6 = categoryData.get(6)!;
@@ -612,7 +618,7 @@ export function useScope3GranularData(organizationId: string | undefined, year: 
           .select('quantity, utility_type')
           .eq('organization_id', organizationId)
           .gte('reporting_period_start', yearStart)
-          .lte('reporting_period_end', yearEnd);
+          .lte('reporting_period_start', yearEnd);
 
         if (utilityData && utilityData.length > 0) {
           // WTT factors (approximate % of direct emission factor)

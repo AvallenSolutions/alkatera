@@ -60,7 +60,8 @@ const UTILITY_EMISSION_FACTORS: Record<string, { factor: number; scope: 'Scope 1
   diesel_stationary: { factor: 2.68787, scope: 'Scope 1' },
   diesel_mobile: { factor: 2.68787, scope: 'Scope 1' },
   petrol_mobile: { factor: 2.31, scope: 'Scope 1' },
-  natural_gas: { factor: 0.18293, scope: 'Scope 1' },
+  natural_gas: { factor: 0.18293, scope: 'Scope 1' },        // per kWh
+  natural_gas_m3: { factor: 0.18293 * 10.55, scope: 'Scope 1' }, // per m³ (1 m³ ≈ 10.55 kWh)
   lpg: { factor: 1.55537, scope: 'Scope 1' },
   heavy_fuel_oil: { factor: 3.17740, scope: 'Scope 1' },
   biomass_solid: { factor: 0.01551, scope: 'Scope 1' },
@@ -114,7 +115,7 @@ export async function calculateScope1(
       `)
       .in('facility_id', facilityIds)
       .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_end', yearEnd);
+      .lte('reporting_period_start', yearEnd);
 
     if (utilityData) {
       for (const entry of utilityData) {
@@ -140,7 +141,7 @@ export async function calculateScope1(
     .eq('organization_id', organizationId)
     .eq('scope', 'Scope 1')
     .gte('reporting_period_start', yearStart)
-    .lte('reporting_period_end', yearEnd);
+    .lte('reporting_period_start', yearEnd);
 
   if (fleetScope1Data) {
     fleetScope1Data.forEach((item: any) => {
@@ -196,7 +197,7 @@ export async function calculateScope2(
       `)
       .in('facility_id', facilityIds)
       .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_end', yearEnd);
+      .lte('reporting_period_start', yearEnd);
 
     if (utilityData) {
       for (const entry of utilityData) {
@@ -216,7 +217,7 @@ export async function calculateScope2(
     .eq('organization_id', organizationId)
     .eq('scope', 'Scope 2')
     .gte('reporting_period_start', yearStart)
-    .lte('reporting_period_end', yearEnd);
+    .lte('reporting_period_start', yearEnd);
 
   if (fleetScope2Data) {
     fleetScope2Data.forEach((item: any) => {
@@ -355,7 +356,7 @@ export async function calculateScope3(
           }
         }
 
-        // Last resort: check facility reporting sessions
+        // Fallback: check facility_production_volumes (new table), then sessions (legacy)
         if (unitsProduced === 0) {
           const { data: assignments } = await supabase
             .from('facility_product_assignments')
@@ -364,15 +365,32 @@ export async function calculateScope3(
             .eq('assignment_status', 'active');
 
           if (assignments && assignments.length > 0) {
-            const { data: sessions } = await supabase
-              .from('facility_reporting_sessions')
-              .select('total_production_volume')
-              .in('facility_id', assignments.map((a: any) => a.facility_id))
+            const facilityIds = assignments.map((a: any) => a.facility_id);
+
+            // Try new facility_production_volumes table first
+            const { data: fpvRows } = await supabase
+              .from('facility_production_volumes')
+              .select('production_volume')
+              .in('facility_id', facilityIds)
               .order('reporting_period_end', { ascending: false })
               .limit(1);
 
-            if (sessions && sessions.length > 0) {
-              unitsProduced = Number(sessions[0].total_production_volume || 0);
+            if (fpvRows && fpvRows.length > 0) {
+              unitsProduced = Number(fpvRows[0].production_volume || 0);
+            }
+
+            // Legacy fallback: facility_reporting_sessions
+            if (unitsProduced === 0) {
+              const { data: sessions } = await supabase
+                .from('facility_reporting_sessions')
+                .select('total_production_volume')
+                .in('facility_id', facilityIds)
+                .order('reporting_period_end', { ascending: false })
+                .limit(1);
+
+              if (sessions && sessions.length > 0) {
+                unitsProduced = Number(sessions[0].total_production_volume || 0);
+              }
             }
           }
         }
@@ -468,7 +486,7 @@ export async function calculateScope3(
     .eq('organization_id', organizationId)
     .eq('scope', 'Scope 3 Cat 6')
     .gte('reporting_period_start', yearStart)
-    .lte('reporting_period_end', yearEnd);
+    .lte('reporting_period_start', yearEnd);
 
   if (fleetScope3Data) {
     fleetScope3Data.forEach((item: any) => {

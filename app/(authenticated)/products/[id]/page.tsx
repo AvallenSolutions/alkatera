@@ -324,6 +324,10 @@ export default function ProductDashboardPage() {
               <FacilitiesTab
                 productId={parseInt(productId)}
                 organizationId={currentOrganization.id}
+                annualProductionVolume={product.annual_production_volume ?? null}
+                annualProductionUnit={product.annual_production_unit ?? null}
+                unitSizeUnit={product.unit_size_unit ?? null}
+                onProductUpdated={refetch}
               />
             )}
           </TabsContent>
@@ -394,6 +398,7 @@ export default function ProductDashboardPage() {
           <RecipeEditorPanel
             productId={productId}
             organizationId={currentOrganization?.id || ''}
+            productCategory={product?.product_category}
             onSaveComplete={() => {
               refetch();
             }}

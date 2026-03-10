@@ -447,7 +447,8 @@ export function PackagingFormCard({
     }
 
     const updates: Partial<PackagingFormData> = {
-      name: userOriginalName,
+      // Auto-fill the display name from the DB match only if user hasn't entered one yet
+      ...(!packaging.name ? { name: selection.name } : {}),
       matched_source_name: selection.name,
       data_source: selection.data_source,
       data_source_id: selection.data_source_id,
@@ -594,19 +595,34 @@ export function PackagingFormCard({
           {packaging.packaging_category && (
             <>
               <div>
+                <Label htmlFor={`name-${packaging.tempId}`}>
+                  Material Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id={`name-${packaging.tempId}`}
+                  value={packaging.name}
+                  onChange={(e) => onUpdate(packaging.tempId, { name: e.target.value })}
+                  placeholder="e.g. 750ml Flint Glass Bordeaux Bottle"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  The full display name for this packaging material
+                </p>
+              </div>
+
+              <div>
                 <Label htmlFor={`search-${packaging.tempId}`} className="flex items-center gap-2">
-                  Search Material <span className="text-destructive">*</span>
+                  Emission Factor <span className="text-destructive">*</span>
                 </Label>
                 <InlineIngredientSearch
                   organizationId={organizationId}
-                  value={packaging.name}
-                  placeholder="Search for packaging material..."
+                  value={packaging.matched_source_name || ''}
+                  placeholder="Search databases for emission factor..."
                   materialType="packaging"
                   onSelect={handleSearchSelect}
-                  onChange={(value) => onUpdate(packaging.tempId, { name: value, matched_source_name: undefined, data_source: null, data_source_id: undefined })}
+                  onChange={() => onUpdate(packaging.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Search by material name to find matches from your supplier network or global database
+                  Search for the closest matching emission factor from supplier data or global databases
                 </p>
                 {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && (
                   <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs">

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search, Lightbulb } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { findBrandNameMatch } from "@/lib/openlca/drinks-aliases";
 import type { DataSource } from "@/lib/types/lca";
 
 interface ProxySuggestion {
@@ -21,6 +22,7 @@ interface ProxySuggestion {
 interface SearchResult {
   id: string;
   name: string;
+  friendly_name?: string;
   category: string;
   unit?: string;
   processType?: string;
@@ -103,9 +105,20 @@ export function InlineIngredientSearch({
   const searchStartRef = useRef<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isTypingRef = useRef(false);
+
+  // Brand name detection: suggest generic term when user types a trade name
+  const brandMatch = useMemo(() => {
+    if (query.length < 3 || !isTypingRef.current) return null;
+    return findBrandNameMatch(query);
+  }, [query]);
 
   useEffect(() => {
-    setQuery(value);
+    // Only sync from prop when user isn't actively typing,
+    // otherwise the parent clearing matched_source_name would wipe the search input.
+    if (!isTypingRef.current) {
+      setQuery(value);
+    }
   }, [value]);
 
   useEffect(() => {
@@ -254,6 +267,7 @@ export function InlineIngredientSearch({
   };
 
   const handleInputChange = (newValue: string) => {
+    isTypingRef.current = true;
     setQuery(newValue);
     onChange?.(newValue);
     setProxySuggestions([]);
@@ -316,7 +330,8 @@ export function InlineIngredientSearch({
 
     onSelect(selectedData);
 
-    setQuery(overrideUserQuery || result.name);
+    isTypingRef.current = false;
+    setQuery(result.name);
     setShowResults(false);
   };
 
@@ -453,6 +468,7 @@ export function InlineIngredientSearch({
         <Input
           value={query}
           onChange={(e) => handleInputChange(e.target.value)}
+          onBlur={() => { isTypingRef.current = false; }}
           placeholder={placeholder}
           className="pr-10"
         />
@@ -473,6 +489,48 @@ export function InlineIngredientSearch({
                 ? 'Searching ecoinvent database (first search takes longer)...'
                 : 'Loading ecoinvent process library. This only happens once per session...'}
           </span>
+        </div>
+      )}
+
+      {brandMatch && !showResults && (
+        <div className="mt-1.5 rounded-md border border-[#ccff00]/30 bg-[#ccff00]/5 px-3 py-2 text-xs animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="flex items-start gap-2">
+            <Lightbulb className="h-3.5 w-3.5 text-[#ccff00] mt-0.5 shrink-0" />
+            <div className="flex-1">
+              <p className="text-muted-foreground">
+                <span className="font-medium text-foreground">&quot;{query}&quot;</span> is a brand/variety name — {brandMatch.explanation.toLowerCase()}
+              </p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] border-[#ccff00]/40 hover:bg-[#ccff00]/10"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleInputChange(brandMatch.genericTerm);
+                  }}
+                >
+                  <Search className="h-2.5 w-2.5 mr-1" />
+                  Search &quot;{brandMatch.genericTerm}&quot;
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[10px] text-muted-foreground"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    performSearch(query);
+                  }}
+                >
+                  Keep original search
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -532,9 +590,16 @@ export function InlineIngredientSearch({
                   {getResultIcon(result)}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm truncate">{result.name}</span>
+                      <span className="font-medium text-sm truncate">
+                        {result.friendly_name || result.name}
+                      </span>
                       {getSourceBadge(result)}
                     </div>
+                    {result.friendly_name && (
+                      <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5" title={result.name}>
+                        {result.name}
+                      </p>
+                    )}
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       {result.unit && (
                         <span className="text-xs text-muted-foreground">
@@ -559,10 +624,14 @@ export function InlineIngredientSearch({
                       )}
                     </div>
                     {result.co2_factor && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {result.co2_factor.toFixed(3)} kg CO₂e/{result.unit || 'kg'}
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                        <span className={`inline-block h-2 w-2 rounded-full ${getIntensityDot(result.co2_factor)}`} />
+                        <span>{result.co2_factor.toFixed(3)} kg CO₂e/{result.unit || 'kg'}</span>
+                        <span className={`${getIntensityLabel(result.co2_factor).className}`}>
+                          {getIntensityLabel(result.co2_factor).label}
+                        </span>
                         {result.source_type === 'global_library' && (result.uncertainty_percent || result.metadata?.uncertainty_percent) && (
-                          <span className="text-muted-foreground/70 ml-1">
+                          <span className="text-muted-foreground/70">
                             ±{result.uncertainty_percent || result.metadata?.uncertainty_percent}%
                           </span>
                         )}
@@ -599,10 +668,46 @@ export function InlineIngredientSearch({
 
       {showResults && results.length === 0 && !isSearching && query.length >= 2 && (
         <Card className="absolute z-50 mt-1 w-full shadow-lg">
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            No results found for &quot;{query}&quot;
+          <div className="p-4 text-sm text-muted-foreground">
+            <p className="text-center">No results found for &quot;{query}&quot;</p>
+
+            {/* Brand name suggestion in zero-results */}
+            {(() => {
+              const zeroResultBrand = findBrandNameMatch(query);
+              if (zeroResultBrand) {
+                return (
+                  <div className="mt-3 rounded-md border border-[#ccff00]/30 bg-[#ccff00]/5 px-3 py-2 text-xs">
+                    <div className="flex items-start gap-2">
+                      <Lightbulb className="h-3.5 w-3.5 text-[#ccff00] mt-0.5 shrink-0" />
+                      <div>
+                        <p>
+                          Did you mean <span className="font-medium text-foreground">&quot;{zeroResultBrand.genericTerm}&quot;</span>?
+                          {' '}{zeroResultBrand.explanation}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 px-2 text-[10px] mt-1.5 border-[#ccff00]/40 hover:bg-[#ccff00]/10"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleInputChange(zeroResultBrand.genericTerm);
+                          }}
+                        >
+                          <Search className="h-2.5 w-2.5 mr-1" />
+                          Search &quot;{zeroResultBrand.genericTerm}&quot;
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {!openLCAEnabled && (
-              <div className="mt-2 text-xs text-amber-600">
+              <div className="mt-2 text-xs text-amber-600 text-center">
                 OpenLCA is not connected. Configure it in Settings to search ecoInvent.
               </div>
             )}
@@ -615,11 +720,28 @@ export function InlineIngredientSearch({
             proxyAllFailed={proxyAllFailed}
             onFetchProxy={() => fetchProxySuggestions(query)}
             onUseProxy={handleUseProxy}
+            autoFetch={query.length >= 3}
           />
         </Card>
       )}
     </div>
   );
+}
+
+// ── Carbon Intensity Labels ───────────────────────────────────────────
+
+function getIntensityLabel(co2Factor: number): { label: string; className: string } {
+  if (co2Factor < 0.5) return { label: 'Low impact', className: 'text-green-600 dark:text-green-400' };
+  if (co2Factor <= 2.0) return { label: 'Moderate impact', className: 'text-amber-600 dark:text-amber-400' };
+  if (co2Factor <= 5.0) return { label: 'High impact', className: 'text-orange-600 dark:text-orange-400' };
+  return { label: 'Very high — verify match', className: 'text-red-600 dark:text-red-400' };
+}
+
+function getIntensityDot(co2Factor: number): string {
+  if (co2Factor < 0.5) return 'bg-green-500';
+  if (co2Factor <= 2.0) return 'bg-amber-500';
+  if (co2Factor <= 5.0) return 'bg-orange-500';
+  return 'bg-red-500';
 }
 
 // ── AI Proxy Suggestion Panel ─────────────────────────────────────────
@@ -638,6 +760,7 @@ function ProxySuggestionPanel({
   proxyAllFailed,
   onFetchProxy,
   onUseProxy,
+  autoFetch = false,
 }: {
   query: string;
   proxySuggestions: ProxySuggestion[];
@@ -646,7 +769,20 @@ function ProxySuggestionPanel({
   proxyAllFailed: boolean;
   onFetchProxy: () => void;
   onUseProxy: (suggestion: ProxySuggestion) => void;
+  autoFetch?: boolean;
 }) {
+  // Auto-fetch proxy suggestions when zero results and autoFetch is true
+  const autoFetchedRef = useRef(false);
+  useEffect(() => {
+    if (autoFetch && !autoFetchedRef.current && !loadingProxy && proxySuggestions.length === 0 && !proxyAllFailed && query.length >= 3) {
+      autoFetchedRef.current = true;
+      onFetchProxy();
+    }
+    // Reset when query changes
+    if (!autoFetch) {
+      autoFetchedRef.current = false;
+    }
+  }, [autoFetch, query, loadingProxy, proxySuggestions.length, proxyAllFailed, onFetchProxy]);
   return (
     <div className="border-t px-2 py-2">
       <Button

@@ -1,3 +1,7 @@
+/**
+ * @deprecated Replaced by DirectDataEntry.tsx + ProductionVolumeManager.tsx.
+ * Not imported anywhere — safe to delete.
+ */
 "use client";
 
 import { useState, useEffect } from "react";

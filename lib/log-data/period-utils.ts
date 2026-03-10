@@ -1,6 +1,7 @@
 /**
- * Period calculation utilities for the Log Data page.
+ * Period calculation utilities.
  * Generates available periods for monthly, quarterly, and annual cadences.
+ * Supports org-configurable financial year start month.
  */
 
 export interface Period {
@@ -153,4 +154,134 @@ export function getFinancialYearRange(date: Date): { start: string; end: string 
     start: `${year - 1}-04-01`,
     end: `${year}-03-31`,
   };
+}
+
+// =============================================================================
+// FY-parameterised functions
+// =============================================================================
+
+/**
+ * Get the year range for a given "label year" and FY start month.
+ *
+ * @param year - The label year (e.g. 2025)
+ * @param fyStartMonth - 1-indexed month the FY starts (1=Jan=calendar year, 4=Apr=UK FY)
+ * @returns { yearStart, yearEnd } as ISO date strings
+ *
+ * Examples:
+ *   getYearRangeForOrg(2025, 1)  → { yearStart: "2025-01-01", yearEnd: "2025-12-31" }
+ *   getYearRangeForOrg(2025, 4)  → { yearStart: "2025-04-01", yearEnd: "2026-03-31" }
+ */
+export function getYearRangeForOrg(
+  year: number,
+  fyStartMonth: number = 1
+): { yearStart: string; yearEnd: string } {
+  if (fyStartMonth === 1) {
+    return {
+      yearStart: `${year}-01-01`,
+      yearEnd: `${year}-12-31`,
+    };
+  }
+
+  // FY starts in fyStartMonth of the label year
+  const startMonth = fyStartMonth - 1; // 0-indexed
+  const endMonth = startMonth - 1 < 0 ? 11 : startMonth - 1; // month before start = end of FY
+  const endYear = year + 1;
+  const lastDay = lastDayOfMonth(endYear, endMonth);
+
+  return {
+    yearStart: toISODate(year, startMonth, 1),
+    yearEnd: toISODate(endYear, endMonth, lastDay),
+  };
+}
+
+/**
+ * Get a display label for a year, accounting for FY.
+ *
+ * @param year - The label year
+ * @param fyStartMonth - 1-indexed month (1=Jan=calendar year)
+ *
+ * Examples:
+ *   getYearLabelForOrg(2025, 1)  → "2025"
+ *   getYearLabelForOrg(2025, 4)  → "FY 2025-26"
+ */
+export function getYearLabelForOrg(year: number, fyStartMonth: number = 1): string {
+  if (fyStartMonth === 1) {
+    return `${year}`;
+  }
+  return `FY ${year}-${String(year + 1).slice(2)}`;
+}
+
+/**
+ * Determine which "label year" a given date falls into, given an FY start month.
+ *
+ * For calendar year (fyStartMonth=1): the label year is just the date's year.
+ * For FY starting in April (fyStartMonth=4): Jan-Mar 2026 → label year 2025, Apr 2026+ → 2026.
+ */
+export function getLabelYearForDate(date: Date, fyStartMonth: number = 1): number {
+  if (fyStartMonth === 1) return date.getFullYear();
+
+  const month = date.getMonth(); // 0-indexed
+  const startMonth0 = fyStartMonth - 1; // 0-indexed
+
+  if (month >= startMonth0) {
+    return date.getFullYear();
+  }
+  return date.getFullYear() - 1;
+}
+
+/**
+ * Generate available periods for a given cadence, parameterised by FY start month.
+ * Drop-in replacement for getAvailablePeriods() with FY awareness.
+ *
+ * @param cadence - 'monthly' | 'quarterly' | 'annual'
+ * @param fyStartMonth - 1-indexed month (1=Jan=calendar year, 4=Apr=UK FY)
+ */
+export function getAvailablePeriodsForOrg(
+  cadence: Cadence,
+  fyStartMonth: number = 1
+): Period[] {
+  // Monthly and quarterly are date-based, not FY-specific
+  if (cadence !== 'annual' || fyStartMonth === 1) {
+    return getAvailablePeriods(cadence);
+  }
+
+  // Annual periods shifted to FY boundaries
+  const now = new Date();
+  const currentLabelYear = getLabelYearForDate(now, fyStartMonth);
+  const periods: Period[] = [];
+
+  for (let i = 0; i < 4; i++) {
+    const labelYear = currentLabelYear - i;
+    const { yearStart, yearEnd } = getYearRangeForOrg(labelYear, fyStartMonth);
+    periods.push({
+      start: yearStart,
+      end: yearEnd,
+      label: getYearLabelForOrg(labelYear, fyStartMonth),
+    });
+  }
+
+  return periods;
+}
+
+/**
+ * Get the list of selectable years for year-picker dropdowns.
+ * Returns label years (most recent first) with their date ranges.
+ */
+export function getSelectableYears(
+  fyStartMonth: number = 1,
+  count: number = 4
+): Array<{ year: number; label: string; yearStart: string; yearEnd: string }> {
+  const now = new Date();
+  const currentLabelYear = getLabelYearForDate(now, fyStartMonth);
+
+  return Array.from({ length: count }, (_, i) => {
+    const year = currentLabelYear - i;
+    const { yearStart, yearEnd } = getYearRangeForOrg(year, fyStartMonth);
+    return {
+      year,
+      label: getYearLabelForOrg(year, fyStartMonth),
+      yearStart,
+      yearEnd,
+    };
+  });
 }

@@ -1,3 +1,7 @@
+/**
+ * @deprecated Replaced by useReportingPeriod hook — sessions no longer gate data entry.
+ * See: Reporting Period Simplification plan.
+ */
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 

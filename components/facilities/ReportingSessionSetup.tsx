@@ -1,3 +1,7 @@
+/**
+ * @deprecated Replaced by DirectDataEntry.tsx — session-based entry flow removed.
+ * See: Reporting Period Simplification plan.
+ */
 "use client";
 
 import { useState, useEffect } from "react";

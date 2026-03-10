@@ -15,6 +15,8 @@ import {
   Sparkles,
   Upload,
   Wine,
+  Copy,
+  BookmarkPlus,
 } from "lucide-react";
 import { useOrganization } from "@/lib/organizationContext";
 import { IngredientFormCard } from "@/components/products/IngredientFormCard";
@@ -22,6 +24,8 @@ import { PackagingFormCard } from "@/components/products/PackagingFormCard";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
 import { MaturationProfileCard } from "@/components/products/MaturationProfileCard";
 import { SearchGuidePanel } from "@/components/products/SearchGuidePanel";
+import { RecipeChecklist } from "@/components/products/RecipeChecklist";
+import { PackagingTemplateDialog } from "@/components/products/PackagingTemplateDialog";
 import { useRecipeEditor } from "@/hooks/useRecipeEditor";
 import type { IngredientFormData } from "@/components/products/IngredientFormCard";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
@@ -30,6 +34,7 @@ import type { MaturationFormData } from "@/components/products/MaturationProfile
 interface RecipeEditorPanelProps {
   productId: string;
   organizationId: string;
+  productCategory?: string | null;
   onSaveComplete?: () => void;
   onDirtyChange?: (isDirty: boolean) => void;
   compact?: boolean;
@@ -39,6 +44,7 @@ interface RecipeEditorPanelProps {
 export function RecipeEditorPanel({
   productId,
   organizationId,
+  productCategory,
   onSaveComplete,
   onDirtyChange,
   compact = false,
@@ -47,6 +53,8 @@ export function RecipeEditorPanel({
   const { currentOrganization } = useOrganization();
   const [activeTab, setActiveTab] = useState(initialTab);
   const [showBOMImport, setShowBOMImport] = useState(false);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateDialogMode, setTemplateDialogMode] = useState<"save" | "browse">("browse");
 
   const {
     product,
@@ -69,8 +77,11 @@ export function RecipeEditorPanel({
     removePackaging,
     addPackaging,
     addPackagingWithType,
+    addIngredientWithDefaults,
+    addPackagingWithDefaults,
     saveIngredients,
     savePackaging,
+    setPackagingFromTemplate,
     saveMaturation,
     removeMaturation,
   } = useRecipeEditor(productId, organizationId);
@@ -282,6 +293,15 @@ export function RecipeEditorPanel({
                 </Alert>
               )}
 
+              <RecipeChecklist
+                productCategory={productCategory}
+                type="ingredient"
+                existingItems={ingredientForms}
+                onQuickAdd={(name, searchQuery) => {
+                  addIngredientWithDefaults(name, searchQuery);
+                }}
+              />
+
               <div className="space-y-4">
                 {ingredientForms.map((ingredient, index) => (
                   <IngredientFormCard
@@ -339,6 +359,31 @@ export function RecipeEditorPanel({
                   <CardDescription>
                     Define your packaging materials with environmental impact data
                   </CardDescription>
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setTemplateDialogMode("browse");
+                        setShowTemplateDialog(true);
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Apply Template
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setTemplateDialogMode("save");
+                        setShowTemplateDialog(true);
+                      }}
+                      disabled={packagingCount === 0}
+                    >
+                      <BookmarkPlus className="h-3.5 w-3.5 mr-1.5" />
+                      Save as Template
+                    </Button>
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -357,6 +402,15 @@ export function RecipeEditorPanel({
                   </AlertDescription>
                 </Alert>
               )}
+
+              <RecipeChecklist
+                productCategory={productCategory}
+                type="packaging"
+                existingItems={packagingForms}
+                onQuickAdd={(name, searchQuery, packagingCategory) => {
+                  addPackagingWithDefaults(name, searchQuery, packagingCategory);
+                }}
+              />
 
               <div className="space-y-4">
                 {packagingForms.map((packaging, index) => (
@@ -422,6 +476,18 @@ export function RecipeEditorPanel({
         onOpenChange={setShowBOMImport}
         onImportComplete={handleBOMImportComplete}
         organizationId={organizationId}
+      />
+
+      <PackagingTemplateDialog
+        open={showTemplateDialog}
+        onOpenChange={setShowTemplateDialog}
+        organizationId={organizationId}
+        mode={templateDialogMode}
+        currentPackaging={packagingForms}
+        onApplyTemplate={(items) => {
+          setPackagingFromTemplate(items);
+          setShowTemplateDialog(false);
+        }}
       />
     </div>
   );

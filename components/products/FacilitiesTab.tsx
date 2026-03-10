@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,11 +24,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertCircle,
   Building2,
-  CheckCircle2,
-  Edit2,
+  Check,
   Factory,
   Loader2,
   MapPin,
+  Package,
   Plus,
   Trash2,
   Users,
@@ -39,6 +39,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 interface FacilitiesTabProps {
   productId: number;
   organizationId: string;
+  annualProductionVolume: number | null;
+  annualProductionUnit: string | null;
+  unitSizeUnit: string | null;
+  onProductUpdated: () => void;
 }
 
 interface Facility {
@@ -49,28 +53,12 @@ interface Facility {
   address_country: string | null;
 }
 
-interface ReportingSession {
-  id: string;
-  facility_id: string;
-  reporting_period_start: string;
-  reporting_period_end: string;
-  total_production_volume: number;
-  volume_unit: string;
-  emission_intensity?: number;
-}
-
 interface FacilityAssignment {
   id: string;
   facility_id: string;
   facility: Facility;
   is_primary_facility: boolean;
-  production_volume: number | null;
-  production_volume_unit: string | null;
-  reporting_session_id: string | null;
-  // Computed from facility emissions
-  allocated_emissions?: number;
-  allocation_status: "pending" | "calculated" | "verified";
-  // LCA-derived allocation data (from PCF production sites / CM allocations)
+  allocation_percentage: number;
   lca_allocation?: {
     allocated_emissions: number;
     reporting_period_start: string;
@@ -89,23 +77,54 @@ const VOLUME_UNITS = [
   { value: "cases", label: "Cases" },
 ];
 
-export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps) {
+/** Map product unit_size_unit to a sensible production unit default */
+function defaultProductionUnit(unitSizeUnit: string | null): string {
+  switch (unitSizeUnit) {
+    case "ml":
+    case "L":
+      return "litres";
+    case "g":
+    case "kg":
+      return "kg";
+    default:
+      return "units";
+  }
+}
+
+export function FacilitiesTab({
+  productId,
+  organizationId,
+  annualProductionVolume,
+  annualProductionUnit,
+  unitSizeUnit,
+  onProductUpdated,
+}: FacilitiesTabProps) {
   const supabase = getSupabaseBrowserClient();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [assignments, setAssignments] = useState<FacilityAssignment[]>([]);
-  const [reportingSessions, setReportingSessions] = useState<Record<string, ReportingSession[]>>({});
 
+  // Facility selection dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<string[]>([]);
 
-  // Editing state
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editVolume, setEditVolume] = useState<string>("");
-  const [editUnit, setEditUnit] = useState<string>("units");
-  const [editSessionId, setEditSessionId] = useState<string>("");
+  // Annual production editing
+  const [editingProduction, setEditingProduction] = useState(false);
+  const [volumeInput, setVolumeInput] = useState(annualProductionVolume?.toString() || "");
+  const [unitInput, setUnitInput] = useState(
+    annualProductionUnit || defaultProductionUnit(unitSizeUnit)
+  );
+
+  // Allocation percentages (local editing state)
+  const [allocations, setAllocations] = useState<Record<string, number>>({});
+
+  // Sync external props when they change
+  useEffect(() => {
+    setVolumeInput(annualProductionVolume?.toString() || "");
+    setUnitInput(annualProductionUnit || defaultProductionUnit(unitSizeUnit));
+  }, [annualProductionVolume, annualProductionUnit, unitSizeUnit]);
 
   useEffect(() => {
     loadData();
@@ -115,21 +134,14 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
     setLoading(true);
     try {
       const [facilitiesRes, assignmentsRes] = await Promise.all([
-        // All facilities in the organization
         supabase
           .from("facilities")
           .select("id, name, operational_control, address_city, address_country")
           .eq("organization_id", organizationId),
-        // Current facility assignments for this product
         supabase
           .from("facility_product_assignments")
           .select(`
-            id,
-            facility_id,
-            is_primary_facility,
-            production_volume,
-            production_volume_unit,
-            reporting_session_id,
+            *,
             facilities (
               id,
               name,
@@ -150,17 +162,13 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
           facility_id: a.facility_id,
           facility: a.facilities,
           is_primary_facility: a.is_primary_facility,
-          production_volume: a.production_volume,
-          production_volume_unit: a.production_volume_unit || "units",
-          reporting_session_id: a.reporting_session_id,
-          allocation_status: a.production_volume ? "calculated" as const : "pending" as const,
+          allocation_percentage: a.allocation_percentage ?? 100,
         }));
 
-        // Load LCA-derived allocation data from PCF production sites & CM allocations
-        // This is where the LCA wizard stores actual allocation results
-        const facilityIds = assignmentsList.map((a: FacilityAssignment) => a.facility_id);
+        // Load LCA allocation data for display
+        const facilityIds = assignmentsList.map((a) => a.facility_id);
+        const lcaAllocationMap: Record<string, FacilityAssignment["lca_allocation"]> = {};
 
-        // Get all PCF IDs for this product
         const { data: peiData } = await supabase
           .from("product_carbon_footprints")
           .select("id")
@@ -168,11 +176,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
 
         const peiIds = (peiData || []).map((p: any) => p.id);
 
-        // Build a map of facility_id → latest LCA allocation
-        const lcaAllocationMap: Record<string, FacilityAssignment["lca_allocation"]> = {};
-
         if (peiIds.length > 0 && facilityIds.length > 0) {
-          // Owned facility production sites
           const { data: prodSites } = await supabase
             .from("product_carbon_footprint_production_sites")
             .select("facility_id, allocated_emissions_kg_co2e, reporting_period_start, reporting_period_end, status, attribution_ratio")
@@ -195,7 +199,6 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
           }
         }
 
-        // Contract manufacturer allocations
         if (facilityIds.length > 0) {
           const { data: cmAllocations } = await supabase
             .from("contract_manufacturer_allocations")
@@ -220,44 +223,19 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
           }
         }
 
-        // Merge LCA allocation data into assignments
-        const enrichedAssignments = assignmentsList.map((a) => {
-          const lcaAlloc = lcaAllocationMap[a.facility_id];
-          return {
-            ...a,
-            lca_allocation: lcaAlloc || null,
-            allocated_emissions: lcaAlloc?.allocated_emissions || a.allocated_emissions,
-            allocation_status: lcaAlloc
-              ? (lcaAlloc.status === "verified" ? "verified" as const : "calculated" as const)
-              : a.allocation_status,
-          };
-        });
+        const enrichedAssignments = assignmentsList.map((a) => ({
+          ...a,
+          lca_allocation: lcaAllocationMap[a.facility_id] || null,
+        }));
 
         setAssignments(enrichedAssignments);
 
-        // Load reporting sessions for each assigned facility
-        if (facilityIds.length > 0) {
-          const { data: sessions } = await supabase
-            .from("facility_reporting_sessions")
-            .select("id, facility_id, reporting_period_start, reporting_period_end, total_production_volume, volume_unit")
-            .in("facility_id", facilityIds)
-            .eq("status", "completed")
-            .order("reporting_period_end", { ascending: false });
-
-          if (sessions) {
-            const sessionsByFacility: Record<string, ReportingSession[]> = {};
-            for (const session of sessions) {
-              if (!sessionsByFacility[session.facility_id]) {
-                sessionsByFacility[session.facility_id] = [];
-              }
-              sessionsByFacility[session.facility_id].push(session);
-            }
-            setReportingSessions(sessionsByFacility);
-
-            // Load emission intensities for each session
-            await loadEmissionIntensities(enrichedAssignments, sessionsByFacility);
-          }
+        // Init allocation percentages from DB
+        const allocMap: Record<string, number> = {};
+        for (const a of enrichedAssignments) {
+          allocMap[a.facility_id] = a.allocation_percentage;
         }
+        setAllocations(allocMap);
       }
     } catch (error) {
       console.error("Error loading facilities data:", error);
@@ -267,54 +245,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
     }
   };
 
-  const loadEmissionIntensities = async (
-    assignmentsList: FacilityAssignment[],
-    sessionsByFacility: Record<string, ReportingSession[]>
-  ) => {
-    // Get emission data for facilities with reporting sessions
-    const facilityIds = Object.keys(sessionsByFacility);
-    if (facilityIds.length === 0) return;
-
-    const { data: emissions } = await supabase
-      .from("facility_emissions_aggregated")
-      .select("facility_id, reporting_session_id, calculated_intensity")
-      .in("facility_id", facilityIds);
-
-    if (!emissions) return;
-
-    // Map intensities to sessions
-    const intensityMap: Record<string, number> = {};
-    for (const e of emissions) {
-      if (e.reporting_session_id && e.calculated_intensity) {
-        intensityMap[e.reporting_session_id] = e.calculated_intensity;
-      }
-    }
-
-    // Update sessions with intensities
-    const updatedSessions = { ...sessionsByFacility };
-    for (const facilityId of Object.keys(updatedSessions)) {
-      updatedSessions[facilityId] = updatedSessions[facilityId].map((s) => ({
-        ...s,
-        emission_intensity: intensityMap[s.id] || 0,
-      }));
-    }
-    setReportingSessions(updatedSessions);
-
-    // Calculate allocated emissions for each assignment
-    const updatedAssignments = assignmentsList.map((a) => {
-      if (a.reporting_session_id && a.production_volume) {
-        const session = updatedSessions[a.facility_id]?.find((s) => s.id === a.reporting_session_id);
-        const intensity = session?.emission_intensity || 0;
-        return {
-          ...a,
-          allocated_emissions: intensity * a.production_volume,
-          allocation_status: intensity > 0 ? "verified" as const : "calculated" as const,
-        };
-      }
-      return a;
-    });
-    setAssignments(updatedAssignments);
-  };
+  // --- Facility selection ---
 
   const handleAddFacilities = () => {
     setSelectedFacilityIds(assignments.map((a) => a.facility_id));
@@ -346,9 +277,30 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
       });
 
       const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to save");
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to save facility assignments");
+      // Auto-distribute allocation percentages evenly for new set
+      if (selectedFacilityIds.length > 0) {
+        const evenPct = Math.round(100 / selectedFacilityIds.length);
+        // Fetch updated assignments to get their IDs
+        const { data: updatedAssignments } = await supabase
+          .from("facility_product_assignments")
+          .select("id, facility_id")
+          .eq("product_id", productId)
+          .eq("assignment_status", "active");
+
+        if (updatedAssignments) {
+          for (let i = 0; i < updatedAssignments.length; i++) {
+            const isLast = i === updatedAssignments.length - 1;
+            const pct = isLast
+              ? 100 - evenPct * (updatedAssignments.length - 1)
+              : evenPct;
+            await supabase
+              .from("facility_product_assignments")
+              .update({ allocation_percentage: pct })
+              .eq("id", updatedAssignments[i].id);
+          }
+        }
       }
 
       toast.success("Facilities updated");
@@ -362,14 +314,33 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
     }
   };
 
-  const handleRemoveFacility = async (assignmentId: string) => {
+  const handleRemoveFacility = async (assignmentId: string, facilityId: string) => {
     try {
       const { error } = await supabase
         .from("facility_product_assignments")
         .update({ assignment_status: "archived" })
         .eq("id", assignmentId);
 
-      if (error) throw new Error(error.message || "Database error");
+      if (error) throw new Error(error.message);
+
+      // Redistribute remaining allocations
+      const remaining = assignments.filter((a) => a.facility_id !== facilityId);
+      if (remaining.length === 1) {
+        await supabase
+          .from("facility_product_assignments")
+          .update({ allocation_percentage: 100 })
+          .eq("id", remaining[0].id);
+      } else if (remaining.length > 1) {
+        const evenPct = Math.round(100 / remaining.length);
+        for (let i = 0; i < remaining.length; i++) {
+          const isLast = i === remaining.length - 1;
+          const pct = isLast ? 100 - evenPct * (remaining.length - 1) : evenPct;
+          await supabase
+            .from("facility_product_assignments")
+            .update({ allocation_percentage: pct })
+            .eq("id", remaining[i].id);
+        }
+      }
 
       toast.success("Facility removed");
       loadData();
@@ -379,45 +350,74 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
     }
   };
 
-  const handleStartEdit = (assignment: FacilityAssignment) => {
-    setEditingId(assignment.id);
-    setEditVolume(assignment.production_volume?.toString() || "");
-    setEditUnit(assignment.production_volume_unit || "units");
-    setEditSessionId(assignment.reporting_session_id || "");
-  };
+  // --- Annual production ---
 
-  const handleSaveVolume = async (assignmentId: string) => {
+  const handleSaveProduction = async () => {
     setSaving(true);
     try {
+      const volume = volumeInput ? parseFloat(volumeInput) : null;
       const { error } = await supabase
-        .from("facility_product_assignments")
+        .from("products")
         .update({
-          production_volume: editVolume ? parseFloat(editVolume) : null,
-          production_volume_unit: editUnit,
-          reporting_session_id: editSessionId || null,
+          annual_production_volume: volume,
+          annual_production_unit: unitInput,
         })
-        .eq("id", assignmentId);
+        .eq("id", productId);
 
       if (error) throw error;
 
-      toast.success("Production volume saved");
-      setEditingId(null);
-      loadData();
-    } catch (error) {
-      console.error("Error saving volume:", error);
-      toast.error("Failed to save production volume");
+      toast.success("Annual production saved");
+      setEditingProduction(false);
+      onProductUpdated();
+    } catch (error: any) {
+      console.error("Error saving production:", error);
+      toast.error(error.message || "Failed to save production volume");
     } finally {
       setSaving(false);
     }
   };
 
-  const totalAllocatedEmissions = assignments.reduce(
-    (sum, a) => sum + (a.allocated_emissions || 0),
-    0
+  // --- Allocation percentages ---
+
+  const totalAllocation = useMemo(
+    () => Object.values(allocations).reduce((sum, pct) => sum + (pct || 0), 0),
+    [allocations]
   );
 
-  const allHaveVolumes = assignments.every((a) => (a.production_volume && a.production_volume > 0) || a.lca_allocation);
-  const allVerified = assignments.every((a) => a.allocation_status === "verified");
+  const handleAllocationChange = (facilityId: string, value: string) => {
+    const num = value === "" ? 0 : parseFloat(value);
+    if (isNaN(num)) return;
+    setAllocations((prev) => ({ ...prev, [facilityId]: Math.min(100, Math.max(0, num)) }));
+  };
+
+  const handleSaveAllocations = async () => {
+    if (Math.abs(totalAllocation - 100) > 0.5) {
+      toast.error("Allocation percentages must total 100%");
+      return;
+    }
+    setSaving(true);
+    try {
+      for (const assignment of assignments) {
+        const pct = allocations[assignment.facility_id] ?? assignment.allocation_percentage;
+        await supabase
+          .from("facility_product_assignments")
+          .update({ allocation_percentage: pct })
+          .eq("id", assignment.id);
+      }
+      toast.success("Allocation saved");
+      loadData();
+    } catch (error: any) {
+      console.error("Error saving allocations:", error);
+      toast.error(error.message || "Failed to save allocations");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // --- Derived values ---
+
+  const hasProductionVolume = annualProductionVolume != null && annualProductionVolume > 0;
+  const displayUnit = annualProductionUnit || unitInput;
 
   if (loading) {
     return (
@@ -432,9 +432,9 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-white">Manufacturing Facilities</h3>
-          <p className="text-sm text-slate-400">
-            Facilities where this product is manufactured
+          <h3 className="text-lg font-semibold">Manufacturing Facilities</h3>
+          <p className="text-sm text-muted-foreground">
+            Where is this product manufactured?
           </p>
         </div>
         <Button onClick={handleAddFacilities} className="bg-lime-500 hover:bg-lime-600 text-black">
@@ -445,12 +445,12 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
 
       {/* Empty State */}
       {assignments.length === 0 ? (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card>
           <CardContent className="py-12 text-center">
-            <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-            <h4 className="text-lg font-medium text-white mb-2">No Facilities Assigned</h4>
-            <p className="text-sm text-slate-400 mb-4">
-              Link facilities to this product to track manufacturing emissions
+            <Factory className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h4 className="text-lg font-medium mb-2">No Facilities Assigned</h4>
+            <p className="text-sm text-muted-foreground mb-4">
+              Link the facilities where this product is manufactured
             </p>
             <Button onClick={handleAddFacilities} variant="outline">
               <Plus className="mr-2 h-4 w-4" />
@@ -460,73 +460,114 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
         </Card>
       ) : (
         <>
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Allocations</p>
-                  <p className="text-3xl font-bold text-white mt-1">{assignments.length}</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Allocated CO₂e</p>
-                  <p className="text-3xl font-bold text-lime-400 mt-1">
-                    {totalAllocatedEmissions > 0
-                      ? totalAllocatedEmissions.toLocaleString(undefined, { maximumFractionDigits: 0 })
-                      : "—"}
-                  </p>
-                  <p className="text-xs text-slate-500">kg CO₂e</p>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <p className="text-xs text-slate-400 uppercase tracking-wider">Status</p>
-                  <div className="mt-2">
-                    {!allHaveVolumes ? (
-                      <Badge className="bg-amber-500/20 text-amber-300">
-                        <AlertCircle className="h-3 w-3 mr-1" />
-                        Missing Data
-                      </Badge>
-                    ) : allVerified ? (
-                      <Badge className="bg-lime-500/20 text-lime-300">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        All Verified
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-blue-500/20 text-blue-300">Calculated</Badge>
-                    )}
+          {/* Annual Production Card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-lime-500/20 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-lime-500" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base">Annual Production</CardTitle>
+                    <CardDescription>
+                      How many units of this product do you produce per year?
+                    </CardDescription>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                {hasProductionVolume && !editingProduction && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingProduction(true)}
+                  >
+                    Edit
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {!hasProductionVolume || editingProduction ? (
+                <div className="flex items-end gap-3">
+                  <div className="flex-1 space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Volume</Label>
+                    <Input
+                      type="number"
+                      value={volumeInput}
+                      onChange={(e) => setVolumeInput(e.target.value)}
+                      placeholder="e.g. 10000"
+                      min={0}
+                    />
+                  </div>
+                  <div className="w-40 space-y-1.5">
+                    <Label className="text-sm text-muted-foreground">Unit</Label>
+                    <Select value={unitInput} onValueChange={setUnitInput}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VOLUME_UNITS.map((unit) => (
+                          <SelectItem key={unit.value} value={unit.value}>
+                            {unit.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    onClick={handleSaveProduction}
+                    disabled={saving || !volumeInput}
+                    className="bg-lime-500 hover:bg-lime-600 text-black"
+                  >
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                  </Button>
+                  {editingProduction && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingProduction(false);
+                        setVolumeInput(annualProductionVolume?.toString() || "");
+                        setUnitInput(annualProductionUnit || defaultProductionUnit(unitSizeUnit));
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold text-lime-500">
+                    {annualProductionVolume!.toLocaleString()}
+                  </span>
+                  <span className="text-lg text-muted-foreground">{displayUnit} / year</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Facility List */}
-          <Card className="bg-slate-900/50 border-slate-800">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white">Linked Facilities</CardTitle>
+              <CardTitle>Linked Facilities</CardTitle>
               <CardDescription>
-                Enter production volume for each facility to calculate allocated emissions
+                {assignments.length === 1
+                  ? "This product is manufactured at one facility"
+                  : `Split production across ${assignments.length} facilities`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {assignments.map((assignment) => {
-                const isEditing = editingId === assignment.id;
-                const sessions = reportingSessions[assignment.facility_id] || [];
+                const pct = allocations[assignment.facility_id] ?? assignment.allocation_percentage;
+                const computedVolume = hasProductionVolume
+                  ? Math.round((annualProductionVolume! * pct) / 100)
+                  : null;
 
                 return (
                   <div
                     key={assignment.id}
-                    className="p-4 rounded-lg bg-slate-800/50 border border-slate-700"
+                    className="p-4 rounded-lg border bg-card"
                   >
-                    {/* Facility Header */}
-                    <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         {assignment.facility.operational_control === "owned" ? (
                           <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
@@ -538,173 +579,101 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
                           </div>
                         )}
                         <div>
-                          <p className="font-medium text-white">{assignment.facility.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{assignment.facility.name}</p>
+                            <Badge variant="outline" className="text-xs">
+                              {assignment.facility.operational_control === "owned" ? "Owned" : "Third Party"}
+                            </Badge>
+                            {assignment.is_primary_facility && (
+                              <Badge className="bg-lime-500/20 text-lime-700 dark:text-lime-300 text-xs">Primary</Badge>
+                            )}
+                          </div>
                           {assignment.facility.address_city && (
-                            <p className="text-sm text-slate-400 flex items-center gap-1">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                               <MapPin className="h-3 w-3" />
                               {assignment.facility.address_city}, {assignment.facility.address_country}
                             </p>
                           )}
                         </div>
-                        <Badge variant="outline" className="ml-2">
-                          {assignment.facility.operational_control === "owned" ? "Owned" : "Third Party"}
-                        </Badge>
-                        {assignment.is_primary_facility && (
-                          <Badge className="bg-lime-500/20 text-lime-300">Primary</Badge>
-                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        {!isEditing && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleStartEdit(assignment)}
-                            className="text-slate-400 hover:text-white"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveFacility(assignment.id)}
-                          className="text-slate-400 hover:text-red-400"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveFacility(assignment.id, assignment.facility_id)}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
 
-                    {/* Production Volume Entry */}
-                    {isEditing ? (
-                      <div className="space-y-4 bg-slate-900/50 p-4 rounded-lg">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-slate-300">Production Volume</Label>
-                            <Input
-                              type="number"
-                              value={editVolume}
-                              onChange={(e) => setEditVolume(e.target.value)}
-                              placeholder="Enter volume"
-                              className="bg-slate-800 border-slate-700"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-slate-300">Unit</Label>
-                            <Select value={editUnit} onValueChange={setEditUnit}>
-                              <SelectTrigger className="bg-slate-800 border-slate-700">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {VOLUME_UNITS.map((unit) => (
-                                  <SelectItem key={unit.value} value={unit.value}>
-                                    {unit.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-slate-300">Reporting Period</Label>
-                            <Select value={editSessionId} onValueChange={setEditSessionId}>
-                              <SelectTrigger className="bg-slate-800 border-slate-700">
-                                <SelectValue placeholder="Select period" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {sessions.length === 0 ? (
-                                  <SelectItem value="none" disabled>
-                                    No reporting sessions available
-                                  </SelectItem>
-                                ) : (
-                                  sessions.map((session) => (
-                                    <SelectItem key={session.id} value={session.id}>
-                                      {new Date(session.reporting_period_start).getFullYear()} -{" "}
-                                      {new Date(session.reporting_period_end).getFullYear()}
-                                      {session.emission_intensity
-                                        ? ` (${session.emission_intensity.toFixed(2)} kg/unit)`
-                                        : ""}
-                                    </SelectItem>
-                                  ))
-                                )}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                    {/* Allocation & computed volume */}
+                    <div className="mt-3 flex items-center gap-4">
+                      {assignments.length > 1 ? (
+                        <div className="flex items-center gap-2">
+                          <Label className="text-sm text-muted-foreground whitespace-nowrap">Allocation</Label>
+                          <Input
+                            type="number"
+                            value={pct}
+                            onChange={(e) => handleAllocationChange(assignment.facility_id, e.target.value)}
+                            className="w-20 text-right"
+                            min={0}
+                            max={100}
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
                         </div>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditingId(null)}
-                            disabled={saving}
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSaveVolume(assignment.id)}
-                            disabled={saving}
-                            className="bg-lime-500 hover:bg-lime-600 text-black"
-                          >
-                            {saving ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              "Save"
-                            )}
-                          </Button>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">100%</Badge>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div>
-                          <p className="text-slate-400">Production</p>
-                          <p className="text-white font-medium">
-                            {assignment.production_volume
-                              ? `${assignment.production_volume.toLocaleString()} ${assignment.production_volume_unit}`
-                              : assignment.lca_allocation?.attribution_ratio
-                                ? `${(assignment.lca_allocation.attribution_ratio * 100).toFixed(1)}% attribution`
-                                : "—"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400">Period</p>
-                          <p className="text-white font-medium">
-                            {assignment.lca_allocation?.reporting_period_start
-                              ? `${new Date(assignment.lca_allocation.reporting_period_start).toLocaleDateString("en-GB", { month: "short", year: "numeric" })} – ${new Date(assignment.lca_allocation.reporting_period_end).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}`
-                              : assignment.reporting_session_id
-                                ? sessions.find((s) => s.id === assignment.reporting_session_id)
-                                  ? `${new Date(
-                                      sessions.find((s) => s.id === assignment.reporting_session_id)!
-                                        .reporting_period_start
-                                    ).getFullYear()}`
-                                  : "Selected"
-                                : "—"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400">Allocated CO₂e</p>
-                          <p className="text-lime-400 font-medium">
-                            {assignment.allocated_emissions
-                              ? `${assignment.allocated_emissions.toLocaleString(undefined, {
-                                  maximumFractionDigits: 0,
-                                })} kg`
-                              : "—"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400">Status</p>
-                          {!assignment.production_volume && !assignment.lca_allocation ? (
-                            <Badge className="bg-amber-500/20 text-amber-300">Missing</Badge>
-                          ) : assignment.allocation_status === "verified" ? (
-                            <Badge className="bg-lime-500/20 text-lime-300">Verified</Badge>
-                          ) : (
-                            <Badge className="bg-blue-500/20 text-blue-300">Calculated</Badge>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                      )}
+
+                      {computedVolume != null && (
+                        <p className="text-sm text-muted-foreground">
+                          {computedVolume.toLocaleString()} {displayUnit} / year
+                        </p>
+                      )}
+
+                      {/* LCA results badge */}
+                      {assignment.lca_allocation && (
+                        <Badge
+                          variant="outline"
+                          className="ml-auto text-xs border-lime-500/30 text-lime-700 dark:text-lime-300"
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Latest LCA: {assignment.lca_allocation.allocated_emissions.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg CO₂e
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 );
               })}
+
+              {/* Allocation validation & save */}
+              {assignments.length > 1 && (
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center gap-2">
+                    {Math.abs(totalAllocation - 100) > 0.5 ? (
+                      <Badge variant="destructive" className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Total: {totalAllocation.toFixed(0)}% — must equal 100%
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-lime-500/20 text-lime-700 dark:text-lime-300">
+                        <Check className="h-3 w-3 mr-1" />
+                        Total: 100%
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    onClick={handleSaveAllocations}
+                    disabled={saving || Math.abs(totalAllocation - 100) > 0.5}
+                    size="sm"
+                    className="bg-lime-500 hover:bg-lime-600 text-black"
+                  >
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Allocation"}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </>
@@ -723,8 +692,8 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
           <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
             {facilities.length === 0 ? (
               <div className="text-center py-8">
-                <Factory className="h-12 w-12 mx-auto mb-4 text-slate-600" />
-                <p className="text-sm text-slate-400">
+                <Factory className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
                   No facilities found. Add facilities in Company &gt; Facilities first.
                 </p>
               </div>
@@ -735,7 +704,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
                   className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-all ${
                     selectedFacilityIds.includes(facility.id)
                       ? "bg-lime-500/10 border-lime-500/50"
-                      : "bg-slate-800/50 border-slate-700 hover:border-slate-600"
+                      : "border-border hover:border-muted-foreground/30"
                   }`}
                   onClick={() => handleToggleFacility(facility.id)}
                 >
@@ -750,8 +719,8 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
                       <Users className="h-5 w-5 text-amber-400" />
                     )}
                     <div>
-                      <p className="font-medium text-white">{facility.name}</p>
-                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <p className="font-medium">{facility.name}</p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         {facility.address_city && (
                           <span className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
@@ -769,7 +738,7 @@ export function FacilitiesTab({ productId, organizationId }: FacilitiesTabProps)
             )}
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t">
             <Button variant="ghost" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { UTILITY_TYPES } from "@/lib/constants/utility-types";
 import {
   Dialog,
   DialogContent,
@@ -43,18 +44,7 @@ interface DataContract {
   quality: 'actual' | 'estimated';
 }
 
-const UTILITY_TYPES = [
-  { value: 'electricity_grid', label: 'Purchased Electricity', defaultUnit: 'kWh', scope: 'Scope 2' },
-  { value: 'heat_steam_purchased', label: 'Purchased Heat / Steam', defaultUnit: 'kWh', scope: 'Scope 2' },
-  { value: 'natural_gas', label: 'Natural Gas', defaultUnit: 'm³', scope: 'Scope 1' },
-  { value: 'lpg', label: 'LPG (Propane/Butane)', defaultUnit: 'Litres', scope: 'Scope 1' },
-  { value: 'diesel_stationary', label: 'Diesel (Generators/Stationary)', defaultUnit: 'Litres', scope: 'Scope 1' },
-  { value: 'heavy_fuel_oil', label: 'Heavy Fuel Oil', defaultUnit: 'Litres', scope: 'Scope 1' },
-  { value: 'biomass_solid', label: 'Biogas / Biomass', defaultUnit: 'kg', scope: 'Scope 1' },
-  { value: 'refrigerant_leakage', label: 'Refrigerants (Leakage)', defaultUnit: 'kg', scope: 'Scope 1' },
-  { value: 'diesel_mobile', label: 'Company Fleet (Diesel)', defaultUnit: 'Litres', scope: 'Scope 1' },
-  { value: 'petrol_mobile', label: 'Company Fleet (Petrol/Gasoline)', defaultUnit: 'Litres', scope: 'Scope 1' },
-];
+// Uses shared UTILITY_TYPES from lib/constants/utility-types.ts
 
 const FACILITY_FUNCTIONS = [
   'Brewing',
@@ -371,7 +361,7 @@ export function AddFacilityWizard({
                           <div>
                             <p className="font-medium">{utility.label}</p>
                             <p className="text-xs text-muted-foreground">
-                              Default Unit: {utility.defaultUnit} • {utility.scope}
+                              Default Unit: {utility.defaultUnit} • Scope {utility.scope}
                             </p>
                           </div>
                         </div>

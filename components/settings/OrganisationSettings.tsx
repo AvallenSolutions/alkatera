@@ -10,6 +10,7 @@ import {
   Save,
   Loader2,
   ArrowLeft,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,8 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
   const [billingEmail, setBillingEmail] = useState("");
   const [taxId, setTaxId] = useState("");
   const [productType, setProductType] = useState("");
+  const [fyStartMonth, setFyStartMonth] = useState("1");
+  const [defaultCadence, setDefaultCadence] = useState("monthly");
 
   useEffect(() => {
     if (currentOrganization?.id) {
@@ -124,6 +127,11 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
       setBillingEmail(orgInfo.billing_email || "");
       setTaxId(orgInfo.tax_id || "");
       setProductType(orgInfo.product_type || "");
+
+      // Load reporting period settings from report_defaults
+      const reportingPeriod = orgInfo.report_defaults?.reporting_period;
+      setFyStartMonth(String(reportingPeriod?.fiscal_year_start_month ?? 1));
+      setDefaultCadence(reportingPeriod?.default_cadence ?? "monthly");
     } catch (error) {
       console.error("Error fetching organization data:", error);
       toast.error("Failed to load organization details");
@@ -146,6 +154,16 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
     setIsSaving(true);
 
     try {
+      // Merge reporting_period into existing report_defaults
+      const existingDefaults = (orgData as any)?.report_defaults || {};
+      const updatedReportDefaults = {
+        ...existingDefaults,
+        reporting_period: {
+          fiscal_year_start_month: parseInt(fyStartMonth),
+          default_cadence: defaultCadence,
+        },
+      };
+
       // Build update payload - tax_id requires migration 20260121100000 to be applied
       const updatePayload: Record<string, any> = {
         name: name.trim(),
@@ -159,6 +177,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
         company_size: companySize || null,
         billing_email: billingEmail.trim() || null,
         product_type: productType || null,
+        report_defaults: updatedReportDefaults,
         updated_at: new Date().toISOString(),
       };
 
@@ -428,6 +447,54 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                   placeholder="GB123456789"
                   disabled={isSaving}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Reporting Period
+              </CardTitle>
+              <CardDescription>
+                Configure your financial year and default reporting cadence
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="fy-start">Financial Year</Label>
+                <Select value={fyStartMonth} onValueChange={setFyStartMonth} disabled={isSaving}>
+                  <SelectTrigger id="fy-start">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Calendar Year (January–December)</SelectItem>
+                    <SelectItem value="4">UK Financial Year (April–March)</SelectItem>
+                    <SelectItem value="7">July–June</SelectItem>
+                    <SelectItem value="10">October–September</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Determines the date ranges used across Company Emissions, reports, and data entry
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="default-cadence">Default Reporting Cadence</Label>
+                <Select value={defaultCadence} onValueChange={setDefaultCadence} disabled={isSaving}>
+                  <SelectTrigger id="default-cadence">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Suggested period when entering facility data. Can be changed per entry.
+                </p>
               </div>
             </CardContent>
           </Card>

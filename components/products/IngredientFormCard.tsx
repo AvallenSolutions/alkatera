@@ -67,6 +67,49 @@ interface IngredientFormCardProps {
   canRemove: boolean;
 }
 
+/**
+ * Convert a quantity between units, keeping the physical amount consistent.
+ *
+ * Mass ↔ volume conversions assume density ≈ 1.0 kg/L (appropriate for most
+ * beverages and water-based ingredients). For spirits (~0.8–0.95 kg/L) this
+ * introduces a small error, but it's far better than no conversion at all.
+ *
+ * Returns null when conversion between incompatible unit families (e.g.
+ * mass → "unit") so the caller can leave the amount unchanged.
+ */
+function convertAmount(
+  amount: number | string,
+  fromUnit: string,
+  toUnit: string
+): number | null {
+  const qty = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(qty) || qty <= 0) return null;
+  if (fromUnit === toUnit) return qty;
+
+  // Convert to grams as the common intermediate
+  const toGrams: Record<string, number> = {
+    kg: 1000,
+    g: 1,
+    mg: 0.001,
+    oz: 28.3495,
+    lb: 453.592,
+    // Volume → mass assuming density ≈ 1.0 kg/L
+    l: 1000,
+    ml: 1,
+  };
+
+  const fromFactor = toGrams[fromUnit];
+  const toFactor = toGrams[toUnit];
+
+  if (!fromFactor || !toFactor) return null; // "unit" or unknown — don't convert
+
+  const grams = qty * fromFactor;
+  const converted = grams / toFactor;
+
+  // Round to avoid floating-point noise (max 6 decimal places)
+  return parseFloat(converted.toPrecision(6));
+}
+
 export function IngredientFormCard({
   ingredient,
   index,
@@ -199,7 +242,8 @@ export function IngredientFormCard({
     });
 
     const updates: Partial<IngredientFormData> = {
-      name: userOriginalName,
+      // Auto-fill the display name from the DB match only if user hasn't entered one yet
+      ...(!ingredient.name ? { name: selection.name } : {}),
       matched_source_name: selection.name,
       data_source: selection.data_source,
       data_source_id: selection.data_source_id,
@@ -249,18 +293,33 @@ export function IngredientFormCard({
 
         <div className="space-y-4">
           <div>
+            <Label htmlFor={`name-${ingredient.tempId}`}>
+              Ingredient Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id={`name-${ingredient.tempId}`}
+              value={ingredient.name}
+              onChange={(e) => onUpdate(ingredient.tempId, { name: e.target.value })}
+              placeholder="e.g. Simpsons Golden Promise Pale Ale Malt"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              The full display name for this ingredient as it appears on your recipe
+            </p>
+          </div>
+
+          <div>
             <Label htmlFor={`search-${ingredient.tempId}`} className="flex items-center gap-2">
-              Search Ingredient <span className="text-destructive">*</span>
+              Emission Factor <span className="text-destructive">*</span>
             </Label>
             <InlineIngredientSearch
               organizationId={organizationId}
-              value={ingredient.name}
-              placeholder="Search for ingredient..."
+              value={ingredient.matched_source_name || ''}
+              placeholder="Search databases for emission factor..."
               onSelect={handleSearchSelect}
-              onChange={(value) => onUpdate(ingredient.tempId, { name: value, matched_source_name: undefined, data_source: null, data_source_id: undefined })}
+              onChange={() => onUpdate(ingredient.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined })}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Search by ingredient name to find matches from your supplier network or global database
+              Search for the closest matching emission factor from supplier data or global databases
             </p>
             {ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && (
               <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs">
@@ -297,7 +356,17 @@ export function IngredientFormCard({
               </Label>
               <Select
                 value={ingredient.unit}
-                onValueChange={(value) => onUpdate(ingredient.tempId, { unit: value })}
+                onValueChange={(newUnit) => {
+                  const updates: Partial<IngredientFormData> = { unit: newUnit };
+                  // Convert the amount so the physical quantity stays the same
+                  if (ingredient.amount && ingredient.unit) {
+                    const converted = convertAmount(ingredient.amount, ingredient.unit, newUnit);
+                    if (converted !== null) {
+                      updates.amount = converted;
+                    }
+                  }
+                  onUpdate(ingredient.tempId, updates);
+                }}
               >
                 <SelectTrigger id={`unit-${ingredient.tempId}`}>
                   <SelectValue placeholder="Select unit" />

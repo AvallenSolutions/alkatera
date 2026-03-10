@@ -322,7 +322,7 @@ Deno.serve(async (req: Request) => {
     if (resendApiKey) {
       try {
         // CC the inviting user + alkatera
-        const ccList = [user.email, "sayhello@mail.alkatera.com"].filter(Boolean) as string[];
+        const ccList = [user.email, "hello@alkatera.com"].filter(Boolean) as string[];
 
         const resendResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",

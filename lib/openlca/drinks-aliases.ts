@@ -649,3 +649,182 @@ export function findMatchingAliases(query: string): DrinksAlias[] {
     })
   );
 }
+
+// ─── BRAND NAME ALIASES ────────────────────────────────────────────────────
+//
+// Maps trade/brand names that non-expert users commonly type to the generic
+// emission factor terms in the database. When a user types "Golden Promise"
+// the system can suggest searching for "malted barley" instead.
+
+export interface BrandNameAlias {
+  /** Brand/trade name terms to detect (lowercase) */
+  brandTerms: string[];
+  /** The generic emission factor term to search for */
+  genericTerm: string;
+  /** User-facing explanation of why the redirect is helpful */
+  explanation: string;
+  /** Whether this maps to an ingredient or packaging factor */
+  materialType: 'ingredient' | 'packaging';
+}
+
+export const BRAND_NAME_ALIASES: BrandNameAlias[] = [
+  // ── Malt varieties ────────────────────────────────────────────────────
+  {
+    brandTerms: ['golden promise', 'maris otter', 'pearl malt', 'planet malt', 'concerto malt', 'propino malt', 'laureate malt', 'chevallier malt'],
+    genericTerm: 'malted barley',
+    explanation: 'Malt varieties share the same emission factor',
+    materialType: 'ingredient',
+  },
+  {
+    brandTerms: ['crystal malt', 'caramalt', 'cara malt', 'carapils', 'carafa', 'melanoidin malt', 'munich malt', 'vienna malt', 'pilsner malt', 'pale malt', 'pale ale malt', 'lager malt'],
+    genericTerm: 'malted barley',
+    explanation: 'Speciality malt types use the same base barley factor',
+    materialType: 'ingredient',
+  },
+  {
+    brandTerms: ['simpsons malt', 'warminster malt', 'thomas fawcett', 'crisp malt', 'muntons', 'bairds malt', 'weyermann'],
+    genericTerm: 'malted barley',
+    explanation: 'Maltster brand names use the generic malted barley factor',
+    materialType: 'ingredient',
+  },
+  {
+    brandTerms: ['wheat malt', 'torrified wheat', 'torrefied wheat', 'flaked wheat'],
+    genericTerm: 'wheat grain',
+    explanation: 'Wheat malt products use the wheat grain factor',
+    materialType: 'ingredient',
+  },
+  {
+    brandTerms: ['flaked oats', 'oat malt', 'naked oats'],
+    genericTerm: 'oats',
+    explanation: 'Oat products use the oat grain factor',
+    materialType: 'ingredient',
+  },
+  {
+    brandTerms: ['flaked barley', 'torrified barley', 'roasted barley', 'chocolate barley'],
+    genericTerm: 'malted barley',
+    explanation: 'Barley products use the malted barley factor',
+    materialType: 'ingredient',
+  },
+
+  // ── Hop varieties ─────────────────────────────────────────────────────
+  {
+    brandTerms: [
+      'citra', 'cascade', 'mosaic', 'simcoe', 'centennial', 'chinook', 'amarillo',
+      'galaxy', 'nelson sauvin', 'motueka', 'riwaka', 'saaz', 'hallertau',
+      'tettnang', 'fuggle', 'goldings', 'east kent golding', 'challenger',
+      'bramling cross', 'northdown', 'target', 'pilgrim', 'admiral',
+      'styrian golding', 'sorachi ace', 'sabro', 'strata', 'idaho 7',
+      'ekuanot', 'el dorado', 'vic secret', 'enigma', 'talus',
+      'lupomax', 'cryo hops', 'incognito',
+    ],
+    genericTerm: 'hops',
+    explanation: 'All hop varieties share the same emission factor',
+    materialType: 'ingredient',
+  },
+
+  // ── Yeast brands ──────────────────────────────────────────────────────
+  {
+    brandTerms: [
+      'safale', 'saflager', 'safbrew', 'safcider', 'fermentis',
+      'lallemand', 'lalvin', 'mangrove jack', 'mangrove jacks',
+      'white labs', 'wyeast', 'omega yeast', 'imperial yeast',
+      'verdant ipa', 'kveik', 'lutra', 'voss kveik',
+      'nottingham', 'us-05', 's-04', 'w-34/70', 'belle saison',
+    ],
+    genericTerm: 'yeast',
+    explanation: 'All yeast brands share the same emission factor',
+    materialType: 'ingredient',
+  },
+
+  // ── Grape varieties ───────────────────────────────────────────────────
+  {
+    brandTerms: [
+      'pinot noir', 'cabernet sauvignon', 'merlot', 'syrah', 'shiraz',
+      'tempranillo', 'sangiovese', 'nebbiolo', 'malbec', 'grenache',
+      'mourvedre', 'zinfandel', 'primitivo', 'barbera', 'gamay',
+      'sauvignon blanc', 'chardonnay', 'riesling', 'pinot grigio',
+      'pinot gris', 'gewurztraminer', 'viognier', 'chenin blanc',
+      'semillon', 'muscadet', 'albarino', 'gruner veltliner',
+      'vermentino', 'trebbiano', 'garganega', 'glera',
+    ],
+    genericTerm: 'grape',
+    explanation: 'Grape varieties share the same emission factor',
+    materialType: 'ingredient',
+  },
+
+  // ── Glass bottle manufacturers ────────────────────────────────────────
+  {
+    brandTerms: ['ardagh', 'encirc', 'o-i', 'owens illinois', 'verallia', 'vetropack', 'saverglass', 'saxco', 'allied glass', 'beatson clark'],
+    genericTerm: 'glass bottle',
+    explanation: 'Glass manufacturers use the same packaging glass factor',
+    materialType: 'packaging',
+  },
+
+  // ── Can manufacturers ─────────────────────────────────────────────────
+  {
+    brandTerms: ['ball corporation', 'ball can', 'crown holdings', 'crown can', 'canpack', 'ardagh metal'],
+    genericTerm: 'aluminium can',
+    explanation: 'Can manufacturers use the same aluminium can factor',
+    materialType: 'packaging',
+  },
+
+  // ── Closure brands ────────────────────────────────────────────────────
+  {
+    brandTerms: ['amorim', 'nomacorc', 'diam', 'guala closures', 'herti', 'stelvin', 'vinolok'],
+    genericTerm: 'cork',
+    explanation: 'Closure brands use the same cork/closure factor',
+    materialType: 'packaging',
+  },
+
+  // ── Label suppliers ───────────────────────────────────────────────────
+  {
+    brandTerms: ['multi-color corporation', 'ccl label', 'spear group'],
+    genericTerm: 'label',
+    explanation: 'Label suppliers use the same label factor',
+    materialType: 'packaging',
+  },
+
+  // ── Keg systems ───────────────────────────────────────────────────────
+  {
+    brandTerms: ['keykegs', 'keykeg', 'dolium', 'petainer', 'ecokeg', 'kegstar', 'micro star'],
+    genericTerm: 'pet bottle',
+    explanation: 'One-way kegs are typically PET-based containers',
+    materialType: 'packaging',
+  },
+
+  // ── Water treatment brands ────────────────────────────────────────────
+  {
+    brandTerms: ['campden tablets', 'whirlfloc', 'protafloc', 'irish moss', 'kettle finings', 'isinglass', 'bentonite', 'gelatin finings'],
+    genericTerm: 'tap water',
+    explanation: 'Brewing process aids have negligible weight — use water as proxy',
+    materialType: 'ingredient',
+  },
+];
+
+/**
+ * Check whether the user's search query matches a known brand/trade name.
+ * Returns the first matching alias, or null if no brand name was detected.
+ */
+export function findBrandNameMatch(query: string): BrandNameAlias | null {
+  const queryLower = query.toLowerCase().trim();
+  if (queryLower.length < 3) return null;
+
+  for (const alias of BRAND_NAME_ALIASES) {
+    for (const term of alias.brandTerms) {
+      // Exact match
+      if (queryLower === term) return alias;
+
+      // Query contains the brand term at a word boundary
+      if (queryLower.length > term.length && matchesAtWordBoundary(queryLower, term)) {
+        return alias;
+      }
+
+      // Brand term contains the query at a word boundary (user typed partial)
+      if (term.length > queryLower.length && term.startsWith(queryLower) && queryLower.length >= 4) {
+        return alias;
+      }
+    }
+  }
+
+  return null;
+}

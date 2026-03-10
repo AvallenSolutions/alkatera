@@ -199,7 +199,7 @@ export async function getAnnualAverageIntensity(
     .select('*')
     .eq('facility_id', facilityId)
     .gte('reporting_period_start', yearStart)
-    .lte('reporting_period_end', yearEnd);
+    .lte('reporting_period_start', yearEnd);
 
   if (error || !data || data.length === 0) {
     return null;

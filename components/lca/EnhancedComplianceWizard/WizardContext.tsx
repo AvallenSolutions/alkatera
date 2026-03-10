@@ -390,7 +390,7 @@ export function WizardProvider({
       const { data: facilitiesData } = await sb
         .from('facility_product_assignments')
         .select(
-          'id, facility_id, facilities (id, name, operational_control, address_city, address_country)'
+          '*, facilities (id, name, operational_control, address_city, address_country)'
         )
         .eq('product_id', productId)
         .eq('assignment_status', 'active');
@@ -428,9 +428,23 @@ export function WizardProvider({
           .toISOString()
           .split('T')[0];
 
+        // Pre-populate production volumes from product's annual production
+        const annualVolume = productData.annual_production_volume;
+        const annualUnit = productData.annual_production_unit || 'units';
+
         allocations = facilities.map((f) => {
           const facilitySessions = allSessions[f.facility_id] || [];
           const latestSession = facilitySessions[0];
+
+          // Get allocation percentage from the assignment record
+          const assignmentRecord = facilitiesData!.find((fd: any) => fd.facility_id === f.facility_id);
+          const allocationPct = (assignmentRecord as any)?.allocation_percentage ?? 100;
+
+          // Pre-compute product volume at this facility
+          const prePopulatedVolume = annualVolume
+            ? String(Math.round(annualVolume * allocationPct / 100))
+            : '';
+
           if (latestSession) {
             return {
               facilityId: f.facility_id,
@@ -438,8 +452,8 @@ export function WizardProvider({
               operationalControl: f.facility.operational_control,
               reportingPeriodStart: latestSession.reporting_period_start,
               reportingPeriodEnd: latestSession.reporting_period_end,
-              productionVolume: '',
-              productionVolumeUnit: latestSession.volume_unit || 'units',
+              productionVolume: prePopulatedVolume,
+              productionVolumeUnit: annualVolume ? annualUnit : (latestSession.volume_unit || 'units'),
               facilityTotalProduction: String(
                 latestSession.total_production_volume
               ),
@@ -452,8 +466,8 @@ export function WizardProvider({
             operationalControl: f.facility.operational_control,
             reportingPeriodStart: defaultStartDate,
             reportingPeriodEnd: defaultEndDate,
-            productionVolume: '',
-            productionVolumeUnit: 'units',
+            productionVolume: prePopulatedVolume,
+            productionVolumeUnit: annualVolume ? annualUnit : 'units',
             facilityTotalProduction: '',
           };
         });

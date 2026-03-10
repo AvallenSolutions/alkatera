@@ -102,8 +102,8 @@ export default function ProductsPage() {
       return;
     }
 
-    // Redirect to new calculate LCA flow
-    router.push(`/products/${product.id}/calculate-lca`);
+    // Redirect to LCA compliance wizard
+    router.push(`/products/${product.id}/compliance-wizard`);
   };
 
   if (!organizationId) {

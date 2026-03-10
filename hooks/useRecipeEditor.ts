@@ -365,6 +365,33 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     toast.info(`Adding new ${category} packaging. Your existing items are preserved.`);
   };
 
+  /** Add an ingredient with a pre-filled name (from recipe checklist quick-add) */
+  const addIngredientWithDefaults = (name: string, searchQuery: string) => {
+    setIngredientForms(prev => {
+      // If there's only one empty form, replace it instead of adding
+      if (prev.length === 1 && !prev[0].name && !prev[0].amount) {
+        return [{ ...DEFAULT_INGREDIENT, tempId: `temp-${Date.now()}`, name }];
+      }
+      return [...prev, { ...DEFAULT_INGREDIENT, tempId: `temp-${Date.now()}`, name }];
+    });
+  };
+
+  /** Add a packaging item with a pre-filled name and category (from recipe checklist quick-add) */
+  const addPackagingWithDefaults = (name: string, searchQuery: string, packagingCategory?: PackagingCategory) => {
+    setPackagingForms(prev => {
+      const newPkg = {
+        ...createDefaultPackaging(),
+        name,
+        ...(packagingCategory ? { packaging_category: packagingCategory } : {}),
+      };
+      // If there's only one empty form, replace it instead of adding
+      if (prev.length === 1 && !prev[0].name && !prev[0].amount) {
+        return [newPkg];
+      }
+      return [...prev, newPkg];
+    });
+  };
+
   // Save operations
   const saveIngredients = async () => {
     const validForms = ingredientForms.filter(f => f.name && f.amount && Number(f.amount) > 0);
@@ -712,6 +739,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
   const ingredientCount = ingredientForms.filter(f => f.name && f.amount).length;
   const packagingCount = packagingForms.filter(f => f.name && f.amount && f.packaging_category).length;
 
+  // Replace all packaging forms with template items
+  const setPackagingFromTemplate = (items: PackagingFormData[]) => {
+    setPackagingForms(items);
+  };
+
   // Dirty state: compare current forms against last-saved snapshot
   const isDirty = formFingerprint(ingredientForms) !== savedIngredientSnapshot.current ||
     formFingerprint(packagingForms) !== savedPackagingSnapshot.current ||
@@ -738,8 +770,11 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     removePackaging,
     addPackaging,
     addPackagingWithType,
+    addIngredientWithDefaults,
+    addPackagingWithDefaults,
     saveIngredients,
     savePackaging,
+    setPackagingFromTemplate,
     updateMaturationProfile,
     saveMaturation,
     removeMaturation,

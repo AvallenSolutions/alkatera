@@ -22,6 +22,8 @@ export interface Product {
   certifications?: Certification[];
   awards?: Award[];
   is_multipack?: boolean;
+  annual_production_volume?: number | null;
+  annual_production_unit?: string | null;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
@@ -38,6 +40,8 @@ export interface CreateProductInput {
   certifications?: Certification[];
   awards?: Award[];
   is_multipack?: boolean;
+  annual_production_volume?: number;
+  annual_production_unit?: string;
 }
 
 export interface UpdateProductInput extends Partial<CreateProductInput> {

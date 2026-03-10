@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useOrganization } from "@/lib/organizationContext";
+import { useReportingPeriod } from "@/hooks/useReportingPeriod";
 import { PageLoader } from "@/components/ui/page-loader";
 import { OperationsEnergyCard } from "@/components/reports/OperationsEnergyCard";
 import { ProductsSupplyChainCard } from "@/components/reports/ProductsSupplyChainCard";
@@ -85,8 +86,10 @@ export default function FootprintBuilderPage() {
   const params = useParams();
   const router = useRouter();
   const { currentOrganization } = useOrganization();
+  const { getYearRange } = useReportingPeriod();
 
   const year = parseInt(params.year as string);
+  const { yearStart: fyYearStart, yearEnd: fyYearEnd } = getYearRange(year);
 
   const [report, setReport] = useState<CorporateReport | null>(null);
   const [overheads, setOverheads] = useState<OverheadEntry[]>([]);
@@ -177,8 +180,8 @@ export default function FootprintBuilderPage() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const yearStart = `${year}-01-01`;
-      const yearEnd = `${year}-12-31`;
+      const yearStart = fyYearStart;
+      const yearEnd = fyYearEnd;
 
       // Use the single source of truth calculation functions from corporate-emissions.ts
       // These calculate live from utility_data_entries + fleet_activities,
@@ -201,8 +204,8 @@ export default function FootprintBuilderPage() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-      const yearStart = `${year}-01-01`;
-      const yearEnd = `${year}-12-31`;
+      const yearStart = fyYearStart;
+      const yearEnd = fyYearEnd;
 
       const { data, error } = await supabase
         .from("fleet_activities")

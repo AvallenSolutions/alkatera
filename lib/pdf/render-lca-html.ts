@@ -236,7 +236,7 @@ function renderGoalAndScopePage(data: LCAReportData): string {
         </div>
       </div>
 
-      <div style="flex: 1; min-height: 0; overflow: hidden; margin-bottom: 48px;">
+      <div style="margin-bottom: 48px;">
         <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Assumptions &amp; Limitations</div>
         ${assumptions}
       </div>
@@ -447,14 +447,44 @@ function renderDataQualityPage(data: LCAReportData): string {
     <div class="page light-page">
       ${renderSectionHeader('04', 'Data Quality — Notes', false, true)}
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Missing Data Treatment (ISO 14044 §4.2.3.6.3)</div>
         <p style="font-size: 12px; color: #44403c; line-height: 1.7;">${escapeHtml(data.dataQuality.missingDataTreatment)}</p>
       </div>
 
-      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px;">
+      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
         <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Uncertainty Assessment</div>
         <p style="font-size: 12px; color: #44403c; line-height: 1.7;">${escapeHtml(data.dataQuality.uncertaintyNote)}</p>
+      </div>
+
+      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px;">Data Quality Improvement Roadmap</div>
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 12px; color: #44403c; line-height: 1.6;">
+          <div style="font-weight: 600; color: #dc2626;">Priority 1</div>
+          <div>Collect primary data from top 3 impact contributors — this typically addresses &gt;60% of total climate impact uncertainty.</div>
+          <div style="font-weight: 600; color: #f97316;">Priority 2</div>
+          <div>Replace proxy emission factors with material-specific secondary data from ecoinvent or AGRIBALYSE for improved geographic and technological representativeness.</div>
+          <div style="font-weight: 600; color: #eab308;">Priority 3</div>
+          <div>Verify transport distances and modes with suppliers to refine distribution stage estimates currently based on distance × freight factor calculations.</div>
+          <div style="font-weight: 600; color: #22c55e;">Ongoing</div>
+          <div>Annual data refresh with updated DEFRA emission factors and database versions. Re-assess data quality scores after each improvement cycle.</div>
+        </div>
+      </div>
+
+      <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 20px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #0c4a6e;">Data Source Distribution</div>
+        <div style="display: flex; gap: 24px; align-items: center;">
+          <div style="flex: 1; height: 24px; border-radius: 6px; overflow: hidden; display: flex;">
+            <div style="width: ${cs.primaryDataShare}%; background: #22c55e; min-width: ${cs.primaryDataShare > 0 ? '2px' : '0'};"></div>
+            <div style="width: ${cs.secondaryDataShare}%; background: #3b82f6;"></div>
+            <div style="width: ${cs.proxyDataShare}%; background: #f97316;"></div>
+          </div>
+          <div style="font-size: 11px; color: #64748b; white-space: nowrap;">
+            <span style="display: inline-block; width: 8px; height: 8px; background: #22c55e; border-radius: 2px; margin-right: 4px;"></span>Primary ${cs.primaryDataShare}%
+            <span style="display: inline-block; width: 8px; height: 8px; background: #3b82f6; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Secondary ${cs.secondaryDataShare}%
+            <span style="display: inline-block; width: 8px; height: 8px; background: #f97316; border-radius: 2px; margin-left: 12px; margin-right: 4px;"></span>Proxy ${cs.proxyDataShare}%
+          </div>
+        </div>
       </div>
 
       ${renderPageFooter(6)}
@@ -595,9 +625,15 @@ function renderGhgDetailedPage(data: LCAReportData): string {
             <td>Variable</td>
           </tr>
           <tr style="font-weight: 600; background: #f0fdf4;">
-            <td>Total GWP-100</td>
+            <td>Total GWP-100 (all species)</td>
             <td></td>
             <td style="color: #166534;">${escapeHtml(ghg.totalGwp100)} kg CO&#8322;e</td>
+            <td></td>
+          </tr>
+          <tr style="font-weight: 600; background: #fef3c7;">
+            <td>Fossil Carbon Footprint (excl. biogenic)</td>
+            <td></td>
+            <td style="color: #92400e;">${escapeHtml(ghg.fossilOnlyTotal || ghg.totalGwp100)} kg CO&#8322;e</td>
             <td></td>
           </tr>
         </tbody>

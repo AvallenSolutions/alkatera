@@ -137,3 +137,115 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+const ALLOWED_FIELDS = [
+  'reporting_year', 'reporting_quarter',
+  'total_employees', 'local_employees', 'local_definition',
+  'total_procurement_spend', 'local_procurement_spend',
+  'local_supplier_count', 'total_supplier_count',
+  'corporate_tax_paid', 'payroll_taxes_paid', 'business_rates_paid',
+  'community_investment_total', 'infrastructure_investment', 'notes',
+] as const;
+
+export async function PUT(request: NextRequest) {
+  try {
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let organizationId = user.user_metadata?.current_organization_id;
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
+    }
+
+    const body = await request.json();
+
+    if (!body.id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    for (const field of ALLOWED_FIELDS) {
+      if (field in body) {
+        updateData[field] = body[field];
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('community_local_impact')
+      .update(updateData)
+      .eq('id', body.id)
+      .eq('organization_id', organizationId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[Local Impact API] Error updating data:', error);
+      return NextResponse.json({ error: 'Failed to update local impact data', details: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('Error in PUT /api/community-impact/local-impact:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    let organizationId = user.user_metadata?.current_organization_id;
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
+    }
+
+    const body = await request.json();
+
+    if (!body.id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('community_local_impact')
+      .delete()
+      .eq('id', body.id)
+      .eq('organization_id', organizationId);
+
+    if (error) {
+      console.error('[Local Impact API] Error deleting data:', error);
+      return NextResponse.json({ error: 'Failed to delete local impact data', details: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/community-impact/local-impact:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

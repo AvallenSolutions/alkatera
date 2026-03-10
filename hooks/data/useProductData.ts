@@ -69,6 +69,8 @@ export interface Product {
   unit_size_unit: string;
   organization_id: string;
   is_multipack?: boolean;
+  annual_production_volume?: number | null;
+  annual_production_unit?: string | null;
   passport_enabled?: boolean;
   passport_token?: string | null;
   passport_views_count?: number;

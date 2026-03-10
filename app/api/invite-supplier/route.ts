@@ -242,7 +242,7 @@ export async function POST(request: NextRequest) {
           </div>
         `;
 
-        const ccList = [user.email, 'sayhello@mail.alkatera.com'].filter(Boolean) as string[];
+        const ccList = [user.email, 'hello@alkatera.com'].filter(Boolean) as string[];
 
         await resend.emails.send({
           from: 'alkatera <sayhello@mail.alkatera.com>',

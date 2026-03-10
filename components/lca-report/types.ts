@@ -90,6 +90,8 @@ export interface LCAReportData {
   };
   ghgDetailed: {
     totalGwp100: string;
+    /** Fossil-only total (excl. biogenic CO₂) per ISO 14067 §6.4.9.3 */
+    fossilOnlyTotal?: string;
     fossilCo2: string;
     biogenicCo2: string;
     dlucCo2: string;

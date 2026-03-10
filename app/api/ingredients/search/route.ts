@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { filterDrinksRelevantProcesses, searchWithAliases, filterAgribalyseProcesses, searchAgribalyseWithAliases } from '@/lib/openlca/drinks-process-filter';
 import { createOpenLCAClientForDatabase, isAgribalyseConfigured } from '@/lib/openlca/client';
+import { INGREDIENT_ALIASES, PACKAGING_ALIASES } from '@/lib/openlca/drinks-aliases';
 
 export const dynamic = 'force-dynamic';
 
 interface SearchResult {
   id: string;
   name: string;
+  friendly_name?: string;
   category: string;
   unit?: string;
   processType?: string;
@@ -530,6 +532,26 @@ export async function GET(request: NextRequest) {
       // Tertiary: alphabetical
       return a.name.localeCompare(b.name);
     });
+
+    // Add friendly names via reverse-lookup against drinks aliases.
+    // When a technical ecoinvent name matches a known process pattern,
+    // we provide a human-readable label (e.g. "Malted Barley" for
+    // "malt production, from barley grain {GLO}| cut-off, U").
+    const allAliases = [...INGREDIENT_ALIASES, ...PACKAGING_ALIASES];
+    for (const result of allResults) {
+      if (result.source_type === 'ecoinvent_live' || result.source_type === 'agribalyse_live' || result.source_type === 'ecoinvent_proxy') {
+        const nameLower = result.name.toLowerCase();
+        for (const alias of allAliases) {
+          const matched = alias.processPatterns.some(pattern => nameLower.includes(pattern));
+          if (matched) {
+            // Title-case the first search term as the friendly name
+            const term = alias.searchTerms[0];
+            result.friendly_name = term.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            break;
+          }
+        }
+      }
+    }
 
     // Separate global library from org-specific staging counts
     const globalLibraryCount = stagingResults.filter(r => r.source_type === 'global_library').length;

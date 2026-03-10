@@ -846,9 +846,92 @@ export async function resolveImpactFactors(
         stagingFactor = stagingMatch;
       }
     }
+
+    // If ID lookups failed (e.g. live ecoinvent process not in local proxy table),
+    // try name-based lookup in ecoinvent_material_proxies using matched_source_name.
+    // This handles the case where a user selected a live ecoinvent result but the
+    // OpenLCA API is unavailable during validation — we can still find a cached proxy
+    // with the same or similar name.
+    if (!directProxy || !directProxy.impact_climate) {
+      const proxySearchName = material.matched_source_name || material.material_name;
+      const { data: nameProxy } = await supabase
+        .from('ecoinvent_material_proxies')
+        .select('*')
+        .ilike('material_name', `%${proxySearchName}%`)
+        .not('impact_climate', 'is', null)
+        .limit(1)
+        .maybeSingle();
+      if (nameProxy && nameProxy.impact_climate) {
+        console.log(`[Waterfall] ✓ Name-based proxy lookup SUCCESS: "${proxySearchName}" → ${nameProxy.material_name}`);
+
+        const climateTotal = Number(nameProxy.impact_climate || 0) * quantity_kg;
+        const hasGHGBreakdown = nameProxy.impact_climate_fossil || nameProxy.impact_climate_biogenic;
+        const fossilCO2 = hasGHGBreakdown
+          ? Number(nameProxy.impact_climate_fossil || 0) * quantity_kg
+          : climateTotal * 0.85;
+        const biogenicCO2 = hasGHGBreakdown
+          ? Number(nameProxy.impact_climate_biogenic || 0) * quantity_kg
+          : climateTotal * 0.15;
+
+        return {
+          impact_climate: climateTotal,
+          impact_climate_fossil: fossilCO2,
+          impact_climate_biogenic: biogenicCO2,
+          impact_climate_dluc: Number(nameProxy.impact_climate_dluc || 0) * quantity_kg,
+          ch4_kg: Number(nameProxy.ch4_factor || 0) * quantity_kg,
+          ch4_fossil_kg: Number(nameProxy.ch4_fossil_factor || 0) * quantity_kg,
+          ch4_biogenic_kg: Number(nameProxy.ch4_biogenic_factor || 0) * quantity_kg,
+          n2o_kg: Number(nameProxy.n2o_factor || 0) * quantity_kg,
+          impact_water: Number(nameProxy.impact_water || 0) * quantity_kg,
+          impact_water_scarcity: Number(nameProxy.impact_water || 0) * quantity_kg * awareFactor,
+          impact_land: Number(nameProxy.impact_land_use || nameProxy.impact_land || 0) * quantity_kg,
+          impact_waste: Number(nameProxy.impact_waste || 0) * quantity_kg,
+          impact_ozone_depletion: Number(nameProxy.impact_ozone_depletion || 0) * quantity_kg,
+          impact_photochemical_ozone_formation: Number(nameProxy.impact_photochemical_ozone_formation || 0) * quantity_kg,
+          impact_ionising_radiation: Number(nameProxy.impact_ionising_radiation || 0) * quantity_kg,
+          impact_particulate_matter: Number(nameProxy.impact_particulate_matter || 0) * quantity_kg,
+          impact_human_toxicity_carcinogenic: Number(nameProxy.impact_human_toxicity_carcinogenic || 0) * quantity_kg,
+          impact_human_toxicity_non_carcinogenic: Number(nameProxy.impact_human_toxicity_non_carcinogenic || 0) * quantity_kg,
+          impact_terrestrial_ecotoxicity: Number(nameProxy.impact_terrestrial_ecotoxicity || 0) * quantity_kg,
+          impact_freshwater_ecotoxicity: Number(nameProxy.impact_freshwater_ecotoxicity || 0) * quantity_kg,
+          impact_marine_ecotoxicity: Number(nameProxy.impact_marine_ecotoxicity || 0) * quantity_kg,
+          impact_freshwater_eutrophication: Number(nameProxy.impact_freshwater_eutrophication || 0) * quantity_kg,
+          impact_marine_eutrophication: Number(nameProxy.impact_marine_eutrophication || 0) * quantity_kg,
+          impact_terrestrial_acidification: Number(nameProxy.impact_terrestrial_acidification || 0) * quantity_kg,
+          impact_mineral_resource_scarcity: Number(nameProxy.impact_mineral_resource_scarcity || 0) * quantity_kg,
+          impact_fossil_resource_scarcity: Number(nameProxy.impact_fossil_fuel_scarcity || 0) * quantity_kg,
+          data_priority: 3,
+          data_quality_tag: 'Secondary_Modelled',
+          data_quality_grade: category === 'MANUFACTURING_MATERIAL' ? 'MEDIUM' as const : 'LOW' as const,
+          source_reference: `Ecoinvent 3.12: ${nameProxy.material_name} (${nameProxy.geography || 'GLO'})`,
+          confidence_score: 45,
+          methodology: `ReCiPe 2016 Midpoint (H) / Ecoinvent ${nameProxy.ecoinvent_version || '3.12'}`,
+          gwp_data_source: 'Ecoinvent 3.12',
+          non_gwp_data_source: 'Ecoinvent 3.12',
+          gwp_reference_id: nameProxy.id,
+          non_gwp_reference_id: nameProxy.id,
+          resolved_factor_id: nameProxy.id,
+          is_hybrid_source: false,
+          category_type: category,
+        };
+      }
+    }
   }
 
   // Fallback: Try staging_emission_factors by name — first exact match, then partial match
+  // Try matched_source_name first (the database match name), then fall back to material_name (user's name)
+  if (!stagingFactor && material.matched_source_name) {
+    const { data: nameMatch } = await supabase
+      .from('staging_emission_factors')
+      .select('*')
+      .ilike('name', material.matched_source_name)
+      .limit(1)
+      .maybeSingle();
+    stagingFactor = nameMatch;
+    if (nameMatch) {
+      console.log(`[Waterfall] Staging name match via matched_source_name: "${material.matched_source_name}" → ${nameMatch.name}`);
+    }
+  }
   if (!stagingFactor) {
     const { data: nameMatch } = await supabase
       .from('staging_emission_factors')
@@ -860,6 +943,16 @@ export async function resolveImpactFactors(
   }
 
   // If no exact match, try partial/fuzzy match with wildcards
+  // Try matched_source_name first (more specific database name), then material_name
+  if (!stagingFactor && material.matched_source_name) {
+    const { data: fuzzyMatch } = await supabase
+      .from('staging_emission_factors')
+      .select('*')
+      .ilike('name', `%${material.matched_source_name}%`)
+      .limit(1)
+      .maybeSingle();
+    stagingFactor = fuzzyMatch;
+  }
   if (!stagingFactor) {
     const { data: fuzzyMatch } = await supabase
       .from('staging_emission_factors')
@@ -870,10 +963,10 @@ export async function resolveImpactFactors(
     stagingFactor = fuzzyMatch;
   }
 
-  // If still no match, try matching individual keywords from the material name
+  // If still no match, try matching individual keywords from the matched source name or material name
   if (!stagingFactor) {
-    // Extract key terms: remove common words, try the most specific term first
-    const keywords = material.material_name
+    const searchName = material.matched_source_name || material.material_name;
+    const keywords = searchName
       .replace(/\b(the|a|an|of|for|with|and|or|in|on|at|to|from)\b/gi, '')
       .split(/[\s,()-]+/)
       .filter((w: string) => w.length > 2)

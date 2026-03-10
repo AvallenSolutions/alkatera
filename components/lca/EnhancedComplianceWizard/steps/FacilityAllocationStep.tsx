@@ -74,12 +74,26 @@ export function FacilityAllocationStep() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold">Facility Allocation</h3>
+        <h3 className="text-lg font-semibold">Review Facility Allocation</h3>
         <p className="text-sm text-muted-foreground">
-          Enter the production volumes for each facility linked to this
-          product. This determines how manufacturing emissions are attributed.
+          Confirm the production volumes and reporting periods for your LCA calculation.
         </p>
       </div>
+
+      {/* Pre-populated info */}
+      {linkedFacilities.length > 0 &&
+        facilityAllocations.some((a) => a.productionVolume) &&
+        preCalcState.product?.annual_production_volume && (
+          <Alert className="border-lime-500/30 bg-lime-500/10">
+            <Info className="h-4 w-4 text-lime-600" />
+            <AlertDescription className="text-sm">
+              Production volumes are pre-filled from your product&apos;s annual production
+              ({preCalcState.product.annual_production_volume.toLocaleString()}{' '}
+              {preCalcState.product.annual_production_unit || 'units'}/year).
+              You can adjust them below if needed.
+            </AlertDescription>
+          </Alert>
+        )}
 
       {linkedFacilities.length > 0 ? (
         <div className="space-y-4">

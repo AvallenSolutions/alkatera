@@ -6,20 +6,20 @@ import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Building2, Zap, Pencil, Droplets, Recycle, Calendar } from "lucide-react";
+import { ArrowLeft, Trash2, Building2, Zap, Pencil, History, Package, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { PageLoader } from "@/components/ui/page-loader";
 import { toast } from "sonner";
-import { LogEmissionsWithProduction } from "@/components/facilities/LogEmissionsWithProduction";
 import { EditFacilityDialog } from "@/components/facilities/EditFacilityDialog";
-import { ReportingSessionSetup } from "@/components/facilities/ReportingSessionSetup";
-import { AddUtilityToSession } from "@/components/facilities/AddUtilityToSession";
-import { useReportingSession } from "@/hooks/data/useReportingSession";
-import { WaterDataEntry } from "@/components/facilities/WaterDataEntry";
-import { WasteDataEntry } from "@/components/facilities/WasteDataEntry";
+import { DirectDataEntry } from "@/components/facilities/DirectDataEntry";
+import { ProductionVolumeManager } from "@/components/facilities/ProductionVolumeManager";
 import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
+import { UTILITY_TYPES } from "@/lib/constants/utility-types";
 
 interface Facility {
   id: string;
@@ -51,6 +51,8 @@ interface UtilityDataEntry {
   calculated_scope: string;
   notes: string | null;
   created_at: string;
+  reporting_session_id: string | null;
+  activity_date?: string | null;
 }
 
 interface FacilityActivityEntry {
@@ -67,20 +69,9 @@ interface FacilityActivityEntry {
   water_classification?: string;
   waste_category?: string;
   waste_treatment_method?: string;
+  reporting_session_id?: string | null;
+  activity_date?: string | null;
 }
-
-const UTILITY_TYPES = [
-  { value: 'electricity_grid', label: 'Purchased Electricity', defaultUnit: 'kWh' },
-  { value: 'heat_steam_purchased', label: 'Purchased Heat / Steam', defaultUnit: 'kWh' },
-  { value: 'natural_gas', label: 'Natural Gas', defaultUnit: 'm³' },
-  { value: 'lpg', label: 'LPG (Propane/Butane)', defaultUnit: 'Litres' },
-  { value: 'diesel_stationary', label: 'Diesel (Generators/Stationary)', defaultUnit: 'Litres' },
-  { value: 'heavy_fuel_oil', label: 'Heavy Fuel Oil', defaultUnit: 'Litres' },
-  { value: 'biomass_solid', label: 'Biogas / Biomass', defaultUnit: 'kg' },
-  { value: 'refrigerant_leakage', label: 'Refrigerants (Leakage)', defaultUnit: 'kg' },
-  { value: 'diesel_mobile', label: 'Company Fleet (Diesel)', defaultUnit: 'Litres' },
-  { value: 'petrol_mobile', label: 'Company Fleet (Petrol/Gasoline)', defaultUnit: 'Litres' },
-];
 
 export default function FacilityDetailPage() {
   const params = useParams();
@@ -95,10 +86,14 @@ export default function FacilityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("data-entry");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [activeWaterSessionId, setActiveWaterSessionId] = useState<string | null>(null);
-  const [activeWasteSessionId, setActiveWasteSessionId] = useState<string | null>(null);
-  const { sessions, loading: sessionsLoading, refetch: refetchSessions } = useReportingSession(facilityId);
+  const [editingEntry, setEditingEntry] = useState<{
+    id: string;
+    table: 'utility_data_entries' | 'facility_activity_entries';
+    activity_date: string;
+    quantity: string;
+    notes: string;
+  } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const loadFacilityData = useCallback(async () => {
     try {
@@ -158,13 +153,12 @@ export default function FacilityDetailPage() {
     }
   }, [facilityId, loadFacilityData]);
 
-
-  const handleDeleteEntry = async (entryId: string) => {
+  const handleDeleteEntry = async (entryId: string, table: 'utility_data_entries' | 'facility_activity_entries') => {
     if (!confirm('Are you sure you want to delete this entry?')) return;
 
     try {
       const { error } = await supabase
-        .from('utility_data_entries')
+        .from(table)
         .delete()
         .eq('id', entryId);
 
@@ -175,6 +169,48 @@ export default function FacilityDetailPage() {
     } catch (error: any) {
       console.error('Error deleting entry:', error);
       toast.error(error.message || 'Failed to delete entry');
+    }
+  };
+
+  const openEditDialog = (
+    entry: UtilityDataEntry | FacilityActivityEntry,
+    table: 'utility_data_entries' | 'facility_activity_entries'
+  ) => {
+    setEditingEntry({
+      id: entry.id,
+      table,
+      activity_date: entry.activity_date || '',
+      quantity: String(entry.quantity),
+      notes: entry.notes || '',
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingEntry) return;
+    setEditSaving(true);
+
+    try {
+      const updates: Record<string, any> = {
+        quantity: parseFloat(editingEntry.quantity),
+        notes: editingEntry.notes || null,
+        activity_date: editingEntry.activity_date || null,
+      };
+
+      const { error } = await supabase
+        .from(editingEntry.table)
+        .update(updates)
+        .eq('id', editingEntry.id);
+
+      if (error) throw error;
+
+      toast.success('Entry updated');
+      setEditingEntry(null);
+      await loadFacilityData();
+    } catch (error: any) {
+      console.error('Error updating entry:', error);
+      toast.error(error.message || 'Failed to update entry');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -251,21 +287,17 @@ export default function FacilityDetailPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="report-period">
-            <Calendar className="h-4 w-4 mr-2" />
-            Report Period
-          </TabsTrigger>
           <TabsTrigger value="data-entry">
             <Zap className="h-4 w-4 mr-2" />
-            Utilities
+            Data Entry
           </TabsTrigger>
-          <TabsTrigger value="water">
-            <Droplets className="h-4 w-4 mr-2" />
-            Water
+          <TabsTrigger value="production">
+            <Package className="h-4 w-4 mr-2" />
+            Production
           </TabsTrigger>
-          <TabsTrigger value="waste">
-            <Recycle className="h-4 w-4 mr-2" />
-            Waste
+          <TabsTrigger value="history">
+            <History className="h-4 w-4 mr-2" />
+            History
           </TabsTrigger>
           <TabsTrigger value="overview">
             <Building2 className="h-4 w-4 mr-2" />
@@ -273,151 +305,51 @@ export default function FacilityDetailPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="report-period" className="space-y-6 mt-6">
-          <ReportingSessionSetup
+        {/* ============================================================= */}
+        {/* DATA ENTRY TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="data-entry" className="space-y-6 mt-6">
+          <DirectDataEntry
             facilityId={facilityId}
-            organizationId={facility?.organization_id || ''}
-            onSessionCreated={(sessionId) => {
-              setActiveSessionId(sessionId);
-              refetchSessions();
-            }}
+            organizationId={facility.organization_id}
+            onDataSaved={loadFacilityData}
           />
-
-          {sessions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Reporting Periods</CardTitle>
-                <CardDescription>
-                  Manage reporting periods and production volumes for this facility
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {sessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="p-4 border rounded-lg"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">
-                            {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
-                            {new Date(session.reporting_period_end).toLocaleDateString()}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Production Volume: {session.total_production_volume} {session.volume_unit}
-                          </p>
-                        </div>
-                        <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
-                          {session.data_source_type}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
-        <TabsContent value="data-entry" className="space-y-6 mt-6">
-          {!activeSessionId ? (
-            <>
-              {sessions.length === 0 ? (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-400" />
-                      <p className="font-medium">No reporting periods found</p>
-                      <p className="text-sm mt-1">Create a reporting period in the Report Period tab first</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Select Reporting Period</CardTitle>
-                    <CardDescription>
-                      Choose a reporting period to add Scope 1 & 2 utility data
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {sessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition"
-                          onClick={() => setActiveSessionId(session.id)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">
-                                {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
-                                {new Date(session.reporting_period_end).toLocaleDateString()}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Production Volume: {session.total_production_volume} {session.volume_unit}
-                              </p>
-                            </div>
-                            <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
-                              {session.data_source_type}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          ) : (
-            <>
-              {activeSessionId && sessions.find((s) => s.id === activeSessionId) && (
-                <>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveSessionId(null)}
-                    >
-                      ← Back to Sessions
-                    </Button>
-                  </div>
-                  <AddUtilityToSession
-                    sessionId={activeSessionId}
-                    facilityId={facilityId}
-                    organizationId={facility?.organization_id || ''}
-                    periodStart={sessions.find((s) => s.id === activeSessionId)?.reporting_period_start || ''}
-                    periodEnd={sessions.find((s) => s.id === activeSessionId)?.reporting_period_end || ''}
-                    productionVolume={sessions.find((s) => s.id === activeSessionId)?.total_production_volume || 0}
-                    volumeUnit={sessions.find((s) => s.id === activeSessionId)?.volume_unit || ''}
-                    onUtilityAdded={() => {
-                      loadFacilityData();
-                    }}
-                  />
-                </>
-              )}
-            </>
-          )}
+        {/* ============================================================= */}
+        {/* PRODUCTION TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="production" className="space-y-6 mt-6">
+          <ProductionVolumeManager
+            facilityId={facilityId}
+            organizationId={facility.organization_id}
+          />
+        </TabsContent>
 
+        {/* ============================================================= */}
+        {/* HISTORY TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="history" className="space-y-6 mt-6">
+          {/* Utility History */}
           <Card>
             <CardHeader>
-              <CardTitle>Utility Data History</CardTitle>
+              <CardTitle>Utility Data</CardTitle>
               <CardDescription>
-                All consumption data for this facility
+                All energy and fuel consumption data for this facility
               </CardDescription>
             </CardHeader>
             <CardContent>
               {utilityData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No utility data recorded yet</p>
-                  <p className="text-sm mt-1">Add your first entry above</p>
+                  <p className="text-sm mt-1">Add entries in the Data Entry tab</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Utility Type</TableHead>
-                      <TableHead>Period</TableHead>
+                      <TableHead>Date</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Scope</TableHead>
                       <TableHead>Quality</TableHead>
@@ -432,9 +364,15 @@ export default function FacilityDetailPage() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            {new Date(entry.reporting_period_start).toLocaleDateString()} -
-                            <br />
-                            {new Date(entry.reporting_period_end).toLocaleDateString()}
+                            {entry.activity_date ? (
+                              <>{new Date(entry.activity_date).toLocaleDateString()}</>
+                            ) : (
+                              <>
+                                {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                                <br />
+                                {new Date(entry.reporting_period_end).toLocaleDateString()}
+                              </>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -451,13 +389,22 @@ export default function FacilityDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteEntry(entry.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(entry, 'utility_data_entries')}
+                            >
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteEntry(entry.id, 'utility_data_entries')}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -466,103 +413,26 @@ export default function FacilityDetailPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="water" className="space-y-6 mt-6">
-          {!activeWaterSessionId ? (
-            <>
-              {sessions.length === 0 ? (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Droplets className="h-12 w-12 mx-auto mb-4 text-blue-400" />
-                      <p className="font-medium">No reporting periods found</p>
-                      <p className="text-sm mt-1">Create a reporting period in the Report Period tab first</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Select Reporting Period</CardTitle>
-                    <CardDescription>
-                      Choose a reporting period to add water data
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {sessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition"
-                          onClick={() => setActiveWaterSessionId(session.id)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">
-                                {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
-                                {new Date(session.reporting_period_end).toLocaleDateString()}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Production Volume: {session.total_production_volume} {session.volume_unit}
-                              </p>
-                            </div>
-                            <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
-                              {session.data_source_type}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          ) : (
-            <>
-              {activeWaterSessionId && sessions.find((s) => s.id === activeWaterSessionId) && (
-                <>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveWaterSessionId(null)}
-                    >
-                      ← Back to Periods
-                    </Button>
-                  </div>
-                  <WaterDataEntry
-                    facilityId={facilityId}
-                    organizationId={facility?.organization_id || ''}
-                    sessionId={activeWaterSessionId}
-                    periodStart={sessions.find((s) => s.id === activeWaterSessionId)?.reporting_period_start || ''}
-                    periodEnd={sessions.find((s) => s.id === activeWaterSessionId)?.reporting_period_end || ''}
-                    isThirdParty={facility?.operational_control === 'third_party'}
-                    onEntryAdded={loadFacilityData}
-                  />
-                </>
-              )}
-            </>
-          )}
-
+          {/* Water History */}
           <Card>
             <CardHeader>
-              <CardTitle>Water Data History</CardTitle>
+              <CardTitle>Water Data</CardTitle>
               <CardDescription>
-                All water intake, discharge, and recycling data for this facility
+                All water intake, discharge, and recycling data
               </CardDescription>
             </CardHeader>
             <CardContent>
               {waterData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No water data recorded yet</p>
-                  <p className="text-sm mt-1">Add your first entry above</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Activity Type</TableHead>
-                      <TableHead>Period</TableHead>
+                      <TableHead>Date</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Source</TableHead>
                       <TableHead>Data Quality</TableHead>
@@ -579,9 +449,15 @@ export default function FacilityDetailPage() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            {new Date(entry.reporting_period_start).toLocaleDateString()} -
-                            <br />
-                            {new Date(entry.reporting_period_end).toLocaleDateString()}
+                            {entry.activity_date ? (
+                              <>{new Date(entry.activity_date).toLocaleDateString()}</>
+                            ) : (
+                              <>
+                                {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                                <br />
+                                {new Date(entry.reporting_period_end).toLocaleDateString()}
+                              </>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -612,27 +488,22 @@ export default function FacilityDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              if (!confirm('Are you sure you want to delete this entry?')) return;
-                              try {
-                                const { error } = await supabase
-                                  .from('facility_activity_entries')
-                                  .delete()
-                                  .eq('id', entry.id);
-                                if (error) throw error;
-                                toast.success('Entry deleted');
-                                await loadFacilityData();
-                              } catch (error: any) {
-                                console.error('Error deleting entry:', error);
-                                toast.error(error.message || 'Failed to delete entry');
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(entry, 'facility_activity_entries')}
+                            >
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteEntry(entry.id, 'facility_activity_entries')}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -641,103 +512,26 @@ export default function FacilityDetailPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="waste" className="space-y-6 mt-6">
-          {!activeWasteSessionId ? (
-            <>
-              {sessions.length === 0 ? (
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center py-8 text-muted-foreground">
-                      <Recycle className="h-12 w-12 mx-auto mb-4 text-orange-400" />
-                      <p className="font-medium">No reporting periods found</p>
-                      <p className="text-sm mt-1">Create a reporting period in the Report Period tab first</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Select Reporting Period</CardTitle>
-                    <CardDescription>
-                      Choose a reporting period to add waste data
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {sessions.map((session) => (
-                        <div
-                          key={session.id}
-                          className="p-4 border rounded-lg hover:bg-muted/50 cursor-pointer transition"
-                          onClick={() => setActiveWasteSessionId(session.id)}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">
-                                {new Date(session.reporting_period_start).toLocaleDateString()} to{' '}
-                                {new Date(session.reporting_period_end).toLocaleDateString()}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Production Volume: {session.total_production_volume} {session.volume_unit}
-                              </p>
-                            </div>
-                            <Badge variant={session.data_source_type === 'Primary' ? 'default' : 'secondary'}>
-                              {session.data_source_type}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          ) : (
-            <>
-              {activeWasteSessionId && sessions.find((s) => s.id === activeWasteSessionId) && (
-                <>
-                  <div className="flex items-center gap-2 mb-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setActiveWasteSessionId(null)}
-                    >
-                      ← Back to Periods
-                    </Button>
-                  </div>
-                  <WasteDataEntry
-                    facilityId={facilityId}
-                    organizationId={facility?.organization_id || ''}
-                    sessionId={activeWasteSessionId}
-                    periodStart={sessions.find((s) => s.id === activeWasteSessionId)?.reporting_period_start || ''}
-                    periodEnd={sessions.find((s) => s.id === activeWasteSessionId)?.reporting_period_end || ''}
-                    isThirdParty={facility?.operational_control === 'third_party'}
-                    onEntryAdded={loadFacilityData}
-                  />
-                </>
-              )}
-            </>
-          )}
-
+          {/* Waste History */}
           <Card>
             <CardHeader>
-              <CardTitle>Waste Data History</CardTitle>
+              <CardTitle>Waste Data</CardTitle>
               <CardDescription>
-                All waste generation, recycling, and disposal data for this facility
+                All waste generation, recycling, and disposal data
               </CardDescription>
             </CardHeader>
             <CardContent>
               {wasteData.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No waste data recorded yet</p>
-                  <p className="text-sm mt-1">Add your first entry above</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Waste Category</TableHead>
-                      <TableHead>Period</TableHead>
+                      <TableHead>Date</TableHead>
                       <TableHead>Quantity</TableHead>
                       <TableHead>Treatment Method</TableHead>
                       <TableHead>Data Quality</TableHead>
@@ -754,9 +548,15 @@ export default function FacilityDetailPage() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            {new Date(entry.reporting_period_start).toLocaleDateString()} -
-                            <br />
-                            {new Date(entry.reporting_period_end).toLocaleDateString()}
+                            {entry.activity_date ? (
+                              <>{new Date(entry.activity_date).toLocaleDateString()}</>
+                            ) : (
+                              <>
+                                {new Date(entry.reporting_period_start).toLocaleDateString()} -
+                                <br />
+                                {new Date(entry.reporting_period_end).toLocaleDateString()}
+                              </>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -787,27 +587,22 @@ export default function FacilityDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              if (!confirm('Are you sure you want to delete this entry?')) return;
-                              try {
-                                const { error } = await supabase
-                                  .from('facility_activity_entries')
-                                  .delete()
-                                  .eq('id', entry.id);
-                                if (error) throw error;
-                                toast.success('Entry deleted');
-                                await loadFacilityData();
-                              } catch (error: any) {
-                                console.error('Error deleting entry:', error);
-                                toast.error(error.message || 'Failed to delete entry');
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(entry, 'facility_activity_entries')}
+                            >
+                              <Pencil className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteEntry(entry.id, 'facility_activity_entries')}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -816,8 +611,70 @@ export default function FacilityDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Edit Entry Dialog */}
+          <Dialog open={!!editingEntry} onOpenChange={(open) => !open && setEditingEntry(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>Edit Entry</DialogTitle>
+              </DialogHeader>
+              {editingEntry && (
+                <div className="space-y-4 py-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-date">Activity Date</Label>
+                    <Input
+                      id="edit-date"
+                      type="date"
+                      value={editingEntry.activity_date}
+                      onChange={(e) =>
+                        setEditingEntry({ ...editingEntry, activity_date: e.target.value })
+                      }
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      The specific date of this reading (e.g. invoice date, meter reading date)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-quantity">Quantity</Label>
+                    <Input
+                      id="edit-quantity"
+                      type="number"
+                      step="any"
+                      value={editingEntry.quantity}
+                      onChange={(e) =>
+                        setEditingEntry({ ...editingEntry, quantity: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-notes">Notes</Label>
+                    <Input
+                      id="edit-notes"
+                      value={editingEntry.notes}
+                      placeholder="Optional notes"
+                      onChange={(e) =>
+                        setEditingEntry({ ...editingEntry, notes: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingEntry(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit} disabled={editSaving}>
+                  {editSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
+        {/* ============================================================= */}
+        {/* OVERVIEW TAB */}
+        {/* ============================================================= */}
         <TabsContent value="overview" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
@@ -890,7 +747,7 @@ export default function FacilityDetailPage() {
             <div className="lg:col-span-1">
               <DataQualityConfidenceCard
                 facilityId={facilityId}
-                organizationId={facility?.organization_id || ''}
+                organizationId={facility.organization_id}
               />
             </div>
           </div>

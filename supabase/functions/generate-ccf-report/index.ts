@@ -139,7 +139,7 @@ Deno.serve(async (req: Request) => {
       .eq('organization_id', organization_id)
       .eq('scope', 'Scope 1')
       .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_end', yearEnd);
+      .lte('reporting_period_start', yearEnd);
 
     let fleetScope1Kg = 0;
     if (fleetScope1Data) {
@@ -156,7 +156,7 @@ Deno.serve(async (req: Request) => {
       .eq('organization_id', organization_id)
       .eq('scope', 'Scope 2')
       .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_end', yearEnd);
+      .lte('reporting_period_start', yearEnd);
 
     let fleetScope2Kg = 0;
     if (fleetScope2Data) {
@@ -285,7 +285,7 @@ Deno.serve(async (req: Request) => {
       .eq('organization_id', organization_id)
       .eq('scope', 'Scope 3 Cat 6')
       .gte('reporting_period_start', yearStart)
-      .lte('reporting_period_end', yearEnd);
+      .lte('reporting_period_start', yearEnd);
 
     let fleetScope3Kg = 0;
     if (fleetScope3Data) {

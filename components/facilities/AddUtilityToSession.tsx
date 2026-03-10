@@ -1,3 +1,7 @@
+/**
+ * @deprecated Replaced by DirectDataEntry.tsx — session-based entry flow removed.
+ * See: Reporting Period Simplification plan.
+ */
 "use client";
 
 import { useState } from "react";
@@ -32,6 +36,7 @@ interface UtilityEntry {
   utility_type: string;
   quantity: string;
   unit: string;
+  activity_date: string;
 }
 
 interface AddUtilityToSessionProps {
@@ -56,12 +61,12 @@ export function AddUtilityToSession({
   onUtilityAdded,
 }: AddUtilityToSessionProps) {
   const [utilityEntries, setUtilityEntries] = useState<UtilityEntry[]>([
-    { utility_type: "", quantity: "", unit: "" },
+    { utility_type: "", quantity: "", unit: "", activity_date: "" },
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const addUtilityEntry = () => {
-    setUtilityEntries([...utilityEntries, { utility_type: "", quantity: "", unit: "" }]);
+    setUtilityEntries([...utilityEntries, { utility_type: "", quantity: "", unit: "", activity_date: "" }]);
   };
 
   const removeUtilityEntry = (index: number) => {
@@ -130,6 +135,7 @@ export function AddUtilityToSession({
             utility_type: entry.utility_type,
             quantity: parseFloat(entry.quantity),
             unit: entry.unit,
+            activity_date: entry.activity_date || null,
             reporting_period_start: periodStart,
             reporting_period_end: periodEnd,
             data_quality: "actual",
@@ -199,7 +205,7 @@ export function AddUtilityToSession({
         );
 
       // Reset form
-      setUtilityEntries([{ utility_type: "", quantity: "", unit: "" }]);
+      setUtilityEntries([{ utility_type: "", quantity: "", unit: "", activity_date: "" }]);
       toast.success(`${validEntries.length} utility entries added successfully`);
 
       // Trigger calculations
@@ -262,7 +268,7 @@ export function AddUtilityToSession({
           </div>
 
           {utilityEntries.map((entry, index) => (
-            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
+            <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 border rounded-lg">
               <div className="md:col-span-2">
                 <Label>Utility Type</Label>
                 <Select
@@ -296,6 +302,17 @@ export function AddUtilityToSession({
                   value={entry.quantity}
                   onChange={(e) => updateUtilityEntry(index, "quantity", e.target.value)}
                   disabled={isSubmitting}
+                />
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={entry.activity_date}
+                  onChange={(e) => updateUtilityEntry(index, "activity_date", e.target.value)}
+                  disabled={isSubmitting}
+                  min={periodStart}
+                  max={periodEnd}
                 />
               </div>
               <div className="flex items-end gap-2">

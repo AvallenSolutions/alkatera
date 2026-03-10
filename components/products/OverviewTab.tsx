@@ -158,7 +158,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
                     Complete a Life Cycle Assessment to visualise the environmental impact of this product
                   </p>
                 </div>
-                <Link href={`/products/${product.id}/calculate-lca`}>
+                <Link href={`/products/${product.id}/compliance-wizard`}>
                   <Button className="bg-lime-500 hover:bg-lime-600 text-slate-900">
                     Run LCA
                     <ArrowRight className="ml-2 h-4 w-4" />
