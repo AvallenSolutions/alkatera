@@ -261,7 +261,7 @@ export function Scope3CategoryBreakdown({
                                   Top Ingredients
                                 </p>
                                 <div className="space-y-1">
-                                  {product.materials.slice(0, 3).map((m, idx) => (
+                                  {product.materials.map((m, idx) => (
                                     <div
                                       key={idx}
                                       className="flex items-center justify-between text-xs"
@@ -281,7 +281,7 @@ export function Scope3CategoryBreakdown({
                                   Packaging
                                 </p>
                                 <div className="space-y-1">
-                                  {product.packaging.slice(0, 3).map((p, idx) => (
+                                  {product.packaging.map((p, idx) => (
                                     <div
                                       key={idx}
                                       className="flex items-center justify-between text-xs"

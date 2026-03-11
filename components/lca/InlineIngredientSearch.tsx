@@ -82,6 +82,11 @@ interface InlineIngredientSearchProps {
     recycled_content_pct?: number;
     packaging_components?: any;
     user_query?: string;
+    // Emission factor metadata for detail tooltip
+    ef_source?: string;
+    ef_source_type?: string;
+    ef_data_quality_grade?: string;
+    ef_uncertainty_percent?: number;
     // Packaging supplier product data (auto-populated from supplier)
     supplier_weight_g?: number | null;
     supplier_packaging_category?: string | null;
@@ -334,6 +339,11 @@ export function InlineIngredientSearch({
       location: result.location,
       recycled_content_pct: result.recycled_content_pct || result.metadata?.recycled_content_pct,
       packaging_components: result.packaging_components,
+      // Emission factor metadata for detail tooltip
+      ef_source: result.source || result.metadata?.source,
+      ef_source_type: result.source_type,
+      ef_data_quality_grade: result.data_quality_grade || result.metadata?.data_quality_grade,
+      ef_uncertainty_percent: result.uncertainty_percent || result.metadata?.uncertainty_percent,
       // Pass through packaging supplier product data for auto-population
       supplier_weight_g: result.supplier_weight_g,
       supplier_packaging_category: result.supplier_packaging_category,

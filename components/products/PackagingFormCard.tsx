@@ -66,6 +66,11 @@ export interface PackagingFormData {
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   carbon_intensity?: number;
+  // Emission factor metadata (for detail tooltip)
+  ef_source?: string;
+  ef_source_type?: string;
+  ef_data_quality_grade?: string;
+  ef_uncertainty_percent?: number;
   // EPR Compliance fields
   has_component_breakdown: boolean;
   components: PackagingMaterialComponent[];
@@ -432,6 +437,10 @@ export function PackagingFormCard({
     location?: string;
     recycled_content_pct?: number;
     packaging_components?: any;
+    ef_source?: string;
+    ef_source_type?: string;
+    ef_data_quality_grade?: string;
+    ef_uncertainty_percent?: number;
     // Packaging supplier product data
     supplier_weight_g?: number | null;
     supplier_packaging_category?: string | null;
@@ -476,6 +485,11 @@ export function PackagingFormCard({
       supplier_product_id: selection.supplier_product_id,
       supplier_name: selection.supplier_name,
       carbon_intensity: selection.carbon_intensity,
+      // Emission factor metadata for tooltip
+      ef_source: selection.ef_source,
+      ef_source_type: selection.ef_source_type,
+      ef_data_quality_grade: selection.ef_data_quality_grade,
+      ef_uncertainty_percent: selection.ef_uncertainty_percent,
       packaging_category: detectedCategory,
       // Only prefill unit from search result when packaging has no amount set yet (first selection).
       // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
@@ -658,18 +672,63 @@ export function PackagingFormCard({
                   placeholder="Search databases for emission factor..."
                   materialType="packaging"
                   onSelect={handleSearchSelect}
-                  onChange={() => onUpdate(packaging.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined })}
+                  onChange={() => onUpdate(packaging.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined, ef_source: undefined, ef_source_type: undefined, ef_data_quality_grade: undefined, ef_uncertainty_percent: undefined })}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
                   Search for the closest matching emission factor from supplier data or global databases
                 </p>
                 {packaging.matched_source_name && packaging.matched_source_name !== packaging.name && (
-                  <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs">
-                    <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span className="text-amber-700 dark:text-amber-300">
-                      Calculation proxy: <span className="font-medium">{packaging.matched_source_name}</span>
-                    </span>
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs cursor-help">
+                          <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                          <span className="text-amber-700 dark:text-amber-300">
+                            Calculation proxy: <span className="font-medium">{packaging.matched_source_name}</span>
+                          </span>
+                          {(packaging.carbon_intensity || packaging.ef_source) && (
+                            <Info className="h-3 w-3 text-amber-400 dark:text-amber-500 shrink-0 ml-auto" />
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      {(packaging.carbon_intensity || packaging.ef_source || packaging.ef_data_quality_grade) && (
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          <div className="space-y-1 text-xs">
+                            {packaging.carbon_intensity != null && (
+                              <div className="flex justify-between gap-4">
+                                <span className="text-muted-foreground">CO₂e intensity</span>
+                                <span className="font-medium">{packaging.carbon_intensity.toFixed(3)} kg CO₂e/{packaging.unit || 'kg'}</span>
+                              </div>
+                            )}
+                            {packaging.ef_source && (
+                              <div className="flex justify-between gap-4">
+                                <span className="text-muted-foreground">Source</span>
+                                <span className="font-medium">{packaging.ef_source}</span>
+                              </div>
+                            )}
+                            {packaging.ef_data_quality_grade && (
+                              <div className="flex justify-between gap-4">
+                                <span className="text-muted-foreground">Data quality</span>
+                                <span className="font-medium">{packaging.ef_data_quality_grade}</span>
+                              </div>
+                            )}
+                            {packaging.origin_address && (
+                              <div className="flex justify-between gap-4">
+                                <span className="text-muted-foreground">Geography</span>
+                                <span className="font-medium">{packaging.origin_address}</span>
+                              </div>
+                            )}
+                            {packaging.ef_uncertainty_percent != null && (
+                              <div className="flex justify-between gap-4">
+                                <span className="text-muted-foreground">Uncertainty</span>
+                                <span className="font-medium">±{packaging.ef_uncertainty_percent}%</span>
+                              </div>
+                            )}
+                          </div>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
 

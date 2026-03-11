@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers } from "lucide-react";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
@@ -44,6 +45,11 @@ export interface IngredientFormData {
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
   carbon_intensity?: number;
+  // Emission factor metadata (for detail tooltip)
+  ef_source?: string;
+  ef_source_type?: string;
+  ef_data_quality_grade?: string;
+  ef_uncertainty_percent?: number;
 }
 
 interface ProductionFacility {
@@ -237,6 +243,10 @@ export function IngredientFormCard({
     unit: string;
     carbon_intensity?: number;
     location?: string;
+    ef_source?: string;
+    ef_source_type?: string;
+    ef_data_quality_grade?: string;
+    ef_uncertainty_percent?: number;
   }) => {
     // Preserve the user's real ingredient name, store DB match name separately
     const userOriginalName = selection.user_query || selection.name;
@@ -258,6 +268,11 @@ export function IngredientFormCard({
       supplier_product_id: selection.supplier_product_id,
       supplier_name: selection.supplier_name,
       carbon_intensity: selection.carbon_intensity,
+      // Emission factor metadata for tooltip
+      ef_source: selection.ef_source,
+      ef_source_type: selection.ef_source_type,
+      ef_data_quality_grade: selection.ef_data_quality_grade,
+      ef_uncertainty_percent: selection.ef_uncertainty_percent,
       // Only prefill unit from search result when ingredient has no amount set yet (first selection).
       // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
       ...(!ingredient.amount ? { unit: selection.unit } : {}),
@@ -324,18 +339,63 @@ export function IngredientFormCard({
               value={ingredient.matched_source_name || ''}
               placeholder="Search databases for emission factor..."
               onSelect={handleSearchSelect}
-              onChange={() => onUpdate(ingredient.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined })}
+              onChange={() => onUpdate(ingredient.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined, ef_source: undefined, ef_source_type: undefined, ef_data_quality_grade: undefined, ef_uncertainty_percent: undefined })}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Search for the closest matching emission factor from supplier data or global databases
             </p>
             {ingredient.matched_source_name && ingredient.matched_source_name !== ingredient.name && (
-              <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs">
-                <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span className="text-amber-700 dark:text-amber-300">
-                  Calculation proxy: <span className="font-medium">{ingredient.matched_source_name}</span>
-                </span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-xs cursor-help">
+                      <Database className="h-3 w-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span className="text-amber-700 dark:text-amber-300">
+                        Calculation proxy: <span className="font-medium">{ingredient.matched_source_name}</span>
+                      </span>
+                      {(ingredient.carbon_intensity || ingredient.ef_source) && (
+                        <Info className="h-3 w-3 text-amber-400 dark:text-amber-500 shrink-0 ml-auto" />
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  {(ingredient.carbon_intensity || ingredient.ef_source || ingredient.ef_data_quality_grade) && (
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <div className="space-y-1 text-xs">
+                        {ingredient.carbon_intensity != null && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">CO₂e intensity</span>
+                            <span className="font-medium">{ingredient.carbon_intensity.toFixed(3)} kg CO₂e/{ingredient.unit || 'kg'}</span>
+                          </div>
+                        )}
+                        {ingredient.ef_source && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">Source</span>
+                            <span className="font-medium">{ingredient.ef_source}</span>
+                          </div>
+                        )}
+                        {ingredient.ef_data_quality_grade && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">Data quality</span>
+                            <span className="font-medium">{ingredient.ef_data_quality_grade}</span>
+                          </div>
+                        )}
+                        {ingredient.origin_address && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">Geography</span>
+                            <span className="font-medium">{ingredient.origin_address}</span>
+                          </div>
+                        )}
+                        {ingredient.ef_uncertainty_percent != null && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-muted-foreground">Uncertainty</span>
+                            <span className="font-medium">±{ingredient.ef_uncertainty_percent}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
 

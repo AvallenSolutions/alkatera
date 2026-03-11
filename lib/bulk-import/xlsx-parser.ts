@@ -197,12 +197,13 @@ function parsePackagingSheet(wb: XLSX.WorkBook, errors: string[]): ParsedPackagi
     const weight_g = num(row?.[4]);
     if (weight_g == null) { errors.push(`Packaging row ${i + 1}: missing weight for "${name}"`); continue; }
 
-    // Parse up to 3 components
+    // Parse all component columns (groups of 4 starting at column 17)
     const components: ParsedPackagingComponent[] = [];
-    for (let c = 0; c < 3; c++) {
-      const base = 17 + c * 4; // columns R/S/T/U, V/W/X/Y, Z/AA/AB/AC
+    for (let c = 0; ; c++) {
+      const base = 17 + c * 4; // columns R/S/T/U, V/W/X/Y, Z/AA/AB/AC, ...
       const cName = str(row?.[base]);
       const cMat = str(row?.[base + 1]);
+      if (!cName && !cMat) break; // stop at first empty component slot
       const cWeight = num(row?.[base + 2]);
       const cRecycled = num(row?.[base + 3]);
       if (cName && cMat) {
