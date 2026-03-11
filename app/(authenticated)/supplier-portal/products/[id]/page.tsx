@@ -29,7 +29,25 @@ import {
   FileText,
   Shield,
   Trash2,
+  Wheat,
+  Box,
+  AlertTriangle,
+  Info,
 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { SupplierProductType, PackagingCategoryType, EPRMaterialCode, SupplierProductComponent } from '@/lib/types/supplier-product';
+import {
+  PACKAGING_CATEGORY_LABELS,
+  EPR_MATERIAL_CODE_LABELS,
+  PRIMARY_MATERIAL_OPTIONS,
+  EPR_COMPONENT_MATERIAL_OPTIONS,
+} from '@/lib/types/supplier-product';
 
 const COMMON_CERTIFICATIONS = [
   'Organic',
@@ -89,6 +107,18 @@ export default function SupplierProductDetailPage() {
   const [unitMeasurementType, setUnitMeasurementType] = useState('');
   const [originCountryCode, setOriginCountryCode] = useState('');
   const [productImageUrl, setProductImageUrl] = useState('');
+
+  // Product type & packaging-specific fields
+  const [productType, setProductType] = useState<SupplierProductType>('ingredient');
+  const [weightG, setWeightG] = useState('');
+  const [packagingCategory, setPackagingCategory] = useState<PackagingCategoryType | ''>('');
+  const [primaryMaterial, setPrimaryMaterial] = useState('');
+  const [eprMaterialCode, setEprMaterialCode] = useState<EPRMaterialCode | ''>('');
+  const [eprIsDrinksContainer, setEprIsDrinksContainer] = useState(false);
+
+  // Material composition components (packaging only)
+  const [components, setComponents] = useState<SupplierProductComponent[]>([]);
+  const [savingComponents, setSavingComponents] = useState(false);
 
   // Climate
   const [impactClimate, setImpactClimate] = useState('');
@@ -162,6 +192,24 @@ export default function SupplierProductDetailPage() {
     setUnitMeasurementType(product.unit_measurement_type || '');
     setOriginCountryCode(product.origin_country_code || '');
     setProductImageUrl(product.product_image_url || '');
+
+    // Product type & packaging fields
+    setProductType(product.product_type || 'ingredient');
+    setWeightG(product.weight_g?.toString() || '');
+    setPackagingCategory(product.packaging_category || '');
+    setPrimaryMaterial(product.primary_material || '');
+    setEprMaterialCode(product.epr_material_code || '');
+    setEprIsDrinksContainer(product.epr_is_drinks_container || false);
+
+    // Load material components for packaging products
+    if (product.product_type === 'packaging') {
+      const { data: componentsData } = await supabase
+        .from('supplier_product_components')
+        .select('*')
+        .eq('supplier_product_id', productId)
+        .order('created_at', { ascending: true });
+      setComponents(componentsData || []);
+    }
 
     // Climate
     setImpactClimate(product.impact_climate?.toString() || '');
@@ -246,6 +294,13 @@ export default function SupplierProductDetailPage() {
         unit_measurement_type: unitMeasurementType || null,
         origin_country_code: originCountryCode.trim() || null,
         product_image_url: productImageUrl || null,
+        // Product type & packaging
+        product_type: productType,
+        weight_g: parseNum(weightG),
+        packaging_category: packagingCategory || null,
+        primary_material: primaryMaterial || null,
+        epr_material_code: eprMaterialCode || null,
+        epr_is_drinks_container: productType === 'packaging' ? eprIsDrinksContainer : null,
         // Climate
         impact_climate: parseNum(impactClimate),
         carbon_intensity: parseNum(impactClimate) ?? parseNum(carbonIntensity), // sync legacy field
@@ -282,6 +337,74 @@ export default function SupplierProductDetailPage() {
       setSaving(false);
     }
   };
+
+  // --- Material component management (packaging only) ---
+  const addComponent = async () => {
+    if (!supplier) return;
+    setSavingComponents(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error: insertError } = await supabase
+        .from('supplier_product_components')
+        .insert({
+          supplier_product_id: productId,
+          component_name: '',
+          epr_material_type: 'other',
+          weight_grams: 0,
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+      setComponents(prev => [...prev, data]);
+    } catch (err: any) {
+      console.error('Error adding component:', err);
+      setError(err.message || 'Failed to add component');
+    } finally {
+      setSavingComponents(false);
+    }
+  };
+
+  const updateComponent = async (id: string, field: string, value: any) => {
+    // Optimistic update
+    setComponents(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c));
+  };
+
+  const saveComponent = async (comp: SupplierProductComponent) => {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error: updateError } = await supabase
+        .from('supplier_product_components')
+        .update({
+          component_name: comp.component_name,
+          epr_material_type: comp.epr_material_type,
+          weight_grams: comp.weight_grams,
+          percentage: comp.percentage,
+          recycled_content_pct: comp.recycled_content_pct,
+          is_recyclable: comp.is_recyclable,
+        })
+        .eq('id', comp.id);
+      if (updateError) throw updateError;
+    } catch (err: any) {
+      console.error('Error saving component:', err);
+    }
+  };
+
+  const deleteComponent = async (id: string) => {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error: deleteError } = await supabase
+        .from('supplier_product_components')
+        .delete()
+        .eq('id', id);
+      if (deleteError) throw deleteError;
+      setComponents(prev => prev.filter(c => c.id !== id));
+    } catch (err: any) {
+      console.error('Error deleting component:', err);
+      setError(err.message || 'Failed to delete component');
+    }
+  };
+
+  const totalComponentWeight = components.reduce((sum, c) => sum + Number(c.weight_grams || 0), 0);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -397,6 +520,17 @@ export default function SupplierProductDetailPage() {
           </Button>
           <div className="h-6 w-px bg-border" />
           <h1 className="text-xl font-serif text-foreground">{name || 'Product Details'}</h1>
+          {productType === 'packaging' ? (
+            <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/20">
+              <Box className="h-3 w-3 mr-1" />
+              Packaging
+            </Badge>
+          ) : (
+            <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/20">
+              <Wheat className="h-3 w-3 mr-1" />
+              Ingredient
+            </Badge>
+          )}
         </div>
         <Button onClick={handleSave} disabled={saving}>
           {saving ? (
@@ -471,7 +605,7 @@ export default function SupplierProductDetailPage() {
                   <img
                     src={productImageUrl}
                     alt={name}
-                    className="w-32 h-32 object-cover rounded-lg border border-border"
+                    className="w-32 h-32 object-contain rounded-lg border border-border"
                   />
                   <button
                     onClick={() => {
@@ -542,39 +676,97 @@ export default function SupplierProductDetailPage() {
               <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description of this product..." rows={3} />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Unit <span className="text-destructive">*</span></Label>
-                <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g., kg" />
-              </div>
-              <div className="space-y-2">
-                <Label>Unit Measurement</Label>
-                <Input type="number" step="any" value={unitMeasurement} onChange={(e) => setUnitMeasurement(e.target.value)} placeholder="e.g., 25" />
-              </div>
-              <div className="space-y-2">
-                <Label>Measurement Type</Label>
-                <select value={unitMeasurementType} onChange={(e) => setUnitMeasurementType(e.target.value)} className={selectClass}>
-                  <option value="">Select...</option>
-                  <option value="weight">Weight</option>
-                  <option value="volume">Volume</option>
-                  <option value="length">Length</option>
-                  <option value="area">Area</option>
-                  <option value="count">Count</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g., Grain" />
-              </div>
-              <div className="space-y-2">
-                <Label>Origin Country Code</Label>
-                <Input value={originCountryCode} onChange={(e) => setOriginCountryCode(e.target.value)} placeholder="e.g., GB" maxLength={3} />
-                <p className="text-xs text-muted-foreground">ISO country code (e.g., GB, US, DE)</p>
-              </div>
-            </div>
+            {productType === 'ingredient' ? (
+              /* Ingredient: unit, measurement, category */
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Unit <span className="text-destructive">*</span></Label>
+                    <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g., kg" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Unit Measurement</Label>
+                    <Input type="number" step="any" value={unitMeasurement} onChange={(e) => setUnitMeasurement(e.target.value)} placeholder="e.g., 25" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Measurement Type</Label>
+                    <select value={unitMeasurementType} onChange={(e) => setUnitMeasurementType(e.target.value)} className={selectClass}>
+                      <option value="">Select...</option>
+                      <option value="weight">Weight</option>
+                      <option value="volume">Volume</option>
+                      <option value="length">Length</option>
+                      <option value="area">Area</option>
+                      <option value="count">Count</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g., Grain" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Origin Country Code</Label>
+                    <Input value={originCountryCode} onChange={(e) => setOriginCountryCode(e.target.value)} placeholder="e.g., GB" maxLength={3} />
+                    <p className="text-xs text-muted-foreground">ISO country code (e.g., GB, US, DE)</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* Packaging: weight, category, material */
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Packaging Category</Label>
+                    <Select
+                      value={packagingCategory}
+                      onValueChange={(val) => setPackagingCategory(val as PackagingCategoryType)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.entries(PACKAGING_CATEGORY_LABELS) as Array<[PackagingCategoryType, string]>).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Weight per Unit (g)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={weightG}
+                      onChange={(e) => setWeightG(e.target.value)}
+                      placeholder="e.g., 83"
+                    />
+                    <p className="text-xs text-muted-foreground">Weight of a single unit in grams</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Primary Material</Label>
+                    <Select value={primaryMaterial} onValueChange={setPrimaryMaterial}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select material..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PRIMARY_MATERIAL_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Origin Country Code</Label>
+                    <Input value={originCountryCode} onChange={(e) => setOriginCountryCode(e.target.value)} placeholder="e.g., GB" maxLength={3} />
+                    <p className="text-xs text-muted-foreground">ISO country code (e.g., GB, US, DE)</p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </TabsContent>
 
@@ -717,29 +909,195 @@ export default function SupplierProductDetailPage() {
             </div>
           </div>
 
-          {/* Nature */}
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-green-500/10">
-                <Leaf className="h-4 w-4 text-green-400" />
+          {/* Nature — ingredient products only */}
+          {productType === 'ingredient' && (
+            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-green-500/10">
+                  <Leaf className="h-4 w-4 text-green-400" />
+                </div>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Nature &amp; Biodiversity</h2>
               </div>
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Nature &amp; Biodiversity</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Land Use (m&sup2;a crop eq per {unit || 'unit'})</Label>
-                <Input
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={impactLand}
-                  onChange={(e) => setImpactLand(e.target.value)}
-                  placeholder="e.g., 2.5"
-                />
-                <p className="text-xs text-muted-foreground">Agricultural land use impact per unit</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Land Use (m&sup2;a crop eq per {unit || 'unit'})</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={impactLand}
+                    onChange={(e) => setImpactLand(e.target.value)}
+                    placeholder="e.g., 2.5"
+                  />
+                  <p className="text-xs text-muted-foreground">Agricultural land use impact per unit</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Material Composition — packaging only */}
+          {productType === 'packaging' && (
+            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-md bg-purple-500/10">
+                    <Box className="h-4 w-4 text-purple-400" />
+                  </div>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Material Composition</h2>
+                </div>
+                <Button variant="outline" size="sm" onClick={addComponent} disabled={savingComponents}>
+                  {savingComponents ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" />Add Component</>}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Break down the materials that make up this packaging unit. This data helps your customers with EPR reporting and circularity calculations.
+              </p>
+
+              {components.length > 0 ? (
+                <div className="space-y-3">
+                  {/* Header row */}
+                  <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+                    <div className="col-span-3">Component</div>
+                    <div className="col-span-3">Material Type</div>
+                    <div className="col-span-2">Weight (g)</div>
+                    <div className="col-span-2">Recycled %</div>
+                    <div className="col-span-2"></div>
+                  </div>
+                  {components.map((comp) => (
+                    <div key={comp.id} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-3">
+                        <Input
+                          value={comp.component_name}
+                          onChange={(e) => updateComponent(comp.id, 'component_name', e.target.value)}
+                          onBlur={() => saveComponent(comp)}
+                          placeholder="e.g., Outer shell"
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <select
+                          value={comp.epr_material_type}
+                          onChange={(e) => {
+                            updateComponent(comp.id, 'epr_material_type', e.target.value);
+                            saveComponent({ ...comp, epr_material_type: e.target.value });
+                          }}
+                          className={selectClass + ' text-sm'}
+                        >
+                          {EPR_COMPONENT_MATERIAL_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={comp.weight_grams}
+                          onChange={(e) => updateComponent(comp.id, 'weight_grams', parseFloat(e.target.value) || 0)}
+                          onBlur={() => saveComponent(comp)}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          max="100"
+                          value={comp.recycled_content_pct ?? ''}
+                          onChange={(e) => updateComponent(comp.id, 'recycled_content_pct', e.target.value ? parseFloat(e.target.value) : null)}
+                          onBlur={() => saveComponent(comp)}
+                          placeholder="%"
+                          className="text-sm"
+                        />
+                      </div>
+                      <div className="col-span-2 flex justify-end">
+                        <Button variant="ghost" size="sm" onClick={() => deleteComponent(comp.id)} className="text-destructive hover:text-destructive">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Total weight summary */}
+                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                    <span className="text-sm text-muted-foreground">
+                      Total component weight: <strong className="text-foreground">{totalComponentWeight.toFixed(1)}g</strong>
+                    </span>
+                    {weightG && Math.abs(totalComponentWeight - parseFloat(weightG)) > 0.5 && (
+                      <span className="flex items-center gap-1 text-xs text-amber-400">
+                        <AlertTriangle className="h-3 w-3" />
+                        Differs from unit weight ({weightG}g)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-sm text-muted-foreground border border-dashed border-border rounded-lg">
+                  No components added yet. Click &ldquo;Add Component&rdquo; to break down the materials in this packaging.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* EPR Data — packaging only */}
+          {productType === 'packaging' && (
+            <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-md bg-blue-500/10">
+                  <FileText className="h-4 w-4 text-blue-400" />
+                </div>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">EPR Data</h2>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20 flex items-start gap-2">
+                <Info className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-300">
+                  Extended Producer Responsibility (EPR) data helps your customers comply with UK packaging regulations and the Report Packaging Data (RPD) requirements.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>EPR Material Code</Label>
+                  <Select
+                    value={eprMaterialCode}
+                    onValueChange={(val) => setEprMaterialCode(val as EPRMaterialCode)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select RPD material..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(EPR_MATERIAL_CODE_LABELS) as Array<[EPRMaterialCode, string]>).map(([code, label]) => (
+                        <SelectItem key={code} value={code}>{code} — {label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">UK RPD material classification code</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Is Drinks Container?</Label>
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setEprIsDrinksContainer(!eprIsDrinksContainer)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        eprIsDrinksContainer ? 'bg-[#ccff00]' : 'bg-muted'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          eprIsDrinksContainer ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    <span className="text-sm text-muted-foreground">
+                      {eprIsDrinksContainer ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Whether this is classified as a drinks container for EPR</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={saving}>

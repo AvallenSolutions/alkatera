@@ -274,20 +274,40 @@ describe('calculateImpactValuation', () => {
   // ============================================================================
 
   describe('Aggregates', () => {
-    it('computes grand_total as sum of all 4 capital totals', () => {
+    it('computes grand_total as net impact (benefits minus costs)', () => {
       const result = calculateImpactValuation(buildInputs());
 
       const naturalTotal = (100 * 86) + (5000 * 0.05) + (10 * 1200) + (25 * 120);
       const humanTotal = (8000 * 1.5) + (200 * 25) + (72 * 500);
       const socialTotal = (150 * 18) + (10000 * 1.2) + (50000 * 0.64);
       const governanceTotal = 80 * 300;
+      const livingWageGap = 8000 * 1.5;
 
-      const expectedGrandTotal = naturalTotal + humanTotal + socialTotal + governanceTotal;
+      const expectedNegative = naturalTotal + livingWageGap;
+      const expectedPositive = (humanTotal - livingWageGap) + socialTotal + governanceTotal;
+      const expectedNet = expectedPositive - expectedNegative;
 
-      expect(result.grand_total).toBe(expectedGrandTotal);
-      expect(result.grand_total).toBe(
-        result.natural.total + result.human.total + result.social.total + result.governance.total
-      );
+      expect(result.negative_total).toBe(expectedNegative);
+      expect(result.positive_total).toBe(expectedPositive);
+      expect(result.net_impact).toBe(expectedNet);
+      expect(result.grand_total).toBe(expectedNet);
+    });
+
+    it('marks natural capital items and living_wage_gap as costs', () => {
+      const result = calculateImpactValuation(buildInputs());
+
+      for (const item of result.natural.items) {
+        expect(item.is_cost).toBe(true);
+      }
+      const lwg = result.human.items.find((i) => i.key === 'living_wage_gap_gbp');
+      expect(lwg?.is_cost).toBe(true);
+      expect(lwg?.label).toBe('Living Wage Gap');
+
+      // Training and wellbeing are benefits, not costs
+      const training = result.human.items.find((i) => i.key === 'training_hour');
+      expect(training?.is_cost).toBeUndefined();
+      const wellbeing = result.human.items.find((i) => i.key === 'wellbeing_score_point');
+      expect(wellbeing?.is_cost).toBeUndefined();
     });
 
     it('computes data_coverage as fraction of non-null inputs out of 11', () => {
@@ -376,6 +396,9 @@ describe('calculateImpactValuation', () => {
       expect(result.social.total).toBe(0);
       expect(result.governance.total).toBe(0);
       expect(result.grand_total).toBe(0);
+      expect(result.positive_total).toBe(0);
+      expect(result.negative_total).toBe(0);
+      expect(result.net_impact).toBe(0);
 
       expect(result.data_coverage).toBe(0);
       expect(result.confidence_level).toBe('low');

@@ -409,7 +409,7 @@ export default function SupplierDetailPage() {
                             src={product.product_image_url}
                             alt={product.name}
                             fill
-                            className="object-cover"
+                            className="object-contain"
                           />
                         ) : (
                           <div className="h-full w-full flex items-center justify-center">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -15,19 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import {
   Leaf,
@@ -37,13 +24,12 @@ import {
   RefreshCw,
   AlertCircle,
   TrendingUp,
+  TrendingDown,
   FileText,
   ShoppingBag,
   Copy,
   Check,
   BookOpen,
-  Download,
-  ChevronDown,
   CheckCircle2,
   CircleAlert,
   Zap,
@@ -51,11 +37,15 @@ import {
 import { useImpactValuation } from '@/hooks/data/useImpactValuation';
 import { useImpactValuationNarratives } from '@/hooks/data/useImpactValuationNarratives';
 import { useImpactValuationMethodology } from '@/hooks/data/useImpactValuationMethodology';
+import { useImpactValuationTrends } from '@/hooks/data/useImpactValuationTrends';
 import { useCompanyFootprint } from '@/hooks/data/useCompanyFootprint';
 import { usePeopleCultureScore } from '@/hooks/data/usePeopleCultureScore';
 import { useCommunityImpactScore } from '@/hooks/data/useCommunityImpactScore';
 import { useOrganization } from '@/lib/organizationContext';
+import { usePersistedYear } from '@/hooks/usePersistedYear';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { ImpactValuationMethodology } from '@/components/reports/ImpactValuationMethodology';
+import { ImpactValuationTrends } from '@/components/reports/ImpactValuationTrends';
 import type { CapitalBreakdown } from '@/lib/calculations/impact-valuation';
 
 // ─── Number formatting ──────────────────────────────────────────────────────
@@ -141,6 +131,10 @@ function CapitalCard({
   const config = capitalConfig[capitalKey];
   const { Icon } = config;
 
+  // Determine overall card type badge
+  const isCostCapital = capitalKey === 'natural';
+  const isMixedCapital = capitalKey === 'human';
+
   return (
     <Card className={config.borderClass}>
       <CardHeader className={`${config.headerBg} rounded-t-lg`}>
@@ -154,6 +148,16 @@ function CapitalCard({
               <p className="text-2xl font-bold mt-0.5">{formatGBP(breakdown.total)}</p>
             </div>
           </CardTitle>
+          {isCostCapital && (
+            <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800 text-xs">
+              Cost
+            </Badge>
+          )}
+          {!isCostCapital && !isMixedCapital && (
+            <Badge variant="outline" className="text-emerald-600 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800 text-xs">
+              Benefit
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="pt-4">
@@ -161,9 +165,17 @@ function CapitalCard({
           {breakdown.items.map((item) => (
             <div key={item.key} className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-medium ${item.has_data ? '' : 'text-muted-foreground'}`}>
-                  {item.label}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className={`text-sm font-medium ${item.has_data ? '' : 'text-muted-foreground'}`}>
+                    {item.label}
+                  </p>
+                  {isMixedCapital && item.is_cost && (
+                    <span className="text-[10px] text-red-500 dark:text-red-400 font-medium">Cost</span>
+                  )}
+                  {isMixedCapital && !item.is_cost && (
+                    <span className="text-[10px] text-emerald-500 dark:text-emerald-400 font-medium">Benefit</span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   {item.has_data
                     ? `${item.raw_input?.toLocaleString('en-GB') ?? '—'} ${item.unit}`
@@ -291,45 +303,6 @@ function SkeletonCard() {
   );
 }
 
-// ─── Methodology download helper ────────────────────────────────────────────
-
-function generateMethodologyStatement(
-  orgName: string,
-  year: number,
-  version: string,
-  calculatedAt: string,
-  items: Array<{ capital: string; label: string; proxy_value: number; unit: string; source: string }>
-): string {
-  const capitalGroupLabels: Record<string, string> = {
-    natural: 'NATURAL CAPITAL',
-    human: 'HUMAN CAPITAL',
-    social: 'SOCIAL CAPITAL',
-    governance: 'GOVERNANCE CAPITAL',
-  };
-  const capitalOrder = ['natural', 'human', 'social', 'governance'];
-
-  let text = `alkatera Impact Valuation Methodology Statement\n`;
-  text += `Organisation: ${orgName}\n`;
-  text += `Reporting Year: ${year}\n`;
-  text += `Proxy Version: ${version}\n`;
-  text += `Calculated: ${new Date(calculatedAt).toLocaleDateString('en-GB')}\n\n`;
-
-  for (const capital of capitalOrder) {
-    const capitalItems = items.filter((i) => i.capital === capital);
-    if (capitalItems.length === 0) continue;
-    text += `${capitalGroupLabels[capital]}\n`;
-    for (const item of capitalItems) {
-      text += `- ${item.label}: £${Number(item.proxy_value).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} ${item.unit} — ${item.source}\n`;
-    }
-    text += '\n';
-  }
-
-  text += `This methodology statement was generated by alkatera. All proxy values\n`;
-  text += `are independently sourced and versioned. Calculations are deterministic.\n`;
-
-  return text;
-}
-
 // ─── Data readiness checklist item ──────────────────────────────────────────
 
 function ChecklistItem({
@@ -359,12 +332,17 @@ export default function ImpactValuationPage() {
   const searchParams = useSearchParams();
   const { currentOrganization } = useOrganization();
 
-  // Year selector state
+  // Year selector state — URL param takes priority, then persisted localStorage value
   const currentYear = new Date().getFullYear();
   const yearParam = searchParams.get('year');
-  const [selectedYear, setSelectedYear] = useState<number>(
-    yearParam ? parseInt(yearParam, 10) : currentYear
+  const { selectedYear: persistedYear, setSelectedYear: setPersistedYear } = usePersistedYear();
+  const [selectedYear, setSelectedYearState] = useState<number>(
+    yearParam ? parseInt(yearParam, 10) : persistedYear
   );
+  const setSelectedYear = (year: number) => {
+    setSelectedYearState(year);
+    setPersistedYear(year);
+  };
   const [availableYears, setAvailableYears] = useState<number[]>([currentYear]);
 
   // Fetch available years on mount
@@ -410,44 +388,13 @@ export default function ImpactValuationPage() {
     isLoading: methodologyLoading,
   } = useImpactValuationMethodology(selectedYear);
 
+  // Trends data
+  const { trends } = useImpactValuationTrends();
+
   // Empty state data hooks
   const { footprint, loading: footprintLoading } = useCompanyFootprint(selectedYear);
   const { score: peopleCultureScore, loading: pcLoading } = usePeopleCultureScore();
   const { score: communityImpactScore, loading: ciLoading } = useCommunityImpactScore();
-
-  const [methodologyOpen, setMethodologyOpen] = useState(false);
-
-  // Methodology capital grouping
-  const capitalGroupLabels: Record<string, string> = {
-    natural: 'Natural Capital',
-    human: 'Human Capital',
-    social: 'Social Capital',
-    governance: 'Governance Capital',
-  };
-  const capitalOrder = ['natural', 'human', 'social', 'governance'];
-
-  const handleDownloadMethodology = useCallback(() => {
-    if (!proxyVersion || !calculatedAt || methodologyItems.length === 0) return;
-
-    const orgName = currentOrganization?.name || 'Organisation';
-    const text = generateMethodologyStatement(
-      orgName,
-      selectedYear,
-      proxyVersion,
-      calculatedAt,
-      methodologyItems
-    );
-
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `alkatera-impact-valuation-methodology-${selectedYear}-v${proxyVersion}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [proxyVersion, calculatedAt, methodologyItems, currentOrganization?.name, selectedYear]);
 
   const handleYearChange = (value: string) => {
     const year = parseInt(value, 10);
@@ -549,17 +496,36 @@ export default function ImpactValuationPage() {
         {result && (
           <>
             {/* Summary card */}
-            <Card className="border-2 border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+            <Card className={`border-2 ${
+              result.net_impact >= 0
+                ? 'border-emerald-200 dark:border-emerald-800 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30'
+                : 'border-amber-200 dark:border-amber-800 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30'
+            }`}>
               <CardContent className="py-6">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-4">
-                    <div className="h-14 w-14 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-                      <TrendingUp className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+                    <div className={`h-14 w-14 rounded-xl flex items-center justify-center ${
+                      result.net_impact >= 0
+                        ? 'bg-emerald-100 dark:bg-emerald-900/50'
+                        : 'bg-amber-100 dark:bg-amber-900/50'
+                    }`}>
+                      {result.net_impact >= 0 ? (
+                        <TrendingUp className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <TrendingDown className="h-7 w-7 text-amber-600 dark:text-amber-400" />
+                      )}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Impact Value</p>
-                      <p className="text-4xl font-bold text-emerald-900 dark:text-emerald-100">
+                      <p className="text-sm font-medium text-muted-foreground">Net Impact Value</p>
+                      <p className={`text-4xl font-bold ${
+                        result.net_impact >= 0
+                          ? 'text-emerald-900 dark:text-emerald-100'
+                          : 'text-amber-900 dark:text-amber-100'
+                      }`}>
                         {formatGBP(result.grand_total)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Benefits: {formatGBP(result.positive_total)} · Costs: {formatGBP(result.negative_total)}
                       </p>
                     </div>
                   </div>
@@ -583,6 +549,9 @@ export default function ImpactValuationPage() {
               <CapitalCard capitalKey="social" breakdown={result.social} />
               <CapitalCard capitalKey="governance" breakdown={result.governance} />
             </div>
+
+            {/* ── Impact Trends ────────────────────────────────────────────── */}
+            {trends.length > 0 && <ImpactValuationTrends trends={trends} />}
 
             {/* ── Narratives section ──────────────────────────────────────── */}
             <div className="space-y-4">
@@ -629,126 +598,14 @@ export default function ImpactValuationPage() {
             </div>
 
             {/* ── Methodology & Proxy Values ──────────────────────────────── */}
-            <Collapsible open={methodologyOpen} onOpenChange={setMethodologyOpen}>
-              <Card>
-                <CollapsibleTrigger asChild>
-                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <BookOpen className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <CardTitle className="text-base">Methodology &amp; Proxy Values</CardTitle>
-                          {proxyVersion && calculatedAt && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Proxy version {proxyVersion} · Calculated{' '}
-                              {new Date(calculatedAt).toLocaleDateString('en-GB')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${
-                          methodologyOpen ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </div>
-                  </CardHeader>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <CardContent className="pt-0 space-y-6">
-                    {/* Explanatory paragraph */}
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Impact values are calculated by multiplying each metric by an independently
-                      sourced proxy value (shadow price). Proxy values are drawn from Defra, HM
-                      Treasury Green Book, the Social Value Bank, and other peer-reviewed sources.
-                      All calculations are deterministic — no AI is used in the number generation.
-                    </p>
-
-                    {/* Methodology table */}
-                    {methodologyLoading ? (
-                      <div className="space-y-2">
-                        <Skeleton className="h-8 w-full" />
-                        <Skeleton className="h-8 w-full" />
-                        <Skeleton className="h-8 w-full" />
-                      </div>
-                    ) : methodologyItems.length > 0 ? (
-                      <div className="space-y-6">
-                        {capitalOrder.map((capital) => {
-                          const items = methodologyItems.filter((i) => i.capital === capital);
-                          if (items.length === 0) return null;
-                          return (
-                            <div key={capital}>
-                              <h4 className="text-sm font-semibold mb-2">
-                                {capitalGroupLabels[capital]}
-                              </h4>
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>Metric</TableHead>
-                                    <TableHead className="text-right">Proxy Value</TableHead>
-                                    <TableHead>Unit</TableHead>
-                                    <TableHead>Source</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {items.map((item) => (
-                                    <TableRow key={item.metric_key}>
-                                      <TableCell className="font-medium">
-                                        {item.label}
-                                      </TableCell>
-                                      <TableCell className="text-right tabular-nums">
-                                        £{Number(item.proxy_value).toLocaleString('en-GB', {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 4,
-                                        })}
-                                      </TableCell>
-                                      <TableCell className="text-muted-foreground">
-                                        {item.unit}
-                                      </TableCell>
-                                      <TableCell className="text-muted-foreground">
-                                        {item.source}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">
-                        No methodology data available for this calculation.
-                      </p>
-                    )}
-
-                    {/* Footer note */}
-                    {proxyVersion && (
-                      <p className="text-xs text-muted-foreground border-t pt-4">
-                        Proxy values are versioned. The values shown reflect version {proxyVersion},
-                        effective from{' '}
-                        {methodologyItems[0]
-                          ? new Date(calculatedAt || '').toLocaleDateString('en-GB')
-                          : '—'}
-                        .
-                      </p>
-                    )}
-
-                    {/* Download button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleDownloadMethodology}
-                      disabled={!proxyVersion || methodologyItems.length === 0}
-                      className="gap-2"
-                    >
-                      <Download className="h-4 w-4" />
-                      Download Methodology Statement
-                    </Button>
-                  </CardContent>
-                </CollapsibleContent>
-              </Card>
-            </Collapsible>
+            <ImpactValuationMethodology
+              methodologyItems={methodologyItems}
+              proxyVersion={proxyVersion}
+              calculatedAt={calculatedAt}
+              methodologyLoading={methodologyLoading}
+              orgName={currentOrganization?.name || 'Organisation'}
+              selectedYear={selectedYear}
+            />
           </>
         )}
 

@@ -79,7 +79,7 @@ function renderCoverPage(data: LCAReportData): string {
 
   const productImageHtml = data.meta.productImageUrl
     ? `<div style="position: absolute; top: 80px; right: 48px; z-index: 10; width: 220px; height: 280px; border-radius: 16px; overflow: hidden; border: 2px solid rgba(204,255,0,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
-        <img src="${escapeHtml(data.meta.productImageUrl)}" style="width: 100%; height: 100%; object-fit: cover;" alt="${escapeHtml(data.meta.productName)}" />
+        <img src="${escapeHtml(data.meta.productImageUrl)}" style="width: 100%; height: 100%; object-fit: contain;" alt="${escapeHtml(data.meta.productName)}" />
       </div>`
     : '';
 

@@ -388,10 +388,18 @@ export function PackagingFormCard({
     switch (packaging.data_source) {
       case 'supplier':
         return (
-          <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
-            <Building2 className="h-3 w-3 mr-1" />
-            Primary Data Selected
-          </Badge>
+          <div className="space-y-1">
+            <Badge className="bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">
+              <Building2 className="h-3 w-3 mr-1" />
+              Primary Data Selected
+            </Badge>
+            {packaging.supplier_name && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Building2 className="h-3 w-3" />
+                <span>From: <span className="font-medium text-foreground">{packaging.supplier_name}</span></span>
+              </div>
+            )}
+          </div>
         );
       case 'openlca':
         return (
@@ -424,26 +432,39 @@ export function PackagingFormCard({
     location?: string;
     recycled_content_pct?: number;
     packaging_components?: any;
+    // Packaging supplier product data
+    supplier_weight_g?: number | null;
+    supplier_packaging_category?: string | null;
+    supplier_primary_material?: string | null;
+    supplier_epr_material_code?: string | null;
+    supplier_epr_is_drinks_container?: boolean | null;
   }) => {
     // Preserve user's real material name, store DB match name separately
     const userOriginalName = selection.user_query || selection.name;
 
-    // Auto-detect packaging category from the DATABASE match name (not user name)
-    const nameLower = selection.name.toLowerCase();
-    let detectedCategory: PackagingCategory = 'container';
+    // Use supplier packaging_category if available, otherwise auto-detect from name
+    let detectedCategory: PackagingCategory = packaging.packaging_category || 'container';
 
-    if (nameLower.includes('label') || nameLower.includes('sticker') || nameLower.includes('tamper')) {
-      detectedCategory = 'label';
-    } else if (nameLower.includes('cap') || nameLower.includes('lid') || nameLower.includes('closure') || nameLower.includes('cork') || nameLower.includes('seal')) {
-      detectedCategory = 'closure';
-    } else if (nameLower.includes('pallet') || nameLower.includes('stretch wrap') || nameLower.includes('edge protector') || nameLower.includes('strapping')) {
-      detectedCategory = 'tertiary';
-    } else if (nameLower.includes('trade case') || nameLower.includes('shipping') || nameLower.includes('transit')) {
-      detectedCategory = 'shipment';
-    } else if (nameLower.includes('box') || nameLower.includes('carton') || nameLower.includes('cardboard') || nameLower.includes('case') || nameLower.includes('crate') || nameLower.includes('gift')) {
-      detectedCategory = 'secondary';
-    } else if (nameLower.includes('bottle') || nameLower.includes('jar') || nameLower.includes('can') || nameLower.includes('container') || nameLower.includes('pouch')) {
-      detectedCategory = 'container';
+    if (selection.supplier_packaging_category) {
+      // Trust supplier-provided packaging category
+      detectedCategory = selection.supplier_packaging_category as PackagingCategory;
+    } else {
+      // Auto-detect packaging category from the DATABASE match name (not user name)
+      const nameLower = selection.name.toLowerCase();
+
+      if (nameLower.includes('label') || nameLower.includes('sticker') || nameLower.includes('tamper')) {
+        detectedCategory = 'label';
+      } else if (nameLower.includes('cap') || nameLower.includes('lid') || nameLower.includes('closure') || nameLower.includes('cork') || nameLower.includes('seal')) {
+        detectedCategory = 'closure';
+      } else if (nameLower.includes('pallet') || nameLower.includes('stretch wrap') || nameLower.includes('edge protector') || nameLower.includes('strapping')) {
+        detectedCategory = 'tertiary';
+      } else if (nameLower.includes('trade case') || nameLower.includes('shipping') || nameLower.includes('transit')) {
+        detectedCategory = 'shipment';
+      } else if (nameLower.includes('box') || nameLower.includes('carton') || nameLower.includes('cardboard') || nameLower.includes('case') || nameLower.includes('crate') || nameLower.includes('gift')) {
+        detectedCategory = 'secondary';
+      } else if (nameLower.includes('bottle') || nameLower.includes('jar') || nameLower.includes('can') || nameLower.includes('container') || nameLower.includes('pouch')) {
+        detectedCategory = 'container';
+      }
     }
 
     const updates: Partial<PackagingFormData> = {
@@ -473,6 +494,24 @@ export function PackagingFormCard({
     if (selection.packaging_components && Array.isArray(selection.packaging_components) && selection.packaging_components.length > 0) {
       updates.components = selection.packaging_components;
       updates.has_component_breakdown = true;
+    }
+
+    // Auto-populate packaging-specific supplier data
+    if (selection.supplier_weight_g !== undefined && selection.supplier_weight_g !== null && selection.supplier_weight_g > 0) {
+      updates.net_weight_g = selection.supplier_weight_g;
+      // Convert weight to the packaging unit for the amount field
+      if (!packaging.amount || packaging.amount === '' || Number(packaging.amount) === 0) {
+        if (packaging.unit === 'kg') {
+          updates.amount = (selection.supplier_weight_g / 1000).toString();
+        } else {
+          updates.amount = selection.supplier_weight_g.toString();
+        }
+      }
+    }
+
+    // Auto-populate EPR drinks container flag from supplier
+    if (selection.supplier_epr_is_drinks_container !== undefined && selection.supplier_epr_is_drinks_container !== null) {
+      updates.epr_is_drinks_container = selection.supplier_epr_is_drinks_container;
     }
 
     onUpdate(packaging.tempId, updates);

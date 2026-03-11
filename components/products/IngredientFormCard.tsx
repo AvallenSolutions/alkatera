@@ -128,12 +128,20 @@ export function IngredientFormCard({
     switch (ingredient.data_source) {
       case 'supplier':
         return (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-              <Award className="h-3 w-3 mr-1.5" />
-              Supplier Verified (High Quality)
-            </Badge>
-            <span className="text-xs text-muted-foreground">95% confidence</span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                <Award className="h-3 w-3 mr-1.5" />
+                Supplier Verified (High Quality)
+              </Badge>
+              <span className="text-xs text-muted-foreground">95% confidence</span>
+            </div>
+            {ingredient.supplier_name && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Building2 className="h-3 w-3" />
+                <span>From: <span className="font-medium text-foreground">{ingredient.supplier_name}</span></span>
+              </div>
+            )}
           </div>
         );
       case 'staging':

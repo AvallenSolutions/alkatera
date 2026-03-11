@@ -24,6 +24,7 @@ import { SetupProgressBanner } from '@/components/dashboard/SetupProgressBanner'
 import { useSetupProgress } from '@/hooks/data/useSetupProgress';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { InlineErrorBoundary } from '@/components/ErrorBoundary';
+import { usePersistedYear } from '@/hooks/usePersistedYear';
 
 import {
   RecentActivityWidget,
@@ -109,7 +110,7 @@ function getStatusFromValue(value: number | null, thresholds: { good: number; wa
   return 'critical';
 }
 
-const AVAILABLE_YEARS = [2026, 2025, 2024, 2023];
+const AVAILABLE_YEARS = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i);
 
 // ── LCA status badge colours ────────────────────────────────────────
 const LCA_BADGE: Record<string, { label: string; className: string }> = {
@@ -120,7 +121,7 @@ const LCA_BADGE: Record<string, { label: string; className: string }> = {
 
 export default function DashboardPage() {
   const { currentOrganization } = useOrganization();
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const { selectedYear, setSelectedYear } = usePersistedYear(AVAILABLE_YEARS);
   const { footprint, loading: footprintLoading } = useCompanyFootprint(selectedYear);
   const { footprint: previousYearFootprint } = useCompanyFootprint(selectedYear - 1);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);

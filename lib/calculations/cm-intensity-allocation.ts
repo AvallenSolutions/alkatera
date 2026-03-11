@@ -21,6 +21,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getProductRunData, calculateRunEmissions } from './production-run-allocation';
 
 // ============================================================================
 // TYPES
@@ -73,7 +74,7 @@ export interface AllocatedEmissions {
   waste_kg: number;
 
   // Metadata
-  allocation_method: 'auto_matched' | 'intensity_based' | 'annual_average' | 'proportional';
+  allocation_method: 'direct_run_data' | 'auto_matched' | 'intensity_based' | 'annual_average' | 'proportional';
   intensity_factor_id: string | null;
   period_matched: boolean;
   data_quality_warning: string | null;
@@ -252,7 +253,32 @@ export async function allocateBatchEmissions(
     data_quality_warning: null,
   };
 
-  // Try to find period-specific intensity factor
+  // ── Priority 1: Check for direct production run resource data ──
+  // This is the highest quality data — actual measurements per run.
+  // No allocation needed because the data is already product-specific.
+  const directRunData = await getProductRunData(
+    supabase,
+    batch.product_id,
+    batch.facility_id,
+    batch.date,
+    batch.date
+  );
+
+  if (directRunData.length > 0) {
+    // Use the first matching run entry (exact date match)
+    const run = directRunData[0];
+    const emissions = calculateRunEmissions(run);
+
+    result.allocation_method = 'direct_run_data';
+    result.period_matched = true;
+    result.scope2_co2e_kg = emissions.electricity_co2e_kg;
+    result.total_co2e_kg = emissions.electricity_co2e_kg;
+    result.water_litres = emissions.water_intake_m3 * 1000; // m³ → litres
+    // Note: waste not tracked in direct run data (only water/wastewater)
+    return result;
+  }
+
+  // ── Priority 2: Try period-specific CM intensity factor ──
   const intensityFactor = await findIntensityFactorForDate(
     supabase,
     batch.facility_id,

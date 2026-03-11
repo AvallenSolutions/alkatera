@@ -68,6 +68,7 @@ export interface CapitalBreakdownItem {
   proxy_used: number;
   unit: string;
   has_data: boolean;
+  is_cost?: boolean; // true = negative externality (cost to society)
 }
 
 export interface CapitalBreakdown {
@@ -81,7 +82,10 @@ export interface ImpactValuationResult {
   social: CapitalBreakdown;
   governance: CapitalBreakdown;
   grand_total: number;
-  data_coverage: number; // 0–1, fraction of metrics with real data
+  positive_total: number;  // sum of benefit values (human benefits + social + governance)
+  negative_total: number;  // sum of cost values (natural capital + living wage gap)
+  net_impact: number;      // positive_total - negative_total
+  data_coverage: number;   // 0–1, fraction of metrics with real data
   confidence_level: 'high' | 'medium' | 'low';
   reporting_year: number;
 }
@@ -93,11 +97,12 @@ function calcItem(
   label: string,
   rawInput: number | null,
   proxy: number,
-  unit: string
+  unit: string,
+  isCost?: boolean
 ): CapitalBreakdownItem {
   const hasData = rawInput !== null;
   const value = (rawInput ?? 0) * proxy;
-  return { key, label, value, raw_input: rawInput, proxy_used: proxy, unit, has_data: hasData };
+  return { key, label, value, raw_input: rawInput, proxy_used: proxy, unit, has_data: hasData, ...(isCost ? { is_cost: true } : {}) };
 }
 
 function sumItems(items: CapitalBreakdownItem[]): number {
@@ -111,18 +116,18 @@ export function calculateImpactValuation(
 ): ImpactValuationResult {
   const { natural: n, human: h, social: s, governance: g, proxies: p } = inputs;
 
-  // ── Natural Capital ──────────────────────────────────────────────────────
+  // ── Natural Capital (all costs) ─────────────────────────────────────────
   const naturalItems: CapitalBreakdownItem[] = [
-    calcItem('carbon_tonne', 'Carbon (GHG)', n.total_emissions_tco2e, p.carbon_tonne, 'per tCO2e'),
-    calcItem('water_m3', 'Water Use', n.water_consumption_m3, p.water_m3, 'per m³ world-eq'),
-    calcItem('land_ha', 'Land Use', n.land_use_ha, p.land_ha, 'per ha/yr'),
-    calcItem('waste_tonne', 'Waste to Landfill', n.waste_to_landfill_tonnes, p.waste_tonne, 'per tonne'),
+    calcItem('carbon_tonne', 'Carbon (GHG)', n.total_emissions_tco2e, p.carbon_tonne, 'per tCO2e', true),
+    calcItem('water_m3', 'Water Use', n.water_consumption_m3, p.water_m3, 'per m³ world-eq', true),
+    calcItem('land_ha', 'Land Use', n.land_use_ha, p.land_ha, 'per ha/yr', true),
+    calcItem('waste_tonne', 'Waste to Landfill', n.waste_to_landfill_tonnes, p.waste_tonne, 'per tonne', true),
   ];
   const naturalTotal = sumItems(naturalItems);
 
-  // ── Human Capital ────────────────────────────────────────────────────────
+  // ── Human Capital (living wage gap is a cost; training & wellbeing are benefits) ──
   const humanItems: CapitalBreakdownItem[] = [
-    calcItem('living_wage_gap_gbp', 'Living Wage Uplift', h.living_wage_gap_annual_gbp, p.living_wage_gap_gbp, 'per £1 gap/yr'),
+    calcItem('living_wage_gap_gbp', 'Living Wage Gap', h.living_wage_gap_annual_gbp, p.living_wage_gap_gbp, 'per £1 gap/yr', true),
     calcItem('training_hour', 'Employee Training', h.total_training_hours, p.training_hour, 'per hour'),
     calcItem('wellbeing_score_point', 'Employee Wellbeing', h.wellbeing_score, p.wellbeing_score_point, 'per 1pt score improvement'),
   ];
@@ -170,14 +175,21 @@ export function calculateImpactValuation(
     confidenceLevel = 'low';
   }
 
-  const grandTotal = naturalTotal + humanTotal + socialTotal + governanceTotal;
+  // ── Net impact (benefits minus costs) ────────────────────────────────────
+  const livingWageGapValue = humanItems.find((i) => i.key === 'living_wage_gap_gbp')?.value ?? 0;
+  const negativeTotal = naturalTotal + livingWageGapValue;
+  const positiveTotal = (humanTotal - livingWageGapValue) + socialTotal + governanceTotal;
+  const netImpact = positiveTotal - negativeTotal;
 
   return {
     natural: { total: naturalTotal, items: naturalItems },
     human: { total: humanTotal, items: humanItems },
     social: { total: socialTotal, items: socialItems },
     governance: { total: governanceTotal, items: governanceItems },
-    grand_total: grandTotal,
+    grand_total: netImpact,
+    positive_total: positiveTotal,
+    negative_total: negativeTotal,
+    net_impact: netImpact,
     data_coverage: dataCoverage,
     confidence_level: confidenceLevel,
     reporting_year: inputs.reporting_year,

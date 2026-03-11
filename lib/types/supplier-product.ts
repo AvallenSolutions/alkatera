@@ -139,6 +139,76 @@ export interface UncertaintyMetadata {
 // SUPPLIER PRODUCT INTERFACE (FULL)
 // ============================================================================
 
+export type SupplierProductType = 'ingredient' | 'packaging';
+
+export type PackagingCategoryType = 'container' | 'label' | 'closure' | 'secondary' | 'shipment' | 'tertiary';
+
+export type EPRMaterialCode = 'AL' | 'FC' | 'GL' | 'PC' | 'PL' | 'ST' | 'WD' | 'OT';
+
+export const EPR_MATERIAL_CODE_LABELS: Record<EPRMaterialCode, string> = {
+  AL: 'Aluminium',
+  FC: 'Fibre Composite',
+  GL: 'Glass',
+  PC: 'Paper/Card',
+  PL: 'Plastic',
+  ST: 'Steel',
+  WD: 'Wood',
+  OT: 'Other',
+};
+
+export const PACKAGING_CATEGORY_LABELS: Record<PackagingCategoryType, string> = {
+  container: 'Container (bottle, can, pack)',
+  label: 'Label',
+  closure: 'Closure (cap, cork, seal)',
+  secondary: 'Secondary (gift pack, outer box)',
+  shipment: 'Shipment (delivery box)',
+  tertiary: 'Tertiary (pallet wrap)',
+};
+
+export const PRIMARY_MATERIAL_OPTIONS = [
+  { value: 'glass', label: 'Glass' },
+  { value: 'aluminium', label: 'Aluminium' },
+  { value: 'steel', label: 'Steel' },
+  { value: 'plastic_pet', label: 'Plastic (PET)' },
+  { value: 'plastic_hdpe', label: 'Plastic (HDPE)' },
+  { value: 'plastic_other', label: 'Plastic (Other)' },
+  { value: 'paper_cardboard', label: 'Paper/Cardboard' },
+  { value: 'recycled_paperboard', label: 'Recycled Paperboard' },
+  { value: 'fibre_composite', label: 'Fibre Composite' },
+  { value: 'wood', label: 'Wood' },
+  { value: 'cork', label: 'Cork' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export const EPR_COMPONENT_MATERIAL_OPTIONS = [
+  { value: 'aluminium', label: 'Aluminium' },
+  { value: 'fibre_composite', label: 'Fibre Composite' },
+  { value: 'glass', label: 'Glass' },
+  { value: 'paper_cardboard', label: 'Paper/Cardboard' },
+  { value: 'plastic_rigid', label: 'Plastic (Rigid)' },
+  { value: 'plastic_flexible', label: 'Plastic (Flexible)' },
+  { value: 'steel', label: 'Steel' },
+  { value: 'wood', label: 'Wood' },
+  { value: 'adhesive', label: 'Adhesive' },
+  { value: 'ink', label: 'Ink' },
+  { value: 'coating', label: 'Coating' },
+  { value: 'lacquer', label: 'Lacquer' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export interface SupplierProductComponent {
+  id: string;
+  supplier_product_id: string;
+  component_name: string;
+  epr_material_type: string;
+  weight_grams: number;
+  percentage: number | null;
+  recycled_content_pct: number | null;
+  is_recyclable: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SupplierProduct {
   id: string;
   supplier_id: string;
@@ -155,6 +225,16 @@ export interface SupplierProduct {
   metadata: Record<string, any> | null;
   created_at: string;
   updated_at: string;
+
+  // Product type
+  product_type: SupplierProductType;
+
+  // Packaging-specific fields
+  weight_g: number | null;
+  packaging_category: PackagingCategoryType | null;
+  primary_material: string | null;
+  epr_material_code: EPRMaterialCode | null;
+  epr_is_drinks_container: boolean | null;
 
   // Origin location
   origin_address: string | null;

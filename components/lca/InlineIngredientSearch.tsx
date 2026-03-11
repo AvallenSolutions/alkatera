@@ -41,6 +41,13 @@ interface SearchResult {
   supplier_name?: string;
   recycled_content_pct?: number;
   packaging_components?: any;
+  // Packaging supplier product data
+  supplier_product_type?: 'ingredient' | 'packaging';
+  supplier_weight_g?: number | null;
+  supplier_packaging_category?: string | null;
+  supplier_primary_material?: string | null;
+  supplier_epr_material_code?: string | null;
+  supplier_epr_is_drinks_container?: boolean | null;
 }
 
 interface SearchResponse {
@@ -61,7 +68,7 @@ interface InlineIngredientSearchProps {
   organizationId: string;
   value: string;
   placeholder?: string;
-  /** Whether this search is for an ingredient or packaging material. Affects AI proxy suggestions. */
+  /** Whether this search is for an ingredient or packaging material. Affects filtering and AI proxy suggestions. */
   materialType?: 'ingredient' | 'packaging';
   onSelect: (selection: {
     name: string;
@@ -75,6 +82,12 @@ interface InlineIngredientSearchProps {
     recycled_content_pct?: number;
     packaging_components?: any;
     user_query?: string;
+    // Packaging supplier product data (auto-populated from supplier)
+    supplier_weight_g?: number | null;
+    supplier_packaging_category?: string | null;
+    supplier_primary_material?: string | null;
+    supplier_epr_material_code?: string | null;
+    supplier_epr_is_drinks_container?: boolean | null;
   }) => void;
   onChange?: (value: string) => void;
   className?: string;
@@ -156,8 +169,9 @@ export function InlineIngredientSearch({
         throw new Error("Not authenticated");
       }
 
+      const searchUrl = `/api/ingredients/search?q=${encodeURIComponent(searchQuery)}&organization_id=${organizationId}${materialType ? `&material_type=${materialType}` : ''}`;
       const response = await fetch(
-        `/api/ingredients/search?q=${encodeURIComponent(searchQuery)}&organization_id=${organizationId}`,
+        searchUrl,
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -237,8 +251,9 @@ export function InlineIngredientSearch({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      const proxySearchUrl = `/api/ingredients/search?q=${encodeURIComponent(suggestion.search_query)}&organization_id=${organizationId}${materialType ? `&material_type=${materialType}` : ''}`;
       const response = await fetch(
-        `/api/ingredients/search?q=${encodeURIComponent(suggestion.search_query)}&organization_id=${organizationId}`,
+        proxySearchUrl,
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -319,6 +334,12 @@ export function InlineIngredientSearch({
       location: result.location,
       recycled_content_pct: result.recycled_content_pct || result.metadata?.recycled_content_pct,
       packaging_components: result.packaging_components,
+      // Pass through packaging supplier product data for auto-population
+      supplier_weight_g: result.supplier_weight_g,
+      supplier_packaging_category: result.supplier_packaging_category,
+      supplier_primary_material: result.supplier_primary_material,
+      supplier_epr_material_code: result.supplier_epr_material_code,
+      supplier_epr_is_drinks_container: result.supplier_epr_is_drinks_container,
     };
 
     console.log('[InlineSearch] Calling onSelect with:', {

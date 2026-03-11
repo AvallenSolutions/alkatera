@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, ArrowRight, SkipForward, Factory, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { LocationPicker, type LocationData } from '@/components/shared/LocationPicker'
 
 const FACILITY_TYPES = [
   { value: 'Distillery', label: 'Distillery' },
@@ -29,8 +30,24 @@ export function FacilitiesSetup() {
 
   const [facilityName, setFacilityName] = useState('')
   const [facilityType, setFacilityType] = useState('')
-  const [address, setAddress] = useState('')
+  const [locationSearchValue, setLocationSearchValue] = useState('')
+  const [addressLine1, setAddressLine1] = useState('')
+  const [addressCity, setAddressCity] = useState('')
+  const [addressCountry, setAddressCountry] = useState('')
+  const [addressCountryCode, setAddressCountryCode] = useState('')
+  const [addressLat, setAddressLat] = useState<number | null>(null)
+  const [addressLng, setAddressLng] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+
+  const handleLocationSelect = (location: LocationData) => {
+    setLocationSearchValue(location.address)
+    setAddressLine1(location.address)
+    setAddressCity(location.city || '')
+    setAddressCountry(location.country || '')
+    setAddressCountryCode(location.countryCode || '')
+    setAddressLat(location.lat)
+    setAddressLng(location.lng)
+  }
 
   const handleSave = async () => {
     if (!currentOrganization || !facilityName.trim()) return
@@ -64,7 +81,17 @@ export function FacilitiesSetup() {
         organization_id: currentOrganization.id,
         name: facilityName.trim(),
         facility_type_id: facilityTypeId,
-        location_address: address.trim() || null,
+        // Structured address fields for distance calculations
+        address_line1: addressLine1 || null,
+        address_city: addressCity || null,
+        address_country: addressCountry || null,
+        address_lat: addressLat,
+        address_lng: addressLng,
+        // Also populate location columns for AWARE water stress assessment
+        location_address: addressLine1 || null,
+        location_country_code: addressCountryCode || null,
+        latitude: addressLat,
+        longitude: addressLng,
       })
 
       if (error) throw error
@@ -131,15 +158,21 @@ export function FacilitiesSetup() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="onb-facility-address" className="text-sm font-medium text-white/70">Address</Label>
-            <Input
-              id="onb-facility-address"
-              placeholder="Start typing address..."
-              value={address}
-              onChange={e => setAddress(e.target.value)}
+            <Label className="text-sm font-medium text-white/70">Location</Label>
+            <p className="text-xs text-white/30">
+              Search for your facility&apos;s city or address
+            </p>
+            <LocationPicker
+              value={locationSearchValue}
+              onLocationSelect={handleLocationSelect}
+              placeholder="Search for city or address..."
               disabled={isSaving}
-              className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:ring-[#ccff00]/50"
             />
+            {addressCity && (
+              <p className="text-xs text-white/40 mt-1">
+                {addressCity}{addressCountry ? `, ${addressCountry}` : ''}
+              </p>
+            )}
           </div>
         </div>
 

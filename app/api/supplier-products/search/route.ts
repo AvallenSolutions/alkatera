@@ -10,6 +10,14 @@ interface SupplierProductSearchResult {
   category: string | null;
   unit: string;
   product_code: string | null;
+  // Product type (ingredient vs packaging)
+  product_type: 'ingredient' | 'packaging';
+  // Packaging-specific fields
+  weight_g: number | null;
+  packaging_category: string | null;
+  primary_material: string | null;
+  epr_material_code: string | null;
+  epr_is_drinks_container: boolean | null;
   // Legacy carbon field (maintained for backward compatibility)
   carbon_intensity: number | null;
   // Multi-category impacts
@@ -123,6 +131,8 @@ export async function GET(request: NextRequest) {
     // Note: Staging emission factors should NOT be returned by this endpoint
     // They belong in /api/ingredients/search as secondary data
     // ========================================
+    const productType = searchParams.get('product_type'); // 'ingredient' | 'packaging' | null (all)
+
     let supplierQuery = supabase
       .from('supplier_products')
       .select(`
@@ -132,6 +142,12 @@ export async function GET(request: NextRequest) {
         unit,
         carbon_intensity,
         product_code,
+        product_type,
+        weight_g,
+        packaging_category,
+        primary_material,
+        epr_material_code,
+        epr_is_drinks_container,
         impact_climate,
         impact_water,
         impact_waste,
@@ -169,6 +185,11 @@ export async function GET(request: NextRequest) {
       .eq('is_active', true)
       .order('name');
 
+    // Filter by product type when specified
+    if (productType === 'ingredient' || productType === 'packaging') {
+      supplierQuery = supplierQuery.eq('product_type', productType);
+    }
+
     if (query && query.trim().length > 0) {
       supplierQuery = supplierQuery.ilike('name', `%${query.trim()}%`);
     }
@@ -190,6 +211,14 @@ export async function GET(request: NextRequest) {
       category: product.category,
       unit: product.unit,
       product_code: product.product_code,
+      // Product type
+      product_type: product.product_type || 'ingredient',
+      // Packaging-specific fields
+      weight_g: product.weight_g,
+      packaging_category: product.packaging_category,
+      primary_material: product.primary_material,
+      epr_material_code: product.epr_material_code,
+      epr_is_drinks_container: product.epr_is_drinks_container,
       // Legacy carbon field
       carbon_intensity: product.carbon_intensity,
       // Multi-category impacts

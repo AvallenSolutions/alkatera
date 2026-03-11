@@ -265,6 +265,37 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           console.warn(`[calculateProductCarbonFootprint] ⚠️ DATA GAP — ${allocation.facilityName}: ${gridFactorResult.dataGapWarning}`);
         }
 
+        // ─── Check for direct production run resource data (highest quality) ───
+        // Direct run data is product-specific — no attribution ratio needed for
+        // electricity and water. This bypasses facility-level allocation for
+        // those resources while still using utility data for Scope 1 fuels.
+        // Priority in the allocation cascade:
+        //   1. Direct Run Data (this check) — 95% confidence
+        //   2. Facility-Level Allocation (below) — 70% confidence
+        const { data: directRunData } = await supabase
+          .from('production_run_resource_data')
+          .select('electricity_computed_kwh, water_intake_m3, wastewater_discharge_m3, production_volume, production_volume_unit')
+          .eq('product_id', parseInt(productId))
+          .eq('facility_id', allocation.facilityId)
+          .gte('production_date', allocation.reportingPeriodStart)
+          .lte('production_date', allocation.reportingPeriodEnd);
+
+        const hasDirectRunData = directRunData && directRunData.length > 0;
+        let runElectricityKwh = 0;
+        let runWaterM3 = 0;
+
+        if (hasDirectRunData) {
+          for (const run of directRunData) {
+            runElectricityKwh += Number(run.electricity_computed_kwh || 0);
+            runWaterM3 += Number(run.water_intake_m3 || 0);
+          }
+          console.log(
+            `[calculateProductCarbonFootprint] ✨ DIRECT RUN DATA for ${allocation.facilityName}: ` +
+            `${directRunData.length} run(s), ${runElectricityKwh.toFixed(1)} kWh electricity, ` +
+            `${runWaterM3.toFixed(2)} m³ water — no allocation needed for these resources`
+          );
+        }
+
         const { data: utilityEntries, error: utilityError } = await supabase
           .from('utility_data_entries')
           .select('utility_type, quantity, unit, calculated_scope')
@@ -307,6 +338,19 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           };
 
           for (const entry of utilityEntries) {
+            // When direct run data exists, skip electricity_grid entries from utility —
+            // we have product-specific electricity measurements that are more accurate.
+            // Also skip water entries — run data provides product-specific water.
+            if (hasDirectRunData) {
+              if (entry.utility_type === 'electricity_grid') {
+                console.log(`[calculateProductCarbonFootprint] ⏭ Skipping utility electricity_grid for ${allocation.facilityName} — using direct run data instead`);
+                continue;
+              }
+              if (entry.utility_type === 'water' || entry.utility_type === 'water_supply') {
+                continue; // Water comes from run data
+              }
+            }
+
             const config = EMISSION_FACTORS[entry.utility_type];
             if (!config) {
               // Water entries in utility_data_entries (utility_type: water / water_supply)
@@ -348,96 +392,144 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         }
 
         // Query water data from facility_activity_entries (separate table from utilities).
+        // Skip this query when direct run data exists — run data provides product-specific water.
         // IMPORTANT: This table and utility_data_entries can both contain water data for the
         // same facility/period. We must NOT add both to the same total — that would double-count.
-        // Priority: facility_activity_entries (more granular, activity-specific) > utility_data_entries.
-        // If activity entries exist for water, use them exclusively. If not, fall back to utility entries.
-        const { data: waterEntries, error: waterError } = await supabase
-          .from('facility_activity_entries')
-          .select('activity_category, quantity, unit')
-          .eq('facility_id', allocation.facilityId)
-          .in('activity_category', ['water_intake', 'water_recycled'])
-          .lte('reporting_period_start', allocation.reportingPeriodEnd)
-          .gte('reporting_period_end', allocation.reportingPeriodStart);
+        // Priority: Direct run data > facility_activity_entries > utility_data_entries.
+        let waterEntries: { activity_category: string; quantity: number; unit: string }[] | null = null;
+        if (!hasDirectRunData) {
+          const { data: waterData, error: waterError } = await supabase
+            .from('facility_activity_entries')
+            .select('activity_category, quantity, unit')
+            .eq('facility_id', allocation.facilityId)
+            .in('activity_category', ['water_intake', 'water_recycled'])
+            .lte('reporting_period_start', allocation.reportingPeriodEnd)
+            .gte('reporting_period_end', allocation.reportingPeriodStart);
 
-        if (waterError) {
-          console.warn(`[calculateProductCarbonFootprint] Failed to query water data for ${allocation.facilityName}:`, waterError);
-        }
-
-        let waterFromActivityTable = 0;
-        if (waterEntries && waterEntries.length > 0) {
-          for (const entry of waterEntries) {
-            let quantityM3 = Number(entry.quantity || 0);
-            if (entry.unit === 'litres' || entry.unit === 'L') {
-              quantityM3 = quantityM3 / 1000;
-            }
-            waterFromActivityTable += quantityM3;
+          if (waterError) {
+            console.warn(`[calculateProductCarbonFootprint] Failed to query water data for ${allocation.facilityName}:`, waterError);
           }
+          waterEntries = waterData;
         }
 
-        // Merge water: prefer activity_entries if present (avoids double-counting).
-        // If both sources have data, log a warning — this indicates a data entry issue
-        // where water was recorded in both tables for the same reporting period.
-        if (waterFromActivityTable > 0 && waterFromUtilityTable > 0) {
-          console.warn(
-            `[calculateProductCarbonFootprint] ⚠️ WATER DOUBLE-COUNT RISK for ${allocation.facilityName}: ` +
-            `Both utility_data_entries (${waterFromUtilityTable.toFixed(2)} m³) and ` +
-            `facility_activity_entries (${waterFromActivityTable.toFixed(2)} m³) contain water data. ` +
-            `Using facility_activity_entries only (more specific). ` +
-            `Check that users are not entering water in both places.`
-          );
-          totalWaterFromUtility = waterFromActivityTable;
-        } else if (waterFromActivityTable > 0) {
-          totalWaterFromUtility = waterFromActivityTable;
-          console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: ${waterFromActivityTable.toFixed(2)} m³ from facility_activity_entries`);
-        } else if (waterFromUtilityTable > 0) {
-          totalWaterFromUtility = waterFromUtilityTable;
-          console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: ${waterFromUtilityTable.toFixed(2)} m³ from utility_data_entries (fallback)`);
+        // ─── Determine final emissions and water values ───
+        // Two paths:
+        //   A) Direct run data exists → electricity & water are product-specific (no attribution).
+        //      Scope 1 fuels from utility data still need facility-level attribution.
+        //   B) No run data → everything uses facility-level attribution (existing approach).
+
+        let scope1Emissions = 0;
+        let scope2Emissions = 0;
+        let allocatedEmissions = 0;
+        let allocatedWater = 0;
+        let allocatedWaste = 0;
+        let attributionRatio = 0;
+        let hasVerifiedFacilityData = false;
+
+        if (hasDirectRunData) {
+          // ─── Path A: Direct run data (highest quality) ───
+          // Scope 2 from direct run electricity — product-specific, no attribution needed
+          const runScope2 = runElectricityKwh * gridFactorResult.factor;
+
+          // Scope 1 from utility data (fuels, gas, etc.) — still needs attribution
+          // because fuel usage is facility-level, not product-specific
+          const rawAttributionRatio = allocation.facilityTotalProduction > 0
+            ? allocation.productionVolume / allocation.facilityTotalProduction
+            : 0;
+          attributionRatio = Math.min(1, Math.max(0, rawAttributionRatio));
+          scope1Emissions = scope1Raw * attributionRatio;
+
+          // Scope 2 = ONLY from direct run data (no attribution)
+          // Any heat_steam_purchased from utility is still attributed (it's in scope2Raw)
+          const attributedOtherScope2 = scope2Raw * attributionRatio;
+          scope2Emissions = runScope2 + attributedOtherScope2;
+
+          allocatedEmissions = scope1Emissions + scope2Emissions;
+
+          // Water from direct run data — product-specific, no attribution
+          allocatedWater = runWaterM3 * 1000; // m³ → litres
+          allocatedWaste = 0;
+          hasVerifiedFacilityData = true; // Direct run data is always verified
+
+          console.log(`[calculateProductCarbonFootprint] ✨ Facility ${allocation.facilityName} — DIRECT RUN DATA path:`, {
+            runElectricityKwh,
+            runScope2_kgCO2e: runScope2,
+            scope1FromUtility: scope1Emissions,
+            otherScope2Attributed: attributedOtherScope2,
+            totalAllocated: allocatedEmissions,
+            waterFromRunData_litres: allocatedWater,
+            attributionRatioForScope1: attributionRatio,
+            gridFactor: gridFactorResult.factor,
+          });
         } else {
-          console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: no water data found in either table`);
+          // ─── Path B: Facility-level allocation (existing approach) ───
+          // Merge water from utility and activity tables
+          let waterFromActivityTable = 0;
+          if (waterEntries && waterEntries.length > 0) {
+            for (const entry of waterEntries) {
+              let quantityM3 = Number(entry.quantity || 0);
+              if (entry.unit === 'litres' || entry.unit === 'L') {
+                quantityM3 = quantityM3 / 1000;
+              }
+              waterFromActivityTable += quantityM3;
+            }
+          }
+
+          // Merge water: prefer activity_entries if present (avoids double-counting).
+          if (waterFromActivityTable > 0 && waterFromUtilityTable > 0) {
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠️ WATER DOUBLE-COUNT RISK for ${allocation.facilityName}: ` +
+              `Both utility_data_entries (${waterFromUtilityTable.toFixed(2)} m³) and ` +
+              `facility_activity_entries (${waterFromActivityTable.toFixed(2)} m³) contain water data. ` +
+              `Using facility_activity_entries only (more specific). ` +
+              `Check that users are not entering water in both places.`
+            );
+            totalWaterFromUtility = waterFromActivityTable;
+          } else if (waterFromActivityTable > 0) {
+            totalWaterFromUtility = waterFromActivityTable;
+            console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: ${waterFromActivityTable.toFixed(2)} m³ from facility_activity_entries`);
+          } else if (waterFromUtilityTable > 0) {
+            totalWaterFromUtility = waterFromUtilityTable;
+            console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: ${waterFromUtilityTable.toFixed(2)} m³ from utility_data_entries (fallback)`);
+          } else {
+            console.log(`[calculateProductCarbonFootprint] Water for ${allocation.facilityName}: no water data found in either table`);
+          }
+
+          // CRITICAL FIX: Attribution ratio must be in [0, 1].
+          const rawAttributionRatio = allocation.facilityTotalProduction > 0
+            ? allocation.productionVolume / allocation.facilityTotalProduction
+            : 0;
+          if (rawAttributionRatio > 1) {
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠️ ATTRIBUTION RATIO > 1 for ${allocation.facilityName}: ` +
+              `productionVolume=${allocation.productionVolume} > facilityTotalProduction=${allocation.facilityTotalProduction}. ` +
+              `This means more product was attributed to this facility than its total output, which is physically impossible. ` +
+              `Clamping ratio to 1.0. Please verify that productionVolume and facilityTotalProduction use the same unit.`
+            );
+          }
+          attributionRatio = Math.min(1, Math.max(0, rawAttributionRatio));
+          allocatedEmissions = facilityTotalEmissions * attributionRatio;
+          scope1Emissions = scope1Raw * attributionRatio;
+          scope2Emissions = scope2Raw * attributionRatio;
+
+          hasVerifiedFacilityData = facilityTotalEmissions > 0;
+
+          console.log(`[calculateProductCarbonFootprint] Facility ${allocation.facilityName} emissions data:`, {
+            hasUtilityData: facilityTotalEmissions > 0,
+            hasVerifiedFacilityData,
+            facilityTotalEmissions,
+            scope1BeforeAllocation: scope1Raw,
+            scope2BeforeAllocation: scope2Raw,
+            attributionRatio,
+            allocatedScope1: scope1Emissions,
+            allocatedScope2: scope2Emissions,
+          });
+
+          const totalWater = totalWaterFromUtility;
+          const totalWaste = 0;
+          allocatedWater = totalWater * attributionRatio;
+          allocatedWaste = totalWaste * attributionRatio;
         }
-
-        // CRITICAL FIX: Attribution ratio must be in [0, 1].
-        // productionVolume is the number of units of THIS product made at the facility.
-        // facilityTotalProduction is the total throughput across ALL products.
-        // Both must be in the SAME unit (e.g. litres) before dividing.
-        // An unchecked ratio > 1 means this product is allocated MORE emissions than
-        // the entire facility — an obvious error. We clamp to [0, 1] and warn loudly.
-        const rawAttributionRatio = allocation.facilityTotalProduction > 0
-          ? allocation.productionVolume / allocation.facilityTotalProduction
-          : 0;
-        if (rawAttributionRatio > 1) {
-          console.warn(
-            `[calculateProductCarbonFootprint] ⚠️ ATTRIBUTION RATIO > 1 for ${allocation.facilityName}: ` +
-            `productionVolume=${allocation.productionVolume} > facilityTotalProduction=${allocation.facilityTotalProduction}. ` +
-            `This means more product was attributed to this facility than its total output, which is physically impossible. ` +
-            `Clamping ratio to 1.0. Please verify that productionVolume and facilityTotalProduction use the same unit.`
-          );
-        }
-        const attributionRatio = Math.min(1, Math.max(0, rawAttributionRatio));
-        const allocatedEmissions = facilityTotalEmissions * attributionRatio;
-        const scope1Emissions = scope1Raw * attributionRatio;
-        const scope2Emissions = scope2Raw * attributionRatio;
-
-        // Track if we found verified facility data (from either source)
-        const hasVerifiedFacilityData = facilityTotalEmissions > 0;
-
-        console.log(`[calculateProductCarbonFootprint] Facility ${allocation.facilityName} emissions data:`, {
-          hasUtilityData: facilityTotalEmissions > 0,
-          hasVerifiedFacilityData,
-          facilityTotalEmissions,
-          scope1BeforeAllocation: scope1Raw,
-          scope2BeforeAllocation: scope2Raw,
-          attributionRatio,
-          allocatedScope1: scope1Emissions,
-          allocatedScope2: scope2Emissions,
-        });
-
-        // Extract water and waste from utility data
-        const totalWater = totalWaterFromUtility;
-        const totalWaste = 0; // Waste data not yet captured in utility_data_entries
-        const allocatedWater = totalWater * attributionRatio;
-        const allocatedWaste = totalWaste * attributionRatio;
 
         // Collect for aggregator (passed directly, bypasses broken DB trigger)
         const isContractManufacturer = allocation.operationalControl === 'third_party';
@@ -468,8 +560,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             reporting_period_end: allocation.reportingPeriodEnd,
             total_facility_production_volume: allocation.facilityTotalProduction,
             production_volume_unit: allocation.productionVolumeUnit || 'units',
-            total_facility_co2e_kg: facilityTotalEmissions,
-            co2e_entry_method: hasVerifiedFacilityData ? 'direct' : 'direct',
+            total_facility_co2e_kg: hasDirectRunData ? allocatedEmissions : facilityTotalEmissions,
+            co2e_entry_method: hasDirectRunData ? 'direct_run_data' : 'direct',
             client_production_volume: allocation.productionVolume,
             // These are auto-calculated by trigger but we can provide them:
             // attribution_ratio, allocated_emissions_kg_co2e, emission_intensity_kg_co2e_per_unit
@@ -480,7 +572,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             allocated_waste_kg: allocatedWaste,
             status: hasVerifiedFacilityData ? 'verified' : 'provisional',
             is_energy_intensive_process: false,
-            data_source_tag: hasVerifiedFacilityData ? 'Facility_Verified' : 'User_Input',
+            data_source_tag: hasDirectRunData ? 'Direct_Run_Data' : (hasVerifiedFacilityData ? 'Facility_Verified' : 'User_Input'),
           };
 
           // Use upsert to handle existing allocations for same period
@@ -525,8 +617,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             status: hasVerifiedFacilityData ? 'verified' : 'provisional',
             is_energy_intensive_process: false,
             uses_proxy_data: !hasVerifiedFacilityData,
-            data_source_tag: hasVerifiedFacilityData ? 'Facility_Verified' : 'User_Input',
-            co2e_entry_method: 'Production Volume Allocation',
+            data_source_tag: hasDirectRunData ? 'Direct_Run_Data' : (hasVerifiedFacilityData ? 'Facility_Verified' : 'User_Input'),
+            co2e_entry_method: hasDirectRunData ? 'Direct Run Data' : 'Production Volume Allocation',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };

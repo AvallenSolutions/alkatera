@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Trash2, Building2, Zap, Pencil, History, Package, Loader2 } from "lucide-react";
+import { ArrowLeft, Trash2, Building2, Zap, Pencil, History, Package, Loader2, FlaskConical, Droplets, ArrowRightLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import { EditFacilityDialog } from "@/components/facilities/EditFacilityDialog";
 import { DirectDataEntry } from "@/components/facilities/DirectDataEntry";
 import { ProductionVolumeManager } from "@/components/facilities/ProductionVolumeManager";
 import { DataQualityConfidenceCard } from "@/components/facilities/DataQualityConfidenceCard";
+import { ProductionRunDataEntry } from "@/components/facilities/ProductionRunDataEntry";
 import { UTILITY_TYPES } from "@/lib/constants/utility-types";
 
 interface Facility {
@@ -295,6 +296,10 @@ export default function FacilityDetailPage() {
             <Package className="h-4 w-4 mr-2" />
             Production
           </TabsTrigger>
+          <TabsTrigger value="run-data">
+            <FlaskConical className="h-4 w-4 mr-2" />
+            Run Data
+          </TabsTrigger>
           <TabsTrigger value="history">
             <History className="h-4 w-4 mr-2" />
             History
@@ -323,6 +328,17 @@ export default function FacilityDetailPage() {
           <ProductionVolumeManager
             facilityId={facilityId}
             organizationId={facility.organization_id}
+          />
+        </TabsContent>
+
+        {/* ============================================================= */}
+        {/* RUN DATA TAB */}
+        {/* ============================================================= */}
+        <TabsContent value="run-data" className="space-y-6 mt-6">
+          <ProductionRunDataEntry
+            facilityId={facilityId}
+            organizationId={facility.organization_id}
+            onDataSaved={loadFacilityData}
           />
         </TabsContent>
 
@@ -611,6 +627,13 @@ export default function FacilityDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Production Run Resource Data History */}
+          <ProductionRunDataEntry
+            facilityId={facilityId}
+            organizationId={facility.organization_id}
+            onDataSaved={loadFacilityData}
+          />
 
           {/* Edit Entry Dialog */}
           <Dialog open={!!editingEntry} onOpenChange={(open) => !open && setEditingEntry(null)}>

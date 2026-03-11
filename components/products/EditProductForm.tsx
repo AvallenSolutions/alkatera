@@ -390,7 +390,7 @@ export function EditProductForm({ productId, onSuccess, onCancel }: EditProductF
                   <img
                     src={imageUrl}
                     alt="Product preview"
-                    className="w-full h-48 object-cover rounded-lg border border-border"
+                    className="w-full max-h-48 object-contain rounded-lg border border-border"
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = '';
                       (e.target as HTMLImageElement).style.display = 'none';

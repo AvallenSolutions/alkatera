@@ -29,8 +29,19 @@ import {
   Leaf,
   FileText,
   ImageIcon,
+  Wheat,
+  Box,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import type { SupplierProductType, PackagingCategoryType } from '@/lib/types/supplier-product';
+import { PACKAGING_CATEGORY_LABELS } from '@/lib/types/supplier-product';
 
 interface SupplierProduct {
   id: string;
@@ -38,6 +49,9 @@ interface SupplierProduct {
   description: string | null;
   category: string | null;
   unit: string;
+  product_type: SupplierProductType;
+  weight_g: number | null;
+  packaging_category: string | null;
   carbon_intensity: number | null;
   impact_climate: number | null;
   impact_water: number | null;
@@ -68,9 +82,12 @@ export default function SupplierProductsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Simple "Add Product" form state
+  const [productType, setProductType] = useState<SupplierProductType>('ingredient');
   const [productName, setProductName] = useState('');
   const [unit, setUnit] = useState('');
   const [category, setCategory] = useState('');
+  const [packagingCategory, setPackagingCategory] = useState<PackagingCategoryType | ''>('');
+  const [weightG, setWeightG] = useState('');
 
   useEffect(() => {
     loadData();
@@ -93,7 +110,7 @@ export default function SupplierProductsPage() {
 
       const { data: productsData, error: productsError } = await supabase
         .from('supplier_products')
-        .select('id, name, description, category, unit, carbon_intensity, impact_climate, impact_water, impact_waste, impact_land, recycled_content_pct, product_code, product_image_url, is_active, is_verified, origin_country_code, certifications, created_at')
+        .select('id, name, description, category, unit, product_type, weight_g, packaging_category, carbon_intensity, impact_climate, impact_water, impact_waste, impact_land, recycled_content_pct, product_code, product_image_url, is_active, is_verified, origin_country_code, certifications, created_at')
         .eq('supplier_id', supplierData.id)
         .order('created_at', { ascending: false });
 
@@ -109,9 +126,12 @@ export default function SupplierProductsPage() {
   }
 
   const resetForm = () => {
+    setProductType('ingredient');
     setProductName('');
     setUnit('');
     setCategory('');
+    setPackagingCategory('');
+    setWeightG('');
     setError(null);
   };
 
@@ -119,8 +139,18 @@ export default function SupplierProductsPage() {
     e.preventDefault();
     if (!supplier) return;
 
-    if (!productName.trim() || !unit.trim()) {
-      setError('Product name and unit are required');
+    const effectiveUnit = productType === 'packaging' ? 'unit' : unit.trim();
+
+    if (!productName.trim()) {
+      setError('Product name is required');
+      return;
+    }
+    if (productType === 'ingredient' && !effectiveUnit) {
+      setError('Unit is required for ingredient products');
+      return;
+    }
+    if (productType === 'packaging' && !packagingCategory) {
+      setError('Packaging category is required');
       return;
     }
 
@@ -133,8 +163,13 @@ export default function SupplierProductsPage() {
       const insertData: Record<string, any> = {
         supplier_id: supplier.id,
         name: productName.trim(),
-        unit: unit.trim(),
-        category: category.trim() || null,
+        unit: effectiveUnit,
+        product_type: productType,
+        category: productType === 'ingredient' ? (category.trim() || null) : null,
+      }
+      if (productType === 'packaging') {
+        insertData.packaging_category = packagingCategory || null;
+        insertData.weight_g = weightG ? parseFloat(weightG) : null;
       }
       if (supplier.organization_id) {
         insertData.organization_id = supplier.organization_id
@@ -239,8 +274,8 @@ export default function SupplierProductsPage() {
               >
                 <div className="flex items-center gap-4 min-w-0">
                   {product.product_image_url ? (
-                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-border">
-                      <img src={product.product_image_url} alt="" className="w-full h-full object-cover" />
+                    <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 border border-border flex items-center justify-center bg-slate-100 dark:bg-slate-800">
+                      <img src={product.product_image_url} alt="" className="max-w-full max-h-full object-contain" />
                     </div>
                   ) : (
                     <div className="p-2.5 rounded-lg bg-purple-500/10 flex-shrink-0">
@@ -250,6 +285,17 @@ export default function SupplierProductsPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium text-foreground truncate">{product.name}</p>
+                      {product.product_type === 'packaging' ? (
+                        <Badge variant="secondary" className="text-xs bg-purple-500/10 text-purple-400 border-purple-500/20">
+                          <Box className="h-3 w-3 mr-1" />
+                          Packaging
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs bg-amber-500/10 text-amber-400 border-amber-500/20">
+                          <Wheat className="h-3 w-3 mr-1" />
+                          Ingredient
+                        </Badge>
+                      )}
                       {product.is_verified && (
                         <Badge variant="default" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -261,13 +307,23 @@ export default function SupplierProductsPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                      {product.category && (
+                      {product.product_type === 'packaging' && product.packaging_category && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
+                          <Tag className="h-3 w-3" />
+                          {product.packaging_category.replace('_', ' ')}
+                        </span>
+                      )}
+                      {product.product_type === 'ingredient' && product.category && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Tag className="h-3 w-3" />
                           {product.category}
                         </span>
                       )}
-                      <span className="text-xs text-muted-foreground">Unit: {product.unit}</span>
+                      {product.product_type === 'packaging' && product.weight_g ? (
+                        <span className="text-xs text-muted-foreground">{product.weight_g}g per unit</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Unit: {product.unit}</span>
+                      )}
                       {product.origin_country_code && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Globe className="h-3 w-3" />
@@ -321,6 +377,37 @@ export default function SupplierProductsPage() {
               </Alert>
             )}
 
+            {/* Product type toggle */}
+            <div className="space-y-2">
+              <Label>Product Type <span className="text-destructive">*</span></Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProductType('ingredient')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
+                    productType === 'ingredient'
+                      ? 'border-[#ccff00]/50 bg-[#ccff00]/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:border-border/80'
+                  }`}
+                >
+                  <Wheat className="h-4 w-4" />
+                  Ingredient
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProductType('packaging')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg border text-sm font-medium transition-all ${
+                    productType === 'packaging'
+                      ? 'border-purple-500/50 bg-purple-500/10 text-foreground'
+                      : 'border-border bg-background text-muted-foreground hover:border-border/80'
+                  }`}
+                >
+                  <Box className="h-4 w-4" />
+                  Packaging
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="product-name">
                 Product Name <span className="text-destructive">*</span>
@@ -329,35 +416,73 @@ export default function SupplierProductsPage() {
                 id="product-name"
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
-                placeholder="e.g., Organic Barley Malt"
+                placeholder={productType === 'packaging' ? 'e.g., Frugal Bottle 750ml' : 'e.g., Organic Barley Malt'}
                 required
                 autoFocus
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="product-unit">
-                  Unit <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="product-unit"
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  placeholder="e.g., kg"
-                  required
-                />
+            {productType === 'ingredient' ? (
+              /* Ingredient fields */
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="product-unit">
+                    Unit <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="product-unit"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    placeholder="e.g., kg"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="product-category">Category</Label>
+                  <Input
+                    id="product-category"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    placeholder="e.g., Grain"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="product-category">Category</Label>
-                <Input
-                  id="product-category"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="e.g., Grain"
-                />
+            ) : (
+              /* Packaging fields */
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>
+                    Packaging Category <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={packagingCategory}
+                    onValueChange={(val) => setPackagingCategory(val as PackagingCategoryType)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.entries(PACKAGING_CATEGORY_LABELS) as Array<[PackagingCategoryType, string]>).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="product-weight">Weight per Unit (g)</Label>
+                  <Input
+                    id="product-weight"
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={weightG}
+                    onChange={(e) => setWeightG(e.target.value)}
+                    placeholder="e.g., 83"
+                  />
+                  <p className="text-xs text-muted-foreground">Weight of a single packaging unit in grams</p>
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex justify-end gap-3 pt-2">
               <Button

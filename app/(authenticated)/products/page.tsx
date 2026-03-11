@@ -259,11 +259,11 @@ export default function ProductsPage() {
               <Link href={`/products/${product.id}`}>
                 <CardHeader>
                   {product.product_image_url ? (
-                    <div className="mb-4 aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                    <div className="mb-4 aspect-video rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                       <img
                         src={product.product_image_url}
                         alt={product.name}
-                        className="w-full h-full object-cover"
+                        className="max-w-full max-h-full object-contain"
                       />
                     </div>
                   ) : (

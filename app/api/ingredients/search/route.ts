@@ -24,6 +24,15 @@ interface SearchResult {
   uncertainty_percent?: number;
   source_citation?: string;
   metadata?: Record<string, any>;
+  // Supplier product packaging data (passed through to form cards)
+  supplier_product_type?: 'ingredient' | 'packaging';
+  supplier_weight_g?: number | null;
+  supplier_packaging_category?: string | null;
+  supplier_primary_material?: string | null;
+  supplier_epr_material_code?: string | null;
+  supplier_epr_is_drinks_container?: boolean | null;
+  recycled_content_pct?: number | null;
+  packaging_components?: any;
 }
 
 // Cache the ecoinvent process list in memory to avoid fetching 23k+ processes on every search
@@ -321,6 +330,10 @@ export async function GET(request: NextRequest) {
     // Collect results from ALL sources in parallel
     const allResults: SearchResult[] = [];
 
+    // Optional material_type filter: 'ingredient' or 'packaging'
+    // When set, supplier products are filtered to only show matching product_type
+    const materialType = searchParams.get('material_type'); // 'ingredient' | 'packaging' | null
+
     // Run all searches in parallel for better performance
     const [
       supplierResults,
@@ -331,11 +344,13 @@ export async function GET(request: NextRequest) {
     ] = await Promise.all([
       // SOURCE 1: Verified Supplier Products (Primary Data)
       organizationId ? (async () => {
-        const { data: supplierProducts, error } = await supabase
+        let supplierQuery = supabase
           .from('supplier_products')
           .select(`
             id, name, category, unit, carbon_intensity, product_code,
             verified_at, recycled_content_pct, water_factor, land_factor, waste_factor,
+            product_type, weight_g, packaging_category, primary_material,
+            epr_material_code, epr_is_drinks_container,
             suppliers!inner(name)
           `)
           .eq('organization_id', organizationId)
@@ -345,7 +360,40 @@ export async function GET(request: NextRequest) {
           .order('name')
           .limit(10);
 
+        // Filter by product_type when materialType is specified
+        if (materialType === 'ingredient' || materialType === 'packaging') {
+          supplierQuery = supplierQuery.eq('product_type', materialType);
+        }
+
+        const { data: supplierProducts, error } = await supplierQuery;
+
         if (error || !supplierProducts) return [];
+
+        // Load component breakdowns for packaging supplier products
+        const packagingProductIds = supplierProducts
+          .filter((p: any) => p.product_type === 'packaging')
+          .map((p: any) => p.id);
+
+        let componentsByProduct: Record<string, any[]> = {};
+        if (packagingProductIds.length > 0) {
+          const { data: components } = await supabase
+            .from('supplier_product_components')
+            .select('*')
+            .in('supplier_product_id', packagingProductIds);
+
+          for (const comp of (components || [])) {
+            if (!componentsByProduct[comp.supplier_product_id]) {
+              componentsByProduct[comp.supplier_product_id] = [];
+            }
+            componentsByProduct[comp.supplier_product_id].push({
+              epr_material_type: comp.epr_material_type,
+              component_name: comp.component_name,
+              weight_grams: comp.weight_grams,
+              recycled_content_percentage: comp.recycled_content_pct || 0,
+              is_recyclable: comp.is_recyclable,
+            });
+          }
+        }
 
         return supplierProducts.map((product: any): SearchResult => ({
           id: product.id,
@@ -361,6 +409,15 @@ export async function GET(request: NextRequest) {
           source: 'Primary Verified',
           source_type: 'primary',
           data_quality: 'verified',
+          // Supplier product packaging data (passed through to form cards)
+          supplier_product_type: product.product_type || 'ingredient',
+          supplier_weight_g: product.weight_g,
+          supplier_packaging_category: product.packaging_category,
+          supplier_primary_material: product.primary_material,
+          supplier_epr_material_code: product.epr_material_code,
+          supplier_epr_is_drinks_container: product.epr_is_drinks_container,
+          recycled_content_pct: product.recycled_content_pct,
+          packaging_components: componentsByProduct[product.id] || undefined,
           metadata: {
             supplier_name: product.suppliers?.name,
             product_code: product.product_code,

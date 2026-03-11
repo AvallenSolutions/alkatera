@@ -57,6 +57,7 @@ const FACILITY_FUNCTIONS = [
   'Office',
   'R&D',
   'Quality Control',
+  'Co-Manufacturer',
 ];
 
 export function AddFacilityWizard({

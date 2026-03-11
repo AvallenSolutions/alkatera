@@ -31,7 +31,7 @@ export function ProductHeader({ product, isHealthy, onEdit }: ProductHeaderProps
                   alt={product.name}
                   width={96}
                   height={96}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full object-contain"
                 />
               ) : (
                 <div className="h-full w-full flex items-center justify-center text-muted-foreground">

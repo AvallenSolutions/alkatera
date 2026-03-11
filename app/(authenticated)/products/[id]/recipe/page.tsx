@@ -138,7 +138,11 @@ export default function ProductRecipePage() {
             id,
             name,
             address_lat,
-            address_lng
+            address_lng,
+            address_line1,
+            address_city,
+            address_country,
+            location_address
           )
         `)
         .eq("product_id", productId)
@@ -146,7 +150,55 @@ export default function ProductRecipePage() {
 
       if (assignmentsData && assignmentsData.length > 0) {
         // Track total linked facilities (before coordinate filtering)
-        setTotalLinkedFacilities(assignmentsData.filter((a: any) => a.facilities).length);
+        const linkedWithFacility = assignmentsData.filter((a: any) => a.facilities);
+        setTotalLinkedFacilities(linkedWithFacility.length);
+
+        // Identify facilities that have address info but no coordinates — auto-geocode them
+        const facilitiesNeedingGeocode = linkedWithFacility.filter((a: any) => {
+          const f = a.facilities;
+          const hasCoords = f.address_lat && f.address_lng;
+          const hasAddress = f.address_line1 || f.address_city || f.location_address;
+          return !hasCoords && hasAddress;
+        });
+
+        if (facilitiesNeedingGeocode.length > 0) {
+          console.log(`[Production Sites] ${facilitiesNeedingGeocode.length} facility/ies have address but no coordinates — auto-geocoding...`);
+          // Geocode in parallel, don't block page load on failures
+          const geocodeResults = await Promise.allSettled(
+            facilitiesNeedingGeocode.map(async (a: any) => {
+              try {
+                const response = await fetch('/api/facilities/geocode', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ facilityId: a.facilities.id }),
+                });
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.success && data.lat && data.lng) {
+                    return { facilityId: a.facilities.id, lat: data.lat, lng: data.lng };
+                  }
+                }
+                return null;
+              } catch (err) {
+                console.warn(`[Production Sites] Failed to geocode facility ${a.facilities.id}:`, err);
+                return null;
+              }
+            })
+          );
+
+          // Merge geocoded coordinates back into assignmentsData
+          for (const result of geocodeResults) {
+            if (result.status === 'fulfilled' && result.value) {
+              const { facilityId: geoFacilityId, lat, lng } = result.value;
+              const assignment = assignmentsData.find((a: any) => a.facilities?.id === geoFacilityId);
+              if (assignment) {
+                (assignment as any).facilities.address_lat = lat;
+                (assignment as any).facilities.address_lng = lng;
+                console.log(`[Production Sites] Auto-geocoded facility ${geoFacilityId}: (${lat}, ${lng})`);
+              }
+            }
+          }
+        }
 
         const assignedFacilities = assignmentsData
           .filter((a: any) => a.facilities && a.facilities.address_lat && a.facilities.address_lng)

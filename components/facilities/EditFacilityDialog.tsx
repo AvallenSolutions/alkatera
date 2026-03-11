@@ -13,17 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { COUNTRIES } from "@/lib/countries";
+import { LocationPicker, type LocationData } from "@/components/shared/LocationPicker";
 
 interface EditFacilityDialogProps {
   open: boolean;
@@ -41,6 +35,10 @@ interface FacilityData {
   address_city: string;
   address_country: string;
   address_postcode: string;
+  address_lat: number | null;
+  address_lng: number | null;
+  location_address: string | null;
+  location_country_code: string | null;
 }
 
 const FACILITY_FUNCTIONS = [
@@ -54,6 +52,7 @@ const FACILITY_FUNCTIONS = [
   'Office',
   'R&D',
   'Quality Control',
+  'Co-Manufacturer',
 ];
 
 export function EditFacilityDialog({
@@ -70,11 +69,14 @@ export function EditFacilityDialog({
   const [operationalControl, setOperationalControl] = useState<'owned' | 'third_party'>('owned');
   const [facilityName, setFacilityName] = useState('');
   const [selectedFunctions, setSelectedFunctions] = useState<string[]>([]);
+  const [locationSearchValue, setLocationSearchValue] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressCity, setAddressCity] = useState('');
   const [addressCountry, setAddressCountry] = useState('');
   const [addressCountryCode, setAddressCountryCode] = useState('');
   const [addressPostcode, setAddressPostcode] = useState('');
+  const [addressLat, setAddressLat] = useState<number | null>(null);
+  const [addressLng, setAddressLng] = useState<number | null>(null);
 
   useEffect(() => {
     if (open && facilityId) {
@@ -102,11 +104,18 @@ export function EditFacilityDialog({
       setAddressLine1(data.address_line1 || '');
       setAddressCity(data.address_city || '');
       setAddressPostcode(data.address_postcode || '');
+      setAddressLat(data.address_lat ? parseFloat(data.address_lat) : null);
+      setAddressLng(data.address_lng ? parseFloat(data.address_lng) : null);
 
-      // Handle country code - prefer location_country_code if set, otherwise try to derive from address_country
+      // Set the location search value for display in the LocationPicker
+      const displayParts: string[] = [];
+      if (data.address_line1) displayParts.push(data.address_line1);
+      if (data.address_city) displayParts.push(data.address_city);
+      setLocationSearchValue(displayParts.join(', ') || data.location_address || '');
+
+      // Handle country code
       let countryCode = data.location_country_code || '';
       if (!countryCode && data.address_country) {
-        // Try to find ISO code from country name (for legacy facilities)
         const matchedCountry = COUNTRIES.find(
           c => c.label.toLowerCase() === data.address_country.toLowerCase() ||
                c.value.toLowerCase() === data.address_country.toLowerCase()
@@ -114,12 +123,12 @@ export function EditFacilityDialog({
         countryCode = matchedCountry?.value || '';
       }
       setAddressCountryCode(countryCode);
-      // Keep address_country synced with the country label for display
       const countryLabel = COUNTRIES.find(c => c.value === countryCode)?.label || data.address_country || '';
       setAddressCountry(countryLabel);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to load facility';
       console.error('Error loading facility:', error);
-      toast.error(error.message || 'Failed to load facility');
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -131,6 +140,16 @@ export function EditFacilityDialog({
     } else {
       setSelectedFunctions([...selectedFunctions, func]);
     }
+  };
+
+  const handleLocationSelect = (location: LocationData) => {
+    setLocationSearchValue(location.address);
+    setAddressLine1(location.address);
+    setAddressCity(location.city || '');
+    setAddressCountry(location.country || '');
+    setAddressCountryCode(location.countryCode || '');
+    setAddressLat(location.lat);
+    setAddressLng(location.lng);
   };
 
   const handleSave = async () => {
@@ -146,13 +165,17 @@ export function EditFacilityDialog({
       return;
     }
 
-    if (!addressLine1.trim() || !addressCity.trim() || !addressCountryCode) {
-      toast.error('Please complete the address fields');
-      return;
-    }
-
     try {
       setIsSaving(true);
+
+      // Derive country code for the update
+      let countryCodeToSave = addressCountryCode;
+      if (!countryCodeToSave && addressCountry) {
+        const matchedCountry = COUNTRIES.find(
+          c => c.label.toLowerCase() === addressCountry.toLowerCase()
+        );
+        countryCodeToSave = matchedCountry?.value || '';
+      }
 
       const { error } = await supabase
         .from('facilities')
@@ -160,13 +183,18 @@ export function EditFacilityDialog({
           name: facilityName.trim(),
           functions: selectedFunctions,
           operational_control: operationalControl,
-          address_line1: addressLine1.trim(),
-          address_city: addressCity.trim(),
-          address_country: addressCountry.trim(),
-          address_postcode: addressPostcode.trim(),
-          // Also update location_country_code for AWARE water stress assessment
-          location_country_code: addressCountryCode,
-          location_address: addressLine1.trim(),
+          address_line1: addressLine1.trim() || null,
+          address_city: addressCity.trim() || null,
+          address_country: addressCountry.trim() || null,
+          address_postcode: addressPostcode.trim() || null,
+          // Save geocoded coordinates — critical for distance calculations
+          address_lat: addressLat,
+          address_lng: addressLng,
+          // Also update location columns for AWARE water stress assessment
+          location_country_code: countryCodeToSave || null,
+          location_address: addressLine1.trim() || null,
+          latitude: addressLat,
+          longitude: addressLng,
           updated_at: new Date().toISOString(),
         })
         .eq('id', facilityId);
@@ -176,9 +204,10 @@ export function EditFacilityDialog({
       toast.success('Facility updated successfully');
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to update facility';
       console.error('Error updating facility:', error);
-      toast.error(error.message || 'Failed to update facility');
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -273,59 +302,43 @@ export function EditFacilityDialog({
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <Label htmlFor="addressLine1">Street Address *</Label>
-                  <Input
-                    id="addressLine1"
-                    placeholder="123 Main Street"
-                    value={addressLine1}
-                    onChange={(e) => setAddressLine1(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="addressCity">City *</Label>
-                  <Input
-                    id="addressCity"
-                    placeholder="London"
-                    value={addressCity}
-                    onChange={(e) => setAddressCity(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="addressPostcode">Postcode</Label>
-                  <Input
-                    id="addressPostcode"
-                    placeholder="SW1A 1AA"
-                    value={addressPostcode}
-                    onChange={(e) => setAddressPostcode(e.target.value)}
-                  />
-                </div>
+              {/* Location — use LocationPicker for geocoding */}
+              <div>
+                <Label>Facility Location</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Search for the city or address to enable automatic distance calculations
+                </p>
+                <LocationPicker
+                  value={locationSearchValue}
+                  onLocationSelect={handleLocationSelect}
+                  placeholder="Search for city or address..."
+                />
+                {addressCity && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {addressCity}{addressCountry ? `, ${addressCountry}` : ''}
+                    {addressLat && addressLng ? (
+                      <span className="text-green-600 dark:text-green-400 ml-2">
+                        Coordinates saved
+                      </span>
+                    ) : null}
+                  </p>
+                )}
+                {!addressLat && !addressLng && (facility?.address_line1 || facility?.location_address) && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                    This facility has an address but no coordinates. Search again to enable distance calculations.
+                  </p>
+                )}
               </div>
 
+              {/* Postcode — standalone field since LocationPicker doesn't always return it */}
               <div>
-                <Label htmlFor="addressCountry">Country *</Label>
-                <Select
-                  value={addressCountryCode}
-                  onValueChange={(code) => {
-                    setAddressCountryCode(code);
-                    const country = COUNTRIES.find(c => c.value === code);
-                    setAddressCountry(country?.label || '');
-                  }}
-                >
-                  <SelectTrigger id="addressCountry">
-                    <SelectValue placeholder="Select country..." />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {COUNTRIES.map((country) => (
-                      <SelectItem key={country.value} value={country.value}>
-                        {country.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="addressPostcode">Postcode</Label>
+                <Input
+                  id="addressPostcode"
+                  placeholder="SW1A 1AA"
+                  value={addressPostcode}
+                  onChange={(e) => setAddressPostcode(e.target.value)}
+                />
               </div>
             </div>
           </div>

@@ -120,11 +120,11 @@ export default function ProductDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {product.product_image_url && (
-                <div className="rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800">
+                <div className="rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                   <img
                     src={product.product_image_url}
                     alt={product.name}
-                    className="w-full h-64 object-cover"
+                    className="max-w-full max-h-80 object-contain"
                   />
                 </div>
               )}

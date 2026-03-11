@@ -401,6 +401,7 @@ export default function ProductDashboardPage() {
             productCategory={product?.product_category}
             onSaveComplete={() => {
               refetch();
+              closeRecipeEditor(true);
             }}
             onDirtyChange={setRecipeEditorDirty}
             compact={true}
