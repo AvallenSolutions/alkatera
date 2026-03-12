@@ -5,10 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search, Lightbulb } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search, Lightbulb, Droplets, TreePine } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { findBrandNameMatch } from "@/lib/openlca/drinks-aliases";
 import type { DataSource } from "@/lib/types/lca";
+import { EmissionFactorDetailPopover } from "./EmissionFactorDetailPopover";
 
 interface ProxySuggestion {
   proxy_name: string;
@@ -19,7 +20,7 @@ interface ProxySuggestion {
   uncertainty_impact?: string;
 }
 
-interface SearchResult {
+export interface SearchResult {
   id: string;
   name: string;
   friendly_name?: string;
@@ -625,6 +626,17 @@ export function InlineIngredientSearch({
                         {result.friendly_name || result.name}
                       </span>
                       {getSourceBadge(result)}
+                      <EmissionFactorDetailPopover result={result}>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center h-4 w-4 rounded-full hover:bg-accent shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          aria-label="View factor details"
+                        >
+                          <Info className="h-3 w-3 text-muted-foreground/40 hover:text-muted-foreground" />
+                        </button>
+                      </EmissionFactorDetailPopover>
                     </div>
                     {result.friendly_name && (
                       <p className="text-[11px] text-muted-foreground/70 truncate mt-0.5" title={result.name}>
@@ -668,6 +680,51 @@ export function InlineIngredientSearch({
                         )}
                       </div>
                     )}
+                    {/* Multi-impact indicators + data quality */}
+                    {(() => {
+                      const water = result.water_factor;
+                      const landVal = result.land_factor;
+                      const grade = result.data_quality_grade || result.metadata?.data_quality_grade;
+                      const geo = result.metadata?.geographic_scope;
+                      const temporal = result.metadata?.temporal_coverage;
+                      const showGrade = grade && (result.source_type === 'global_library' || result.source_type === 'ecoinvent_proxy');
+                      const hasAny = (water != null && water > 0) || (landVal != null && landVal > 0) || showGrade || geo || temporal;
+
+                      if (!hasAny) return null;
+
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[10px] text-muted-foreground/60">
+                          {water != null && water > 0 && (
+                            <span className="inline-flex items-center gap-0.5 text-blue-500 dark:text-blue-400">
+                              <Droplets className="h-2.5 w-2.5" />
+                              {water.toFixed(1)}
+                            </span>
+                          )}
+                          {landVal != null && landVal > 0 && (
+                            <span className="inline-flex items-center gap-0.5 text-green-600 dark:text-green-400">
+                              <TreePine className="h-2.5 w-2.5" />
+                              {landVal.toFixed(1)}
+                            </span>
+                          )}
+                          {showGrade && (
+                            <span className="inline-flex items-center gap-1">
+                              <span className={`h-1.5 w-1.5 rounded-full ${
+                                grade === 'HIGH' ? 'bg-emerald-500' :
+                                grade === 'MEDIUM' ? 'bg-amber-500' :
+                                'bg-red-500'
+                              }`} />
+                              {grade === 'HIGH' ? 'High' : grade === 'MEDIUM' ? 'Med' : 'Low'}
+                            </span>
+                          )}
+                          {geo && (
+                            <span>{geo}</span>
+                          )}
+                          {temporal && (
+                            <span>{temporal}</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                     {result.source_type === 'global_library' && result.source_citation && (
                       <div className="text-xs text-muted-foreground/70 mt-0.5 truncate max-w-full" title={result.source_citation}>
                         Source: {result.source_citation.length > 80 ? result.source_citation.slice(0, 80) + '...' : result.source_citation}

@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import { InlineIngredientSearch } from '@/components/lca/InlineIngredientSearch';
 import type { DataSource } from '@/lib/types/lca';
 import type { MaterialWithValidation } from '../types';
+import { materialHasAssignedFactor } from '../types';
 import { useWizardContext } from '../WizardContext';
 import { cn } from '@/lib/utils';
 
@@ -150,6 +151,7 @@ export function MaterialValidationStep() {
             return {
               ...updatedRow,
               hasData: true,
+              validationStatus: 'resolved' as const,
               dataQuality: r.data_quality_tag,
               confidenceScore: r.confidence_score,
               resolvedFactorName: updatedRow.matched_source_name || updatedRow.material_name,
@@ -158,15 +160,31 @@ export function MaterialValidationStep() {
               error: undefined,
             } as MaterialWithValidation;
           }
+
+          // DB-column guard: we just saved the factor to DB, so if the
+          // resolver failed transiently, check the DB columns before
+          // marking as missing. The user DID pick a factor — don't lose it.
+          if (materialHasAssignedFactor(updatedRow)) {
+            return {
+              ...updatedRow,
+              hasData: true,
+              validationStatus: 'assigned' as const,
+              resolvedFactorName: updatedRow.matched_source_name || updatedRow.material_name,
+              error: validation.missingData[0]?.error,
+            } as MaterialWithValidation;
+          }
+
           const missing = validation.missingData[0];
           return {
             ...updatedRow,
             hasData: false,
+            validationStatus: 'missing' as const,
             error: missing?.error || 'Validation failed',
           } as MaterialWithValidation;
         });
 
-        const newMissing = updated.filter((m) => !m.hasData).length;
+        // Use validationStatus to determine truly missing count
+        const newMissing = updated.filter((m) => m.validationStatus === 'missing').length;
         return {
           ...prev,
           materials: updated,
@@ -229,6 +247,16 @@ export function MaterialValidationStep() {
           </AlertDescription>
         </Alert>
       )}
+      {materials.some((m) => m.validationStatus === 'assigned') && (
+        <Alert className="border-amber-500/30 bg-amber-500/5">
+          <Info className="h-4 w-4 text-amber-500" />
+          <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs">
+            <strong>Some factors are assigned but could not be fully verified right now.</strong>{' '}
+            This is usually temporary (database timeout or network issue). The
+            calculation will attempt to resolve them again when it runs.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Proxy explanation note */}
       {materials.some(
@@ -279,6 +307,8 @@ export function MaterialValidationStep() {
                 <div className="flex items-center gap-2">
                   {material.hasData ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  ) : material.validationStatus === 'assigned' ? (
+                    <CheckCircle2 className="h-4 w-4 text-amber-500" />
                   ) : isSaving ? (
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
                   ) : (
@@ -318,7 +348,17 @@ export function MaterialValidationStep() {
                 </div>
               )}
 
-              {!material.hasData && (
+              {!material.hasData && material.validationStatus === 'assigned' && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="secondary" className="text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                    Assigned
+                  </Badge>
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    {material.resolvedFactorName || material.matched_source_name || material.material_name}
+                  </span>
+                </div>
+              )}
+              {!material.hasData && material.validationStatus === 'missing' && (
                 <Badge variant="destructive" className="text-xs">
                   Missing emission factor
                 </Badge>
@@ -434,6 +474,46 @@ export function MaterialValidationStep() {
                                   ` · ${confidenceScore}% confidence`}
                               </span>
                             )}
+                            {/* Decomposition transparency: show embedded transport/electricity % */}
+                            {material.embeddedTransportPercent != null && material.embeddedTransportPercent > 0 && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="text-[10px] text-muted-foreground/50 cursor-help">
+                                    Includes ~{material.embeddedTransportPercent.toFixed(0)}% transport
+                                    {material.embeddedElectricityPercent != null && material.embeddedElectricityPercent > 0 &&
+                                      `, ~${material.embeddedElectricityPercent.toFixed(0)}% electricity`}
+                                    {material.embeddedElectricityGeography &&
+                                      ` (${material.embeddedElectricityGeography})`}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-[280px] text-xs">
+                                  <p>
+                                    This cradle-to-gate factor includes generic upstream
+                                    transport and processing electricity from the ecoinvent
+                                    database. If you specify your ingredient&apos;s origin and
+                                    transport mode, your actual transport will replace this
+                                    estimate during calculation.
+                                  </p>
+                                  {material.embeddedElectricityGeography && material.origin_country &&
+                                    material.embeddedElectricityGeography !== (material as any).origin_country_code && (
+                                    <p className="mt-1 text-amber-600 dark:text-amber-400">
+                                      ⚠ Factor electricity uses {material.embeddedElectricityGeography} grid.
+                                      Your ingredient origin ({material.origin_country}) may have a different
+                                      grid intensity — this will be adjusted during calculation.
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                          </div>
+                        ) : material.validationStatus === 'assigned' ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                              {material.resolvedFactorName || material.matched_source_name || material.material_name}
+                            </span>
+                            <span className="text-xs text-muted-foreground/70 italic">
+                              Factor assigned · verification pending
+                            </span>
                           </div>
                         ) : (
                           <span className="text-xs text-muted-foreground italic">
@@ -457,6 +537,10 @@ export function MaterialValidationStep() {
                             {Icon && <Icon className="h-3 w-3 mr-1" />}
                             {material.dataQuality?.replace(/_/g, ' ')}
                           </Badge>
+                        ) : material.validationStatus === 'assigned' ? (
+                          <Badge variant="secondary" className="text-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                            Assigned
+                          </Badge>
                         ) : (
                           <Badge variant="destructive" className="text-xs">
                             Missing
@@ -468,6 +552,8 @@ export function MaterialValidationStep() {
                       <TableCell>
                         {material.hasData ? (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : material.validationStatus === 'assigned' ? (
+                          <CheckCircle2 className="h-4 w-4 text-amber-500" />
                         ) : isSaving ? (
                           <Loader2 className="h-4 w-4 animate-spin text-primary" />
                         ) : (

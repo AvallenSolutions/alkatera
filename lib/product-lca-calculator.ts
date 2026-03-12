@@ -832,6 +832,54 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           transportEmissions /= unitsPerGroup;
         }
 
+        // ──────────────────────────────────────────────────────────────
+        // Impact decomposition adjustments
+        //
+        // When we have decomposed impacts from OpenLCA contribution analysis,
+        // we can replace the generic ecoinvent transport/electricity with
+        // user-specific values:
+        //
+        // Transport: If user provided origin + mode + distance, use their
+        //   DEFRA-calculated transport instead of ecoinvent's generic transport.
+        //   adjusted = (total - embedded_transport) + user_transport
+        //
+        // Electricity: If user's origin country differs from the factor's
+        //   embedded electricity geography, adjust using the grid factor ratio.
+        //   adjusted += embedded_electricity × (user_grid / factor_grid - 1)
+        // ──────────────────────────────────────────────────────────────
+        let adjustedClimate = resolved.impact_climate;
+
+        const hasDecomposition = (resolved.impact_climate_production ?? 0) > 0;
+        const embeddedTransport = resolved.impact_climate_transport_embedded ?? 0;
+        const embeddedElectricity = resolved.impact_climate_electricity_embedded ?? 0;
+        const embeddedElecGeo = resolved.embedded_electricity_geography;
+
+        // Transport replacement: swap ecoinvent generic transport for user's actual transport
+        if (transportEmissions > 0 && hasDecomposition && embeddedTransport > 0) {
+          adjustedClimate = resolved.impact_climate - embeddedTransport + transportEmissions;
+          console.log(
+            `[calculateProductCarbonFootprint] ⚡ Transport replaced for ${material.material_name}: ` +
+            `ecoinvent=${embeddedTransport.toFixed(3)} → DEFRA=${transportEmissions.toFixed(3)} kg CO2e`
+          );
+        }
+
+        // Electricity grid adjustment: correct for processing country's actual grid mix
+        if (hasDecomposition && embeddedElectricity > 0 && embeddedElecGeo && (material as any).origin_country_code) {
+          const userGrid = getGridFactor((material as any).origin_country_code);
+          const factorGrid = getGridFactor(embeddedElecGeo);
+
+          // Only adjust if both grids are known (not estimated) and different
+          if (!userGrid.isEstimated && !factorGrid.isEstimated && Math.abs(userGrid.factor - factorGrid.factor) > 0.001) {
+            const electricityAdjustment = embeddedElectricity * (userGrid.factor / factorGrid.factor - 1);
+            adjustedClimate += electricityAdjustment;
+            console.log(
+              `[calculateProductCarbonFootprint] ⚡ Electricity adjusted for ${material.material_name}: ` +
+              `${embeddedElecGeo}=${factorGrid.factor.toFixed(3)} → ${(material as any).origin_country_code}=${userGrid.factor.toFixed(3)} ` +
+              `(Δ=${electricityAdjustment >= 0 ? '+' : ''}${electricityAdjustment.toFixed(3)} kg CO2e)`
+            );
+          }
+        }
+
         // Build LCA material record with all impact data
         // Note: data_source must be 'openlca', 'supplier', or NULL per constraint
         // For staging factors, we use NULL
@@ -873,7 +921,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           origin_country_code: material.origin_country_code || null,
 
           // Impact values
-          impact_climate: resolved.impact_climate,
+          impact_climate: adjustedClimate,
           impact_climate_fossil: resolved.impact_climate_fossil,
           impact_climate_biogenic: resolved.impact_climate_biogenic,
           impact_climate_dluc: resolved.impact_climate_dluc,
@@ -890,6 +938,12 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           impact_freshwater_eutrophication: resolved.impact_freshwater_eutrophication,
           impact_terrestrial_acidification: resolved.impact_terrestrial_acidification,
           impact_fossil_resource_scarcity: resolved.impact_fossil_resource_scarcity,
+
+          // Decomposition metadata (for UI transparency)
+          impact_climate_production: resolved.impact_climate_production,
+          impact_climate_transport_embedded: resolved.impact_climate_transport_embedded,
+          impact_climate_electricity_embedded: resolved.impact_climate_electricity_embedded,
+          embedded_electricity_geography: resolved.embedded_electricity_geography,
 
           // Data quality & provenance
           data_priority: resolved.data_priority,
@@ -911,9 +965,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         lcaMaterialsWithImpacts.push(lcaMaterial);
 
-        const totalMaterialEmissions = resolved.impact_climate + transportEmissions;
         const allocationNote = unitsPerGroup > 1 ? ` (allocated ÷${unitsPerGroup} units)` : '';
-        console.log(`[calculateProductCarbonFootprint] ✓ Resolved ${material.material_name}: ${resolved.impact_climate.toFixed(3)} kg CO2e + ${transportEmissions.toFixed(3)} kg transport = ${totalMaterialEmissions.toFixed(3)} kg CO2e total (Priority ${resolved.data_priority})${allocationNote}`);
+        const adjustedNote = adjustedClimate !== resolved.impact_climate ? ` (adjusted from ${resolved.impact_climate.toFixed(3)})` : '';
+        console.log(`[calculateProductCarbonFootprint] ✓ Resolved ${material.material_name}: ${adjustedClimate.toFixed(3)} kg CO2e${adjustedNote} (Priority ${resolved.data_priority})${allocationNote}`);
 
       } catch (error: any) {
         console.error(`[calculateProductCarbonFootprint] ✗ Failed to resolve ${material.material_name}:`, error.message);

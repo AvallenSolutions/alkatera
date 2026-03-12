@@ -542,6 +542,11 @@ export async function GET(request: NextRequest) {
             lcia_method: proxy.lcia_method,
             system_model: proxy.system_model,
             ecoinvent_process_name: proxy.ecoinvent_process_name,
+            // Impact decomposition (populated when proxy resolved with contribution analysis)
+            impact_climate_production: proxy.impact_climate_production,
+            impact_climate_transport: proxy.impact_climate_transport,
+            impact_climate_electricity: proxy.impact_climate_electricity,
+            embedded_electricity_geography: proxy.embedded_electricity_geography,
           },
         }));
       })(),

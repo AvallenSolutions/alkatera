@@ -92,6 +92,15 @@ export interface WaterfallResult {
   data_collection_year?: number;     // For temporal representativeness
   geographic_scope?: string;         // ISO country code or GLO
 
+  // Impact decomposition (from OpenLCA contribution analysis)
+  // Enables replacing generic ecoinvent transport/electricity with user-specific data
+  impact_climate_production?: number;       // Climate excluding transport & electricity
+  impact_climate_transport_embedded?: number; // Embedded transport climate impact
+  impact_climate_electricity_embedded?: number; // Embedded electricity climate impact
+  embedded_electricity_geography?: string | null; // ISO code of electricity process geography
+  transport_process_names?: string[];       // For UI transparency
+  electricity_process_names?: string[];     // For UI transparency
+
   // Optional IDs
   supplier_lca_id?: string;
   category_type: MaterialCategoryType;

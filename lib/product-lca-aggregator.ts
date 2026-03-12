@@ -232,11 +232,18 @@ export async function aggregateProductImpacts(
     const quantity = Number(material.quantity || 0);
 
     totalClimate += climateImpact;
-    // NOTE: transportImpact is tracked separately in totalTransport but NOT
-    // added again to totalClimate — transport is already embedded in
-    // impact_climate on the material record when the calculator resolves
-    // per-material impacts. Adding it twice was a bug causing systematic
-    // over-reporting of the carbon footprint.
+    // NOTE: impact_climate already includes the correct transport and
+    // electricity values. The product-lca-calculator applies decomposition
+    // adjustments before writing impact_climate:
+    //
+    // - If user provided specific transport data: impact_climate =
+    //   (ecoinvent total - embedded generic transport) + user DEFRA transport
+    // - If user's origin country differs from factor electricity geography:
+    //   impact_climate is further adjusted by the grid factor ratio
+    // - If no user data: impact_climate = full ecoinvent factor (unchanged)
+    //
+    // transportImpact (impact_transport) is tracked separately in totalTransport
+    // for reporting breakdown only — it is NOT added to totalClimate.
     totalClimateFossil += climateFossil;
     totalClimateBiogenic += climateBiogenic;
     totalClimateDluc += climateDluc;
@@ -251,7 +258,7 @@ export async function aggregateProductImpacts(
     totalFossilResourceScarcity += Number(material.impact_fossil_resource_scarcity || 0);
 
     scope3Emissions += climateImpact;
-    // Do NOT add transportImpact again — already included in climateImpact.
+    // transportImpact is for reporting breakdown only — NOT added to scope totals.
 
     const materialType = (material.material_type || '').toLowerCase();
 
@@ -263,11 +270,9 @@ export async function aggregateProductImpacts(
       rawMaterialsEmissions += climateImpact;
     }
 
-    // ISO COMPLIANCE FIX: Removed duplicate transport addition to stage buckets.
-    // Transport is already embedded in impact_climate on each material record
-    // (see NOTE at line ~227). The climateImpact added to stage buckets above
-    // already includes inbound transport. Adding transportImpact again was
-    // double-counting, causing stage sum to exceed headline total by ~totalTransport.
+    // impact_climate on each material already includes inbound transport
+    // (either ecoinvent generic or user-specific DEFRA transport, depending on
+    // whether the user provided transport data and decomposition was available).
     // Outbound distribution is handled separately by the distribution stage.
 
     totalCO2Fossil += climateFossil;

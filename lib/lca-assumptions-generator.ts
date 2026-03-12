@@ -145,7 +145,7 @@ export function generateAssumptions(ctx: AssumptionContext): string[] {
   // Always include material transport assumption
   assumptions.push({
     category: 'transport',
-    text: `Raw material transport impacts are embedded in the upstream emission factors from the database (cradle-to-gate factors include extraction, processing, and delivery to factory gate).`,
+    text: `Raw material transport impacts are embedded in the upstream emission factors from the database (cradle-to-gate factors include extraction, processing, and delivery to factory gate). Where ingredient-specific transport data is provided (origin, mode, distance), the generic embedded transport is replaced with DEFRA 2025 freight factors for the actual route. Electricity impacts are adjusted when the ingredient's processing country differs from the emission factor's electricity geography.`,
   });
 
   // ──────────────────────────────────────────────────────────────────────────

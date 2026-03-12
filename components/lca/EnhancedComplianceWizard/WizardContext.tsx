@@ -24,7 +24,7 @@ import type {
   ReportingSession,
   MaterialWithValidation,
 } from './types';
-import { INITIAL_PRE_CALC_STATE } from './types';
+import { INITIAL_PRE_CALC_STATE, materialHasAssignedFactor } from './types';
 import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife, boundaryNeedsDistribution } from '@/lib/system-boundaries';
 import type { UsePhaseConfig } from '@/lib/use-phase-factors';
 import type { EoLConfig } from '@/lib/end-of-life-factors';
@@ -373,16 +373,50 @@ export function WizardProvider({
           );
 
           if (validMaterial) {
+            const r = validMaterial.resolved;
+            // Compute decomposition percentages for UI transparency
+            const totalClimate = r.impact_climate || 1; // avoid div by zero
+            const transportPct = r.impact_climate_transport_embedded
+              ? (r.impact_climate_transport_embedded / totalClimate) * 100
+              : undefined;
+            const electricityPct = r.impact_climate_electricity_embedded
+              ? (r.impact_climate_electricity_embedded / totalClimate) * 100
+              : undefined;
+
             return {
               ...mat,
               hasData: true,
-              dataQuality: validMaterial.resolved.data_quality_tag,
-              confidenceScore: validMaterial.resolved.confidence_score,
+              validationStatus: 'resolved' as const,
+              dataQuality: r.data_quality_tag,
+              confidenceScore: r.confidence_score,
+              factorGeography: r.geographic_scope || undefined,
+              embeddedTransportPercent: transportPct,
+              embeddedElectricityPercent: electricityPct,
+              embeddedElectricityGeography: r.embedded_electricity_geography,
             };
-          } else if (missingMaterial) {
-            return { ...mat, hasData: false, error: missingMaterial.error };
           }
-          return { ...mat, hasData: false, error: 'Unknown validation error' };
+
+          // DB-column guard: if the resolver failed but the DB has an assigned
+          // factor, treat as "assigned" (not "missing"). This prevents transient
+          // resolver failures (OpenLCA timeout, network errors) from hiding
+          // factors that the user has already selected.
+          if (materialHasAssignedFactor(mat)) {
+            return {
+              ...mat,
+              hasData: true,
+              validationStatus: 'assigned' as const,
+              resolvedFactorName: mat.matched_source_name || mat.material_name,
+              error: missingMaterial?.error,
+            };
+          }
+
+          // Truly missing — no factor in DB
+          return {
+            ...mat,
+            hasData: false,
+            validationStatus: 'missing' as const,
+            error: missingMaterial?.error || 'Unknown validation error',
+          };
         }
       );
 
@@ -473,11 +507,18 @@ export function WizardProvider({
         });
       }
 
+      // Derive canCalculate and missingCount from the consumer-level
+      // validationStatus (not the raw resolver result), so transient resolver
+      // failures for assigned materials don't block the calculation.
+      const trulyMissing = materialsWithStatus.filter(
+        (m) => m.validationStatus === 'missing'
+      ).length;
+
       setPreCalcState((prev) => ({
         ...prev,
         materials: materialsWithStatus,
-        canCalculate: validation.valid,
-        missingCount: validation.missingData.length,
+        canCalculate: trulyMissing === 0,
+        missingCount: trulyMissing,
         linkedFacilities: facilities,
         facilityAllocations: allocations,
         reportingSessions: allSessions,

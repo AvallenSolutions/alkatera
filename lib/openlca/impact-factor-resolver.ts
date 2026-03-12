@@ -17,6 +17,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
 import { OpenLCAClient } from './client';
+import { OpenLCACalculator } from './calculator';
 import type { WaterfallResult, MaterialCategoryType } from '../impact-waterfall-resolver';
 import type { ImpactResult, Ref } from './schema';
 
@@ -50,6 +51,15 @@ export interface OpenLCAImpactData {
   impactFreshwaterEutrophication: number;
   impactTerrestrialAcidification: number;
   impactFossilResourceScarcity: number;
+
+  // Impact decomposition (from contribution analysis)
+  // These enable replacing generic ecoinvent transport/electricity with user-specific data
+  impactClimateProduction: number;       // Climate excluding transport & electricity
+  impactClimateTransport: number;        // Embedded transport climate impact
+  impactClimateElectricity: number;      // Embedded electricity climate impact
+  embeddedElectricityGeography: string | null;  // ISO code of electricity process geography
+  transportProcessNames: string[];       // For transparency
+  electricityProcessNames: string[];     // For transparency
 
   // Metadata
   impactMethod: string;
@@ -183,6 +193,13 @@ async function getCachedImpacts(
     impactFreshwaterEutrophication: data.impact_freshwater_eutrophication || 0,
     impactTerrestrialAcidification: data.impact_terrestrial_acidification || 0,
     impactFossilResourceScarcity: data.impact_fossil_resource_scarcity || 0,
+    // Decomposition fields (null/0 for legacy cached data without decomposition)
+    impactClimateProduction: data.impact_climate_production ?? 0,
+    impactClimateTransport: data.impact_climate_transport ?? 0,
+    impactClimateElectricity: data.impact_climate_electricity ?? 0,
+    embeddedElectricityGeography: data.embedded_electricity_geography || null,
+    transportProcessNames: data.transport_process_names || [],
+    electricityProcessNames: data.electricity_process_names || [],
     impactMethod: data.impact_method || 'ReCiPe 2016 Midpoint (H)',
     ecoinventVersion: data.ecoinvent_version || '3.12',
     systemModel: data.system_model || 'cutoff',
@@ -224,6 +241,13 @@ async function cacheImpacts(
       impact_freshwater_eutrophication: data.impactFreshwaterEutrophication,
       impact_terrestrial_acidification: data.impactTerrestrialAcidification,
       impact_fossil_resource_scarcity: data.impactFossilResourceScarcity,
+      // Decomposition fields
+      impact_climate_production: data.impactClimateProduction,
+      impact_climate_transport: data.impactClimateTransport,
+      impact_climate_electricity: data.impactClimateElectricity,
+      embedded_electricity_geography: data.embeddedElectricityGeography,
+      transport_process_names: data.transportProcessNames,
+      electricity_process_names: data.electricityProcessNames,
       impact_method: data.impactMethod,
       ecoinvent_version: data.ecoinventVersion,
       system_model: data.systemModel,
@@ -237,48 +261,123 @@ async function cacheImpacts(
 }
 
 /**
- * Query OpenLCA for impact factors for a specific process
+ * Query OpenLCA for impact factors for a specific process.
+ *
+ * Uses contribution analysis to decompose the total climate impact into:
+ * - Production (raw material + processing, excluding transport & electricity)
+ * - Transport (embedded upstream freight)
+ * - Electricity (embedded upstream grid electricity)
+ *
+ * This decomposition enables the platform to replace generic ecoinvent
+ * transport/electricity with user-specific data when available.
  */
 async function queryOpenLCAImpacts(
   client: OpenLCAClient,
   processId: string,
   impactMethodName: string = 'ReCiPe 2016'
 ): Promise<OpenLCAImpactData> {
-  console.log(`[OpenLCA] Calculating impacts for process: ${processId}`);
+  console.log(`[OpenLCA] Calculating impacts for process: ${processId} (with contribution analysis)`);
 
   // Get process details
   const process = await client.getProcess(processId);
 
-  // Calculate impacts using convenience method
-  const impacts = await client.calculateProcess(processId, impactMethodName, 1);
+  // Instead of the convenience calculateProcess() (which disposes immediately),
+  // we do the calculation manually so we can extract the upstream tree before dispose.
+  let resultId: string | null = null;
 
-  // Parse results
-  const parsedImpacts = parseImpactResults(impacts);
+  try {
+    // Find impact method
+    const impactMethod = await client.findImpactMethod(impactMethodName);
+    if (!impactMethod) {
+      throw new Error(`Impact method not found: ${impactMethodName}`);
+    }
 
-  return {
-    processId,
-    processName: process.name || 'Unknown',
-    geography: (process.location as any)?.code || 'GLO',
-    unit: 'kg', // Default reference unit
-    quantity: 1,
-    impactClimate: parsedImpacts.impactClimate || 0,
-    impactClimateFossil: parsedImpacts.impactClimateFossil || 0,
-    impactClimateBiogenic: parsedImpacts.impactClimateBiogenic || 0,
-    impactClimateDluc: parsedImpacts.impactClimateDluc || 0,
-    impactWater: parsedImpacts.impactWater || 0,
-    impactLand: parsedImpacts.impactLand || 0,
-    impactWaste: parsedImpacts.impactWaste || 0,
-    impactOzoneDepletion: parsedImpacts.impactOzoneDepletion || 0,
-    impactTerrestrialEcotoxicity: parsedImpacts.impactTerrestrialEcotoxicity || 0,
-    impactFreshwaterEcotoxicity: parsedImpacts.impactFreshwaterEcotoxicity || 0,
-    impactFreshwaterEutrophication: parsedImpacts.impactFreshwaterEutrophication || 0,
-    impactTerrestrialAcidification: parsedImpacts.impactTerrestrialAcidification || 0,
-    impactFossilResourceScarcity: parsedImpacts.impactFossilResourceScarcity || 0,
-    impactMethod: impactMethodName,
-    ecoinventVersion: '3.12',
-    systemModel: 'cutoff',
-    calculatedAt: new Date(),
-  };
+    // OpenLCA 2.x: Calculate directly from process using 'target' parameter
+    const setup = {
+      target: {
+        '@type': 'Process',
+        '@id': processId,
+      },
+      impactMethod: {
+        '@type': 'ImpactMethod',
+        '@id': impactMethod['@id'],
+      },
+      amount: 1,
+    };
+
+    // Run calculation
+    const resultRef = await client.calculate(setup as any);
+    resultId = resultRef['@id'];
+
+    // Wait for result
+    await client.waitForResult(resultId);
+
+    // Get total impacts
+    const impacts = await client.getTotalImpacts(resultId);
+    const parsedImpacts = parseImpactResults(impacts);
+
+    // Extract transport and electricity decomposition from upstream tree
+    // Build impact category refs from the total impacts for tree queries
+    const impactCategoryRefs = impacts
+      .map((i) => i.impactCategory)
+      .filter((c): c is Ref => c !== undefined);
+
+    const calculator = new OpenLCACalculator(client);
+    const decomposition = await calculator.extractTransportAndElectricity(
+      resultId,
+      impactCategoryRefs
+    );
+
+    const totalClimate = parsedImpacts.impactClimate || 0;
+    const transportClimate = decomposition.transportClimate;
+    const electricityClimate = decomposition.electricityClimate;
+    // Production = total minus transport and electricity sub-processes
+    const productionClimate = Math.max(0, totalClimate - transportClimate - electricityClimate);
+
+    console.log(
+      `[OpenLCA] Decomposition for ${process.name}: ` +
+      `total=${totalClimate.toFixed(4)}, production=${productionClimate.toFixed(4)}, ` +
+      `transport=${transportClimate.toFixed(4)} (${((transportClimate / totalClimate) * 100).toFixed(1)}%), ` +
+      `electricity=${electricityClimate.toFixed(4)} (${((electricityClimate / totalClimate) * 100).toFixed(1)}%)`
+    );
+
+    return {
+      processId,
+      processName: process.name || 'Unknown',
+      geography: (process.location as any)?.code || 'GLO',
+      unit: 'kg',
+      quantity: 1,
+      impactClimate: parsedImpacts.impactClimate || 0,
+      impactClimateFossil: parsedImpacts.impactClimateFossil || 0,
+      impactClimateBiogenic: parsedImpacts.impactClimateBiogenic || 0,
+      impactClimateDluc: parsedImpacts.impactClimateDluc || 0,
+      impactWater: parsedImpacts.impactWater || 0,
+      impactLand: parsedImpacts.impactLand || 0,
+      impactWaste: parsedImpacts.impactWaste || 0,
+      impactOzoneDepletion: parsedImpacts.impactOzoneDepletion || 0,
+      impactTerrestrialEcotoxicity: parsedImpacts.impactTerrestrialEcotoxicity || 0,
+      impactFreshwaterEcotoxicity: parsedImpacts.impactFreshwaterEcotoxicity || 0,
+      impactFreshwaterEutrophication: parsedImpacts.impactFreshwaterEutrophication || 0,
+      impactTerrestrialAcidification: parsedImpacts.impactTerrestrialAcidification || 0,
+      impactFossilResourceScarcity: parsedImpacts.impactFossilResourceScarcity || 0,
+      // Decomposition
+      impactClimateProduction: productionClimate,
+      impactClimateTransport: transportClimate,
+      impactClimateElectricity: electricityClimate,
+      embeddedElectricityGeography: decomposition.electricityGeography,
+      transportProcessNames: decomposition.transportProcessNames,
+      electricityProcessNames: decomposition.electricityProcessNames,
+      impactMethod: impactMethodName,
+      ecoinventVersion: '3.12',
+      systemModel: 'cutoff',
+      calculatedAt: new Date(),
+    };
+  } finally {
+    // Always dispose result to free memory
+    if (resultId) {
+      await client.dispose(resultId);
+    }
+  }
 }
 
 /**
@@ -369,6 +468,14 @@ export async function resolveOpenLCAImpacts(
     gwp_reference_id: processId,
     non_gwp_reference_id: processId,
     is_hybrid_source: false,
+
+    // Impact decomposition (per-quantity, same scaling as impact_climate)
+    impact_climate_production: impactData.impactClimateProduction * quantityKg,
+    impact_climate_transport_embedded: impactData.impactClimateTransport * quantityKg,
+    impact_climate_electricity_embedded: impactData.impactClimateElectricity * quantityKg,
+    embedded_electricity_geography: impactData.embeddedElectricityGeography,
+    transport_process_names: impactData.transportProcessNames,
+    electricity_process_names: impactData.electricityProcessNames,
 
     // Category
     category_type: 'MANUFACTURING_MATERIAL' as MaterialCategoryType,

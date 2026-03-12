@@ -285,6 +285,139 @@ export class OpenLCACalculator {
   }
 
   /**
+   * Extract transport and electricity contributions from upstream tree.
+   *
+   * Uses the flattened contribution tree to identify processes that are
+   * transport or electricity sub-flows, then sums their climate impact.
+   * This enables the platform to replace generic ecoinvent transport/electricity
+   * with user-specific data (DEFRA freight factors, country grid factors).
+   *
+   * @param resultId - OpenLCA calculation result ID (must not be disposed yet)
+   * @param impactCategories - Impact category refs from the calculation
+   * @returns Decomposed transport and electricity climate contributions
+   */
+  async extractTransportAndElectricity(
+    resultId: string,
+    impactCategories: Ref[]
+  ): Promise<{
+    transportClimate: number;
+    electricityClimate: number;
+    electricityGeography: string | null;
+    transportProcessNames: string[];
+    electricityProcessNames: string[];
+  }> {
+    // Patterns for identifying transport processes in ecoinvent
+    const TRANSPORT_PATTERNS = [
+      'transport, freight',
+      'transport, lorry',
+      'transport, sea',
+      'transport, rail',
+      'transport, air',
+      'market for transport',
+      'transport, pipeline',
+      'transport, barge',
+    ];
+
+    // Patterns for identifying electricity processes in ecoinvent
+    const ELECTRICITY_PATTERNS = [
+      'electricity,',
+      'market for electricity',
+      'electricity production',
+      'market group for electricity',
+    ];
+
+    // Find the climate change impact category (main GWP100)
+    const climateCategory = impactCategories.find((c) => {
+      const name = c.name?.toLowerCase() || '';
+      return (
+        (name.includes('climate change') || name.includes('global warming')) &&
+        !name.includes('fossil') &&
+        !name.includes('biogenic') &&
+        !name.includes('land use')
+      );
+    });
+
+    if (!climateCategory) {
+      console.warn('[OpenLCA] No climate change category found for decomposition');
+      return {
+        transportClimate: 0,
+        electricityClimate: 0,
+        electricityGeography: null,
+        transportProcessNames: [],
+        electricityProcessNames: [],
+      };
+    }
+
+    try {
+      const tree = await this.client.getUpstreamTree(resultId, climateCategory);
+      const flatNodes = this.flattenTree(tree.root);
+
+      let transportClimate = 0;
+      let electricityClimate = 0;
+      let electricityGeography: string | null = null;
+      const transportProcessNames: string[] = [];
+      const electricityProcessNames: string[] = [];
+
+      for (const node of flatNodes) {
+        const processName = (node.provider.name || '').toLowerCase();
+
+        // Check transport
+        const isTransport = TRANSPORT_PATTERNS.some((p) => processName.includes(p));
+        if (isTransport) {
+          transportClimate += node.result;
+          const fullName = node.provider.name || 'Unknown transport';
+          if (!transportProcessNames.includes(fullName)) {
+            transportProcessNames.push(fullName);
+          }
+          continue; // A process is either transport or electricity, not both
+        }
+
+        // Check electricity
+        const isElectricity = ELECTRICITY_PATTERNS.some((p) => processName.includes(p));
+        if (isElectricity) {
+          electricityClimate += node.result;
+          const fullName = node.provider.name || 'Unknown electricity';
+          if (!electricityProcessNames.includes(fullName)) {
+            electricityProcessNames.push(fullName);
+          }
+
+          // Extract geography from process name (ecoinvent format: "electricity, low voltage {ZW}")
+          if (!electricityGeography) {
+            const geoMatch = (node.provider.name || '').match(/\{([A-Z]{2,3}(?:-[A-Z]{2,3})?)\}/);
+            if (geoMatch) {
+              electricityGeography = geoMatch[1];
+            }
+          }
+        }
+      }
+
+      console.log(
+        `[OpenLCA] Decomposition: transport=${transportClimate.toFixed(4)} kg CO2e ` +
+        `(${transportProcessNames.length} processes), ` +
+        `electricity=${electricityClimate.toFixed(4)} kg CO2e ` +
+        `(${electricityProcessNames.length} processes, geo=${electricityGeography || 'unknown'})`
+      );
+
+      return {
+        transportClimate,
+        electricityClimate,
+        electricityGeography,
+        transportProcessNames,
+        electricityProcessNames,
+      };
+    } catch (error) {
+      console.warn('[OpenLCA] Failed to extract transport/electricity decomposition:', error);
+      return {
+        transportClimate: 0,
+        electricityClimate: 0,
+        electricityGeography: null,
+        transportProcessNames: [],
+        electricityProcessNames: [],
+      };
+    }
+  }
+
+  /**
    * Calculate climate impact with GHG breakdown
    */
   async calculateGHG(

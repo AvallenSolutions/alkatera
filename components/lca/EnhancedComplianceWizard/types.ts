@@ -10,8 +10,34 @@ import type { OperationStep } from '@/components/ui/operation-progress';
 // MATERIAL VALIDATION
 // ============================================================================
 
+/**
+ * Tri-state validation status for materials:
+ * - 'resolved': Factor assigned AND the resolver successfully computed impact numbers
+ * - 'assigned': Factor assigned in DB but the resolver failed transiently (timeout, network, etc.)
+ * - 'missing':  No factor assigned — user needs to pick one
+ */
+export type MaterialValidationStatus = 'resolved' | 'assigned' | 'missing';
+
+/**
+ * Check whether a material has a factor assigned in the DB, regardless of
+ * whether the waterfall resolver can currently compute full impact numbers.
+ *
+ * This is the single source of truth for "has the user picked a factor?".
+ * The DB constraint `data_source_integrity` guarantees:
+ *   (data_source = 'openlca'  AND data_source_id IS NOT NULL)
+ * | (data_source = 'supplier' AND supplier_product_id IS NOT NULL)
+ * | (data_source IS NULL)
+ */
+export function materialHasAssignedFactor(mat: ProductMaterial): boolean {
+  if (mat.data_source === 'supplier' && mat.supplier_product_id) return true;
+  if (mat.data_source && mat.data_source_id) return true;
+  return false;
+}
+
 export interface MaterialWithValidation extends ProductMaterial {
   hasData: boolean;
+  /** Tri-state status distinguishing fully resolved, assigned-but-unresolved, and truly missing */
+  validationStatus: MaterialValidationStatus;
   dataQuality?: string;
   confidenceScore?: number;
   error?: string;
@@ -21,6 +47,16 @@ export interface MaterialWithValidation extends ProductMaterial {
   resolvedFactorSource?: string;
   /** Priority tier used (1=supplier, 2=DEFRA hybrid, 3=ecoinvent/staging) */
   resolvedPriority?: 1 | 2 | 3;
+
+  // Impact decomposition transparency (populated from contribution analysis)
+  /** Factor geography (ISO code, e.g. "GLO", "ZW") — from ecoinvent process */
+  factorGeography?: string;
+  /** Percentage of the factor's climate impact attributable to transport */
+  embeddedTransportPercent?: number;
+  /** Percentage attributable to electricity */
+  embeddedElectricityPercent?: number;
+  /** Geography of the embedded electricity process */
+  embeddedElectricityGeography?: string | null;
 }
 
 // ============================================================================
