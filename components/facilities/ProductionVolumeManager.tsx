@@ -65,6 +65,10 @@ export function ProductionVolumeManager({
       const res = await fetch(
         `/api/facility-production-volumes?facility_id=${facilityId}&organization_id=${organizationId}`
       );
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`API returned ${res.status} (non-JSON). Route may not be deployed.`);
+      }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
       setVolumes(json.data || []);
@@ -106,6 +110,10 @@ export function ProductionVolumeManager({
         }),
       });
 
+      const contentType = res.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server returned ${res.status} (non-JSON response). The API route may not be deployed correctly.`);
+      }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error);
 
@@ -125,6 +133,10 @@ export function ProductionVolumeManager({
     try {
       const res = await fetch(`/api/facility-production-volumes?id=${id}`, { method: "DELETE" });
       if (!res.ok) {
+        const contentType = res.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(`Server returned ${res.status} (non-JSON response)`);
+        }
         const json = await res.json();
         throw new Error(json.error);
       }
