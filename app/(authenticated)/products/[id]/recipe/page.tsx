@@ -325,6 +325,22 @@ export default function ProductRecipePage() {
           is_organic_certified: item.is_organic_certified || false,
           transport_mode: item.transport_mode || 'truck',
           distance_km: item.distance_km || '',
+          // Multi-modal transport legs. If absent, synthesise a single leg from legacy fields
+          // so the component always has transport_legs to work with.
+          transport_legs: item.transport_legs ?? (
+            item.transport_mode ? [{
+              id: 'leg_0',
+              label: '',
+              transportMode: item.transport_mode,
+              distanceKm: Number(item.distance_km || 0),
+            }] : [{ id: 'leg_0', label: '', transportMode: 'truck', distanceKm: 0 }]
+          ),
+          // Inbound delivery container
+          inbound_container_type:         item.inbound_container_type         ?? null,
+          inbound_container_volume_l:     item.inbound_container_volume_l     ?? null,
+          inbound_container_tare_kg:      item.inbound_container_tare_kg      ?? null,
+          inbound_container_reuse_cycles: item.inbound_container_reuse_cycles ?? null,
+          inbound_container_ef:           item.inbound_container_ef           ?? null,
         })));
       }
 
@@ -375,6 +391,11 @@ export default function ProductRecipePage() {
             origin_country_code: item.origin_country_code || '',
             transport_mode: item.transport_mode || 'truck',
             distance_km: item.distance_km || '',
+            transport_legs: item.transport_legs ?? (
+              item.transport_mode
+                ? [{ id: 'leg_0', label: '', transportMode: item.transport_mode, distanceKm: Number(item.distance_km || 0) }]
+                : [{ id: 'leg_0', label: '', transportMode: 'truck', distanceKm: 0 }]
+            ),
             // EPR Compliance fields
             has_component_breakdown: item.has_component_breakdown || false,
             components: componentsByMaterial[item.id] || [],
@@ -570,8 +591,16 @@ export default function ProductRecipePage() {
       material_type: 'ingredient',
       origin_country: form.origin_country || null,
       is_organic_certified: form.is_organic_certified || false,
-      transport_mode: form.transport_mode || 'truck',
-      distance_km: form.distance_km ? Number(form.distance_km) : null,
+      // Derive single-leg backward-compat fields from transport_legs[0] (or legacy fields)
+      transport_mode: form.transport_legs?.[0]?.transportMode ?? form.transport_mode ?? 'truck',
+      distance_km:    form.transport_legs?.[0]?.distanceKm    ?? (form.distance_km ? Number(form.distance_km) : null),
+      transport_legs: (form.transport_legs && form.transport_legs.length > 0) ? form.transport_legs : null,
+      // Inbound delivery container
+      inbound_container_type:         form.inbound_container_type         ?? null,
+      inbound_container_volume_l:     form.inbound_container_volume_l     ?? null,
+      inbound_container_tare_kg:      form.inbound_container_tare_kg      ?? null,
+      inbound_container_reuse_cycles: form.inbound_container_reuse_cycles ?? null,
+      inbound_container_ef:           form.inbound_container_ef           ?? null,
     }));
 
     const { error: insertError } = await supabase
@@ -706,10 +735,16 @@ export default function ProductRecipePage() {
         }
         // Otherwise, leave data_source as null (don't include it)
 
-        // Include transport data if available
-        if (form.transport_mode && form.distance_km) {
+        // Include transport data (multi-modal preferred; single-leg backward compat)
+        if (form.transport_legs && form.transport_legs.length > 0) {
+          materialData.transport_legs  = form.transport_legs;
+          // Keep legacy fields in sync with first leg for backward-compat calculations
+          materialData.transport_mode  = form.transport_legs[0].transportMode;
+          materialData.distance_km     = form.transport_legs[0].distanceKm;
+        } else if (form.transport_mode && form.distance_km) {
           materialData.transport_mode = form.transport_mode;
-          materialData.distance_km = Number(form.distance_km);
+          materialData.distance_km    = Number(form.distance_km);
+          materialData.transport_legs = null;
         }
 
         // Include origin geolocation data if available
@@ -719,6 +754,13 @@ export default function ProductRecipePage() {
           materialData.origin_address = form.origin_address || null;
           materialData.origin_country_code = form.origin_country_code || null;
         }
+
+        // Include inbound delivery container fields (all nullable)
+        materialData.inbound_container_type         = form.inbound_container_type         ?? null;
+        materialData.inbound_container_volume_l     = form.inbound_container_volume_l     ?? null;
+        materialData.inbound_container_tare_kg      = form.inbound_container_tare_kg      ?? null;
+        materialData.inbound_container_reuse_cycles = form.inbound_container_reuse_cycles ?? null;
+        materialData.inbound_container_ef           = form.inbound_container_ef           ?? null;
 
         return materialData;
       });
@@ -886,10 +928,15 @@ export default function ProductRecipePage() {
           materialData.supplier_product_id = form.supplier_product_id;
         }
 
-        // Include transport data if available
-        if (form.transport_mode && form.distance_km) {
+        // Include transport data — prefer multi-leg JSONB; fall back to single mode/distance
+        if (form.transport_legs && form.transport_legs.length > 0) {
+          materialData.transport_legs = form.transport_legs;
+          materialData.transport_mode = form.transport_legs[0].transportMode;
+          materialData.distance_km = form.transport_legs[0].distanceKm;
+        } else if (form.transport_mode && form.distance_km) {
           materialData.transport_mode = form.transport_mode;
           materialData.distance_km = Number(form.distance_km);
+          materialData.transport_legs = null;
         }
 
         // Include origin geolocation data if available

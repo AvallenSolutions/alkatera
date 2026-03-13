@@ -31,6 +31,17 @@ export interface DistributionLeg {
   transportMode: TransportMode;
   /** Distance in kilometres */
   distanceKm: number;
+
+  /**
+   * Optional destination waypoint for inbound transport auto-distance calculation.
+   * When set, distanceKm is derived from the previous leg's endpoint (or the
+   * ingredient origin for leg 0) to this location.
+   * The final leg always ends at the production facility so these fields are
+   * only populated on non-final legs.
+   */
+  toAddress?: string;
+  toLat?: number;
+  toLng?: number;
 }
 
 export interface DistributionConfig {

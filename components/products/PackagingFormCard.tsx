@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin, Calculator, Truck, Layers, FileText, ChevronDown, ChevronRight } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, Package, Tag, Grip, Box, MapPin, Calculator, Truck, Layers, FileText, ChevronDown, ChevronRight, Plus, Loader2 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -42,7 +42,13 @@ import type {
 } from "@/lib/types/lca";
 import { PackagingComponentEditor } from "./PackagingComponentEditor";
 import { calculateDistance } from "@/lib/utils/distance-calculator";
-import { getTransportModeWarning } from "@/lib/utils/transport-emissions-calculator";
+import { getTransportModeWarning, formatTransportMode, type TransportMode } from "@/lib/utils/transport-emissions-calculator";
+import {
+  generateLegId,
+  calculateDistributionEmissions,
+  type DistributionLeg,
+  type DistributionResult,
+} from "@/lib/distribution-factors";
 
 export interface PackagingFormData {
   tempId: string;
@@ -65,6 +71,8 @@ export interface PackagingFormData {
   origin_country_code?: string;
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
+  // Multi-modal transport legs (replaces single transport_mode/distance_km when present)
+  transport_legs?: DistributionLeg[] | null;
   carbon_intensity?: number;
   // Emission factor metadata (for detail tooltip)
   ef_source?: string;
@@ -327,6 +335,14 @@ const PACKAGING_TYPES = [
   },
 ] as const;
 
+// Transport mode display labels (used in multi-leg UI)
+const TRANSPORT_MODES: { value: TransportMode; label: string }[] = [
+  { value: 'truck', label: 'Road (HGV)' },
+  { value: 'train', label: 'Rail Freight' },
+  { value: 'ship', label: 'Sea Freight' },
+  { value: 'air',   label: 'Air Freight' },
+];
+
 export function PackagingFormCard({
   packaging,
   index,
@@ -340,52 +356,142 @@ export function PackagingFormCard({
   onAddNewWithType,
   canRemove,
 }: PackagingFormCardProps) {
-  const calculateAndSetDistance = (originLat: number, originLng: number) => {
-    // Step 1: Identify the primary production facility for this product
-    let targetFacility: { lat: number; lng: number } | null = null;
+  const [transportPreview, setTransportPreview] = useState<DistributionResult | null>(null);
+  const [transportPreviewLoading, setTransportPreviewLoading] = useState(false);
 
-    if (productionFacilities.length > 0) {
-      // Find the facility with the highest production share, or use the first one
-      const sortedFacilities = [...productionFacilities].sort((a, b) => {
-        const shareA = a.production_share || 0;
-        const shareB = b.production_share || 0;
-        return shareB - shareA;
-      });
+  // ---------------------------------------------------------------------------
+  // Multi-modal inbound transport helpers
+  // ---------------------------------------------------------------------------
 
-      // Get the first facility with valid coordinates
-      for (const facility of sortedFacilities) {
-        if (facility.address_lat && facility.address_lng) {
-          targetFacility = {
-            lat: facility.address_lat,
-            lng: facility.address_lng,
-          };
-          console.log(`[Distance] Using facility: ${facility.name} (${facility.address_lat}, ${facility.address_lng})`);
-          break;
-        }
-      }
+  /**
+   * Derive the current transport legs from packaging state.
+   * Prefers transport_legs when set; falls back to single transport_mode/distance_km
+   * so that existing packaging items load correctly without migration.
+   */
+  const legs: DistributionLeg[] = (() => {
+    if (packaging.transport_legs && packaging.transport_legs.length > 0) {
+      return packaging.transport_legs;
     }
+    return [{
+      id: 'leg_0_legacy',
+      label: '',
+      transportMode: (packaging.transport_mode || 'truck') as TransportMode,
+      distanceKm: Number(packaging.distance_km || 0),
+    }];
+  })();
 
-    // Step 2: Fall back to organization location if no production facilities
-    if (!targetFacility && organizationLat && organizationLng) {
-      targetFacility = {
-        lat: organizationLat,
-        lng: organizationLng,
-      };
-      console.log(`[Distance] Using organization location: (${organizationLat}, ${organizationLng})`);
-    }
-
-    // Step 3: If no location data available, return 0
-    if (!targetFacility) {
-      console.warn('[Distance] No facility or organization location available');
-      return 0;
-    }
-
-    // Step 4: Calculate distance between ONLY these two specific locations
-    const distance = calculateDistance(originLat, originLng, targetFacility.lat, targetFacility.lng);
-    console.log(`[Distance] From (${originLat}, ${originLng}) to (${targetFacility.lat}, ${targetFacility.lng}) = ${distance} km`);
-
-    return Math.round(distance);
+  /**
+   * Get the primary production facility / org fallback as the shipment destination.
+   * Returns coords + display label.
+   */
+  const getDestinationCoords = (): { lat: number; lng: number; label: string } | null => {
+    const sorted = [...productionFacilities].sort(
+      (a, b) => (b.production_share || 0) - (a.production_share || 0)
+    );
+    const fac = sorted.find((f) => f.address_lat && f.address_lng);
+    if (fac) return { lat: fac.address_lat!, lng: fac.address_lng!, label: fac.name };
+    if (organizationLat && organizationLng) return { lat: organizationLat, lng: organizationLng, label: 'Your location' };
+    return null;
   };
+
+  /**
+   * Recompute distanceKm for every leg from coordinate data.
+   * - Leg 0 "from" = packaging origin (or overrideOriginLat/Lng when origin just changed).
+   * - Leg N "from" = legs[N-1].toLat/toLng.
+   * - Last leg "to" = production facility / org fallback.
+   * - Non-last leg "to" = leg.toLat/toLng (user-picked waypoint).
+   * Falls back to the stored distanceKm when coordinates are missing.
+   */
+  const recomputeDistances = (
+    legsInput: DistributionLeg[],
+    overrideOriginLat?: number,
+    overrideOriginLng?: number,
+  ): DistributionLeg[] => {
+    const dest = getDestinationCoords();
+    const oLat = overrideOriginLat ?? packaging.origin_lat;
+    const oLng = overrideOriginLng ?? packaging.origin_lng;
+
+    return legsInput.map((leg, idx) => {
+      const isLast = idx === legsInput.length - 1;
+      const fromLat = idx === 0 ? oLat : legsInput[idx - 1].toLat;
+      const fromLng = idx === 0 ? oLng : legsInput[idx - 1].toLng;
+      const toLat   = isLast ? dest?.lat : leg.toLat;
+      const toLng   = isLast ? dest?.lng : leg.toLng;
+
+      if (fromLat && fromLng && toLat && toLng) {
+        return { ...leg, distanceKm: Math.round(calculateDistance(fromLat, fromLng, toLat, toLng)) };
+      }
+      return leg; // keep stored distanceKm as fallback
+    });
+  };
+
+  /** Persist legs array, always recomputing distances first. */
+  const updateLegs = (newLegs: DistributionLeg[]) => {
+    const recomputed = recomputeDistances(newLegs);
+    const first = recomputed[0];
+    onUpdate(packaging.tempId, {
+      transport_legs: recomputed,
+      transport_mode: (first?.transportMode ?? 'truck') as any,
+      distance_km: first?.distanceKm ?? 0,
+    });
+  };
+
+  const addTransportLeg = () => {
+    updateLegs([...legs, {
+      id: generateLegId(),
+      label: '',
+      transportMode: 'truck',
+      distanceKm: 0,
+    }]);
+  };
+
+  const removeTransportLeg = (legId: string) => {
+    const filtered = legs.filter((l) => l.id !== legId);
+    updateLegs(filtered.length > 0 ? filtered : [{
+      id: generateLegId(),
+      label: '',
+      transportMode: 'truck',
+      distanceKm: 0,
+    }]);
+  };
+
+  const updateTransportLeg = (legId: string, partial: Partial<DistributionLeg>) => {
+    updateLegs(legs.map((leg) => leg.id === legId ? { ...leg, ...partial } : leg));
+  };
+
+  // Live transport preview — debounced, only shown with 2+ legs
+  useEffect(() => {
+    if (legs.length < 2) {
+      setTransportPreview(null);
+      return;
+    }
+    const hasValidLeg = legs.some((l) => l.distanceKm > 0);
+    if (!hasValidLeg) {
+      setTransportPreview(null);
+      return;
+    }
+
+    // Use net_weight_g as approximate weight for preview
+    const weightKg = (Number(packaging.net_weight_g) || 1) / 1000;
+    if (weightKg <= 0) { setTransportPreview(null); return; }
+
+    const timer = setTimeout(async () => {
+      setTransportPreviewLoading(true);
+      try {
+        const result = await calculateDistributionEmissions({ legs, productWeightKg: weightKg });
+        setTransportPreview(result);
+      } catch (err) {
+        console.error('[PackagingFormCard] Transport preview failed:', err);
+        setTransportPreview(null);
+      } finally {
+        setTransportPreviewLoading(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [packaging.transport_legs, packaging.transport_mode, packaging.distance_km, packaging.net_weight_g]);
+
+  // ---------------------------------------------------------------------------
 
   const getDataSourceBadge = () => {
     if (!packaging.data_source) return null;
@@ -877,16 +983,17 @@ export function PackagingFormCard({
                       value={packaging.origin_address || ''}
                       placeholder="e.g., Shanghai, China or Birmingham Glass Factory, UK"
                       onLocationSelect={(location: LocationData) => {
-                        console.log(`[Address Selected] ${location.address}`);
-                        console.log(`[Material Origin Coordinates] Lat: ${location.lat}, Lng: ${location.lng}`);
-                        const calculatedDistance = calculateAndSetDistance(location.lat, location.lng);
+                        // Recompute ALL leg distances with the new origin coordinates.
+                        const recomputed = recomputeDistances(legs, location.lat, location.lng);
+                        const first = recomputed[0];
                         onUpdate(packaging.tempId, {
                           origin_address: location.address,
                           origin_lat: location.lat,
                           origin_lng: location.lng,
                           origin_country_code: location.countryCode || '',
                           origin_country: location.address,
-                          distance_km: calculatedDistance,
+                          distance_km: first?.distanceKm ?? 0,
+                          transport_legs: recomputed,
                         });
                       }}
                     />
@@ -895,105 +1002,262 @@ export function PackagingFormCard({
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor={`transport-${packaging.tempId}`}>Transport Mode</Label>
-                      <Select
-                        value={packaging.transport_mode}
-                        onValueChange={(value: any) => onUpdate(packaging.tempId, { transport_mode: value })}
+                  {/* ── Multi-modal transport legs ─────────────────────────── */}
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <Label className="text-sm font-medium">Transport route</Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Distances are calculated automatically from coordinates. Add legs for multi-modal routes (e.g. truck → ship → truck).
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addTransportLeg}
+                        className="h-7 text-xs shrink-0"
                       >
-                        <SelectTrigger id={`transport-${packaging.tempId}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="truck">Truck</SelectItem>
-                          <SelectItem value="train">Train</SelectItem>
-                          <SelectItem value="ship">Ship</SelectItem>
-                          <SelectItem value="air">Air</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        <Plus className="mr-1 h-3 w-3" />
+                        Add leg
+                      </Button>
                     </div>
 
-                    <div>
-                      <Label htmlFor={`distance-${packaging.tempId}`} className="flex items-center gap-1">
-                        Distance (km)
-                        {packaging.distance_km && productionFacilities.length > 0 && (
-                          <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
-                            <Calculator className="h-2.5 w-2.5 mr-0.5" />
-                            Auto
-                          </Badge>
+                    {legs.map((leg, legIndex) => {
+                      const isLast = legIndex === legs.length - 1;
+                      const isFirst = legIndex === 0;
+
+                      // "From" — packaging origin for leg 0; previous leg's waypoint for subsequent legs
+                      const fromLabel = isFirst
+                        ? (packaging.origin_address || 'Set packaging origin above')
+                        : (legs[legIndex - 1].toAddress || `Waypoint ${legIndex}`);
+                      const fromHasCoords = isFirst
+                        ? !!(packaging.origin_lat && packaging.origin_lng)
+                        : !!(legs[legIndex - 1].toLat && legs[legIndex - 1].toLng);
+
+                      // "To" — production facility for last leg; user-set waypoint for intermediate legs
+                      const destCoords = getDestinationCoords();
+                      const destLabel = destCoords?.label || 'Your facility';
+                      const toHasCoords = isLast ? !!destCoords : !!(leg.toLat && leg.toLng);
+
+                      // Distance is auto-calculated only when both endpoints have coordinates
+                      const distanceIsAuto = fromHasCoords && toHasCoords;
+
+                      const warning = getTransportModeWarning(leg.transportMode, leg.distanceKm);
+
+                      return (
+                        <div key={leg.id} className="rounded-lg border p-3 space-y-3 bg-muted/20">
+                          {/* Leg header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-muted-foreground">
+                                Leg {legIndex + 1}
+                              </span>
+                              {distanceIsAuto && (
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  <Calculator className="h-2.5 w-2.5 mr-0.5" />
+                                  Auto
+                                </Badge>
+                              )}
+                            </div>
+                            {legs.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                onClick={() => removeTransportLeg(leg.id)}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+
+                          {/* Transport mode */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">Transport mode</Label>
+                            <Select
+                              value={leg.transportMode}
+                              onValueChange={(value) =>
+                                updateTransportLeg(leg.id, { transportMode: value as TransportMode })
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TRANSPORT_MODES.map((mode) => (
+                                  <SelectItem key={mode.value} value={mode.value}>
+                                    {mode.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* From → To route */}
+                          <div className="space-y-2">
+                            {/* From (always auto-derived, read-only) */}
+                            <div>
+                              <Label className="text-xs mb-1 block">From</Label>
+                              <div className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs ${
+                                fromHasCoords
+                                  ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                                  : 'bg-muted border-border'
+                              }`}>
+                                <MapPin className={`h-3 w-3 shrink-0 ${fromHasCoords ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
+                                <span className={fromHasCoords ? 'text-green-800 dark:text-green-200' : 'text-muted-foreground italic'}>
+                                  {fromLabel}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* To */}
+                            {isLast ? (
+                              <div>
+                                <Label className="text-xs mb-1 block">To (production facility)</Label>
+                                <div className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs ${
+                                  destCoords
+                                    ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'
+                                    : 'bg-muted border-border'
+                                }`}>
+                                  <MapPin className={`h-3 w-3 shrink-0 ${destCoords ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`} />
+                                  <span className={destCoords ? 'text-blue-800 dark:text-blue-200' : 'text-muted-foreground italic'}>
+                                    {destCoords ? destLabel : 'No facility with coordinates found'}
+                                  </span>
+                                </div>
+                                {!destCoords && (
+                                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                    <Link href="/company/facilities" className="underline">
+                                      Add facility coordinates
+                                    </Link>{' '}
+                                    to enable auto-calculation.
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                <Label className="text-xs">To (set intermediate waypoint)</Label>
+                                <LocationPicker
+                                  value={leg.toAddress || ''}
+                                  placeholder="e.g. Port of Rotterdam, Netherlands"
+                                  onLocationSelect={(location: LocationData) => {
+                                    updateTransportLeg(leg.id, {
+                                      toAddress: location.address,
+                                      toLat: location.lat,
+                                      toLng: location.lng,
+                                    });
+                                  }}
+                                />
+                                {!leg.toAddress && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Search for the port, hub, or waypoint where transport mode changes.
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Distance */}
+                          <div className="space-y-1">
+                            <Label className="text-xs">Distance (km)</Label>
+                            {distanceIsAuto ? (
+                              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-xs">
+                                <Calculator className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
+                                <span className="font-mono font-semibold text-green-800 dark:text-green-200">
+                                  {leg.distanceKm > 0 ? leg.distanceKm.toLocaleString() : '—'} km
+                                </span>
+                                <span className="text-green-700 dark:text-green-300 text-[10px] ml-1">
+                                  auto-calculated
+                                </span>
+                              </div>
+                            ) : (
+                              <Input
+                                type="number"
+                                min={0}
+                                step={10}
+                                placeholder={
+                                  !fromHasCoords
+                                    ? 'Set origin above to auto-calculate'
+                                    : !toHasCoords && !isLast
+                                    ? 'Set waypoint above to auto-calculate'
+                                    : 'Enter distance manually'
+                                }
+                                value={leg.distanceKm || ''}
+                                onChange={(e) =>
+                                  updateTransportLeg(leg.id, { distanceKm: parseFloat(e.target.value) || 0 })
+                                }
+                              />
+                            )}
+                          </div>
+
+                          {/* Plausibility warning */}
+                          {warning && (
+                            <Alert className="py-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                              <Info className="h-3.5 w-3.5 text-amber-600" />
+                              <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                                {warning}
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Facility setup hints */}
+                    {productionFacilities.length === 0 && totalLinkedFacilities > 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Your linked facilities don&apos;t have location coordinates.{' '}
+                        <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                          Update facility locations
+                        </Link>{' '}
+                        to enable automatic distance calculation.
+                      </p>
+                    )}
+                    {productionFacilities.length === 0 && totalLinkedFacilities === 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        No facilities linked.{' '}
+                        <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                          Add a facility with location
+                        </Link>{' '}
+                        to enable automatic distance calculation.
+                      </p>
+                    )}
+
+                    {/* Multi-leg transport preview */}
+                    {legs.length > 1 && (
+                      <div>
+                        {transportPreviewLoading && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Calculating transport emissions…
+                          </div>
                         )}
-                      </Label>
-                      <Input
-                        id={`distance-${packaging.tempId}`}
-                        type="number"
-                        step="1"
-                        min="0"
-                        placeholder={productionFacilities.length === 0 ? "No facilities configured" : "Select origin to calculate"}
-                        value={packaging.distance_km}
-                        onChange={(e) => onUpdate(packaging.tempId, { distance_km: e.target.value })}
-                        readOnly={!!packaging.origin_lat && productionFacilities.length > 0}
-                        className={packaging.origin_lat && productionFacilities.length > 0 ? 'bg-muted cursor-not-allowed' : ''}
-                      />
-                      {packaging.origin_lat && productionFacilities.length > 0 && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Automatically calculated from origin to your production facility
-                        </p>
-                      )}
-                      {productionFacilities.length === 0 && totalLinkedFacilities > 0 && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                          Your linked facilities don&apos;t have location coordinates.{' '}
-                          <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
-                            Update facility locations
-                          </Link>{' '}
-                          to enable automatic distance calculation.
-                        </p>
-                      )}
-                      {productionFacilities.length === 0 && totalLinkedFacilities === 0 && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                          No facilities linked.{' '}
-                          <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
-                            Add a facility with location
-                          </Link>{' '}
-                          and link it to this product to enable automatic distance calculation.
-                        </p>
-                      )}
-                    </div>
+                        {transportPreview && !transportPreviewLoading && (
+                          <div className="rounded-md bg-slate-50 dark:bg-slate-900 border px-3 py-2 space-y-1.5 text-xs">
+                            <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                              <Calculator className="h-3 w-3" />
+                              Transport impact preview
+                            </div>
+                            {transportPreview.perLeg.map((legResult, i) => (
+                              <div key={legResult.legId} className="flex justify-between text-muted-foreground">
+                                <span>
+                                  {`Leg ${i + 1}`}{' '}
+                                  <span className="text-[10px]">({formatTransportMode(legResult.mode)}, {legResult.distanceKm.toLocaleString()} km)</span>
+                                </span>
+                                <span>{legResult.emissions.toFixed(4)} kg CO₂e</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between border-t pt-1 font-medium">
+                              <span>Total inbound transport</span>
+                              <span className="text-primary">{transportPreview.total.toFixed(4)} kg CO₂e</span>
+                            </div>
+                            <p className="text-muted-foreground">Per unit weight. Uses DEFRA 2025 freight factors.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  {(() => {
-                    const warning = getTransportModeWarning(packaging.transport_mode, Number(packaging.distance_km));
-                    return warning ? (
-                      <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
-                        <Info className="h-4 w-4 text-amber-600" />
-                        <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                          <strong>Transport Mode Check:</strong> {warning}
-                        </AlertDescription>
-                      </Alert>
-                    ) : null;
-                  })()}
-
-                  {packaging.origin_lat && packaging.origin_lng && productionFacilities.length > 0 && (
-                    <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
-                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <AlertDescription className="text-xs space-y-1">
-                        <div className="font-semibold text-blue-900 dark:text-blue-100">Distance Calculation Details:</div>
-                        <div className="text-blue-800 dark:text-blue-200">
-                          <strong>Material Origin:</strong> {packaging.origin_address}
-                          <br />
-                          <span className="font-mono text-[10px]">({packaging.origin_lat?.toFixed(4)}, {packaging.origin_lng?.toFixed(4)})</span>
-                        </div>
-                        <div className="text-blue-800 dark:text-blue-200">
-                          <strong>Production Facility:</strong> {productionFacilities[0]?.name}
-                          <br />
-                          <span className="font-mono text-[10px]">({productionFacilities[0]?.address_lat?.toFixed(4)}, {productionFacilities[0]?.address_lng?.toFixed(4)})</span>
-                        </div>
-                        <div className="text-blue-900 dark:text-blue-100 font-semibold pt-1">
-                          Calculated Distance: {packaging.distance_km} km
-                        </div>
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </div>
               </div>
 

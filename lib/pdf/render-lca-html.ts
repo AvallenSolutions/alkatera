@@ -756,11 +756,15 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
           ? `<span class="badge badge-low">Primary</span>`
           : `<span class="badge badge-medium">Secondary</span>`;
 
+      const containerNote = (ing as any).containerCO2
+        ? `<div style="font-size: 8px; color: #78716c; margin-top: 2px;">incl. ${escapeHtml((ing as any).containerCO2)} kg CO₂e inbound container (${escapeHtml((ing as any).containerType || '')})</div>`
+        : '';
+
       return `<tr>
         ${ingredientCell}
         <td>${escapeHtml(ing.quantity)} ${escapeHtml(ing.unit)}</td>
         <td>${escapeHtml(ing.origin)}</td>
-        <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}</td>
+        <td style="font-weight: 500;">${escapeHtml(ing.climateImpact)}${containerNote}</td>
         <td><span style="color: #ccff00;">${escapeHtml(ing.climatePercentage)}</span></td>
         <td>${escapeHtml(ing.acidification)}</td>
         <td>${escapeHtml(ing.eutrophication)}</td>

@@ -1,6 +1,7 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './impact-waterfall-resolver';
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
+import { calculateDistributionEmissions } from './distribution-factors';
 import { resolveImpactSource } from './utils/data-quality-mapper';
 import { aggregateProductImpacts, type FacilityEmissionsData } from './product-lca-aggregator';
 import { generateLcaInterpretation } from './lca-interpretation-engine';
@@ -749,9 +750,28 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
         // Pass organization ID to enable OpenLCA lookups (Priority 2.5)
         const resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id);
 
-        // Calculate transport emissions if transport data is available
+        // Calculate transport emissions (multi-modal preferred, single-leg fallback)
         let transportEmissions = 0;
-        if (material.transport_mode && material.distance_km) {
+        if (material.transport_legs && material.transport_legs.length > 0) {
+          // Multi-modal: sum emissions across all legs
+          try {
+            const distResult = await calculateDistributionEmissions({
+              legs: material.transport_legs,
+              productWeightKg: quantityKg,
+            });
+            transportEmissions = distResult.total;
+            console.log(
+              `[calculateProductCarbonFootprint] ✓ Multi-modal transport for ${material.material_name}: ` +
+              `${transportEmissions.toFixed(4)} kg CO2e (${material.transport_legs.length} legs)`
+            );
+          } catch (error: any) {
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠ Failed multi-modal transport for ${material.material_name}:`,
+              error.message
+            );
+          }
+        } else if (material.transport_mode && material.distance_km) {
+          // Legacy single-leg fallback (old rows without transport_legs)
           try {
             const transportResult = await calculateTransportEmissions({
               weightKg: quantityKg,
@@ -759,9 +779,15 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
               transportMode: material.transport_mode as TransportMode
             });
             transportEmissions = transportResult.emissions;
-            console.log(`[calculateProductCarbonFootprint] ✓ Transport emissions for ${material.material_name}: ${transportEmissions.toFixed(4)} kg CO2e (${material.transport_mode}, ${material.distance_km} km)`);
+            console.log(
+              `[calculateProductCarbonFootprint] ✓ Transport emissions for ${material.material_name}: ` +
+              `${transportEmissions.toFixed(4)} kg CO2e (${material.transport_mode}, ${material.distance_km} km)`
+            );
           } catch (error: any) {
-            console.warn(`[calculateProductCarbonFootprint] ⚠ Failed to calculate transport emissions for ${material.material_name}:`, error.message);
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠ Failed to calculate transport emissions for ${material.material_name}:`,
+              error.message
+            );
           }
         }
 
@@ -880,6 +906,116 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           }
         }
 
+        // ──────────────────────────────────────────────────────────────────────
+        // Inbound delivery container embodied carbon (optional, ingredient only)
+        //
+        // When an ingredient is delivered in a bulk container (IBC, drum,
+        // flexitank, road tanker), its manufacturing footprint is amortised
+        // over reuse cycles and allocated to this ingredient's volume share.
+        //
+        // Formula (ISO 14044 §4.3.4.2 physical allocation by volume):
+        //   ef_per_fill        = container_ef × tare_kg / reuse_cycles
+        //   fill_fraction      = ingredient_qty_litres / container_volume_l
+        //   container_co2/unit = ef_per_fill × fill_fraction
+        //
+        // The result is added directly to adjustedClimate and stored separately
+        // on the lcaMaterial row for audit traceability.
+        //
+        // Unit handling:
+        //   l / ml → converted to litres (density-neutral; normalizeToKg treats
+        //            1 L as 1 kg, so quantityKg already equals litres for volume units)
+        //   kg     → use quantityKg as litre approximation (density ≈ 1 kg/L);
+        //            a console.warn flags the imprecision for spirits (~0.8 kg/L)
+        //   unit   → skip (cannot convert to litres); container impact = 0
+        // ──────────────────────────────────────────────────────────────────────
+        let containerCO2PerUnit = 0;
+        const containerType = (material as any).inbound_container_type as string | null;
+
+        if (material.material_type === 'ingredient' && containerType) {
+          try {
+            const containerTareKg  = Number((material as any).inbound_container_tare_kg  || 0);
+            const containerVolumeL = Number((material as any).inbound_container_volume_l || 0);
+            const reuseCycles      = Math.max(1, Number((material as any).inbound_container_reuse_cycles || 1));
+            let   containerEf      = Number((material as any).inbound_container_ef || 0);
+
+            // Look up EF from staging_emission_factors when not overridden inline
+            if (!containerEf && containerType !== 'custom') {
+              const CONTAINER_FACTOR_NAMES: Record<string, string> = {
+                ibc_1000l:          'Inbound Container - IBC 1000L (HDPE)',
+                ibc_500l:           'Inbound Container - IBC 500L (HDPE)',
+                drum_200l:          'Inbound Container - Drum 200L (HDPE)',
+                flexitank_24000l:   'Inbound Container - Flexitank 24000L (LDPE)',
+                bulk_tanker_25000l: 'Inbound Container - Bulk Tanker 25000L (Stainless steel)',
+                // Glass bottles — for ingredients purchased in retail units
+                bottle_700ml_glass: 'Inbound Container - Glass Bottle 700ml (standard)',
+                bottle_750ml_glass: 'Inbound Container - Glass Bottle 750ml (standard)',
+                bottle_1l_glass:    'Inbound Container - Glass Bottle 1L (standard)',
+              };
+              const factorName = CONTAINER_FACTOR_NAMES[containerType];
+              if (factorName) {
+                const { data: containerFactor } = await supabase
+                  .from('staging_emission_factors')
+                  .select('co2_factor')
+                  .eq('name', factorName)
+                  .eq('category', 'Inbound Container')
+                  .maybeSingle();
+                containerEf = Number(containerFactor?.co2_factor || 0);
+              }
+            }
+
+            if (containerEf > 0 && containerTareKg > 0 && containerVolumeL > 0) {
+              // Determine ingredient quantity in litres for volume-based allocation
+              const unitLower = (material.unit || '').toLowerCase();
+              let ingredientLitres = 0;
+
+              if (['l', 'litre', 'litres', 'liter', 'liters'].includes(unitLower)) {
+                ingredientLitres = quantityKg; // normalizeToKg treats L as 1:1 with kg
+              } else if (['ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters'].includes(unitLower)) {
+                ingredientLitres = quantityKg; // already converted to kg-equivalent
+              } else if (['kg', 'kilograms', 'kilogram'].includes(unitLower)) {
+                ingredientLitres = quantityKg; // density ≈ 1 kg/L approximation
+                console.warn(
+                  `[calculateProductCarbonFootprint] ⚠ Container allocation for "${material.material_name}": ` +
+                  `unit is kg (weight), not volume. Using 1 kg ≈ 1 L. ` +
+                  `Spirits are ~0.8 kg/L — switch to litres for accuracy.`
+                );
+              } else {
+                console.warn(
+                  `[calculateProductCarbonFootprint] ⚠ Container allocation skipped for "${material.material_name}": ` +
+                  `cannot convert unit '${material.unit}' to litres.`
+                );
+              }
+
+              if (ingredientLitres > 0) {
+                const efPerFill    = (containerEf * containerTareKg) / reuseCycles;
+                const fillFraction = ingredientLitres / containerVolumeL;
+                containerCO2PerUnit = efPerFill * fillFraction;
+
+                console.log(
+                  `[calculateProductCarbonFootprint] ✓ Container impact for "${material.material_name}" ` +
+                  `(${containerType}): ef=${containerEf} tare=${containerTareKg}kg ` +
+                  `reuse=${reuseCycles} vol=${containerVolumeL}L qty=${ingredientLitres.toFixed(3)}L ` +
+                  `→ ${containerCO2PerUnit.toFixed(5)} kg CO2e/unit`
+                );
+              }
+            } else if (containerType && containerType !== 'custom') {
+              console.warn(
+                `[calculateProductCarbonFootprint] ⚠ Container impact skipped for "${material.material_name}": ` +
+                `missing or zero ef (${containerEf}), tare (${containerTareKg}kg), or volume (${containerVolumeL}L).`
+              );
+            }
+          } catch (containerErr: any) {
+            // Non-fatal: log and continue; container impact stays at 0
+            console.warn(
+              `[calculateProductCarbonFootprint] ⚠ Container impact calculation failed for "${material.material_name}":`,
+              containerErr.message
+            );
+          }
+
+          // Add container embodied carbon to the ingredient's climate total
+          adjustedClimate += containerCO2PerUnit;
+        }
+
         // Build LCA material record with all impact data
         // Note: data_source must be 'openlca', 'supplier', or NULL per constraint
         // For staging factors, we use NULL
@@ -961,6 +1097,11 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           non_gwp_data_source: resolved.non_gwp_data_source,
           is_hybrid_source: resolved.is_hybrid_source,
           category_type: resolved.category_type,
+
+          // Inbound delivery container (ingredient rows only; for audit traceability)
+          // containerCO2PerUnit is already included in impact_climate above.
+          inbound_container_type: containerType ?? null,
+          inbound_container_co2_per_unit: containerCO2PerUnit,
         };
 
         lcaMaterialsWithImpacts.push(lcaMaterial);

@@ -647,6 +647,9 @@ export function transformLCADataForReport(
       factorDatabase = gwpSrc;
     }
 
+    // Inbound container contribution (stored as sub-field for PDF annotation)
+    const containerCO2Raw = Number(m.inbound_container_co2_per_unit || 0);
+
     return {
       name: userIngredientName,
       calculationFactor: calcFactorName,
@@ -667,6 +670,9 @@ export function transformLCADataForReport(
         : m.impact_source === 'hybrid_proxy' ? 'Proxy' : 'Secondary',
       dataQualityGrade: m.data_quality_grade || 'N/A',
       confidenceScore: m.confidence_score || 0,
+      // Inbound container annotation (shown as sub-note in PDF when non-zero)
+      containerCO2: containerCO2Raw > 0 ? containerCO2Raw.toFixed(5) : null,
+      containerType: (m.inbound_container_type as string | null) || null,
     };
   });
 

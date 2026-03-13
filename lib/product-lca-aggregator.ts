@@ -204,6 +204,7 @@ export async function aggregateProductImpacts(
   let totalFossilResourceScarcity = 0;
 
   let rawMaterialsEmissions = 0;
+  let containerEmissions = 0; // sub-total of rawMaterialsEmissions: inbound delivery container embodied carbon
   let packagingEmissions = 0;
   let processingEmissions = 0;
   let distributionEmissions = 0;
@@ -268,6 +269,8 @@ export async function aggregateProductImpacts(
       processingEmissions += climateImpact;
     } else {
       rawMaterialsEmissions += climateImpact;
+      // Track inbound container sub-total (already included in climateImpact)
+      containerEmissions += Number((material as any).inbound_container_co2_per_unit || 0);
     }
 
     // impact_climate on each material already includes inbound transport
@@ -808,6 +811,7 @@ export async function aggregateProductImpacts(
       by_material: materialBreakdown.sort((a, b) => b.climate - a.climate),
       by_lifecycle_stage: {
         raw_materials: rawMaterialsEmissions,
+        inbound_containers: containerEmissions, // sub-item of raw_materials (already included in that total)
         processing: processingEmissions,
         packaging: packagingEmissions,
         distribution: distributionEmissions,

@@ -18,13 +18,19 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
-import { COUNTRIES } from "@/lib/countries";
 import type { DataSource } from "@/lib/types/lca";
 import { calculateDistance } from "@/lib/utils/distance-calculator";
-import { getTransportModeWarning } from "@/lib/utils/transport-emissions-calculator";
+import { getTransportModeWarning, formatTransportMode, type TransportMode } from "@/lib/utils/transport-emissions-calculator";
+import {
+  generateLegId,
+  calculateDistributionEmissions,
+  type DistributionLeg,
+  type DistributionResult,
+} from "@/lib/distribution-factors";
 
 export interface IngredientFormData {
   tempId: string;
@@ -44,13 +50,120 @@ export interface IngredientFormData {
   is_organic_certified: boolean;
   transport_mode: 'truck' | 'train' | 'ship' | 'air';
   distance_km: number | string;
+  // Multi-modal transport legs (replaces single transport_mode/distance_km when present)
+  transport_legs?: DistributionLeg[] | null;
   carbon_intensity?: number;
   // Emission factor metadata (for detail tooltip)
   ef_source?: string;
   ef_source_type?: string;
   ef_data_quality_grade?: string;
   ef_uncertainty_percent?: number;
+  // Inbound delivery container (optional)
+  inbound_container_type?: string | null;
+  inbound_container_volume_l?: number | null;
+  inbound_container_tare_kg?: number | null;
+  inbound_container_reuse_cycles?: number | null;
+  inbound_container_ef?: number | null;
 }
+
+// ---------------------------------------------------------------------------
+// Inbound container presets
+// ---------------------------------------------------------------------------
+
+export interface ContainerPreset {
+  key: string;
+  label: string;
+  volume_l: number;
+  tare_kg: number;
+  reuse_cycles: number;
+  is_reusable: boolean;
+  material: string;
+}
+
+export const CONTAINER_PRESETS: ContainerPreset[] = [
+  {
+    key: 'ibc_1000l',
+    label: 'IBC 1000L (HDPE)',
+    volume_l: 1000,
+    tare_kg: 25,
+    reuse_cycles: 10,  // Industry avg for rental-pool IBCs (WRAP guidance)
+    is_reusable: true,
+    material: 'HDPE',
+  },
+  {
+    key: 'ibc_500l',
+    label: 'IBC 500L (HDPE)',
+    volume_l: 500,
+    tare_kg: 16,
+    reuse_cycles: 10,  // Industry avg for rental-pool IBCs (WRAP guidance)
+    is_reusable: true,
+    material: 'HDPE',
+  },
+  {
+    key: 'drum_200l',
+    label: 'Drum 200L (HDPE)',
+    volume_l: 200,
+    tare_kg: 8.5,
+    reuse_cycles: 1,
+    is_reusable: false,
+    material: 'HDPE',
+  },
+  {
+    key: 'flexitank_24000l',
+    label: 'Flexitank 24000L (LDPE)',
+    volume_l: 24000,
+    tare_kg: 30,
+    reuse_cycles: 1,
+    is_reusable: false,
+    material: 'LDPE',
+  },
+  {
+    key: 'bulk_tanker_25000l',
+    label: 'Bulk tanker 25000L (stainless steel)',
+    volume_l: 25000,
+    tare_kg: 20000,
+    reuse_cycles: 300,
+    is_reusable: true,
+    material: 'Stainless steel',
+  },
+  // Glass bottles — for ingredients purchased in retail units (spirits, liqueurs, etc.)
+  {
+    key: 'bottle_700ml_glass',
+    label: 'Glass bottle 700ml (standard)',
+    volume_l: 0.7,
+    tare_kg: 0.40,
+    reuse_cycles: 1,
+    is_reusable: false,
+    material: 'Glass',
+  },
+  {
+    key: 'bottle_750ml_glass',
+    label: 'Glass bottle 750ml (standard)',
+    volume_l: 0.75,
+    tare_kg: 0.45,
+    reuse_cycles: 1,
+    is_reusable: false,
+    material: 'Glass',
+  },
+  {
+    key: 'bottle_1l_glass',
+    label: 'Glass bottle 1L (standard)',
+    volume_l: 1.0,
+    tare_kg: 0.50,
+    reuse_cycles: 1,
+    is_reusable: false,
+    material: 'Glass',
+  },
+  {
+    key: 'custom',
+    label: 'Custom / manual entry',
+    volume_l: 0,
+    tare_kg: 0,
+    reuse_cycles: 1,
+    is_reusable: false,
+    material: '',
+  },
+];
 
 interface ProductionFacility {
   id: string;
@@ -116,6 +229,14 @@ function convertAmount(
   return parseFloat(converted.toPrecision(6));
 }
 
+// Transport mode display labels (used in multi-leg UI)
+const TRANSPORT_MODES: { value: TransportMode; label: string }[] = [
+  { value: 'truck', label: 'Road (HGV)' },
+  { value: 'train', label: 'Rail Freight' },
+  { value: 'ship', label: 'Sea Freight' },
+  { value: 'air',   label: 'Air Freight' },
+];
+
 export function IngredientFormCard({
   ingredient,
   index,
@@ -128,6 +249,198 @@ export function IngredientFormCard({
   onRemove,
   canRemove,
 }: IngredientFormCardProps) {
+  const [containerOpen, setContainerOpen] = useState<boolean>(
+    !!(ingredient.inbound_container_type)
+  );
+  const [transportPreview, setTransportPreview] = useState<DistributionResult | null>(null);
+  const [transportPreviewLoading, setTransportPreviewLoading] = useState(false);
+
+  const getContainerPreset = (key: string | null | undefined): ContainerPreset | undefined =>
+    CONTAINER_PRESETS.find((p) => p.key === key);
+
+  /** Live impact preview shown in the container section (kg CO₂e per product unit). */
+  const getContainerImpactPreview = (): { value: number; warning?: string } | null => {
+    const preset = getContainerPreset(ingredient.inbound_container_type);
+    if (!preset && ingredient.inbound_container_type !== 'custom') return null;
+
+    const tare = Number(ingredient.inbound_container_tare_kg ?? (preset?.tare_kg ?? 0));
+    const volume = Number(ingredient.inbound_container_volume_l ?? (preset?.volume_l ?? 0));
+    const cycles = Math.max(1, Number(ingredient.inbound_container_reuse_cycles ?? (preset?.reuse_cycles ?? 1)));
+    // EF: use override if set, otherwise use a known approximate for the preview
+    const EF_APPROX: Record<string, number> = {
+      ibc_1000l: 1.93, ibc_500l: 1.93, drum_200l: 1.93,
+      flexitank_24000l: 2.10, bulk_tanker_25000l: 2.89,
+      bottle_700ml_glass: 0.85, bottle_750ml_glass: 0.85, bottle_1l_glass: 0.85,
+    };
+    const ef = Number(ingredient.inbound_container_ef ?? EF_APPROX[ingredient.inbound_container_type ?? ''] ?? 0);
+
+    if (!ef || !tare || !volume) return null;
+
+    const qty = Number(ingredient.amount);
+    const unit = (ingredient.unit || '').toLowerCase();
+    let warning: string | undefined;
+
+    const VOLUME_UNITS = ['l', 'litre', 'litres', 'liter', 'liters', 'ml', 'millilitre', 'millilitres'];
+    const MASS_UNITS   = ['kg', 'kilograms', 'g', 'grams'];
+
+    let ingredientLitres: number;
+    if (VOLUME_UNITS.includes(unit)) {
+      // normaliseToKg treats L as 1:1 with kg, so qty is already in "litre-equivalent"
+      ingredientLitres = unit.startsWith('ml') ? qty / 1000 : qty;
+    } else if (MASS_UNITS.includes(unit)) {
+      ingredientLitres = unit === 'g' ? qty / 1000 : qty; // density ≈ 1 kg/L
+      warning = 'Using 1 kg ≈ 1 L — consider switching to litres for spirits';
+    } else {
+      return null; // unit type (e.g. "unit") — can't calculate
+    }
+
+    if (!ingredientLitres || ingredientLitres <= 0) return null;
+
+    const efPerFill   = (ef * tare) / cycles;
+    const fillFraction = ingredientLitres / volume;
+    const co2PerUnit   = efPerFill * fillFraction;
+
+    return { value: co2PerUnit, warning };
+  };
+
+  // ---------------------------------------------------------------------------
+  // Multi-modal inbound transport helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Derive the current transport legs from ingredient state.
+   * Prefers transport_legs when set; falls back to single transport_mode/distance_km
+   * so that existing ingredients load correctly without migration.
+   */
+  const legs: DistributionLeg[] = (() => {
+    if (ingredient.transport_legs && ingredient.transport_legs.length > 0) {
+      return ingredient.transport_legs;
+    }
+    return [{
+      id: 'leg_0_legacy',
+      label: '',
+      transportMode: (ingredient.transport_mode || 'truck') as TransportMode,
+      distanceKm: Number(ingredient.distance_km || 0),
+    }];
+  })();
+
+  /**
+   * Get the primary production facility / org fallback as the shipment destination.
+   * Returns coords + display label.
+   */
+  const getDestinationCoords = (): { lat: number; lng: number; label: string } | null => {
+    const sorted = [...productionFacilities].sort(
+      (a, b) => (b.production_share || 0) - (a.production_share || 0)
+    );
+    const fac = sorted.find((f) => f.address_lat && f.address_lng);
+    if (fac) return { lat: fac.address_lat!, lng: fac.address_lng!, label: fac.name };
+    if (organizationLat && organizationLng) return { lat: organizationLat, lng: organizationLng, label: 'Your location' };
+    return null;
+  };
+
+  /**
+   * Recompute distanceKm for every leg from coordinate data.
+   * - Leg 0 "from" = ingredient origin (or overrideOriginLat/Lng when origin just changed).
+   * - Leg N "from" = legs[N-1].toLat/toLng.
+   * - Last leg "to" = production facility / org fallback.
+   * - Non-last leg "to" = leg.toLat/toLng (user-picked waypoint).
+   * Falls back to the stored distanceKm when coordinates are missing.
+   */
+  const recomputeDistances = (
+    legsInput: DistributionLeg[],
+    overrideOriginLat?: number,
+    overrideOriginLng?: number,
+  ): DistributionLeg[] => {
+    const dest = getDestinationCoords();
+    const oLat = overrideOriginLat ?? ingredient.origin_lat;
+    const oLng = overrideOriginLng ?? ingredient.origin_lng;
+
+    return legsInput.map((leg, idx) => {
+      const isLast = idx === legsInput.length - 1;
+      const fromLat = idx === 0 ? oLat : legsInput[idx - 1].toLat;
+      const fromLng = idx === 0 ? oLng : legsInput[idx - 1].toLng;
+      const toLat   = isLast ? dest?.lat : leg.toLat;
+      const toLng   = isLast ? dest?.lng : leg.toLng;
+
+      if (fromLat && fromLng && toLat && toLng) {
+        return { ...leg, distanceKm: Math.round(calculateDistance(fromLat, fromLng, toLat, toLng)) };
+      }
+      return leg; // keep stored distanceKm as fallback
+    });
+  };
+
+  /** Persist legs array, always recomputing distances first. */
+  const updateLegs = (newLegs: DistributionLeg[]) => {
+    const recomputed = recomputeDistances(newLegs);
+    const first = recomputed[0];
+    onUpdate(ingredient.tempId, {
+      transport_legs: recomputed,
+      transport_mode: (first?.transportMode ?? 'truck') as any,
+      distance_km: first?.distanceKm ?? 0,
+    });
+  };
+
+  const addTransportLeg = () => {
+    updateLegs([...legs, {
+      id: generateLegId(),
+      label: '',
+      transportMode: 'truck',
+      distanceKm: 0,
+    }]);
+  };
+
+  const removeTransportLeg = (legId: string) => {
+    const filtered = legs.filter((l) => l.id !== legId);
+    updateLegs(filtered.length > 0 ? filtered : [{
+      id: generateLegId(),
+      label: '',
+      transportMode: 'truck',
+      distanceKm: 0,
+    }]);
+  };
+
+  const updateTransportLeg = (legId: string, partial: Partial<DistributionLeg>) => {
+    updateLegs(legs.map((leg) => leg.id === legId ? { ...leg, ...partial } : leg));
+  };
+
+  // Live transport preview — debounced, only shown with 2+ legs
+  useEffect(() => {
+    if (legs.length < 2) {
+      setTransportPreview(null);
+      return;
+    }
+    const hasValidLeg = legs.some((l) => l.distanceKm > 0);
+    if (!hasValidLeg) {
+      setTransportPreview(null);
+      return;
+    }
+
+    const qty = Number(ingredient.amount) || 0;
+    const unit = (ingredient.unit || 'kg').toLowerCase();
+    let weightKg = qty;
+    if (unit === 'ml') weightKg = qty / 1000;
+    else if (unit === 'g') weightKg = qty / 1000;
+    else if (unit === 'l') weightKg = qty;
+    if (weightKg <= 0) { setTransportPreview(null); return; }
+
+    const timer = setTimeout(async () => {
+      setTransportPreviewLoading(true);
+      try {
+        const result = await calculateDistributionEmissions({ legs, productWeightKg: weightKg });
+        setTransportPreview(result);
+      } catch (err) {
+        console.error('[IngredientFormCard] Transport preview failed:', err);
+        setTransportPreview(null);
+      } finally {
+        setTransportPreviewLoading(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [ingredient.transport_legs, ingredient.transport_mode, ingredient.distance_km, ingredient.amount, ingredient.unit]);
+
+  // ---------------------------------------------------------------------------
+
   const getDataSourceBadge = () => {
     if (!ingredient.data_source) return null;
 
@@ -483,16 +796,18 @@ export function IngredientFormCard({
                   value={ingredient.origin_address || ''}
                   placeholder="e.g., Munich, Germany or Yorkshire Maltings, UK"
                   onLocationSelect={(location: LocationData) => {
-                    console.log(`[Address Selected] ${location.address}`);
-                    console.log(`[Material Origin Coordinates] Lat: ${location.lat}, Lng: ${location.lng}`);
-                    const calculatedDistance = calculateAndSetDistance(location.lat, location.lng);
+                    // Recompute ALL leg distances with the new origin coordinates.
+                    // recomputeDistances propagates changes through the whole leg chain.
+                    const recomputed = recomputeDistances(legs, location.lat, location.lng);
+                    const first = recomputed[0];
                     onUpdate(ingredient.tempId, {
                       origin_address: location.address,
                       origin_lat: location.lat,
                       origin_lng: location.lng,
                       origin_country_code: location.countryCode || '',
                       origin_country: location.address,
-                      distance_km: calculatedDistance,
+                      distance_km: first?.distanceKm ?? 0,
+                      transport_legs: recomputed,
                     });
                   }}
                 />
@@ -502,107 +817,486 @@ export function IngredientFormCard({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor={`transport-${ingredient.tempId}`}>Transport Mode</Label>
-                  <Select
-                    value={ingredient.transport_mode}
-                    onValueChange={(value: any) => onUpdate(ingredient.tempId, { transport_mode: value })}
+              {/* ── Multi-modal transport legs ─────────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <Label className="text-sm font-medium">Transport route</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Distances are calculated automatically from coordinates. Add legs for multi-modal routes (e.g. truck → ship → truck).
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addTransportLeg}
+                    className="h-7 text-xs shrink-0"
                   >
-                    <SelectTrigger id={`transport-${ingredient.tempId}`}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="truck">Truck</SelectItem>
-                      <SelectItem value="train">Train</SelectItem>
-                      <SelectItem value="ship">Ship</SelectItem>
-                      <SelectItem value="air">Air</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    <Plus className="mr-1 h-3 w-3" />
+                    Add leg
+                  </Button>
                 </div>
 
-                <div>
-                  <Label htmlFor={`distance-${ingredient.tempId}`} className="flex items-center gap-1">
-                    Distance (km)
-                    {ingredient.distance_km && productionFacilities.length > 0 && (
-                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
-                        <Calculator className="h-2.5 w-2.5 mr-0.5" />
-                        Auto
-                      </Badge>
+                {legs.map((leg, legIndex) => {
+                  const isLast = legIndex === legs.length - 1;
+                  const isFirst = legIndex === 0;
+
+                  // "From" — ingredient origin for leg 0; previous leg's waypoint for subsequent legs
+                  const fromLabel = isFirst
+                    ? (ingredient.origin_address || 'Set ingredient origin above')
+                    : (legs[legIndex - 1].toAddress || `Waypoint ${legIndex}`);
+                  const fromHasCoords = isFirst
+                    ? !!(ingredient.origin_lat && ingredient.origin_lng)
+                    : !!(legs[legIndex - 1].toLat && legs[legIndex - 1].toLng);
+
+                  // "To" — production facility for last leg; user-set waypoint for intermediate legs
+                  const destCoords = getDestinationCoords();
+                  const destLabel = destCoords?.label || 'Your facility';
+                  const toHasCoords = isLast ? !!destCoords : !!(leg.toLat && leg.toLng);
+
+                  // Distance is auto-calculated only when both endpoints have coordinates
+                  const distanceIsAuto = fromHasCoords && toHasCoords;
+
+                  const warning = getTransportModeWarning(leg.transportMode, leg.distanceKm);
+
+                  return (
+                    <div key={leg.id} className="rounded-lg border p-3 space-y-3 bg-muted/20">
+                      {/* Leg header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Leg {legIndex + 1}
+                          </span>
+                          {distanceIsAuto && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              <Calculator className="h-2.5 w-2.5 mr-0.5" />
+                              Auto
+                            </Badge>
+                          )}
+                        </div>
+                        {legs.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                            onClick={() => removeTransportLeg(leg.id)}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Transport mode */}
+                      <div className="space-y-1">
+                        <Label className="text-xs">Transport mode</Label>
+                        <Select
+                          value={leg.transportMode}
+                          onValueChange={(value) =>
+                            updateTransportLeg(leg.id, { transportMode: value as TransportMode })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TRANSPORT_MODES.map((mode) => (
+                              <SelectItem key={mode.value} value={mode.value}>
+                                {mode.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* From → To route */}
+                      <div className="space-y-2">
+                        {/* From (always auto-derived, read-only) */}
+                        <div>
+                          <Label className="text-xs mb-1 block">From</Label>
+                          <div className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs ${
+                            fromHasCoords
+                              ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800'
+                              : 'bg-muted border-border'
+                          }`}>
+                            <MapPin className={`h-3 w-3 shrink-0 ${fromHasCoords ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} />
+                            <span className={fromHasCoords ? 'text-green-800 dark:text-green-200' : 'text-muted-foreground italic'}>
+                              {fromLabel}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* To */}
+                        {isLast ? (
+                          <div>
+                            <Label className="text-xs mb-1 block">To (production facility)</Label>
+                            <div className={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs ${
+                              destCoords
+                                ? 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'
+                                : 'bg-muted border-border'
+                            }`}>
+                              <MapPin className={`h-3 w-3 shrink-0 ${destCoords ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`} />
+                              <span className={destCoords ? 'text-blue-800 dark:text-blue-200' : 'text-muted-foreground italic'}>
+                                {destCoords ? destLabel : 'No facility with coordinates found'}
+                              </span>
+                            </div>
+                            {!destCoords && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                <Link href="/company/facilities" className="underline">
+                                  Add facility coordinates
+                                </Link>{' '}
+                                to enable auto-calculation.
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Label className="text-xs">To (set intermediate waypoint)</Label>
+                            <LocationPicker
+                              value={leg.toAddress || ''}
+                              placeholder="e.g. Port of Rotterdam, Netherlands"
+                              onLocationSelect={(location: LocationData) => {
+                                updateTransportLeg(leg.id, {
+                                  toAddress: location.address,
+                                  toLat: location.lat,
+                                  toLng: location.lng,
+                                });
+                              }}
+                            />
+                            {!leg.toAddress && (
+                              <p className="text-xs text-muted-foreground">
+                                Search for the port, hub, or waypoint where transport mode changes.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Distance */}
+                      <div className="space-y-1">
+                        <Label className="text-xs">Distance (km)</Label>
+                        {distanceIsAuto ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-xs">
+                            <Calculator className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
+                            <span className="font-mono font-semibold text-green-800 dark:text-green-200">
+                              {leg.distanceKm > 0 ? leg.distanceKm.toLocaleString() : '—'} km
+                            </span>
+                            <span className="text-green-700 dark:text-green-300 text-[10px] ml-1">
+                              auto-calculated
+                            </span>
+                          </div>
+                        ) : (
+                          <Input
+                            type="number"
+                            min={0}
+                            step={10}
+                            placeholder={
+                              !fromHasCoords
+                                ? 'Set origin above to auto-calculate'
+                                : !toHasCoords && !isLast
+                                ? 'Set waypoint above to auto-calculate'
+                                : 'Enter distance manually'
+                            }
+                            value={leg.distanceKm || ''}
+                            onChange={(e) =>
+                              updateTransportLeg(leg.id, { distanceKm: parseFloat(e.target.value) || 0 })
+                            }
+                          />
+                        )}
+                      </div>
+
+                      {/* Plausibility warning */}
+                      {warning && (
+                        <Alert className="py-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
+                          <Info className="h-3.5 w-3.5 text-amber-600" />
+                          <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
+                            {warning}
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Facility setup hints */}
+                {productionFacilities.length === 0 && totalLinkedFacilities > 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Your linked facilities don&apos;t have location coordinates.{' '}
+                    <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                      Update facility locations
+                    </Link>{' '}
+                    to enable automatic distance calculation.
+                  </p>
+                )}
+                {productionFacilities.length === 0 && totalLinkedFacilities === 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    No facilities linked.{' '}
+                    <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
+                      Add a facility with location
+                    </Link>{' '}
+                    to enable automatic distance calculation.
+                  </p>
+                )}
+
+                {/* Multi-leg transport preview */}
+                {legs.length > 1 && (
+                  <div>
+                    {transportPreviewLoading && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Calculating transport emissions…
+                      </div>
                     )}
-                  </Label>
-                  <Input
-                    id={`distance-${ingredient.tempId}`}
-                    type="number"
-                    step="1"
-                    min="0"
-                    placeholder={productionFacilities.length === 0 ? "No facilities configured" : "Select origin to calculate"}
-                    value={ingredient.distance_km}
-                    onChange={(e) => onUpdate(ingredient.tempId, { distance_km: e.target.value })}
-                    readOnly={!!ingredient.origin_lat && productionFacilities.length > 0}
-                    className={ingredient.origin_lat && productionFacilities.length > 0 ? 'bg-muted cursor-not-allowed' : ''}
-                  />
-                  {ingredient.origin_lat && productionFacilities.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Automatically calculated from origin to your production facility
-                    </p>
-                  )}
-                  {productionFacilities.length === 0 && totalLinkedFacilities > 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Your linked facilities don&apos;t have location coordinates.{' '}
-                      <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
-                        Update facility locations
-                      </Link>{' '}
-                      to enable automatic distance calculation.
-                    </p>
-                  )}
-                  {productionFacilities.length === 0 && totalLinkedFacilities === 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      No facilities linked.{' '}
-                      <Link href="/company/facilities" className="underline hover:text-amber-700 dark:hover:text-amber-300">
-                        Add a facility with location
-                      </Link>{' '}
-                      and link it to this product to enable automatic distance calculation.
-                    </p>
-                  )}
-                </div>
+                    {transportPreview && !transportPreviewLoading && (
+                      <div className="rounded-md bg-slate-50 dark:bg-slate-900 border px-3 py-2 space-y-1.5 text-xs">
+                        <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                          <Calculator className="h-3 w-3" />
+                          Transport impact preview
+                        </div>
+                        {transportPreview.perLeg.map((legResult, i) => (
+                          <div key={legResult.legId} className="flex justify-between text-muted-foreground">
+                            <span>
+                              {`Leg ${i + 1}`}{' '}
+                              <span className="text-[10px]">({formatTransportMode(legResult.mode)}, {legResult.distanceKm.toLocaleString()} km)</span>
+                            </span>
+                            <span>{legResult.emissions.toFixed(4)} kg CO₂e</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between border-t pt-1 font-medium">
+                          <span>Total inbound transport</span>
+                          <span className="text-primary">{transportPreview.total.toFixed(4)} kg CO₂e</span>
+                        </div>
+                        <p className="text-muted-foreground">Per functional unit. Uses DEFRA 2025 freight factors.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-
-              {(() => {
-                const warning = getTransportModeWarning(ingredient.transport_mode, Number(ingredient.distance_km));
-                return warning ? (
-                  <Alert className="mt-2 bg-amber-50 dark:bg-amber-950 border-amber-300 dark:border-amber-800">
-                    <Info className="h-4 w-4 text-amber-600" />
-                    <AlertDescription className="text-xs text-amber-800 dark:text-amber-200">
-                      <strong>Transport Mode Check:</strong> {warning}
-                    </AlertDescription>
-                  </Alert>
-                ) : null;
-              })()}
-
-              {ingredient.origin_lat && ingredient.origin_lng && productionFacilities.length > 0 && (
-                <Alert className="bg-blue-50 border-blue-200 dark:bg-blue-950/20 dark:border-blue-800">
-                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <AlertDescription className="text-xs space-y-1">
-                    <div className="font-semibold text-blue-900 dark:text-blue-100">Distance Calculation Details:</div>
-                    <div className="text-blue-800 dark:text-blue-200">
-                      <strong>Material Origin:</strong> {ingredient.origin_address}
-                      <br />
-                      <span className="font-mono text-[10px]">({ingredient.origin_lat?.toFixed(4)}, {ingredient.origin_lng?.toFixed(4)})</span>
-                    </div>
-                    <div className="text-blue-800 dark:text-blue-200">
-                      <strong>Production Facility:</strong> {productionFacilities[0]?.name}
-                      <br />
-                      <span className="font-mono text-[10px]">({productionFacilities[0]?.address_lat?.toFixed(4)}, {productionFacilities[0]?.address_lng?.toFixed(4)})</span>
-                    </div>
-                    <div className="text-blue-900 dark:text-blue-100 font-semibold pt-1">
-                      Calculated Distance: {ingredient.distance_km} km
-                    </div>
-                  </AlertDescription>
-                </Alert>
-              )}
             </div>
           </div>
+
+          {/* ── Delivery Container ─────────────────────────────────────────── */}
+          <Collapsible open={containerOpen} onOpenChange={setContainerOpen}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between pt-3 border-t text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Delivery Container
+                  </span>
+                  {ingredient.inbound_container_type && (
+                    <Badge variant="outline" className="text-xs bg-slate-50 dark:bg-slate-900">
+                      {getContainerPreset(ingredient.inbound_container_type)?.label ?? ingredient.inbound_container_type}
+                    </Badge>
+                  )}
+                  <span className="text-xs text-muted-foreground">(optional)</span>
+                </div>
+                {containerOpen
+                  ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                }
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="pt-3 space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Record the bulk container your ingredient arrived in. The container&apos;s
+                manufacturing footprint is allocated to this product per unit based on
+                the volume it delivers.
+              </p>
+
+              {/* Container type */}
+              <div>
+                <Label htmlFor={`container-type-${ingredient.tempId}`}>Container type</Label>
+                <Select
+                  value={ingredient.inbound_container_type ?? '__none__'}
+                  onValueChange={(value) => {
+                    if (value === '__none__') {
+                      onUpdate(ingredient.tempId, {
+                        inbound_container_type: null,
+                        inbound_container_volume_l: null,
+                        inbound_container_tare_kg: null,
+                        inbound_container_reuse_cycles: null,
+                        inbound_container_ef: null,
+                      });
+                      return;
+                    }
+                    const preset = getContainerPreset(value);
+                    onUpdate(ingredient.tempId, {
+                      inbound_container_type: value,
+                      inbound_container_volume_l: preset && preset.volume_l > 0 ? preset.volume_l : null,
+                      inbound_container_tare_kg: preset && preset.tare_kg > 0 ? preset.tare_kg : null,
+                      inbound_container_reuse_cycles: preset ? preset.reuse_cycles : 1,
+                      inbound_container_ef: null, // always clear override when switching preset
+                    });
+                  }}
+                >
+                  <SelectTrigger id={`container-type-${ingredient.tempId}`}>
+                    <SelectValue placeholder="Select container type…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Radix UI v2 requires non-empty strings — use sentinel '__none__' */}
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    {CONTAINER_PRESETS.map((p) => (
+                      <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {ingredient.inbound_container_type && (
+                <>
+                  {/* Volume + tare row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor={`container-volume-${ingredient.tempId}`}>Capacity (L)</Label>
+                      <Input
+                        id={`container-volume-${ingredient.tempId}`}
+                        type="number"
+                        min={0.001}
+                        step="any"
+                        value={ingredient.inbound_container_volume_l ?? ''}
+                        readOnly={ingredient.inbound_container_type !== 'custom'}
+                        className={ingredient.inbound_container_type !== 'custom' ? 'bg-muted cursor-not-allowed' : ''}
+                        onChange={(e) => {
+                          if (ingredient.inbound_container_type === 'custom') {
+                            onUpdate(ingredient.tempId, { inbound_container_volume_l: parseFloat(e.target.value) || null });
+                          }
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`container-tare-${ingredient.tempId}`}>Tare weight (kg)</Label>
+                      <Input
+                        id={`container-tare-${ingredient.tempId}`}
+                        type="number"
+                        min={0.01}
+                        step="any"
+                        value={ingredient.inbound_container_tare_kg ?? ''}
+                        readOnly={ingredient.inbound_container_type !== 'custom'}
+                        className={ingredient.inbound_container_type !== 'custom' ? 'bg-muted cursor-not-allowed' : ''}
+                        onChange={(e) => {
+                          if (ingredient.inbound_container_type === 'custom') {
+                            onUpdate(ingredient.tempId, { inbound_container_tare_kg: parseFloat(e.target.value) || null });
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Reusable */}
+                  {(() => {
+                    const preset = getContainerPreset(ingredient.inbound_container_type);
+                    const isReusable = preset
+                      ? preset.is_reusable
+                      : (ingredient.inbound_container_reuse_cycles ?? 1) > 1;
+                    const isLocked = ingredient.inbound_container_type !== 'custom' && ingredient.inbound_container_type !== 'bulk_tanker_25000l';
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id={`container-reusable-${ingredient.tempId}`}
+                            checked={isReusable}
+                            disabled={isLocked}
+                            onCheckedChange={(checked) => {
+                              if (!isLocked) {
+                                onUpdate(ingredient.tempId, {
+                                  inbound_container_reuse_cycles: checked ? 2 : 1,
+                                });
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`container-reusable-${ingredient.tempId}`}
+                            className={`text-sm font-normal ${isLocked ? 'text-muted-foreground' : ''}`}
+                          >
+                            Returned / reusable container
+                          </Label>
+                        </div>
+
+                        {isReusable && (
+                          <div>
+                            <Label htmlFor={`container-cycles-${ingredient.tempId}`}>
+                              Reuse cycles
+                            </Label>
+                            <Input
+                              id={`container-cycles-${ingredient.tempId}`}
+                              type="number"
+                              min={1}
+                              step={1}
+                              value={ingredient.inbound_container_reuse_cycles ?? (preset?.reuse_cycles ?? 1)}
+                              onChange={(e) =>
+                                onUpdate(ingredient.tempId, {
+                                  inbound_container_reuse_cycles: Math.max(1, parseInt(e.target.value, 10) || 1),
+                                })
+                              }
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Total number of uses in the container&apos;s lifetime (e.g. 300 for a steel road tanker fleet).
+                              Carbon footprint is divided across all cycles.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* EF override — custom only */}
+                  {ingredient.inbound_container_type === 'custom' && (
+                    <div>
+                      <Label htmlFor={`container-ef-${ingredient.tempId}`}>
+                        Emission factor (kg CO₂e / kg material)
+                        <span className="text-muted-foreground font-normal ml-1">(optional)</span>
+                      </Label>
+                      <Input
+                        id={`container-ef-${ingredient.tempId}`}
+                        type="number"
+                        min={0}
+                        step="any"
+                        placeholder="Leave blank to use platform default"
+                        value={ingredient.inbound_container_ef ?? ''}
+                        onChange={(e) =>
+                          onUpdate(ingredient.tempId, {
+                            inbound_container_ef: parseFloat(e.target.value) || null,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {/* Live impact preview */}
+                  {(() => {
+                    const preview = getContainerImpactPreview();
+                    if (!preview) return null;
+                    return (
+                      <div className="rounded-md bg-slate-50 dark:bg-slate-900 border px-3 py-2 text-xs space-y-1">
+                        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                          <Calculator className="h-3 w-3" />
+                          Container impact preview
+                        </div>
+                        <div className="font-mono text-foreground">
+                          ~{preview.value < 0.001
+                            ? preview.value.toExponential(2)
+                            : preview.value.toFixed(4)
+                          } kg CO₂e per functional unit
+                        </div>
+                        {preview.warning && (
+                          <div className="text-amber-600 dark:text-amber-400">⚠ {preview.warning}</div>
+                        )}
+                        <div className="text-muted-foreground">
+                          Added to ingredient&apos;s climate impact at calculation time.
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
 
           {ingredient.data_source && (
             <div className="flex items-center justify-between pt-2 border-t">

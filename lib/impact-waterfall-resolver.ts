@@ -2,6 +2,7 @@ import { getSupabaseBrowserClient } from './supabase/browser-client';
 import { DEFAULT_AWARE_FACTOR, getAwareFactorValue } from './calculations/water-risk';
 import { getPreferredDatabase } from './openlca/agribalyse-aliases';
 import type { OpenLCADatabaseSource } from './openlca/client';
+import type { DistributionLeg } from './distribution-factors';
 // OpenLCA calculations now happen server-side via /api/openlca/calculate
 
 export type MaterialCategoryType =
@@ -29,6 +30,17 @@ export interface ProductMaterial {
   category_type?: MaterialCategoryType;
   /** Which OpenLCA database this process belongs to (ecoinvent or agribalyse) */
   openlca_database?: OpenLCADatabaseSource;
+
+  // Inbound delivery container (ingredient rows only)
+  inbound_container_type?: string | null;
+  inbound_container_volume_l?: number | null;
+  inbound_container_tare_kg?: number | null;
+  inbound_container_reuse_cycles?: number | null;
+  inbound_container_ef?: number | null;
+
+  // Multi-modal inbound transport (ingredient rows only).
+  // When present, overrides transport_mode + distance_km.
+  transport_legs?: DistributionLeg[] | null;
 }
 
 export interface WaterfallResult {
