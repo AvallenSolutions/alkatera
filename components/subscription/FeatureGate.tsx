@@ -17,6 +17,8 @@ import {
   Heart,
   Scale,
   Gift,
+  FlaskConical,
+  Mail,
 } from "lucide-react";
 import { useFeatureGate, FeatureCode, TierName } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
@@ -406,6 +408,34 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Shield,
     category: "Products & LCA",
   },
+  impact_valuation_beta: {
+    name: "Impact Valuation",
+    description:
+      "Impact Valuation is currently in private beta. This module lets you translate your sustainability performance into monetised real-world impact — contact us to request access for your organisation.",
+    benefits: [
+      "Monetise your environmental impact in £ terms",
+      "Understand the true cost and value of your sustainability actions",
+      "Compare impact across products, facilities, and supply chain tiers",
+      "Generate investor-ready impact valuation reports",
+      "Dashboard widget showing your total monetised impact score",
+    ],
+    icon: BarChart3,
+    category: "Impact",
+  },
+  epr_beta: {
+    name: "EPR Compliance",
+    description:
+      "UK Extended Producer Responsibility (EPR) compliance tools are currently in beta. Contact us to request access for your organisation.",
+    benefits: [
+      "Calculate your EPR obligation status (large vs small producer)",
+      "Estimate annual waste management fees by material",
+      "Generate RPD-format CSV submissions for the Defra portal",
+      "Track data completeness across all packaging items",
+      "Rosa-guided setup wizard for first-time configuration",
+    ],
+    icon: Shield,
+    category: "Compliance",
+  },
   knowledge_bank_manage: {
     name: "Knowledge Bank (Upload & Manage)",
     description:
@@ -491,6 +521,7 @@ const featureNames: Record<FeatureCode, string> = {
   lca_use_phase: "LCA Use Phase (Cradle-to-Consumer)",
   lca_end_of_life: "LCA End of Life (Cradle-to-Grave)",
   impact_valuation_beta: "Impact Valuation (Beta)",
+  epr_beta: "EPR Compliance (Beta)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {
@@ -556,6 +587,10 @@ function LockedFeaturePage({
   const category = info?.category || "";
   const highlights = tierHighlights[requiredTier] || [];
 
+  // Beta features require an explicit admin grant — the user already has the right
+  // tier but the flag hasn't been enabled for their org yet.
+  const isBetaFeature = feature.endsWith('_beta');
+
   return (
     <div className={cn("flex h-full flex-col items-center justify-center px-6 py-8 max-w-4xl mx-auto", className)}>
       {/* Header */}
@@ -597,53 +632,89 @@ function LockedFeaturePage({
           </div>
         )}
 
-        {/* Upgrade card */}
-        <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-5 flex flex-col">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-semibold">
-                Upgrade to {tierDisplayNames[requiredTier]}
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                From &pound;{tierPrices[requiredTier]}/month
-              </p>
+        {/* Upgrade card — or Beta access card if the feature is beta-gated */}
+        {isBetaFeature ? (
+          <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-5 flex flex-col">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold">Beta Access Required</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This feature is currently in private beta
+                </p>
+              </div>
+              <FlaskConical className="h-5 w-5 text-neon-lime" />
             </div>
-            <Sparkles className="h-5 w-5 text-neon-lime" />
+
+            <p className="text-sm text-muted-foreground mb-4 flex-1 leading-relaxed">
+              {name} is available to select organisations during the beta period.
+              Contact the alka<strong>tera</strong> team to request access for
+              your organisation.
+            </p>
+
+            <a href="mailto:hello@alkatera.com">
+              <Button className="w-full gap-2" size="default">
+                <Mail className="h-4 w-4" />
+                Contact alkatera for Access
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </a>
+
+            <p className="mt-2.5 text-center text-xs text-muted-foreground">
+              You&apos;re currently on the{" "}
+              <span className="font-medium text-foreground">
+                {tierDisplayNames[currentTier]}
+              </span>{" "}
+              plan
+            </p>
           </div>
-
-          {/* What else you unlock */}
-          {highlights.length > 0 && (
-            <div className="mb-4 flex-1">
-              <p className="text-xs font-medium text-muted-foreground mb-2.5 uppercase tracking-wider">
-                Everything you unlock
-              </p>
-              <ul className="space-y-1.5">
-                {highlights.map((highlight, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <Check className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-neon-lime" />
-                    <span className="text-foreground/80">{highlight}</span>
-                  </li>
-                ))}
-              </ul>
+        ) : (
+          <div className="rounded-lg border border-neon-lime/30 bg-neon-lime/5 p-5 flex flex-col">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-semibold">
+                  Upgrade to {tierDisplayNames[requiredTier]}
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  From &pound;{tierPrices[requiredTier]}/month
+                </p>
+              </div>
+              <Sparkles className="h-5 w-5 text-neon-lime" />
             </div>
-          )}
 
-          <Link href="/settings/">
-            <Button className="w-full gap-2" size="default">
-              <Sparkles className="h-4 w-4" />
-              Upgrade to {tierDisplayNames[requiredTier]}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </Link>
+            {/* What else you unlock */}
+            {highlights.length > 0 && (
+              <div className="mb-4 flex-1">
+                <p className="text-xs font-medium text-muted-foreground mb-2.5 uppercase tracking-wider">
+                  Everything you unlock
+                </p>
+                <ul className="space-y-1.5">
+                  {highlights.map((highlight, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <Check className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-neon-lime" />
+                      <span className="text-foreground/80">{highlight}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
-          <p className="mt-2.5 text-center text-xs text-muted-foreground">
-            You&apos;re currently on the{" "}
-            <span className="font-medium text-foreground">
-              {tierDisplayNames[currentTier]}
-            </span>{" "}
-            plan
-          </p>
-        </div>
+            <Link href="/settings/">
+              <Button className="w-full gap-2" size="default">
+                <Sparkles className="h-4 w-4" />
+                Upgrade to {tierDisplayNames[requiredTier]}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+
+            <p className="mt-2.5 text-center text-xs text-muted-foreground">
+              You&apos;re currently on the{" "}
+              <span className="font-medium text-foreground">
+                {tierDisplayNames[currentTier]}
+              </span>{" "}
+              plan
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

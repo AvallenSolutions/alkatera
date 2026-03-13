@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useIsAlkateraAdmin } from '@/hooks/usePermissions';
+import { useSubscription } from '@/hooks/useSubscription';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,11 @@ const BETA_FEATURES = [
     code: 'impact_valuation_beta',
     label: 'Impact Valuation',
     description: 'Access to the Impact Valuation module and dashboard widget',
+  },
+  {
+    code: 'epr_beta',
+    label: 'EPR Compliance',
+    description: 'Access to the UK Extended Producer Responsibility compliance tools',
   },
 ] as const;
 
@@ -72,6 +78,7 @@ function statusColour(status: string | null): string {
 
 export default function AdminBetaAccessPage() {
   const { isAlkateraAdmin, isLoading: authLoading } = useIsAlkateraAdmin();
+  const { refresh: refreshSubscription } = useSubscription();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -157,6 +164,10 @@ export default function AdminBetaAccessPage() {
           ? `${featureCode} enabled for ${orgName}`
           : `${featureCode} disabled for ${orgName}`
       );
+
+      // Refresh the subscription context so the sidebar and feature gates
+      // reflect the new flag immediately without requiring a page reload
+      refreshSubscription();
     } catch (err) {
       console.error('Error toggling feature:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to update beta access');
@@ -178,9 +189,9 @@ export default function AdminBetaAccessPage() {
       )
     : organizations;
 
-  // Count orgs with beta access
+  // Count orgs with any beta access
   const betaCount = organizations.filter(
-    (org) => org.feature_flags?.impact_valuation_beta === true
+    (org) => BETA_FEATURES.some((f) => org.feature_flags?.[f.code] === true)
   ).length;
 
   // ── Auth guard ──────────────────────────────────────────────────────────

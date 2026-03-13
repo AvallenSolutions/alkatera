@@ -97,7 +97,9 @@ export type FeatureCode =
   | "lca_use_phase"
   | "lca_end_of_life"
   // Impact Valuation (beta)
-  | "impact_valuation_beta";
+  | "impact_valuation_beta"
+  // EPR Compliance (beta)
+  | "epr_beta";
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -413,6 +415,11 @@ export function useSubscription() {
 
   const hasFeature = useCallback(
     (featureCode: FeatureCode): boolean => {
+      // Beta features require explicit admin grant via feature_flags — tier fallback is intentionally skipped
+      const betaOnlyFeatures: FeatureCode[] = ['impact_valuation_beta', 'epr_beta'];
+      if (betaOnlyFeatures.includes(featureCode)) {
+        return state.usage?.features?.includes(featureCode) ?? false;
+      }
       // Check the DB features list first
       if (state.usage?.features?.includes(featureCode)) return true;
       // Fallback: check if user's tier level meets the requirement for this feature
@@ -521,6 +528,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "gap_analysis", "audit_packages", "third_party_verification",
     // Impact Valuation — canopy tier OR admin-granted via feature_flags
     "impact_valuation_beta",
+    // EPR Compliance — canopy tier OR admin-granted via feature_flags
+    "epr_beta",
   ];
 
   const blossomFeatures: FeatureCode[] = [

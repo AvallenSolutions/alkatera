@@ -196,6 +196,7 @@ const navigationStructure: NavItem[] = [
         href: '/epr/',
         icon: ShieldCheck,
         minTier: 1,
+        featureCode: 'epr_beta',
         children: [
           { name: 'Setup Wizard',  href: '/epr/wizard/',       icon: Sparkles,        minTier: 1 },
           { name: 'Dashboard',     href: '/epr/',              icon: LayoutDashboard, minTier: 1 },
@@ -619,6 +620,22 @@ export function Sidebar({ className }: SidebarProps) {
 
                         // If child has its own children (e.g., Social Impact subsections)
                         if (childHasChildren) {
+                          // Locked child with children — navigates to the feature gate page
+                          if (child.locked) {
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm opacity-40 hover:opacity-60 transition-opacity mt-1"
+                                title={child.featureCode?.endsWith('_beta') ? 'Beta access required' : `Upgrade to ${child.requiredTierName} to unlock`}
+                              >
+                                {ChildIcon && <ChildIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />}
+                                <span className="truncate flex-1 text-left text-muted-foreground">{child.name}</span>
+                                <FlaskConical className="h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                              </Link>
+                            )
+                          }
+
                           return (
                             <div key={child.href} className="mt-1">
                               <button
