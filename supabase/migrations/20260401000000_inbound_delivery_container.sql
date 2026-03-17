@@ -25,6 +25,23 @@
 
 
 -- ----------------------------------------------------------------------------
+-- 0. Extend category check constraint to allow 'Inbound Container'
+-- ----------------------------------------------------------------------------
+ALTER TABLE staging_emission_factors
+  DROP CONSTRAINT IF EXISTS staging_emission_factors_category_check;
+
+ALTER TABLE staging_emission_factors
+  ADD CONSTRAINT staging_emission_factors_category_check
+  CHECK (category = ANY (ARRAY[
+    'Ingredient'::text,
+    'Packaging'::text,
+    'Energy'::text,
+    'Transport'::text,
+    'Waste'::text,
+    'Inbound Container'::text
+  ]));
+
+-- ----------------------------------------------------------------------------
 -- 1. New columns on product_materials
 -- ----------------------------------------------------------------------------
 
