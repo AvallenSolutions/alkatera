@@ -61,6 +61,8 @@ export function RecipeEditorPanel({
     productionFacilities,
     loading,
     saving,
+    autoSaving,
+    lastSavedAt,
     isDirty,
     ingredientForms,
     packagingForms,
@@ -330,7 +332,7 @@ export function RecipeEditorPanel({
                 Add Another Ingredient ({ingredientCount}/{ingredientForms.length})
               </Button>
 
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex items-center gap-2 pt-4 border-t">
                 <Button
                   type="button"
                   onClick={handleSaveIngredients}
@@ -342,6 +344,12 @@ export function RecipeEditorPanel({
                 <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
                   Cancel
                 </Button>
+                {autoSaving && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Autosaving...</span>
+                )}
+                {!autoSaving && lastSavedAt && (
+                  <span className="text-xs text-muted-foreground">All changes saved</span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -441,7 +449,7 @@ export function RecipeEditorPanel({
                 Add Another Packaging ({packagingCount}/{packagingForms.length})
               </Button>
 
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex items-center gap-2 pt-4 border-t">
                 <Button
                   type="button"
                   onClick={handleSavePackaging}
@@ -453,6 +461,12 @@ export function RecipeEditorPanel({
                 <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
                   Cancel
                 </Button>
+                {autoSaving && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Autosaving...</span>
+                )}
+                {!autoSaving && lastSavedAt && (
+                  <span className="text-xs text-muted-foreground">All changes saved</span>
+                )}
               </div>
             </CardContent>
           </Card>

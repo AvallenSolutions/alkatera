@@ -127,7 +127,8 @@ CREATE POLICY "Users can view their own requests"
     )
     OR EXISTS (
       SELECT 1 FROM public.organization_members om
-      WHERE om.user_id = auth.uid() AND om.role IN ('admin', 'owner')
+      JOIN public.roles r ON r.id = om.role_id
+      WHERE om.user_id = auth.uid() AND r.name IN ('admin', 'owner')
     )
   );
 
@@ -156,7 +157,8 @@ CREATE POLICY "Admins can manage audit logs"
   USING (
     EXISTS (
       SELECT 1 FROM public.organization_members om
-      WHERE om.user_id = auth.uid() AND om.role IN ('admin', 'owner')
+      JOIN public.roles r ON r.id = om.role_id
+      WHERE om.user_id = auth.uid() AND r.name IN ('admin', 'owner')
     )
   );
 

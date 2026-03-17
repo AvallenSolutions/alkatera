@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import { PackagingFormCard, PackagingFormData } from "@/components/products/Pack
 import type { PackagingCategory } from "@/lib/types/lca";
 import { OpenLCAConfigDialog } from "@/components/lca/OpenLCAConfigDialog";
 import { BOMImportFlow } from "@/components/products/BOMImportFlow";
+import { useAutoSave } from "@/hooks/useAutoSave";
 
 interface Product {
   id: string;
@@ -103,6 +104,39 @@ export default function ProductRecipePage() {
       units_per_group: 1,
     }
   ]);
+
+  // --- Autosave infrastructure ---
+  const savedIngredientSnapshot = useRef<string>('');
+  const savedPackagingSnapshot = useRef<string>('');
+  const ingredientFormsRef = useRef(ingredientForms);
+  const packagingFormsRef = useRef(packagingForms);
+  const savingRef = useRef(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+
+  useEffect(() => { ingredientFormsRef.current = ingredientForms; }, [ingredientForms]);
+  useEffect(() => { packagingFormsRef.current = packagingForms; }, [packagingForms]);
+  useEffect(() => { savingRef.current = saving; }, [saving]);
+
+  const formFingerprint = useCallback((forms: Array<{ [key: string]: any }>): string => {
+    return JSON.stringify(forms.map(f => ({
+      name: f.name || '',
+      amount: String(f.amount || ''),
+      unit: f.unit || '',
+      origin_country: f.origin_country || '',
+      origin_address: f.origin_address || '',
+      origin_lat: f.origin_lat || '',
+      origin_lng: f.origin_lng || '',
+      data_source: f.data_source || null,
+      transport_mode: f.transport_mode || '',
+      distance_km: String(f.distance_km || ''),
+      packaging_category: f.packaging_category || '',
+      net_weight_g: String(f.net_weight_g || ''),
+      recycled_content_percentage: String(f.recycled_content_percentage || ''),
+      printing_process: f.printing_process || '',
+      is_organic_certified: f.is_organic_certified || false,
+    })));
+  }, []);
+  // --- End autosave infrastructure ---
 
   useEffect(() => {
     if (productId && currentOrganization?.id) {
@@ -409,6 +443,13 @@ export default function ProductRecipePage() {
           };
         }));
       }
+
+      // Capture initial snapshots for dirty detection after data load
+      // (must happen synchronously after setIngredientForms/setPackagingForms in the same tick)
+      setTimeout(() => {
+        savedIngredientSnapshot.current = formFingerprint(ingredientFormsRef.current);
+        savedPackagingSnapshot.current = formFingerprint(packagingFormsRef.current);
+      }, 0);
     } catch (error: any) {
       console.error("Error fetching product data:", error);
       toast.error("Failed to load product data");
@@ -521,6 +562,202 @@ export default function ProductRecipePage() {
     // Show a helpful toast
     toast.info(`Adding new ${category} packaging. Your existing items are preserved.`);
   };
+
+  // --- Autosave: silent save functions (no toasts, no fetchProductData) ---
+  const autoSaveIngredients = useCallback(async (forms: IngredientFormData[]) => {
+    const validForms = forms.filter(f => f.name && f.amount && Number(f.amount) > 0);
+    if (validForms.length === 0 || !currentOrganization?.id) return;
+
+    const { error: deleteError } = await supabase
+      .from("product_materials")
+      .delete()
+      .eq("product_id", productId)
+      .eq("material_type", "ingredient");
+    if (deleteError) throw new Error(`Autosave ingredients failed: ${deleteError.message}`);
+
+    const materialsToInsert = validForms.map(form => {
+      const materialData: any = {
+        product_id: parseInt(productId),
+        material_name: form.name,
+        matched_source_name: form.matched_source_name || null,
+        quantity: Number(form.amount),
+        unit: form.unit,
+        material_type: 'ingredient',
+        origin_country: form.origin_country || null,
+        is_organic_certified: form.is_organic_certified || false,
+      };
+      if (form.data_source === 'openlca' && form.data_source_id) {
+        materialData.data_source = 'openlca';
+        materialData.data_source_id = form.data_source_id;
+      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
+        materialData.data_source = 'supplier';
+        materialData.supplier_product_id = form.supplier_product_id;
+      }
+      if (form.transport_legs && form.transport_legs.length > 0) {
+        materialData.transport_legs = form.transport_legs;
+        materialData.transport_mode = form.transport_legs[0].transportMode;
+        materialData.distance_km = form.transport_legs[0].distanceKm;
+      } else if (form.transport_mode && form.distance_km) {
+        materialData.transport_mode = form.transport_mode;
+        materialData.distance_km = Number(form.distance_km);
+        materialData.transport_legs = null;
+      }
+      if (form.origin_lat && form.origin_lng) {
+        materialData.origin_lat = form.origin_lat;
+        materialData.origin_lng = form.origin_lng;
+        materialData.origin_address = form.origin_address || null;
+        materialData.origin_country_code = form.origin_country_code || null;
+      }
+      materialData.inbound_container_type = form.inbound_container_type ?? null;
+      materialData.inbound_container_volume_l = form.inbound_container_volume_l ?? null;
+      materialData.inbound_container_tare_kg = form.inbound_container_tare_kg ?? null;
+      materialData.inbound_container_reuse_cycles = form.inbound_container_reuse_cycles ?? null;
+      materialData.inbound_container_ef = form.inbound_container_ef ?? null;
+      return materialData;
+    });
+
+    const { error: insertError } = await supabase
+      .from("product_materials").insert(materialsToInsert).select();
+    if (insertError) throw new Error(`Autosave ingredients failed: ${insertError.message}`);
+    savedIngredientSnapshot.current = formFingerprint(forms);
+  }, [productId, currentOrganization?.id, formFingerprint]);
+
+  const autoSavePackaging = useCallback(async (forms: PackagingFormData[]) => {
+    const validForms = forms.filter(
+      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
+    );
+    if (validForms.length === 0 || !currentOrganization?.id) return;
+
+    const existingItems = validForms.filter(f => !f.tempId.startsWith('temp-'));
+    const newItems = validForms.filter(f => f.tempId.startsWith('temp-'));
+    const idsToKeep = existingItems.map(f => f.tempId);
+
+    const { data: currentPkg } = await supabase
+      .from("product_materials").select("id")
+      .eq("product_id", productId).eq("material_type", "packaging");
+
+    if (currentPkg && currentPkg.length > 0) {
+      const idsToDelete = currentPkg.map(p => p.id).filter(id => !idsToKeep.includes(id.toString()));
+      if (idsToDelete.length > 0) {
+        const { error } = await supabase.from("product_materials").delete().in("id", idsToDelete);
+        if (error) throw new Error(`Autosave packaging failed: ${error.message}`);
+      }
+    }
+
+    const buildMaterialData = (form: PackagingFormData) => {
+      let quantity = Number(form.amount);
+      if (!quantity || quantity <= 0 || isNaN(quantity)) {
+        const weightG = Number(form.net_weight_g);
+        quantity = isNaN(weightG) ? 0 : (form.unit === 'kg' ? weightG / 1000 : weightG);
+      }
+      const materialData: any = {
+        product_id: parseInt(productId),
+        material_name: form.name,
+        matched_source_name: form.matched_source_name || null,
+        quantity, unit: form.unit, material_type: 'packaging',
+        packaging_category: form.packaging_category || null,
+        origin_country: form.origin_country || null,
+        net_weight_g: Number(form.net_weight_g) || null,
+        recycled_content_percentage: form.recycled_content_percentage ? Number(form.recycled_content_percentage) : null,
+        printing_process: form.printing_process || null,
+      };
+      if (form.data_source === 'openlca' && form.data_source_id) {
+        materialData.data_source = 'openlca';
+        materialData.data_source_id = form.data_source_id;
+      } else if (form.data_source === 'supplier' && form.supplier_product_id) {
+        materialData.data_source = 'supplier';
+        materialData.supplier_product_id = form.supplier_product_id;
+      }
+      if (form.transport_legs && form.transport_legs.length > 0) {
+        materialData.transport_legs = form.transport_legs;
+        materialData.transport_mode = form.transport_legs[0].transportMode;
+        materialData.distance_km = form.transport_legs[0].distanceKm;
+      } else if (form.transport_mode && form.distance_km) {
+        materialData.transport_mode = form.transport_mode;
+        materialData.distance_km = Number(form.distance_km);
+        materialData.transport_legs = null;
+      }
+      if (form.origin_lat && form.origin_lng) {
+        materialData.origin_lat = form.origin_lat;
+        materialData.origin_lng = form.origin_lng;
+        materialData.origin_address = form.origin_address || null;
+        materialData.origin_country_code = form.origin_country_code || null;
+      }
+      materialData.has_component_breakdown = form.has_component_breakdown || false;
+      if (form.epr_packaging_level) materialData.epr_packaging_level = form.epr_packaging_level;
+      if (form.epr_packaging_activity) materialData.epr_packaging_activity = form.epr_packaging_activity;
+      materialData.epr_is_household = form.epr_is_household !== undefined ? form.epr_is_household : true;
+      if (form.epr_ram_rating) materialData.epr_ram_rating = form.epr_ram_rating;
+      if (form.epr_uk_nation) materialData.epr_uk_nation = form.epr_uk_nation;
+      materialData.epr_is_drinks_container = form.epr_is_drinks_container || false;
+      materialData.units_per_group = Number(form.units_per_group) || 1;
+      return materialData;
+    };
+
+    for (const form of existingItems) {
+      const materialData = buildMaterialData(form);
+      if (!materialData.quantity || materialData.quantity <= 0 || isNaN(materialData.quantity)) continue;
+      const { error } = await supabase.from("product_materials").update(materialData).eq("id", form.tempId);
+      if (error) throw new Error(`Autosave packaging failed: ${error.message}`);
+    }
+
+    if (newItems.length > 0) {
+      const toInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0 && !isNaN(m.quantity));
+      if (toInsert.length > 0) {
+        const { error } = await supabase.from("product_materials").insert(toInsert).select();
+        if (error) throw new Error(`Autosave packaging failed: ${error.message}`);
+      }
+    }
+    savedPackagingSnapshot.current = formFingerprint(forms);
+  }, [productId, currentOrganization?.id, formFingerprint]);
+
+  const performAutoSave = useCallback(async () => {
+    if (savingRef.current) return;
+    const curIng = ingredientFormsRef.current;
+    const curPkg = packagingFormsRef.current;
+    const ingDirty = formFingerprint(curIng) !== savedIngredientSnapshot.current;
+    const pkgDirty = formFingerprint(curPkg) !== savedPackagingSnapshot.current;
+    if (!ingDirty && !pkgDirty) return;
+    try {
+      if (ingDirty) await autoSaveIngredients(curIng);
+      if (pkgDirty) await autoSavePackaging(curPkg);
+      setLastSavedAt(new Date());
+    } catch (error: any) {
+      console.error('Autosave error:', error);
+      toast.error('Autosave failed. Your changes are still in memory - use the Save button.', { id: 'autosave-error' });
+    }
+  }, [autoSaveIngredients, autoSavePackaging, formFingerprint]);
+
+  const { scheduleSave: scheduleAutoSave, cancel: cancelAutoSave, isSaving: autoSaving } = useAutoSave({
+    onSave: performAutoSave,
+    delay: 8000,
+    enabled: !saving && !loading,
+  });
+
+  // Trigger autosave when forms change
+  useEffect(() => {
+    if (loading) return;
+    const ingDirty = formFingerprint(ingredientForms) !== savedIngredientSnapshot.current;
+    const pkgDirty = formFingerprint(packagingForms) !== savedPackagingSnapshot.current;
+    if (ingDirty || pkgDirty) {
+      scheduleAutoSave();
+    }
+  }, [ingredientForms, packagingForms, loading, scheduleAutoSave, formFingerprint]);
+
+  // Warn before navigating away with unsaved changes
+  useEffect(() => {
+    const ingDirty = formFingerprint(ingredientForms) !== savedIngredientSnapshot.current;
+    const pkgDirty = formFingerprint(packagingForms) !== savedPackagingSnapshot.current;
+    const handler = (e: BeforeUnloadEvent) => {
+      if (ingDirty || pkgDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [ingredientForms, packagingForms, formFingerprint]);
+  // --- End autosave ---
 
   const handleBOMImportComplete = async (
     importedIngredients: IngredientFormData[],
@@ -664,6 +901,7 @@ export default function ProductRecipePage() {
   };
 
   const saveIngredients = async () => {
+    cancelAutoSave();
     const validForms = ingredientForms.filter(f => f.name && f.amount && Number(f.amount) > 0);
 
     // Check authentication
@@ -802,6 +1040,7 @@ export default function ProductRecipePage() {
   };
 
   const savePackaging = async () => {
+    cancelAutoSave();
     console.log('=== SAVE PACKAGING DEBUG ===');
     console.log('All packaging forms:', packagingForms);
 
@@ -1369,7 +1608,7 @@ export default function ProductRecipePage() {
                 Add Another Ingredient ({ingredientCount}/{ingredientForms.length})
               </Button>
 
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex items-center gap-2 pt-4 border-t">
                 <Button
                   type="button"
                   onClick={saveIngredients}
@@ -1381,6 +1620,12 @@ export default function ProductRecipePage() {
                 <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
                   Cancel
                 </Button>
+                {autoSaving && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Autosaving...</span>
+                )}
+                {!autoSaving && lastSavedAt && (
+                  <span className="text-xs text-muted-foreground">All changes saved</span>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1445,7 +1690,7 @@ export default function ProductRecipePage() {
                 Add Another Packaging ({packagingCount}/{packagingForms.length})
               </Button>
 
-              <div className="flex gap-2 pt-4 border-t">
+              <div className="flex items-center gap-2 pt-4 border-t">
                 <Button
                   type="button"
                   onClick={savePackaging}
@@ -1457,6 +1702,12 @@ export default function ProductRecipePage() {
                 <Button type="button" variant="outline" onClick={fetchProductData} disabled={saving}>
                   Cancel
                 </Button>
+                {autoSaving && (
+                  <span className="text-xs text-muted-foreground animate-pulse">Autosaving...</span>
+                )}
+                {!autoSaving && lastSavedAt && (
+                  <span className="text-xs text-muted-foreground">All changes saved</span>
+                )}
               </div>
             </CardContent>
           </Card>

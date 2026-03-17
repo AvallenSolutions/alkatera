@@ -77,7 +77,9 @@ END$$;
 
 -- 1d. Update validate_supplier_invitation_token RPC
 -- Now returns: organization_name, contact_person_name, personal_message, inviter_name
+-- Must DROP first because return type changed (cannot use CREATE OR REPLACE)
 -- ==========================================================================
+DROP FUNCTION IF EXISTS public.validate_supplier_invitation_token(text);
 CREATE OR REPLACE FUNCTION public.validate_supplier_invitation_token(p_token text)
 RETURNS TABLE(
   invitation_id uuid,

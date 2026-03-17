@@ -1,4 +1,9 @@
 -- ============================================================================
+-- Pre-fix: Allow negative co2_factor for carbon-negative materials (e.g. cork)
+-- ============================================================================
+ALTER TABLE staging_emission_factors DROP CONSTRAINT IF EXISTS staging_emission_factors_co2_factor_check;
+
+-- ============================================================================
 -- Major Factor Library Expansion — 59 → 145+ factors
 -- ============================================================================
 -- Purpose: Close critical coverage gaps blocking real-world LCA calculations

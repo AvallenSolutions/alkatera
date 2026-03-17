@@ -176,7 +176,7 @@ INSERT INTO public.staging_emission_factors (
   gwp_methodology, temporal_coverage, uncertainty_percent,
   co2_dluc_factor, ch4_factor
 ) VALUES (
-  NULL, 'Fermentation CO2 Emissions (biogenic)', 'Process', 0.00, 'kg',
+  NULL, 'Fermentation CO2 Emissions (biogenic)', 'Ingredient', 0.00, 'kg',
   'IPCC Guidelines Vol.4 Ch.12; Beverage Industry Environmental Roundtable (BIER) GHG Protocol guidance',
   '{
     "data_quality_grade": "HIGH",
