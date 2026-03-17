@@ -482,6 +482,7 @@ describe('calculateProductCarbonFootprint', () => {
         undefined, // usePhaseConfig
         undefined, // eolConfig
         undefined, // distributionConfig
+        undefined, // productLossConfig
       );
     });
 
@@ -514,6 +515,7 @@ describe('calculateProductCarbonFootprint', () => {
         usePhaseConfig,
         eolConfig,
         undefined, // distributionConfig
+        undefined, // productLossConfig
       );
     });
   });

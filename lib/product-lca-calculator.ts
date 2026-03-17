@@ -6,6 +6,7 @@ import { resolveImpactSource } from './utils/data-quality-mapper';
 import { aggregateProductImpacts, type FacilityEmissionsData } from './product-lca-aggregator';
 import { generateLcaInterpretation } from './lca-interpretation-engine';
 import { calculateDistance } from './utils/distance-calculator';
+import { boundaryToDbEnum } from './system-boundaries';
 import { calculateMaturationImpacts } from './maturation-calculator';
 import type { MaturationProfile } from './types/maturation';
 import { getGridFactor } from './grid-emission-factors';
@@ -31,6 +32,7 @@ export interface CalculatePCFParams {
   usePhaseConfig?: import('./use-phase-factors').UsePhaseConfig;
   eolConfig?: import('./end-of-life-factors').EoLConfig;
   distributionConfig?: import('./distribution-factors').DistributionConfig;
+  productLossConfig?: import('./system-boundaries').ProductLossConfig;
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -215,6 +217,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     if (lcaError || !lca) {
       throw new Error(`Failed to create LCA: ${lcaError?.message || 'Unknown error'}`);
+    }
+
+    // Sync system_boundary to products table so list/detail pages show the correct value
+    if (systemBoundary) {
+      await supabase
+        .from('products')
+        .update({ system_boundary: boundaryToDbEnum(systemBoundary) })
+        .eq('id', productId);
     }
 
     // Increment LCA count for subscription tracking
@@ -1446,7 +1456,8 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       systemBoundary,
       params.usePhaseConfig,
       params.eolConfig,
-      params.distributionConfig
+      params.distributionConfig,
+      params.productLossConfig
     );
 
     if (!aggregationResult.success) {

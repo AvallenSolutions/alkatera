@@ -25,7 +25,8 @@ import type {
   MaterialWithValidation,
 } from './types';
 import { INITIAL_PRE_CALC_STATE, materialHasAssignedFactor } from './types';
-import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife, boundaryNeedsDistribution } from '@/lib/system-boundaries';
+import { boundaryNeedsUsePhase, boundaryNeedsEndOfLife, boundaryNeedsDistribution, boundaryToDbEnum, DEFAULT_PRODUCT_LOSS_CONFIG } from '@/lib/system-boundaries';
+import type { ProductLossConfig } from '@/lib/system-boundaries';
 import type { UsePhaseConfig } from '@/lib/use-phase-factors';
 import type { EoLConfig } from '@/lib/end-of-life-factors';
 import type { DistributionConfig } from '@/lib/distribution-factors';
@@ -33,6 +34,9 @@ import type { DistributionConfig } from '@/lib/distribution-factors';
 // ============================================================================
 // TYPES
 // ============================================================================
+
+export type { ProductLossConfig } from '@/lib/system-boundaries';
+export { DEFAULT_PRODUCT_LOSS_CONFIG } from '@/lib/system-boundaries';
 
 export interface WizardFormData {
   // Step 4: Goal & Purpose
@@ -64,6 +68,7 @@ export interface WizardFormData {
   distributionConfig?: DistributionConfig;
   usePhaseConfig?: UsePhaseConfig;
   eolConfig?: EoLConfig;
+  productLossConfig?: ProductLossConfig;
 
   // Metadata
   referenceYear: number;
@@ -544,10 +549,9 @@ export function WizardProvider({
 
   async function loadPcfData(id: string, resetStep = true) {
     try {
-      const { data: pcf, error: pcfError } = await supabase
-        .from('product_carbon_footprints')
-        .select(
-          `
+      // Try with product_loss_config first; fall back without it if column doesn't exist yet
+      let pcf: any = null;
+      const baseColumns = `
           intended_application,
           reasons_for_study,
           intended_audience,
@@ -565,13 +569,28 @@ export function WizardProvider({
           product_name,
           use_phase_config,
           eol_config,
-          distribution_config
-        `
-        )
+          distribution_config`;
+
+      const { data: pcfFull, error: fullError } = await supabase
+        .from('product_carbon_footprints')
+        .select(`${baseColumns}, product_loss_config`)
         .eq('id', id)
         .single();
 
-      if (pcfError) throw pcfError;
+      if (fullError && fullError.code === '42703') {
+        // Column doesn't exist yet (migration not applied) — retry without it
+        const { data: pcfBase, error: baseError } = await supabase
+          .from('product_carbon_footprints')
+          .select(baseColumns)
+          .eq('id', id)
+          .single();
+        if (baseError) throw baseError;
+        pcf = pcfBase;
+      } else if (fullError) {
+        throw fullError;
+      } else {
+        pcf = pcfFull;
+      }
 
       if (pcf) {
         const productName = pcf.product_name || 'Product';
@@ -617,6 +636,7 @@ export function WizardProvider({
           distributionConfig: pcf.distribution_config || undefined,
           usePhaseConfig: pcf.use_phase_config || undefined,
           eolConfig: pcf.eol_config || undefined,
+          productLossConfig: pcf.product_loss_config || undefined,
           referenceYear: pcf.reference_year || new Date().getFullYear(),
           dqiScore: pcf.dqi_score || 0,
         });
@@ -912,6 +932,9 @@ export function WizardProvider({
       if (formData.eolConfig) {
         updatePayload.eol_config = formData.eolConfig;
       }
+      if (formData.productLossConfig) {
+        updatePayload.product_loss_config = formData.productLossConfig;
+      }
 
       const { error: updateError } = await supabase
         .from('product_carbon_footprints')
@@ -919,6 +942,15 @@ export function WizardProvider({
         .eq('id', pcfId);
 
       if (updateError) throw updateError;
+
+      // Sync system_boundary back to the products table so the product list
+      // and detail pages display the correct boundary (DB uses underscore enum)
+      if (formData.systemBoundary) {
+        await supabase
+          .from('products')
+          .update({ system_boundary: boundaryToDbEnum(formData.systemBoundary) })
+          .eq('id', productId);
+      }
 
       lastSavedDataRef.current = currentData;
       setProgress((prev) => ({

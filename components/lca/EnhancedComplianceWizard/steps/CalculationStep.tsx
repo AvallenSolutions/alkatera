@@ -117,6 +117,7 @@ export function CalculationStep() {
         usePhaseConfig: formData.usePhaseConfig,
         eolConfig: formData.eolConfig,
         distributionConfig: formData.distributionConfig,
+        productLossConfig: formData.productLossConfig,
         onProgress: (step: string, percent: number) => {
           setPreCalcState((prev) => ({
             ...prev,

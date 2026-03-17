@@ -16,11 +16,20 @@ import {
   boundaryNeedsEndOfLife,
   boundaryToDbEnum,
   boundaryFromDbEnum,
+  calculateLossMultiplier,
+  getDefaultConsumerWaste,
+  getDefaultLossConfig,
+  getConsumerWasteEntry,
+  DEFAULT_PRODUCT_LOSS_CONFIG,
+  CONSUMER_WASTE_BY_CATEGORY,
+  CONSUMER_WASTE_BY_GROUP,
+  CONSUMER_WASTE_DATA,
   SYSTEM_BOUNDARIES,
   ALL_LIFECYCLE_STAGES,
   STAGE_LABELS,
   type SystemBoundary,
   type LifecycleStage,
+  type ProductLossConfig,
 } from '../system-boundaries';
 
 // ============================================================================
@@ -334,5 +343,244 @@ describe('boundaryFromDbEnum', () => {
     for (const b of boundaries) {
       expect(boundaryFromDbEnum(boundaryToDbEnum(b))).toBe(b);
     }
+  });
+});
+
+// ============================================================================
+// PRODUCT LOSS MULTIPLIER
+// ============================================================================
+
+describe('calculateLossMultiplier', () => {
+  it('returns 1.0 when no config is provided', () => {
+    expect(calculateLossMultiplier('cradle-to-grave')).toBe(1.0);
+    expect(calculateLossMultiplier('cradle-to-grave', undefined)).toBe(1.0);
+  });
+
+  it('returns 1.0 for cradle-to-gate regardless of config', () => {
+    expect(calculateLossMultiplier('cradle-to-gate', DEFAULT_PRODUCT_LOSS_CONFIG)).toBe(1.0);
+  });
+
+  it('applies only distribution loss for cradle-to-shelf', () => {
+    const config: ProductLossConfig = {
+      distributionLossPercent: 2,
+      retailLossPercent: 3,
+      consumerWastePercent: 10,
+    };
+    const result = calculateLossMultiplier('cradle-to-shelf', config);
+    // Only distribution: 1 / (1 - 0.02) = 1 / 0.98 ≈ 1.0204
+    expect(result).toBeCloseTo(1 / 0.98, 4);
+  });
+
+  it('applies distribution + retail loss for cradle-to-consumer', () => {
+    const config: ProductLossConfig = {
+      distributionLossPercent: 2,
+      retailLossPercent: 3,
+      consumerWastePercent: 10,
+    };
+    const result = calculateLossMultiplier('cradle-to-consumer', config);
+    // Distribution + retail: 1 / (0.98 × 0.97) ≈ 1.0520
+    expect(result).toBeCloseTo(1 / (0.98 * 0.97), 4);
+  });
+
+  it('applies all three loss stages for cradle-to-grave', () => {
+    const config: ProductLossConfig = {
+      distributionLossPercent: 2,
+      retailLossPercent: 3,
+      consumerWastePercent: 10,
+    };
+    const result = calculateLossMultiplier('cradle-to-grave', config);
+    // All three: 1 / (0.98 × 0.97 × 0.90) ≈ 1.1689
+    expect(result).toBeCloseTo(1 / (0.98 * 0.97 * 0.90), 4);
+  });
+
+  it('returns 1.0 when all loss rates are zero', () => {
+    const config: ProductLossConfig = {
+      distributionLossPercent: 0,
+      retailLossPercent: 0,
+      consumerWastePercent: 0,
+    };
+    expect(calculateLossMultiplier('cradle-to-grave', config)).toBe(1.0);
+  });
+
+  it('handles 100% loss rate safely (returns 1.0, no division by zero)', () => {
+    const config: ProductLossConfig = {
+      distributionLossPercent: 100,
+      retailLossPercent: 0,
+      consumerWastePercent: 0,
+    };
+    // Survival = 0 → should return 1.0 (guard)
+    expect(calculateLossMultiplier('cradle-to-shelf', config)).toBe(1.0);
+  });
+
+  it('handles single-stage loss correctly', () => {
+    // Only 5% distribution loss
+    const config: ProductLossConfig = {
+      distributionLossPercent: 5,
+      retailLossPercent: 0,
+      consumerWastePercent: 0,
+    };
+    const result = calculateLossMultiplier('cradle-to-grave', config);
+    // Only distribution applies (retail and consumer are 0)
+    expect(result).toBeCloseTo(1 / 0.95, 4);
+  });
+
+  it('DEFAULT_PRODUCT_LOSS_CONFIG has expected values', () => {
+    expect(DEFAULT_PRODUCT_LOSS_CONFIG.distributionLossPercent).toBe(2);
+    expect(DEFAULT_PRODUCT_LOSS_CONFIG.retailLossPercent).toBe(3);
+    expect(DEFAULT_PRODUCT_LOSS_CONFIG.consumerWastePercent).toBe(5);
+  });
+});
+
+// ============================================================================
+// CATEGORY-AWARE CONSUMER WASTE DEFAULTS
+// ============================================================================
+
+describe('CONSUMER_WASTE_BY_CATEGORY', () => {
+  it('has entries for all spirits categories', () => {
+    const spirits = ['Gin', 'Vodka', 'Rum', 'Whisky', 'Tequila', 'Mezcal', 'Brandy', 'Bourbon', 'Rye Whiskey', 'Calvados', 'Baijiu', 'Aquavit'];
+    for (const s of spirits) {
+      expect(CONSUMER_WASTE_BY_CATEGORY[s]).toBeDefined();
+      expect(CONSUMER_WASTE_BY_CATEGORY[s]).toBeLessThanOrEqual(3); // Spirits are low waste
+    }
+  });
+
+  it('has entries for all beer & cider categories', () => {
+    const beers = ['Lager', 'Ale', 'IPA', 'Stout & Porter', 'Wheat Beer', 'Sour Beer', 'Cider', 'Perry'];
+    for (const b of beers) {
+      expect(CONSUMER_WASTE_BY_CATEGORY[b]).toBe(3);
+    }
+  });
+
+  it('has entries for wine categories', () => {
+    expect(CONSUMER_WASTE_BY_CATEGORY['Red Wine']).toBe(10);
+    expect(CONSUMER_WASTE_BY_CATEGORY['White Wine']).toBe(10);
+    expect(CONSUMER_WASTE_BY_CATEGORY['Sparkling Wine']).toBe(15); // Higher due to carbonation loss
+    expect(CONSUMER_WASTE_BY_CATEGORY['Fortified Wine']).toBe(3); // Higher ABV, self-preserving
+  });
+
+  it('spirits have lower waste than wine', () => {
+    expect(CONSUMER_WASTE_BY_CATEGORY['Gin']).toBeLessThan(CONSUMER_WASTE_BY_CATEGORY['Red Wine']);
+    expect(CONSUMER_WASTE_BY_CATEGORY['Vodka']).toBeLessThan(CONSUMER_WASTE_BY_CATEGORY['White Wine']);
+  });
+
+  it('all values are between 0 and 50', () => {
+    for (const [, value] of Object.entries(CONSUMER_WASTE_BY_CATEGORY)) {
+      expect(value).toBeGreaterThanOrEqual(0);
+      expect(value).toBeLessThanOrEqual(50);
+    }
+  });
+});
+
+describe('CONSUMER_WASTE_BY_GROUP', () => {
+  it('covers all product type groups', () => {
+    expect(CONSUMER_WASTE_BY_GROUP['Spirits']).toBe(1);
+    expect(CONSUMER_WASTE_BY_GROUP['Beer & Cider']).toBe(3);
+    expect(CONSUMER_WASTE_BY_GROUP['Wine']).toBe(10);
+    expect(CONSUMER_WASTE_BY_GROUP['Ready-to-Drink & Cocktails']).toBe(2);
+    expect(CONSUMER_WASTE_BY_GROUP['Non-Alcoholic']).toBe(4);
+  });
+});
+
+describe('getDefaultConsumerWaste', () => {
+  it('returns category-specific value when category is recognised', () => {
+    expect(getDefaultConsumerWaste('Gin', 'Spirits')).toBe(1);
+    expect(getDefaultConsumerWaste('Red Wine', 'Wine')).toBe(10);
+    expect(getDefaultConsumerWaste('Sparkling Wine', 'Wine')).toBe(15);
+    expect(getDefaultConsumerWaste('Lager', 'Beer & Cider')).toBe(3);
+  });
+
+  it('falls back to group default when category is not recognised', () => {
+    expect(getDefaultConsumerWaste('Unknown Category', 'Spirits')).toBe(1);
+    expect(getDefaultConsumerWaste('Unknown Category', 'Wine')).toBe(10);
+  });
+
+  it('falls back to 5% when neither category nor group is recognised', () => {
+    expect(getDefaultConsumerWaste('Unknown', 'Unknown')).toBe(5);
+    expect(getDefaultConsumerWaste(null, null)).toBe(5);
+    expect(getDefaultConsumerWaste(undefined, undefined)).toBe(5);
+  });
+
+  it('prefers category over group', () => {
+    // Fortified Wine is 3%, but Wine group default is 10%
+    expect(getDefaultConsumerWaste('Fortified Wine', 'Wine')).toBe(3);
+    // Liqueur is 3%, but Spirits group default is 1%
+    expect(getDefaultConsumerWaste('Liqueur', 'Spirits')).toBe(3);
+  });
+});
+
+describe('CONSUMER_WASTE_DATA (source annotations)', () => {
+  it('every entry has a non-empty source string', () => {
+    for (const [category, entry] of Object.entries(CONSUMER_WASTE_DATA)) {
+      expect(entry.source).toBeTruthy();
+      expect(entry.source.length).toBeGreaterThan(5);
+    }
+  });
+
+  it('every entry has a valid confidence level', () => {
+    for (const [, entry] of Object.entries(CONSUMER_WASTE_DATA)) {
+      expect(['high', 'medium', 'low']).toContain(entry.confidence);
+    }
+  });
+
+  it('rate in CONSUMER_WASTE_DATA matches CONSUMER_WASTE_BY_CATEGORY', () => {
+    for (const [category, entry] of Object.entries(CONSUMER_WASTE_DATA)) {
+      expect(CONSUMER_WASTE_BY_CATEGORY[category]).toBe(entry.rate);
+    }
+  });
+
+  it('spirits have high confidence', () => {
+    expect(CONSUMER_WASTE_DATA['Gin'].confidence).toBe('high');
+    expect(CONSUMER_WASTE_DATA['Vodka'].confidence).toBe('high');
+    expect(CONSUMER_WASTE_DATA['Whisky'].confidence).toBe('high');
+  });
+
+  it('beer has high confidence', () => {
+    expect(CONSUMER_WASTE_DATA['Lager'].confidence).toBe('high');
+    expect(CONSUMER_WASTE_DATA['Ale'].confidence).toBe('high');
+  });
+
+  it('still wine has high confidence', () => {
+    expect(CONSUMER_WASTE_DATA['Red Wine'].confidence).toBe('high');
+    expect(CONSUMER_WASTE_DATA['White Wine'].confidence).toBe('high');
+  });
+
+  it('non-alcoholic categories have low confidence (estimated by analogy)', () => {
+    expect(CONSUMER_WASTE_DATA['Non-Alcoholic Beer'].confidence).toBe('low');
+    expect(CONSUMER_WASTE_DATA['Non-Alcoholic Wine'].confidence).toBe('low');
+  });
+});
+
+describe('getConsumerWasteEntry', () => {
+  it('returns full entry for known category', () => {
+    const entry = getConsumerWasteEntry('Red Wine');
+    expect(entry).not.toBeNull();
+    expect(entry!.rate).toBe(10);
+    expect(entry!.source).toContain('WRAP');
+    expect(entry!.confidence).toBe('high');
+  });
+
+  it('returns null for unknown category', () => {
+    expect(getConsumerWasteEntry('Unknown')).toBeNull();
+    expect(getConsumerWasteEntry(null)).toBeNull();
+    expect(getConsumerWasteEntry(undefined)).toBeNull();
+  });
+});
+
+describe('getDefaultLossConfig', () => {
+  it('returns a full ProductLossConfig with category-aware consumer waste', () => {
+    const config = getDefaultLossConfig('Gin', 'Spirits');
+    expect(config.distributionLossPercent).toBe(2);
+    expect(config.retailLossPercent).toBe(3);
+    expect(config.consumerWastePercent).toBe(1);
+  });
+
+  it('uses group fallback when category unknown', () => {
+    const config = getDefaultLossConfig(null, 'Wine');
+    expect(config.consumerWastePercent).toBe(10);
+  });
+
+  it('uses global fallback when nothing recognised', () => {
+    const config = getDefaultLossConfig(null, null);
+    expect(config.consumerWastePercent).toBe(5);
   });
 });

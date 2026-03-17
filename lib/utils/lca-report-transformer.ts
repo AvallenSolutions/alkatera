@@ -697,7 +697,8 @@ export function transformLCADataForReport(
     'gate-to-gate': 'Gate-to-Gate',
   };
   // Prefer system_boundary (set by wizard) over lca_scope_type (set at calculation time)
-  const rawBoundary = (lca.system_boundary || lca.lca_scope_type || 'cradle-to-gate').toLowerCase();
+  // Normalise DB enum format (underscores) to code format (hyphens)
+  const rawBoundary = (lca.system_boundary || lca.lca_scope_type || 'cradle-to-gate').toLowerCase().replace(/_/g, '-');
   const scopeTypeLabel = scopeTypeLabelMap[rawBoundary] || 'Cradle-to-Gate';
   const boundaryType = rawBoundary;
 

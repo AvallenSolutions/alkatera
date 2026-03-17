@@ -10,6 +10,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageLoader } from "@/components/ui/page-loader";
 import { ArrowLeft, Package, AlertTriangle, CheckCircle } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { boundaryFromDbEnum } from "@/lib/system-boundaries";
+
+interface ProductCarbonFootprint {
+  system_boundary: string | null;
+}
 
 interface Product {
   id: string;
@@ -20,6 +25,7 @@ interface Product {
   functional_unit_volume: number | null;
   functional_unit_measure: string | null;
   system_boundary: string;
+  product_carbon_footprints: ProductCarbonFootprint[];
   created_at: string;
   updated_at: string;
 }
@@ -51,7 +57,19 @@ export default function ProductDetailPage() {
 
       if (error) throw error;
 
-      setProduct(data);
+      // Fetch the latest system_boundary from product_carbon_footprints
+      const { data: pcfData } = await supabase
+        .from("product_carbon_footprints")
+        .select("system_boundary")
+        .eq("product_id", productId)
+        .not("system_boundary", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      setProduct({
+        ...data,
+        product_carbon_footprints: pcfData || [],
+      });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -94,6 +112,13 @@ export default function ProductDetailPage() {
       </div>
     );
   }
+
+  // Prefer the boundary from the LCA wizard (product_carbon_footprints) over the products table default
+  const pcfBoundary = product.product_carbon_footprints?.find(
+    (pcf) => pcf.system_boundary
+  )?.system_boundary;
+  const rawBoundary = pcfBoundary || product.system_boundary || 'cradle_to_gate';
+  const normalisedBoundary = rawBoundary.includes('_') ? boundaryFromDbEnum(rawBoundary) : rawBoundary;
 
   return (
     <div className="container mx-auto p-6 max-w-5xl space-y-6">
@@ -161,7 +186,7 @@ export default function ProductDetailPage() {
                   'cradle-to-consumer': { label: 'Cradle-to-Consumer', description: 'Includes consumer use phase', icon: 'check' },
                   'cradle-to-grave': { label: 'Cradle-to-Grave', description: 'Full lifecycle including end-of-life', icon: 'check' },
                 };
-                const boundary = product.system_boundary || 'cradle-to-gate';
+                const boundary = boundaryFromDbEnum(product.system_boundary || 'cradle_to_gate');
                 const info = boundaryLabels[boundary] || boundaryLabels['cradle-to-gate'];
                 return (
                   <div className="flex items-center gap-3">
@@ -178,7 +203,7 @@ export default function ProductDetailPage() {
                 );
               })()}
 
-              {(product.system_boundary === "cradle-to-gate" || !product.system_boundary) && (
+              {(normalisedBoundary === "cradle-to-gate") && (
                 <Alert variant="destructive" className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
                   <AlertDescription className="text-amber-900 dark:text-amber-200">
@@ -190,7 +215,7 @@ export default function ProductDetailPage() {
             </CardContent>
           </Card>
 
-          {product.system_boundary && product.system_boundary !== "cradle-to-gate" && (
+          {normalisedBoundary !== "cradle-to-gate" && (
             <Card>
               <CardHeader>
                 <CardTitle>Additional Lifecycle Stages</CardTitle>
@@ -200,7 +225,7 @@ export default function ProductDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {["cradle-to-shelf", "cradle-to-consumer", "cradle-to-grave"].includes(product.system_boundary) && (
+                  {["cradle-to-shelf", "cradle-to-consumer", "cradle-to-grave"].includes(normalisedBoundary) && (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">Distribution</p>
@@ -212,7 +237,7 @@ export default function ProductDetailPage() {
                     </div>
                   )}
 
-                  {["cradle-to-consumer", "cradle-to-grave"].includes(product.system_boundary) && (
+                  {["cradle-to-consumer", "cradle-to-grave"].includes(normalisedBoundary) && (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">Use Phase</p>
@@ -224,7 +249,7 @@ export default function ProductDetailPage() {
                     </div>
                   )}
 
-                  {product.system_boundary === "cradle-to-grave" && (
+                  {normalisedBoundary === "cradle-to-grave" && (
                     <div className="flex items-center justify-between p-4 border rounded-lg">
                       <div>
                         <p className="font-medium">End of Life</p>

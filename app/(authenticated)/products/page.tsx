@@ -10,6 +10,7 @@ import { PageLoader } from "@/components/ui/page-loader";
 import { Input } from "@/components/ui/input";
 import { Plus, Package, AlertCircle, Trash2, MoreVertical, Search, Leaf, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { boundaryFromDbEnum, getBoundaryLabel, SYSTEM_BOUNDARIES } from "@/lib/system-boundaries";
 import { useOrganization } from "@/lib/organizationContext";
 import {
   DropdownMenu,
@@ -29,6 +30,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
+interface ProductCarbonFootprint {
+  system_boundary: string | null;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -42,6 +47,7 @@ interface Product {
   functional_unit_volume: number | null;
   functional_unit_measure: string | null;
   system_boundary: string;
+  product_carbon_footprints: ProductCarbonFootprint[];
   created_at: string;
 }
 
@@ -73,7 +79,34 @@ export default function ProductsPage() {
 
       if (error) throw error;
 
-      setProducts(data || []);
+      // Fetch the latest system_boundary from product_carbon_footprints for each product
+      const productIds = (data || []).map((p: any) => p.id);
+      const { data: pcfData } = productIds.length > 0
+        ? await supabase
+            .from("product_carbon_footprints")
+            .select("product_id, system_boundary")
+            .in("product_id", productIds)
+            .not("system_boundary", "is", null)
+            .order("created_at", { ascending: false })
+        : { data: [] };
+
+      // Build a map of product_id -> latest PCF boundary
+      const pcfBoundaryMap = new Map<string, string>();
+      for (const pcf of pcfData || []) {
+        // First entry per product_id wins (ordered by created_at desc)
+        if (pcf.product_id && !pcfBoundaryMap.has(String(pcf.product_id))) {
+          pcfBoundaryMap.set(String(pcf.product_id), pcf.system_boundary);
+        }
+      }
+
+      setProducts(
+        (data || []).map((p: any) => ({
+          ...p,
+          product_carbon_footprints: pcfBoundaryMap.has(String(p.id))
+            ? [{ system_boundary: pcfBoundaryMap.get(String(p.id))! }]
+            : [],
+        }))
+      );
     } catch (error) {
       console.error("Error fetching products:", error);
     } finally {
@@ -108,17 +141,26 @@ export default function ProductsPage() {
     return "Not specified";
   };
 
+  const getEffectiveBoundary = (product: Product): string => {
+    // Prefer the boundary set by the LCA wizard (stored in product_carbon_footprints)
+    // over the products table default which may never have been updated
+    const pcfBoundary = product.product_carbon_footprints?.find(
+      (pcf) => pcf.system_boundary
+    )?.system_boundary;
+    return pcfBoundary || product.system_boundary || "cradle_to_gate";
+  };
+
   const getBoundaryBadge = (boundary: string) => {
-    if (boundary === "cradle-to-grave") {
-      return (
-        <Badge variant="default" className="bg-green-600">
-          Cradle-to-Grave
-        </Badge>
-      );
-    }
+    // Normalise both DB enum format (underscores) and PCF format (hyphens)
+    const normalised = boundary.includes("_") ? boundaryFromDbEnum(boundary) : boundary;
+    const label = getBoundaryLabel(normalised);
+    const isFullLifecycle = normalised === "cradle-to-consumer" || normalised === "cradle-to-grave";
     return (
-      <Badge variant="secondary" className="bg-amber-600 text-white">
-        Cradle-to-Gate
+      <Badge
+        variant={isFullLifecycle ? "default" : "secondary"}
+        className={isFullLifecycle ? "bg-green-600" : "bg-amber-600 text-white"}
+      >
+        {label}
       </Badge>
     );
   };
@@ -286,7 +328,7 @@ export default function ProductsPage() {
 
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">System Boundary:</span>
-                    {getBoundaryBadge(product.system_boundary)}
+                    {getBoundaryBadge(getEffectiveBoundary(product))}
                   </div>
 
                   <div className="text-xs text-muted-foreground pt-2 border-t">

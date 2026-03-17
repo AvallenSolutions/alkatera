@@ -14,7 +14,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
 import { calculateMaterialEoL, getMaterialFactorKey, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
-import { isStageIncluded } from './system-boundaries';
+import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
 import { IPCC_AR6_GWP } from './ghg-constants';
 import {
   assessMaterialDataQuality,
@@ -107,7 +107,8 @@ export async function aggregateProductImpacts(
   systemBoundary?: string,
   usePhaseConfig?: UsePhaseConfig,
   eolConfig?: EoLConfig,
-  distributionConfig?: DistributionConfig
+  distributionConfig?: DistributionConfig,
+  productLossConfig?: ProductLossConfig
 ): Promise<AggregationResult> {
   console.log(`[aggregateProductImpacts] Processing PCF: ${productCarbonFootprintId}`);
 
@@ -366,6 +367,43 @@ export async function aggregateProductImpacts(
       totalWater += perUnitWater;
       totalWaste += perUnitWaste;
     }
+  }
+
+  // 8b. Apply product loss multiplier to upstream (gate) emissions.
+  // Lost units at downstream stages still carry their full upstream burden,
+  // which increases the per-unit footprint for units that reach the consumer.
+  // Only applied for boundaries beyond cradle-to-gate.
+  const lossMultiplier = calculateLossMultiplier(effectiveBoundary, productLossConfig);
+  if (lossMultiplier > 1.0) {
+    console.log(`[aggregateProductImpacts] Product loss multiplier: ${lossMultiplier.toFixed(4)} (dist: ${productLossConfig?.distributionLossPercent || 0}%, retail: ${productLossConfig?.retailLossPercent || 0}%, consumer: ${productLossConfig?.consumerWastePercent || 0}%)`);
+
+    // Scale all upstream totals
+    totalClimate *= lossMultiplier;
+    totalClimateFossil *= lossMultiplier;
+    totalClimateBiogenic *= lossMultiplier;
+    totalClimateDluc *= lossMultiplier;
+    totalTransport *= lossMultiplier;
+    totalWater *= lossMultiplier;
+    totalWaterScarcity *= lossMultiplier;
+    totalLand *= lossMultiplier;
+    totalWaste *= lossMultiplier;
+    totalTerrestrialEcotoxicity *= lossMultiplier;
+    totalFreshwaterEutrophication *= lossMultiplier;
+    totalTerrestrialAcidification *= lossMultiplier;
+    totalFossilResourceScarcity *= lossMultiplier;
+    totalHFCs *= lossMultiplier;
+    totalCO2Fossil *= lossMultiplier;
+    totalCO2Biogenic *= lossMultiplier;
+    totalCH4Fossil *= lossMultiplier;
+    totalCH4Biogenic *= lossMultiplier;
+    totalN2O *= lossMultiplier;
+    scope1Emissions *= lossMultiplier;
+    scope2Emissions *= lossMultiplier;
+    scope3Emissions *= lossMultiplier;
+    rawMaterialsEmissions *= lossMultiplier;
+    packagingEmissions *= lossMultiplier;
+    processingEmissions *= lossMultiplier;
+    containerEmissions *= lossMultiplier;
   }
 
   // 9a. Use-phase emissions (Cradle-to-Consumer or Cradle-to-Grave)
