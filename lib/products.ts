@@ -106,6 +106,12 @@ export async function updateProduct(input: UpdateProductInput): Promise<Product>
   if (updateData.unit_size_unit !== undefined) {
     updatePayload.unit_size_unit = updateData.unit_size_unit || null;
   }
+  // Keep legacy functional_unit text field in sync with structured fields
+  if (updateData.unit_size_value !== undefined || updateData.unit_size_unit !== undefined) {
+    const val = updateData.unit_size_value ?? updatePayload.unit_size_value;
+    const unit = updateData.unit_size_unit ?? updatePayload.unit_size_unit;
+    updatePayload.functional_unit = val && unit ? `${val} ${unit}` : null;
+  }
   if (updateData.product_description !== undefined) {
     updatePayload.product_description = updateData.product_description || null;
   }

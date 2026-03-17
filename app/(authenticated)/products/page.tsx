@@ -90,14 +90,14 @@ export default function ProductsPage() {
   };
 
   const formatFunctionalUnit = (product: Product) => {
-    // First check the new functional_unit text field
-    if (product.functional_unit) {
-      return product.functional_unit;
-    }
-
-    // Fallback: check unit_size fields
+    // Prefer the structured unit_size fields (updated by the edit form)
     if (product.unit_size_value && product.unit_size_unit) {
       return `${product.unit_size_value} ${product.unit_size_unit}`;
+    }
+
+    // Fallback: legacy functional_unit text field
+    if (product.functional_unit) {
+      return product.functional_unit;
     }
 
     // Legacy fallback: check old functional_unit_type fields

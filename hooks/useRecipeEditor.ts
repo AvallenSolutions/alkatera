@@ -482,7 +482,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
     });
 
     const validForms = packagingForms.filter(
-      f => f.name && f.amount && Number(f.amount) > 0 && f.packaging_category
+      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
     );
 
     if (validForms.length === 0) {
@@ -533,11 +533,18 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       }
 
       const buildMaterialData = (form: PackagingFormData) => {
+        // Derive quantity from amount, falling back to net_weight_g with unit conversion
+        let quantity = Number(form.amount);
+        if (!quantity || quantity <= 0) {
+          const weightG = Number(form.net_weight_g);
+          quantity = form.unit === 'kg' ? weightG / 1000 : weightG;
+        }
+
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
           matched_source_name: form.matched_source_name || null,
-          quantity: Number(form.amount),
+          quantity,
           unit: form.unit,
           material_type: 'packaging',
           packaging_category: form.packaging_category || null,
@@ -581,9 +588,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         return materialData;
       };
 
-      // Update existing items
+      // Update existing items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       for (const form of existingItems) {
         const materialData = buildMaterialData(form);
+        if (materialData.quantity <= 0) continue;
         const { error: updateError } = await supabase
           .from("product_materials")
           .update(materialData)
@@ -591,16 +599,18 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         if (updateError) throw new Error(`Failed to update packaging: ${updateError.message}`);
       }
 
-      // Insert new items
+      // Insert new items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       let insertedData: any[] = [];
       if (newItems.length > 0) {
-        const materialsToInsert = newItems.map(buildMaterialData);
-        const { data, error: insertError } = await supabase
-          .from("product_materials")
-          .insert(materialsToInsert)
-          .select();
-        if (insertError) throw new Error(`Failed to save packaging: ${insertError.message}`);
-        insertedData = data || [];
+        const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0);
+        if (materialsToInsert.length > 0) {
+          const { data, error: insertError } = await supabase
+            .from("product_materials")
+            .insert(materialsToInsert)
+            .select();
+          if (insertError) throw new Error(`Failed to save packaging: ${insertError.message}`);
+          insertedData = data || [];
+        }
       }
 
       // Save components
