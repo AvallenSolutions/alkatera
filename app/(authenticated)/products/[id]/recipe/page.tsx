@@ -614,7 +614,7 @@ export default function ProductRecipePage() {
 
   const saveBOMPackaging = async (forms: PackagingFormData[]) => {
     const validForms = forms.filter(
-      f => f.name && f.amount && Number(f.amount) > 0
+      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
     );
 
     if (validForms.length === 0) {
@@ -635,18 +635,24 @@ export default function ProductRecipePage() {
       throw new Error(`Failed to clear existing packaging: ${deleteError.message}`);
     }
 
-    const materialsToInsert = validForms.map(form => ({
-      product_id: parseInt(productId),
-      material_name: form.name,
-      matched_source_name: form.matched_source_name || null,
-      quantity: Number(form.net_weight_g) || Number(form.amount),
-      unit: form.unit,
-      material_type: 'packaging',
-      packaging_category: form.packaging_category || null,
-      origin_country: form.origin_country || null,
-      transport_mode: form.transport_mode || 'truck',
-      distance_km: form.distance_km ? Number(form.distance_km) : null,
-    }));
+    const materialsToInsert = validForms.map(form => {
+      let quantity = Number(form.net_weight_g) || Number(form.amount);
+      if (!quantity || quantity <= 0 || isNaN(quantity)) quantity = 0;
+      return {
+        product_id: parseInt(productId),
+        material_name: form.name,
+        matched_source_name: form.matched_source_name || null,
+        quantity,
+        unit: form.unit,
+        material_type: 'packaging' as const,
+        packaging_category: form.packaging_category || null,
+        origin_country: form.origin_country || null,
+        transport_mode: form.transport_mode || 'truck',
+        distance_km: form.distance_km ? Number(form.distance_km) : null,
+      };
+    }).filter(m => m.quantity > 0);
+
+    if (materialsToInsert.length === 0) return;
 
     const { error: insertError } = await supabase
       .from('product_materials')
@@ -834,7 +840,7 @@ export default function ProductRecipePage() {
     });
 
     const validForms = packagingForms.filter(
-      f => f.name && f.amount && Number(f.amount) > 0 && f.packaging_category
+      f => f.name && (Number(f.amount) > 0 || Number(f.net_weight_g) > 0) && f.packaging_category
     );
 
     console.log('Valid forms:', validForms);
@@ -905,11 +911,18 @@ export default function ProductRecipePage() {
 
       // Helper function to build material data object
       const buildMaterialData = (form: PackagingFormData) => {
+        // Derive quantity from amount, falling back to net_weight_g with unit conversion
+        let quantity = Number(form.amount);
+        if (!quantity || quantity <= 0 || isNaN(quantity)) {
+          const weightG = Number(form.net_weight_g);
+          quantity = isNaN(weightG) ? 0 : (form.unit === 'kg' ? weightG / 1000 : weightG);
+        }
+
         const materialData: any = {
           product_id: parseInt(productId),
           material_name: form.name,
           matched_source_name: form.matched_source_name || null,
-          quantity: Number(form.amount),
+          quantity,
           unit: form.unit,
           material_type: 'packaging',
           packaging_category: form.packaging_category || null,
@@ -967,10 +980,11 @@ export default function ProductRecipePage() {
         return materialData;
       };
 
-      // Update existing items
+      // Update existing items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       let allSavedIds: string[] = [];
       for (const form of existingItems) {
         const materialData = buildMaterialData(form);
+        if (!materialData.quantity || materialData.quantity <= 0 || isNaN(materialData.quantity)) continue;
         const { error: updateError } = await supabase
           .from("product_materials")
           .update(materialData)
@@ -984,24 +998,26 @@ export default function ProductRecipePage() {
         console.log(`[Packaging Save] Updated existing item ${form.tempId}: ${form.name}`);
       }
 
-      // Insert new items
+      // Insert new items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       let insertedData: any[] = [];
       if (newItems.length > 0) {
-        const materialsToInsert = newItems.map(buildMaterialData);
+        const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0 && !isNaN(m.quantity));
         console.log('Inserting new materials:', materialsToInsert);
 
-        const { data, error: insertError } = await supabase
-          .from("product_materials")
-          .insert(materialsToInsert)
-          .select();
+        if (materialsToInsert.length > 0) {
+          const { data, error: insertError } = await supabase
+            .from("product_materials")
+            .insert(materialsToInsert)
+            .select();
 
-        if (insertError) {
-          console.error("Insert error:", insertError);
-          throw new Error(`Failed to save packaging: ${insertError.message}`);
+          if (insertError) {
+            console.error("Insert error:", insertError);
+            throw new Error(`Failed to save packaging: ${insertError.message}`);
+          }
+          insertedData = data || [];
+          allSavedIds.push(...insertedData.map((d: any) => d.id.toString()));
+          console.log(`[Packaging Save] Inserted ${insertedData.length} new items`);
         }
-        insertedData = data || [];
-        allSavedIds.push(...insertedData.map((d: any) => d.id.toString()));
-        console.log(`[Packaging Save] Inserted ${insertedData.length} new items`);
       }
 
       console.log('=== SAVE SUCCESSFUL ===');

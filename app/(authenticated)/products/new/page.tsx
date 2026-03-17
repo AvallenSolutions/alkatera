@@ -360,7 +360,7 @@ export default function NewProductLCAPage() {
           ...importedIngredients.map((ing) => ({
             product_id: data.id,
             material_name: ing.name,
-            quantity: ing.amount || null,
+            quantity: Number(ing.amount) > 0 ? Number(ing.amount) : null,
             unit: ing.unit || null,
             material_type: "ingredient" as const,
             origin_country: ing.origin_country || null,
@@ -371,7 +371,7 @@ export default function NewProductLCAPage() {
           ...importedPackaging.map((pkg) => ({
             product_id: data.id,
             material_name: pkg.name,
-            quantity: pkg.amount || null,
+            quantity: Number(pkg.amount) > 0 ? Number(pkg.amount) : (Number(pkg.net_weight_g) > 0 ? Number(pkg.net_weight_g) : null),
             unit: pkg.unit || null,
             material_type: "packaging" as const,
             origin_country: pkg.origin_country || null,
@@ -384,13 +384,17 @@ export default function NewProductLCAPage() {
           })),
         ];
 
-        const { error: materialsError } = await supabase
-          .from("product_materials")
-          .insert(materialsToInsert);
+        // Filter out items with invalid quantity to satisfy positive_quantity constraint
+        const validMaterials = materialsToInsert.filter(m => m.quantity != null && m.quantity > 0);
+        if (validMaterials.length > 0) {
+          const { error: materialsError } = await supabase
+            .from("product_materials")
+            .insert(validMaterials);
 
-        if (materialsError) {
-          console.error("Error saving imported materials:", materialsError);
-          toast.warning("Product created but some materials failed to import");
+          if (materialsError) {
+            console.error("Error saving imported materials:", materialsError);
+            toast.warning("Product created but some materials failed to import");
+          }
         }
       }
 

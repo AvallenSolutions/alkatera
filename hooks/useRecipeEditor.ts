@@ -535,9 +535,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       const buildMaterialData = (form: PackagingFormData) => {
         // Derive quantity from amount, falling back to net_weight_g with unit conversion
         let quantity = Number(form.amount);
-        if (!quantity || quantity <= 0) {
+        if (!quantity || quantity <= 0 || isNaN(quantity)) {
           const weightG = Number(form.net_weight_g);
-          quantity = form.unit === 'kg' ? weightG / 1000 : weightG;
+          quantity = isNaN(weightG) ? 0 : (form.unit === 'kg' ? weightG / 1000 : weightG);
         }
 
         const materialData: any = {
@@ -591,7 +591,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       // Update existing items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       for (const form of existingItems) {
         const materialData = buildMaterialData(form);
-        if (materialData.quantity <= 0) continue;
+        if (!materialData.quantity || materialData.quantity <= 0 || isNaN(materialData.quantity)) continue;
         const { error: updateError } = await supabase
           .from("product_materials")
           .update(materialData)
@@ -602,7 +602,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       // Insert new items (guard against quantity <= 0 to satisfy positive_quantity constraint)
       let insertedData: any[] = [];
       if (newItems.length > 0) {
-        const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0);
+        const materialsToInsert = newItems.map(buildMaterialData).filter(m => m.quantity > 0 && !isNaN(m.quantity));
         if (materialsToInsert.length > 0) {
           const { data, error: insertError } = await supabase
             .from("product_materials")

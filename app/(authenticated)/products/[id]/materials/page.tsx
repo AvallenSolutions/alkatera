@@ -134,15 +134,16 @@ export default function ProductMaterialsPage() {
 
   const handleSave = async () => {
     try {
-      if (!formData.material_name || !formData.quantity) {
-        toast.error("Material name and quantity are required");
+      const parsedQuantity = parseFloat(formData.quantity);
+      if (!formData.material_name || !formData.quantity || !(parsedQuantity > 0)) {
+        toast.error("Material name and a positive quantity are required");
         return;
       }
 
       const materialData = {
         product_id: parseInt(productId!),
         material_name: formData.material_name,
-        quantity: parseFloat(formData.quantity),
+        quantity: parsedQuantity,
         unit: formData.unit,
         material_type: formData.material_type,
         origin_country: formData.origin_country || null,
