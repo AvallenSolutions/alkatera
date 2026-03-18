@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
-import type { Database } from '@/types/db_types';
+import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
 
 /**
@@ -18,8 +16,7 @@ export async function GET(
 ) {
   try {
     const { id: organizationId } = await params;
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = getSupabaseServerClient();
 
     // Verify authentication
     const {
@@ -87,8 +84,7 @@ export async function DELETE(
 ) {
   try {
     const { id: organizationId } = await params;
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = getSupabaseServerClient();
 
     // Verify authentication
     const {

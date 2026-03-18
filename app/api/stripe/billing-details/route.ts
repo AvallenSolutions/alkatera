@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { stripe } from '@/lib/stripe-config';
-import type { Database } from '@/types/db_types';
+import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '../_helpers/get-member-role';
 
 export const dynamic = 'force-dynamic';
@@ -47,8 +45,7 @@ function detectTaxIdType(value: string, country?: string): string {
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = getSupabaseServerClient();
 
     const {
       data: { user },
@@ -110,8 +107,7 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = getSupabaseServerClient();
 
     const {
       data: { user },

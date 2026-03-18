@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import { stripe } from '@/lib/stripe-config';
-import type { Database } from '@/types/db_types';
+import { getSupabaseServerClient } from '@/lib/supabase/server-client';
 import { getMemberRole } from '../_helpers/get-member-role';
 
 /**
@@ -18,8 +16,7 @@ import { getMemberRole } from '../_helpers/get-member-role';
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const supabase = createRouteHandlerClient<Database>({ cookies: () => cookieStore });
+    const supabase = getSupabaseServerClient();
 
     // Verify authentication
     const {
