@@ -461,6 +461,104 @@ Please ensure corporate emissions data is entered for the reporting period.
 }
 
 /**
+ * Generates carbon origin breakdown slide (fossil vs biogenic vs land use change)
+ * Data comes from product LCA aggregated_impacts.carbon_origin
+ */
+function buildCarbonOriginSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  if (!data.dataAvailability.hasProducts || data.products.length === 0) {
+    return [{
+      slideNumber: 0,
+      title: 'Carbon Origin Breakdown',
+      content: `# Carbon Origin Breakdown\n\n## No Data Available\n\nProduct LCA data is required for carbon origin analysis.\n\nComplete product life cycle assessments to enable this section.`.trim(),
+    }];
+  }
+
+  // Carbon origin data is embedded in the products' aggregated impacts
+  // For report-level summary, we aggregate across all products
+  const carbonOrigin = (data as any).carbonOrigin;
+
+  if (!carbonOrigin) {
+    return [{
+      slideNumber: 0,
+      title: 'Carbon Origin Breakdown',
+      content: `# Carbon Origin Breakdown\n\n## Data Not Available\n\nCarbon origin breakdown requires detailed LCA data with fossil/biogenic classification.\n\nThis data is generated automatically from product assessments.`.trim(),
+    }];
+  }
+
+  const total = (carbonOrigin.fossil || 0) + Math.abs(carbonOrigin.biogenic || 0) + (carbonOrigin.landUseChange || 0);
+
+  return [{
+    slideNumber: 0,
+    title: 'Carbon Origin Breakdown',
+    content: `
+# Carbon Origin Breakdown
+
+## Emissions by Carbon Source
+
+| Carbon Source | Emissions (kg CO2e) | Share |
+|--------------|---------------------|-------|
+| **Fossil Carbon** | ${formatNumber(carbonOrigin.fossil || 0)} | ${total > 0 ? formatPercentage(carbonOrigin.fossil || 0, total) : 'N/A'} |
+| **Biogenic Carbon** | ${formatNumber(carbonOrigin.biogenic || 0)} | ${total > 0 ? formatPercentage(Math.abs(carbonOrigin.biogenic || 0), total) : 'N/A'} |
+| **Land Use Change** | ${formatNumber(carbonOrigin.landUseChange || 0)} | ${total > 0 ? formatPercentage(carbonOrigin.landUseChange || 0, total) : 'N/A'} |
+
+---
+
+**Fossil carbon** originates from the combustion of fossil fuels and industrial processes.
+**Biogenic carbon** is absorbed and released by biological systems (crops, biomass). Net biogenic CO2 can be negative (carbon sequestration).
+**Land use change** emissions arise from conversion of land (e.g. deforestation) for raw material production.
+
+*Based on ${data.products.length} product LCA${data.products.length > 1 ? 's' : ''} | ISO 14067 classification*
+`.trim(),
+  }];
+}
+
+/**
+ * Generates multi-capital environmental impacts slides
+ * Data comes from product LCA aggregated_impacts
+ */
+function buildMultiCapitalSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  if (!data.dataAvailability.hasProducts || data.products.length === 0) {
+    return [{
+      slideNumber: 0,
+      title: 'Multi-capital Environmental Impacts',
+      content: `# Multi-capital Environmental Impacts\n\n## No Data Available\n\nProduct LCA data is required for multi-capital impact analysis.\n\nComplete product life cycle assessments to enable this section.`.trim(),
+    }];
+  }
+
+  const impacts = (data as any).multiCapitalImpacts;
+
+  if (!impacts) {
+    return [{
+      slideNumber: 0,
+      title: 'Multi-capital Environmental Impacts',
+      content: `# Multi-capital Environmental Impacts\n\n## Data Not Available\n\nMulti-capital impact data is generated from detailed product LCA assessments.`.trim(),
+    }];
+  }
+
+  return [{
+    slideNumber: 0,
+    title: 'Multi-capital Environmental Impacts',
+    content: `
+# Multi-capital Environmental Impacts
+
+## Beyond Carbon: Full Environmental Profile
+
+| Impact Category | Value | Unit |
+|----------------|-------|------|
+${impacts.waterConsumption !== undefined ? `| **Water Consumption** | ${formatNumber(impacts.waterConsumption)} | m3 |` : ''}
+${impacts.landUse !== undefined ? `| **Land Use** | ${formatNumber(impacts.landUse)} | m2a |` : ''}
+${impacts.freshwaterEutrophication !== undefined ? `| **Freshwater Eutrophication** | ${formatNumber(impacts.freshwaterEutrophication, 4)} | kg P eq |` : ''}
+${impacts.terrestrialAcidification !== undefined ? `| **Terrestrial Acidification** | ${formatNumber(impacts.terrestrialAcidification, 4)} | kg SO2 eq |` : ''}
+${impacts.waterScarcity !== undefined ? `| **Water Scarcity** | ${formatNumber(impacts.waterScarcity)} | m3 world eq |` : ''}
+
+---
+
+*Aggregated across ${data.products.length} product LCA${data.products.length > 1 ? 's' : ''} | ReCiPe 2016 Midpoint (H)*
+`.trim(),
+  }];
+}
+
+/**
  * Generates multi-year trend slides
  */
 function buildTrendSlides(config: ReportConfig, data: ReportData): SlideContent[] {
@@ -1345,8 +1443,10 @@ export function buildReportContent(config: ReportConfig, data: ReportData, chart
     'company-overview': () => buildCompanyOverviewSlide(config, data),
     'scope-1-2-3': () => buildEmissionsSlides(config, data),
     'ghg-inventory': () => buildGHGInventorySlides(config, data),
+    'carbon-origin': () => buildCarbonOriginSlides(config, data),
     'trends': () => buildTrendSlides(config, data),
     'product-footprints': () => buildProductSlides(config, data),
+    'multi-capital': () => buildMultiCapitalSlides(config, data),
     'impact-valuation': () => buildImpactValuationSlides(config, data),
     'supply-chain': () => buildSupplyChainSlides(config, data),
     'facilities': () => buildFacilitiesSlide(config, data),
@@ -1444,43 +1544,43 @@ export function buildReportContent(config: ReportConfig, data: ReportData, chart
 function getAudienceOrderedSections(audience: string, selectedSections: string[]): string[] {
   const AUDIENCE_SECTION_ORDER: Record<string, string[]> = {
     'investors': [
-      'executive-summary', 'scope-1-2-3', 'trends', 'targets',
-      'impact-valuation', 'governance', 'product-footprints',
+      'executive-summary', 'scope-1-2-3', 'carbon-origin', 'trends', 'targets',
+      'impact-valuation', 'governance', 'product-footprints', 'multi-capital',
       'people-culture', 'community-impact', 'supply-chain',
       'facilities', 'company-overview', 'methodology', 'regulatory',
       'ghg-inventory', 'appendix',
     ],
     'customers': [
       'executive-summary', 'company-overview', 'community-impact',
-      'people-culture', 'product-footprints', 'impact-valuation',
-      'scope-1-2-3', 'governance', 'supply-chain', 'targets',
+      'people-culture', 'product-footprints', 'multi-capital', 'impact-valuation',
+      'scope-1-2-3', 'carbon-origin', 'governance', 'supply-chain', 'targets',
       'facilities', 'trends', 'methodology', 'ghg-inventory',
       'regulatory', 'appendix',
     ],
     'regulators': [
-      'executive-summary', 'methodology', 'scope-1-2-3',
-      'ghg-inventory', 'product-footprints', 'facilities',
+      'executive-summary', 'methodology', 'scope-1-2-3', 'carbon-origin',
+      'ghg-inventory', 'product-footprints', 'multi-capital', 'facilities',
       'governance', 'people-culture', 'community-impact',
       'supply-chain', 'regulatory', 'targets', 'trends',
       'impact-valuation', 'company-overview', 'appendix',
     ],
     'internal': [
       'executive-summary', 'scope-1-2-3', 'facilities',
-      'people-culture', 'targets', 'product-footprints',
+      'people-culture', 'targets', 'product-footprints', 'multi-capital',
       'community-impact', 'governance', 'supply-chain',
-      'trends', 'impact-valuation', 'company-overview',
+      'trends', 'carbon-origin', 'impact-valuation', 'company-overview',
       'methodology', 'ghg-inventory', 'regulatory', 'appendix',
     ],
     'supply-chain': [
-      'executive-summary', 'supply-chain', 'product-footprints',
-      'scope-1-2-3', 'facilities', 'people-culture',
+      'executive-summary', 'supply-chain', 'product-footprints', 'multi-capital',
+      'scope-1-2-3', 'carbon-origin', 'facilities', 'people-culture',
       'community-impact', 'governance', 'targets',
       'trends', 'impact-valuation', 'company-overview',
       'methodology', 'ghg-inventory', 'regulatory', 'appendix',
     ],
     'technical': [
-      'executive-summary', 'methodology', 'scope-1-2-3',
-      'ghg-inventory', 'product-footprints', 'facilities',
+      'executive-summary', 'methodology', 'scope-1-2-3', 'carbon-origin',
+      'ghg-inventory', 'product-footprints', 'multi-capital', 'facilities',
       'people-culture', 'governance', 'community-impact',
       'supply-chain', 'targets', 'trends', 'impact-valuation',
       'company-overview', 'regulatory', 'appendix',
@@ -1551,6 +1651,8 @@ export function calculateSlideCount(sections: string[]): number {
     'facilities': 1,
     'trends': 1,
     'targets': 1,
+    'carbon-origin': 1,
+    'multi-capital': 1,
     'people-culture': 3,
     'governance': 2,
     'community-impact': 2,

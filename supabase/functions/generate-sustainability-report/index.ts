@@ -592,6 +592,50 @@ async function aggregateReportData(
           referenceYear: p.reference_year,
         }));
         data.dataAvailability.hasProducts = true;
+
+        // Extract carbon origin data from aggregated_impacts (for carbon-origin section)
+        if (sections.includes('carbon-origin')) {
+          let totalFossil = 0, totalBiogenic = 0, totalLandUseChange = 0;
+          for (const p of Array.from(seenProducts.values())) {
+            const ai = (p as any).aggregated_impacts;
+            if (ai?.carbon_origin) {
+              totalFossil += ai.carbon_origin.fossil || 0;
+              totalBiogenic += ai.carbon_origin.biogenic || 0;
+              totalLandUseChange += ai.carbon_origin.land_use_change || 0;
+            }
+          }
+          if (totalFossil > 0 || totalBiogenic !== 0 || totalLandUseChange > 0) {
+            (data as any).carbonOrigin = {
+              fossil: totalFossil,
+              biogenic: totalBiogenic,
+              landUseChange: totalLandUseChange,
+            };
+          }
+        }
+
+        // Extract multi-capital impact data (for multi-capital section)
+        if (sections.includes('multi-capital')) {
+          let totalWater = 0, totalLand = 0, totalEutrophication = 0, totalAcidification = 0, totalWaterScarcity = 0;
+          for (const p of Array.from(seenProducts.values())) {
+            const ai = (p as any).aggregated_impacts;
+            if (ai) {
+              totalWater += ai.water_consumption || 0;
+              totalLand += ai.land_use || 0;
+              totalEutrophication += ai.freshwater_eutrophication || 0;
+              totalAcidification += ai.terrestrial_acidification || 0;
+              totalWaterScarcity += ai.water_scarcity_aware || 0;
+            }
+          }
+          if (totalWater > 0 || totalLand > 0 || totalEutrophication > 0 || totalAcidification > 0) {
+            (data as any).multiCapitalImpacts = {
+              waterConsumption: totalWater,
+              landUse: totalLand,
+              freshwaterEutrophication: totalEutrophication,
+              terrestrialAcidification: totalAcidification,
+              waterScarcity: totalWaterScarcity,
+            };
+          }
+        }
       } else {
       }
     } catch (error) {

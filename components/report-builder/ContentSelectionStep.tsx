@@ -97,8 +97,13 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
 
       if (productCount > 0) {
         recs['product-footprints'] = { id: 'product-footprints', priority: productCount >= 5 ? 'high' : 'medium', dataCompleteness: Math.min(100, (productCount / 10) * 100), rationale: `${productCount} product LCA${productCount > 1 ? 's' : ''} available` };
+        // Carbon origin and multi-capital derive from product LCA data
+        recs['carbon-origin'] = { id: 'carbon-origin', priority: 'medium', dataCompleteness: 70, rationale: 'Derived from product LCA data' };
+        recs['multi-capital'] = { id: 'multi-capital', priority: 'medium', dataCompleteness: 70, rationale: 'Water, land use, and other impacts from product LCAs' };
       } else {
         recs['product-footprints'] = { id: 'product-footprints', priority: 'low', dataCompleteness: 0, rationale: 'No product LCAs completed' };
+        recs['carbon-origin'] = { id: 'carbon-origin', priority: 'low', dataCompleteness: 0, rationale: 'Requires product LCA data' };
+        recs['multi-capital'] = { id: 'multi-capital', priority: 'low', dataCompleteness: 0, rationale: 'Requires product LCA data' };
       }
 
       if (supplierCount > 0) {
@@ -118,15 +123,16 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
       recs['regulatory'] = { id: 'regulatory', priority: config.standards.includes('csrd') ? 'high' : 'medium', dataCompleteness: 100, rationale: config.standards.includes('csrd') ? 'Required for CSRD compliance' : 'Standards alignment' };
       recs['appendix'] = { id: 'appendix', priority: 'low', dataCompleteness: 100, rationale: 'Supplementary data and assumptions' };
 
-      // Impact Valuation — check if a cached result exists
+      // Impact Valuation — check if a calculation result exists
       const { data: ivResult } = await supabase
         .from('impact_valuation_results')
-        .select('id, grand_total')
+        .select('id, grand_total, data_coverage')
         .eq('organization_id', orgId)
         .eq('reporting_year', year)
         .maybeSingle();
-      if (ivResult && ivResult.grand_total > 0) {
-        recs['impact-valuation'] = { id: 'impact-valuation', priority: 'medium', dataCompleteness: 100, rationale: 'Impact valuation data available' };
+      if (ivResult) {
+        const coverage = ivResult.data_coverage || 0;
+        recs['impact-valuation'] = { id: 'impact-valuation', priority: coverage > 50 ? 'high' : 'medium', dataCompleteness: Math.min(100, coverage), rationale: `Impact valuation calculated (${Math.round(coverage)}% data coverage)` };
       } else {
         recs['impact-valuation'] = { id: 'impact-valuation', priority: 'low', dataCompleteness: 0, rationale: 'No impact valuation calculated yet' };
       }

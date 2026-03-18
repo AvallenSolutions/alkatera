@@ -71,7 +71,6 @@ export const AVAILABLE_SECTIONS: SectionDefinition[] = [
     description: 'Fossil carbon vs. biogenic carbon vs. land use change emissions',
     required: false,
     category: 'Emissions',
-    comingSoon: true,
   },
   {
     id: 'product-footprints',
@@ -86,7 +85,6 @@ export const AVAILABLE_SECTIONS: SectionDefinition[] = [
     description: 'Water depletion, land use, waste generation, and other impact categories',
     required: false,
     category: 'Environmental Impacts',
-    comingSoon: true,
   },
   {
     id: 'impact-valuation',

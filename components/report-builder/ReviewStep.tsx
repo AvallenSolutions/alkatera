@@ -33,6 +33,7 @@ interface ReviewStepProps {
 
 export function ReviewStep({ config, onChange, onSaveDefaults, defaultsSaved }: ReviewStepProps) {
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [savingDefaults, setSavingDefaults] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(config.branding.logo);
   const supabase = getSupabaseBrowserClient();
@@ -44,6 +45,7 @@ export function ReviewStep({ config, onChange, onSaveDefaults, defaultsSaved }: 
     if (file.size > 5 * 1024 * 1024) return;
 
     setUploading(true);
+    setUploadError(null);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -53,7 +55,14 @@ export function ReviewStep({ config, onChange, onSaveDefaults, defaultsSaved }: 
         .from('report-assets')
         .upload(filePath, file, { cacheControl: '3600', upsert: false });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('not found') || error.message?.includes('Bucket')) {
+          setUploadError('Storage bucket not configured. Please contact support.');
+        } else {
+          setUploadError(`Upload failed: ${error.message}`);
+        }
+        throw error;
+      }
 
       const { data: urlData } = supabase.storage
         .from('report-assets')
@@ -61,8 +70,11 @@ export function ReviewStep({ config, onChange, onSaveDefaults, defaultsSaved }: 
 
       onChange({ branding: { ...config.branding, logo: urlData.publicUrl } });
       setLogoPreview(urlData.publicUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logo upload error:', error);
+      if (!uploadError) {
+        setUploadError('Failed to upload logo. Please try again.');
+      }
     } finally {
       setUploading(false);
     }
@@ -212,6 +224,9 @@ export function ReviewStep({ config, onChange, onSaveDefaults, defaultsSaved }: 
                   )}
                 </label>
               </div>
+            )}
+            {uploadError && (
+              <p className="text-sm text-destructive mt-2">{uploadError}</p>
             )}
           </div>
 
