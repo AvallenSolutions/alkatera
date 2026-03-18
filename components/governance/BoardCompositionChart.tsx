@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -10,6 +11,8 @@ import {
   CheckCircle,
   AlertTriangle,
   Calendar,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { BoardMember, BoardMetrics } from '@/hooks/data/useBoardComposition';
 
@@ -18,6 +21,7 @@ interface BoardCompositionChartProps {
   metrics: BoardMetrics;
   isLoading?: boolean;
   onEditMember?: (member: BoardMember) => void;
+  onDeleteMember?: (member: BoardMember) => void;
 }
 
 function MetricCard({
@@ -99,7 +103,15 @@ function GenderBreakdownChart({ breakdown }: { breakdown: BoardMetrics['gender_b
   );
 }
 
-function MemberCard({ member }: { member: BoardMember }) {
+function MemberCard({
+  member,
+  onEdit,
+  onDelete,
+}: {
+  member: BoardMember;
+  onEdit?: (member: BoardMember) => void;
+  onDelete?: (member: BoardMember) => void;
+}) {
   const typeColors: Record<string, string> = {
     executive: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
     non_executive: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
@@ -115,20 +127,44 @@ function MemberCard({ member }: { member: BoardMember }) {
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="hover:shadow-md transition-shadow group">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
-          <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+          <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
             <User className="h-5 w-5 text-slate-600" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-medium">{member.member_name}</h3>
-              {member.is_independent && (
-                <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
-                  Independent
-                </Badge>
-              )}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-medium">{member.member_name}</h3>
+                {member.is_independent && (
+                  <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                    Independent
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {onEdit && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => onEdit(member)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    onClick={() => onDelete(member)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
             <p className="text-sm text-muted-foreground">
               {roleLabels[member.role] || member.role}
@@ -167,6 +203,7 @@ export function BoardCompositionChart({
   metrics,
   isLoading,
   onEditMember,
+  onDeleteMember,
 }: BoardCompositionChartProps) {
   if (isLoading) {
     return (
@@ -289,7 +326,12 @@ export function BoardCompositionChart({
           <h3 className="font-semibold text-lg">Current Board Members</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {currentMembers.map((member) => (
-              <MemberCard key={member.id} member={member} />
+              <MemberCard
+                key={member.id}
+                member={member}
+                onEdit={onEditMember}
+                onDelete={onDeleteMember}
+              />
             ))}
           </div>
         </div>

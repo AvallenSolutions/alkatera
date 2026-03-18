@@ -51,6 +51,7 @@ export interface UseBoardCompositionResult {
   refetch: () => Promise<void>;
   addMember: (member: Partial<BoardMember>) => Promise<BoardMember>;
   updateMember: (member: Partial<BoardMember> & { id: string }) => Promise<BoardMember>;
+  deleteMember: (id: string) => Promise<void>;
 }
 
 export function useBoardComposition(): UseBoardCompositionResult {
@@ -169,6 +170,19 @@ export function useBoardComposition(): UseBoardCompositionResult {
     return updated;
   }, [fetchBoard]);
 
+  const deleteMember = useCallback(async (id: string): Promise<void> => {
+    const response = await fetch(`/api/governance/board?id=${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete board member');
+    }
+
+    await fetchBoard();
+  }, [fetchBoard]);
+
   useEffect(() => {
     fetchBoard();
   }, [fetchBoard]);
@@ -181,5 +195,6 @@ export function useBoardComposition(): UseBoardCompositionResult {
     refetch: fetchBoard,
     addMember,
     updateMember,
+    deleteMember,
   };
 }

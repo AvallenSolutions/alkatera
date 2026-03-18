@@ -145,27 +145,24 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Board member id is required' }, { status: 400 });
     }
 
+    // Only include fields that are explicitly provided
+    const allowedFields = [
+      'member_name', 'role', 'member_type', 'gender', 'age_bracket',
+      'ethnicity', 'disability_status', 'expertise_areas', 'industry_experience',
+      'appointment_date', 'term_end_date', 'is_current', 'committee_memberships',
+      'is_independent', 'independence_assessment', 'meeting_attendance_rate',
+    ];
+
+    const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    for (const field of allowedFields) {
+      if (field in body) {
+        updateData[field] = body[field];
+      }
+    }
+
     const { data, error } = await supabase
       .from('governance_board_members')
-      .update({
-        member_name: body.member_name,
-        role: body.role,
-        member_type: body.member_type,
-        gender: body.gender,
-        age_bracket: body.age_bracket,
-        ethnicity: body.ethnicity,
-        disability_status: body.disability_status,
-        expertise_areas: body.expertise_areas,
-        industry_experience: body.industry_experience,
-        appointment_date: body.appointment_date,
-        term_end_date: body.term_end_date,
-        is_current: body.is_current,
-        committee_memberships: body.committee_memberships,
-        is_independent: body.is_independent,
-        independence_assessment: body.independence_assessment,
-        meeting_attendance_rate: body.meeting_attendance_rate,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', body.id)
       .select()
       .single();
@@ -178,6 +175,38 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error in PUT /api/governance/board:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const searchParams = request.nextUrl.searchParams;
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ error: 'Board member id is required' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('governance_board_members')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting board member:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/governance/board:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
