@@ -688,6 +688,294 @@ async function aggregateReportData(
     }
   }
 
+  // ── People & Culture data ──
+  if (sections.includes('people-culture')) {
+    try {
+      // Latest score
+      const { data: scoreRow } = await supabaseClient
+        .from('people_culture_scores')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('calculated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Demographics
+      const { data: demographics } = await supabaseClient
+        .from('people_workforce_demographics')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // DEI actions
+      const { data: deiActions } = await supabaseClient
+        .from('people_dei_actions')
+        .select('id, status')
+        .eq('organization_id', organizationId);
+
+      // Training records for the year
+      const { data: training } = await supabaseClient
+        .from('people_training_records')
+        .select('training_hours, participants')
+        .eq('organization_id', organizationId)
+        .gte('training_date', `${reportYear}-01-01`)
+        .lte('training_date', `${reportYear}-12-31`);
+
+      // Latest survey
+      const { data: survey } = await supabaseClient
+        .from('people_employee_surveys')
+        .select('engagement_score, response_rate')
+        .eq('organization_id', organizationId)
+        .order('survey_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Benefits
+      const { data: benefits } = await supabaseClient
+        .from('people_benefits')
+        .select('benefit_name')
+        .eq('organization_id', organizationId)
+        .eq('is_offered', true);
+
+      // Compensation count (for employee total if demographics missing)
+      const { count: compCount } = await supabaseClient
+        .from('people_employee_compensation')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .eq('is_active', true);
+
+      const totalEmployees = demographics?.total_headcount || compCount || 0;
+      const totalDei = deiActions?.length || 0;
+      const completedDei = deiActions?.filter((a: any) => a.status === 'completed').length || 0;
+
+      // Calculate training hours per employee
+      let trainingHoursPerEmployee: number | null = null;
+      if (training && training.length > 0 && totalEmployees > 0) {
+        const totalHours = training.reduce((sum: number, t: any) => sum + (t.training_hours || 0), 0);
+        trainingHoursPerEmployee = totalHours / totalEmployees;
+      }
+
+      const genderData = demographics?.gender_data as any;
+      let femalePercentage: number | null = null;
+      if (genderData && totalEmployees > 0) {
+        const female = genderData.female || genderData.Female || 0;
+        femalePercentage = (female / totalEmployees) * 100;
+      }
+
+      const turnoverRate = totalEmployees > 0 && demographics?.departures
+        ? (demographics.departures / totalEmployees) * 100
+        : null;
+
+      data.peopleCulture = {
+        overallScore: scoreRow?.overall_score || 0,
+        fairWorkScore: scoreRow?.fair_work_score || 0,
+        diversityScore: scoreRow?.diversity_score || 0,
+        wellbeingScore: scoreRow?.wellbeing_score || 0,
+        trainingScore: scoreRow?.training_score || 0,
+        dataCompleteness: scoreRow?.data_completeness || 0,
+        livingWageCompliance: scoreRow?.living_wage_compliance ?? null,
+        genderPayGapMean: scoreRow?.gender_pay_gap_mean ?? null,
+        ceoWorkerPayRatio: scoreRow?.ceo_worker_pay_ratio ?? null,
+        trainingHoursPerEmployee,
+        engagementScore: survey?.engagement_score ?? null,
+        totalEmployees,
+        femalePercentage,
+        newHires: demographics?.new_hires || 0,
+        departures: demographics?.departures || 0,
+        turnoverRate,
+        deiActionsTotal: totalDei,
+        deiActionsCompleted: completedDei,
+        benefits: (benefits || []).map((b: any) => b.benefit_name),
+      };
+      data.dataAvailability.hasPeopleCulture = true;
+    } catch (error) {
+      console.error('[Data] Exception fetching people & culture:', error);
+    }
+  }
+
+  // ── Governance data ──
+  if (sections.includes('governance')) {
+    try {
+      // Mission
+      const { data: mission } = await supabaseClient
+        .from('governance_mission')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+
+      // Board members
+      const { data: boardMembers } = await supabaseClient
+        .from('governance_board_members')
+        .select('full_name, role_title, gender, is_independent, attendance_rate')
+        .eq('organization_id', organizationId)
+        .eq('is_current', true);
+
+      // Policies
+      const { data: policies } = await supabaseClient
+        .from('governance_policies')
+        .select('policy_name, policy_type, status, is_public')
+        .eq('organization_id', organizationId);
+
+      // Ethics records for the year
+      const { data: ethicsRecords } = await supabaseClient
+        .from('governance_ethics_records')
+        .select('record_type, completion_rate')
+        .eq('organization_id', organizationId)
+        .gte('record_date', `${reportYear}-01-01`)
+        .lte('record_date', `${reportYear}-12-31`);
+
+      // Lobbying count
+      const { count: lobbyingCount } = await supabaseClient
+        .from('governance_lobbying')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', organizationId)
+        .gte('activity_date', `${reportYear}-01-01`)
+        .lte('activity_date', `${reportYear}-12-31`);
+
+      const members = boardMembers || [];
+      const totalMembers = members.length;
+      const femaleCount = members.filter((m: any) => m.gender?.toLowerCase() === 'female').length;
+      const independentCount = members.filter((m: any) => m.is_independent === true).length;
+      const avgAttendance = totalMembers > 0
+        ? members.reduce((sum: number, m: any) => sum + (m.attendance_rate || 0), 0) / totalMembers
+        : 0;
+
+      // Ethics training rate
+      const trainingRecords = (ethicsRecords || []).filter((r: any) => r.record_type === 'ethics_training');
+      const ethicsTrainingRate = trainingRecords.length > 0
+        ? trainingRecords.reduce((sum: number, r: any) => sum + (r.completion_rate || 0), 0) / trainingRecords.length
+        : null;
+      const ethicsIncidents = (ethicsRecords || []).filter((r: any) =>
+        ['whistleblowing_case', 'incident'].includes(r.record_type)
+      ).length;
+
+      // Expected ESG policies for completeness
+      const expectedPolicies = ['Environmental', 'Health & Safety', 'Anti-Corruption', 'Human Rights', 'DEI', 'Data Privacy'];
+      const coveredTypes = new Set((policies || []).map((p: any) => p.policy_type));
+      const policyCompleteness = (coveredTypes.size / expectedPolicies.length) * 100;
+
+      data.governance = {
+        missionStatement: mission?.mission_statement || null,
+        visionStatement: mission?.vision_statement || null,
+        purposeStatement: mission?.purpose_statement || null,
+        isBenefitCorp: mission?.is_benefit_corporation || false,
+        sdgCommitments: mission?.sdg_commitments || [],
+        climateCommitments: mission?.climate_commitments || [],
+        boardMembers: members.map((m: any) => ({
+          name: m.full_name,
+          role: m.role_title || 'Member',
+          gender: m.gender,
+          isIndependent: m.is_independent,
+          attendanceRate: m.attendance_rate,
+        })),
+        boardDiversityMetrics: {
+          totalMembers,
+          femalePercentage: totalMembers > 0 ? (femaleCount / totalMembers) * 100 : 0,
+          independentPercentage: totalMembers > 0 ? (independentCount / totalMembers) * 100 : 0,
+          averageAttendance: avgAttendance,
+        },
+        policies: (policies || []).map((p: any) => ({
+          name: p.policy_name,
+          type: p.policy_type || 'General',
+          status: p.status || 'Draft',
+          isPublic: p.is_public || false,
+        })),
+        policyCompleteness: Math.min(100, policyCompleteness),
+        ethicsTrainingRate,
+        ethicsIncidents,
+        lobbyingActivities: lobbyingCount || 0,
+      };
+      data.dataAvailability.hasGovernance = true;
+    } catch (error) {
+      console.error('[Data] Exception fetching governance:', error);
+    }
+  }
+
+  // ── Community Impact data ──
+  if (sections.includes('community-impact')) {
+    try {
+      // Latest score
+      const { data: scoreRow } = await supabaseClient
+        .from('community_impact_scores')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('calculated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Donations for the year
+      const { data: donations } = await supabaseClient
+        .from('community_donations')
+        .select('amount, currency')
+        .eq('organization_id', organizationId)
+        .gte('donation_date', `${reportYear}-01-01`)
+        .lte('donation_date', `${reportYear}-12-31`);
+
+      // Volunteer activities
+      const { data: volunteering } = await supabaseClient
+        .from('community_volunteer_activities')
+        .select('total_volunteer_hours, duration_hours, participant_count')
+        .eq('organization_id', organizationId)
+        .gte('activity_date', `${reportYear}-01-01`)
+        .lte('activity_date', `${reportYear}-12-31`);
+
+      // Impact stories (published, limit 5)
+      const { data: stories } = await supabaseClient
+        .from('community_impact_stories')
+        .select('title, impact_category, summary')
+        .eq('organization_id', organizationId)
+        .eq('is_published', true)
+        .order('published_date', { ascending: false })
+        .limit(5);
+
+      // Local impact
+      const { data: localImpact } = await supabaseClient
+        .from('community_local_impact')
+        .select('total_employees, local_employees, total_procurement_spend, local_procurement_spend')
+        .eq('organization_id', organizationId)
+        .eq('reporting_year', reportYear)
+        .limit(1)
+        .maybeSingle();
+
+      const totalDonations = (donations || []).reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+      const totalVolunteerHours = (volunteering || []).reduce((sum: number, v: any) => {
+        return sum + (v.total_volunteer_hours || (v.duration_hours || 0) * (v.participant_count || 1));
+      }, 0);
+
+      const localEmploymentRate = localImpact?.total_employees && localImpact?.local_employees
+        ? (localImpact.local_employees / localImpact.total_employees) * 100
+        : null;
+      const localSourcingRate = localImpact?.total_procurement_spend && localImpact?.local_procurement_spend
+        ? (localImpact.local_procurement_spend / localImpact.total_procurement_spend) * 100
+        : null;
+
+      data.communityImpact = {
+        overallScore: scoreRow?.overall_score || 0,
+        givingScore: scoreRow?.giving_score || 0,
+        localImpactScore: scoreRow?.local_impact_score || 0,
+        volunteeringScore: scoreRow?.volunteering_score || 0,
+        engagementScore: scoreRow?.engagement_score || 0,
+        dataCompleteness: scoreRow?.data_completeness || 0,
+        totalDonations,
+        donationCount: donations?.length || 0,
+        totalVolunteerHours,
+        volunteerActivities: volunteering?.length || 0,
+        impactStories: (stories || []).map((s: any) => ({
+          title: s.title,
+          category: s.impact_category || 'General',
+          summary: s.summary || '',
+        })),
+        localEmploymentRate,
+        localSourcingRate,
+      };
+      data.dataAvailability.hasCommunityImpact = true;
+    } catch (error) {
+      console.error('[Data] Exception fetching community impact:', error);
+    }
+  }
+
   // Populate standards compliance status
   if (sections.includes('methodology') || true) {
     data.standards = [];

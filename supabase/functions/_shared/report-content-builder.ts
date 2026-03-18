@@ -94,6 +94,80 @@ export interface ImpactValuationData {
   reporting_year: number;
 }
 
+export interface PeopleCultureData {
+  overallScore: number;
+  fairWorkScore: number;
+  diversityScore: number;
+  wellbeingScore: number;
+  trainingScore: number;
+  dataCompleteness: number;
+  livingWageCompliance: number | null;
+  genderPayGapMean: number | null;
+  ceoWorkerPayRatio: number | null;
+  trainingHoursPerEmployee: number | null;
+  engagementScore: number | null;
+  totalEmployees: number;
+  femalePercentage: number | null;
+  newHires: number;
+  departures: number;
+  turnoverRate: number | null;
+  deiActionsTotal: number;
+  deiActionsCompleted: number;
+  benefits: string[];
+}
+
+export interface GovernanceData {
+  missionStatement: string | null;
+  visionStatement: string | null;
+  purposeStatement: string | null;
+  isBenefitCorp: boolean;
+  sdgCommitments: number[];
+  climateCommitments: string[];
+  boardMembers: {
+    name: string;
+    role: string;
+    gender: string | null;
+    isIndependent: boolean | null;
+    attendanceRate: number | null;
+  }[];
+  boardDiversityMetrics: {
+    totalMembers: number;
+    femalePercentage: number;
+    independentPercentage: number;
+    averageAttendance: number;
+  };
+  policies: {
+    name: string;
+    type: string;
+    status: string;
+    isPublic: boolean;
+  }[];
+  policyCompleteness: number;
+  ethicsTrainingRate: number | null;
+  ethicsIncidents: number;
+  lobbyingActivities: number;
+}
+
+export interface CommunityImpactData {
+  overallScore: number;
+  givingScore: number;
+  localImpactScore: number;
+  volunteeringScore: number;
+  engagementScore: number;
+  dataCompleteness: number;
+  totalDonations: number;
+  donationCount: number;
+  totalVolunteerHours: number;
+  volunteerActivities: number;
+  impactStories: {
+    title: string;
+    category: string;
+    summary: string;
+  }[];
+  localEmploymentRate: number | null;
+  localSourcingRate: number | null;
+}
+
 export interface ReportData {
   organization: OrganizationInfo;
   emissions: EmissionsData;
@@ -104,6 +178,9 @@ export interface ReportData {
   standards: StandardStatus[];
   dataQuality?: DataQualityMetrics;
   impactValuation?: ImpactValuationData;
+  peopleCulture?: PeopleCultureData;
+  governance?: GovernanceData;
+  communityImpact?: CommunityImpactData;
   dataAvailability: {
     hasOrganization: boolean;
     hasEmissions: boolean;
@@ -111,6 +188,9 @@ export interface ReportData {
     hasFacilities: boolean;
     hasSuppliers?: boolean;
     hasImpactValuation?: boolean;
+    hasPeopleCulture?: boolean;
+    hasGovernance?: boolean;
+    hasCommunityImpact?: boolean;
   };
 }
 
@@ -298,6 +378,22 @@ ${hasProducts ? `
 ### Product Portfolio
 - **${data.products.length}** products with completed carbon footprint assessments
 - Average impact: **${formatNumber(data.products.reduce((sum, p) => sum + p.climateImpact, 0) / data.products.length, 4)} kg CO2e** per functional unit
+` : ''}
+
+${data.dataAvailability.hasPeopleCulture && data.peopleCulture ? `
+### People & Culture
+- Overall score: **${formatNumber(data.peopleCulture.overallScore, 0)}/100**
+- **${formatNumber(data.peopleCulture.totalEmployees, 0)}** employees${data.peopleCulture.femalePercentage !== null ? ` (${formatNumber(data.peopleCulture.femalePercentage, 0)}% female)` : ''}
+` : ''}
+
+${data.dataAvailability.hasCommunityImpact && data.communityImpact ? `
+### Community Impact
+- Total donations: **${formatGBP(data.communityImpact.totalDonations)}** | Volunteer hours: **${formatNumber(data.communityImpact.totalVolunteerHours, 0)}**
+` : ''}
+
+${data.dataAvailability.hasGovernance && data.governance ? `
+### Governance
+${data.governance.isBenefitCorp ? '- **Registered Benefit Corporation**\n' : ''}${data.governance.boardDiversityMetrics.totalMembers > 0 ? `- Board: **${data.governance.boardDiversityMetrics.totalMembers}** members, **${formatNumber(data.governance.boardDiversityMetrics.femalePercentage, 0)}%** female` : ''}
 ` : ''}
 
 ---
@@ -648,6 +744,263 @@ ${allItems.map(item => `| ${item.capital} | ${item.label} | ${item.raw_input !==
 }
 
 /**
+ * Generates People & Culture slides
+ */
+function buildPeopleCultureSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  const slides: SlideContent[] = [];
+  const pc = data.peopleCulture;
+
+  if (!data.dataAvailability.hasPeopleCulture || !pc) {
+    slides.push({
+      slideNumber: 0,
+      title: 'People & Culture',
+      content: `# People & Culture\n\n## No Data Available\n\nNo people and culture data has been recorded for ${config.reportYear}.\n\nCapture workforce demographics, compensation, and training data to include this section.`.trim(),
+    });
+    return slides;
+  }
+
+  // Slide 1: Overview with pillar scores
+  slides.push({
+    slideNumber: 0,
+    title: 'People & Culture Overview',
+    content: `
+# People & Culture
+
+## Overall Score: ${formatNumber(pc.overallScore, 0)}/100
+
+| Pillar | Score |
+|--------|-------|
+| **Fair Work** | ${formatNumber(pc.fairWorkScore, 0)}/100 |
+| **Diversity** | ${formatNumber(pc.diversityScore, 0)}/100 |
+| **Wellbeing** | ${formatNumber(pc.wellbeingScore, 0)}/100 |
+| **Training** | ${formatNumber(pc.trainingScore, 0)}/100 |
+
+### Workforce Summary
+
+- **Total employees:** ${formatNumber(pc.totalEmployees, 0)}
+${pc.femalePercentage !== null ? `- **Gender split:** ${formatNumber(pc.femalePercentage, 1)}% female` : ''}
+- **New hires:** ${formatNumber(pc.newHires, 0)} | **Departures:** ${formatNumber(pc.departures, 0)}
+${pc.turnoverRate !== null ? `- **Turnover rate:** ${formatNumber(pc.turnoverRate, 1)}%` : ''}
+
+---
+
+*Data completeness: ${formatNumber(pc.dataCompleteness, 0)}%*
+`.trim(),
+  });
+
+  // Slide 2: Fair Work & Diversity detail
+  const hasFairWorkData = pc.livingWageCompliance !== null || pc.genderPayGapMean !== null || pc.ceoWorkerPayRatio !== null;
+  if (hasFairWorkData || pc.deiActionsTotal > 0) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Fair Work & Diversity',
+      content: `
+# Fair Work & Diversity
+
+${hasFairWorkData ? `## Fair Work Metrics
+
+| Metric | Value |
+|--------|-------|
+${pc.livingWageCompliance !== null ? `| **Living wage compliance** | ${formatNumber(pc.livingWageCompliance, 1)}% |` : ''}
+${pc.genderPayGapMean !== null ? `| **Mean gender pay gap** | ${formatNumber(pc.genderPayGapMean, 1)}% |` : ''}
+${pc.ceoWorkerPayRatio !== null ? `| **CEO:median worker pay ratio** | ${formatNumber(pc.ceoWorkerPayRatio, 0)}:1 |` : ''}
+` : ''}
+
+${pc.deiActionsTotal > 0 ? `## DEI Initiatives
+
+- **${pc.deiActionsTotal}** DEI actions tracked
+- **${pc.deiActionsCompleted}** completed (${formatNumber(pc.deiActionsTotal > 0 ? (pc.deiActionsCompleted / pc.deiActionsTotal) * 100 : 0, 0)}% completion rate)
+` : ''}
+
+---
+
+*People & Culture data from platform records*
+`.trim(),
+    });
+  }
+
+  // Slide 3: Training & Wellbeing (conditional)
+  if (pc.trainingHoursPerEmployee !== null || pc.engagementScore !== null || pc.benefits.length > 0) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Training & Wellbeing',
+      content: `
+# Training & Wellbeing
+
+${pc.trainingHoursPerEmployee !== null ? `## Training\n- **Average training hours per employee:** ${formatNumber(pc.trainingHoursPerEmployee, 1)}\n` : ''}
+
+${pc.engagementScore !== null ? `## Employee Engagement\n- **Engagement score:** ${formatNumber(pc.engagementScore, 0)}/100\n` : ''}
+
+${pc.benefits.length > 0 ? `## Benefits Offered\n${pc.benefits.slice(0, 8).map(b => `- ${b}`).join('\n')}\n${pc.benefits.length > 8 ? `\n*Plus ${pc.benefits.length - 8} additional benefits*` : ''}` : ''}
+
+---
+
+*Training and wellbeing data from platform records*
+`.trim(),
+    });
+  }
+
+  return slides;
+}
+
+/**
+ * Generates Governance slides
+ */
+function buildGovernanceSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  const slides: SlideContent[] = [];
+  const gov = data.governance;
+
+  if (!data.dataAvailability.hasGovernance || !gov) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Governance',
+      content: `# Governance\n\n## No Data Available\n\nNo governance data has been recorded for ${config.reportYear}.\n\nCapture mission, board composition, and policy data to include this section.`.trim(),
+    });
+    return slides;
+  }
+
+  // Slide 1: Overview with mission and board
+  const bdm = gov.boardDiversityMetrics;
+  slides.push({
+    slideNumber: 0,
+    title: 'Governance Overview',
+    content: `
+# Governance
+
+${gov.missionStatement ? `## Mission\n${gov.missionStatement.substring(0, 300)}${gov.missionStatement.length > 300 ? '...' : ''}\n` : ''}
+
+${gov.purposeStatement ? `## Purpose\n${gov.purposeStatement.substring(0, 200)}${gov.purposeStatement.length > 200 ? '...' : ''}\n` : ''}
+
+${gov.isBenefitCorp ? '**Registered Benefit Corporation**\n' : ''}
+${gov.sdgCommitments.length > 0 ? `**SDG Commitments:** ${gov.sdgCommitments.map(s => `SDG ${s}`).join(', ')}\n` : ''}
+
+${bdm.totalMembers > 0 ? `## Board Composition
+
+| Metric | Value |
+|--------|-------|
+| **Total board members** | ${bdm.totalMembers} |
+| **Female representation** | ${formatNumber(bdm.femalePercentage, 0)}% |
+| **Independent directors** | ${formatNumber(bdm.independentPercentage, 0)}% |
+${bdm.averageAttendance > 0 ? `| **Average attendance** | ${formatNumber(bdm.averageAttendance, 0)}% |` : ''}
+` : ''}
+
+---
+
+*Governance data from platform records*
+`.trim(),
+  });
+
+  // Slide 2: Policies & Ethics (conditional)
+  if (gov.policies.length > 0 || gov.ethicsTrainingRate !== null || gov.ethicsIncidents > 0) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Policies & Ethics',
+      content: `
+# Policies & Ethics
+
+${gov.policies.length > 0 ? `## ESG Policies
+
+| Policy | Type | Status |
+|--------|------|--------|
+${gov.policies.slice(0, 10).map(p => `| ${p.name} | ${p.type} | ${p.status} |`).join('\n')}
+${gov.policies.length > 10 ? `\n*Showing 10 of ${gov.policies.length} policies*` : ''}
+
+**Policy completeness:** ${formatNumber(gov.policyCompleteness, 0)}%
+` : ''}
+
+${gov.ethicsTrainingRate !== null || gov.ethicsIncidents > 0 ? `## Ethics & Compliance
+
+| Metric | Value |
+|--------|-------|
+${gov.ethicsTrainingRate !== null ? `| **Ethics training completion** | ${formatNumber(gov.ethicsTrainingRate, 0)}% |` : ''}
+| **Ethics incidents reported** | ${gov.ethicsIncidents} |
+${gov.lobbyingActivities > 0 ? `| **Political activities** | ${gov.lobbyingActivities} |` : ''}
+` : ''}
+
+---
+
+*Governance and ethics data from platform records*
+`.trim(),
+    });
+  }
+
+  return slides;
+}
+
+/**
+ * Generates Community Impact slides
+ */
+function buildCommunityImpactSlides(config: ReportConfig, data: ReportData): SlideContent[] {
+  const slides: SlideContent[] = [];
+  const ci = data.communityImpact;
+
+  if (!data.dataAvailability.hasCommunityImpact || !ci) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Community Impact',
+      content: `# Community Impact\n\n## No Data Available\n\nNo community impact data has been recorded for ${config.reportYear}.\n\nCapture donation, volunteering, and local impact data to include this section.`.trim(),
+    });
+    return slides;
+  }
+
+  // Slide 1: Overview
+  slides.push({
+    slideNumber: 0,
+    title: 'Community Impact Overview',
+    content: `
+# Community Impact
+
+## Overall Score: ${formatNumber(ci.overallScore, 0)}/100
+
+| Pillar | Score |
+|--------|-------|
+| **Giving** | ${formatNumber(ci.givingScore, 0)}/100 |
+| **Local Impact** | ${formatNumber(ci.localImpactScore, 0)}/100 |
+| **Volunteering** | ${formatNumber(ci.volunteeringScore, 0)}/100 |
+| **Engagement** | ${formatNumber(ci.engagementScore, 0)}/100 |
+
+### Key Metrics
+
+| Metric | Value |
+|--------|-------|
+| **Total charitable donations** | ${formatGBP(ci.totalDonations)} |
+| **Number of donations** | ${ci.donationCount} |
+| **Total volunteer hours** | ${formatNumber(ci.totalVolunteerHours, 0)} |
+| **Volunteer activities** | ${ci.volunteerActivities} |
+${ci.localEmploymentRate !== null ? `| **Local employment rate** | ${formatNumber(ci.localEmploymentRate, 1)}% |` : ''}
+${ci.localSourcingRate !== null ? `| **Local sourcing rate** | ${formatNumber(ci.localSourcingRate, 1)}% |` : ''}
+
+---
+
+*Data completeness: ${formatNumber(ci.dataCompleteness, 0)}%*
+`.trim(),
+  });
+
+  // Slide 2: Impact Stories (conditional)
+  if (ci.impactStories.length > 0) {
+    slides.push({
+      slideNumber: 0,
+      title: 'Community Impact Stories',
+      content: `
+# Impact Stories
+
+${ci.impactStories.slice(0, 5).map(story => `## ${story.title}
+*${story.category}*
+
+${story.summary || 'No summary available.'}
+`).join('\n---\n\n')}
+
+---
+
+*${ci.impactStories.length} impact stor${ci.impactStories.length === 1 ? 'y' : 'ies'} published*
+`.trim(),
+    });
+  }
+
+  return slides;
+}
+
+/**
  * Generates closing/contact slide
  */
 function buildClosingSlide(config: ReportConfig, data: ReportData): SlideContent {
@@ -829,24 +1182,44 @@ ${data.facilities.length > 15 ? `\n*Showing top 15 of ${data.facilities.length} 
  * Generates targets and action plans slide
  */
 function buildTargetsSlide(config: ReportConfig, data: ReportData): SlideContent {
+  const gov = data.governance;
+  const hasClimateCommitments = gov?.climateCommitments && gov.climateCommitments.length > 0;
+  const hasTrends = data.emissionsTrends && data.emissionsTrends.length > 1;
+
+  // Calculate trajectory if multi-year data exists
+  let trajectoryNote = '';
+  if (hasTrends) {
+    const first = data.emissionsTrends[0];
+    const last = data.emissionsTrends[data.emissionsTrends.length - 1];
+    if (first.total > 0) {
+      const change = ((last.total - first.total) / first.total * 100);
+      trajectoryNote = change < 0
+        ? `Current trajectory: **${Math.abs(change).toFixed(1)}% reduction** from ${first.year} to ${last.year}`
+        : `Current trajectory: **${change.toFixed(1)}% increase** from ${first.year} to ${last.year} - action needed`;
+    }
+  }
+
   return {
     slideNumber: 0,
     title: 'Targets & Action Plans',
     content: `
 # Targets & Action Plans
 
-## Emission Reduction Commitments
+${hasClimateCommitments ? `## Climate Commitments
 
-### Near-term Targets
-- Establish science-based targets aligned with 1.5\u00B0C pathway
-- Reduce Scope 1 & 2 emissions through energy efficiency and renewable procurement
-- Engage top suppliers on emissions measurement and reduction
+${gov!.climateCommitments.map(c => `- ${c}`).join('\n')}
+` : `## Emission Reduction Commitments
 
-### Strategic Initiatives
-1. **Energy Transition** — Transition to renewable energy sources
-2. **Operational Efficiency** — Implement energy management systems
-3. **Supply Chain Engagement** — Collaborate with suppliers on emissions reduction
-4. **Product Innovation** — Design for lower environmental impact
+*No formal climate commitments have been recorded yet. Consider setting targets aligned with the Paris Agreement and Science Based Targets initiative (SBTi).*
+`}
+
+${trajectoryNote ? `### Emissions Trajectory\n${trajectoryNote}\n` : ''}
+
+### Recommended Actions
+1. **Energy Transition** - Transition to renewable energy sources
+2. **Operational Efficiency** - Implement energy management systems
+3. **Supply Chain Engagement** - Collaborate with suppliers on emissions reduction
+4. **Product Innovation** - Design for lower environmental impact
 
 ${config.standards.includes('csrd') ? '### CSRD Transition Plan Requirements\n- Climate transition plan with clear milestones\n- Scope 3 reduction strategy\n- Capital expenditure alignment with targets' : ''}
 
@@ -861,28 +1234,41 @@ ${config.standards.includes('csrd') ? '### CSRD Transition Plan Requirements\n- 
  * Generates regulatory compliance slide
  */
 function buildRegulatorySlide(config: ReportConfig, data: ReportData): SlideContent {
+  // Use real standards status data when available
+  const hasRealStatus = data.standards && data.standards.length > 0;
+  const hasEmissions = data.dataAvailability.hasEmissions;
+  const hasPeople = data.dataAvailability.hasPeopleCulture;
+  const hasGov = data.dataAvailability.hasGovernance;
+
   return {
     slideNumber: 0,
     title: 'Regulatory Compliance',
     content: `
 # Regulatory Compliance
 
-## Standards Alignment
+${hasRealStatus ? `## Standards Alignment
+
+| Standard | Status | Detail |
+|----------|--------|--------|
+${data.standards.map(s => `| **${s.name}** | ${s.status} | ${s.detail} |`).join('\n')}
+` : `## Standards Alignment
 
 ${config.standards.map(s => `### ${getStandardName(s)}\n- Alignment status: In progress\n- Key requirements addressed in this report`).join('\n\n')}
+`}
 
 ${config.standards.includes('csrd') ? `
-### CSRD Compliance Checklist
-- [ ] Double materiality assessment
-- [ ] Climate-related targets and transition plan
-- [ ] Scope 1, 2, 3 emissions disclosure
-- [ ] Value chain due diligence
-- [ ] Third-party assurance
+### ESRS Data Coverage
+
+| Standard | Topic | Status |
+|----------|-------|--------|
+| **E1** | Climate Change | ${hasEmissions ? 'Data available' : 'No data'} |
+| **S1** | Own Workforce | ${hasPeople ? 'Data available' : 'No data'} |
+| **G1** | Business Conduct | ${hasGov ? 'Data available' : 'No data'} |
 ` : ''}
 
 ---
 
-*Compliance assessment based on current reporting standards*
+*Compliance assessment based on platform data and reporting standards*
 `.trim(),
   };
 }
@@ -946,74 +1332,62 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
   // Always include title slide
   slides.push(buildTitleSlide(config, data));
 
-  // Executive summary (if selected or always include)
+  // Executive summary (always included)
   if (config.sections.includes('executive-summary') || config.sections.length === 0) {
     slides.push(buildExecutiveSummarySlide(config, data));
   }
 
-  // Company overview
-  if (config.sections.includes('company-overview')) {
-    slides.push(buildCompanyOverviewSlide(config, data));
-  }
+  // Audience-specific section ordering
+  const orderedSections = getAudienceOrderedSections(config.audience, config.sections);
 
-  // Emissions data
-  if (config.sections.includes('scope-1-2-3')) {
-    slides.push(...buildEmissionsSlides(config, data));
-  }
+  // Section dispatch map
+  const sectionBuilders: Record<string, () => SlideContent | SlideContent[]> = {
+    'company-overview': () => buildCompanyOverviewSlide(config, data),
+    'scope-1-2-3': () => buildEmissionsSlides(config, data),
+    'ghg-inventory': () => buildGHGInventorySlides(config, data),
+    'trends': () => buildTrendSlides(config, data),
+    'product-footprints': () => buildProductSlides(config, data),
+    'impact-valuation': () => buildImpactValuationSlides(config, data),
+    'supply-chain': () => buildSupplyChainSlides(config, data),
+    'facilities': () => buildFacilitiesSlide(config, data),
+    'people-culture': () => buildPeopleCultureSlides(config, data),
+    'governance': () => buildGovernanceSlides(config, data),
+    'community-impact': () => buildCommunityImpactSlides(config, data),
+    'targets': () => buildTargetsSlide(config, data),
+    'methodology': () => buildMethodologySlide(config, data),
+    'regulatory': () => buildRegulatorySlide(config, data),
+    'appendix': () => buildAppendixSlides(config, data),
+  };
 
-  // Facility emissions (always include if facilities exist)
-  if (data.facilities && data.facilities.length > 0) {
-    slides.push(...buildFacilitySlides(config, data));
-  }
+  for (const sectionId of orderedSections) {
+    // Skip executive-summary (already added above)
+    if (sectionId === 'executive-summary') continue;
 
-  // GHG Gas Inventory
-  if (config.sections.includes('ghg-inventory')) {
-    slides.push(...buildGHGInventorySlides(config, data));
-  }
+    // Special case: trends also triggered by multi-year + emissions
+    if (sectionId === 'trends' && !config.sections.includes('trends')) {
+      if (config.isMultiYear && config.sections.includes('scope-1-2-3')) {
+        slides.push(...buildTrendSlides(config, data));
+      }
+      continue;
+    }
 
-  // Multi-year trends (if multi-year mode enabled or trends section selected)
-  if ((config.isMultiYear && config.sections.includes('scope-1-2-3')) || config.sections.includes('trends')) {
-    slides.push(...buildTrendSlides(config, data));
-  }
+    // Special case: methodology included if any standards selected
+    if (sectionId === 'methodology' && !config.sections.includes('methodology') && config.standards.length > 0) {
+      slides.push(buildMethodologySlide(config, data));
+      continue;
+    }
 
-  // Product footprints
-  if (config.sections.includes('product-footprints')) {
-    slides.push(...buildProductSlides(config, data));
-  }
+    if (!config.sections.includes(sectionId)) continue;
 
-  // Impact Valuation
-  if (config.sections.includes('impact-valuation')) {
-    slides.push(...buildImpactValuationSlides(config, data));
-  }
+    const builder = sectionBuilders[sectionId];
+    if (!builder) continue;
 
-  // Supply chain
-  if (config.sections.includes('supply-chain')) {
-    slides.push(...buildSupplyChainSlides(config, data));
-  }
-
-  // Facilities (legacy section-based)
-  if (config.sections.includes('facilities')) {
-    slides.push(buildFacilitiesSlide(config, data));
-  }
-
-  // Targets & Action Plans
-  if (config.sections.includes('targets')) {
-    slides.push(buildTargetsSlide(config, data));
-  }
-
-  // Methodology
-  if (config.sections.includes('methodology') || config.standards.length > 0) {
-    slides.push(buildMethodologySlide(config, data));
-  }
-
-  // Regulatory Compliance
-  if (config.sections.includes('regulatory')) {
-    slides.push(buildRegulatorySlide(config, data));
-  }
-
-  // Technical Appendix
-  if (config.sections.includes('appendix')) {
-    slides.push(...buildAppendixSlides(config, data));
+    const result = builder();
+    if (Array.isArray(result)) {
+      slides.push(...result);
+    } else {
+      slides.push(result);
+    }
   }
 
   // Closing slide
@@ -1026,6 +1400,64 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
 
   // Convert to markdown format for SlideSpeak
   return slides.map(slide => slide.content).join('\n\n---\n\n');
+}
+
+/**
+ * Returns sections in audience-appropriate priority order.
+ * Sections not in the map are appended at the end in default order.
+ */
+function getAudienceOrderedSections(audience: string, selectedSections: string[]): string[] {
+  const AUDIENCE_SECTION_ORDER: Record<string, string[]> = {
+    'investors': [
+      'executive-summary', 'scope-1-2-3', 'trends', 'targets',
+      'impact-valuation', 'governance', 'product-footprints',
+      'people-culture', 'community-impact', 'supply-chain',
+      'facilities', 'company-overview', 'methodology', 'regulatory',
+      'ghg-inventory', 'appendix',
+    ],
+    'customers': [
+      'executive-summary', 'company-overview', 'community-impact',
+      'people-culture', 'product-footprints', 'impact-valuation',
+      'scope-1-2-3', 'governance', 'supply-chain', 'targets',
+      'facilities', 'trends', 'methodology', 'ghg-inventory',
+      'regulatory', 'appendix',
+    ],
+    'regulators': [
+      'executive-summary', 'methodology', 'scope-1-2-3',
+      'ghg-inventory', 'product-footprints', 'facilities',
+      'governance', 'people-culture', 'community-impact',
+      'supply-chain', 'regulatory', 'targets', 'trends',
+      'impact-valuation', 'company-overview', 'appendix',
+    ],
+    'internal': [
+      'executive-summary', 'scope-1-2-3', 'facilities',
+      'people-culture', 'targets', 'product-footprints',
+      'community-impact', 'governance', 'supply-chain',
+      'trends', 'impact-valuation', 'company-overview',
+      'methodology', 'ghg-inventory', 'regulatory', 'appendix',
+    ],
+    'supply-chain': [
+      'executive-summary', 'supply-chain', 'product-footprints',
+      'scope-1-2-3', 'facilities', 'people-culture',
+      'community-impact', 'governance', 'targets',
+      'trends', 'impact-valuation', 'company-overview',
+      'methodology', 'ghg-inventory', 'regulatory', 'appendix',
+    ],
+    'technical': [
+      'executive-summary', 'methodology', 'scope-1-2-3',
+      'ghg-inventory', 'product-footprints', 'facilities',
+      'people-culture', 'governance', 'community-impact',
+      'supply-chain', 'targets', 'trends', 'impact-valuation',
+      'company-overview', 'regulatory', 'appendix',
+    ],
+  };
+
+  const order = AUDIENCE_SECTION_ORDER[audience] || AUDIENCE_SECTION_ORDER['investors'];
+
+  // Return ordered list, including any sections not in the map at the end
+  const ordered = order.filter(s => selectedSections.includes(s));
+  const remaining = selectedSections.filter(s => !order.includes(s));
+  return [...ordered, ...remaining];
 }
 
 /**
@@ -1084,6 +1516,9 @@ export function calculateSlideCount(sections: string[]): number {
     'facilities': 1,
     'trends': 1,
     'targets': 1,
+    'people-culture': 3,
+    'governance': 2,
+    'community-impact': 2,
     'methodology': 1,
     'regulatory': 1,
     'appendix': 1,
@@ -1097,6 +1532,6 @@ export function calculateSlideCount(sections: string[]): number {
     count += sectionSlides[section] || 1;
   }
 
-  // Minimum 8 slides, maximum 20
-  return Math.max(8, Math.min(20, count));
+  // Minimum 8 slides, maximum 40
+  return Math.max(8, Math.min(40, count));
 }

@@ -131,6 +131,57 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
         recs['impact-valuation'] = { id: 'impact-valuation', priority: 'low', dataCompleteness: 0, rationale: 'No impact valuation calculated yet' };
       }
 
+      // People & Culture — check if scores exist
+      const { data: pcScore } = await supabase
+        .from('people_culture_scores')
+        .select('id, overall_score')
+        .eq('organization_id', orgId)
+        .order('calculated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (pcScore) {
+        recs['people-culture'] = { id: 'people-culture', priority: 'high', dataCompleteness: 80, rationale: 'People & Culture score data available' };
+      } else {
+        // Check if any raw data exists
+        const { count: compCount } = await supabase
+          .from('people_employee_compensation')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', orgId)
+          .eq('is_active', true);
+        recs['people-culture'] = { id: 'people-culture', priority: (compCount || 0) > 0 ? 'medium' : 'low', dataCompleteness: (compCount || 0) > 0 ? 40 : 0, rationale: (compCount || 0) > 0 ? 'Some workforce data available' : 'No people data captured yet' };
+      }
+
+      // Governance — check if mission or policies exist
+      const { data: govMission } = await supabase
+        .from('governance_mission')
+        .select('id')
+        .eq('organization_id', orgId)
+        .maybeSingle();
+      const { count: policyCount } = await supabase
+        .from('governance_policies')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', orgId);
+      const hasGovData = !!govMission || (policyCount || 0) > 0;
+      recs['governance'] = { id: 'governance', priority: hasGovData ? 'high' : 'low', dataCompleteness: hasGovData ? 70 : 0, rationale: hasGovData ? 'Governance data available' : 'No governance data captured yet' };
+
+      // Community Impact — check if scores or donations exist
+      const { data: ciScore } = await supabase
+        .from('community_impact_scores')
+        .select('id, overall_score')
+        .eq('organization_id', orgId)
+        .order('calculated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (ciScore) {
+        recs['community-impact'] = { id: 'community-impact', priority: 'high', dataCompleteness: 80, rationale: 'Community impact score data available' };
+      } else {
+        const { count: donationCount } = await supabase
+          .from('community_donations')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', orgId);
+        recs['community-impact'] = { id: 'community-impact', priority: (donationCount || 0) > 0 ? 'medium' : 'low', dataCompleteness: (donationCount || 0) > 0 ? 40 : 0, rationale: (donationCount || 0) > 0 ? 'Some community data available' : 'No community impact data yet' };
+      }
+
       setRecommendations(recs);
     } catch (error) {
       console.error('Error loading recommendations:', error);
