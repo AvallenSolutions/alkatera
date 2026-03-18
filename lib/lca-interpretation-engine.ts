@@ -61,6 +61,7 @@ interface MaterialRow {
   data_quality_tag: string | null;
   confidence_score: number | null;
   origin_country: string | null;
+  origin_country_code: string | null;
   methodology: string | null;
   source_reference: string | null;
 }
@@ -157,7 +158,11 @@ function runCompletenessCheck(
     // for PCF records aggregated before the key was normalised.
     const raw = breakdown[stage] ?? (stage === 'packaging' ? breakdown['packaging_stage'] : undefined);
     const value = Number(raw || 0);
-    const hasData = value !== 0; // Negative values (e.g. EoL recycling credits) are valid data
+    // A stage has data if its value is non-zero OR the key exists in the breakdown
+    // (meaning the stage was calculated, even if the result is legitimately 0,
+    // e.g. use phase with no refrigeration/carbonation)
+    const keyExists = stage in breakdown || (stage === 'packaging' && 'packaging_stage' in breakdown);
+    const hasData = value !== 0 || keyExists;
     const missingFlags: string[] = [];
 
     if (!hasData) {
@@ -300,23 +305,54 @@ function runConsistencyCheck(
     temporalIssues.push(`Reference year (${referenceYear}) is more than 2 years from current year`);
   }
 
-  // Geographic consistency
+  // Geographic consistency — use ISO country codes when available to avoid
+  // counting "New Zealand" and "NZ" as separate regions
   const regions = materials
-    .filter((m) => m.origin_country)
-    .map((m) => ({ material: m.material_name, region: m.origin_country! }));
+    .filter((m) => m.origin_country_code || m.origin_country)
+    .map((m) => ({
+      material: m.material_name,
+      region: m.origin_country_code?.toUpperCase() || m.origin_country!,
+    }));
 
   const geoIssues: string[] = [];
   const uniqueRegions = new Set(regions.map((r) => r.region));
   if (uniqueRegions.size > 5) {
-    geoIssues.push(`Materials sourced from ${uniqueRegions.size} different regions — verify regional emission factor consistency`);
+    geoIssues.push(`Materials sourced from ${uniqueRegions.size} different countries — verify regional emission factor consistency`);
   }
 
-  // Methodology consistency
-  const methodologies = new Set(materials.map((m) => m.methodology).filter(Boolean));
+  // Methodology consistency — normalise to core methodology family so that
+  // "ReCiPe 2016 Midpoint (H) / Ecoinvent 3.12" and "IPCC AR6 GWP100" are
+  // not flagged as conflicting (both are GWP100-based characterisation factors).
+  // Maturation and grid factor methodologies are auxiliary and excluded.
+  const AUXILIARY_METHODOLOGIES = [
+    'Cut-off allocation / Literature estimates',
+    'DEFRA 2025 grid factors',
+    'DEFRA grid factors',
+  ];
+  const coreMethodologies = new Set(
+    materials
+      .map((m) => m.methodology)
+      .filter((m): m is string => !!m && !AUXILIARY_METHODOLOGIES.some((aux) => m.startsWith(aux)))
+  );
+  // Normalise to family: extract the base method name before version details
+  const methodologyFamilies = new Set(
+    Array.from(coreMethodologies).map((m) => {
+      if (m.startsWith('ReCiPe')) return 'ReCiPe (GWP100)';
+      if (m.startsWith('IPCC')) return 'IPCC (GWP100)';
+      if (m.startsWith('EF 3')) return 'EF 3.x';
+      return m;
+    })
+  );
+  // ReCiPe and IPCC AR6 both use GWP100 characterisation — they're compatible
+  const gwp100Family = new Set(
+    Array.from(methodologyFamilies).map((f) =>
+      f === 'ReCiPe (GWP100)' || f === 'IPCC (GWP100)' ? 'GWP100' : f
+    )
+  );
   let methodologyConsistent = true;
-  if (methodologies.size > 1) {
+  if (gwp100Family.size > 1) {
     methodologyConsistent = false;
-    issues.push(`Multiple methodologies used: ${Array.from(methodologies).join(', ')}`);
+    issues.push(`Multiple methodologies used: ${Array.from(coreMethodologies).join(', ')}`);
   }
 
   // Check for mixed data sources

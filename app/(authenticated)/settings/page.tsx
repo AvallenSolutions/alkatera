@@ -100,6 +100,7 @@ export default function SettingsPage() {
       fetchOrganizationData()
       fetchPaymentMethod()
       fetchSubscriptionHistory()
+      fetchInvoices()
     }
   }, [currentOrganization])
 
@@ -151,6 +152,20 @@ export default function SettingsPage() {
       console.error('Error fetching subscription history:', error)
     } finally {
       setLoadingHistory(false)
+    }
+  }
+
+  async function fetchInvoices() {
+    if (!currentOrganization) return
+
+    try {
+      const response = await fetch(`/api/stripe/invoices?organizationId=${currentOrganization.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setInvoices(data.invoices || [])
+      }
+    } catch (error) {
+      console.error('Error fetching invoices:', error)
     }
   }
 
@@ -798,19 +813,17 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {organizationData?.subscription_started_at && subscriptionStatus === 'active' ? (
+                {subscriptionStatus === 'active' && (organizationData?.current_period_end || organizationData?.subscription_started_at) ? (
                   <div className="space-y-3">
                     <div className="flex items-baseline gap-2">
                       <span className="text-2xl font-bold">
-                        {new Date(
-                          new Date(organizationData.subscription_started_at).setMonth(
-                            new Date(organizationData.subscription_started_at).getMonth() + 1
-                          )
-                        ).toLocaleDateString('en-GB', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric'
-                        })}
+                        {organizationData.current_period_end
+                          ? new Date(organizationData.current_period_end).toLocaleDateString('en-GB', {
+                              day: 'numeric',
+                              month: 'long',
+                              year: 'numeric'
+                            })
+                          : 'Syncing with Stripe...'}
                       </span>
                     </div>
                     <Separator />
@@ -848,7 +861,7 @@ export default function SettingsPage() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Organisation Name</label>
-                    <p className="text-sm mt-1">{currentOrganization?.name || 'Not set'}</p>
+                    <p className="text-sm mt-1">{organizationData?.billing_name || currentOrganization?.name || 'Not set'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Billing Email</label>
@@ -860,10 +873,25 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Country</label>
-                    <p className="text-sm mt-1">{organizationData?.country || 'Not set'}</p>
+                    <p className="text-sm mt-1">{organizationData?.billing_address_country || organizationData?.country || 'Not set'}</p>
                   </div>
+                  {organizationData?.billing_address_line1 && (
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium text-muted-foreground">Billing Address</label>
+                      <p className="text-sm mt-1">
+                        {[
+                          organizationData.billing_address_line1,
+                          organizationData.billing_address_city,
+                          organizationData.billing_address_postal_code,
+                        ].filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <Separator />
+                <p className="text-xs text-muted-foreground">
+                  Changes made in Organisation settings are automatically synced to your Stripe billing account.
+                </p>
                 <Button variant="outline" asChild>
                   <Link href="/company/overview">Update Billing Details</Link>
                 </Button>

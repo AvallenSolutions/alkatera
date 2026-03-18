@@ -201,6 +201,26 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
 
       toast.success("Organisation details updated successfully");
 
+      // Sync billing details to Stripe (best-effort, non-blocking)
+      try {
+        await fetch('/api/stripe/billing-details', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationId: currentOrganization.id,
+            billingEmail: billingEmail.trim() || null,
+            billingName: name.trim(),
+            taxId: taxId.trim() || null,
+            address: address.trim() || null,
+            city: city.trim() || null,
+            country: country.trim() || null,
+          }),
+        });
+      } catch (syncError) {
+        // Stripe sync is best-effort; local save already succeeded
+        console.error('Failed to sync billing details to Stripe:', syncError);
+      }
+
       // Refresh the organization context
       if (refreshOrganizations) {
         await refreshOrganizations();

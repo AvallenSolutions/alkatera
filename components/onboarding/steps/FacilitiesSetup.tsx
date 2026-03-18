@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -38,6 +38,7 @@ export function FacilitiesSetup() {
   const [addressLat, setAddressLat] = useState<number | null>(null)
   const [addressLng, setAddressLng] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const savingRef = useRef(false)
 
   const handleLocationSelect = (location: LocationData) => {
     setLocationSearchValue(location.address)
@@ -51,6 +52,8 @@ export function FacilitiesSetup() {
 
   const handleSave = async () => {
     if (!currentOrganization || !facilityName.trim()) return
+    if (savingRef.current) return
+    savingRef.current = true
 
     setIsSaving(true)
     try {

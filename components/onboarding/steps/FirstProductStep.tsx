@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useOnboarding } from '@/lib/onboarding'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -39,9 +39,12 @@ export function FirstProductStep() {
   const [description, setDescription] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const savingRef = useRef(false)
 
   const handleSave = async () => {
     if (!currentOrganization || !productName.trim()) return
+    if (savingRef.current) return
+    savingRef.current = true
 
     setIsSaving(true)
     try {

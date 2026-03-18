@@ -170,20 +170,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const customerId = session.customer as string;
   const subscriptionId = session.subscription as string;
   // Get subscription details to get the price
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
   const priceId = subscription.items.data[0]?.price.id;
   if (!priceId) {
     console.error('ERROR: No price ID found in subscription');
     return;
   }
 
-  // Update organization using the database function
+  // Update organization using the database function (including current_period_end)
+  // In Stripe API v2025+, current_period_end is on subscription items, not the subscription
+  const itemPeriodEnd = subscription.items.data[0]?.current_period_end;
+  const currentPeriodEnd = itemPeriodEnd
+    ? new Date(itemPeriodEnd * 1000).toISOString()
+    : null;
+
   const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId,
     p_stripe_customer_id: customerId,
     p_stripe_subscription_id: subscriptionId,
     p_price_id: priceId,
     p_status: subscription.status,
+    p_current_period_end: currentPeriodEnd,
   });
 
   if (error) {
@@ -192,7 +199,39 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     console.error('  Details:', error.details);
     console.error('  Hint:', error.hint);
     console.error('  Full error:', JSON.stringify(error, null, 2));
-  } else {
+  }
+
+  // Import billing details from checkout session
+  try {
+    const billingUpdate: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (session.customer_details?.email) {
+      billingUpdate.billing_email = session.customer_details.email;
+    }
+    if (session.customer_details?.name) {
+      billingUpdate.billing_name = session.customer_details.name;
+    }
+    if (session.customer_details?.address) {
+      const addr = session.customer_details.address;
+      if (addr.line1) billingUpdate.billing_address_line1 = addr.line1;
+      if (addr.city) billingUpdate.billing_address_city = addr.city;
+      if (addr.country) billingUpdate.billing_address_country = addr.country;
+      if (addr.postal_code) billingUpdate.billing_address_postal_code = addr.postal_code;
+    }
+    if (session.customer_details?.tax_ids && session.customer_details.tax_ids.length > 0) {
+      billingUpdate.tax_id = session.customer_details.tax_ids[0].value;
+    }
+
+    if (Object.keys(billingUpdate).length > 1) {
+      await getSupabaseAdmin()
+        .from('organizations')
+        .update(billingUpdate)
+        .eq('id', organizationId);
+    }
+  } catch (billingError) {
+    console.error('Error importing billing details from checkout:', billingError);
   }
 }
 
@@ -234,13 +273,20 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const previousTier = currentOrg?.subscription_tier;
   const previousStatus = currentOrg?.subscription_status;
 
-  // Update organization using the database function
+  // Update organization using the database function (including current_period_end)
+  // In Stripe API v2025+, current_period_end is on subscription items, not the subscription
+  const subItemPeriodEnd = subscription.items.data[0]?.current_period_end;
+  const currentPeriodEnd = subItemPeriodEnd
+    ? new Date(subItemPeriodEnd * 1000).toISOString()
+    : null;
+
   const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId,
     p_stripe_customer_id: subscription.customer as string,
     p_stripe_subscription_id: subscription.id,
     p_price_id: priceId,
     p_status: subscription.status,
+    p_current_period_end: currentPeriodEnd,
   });
 
   if (error) {
@@ -447,6 +493,18 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 
   const wasInactive = org.subscription_status === 'suspended' || org.subscription_status === 'past_due';
 
+  // Fetch the latest subscription to get updated current_period_end
+  let periodEndUpdate: Record<string, any> = {};
+  try {
+    const freshSubscription = await stripe.subscriptions.retrieve(subscriptionId) as Stripe.Subscription;
+    const freshPeriodEnd = freshSubscription.items.data[0]?.current_period_end;
+    if (freshPeriodEnd) {
+      periodEndUpdate.current_period_end = new Date(freshPeriodEnd * 1000).toISOString();
+    }
+  } catch (subError) {
+    console.error('Error fetching subscription for period end update:', subError);
+  }
+
   // If organization was suspended or past_due, reactivate it
   if (wasInactive) {
     const { error } = await getSupabaseAdmin()
@@ -456,6 +514,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
         grace_period_end: null,
         grace_period_started_at: null,
         updated_at: new Date().toISOString(),
+        ...periodEndUpdate,
       })
       .eq('id', org.id);
 
@@ -469,7 +528,17 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       });
     }
   } else {
-    // Send payment receipt email for active orgs
+    // Update current_period_end and send payment receipt email
+    if (Object.keys(periodEndUpdate).length > 0) {
+      await getSupabaseAdmin()
+        .from('organizations')
+        .update({
+          updated_at: new Date().toISOString(),
+          ...periodEndUpdate,
+        })
+        .eq('id', org.id);
+    }
+
     await sendSubscriptionEmail(org.id, 'payment_succeeded', {
       amount: invoice.amount_paid,
       wasReactivated: false,

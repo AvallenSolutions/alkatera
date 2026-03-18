@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
         }
 
         // Check if renewal is within 7 days
-        const periodEnd = subscription.current_period_end;
+        // In Stripe API v2025+, current_period_end is on subscription items
+        const periodEnd = subscription.items.data[0]?.current_period_end;
         if (periodEnd > now && periodEnd <= sevenDaysFromNow) {
           const renewalDate = new Date(periodEnd * 1000);
           const amount = subscription.items.data[0]?.price?.unit_amount || 0;
