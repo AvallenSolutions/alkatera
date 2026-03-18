@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { stripe } from '@/lib/stripe-config';
 import type { Database } from '@/types/db_types';
+import { getMemberRole } from '../_helpers/get-member-role';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,14 +67,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify user is a member
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !member) {
+    const role = await getMemberRole(supabase, organizationId, user.id);
+    if (!role) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 });
     }
 
@@ -135,18 +130,12 @@ export async function PUT(request: NextRequest) {
     }
 
     // Verify user is admin/owner
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !member) {
+    const role = await getMemberRole(supabase, organizationId, user.id);
+    if (!role) {
       return NextResponse.json({ error: 'Not a member of this organisation' }, { status: 403 });
     }
 
-    if (member.role !== 'owner' && member.role !== 'admin') {
+    if (role !== 'owner' && role !== 'admin') {
       return NextResponse.json({ error: 'Only admins can update billing details' }, { status: 403 });
     }
 

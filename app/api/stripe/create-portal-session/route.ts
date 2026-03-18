@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { stripe } from '@/lib/stripe-config';
 import type { Database } from '@/types/db_types';
+import { getMemberRole } from '../_helpers/get-member-role';
 
 /**
  * Stripe Customer Portal Session
@@ -36,19 +37,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user is a member of the organization and has appropriate role
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !member) {
+    const role = await getMemberRole(supabase, organizationId, user.id);
+    if (!role) {
       return NextResponse.json({ error: 'Not a member of this organization' }, { status: 403 });
     }
 
     // Only owners and admins can manage billing
-    if (!['owner', 'admin'].includes(member.role)) {
+    if (!['owner', 'admin'].includes(role)) {
       return NextResponse.json(
         { error: 'Only owners and admins can manage billing' },
         { status: 403 }

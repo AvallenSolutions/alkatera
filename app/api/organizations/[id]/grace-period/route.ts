@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/db_types';
+import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role';
 
 /**
  * Get Grace Period Status
@@ -31,14 +32,8 @@ export async function GET(
     }
 
     // Verify user is a member of the organization
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !member) {
+    const role = await getMemberRole(supabase, organizationId, user.id);
+    if (!role) {
       return NextResponse.json({ error: 'Not a member of this organization' }, { status: 403 });
     }
 
@@ -106,14 +101,8 @@ export async function DELETE(
     }
 
     // Verify user is an admin or owner
-    const { data: member, error: memberError } = await supabase
-      .from('organization_members')
-      .select('role')
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .single();
-
-    if (memberError || !member || !['owner', 'admin'].includes(member.role)) {
+    const role = await getMemberRole(supabase, organizationId, user.id);
+    if (!role || !['owner', 'admin'].includes(role)) {
       return NextResponse.json(
         { error: 'Only owners and admins can clear grace periods' },
         { status: 403 }
