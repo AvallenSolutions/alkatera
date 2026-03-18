@@ -1326,7 +1326,7 @@ ${config.isMultiYear ? `- **Multi-year coverage:** ${(config.reportYears || []).
  * CRITICAL: This function is DETERMINISTIC. The same inputs always produce
  * the same outputs. No LLM interpretation of data values occurs here.
  */
-export function buildReportContent(config: ReportConfig, data: ReportData): string {
+export function buildReportContent(config: ReportConfig, data: ReportData, chartUrls?: Record<string, string>): string {
   const slides: SlideContent[] = [];
 
   // Always include title slide
@@ -1387,6 +1387,41 @@ export function buildReportContent(config: ReportConfig, data: ReportData): stri
       slides.push(...result);
     } else {
       slides.push(result);
+    }
+
+    // Inject chart images after relevant sections (PPTX only)
+    if (chartUrls) {
+      if (sectionId === 'scope-1-2-3' && chartUrls['scope-pie']) {
+        slides.push({
+          slideNumber: 0,
+          title: 'Emissions Breakdown Chart',
+          content: `# Emissions by Scope\n\n![Scope 1/2/3 Breakdown](${chartUrls['scope-pie']})`,
+        });
+      }
+      if (sectionId === 'trends' && chartUrls['emissions-trend']) {
+        slides.push({
+          slideNumber: 0,
+          title: 'Emissions Trend',
+          content: `# Emissions Trend\n\n![Multi-Year Emissions Trend](${chartUrls['emissions-trend']})`,
+        });
+      }
+      if (sectionId === 'product-footprints' && chartUrls['product-bar']) {
+        slides.push({
+          slideNumber: 0,
+          title: 'Product Impact Chart',
+          content: `# Product Carbon Footprints\n\n![Product Impact Comparison](${chartUrls['product-bar']})`,
+        });
+      }
+      if ((sectionId === 'people-culture' || sectionId === 'community-impact') && chartUrls['social-radar']) {
+        // Only add radar once (after the first social section)
+        if (sectionId === 'people-culture') {
+          slides.push({
+            slideNumber: 0,
+            title: 'Sustainability Scores',
+            content: `# Sustainability Pillar Scores\n\n![Sustainability Scores Radar](${chartUrls['social-radar']})`,
+          });
+        }
+      }
     }
   }
 

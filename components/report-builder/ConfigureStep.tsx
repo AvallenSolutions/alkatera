@@ -159,6 +159,28 @@ export function ConfigureStep({ config, onChange }: ConfigureStepProps) {
         )}
       </div>
 
+      {/* Output Format */}
+      <div className="space-y-2">
+        <Label htmlFor="outputFormat">Output Format</Label>
+        <Select
+          value={config.outputFormat}
+          onValueChange={(value: any) => onChange({ outputFormat: value })}
+        >
+          <SelectTrigger id="outputFormat">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="pptx">PowerPoint (PPTX)</SelectItem>
+            <SelectItem value="pdf">PDF Report</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-sm text-muted-foreground">
+          {config.outputFormat === 'pdf'
+            ? 'A branded PDF document with charts and tables, ideal for sharing and publishing.'
+            : 'A slide presentation generated via SlideSpeak, ideal for board meetings and stakeholder presentations.'}
+        </p>
+      </div>
+
       {/* Advanced Options */}
       <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
         <CollapsibleTrigger asChild>

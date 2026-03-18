@@ -152,31 +152,70 @@ export function useReportBuilder() {
         throw new Error('Failed to create report record: No data returned');
       }
 
-      // Return reportId immediately for progress tracking
-      // Edge function runs async — progress updates via Realtime
-      supabase.functions.invoke('generate-sustainability-report', {
-        body: { report_config_id: reportRecord.id },
-      }).then(async ({ data, error: functionError }) => {
-        if (functionError) {
-          console.error('Edge function error:', functionError);
+      if (config.outputFormat === 'pdf') {
+        // PDF: call the API route directly (synchronous generation)
+        // The PDF is generated server-side and the report record is updated on completion.
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
+
+        fetch(`/api/reports/${reportRecord.id}/generate-pdf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ inline: false }),
+        }).then(async (response) => {
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'PDF generation failed');
+          }
+          // PDF returned successfully - trigger download
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Sustainability_Report_${config.reportName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          a.remove();
+        }).catch(async (err) => {
+          console.error('PDF generation failed:', err);
           await supabase
             .from('generated_reports')
             .update({
               status: 'failed',
-              error_message: functionError.message || 'Unknown error',
+              error_message: err?.message || 'PDF generation failed',
             })
             .eq('id', reportRecord.id);
-        }
-      }).catch(async (err) => {
-        console.error('Edge function call failed:', err);
-        await supabase
-          .from('generated_reports')
-          .update({
-            status: 'failed',
-            error_message: err?.message || 'Edge function invocation failed',
-          })
-          .eq('id', reportRecord.id);
-      });
+        });
+      } else {
+        // PPTX: invoke edge function async — progress updates via Realtime
+        supabase.functions.invoke('generate-sustainability-report', {
+          body: { report_config_id: reportRecord.id },
+        }).then(async ({ data, error: functionError }) => {
+          if (functionError) {
+            console.error('Edge function error:', functionError);
+            await supabase
+              .from('generated_reports')
+              .update({
+                status: 'failed',
+                error_message: functionError.message || 'Unknown error',
+              })
+              .eq('id', reportRecord.id);
+          }
+        }).catch(async (err) => {
+          console.error('Edge function call failed:', err);
+          await supabase
+            .from('generated_reports')
+            .update({
+              status: 'failed',
+              error_message: err?.message || 'Edge function invocation failed',
+            })
+            .eq('id', reportRecord.id);
+        });
+      }
 
       // Auto-save defaults after generation
       saveDefaults(organizationId, config).catch(() => {});
