@@ -11,6 +11,9 @@ import {
   Loader2,
   ArrowLeft,
   Clock,
+  Upload,
+  X,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -91,6 +94,8 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
   const [billingEmail, setBillingEmail] = useState("");
   const [taxId, setTaxId] = useState("");
   const [productType, setProductType] = useState("");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [fyStartMonth, setFyStartMonth] = useState("1");
   const [defaultCadence, setDefaultCadence] = useState("monthly");
 
@@ -127,6 +132,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
       setBillingEmail(orgInfo.billing_email || "");
       setTaxId(orgInfo.tax_id || "");
       setProductType(orgInfo.product_type || "");
+      setLogoUrl(orgInfo.logo_url || null);
 
       // Load reporting period settings from report_defaults
       const reportingPeriod = orgInfo.report_defaults?.reporting_period;
@@ -138,6 +144,52 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
     } finally {
       setIsLoading(false);
     }
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Logo must be under 5MB');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${currentOrganization?.id || 'org'}-${Date.now()}.${fileExt}`;
+      const filePath = `logos/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('report-assets')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+      if (error) {
+        toast.error(`Upload failed: ${error.message}`);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('report-assets')
+        .getPublicUrl(data.path);
+
+      setLogoUrl(urlData.publicUrl);
+      toast.success('Logo uploaded. Click Save Changes to apply.');
+    } catch (error: any) {
+      console.error('Logo upload error:', error);
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  function handleRemoveLogo() {
+    setLogoUrl(null);
+    toast.info('Logo removed. Click Save Changes to apply.');
   }
 
   async function handleSave() {
@@ -177,6 +229,7 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
         company_size: companySize || null,
         billing_email: billingEmail.trim() || null,
         product_type: productType || null,
+        logo_url: logoUrl,
         report_defaults: updatedReportDefaults,
         updated_at: new Date().toISOString(),
       };
@@ -283,6 +336,63 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
                 placeholder="Your company name"
                 disabled={isSaving}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Organisation Logo</Label>
+              {logoUrl ? (
+                <div className="flex items-center gap-4">
+                  <img
+                    src={logoUrl}
+                    alt="Organisation logo"
+                    className="h-16 w-16 rounded-lg object-contain border bg-white p-1"
+                  />
+                  <div className="flex gap-2">
+                    <label htmlFor="logo-upload-org" className="cursor-pointer">
+                      <Button variant="outline" size="sm" asChild disabled={uploadingLogo || isSaving}>
+                        <span>
+                          {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Upload className="h-4 w-4 mr-1" />}
+                          Change
+                        </span>
+                      </Button>
+                    </label>
+                    <Button variant="ghost" size="sm" onClick={handleRemoveLogo} disabled={isSaving}>
+                      <X className="h-4 w-4 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                  <input
+                    type="file"
+                    id="logo-upload-org"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    disabled={uploadingLogo || isSaving}
+                  />
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
+                  <input
+                    type="file"
+                    id="logo-upload-org"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    disabled={uploadingLogo || isSaving}
+                  />
+                  <label htmlFor="logo-upload-org" className="cursor-pointer flex items-center gap-3">
+                    {uploadingLogo ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">Upload logo</p>
+                      <p className="text-xs text-muted-foreground">PNG, JPG or SVG, max 5MB</p>
+                    </div>
+                  </label>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
