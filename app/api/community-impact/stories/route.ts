@@ -117,6 +117,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user's current organization from metadata or first membership
+    let organizationId = user.user_metadata?.current_organization_id;
+
+    if (!organizationId) {
+      const { data: membership, error: memberError } = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (memberError || !membership) {
+        return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+      }
+      organizationId = membership.organization_id;
+    }
+
     const body = await request.json();
 
     if (!body.id) {
@@ -150,6 +167,7 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 

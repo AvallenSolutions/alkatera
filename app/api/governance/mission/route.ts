@@ -61,11 +61,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    // Insert record
+    // Upsert record (one mission record per organisation)
+    const resolvedOrgId = body.organization_id || organizationId;
     const { data, error } = await supabase
       .from('governance_mission')
-      .insert({
-        organization_id: body.organization_id || organizationId,
+      .upsert({
+        organization_id: resolvedOrgId,
         mission_statement: body.mission_statement,
         mission_last_updated: body.mission_last_updated,
         vision_statement: body.vision_statement,
@@ -79,7 +80,8 @@ export async function POST(request: NextRequest) {
         articles_last_amended: body.articles_last_amended,
         sdg_commitments: body.sdg_commitments,
         climate_commitments: body.climate_commitments,
-      })
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'organization_id' })
       .select()
       .single();
 
