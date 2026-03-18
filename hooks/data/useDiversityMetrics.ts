@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useOrganization } from '@/lib/organizationContext';
+import { formatPeriodRange } from '@/lib/reporting-period-utils';
 
 export interface WorkforceDemographics {
   id: string;
   organization_id: string;
   reporting_period: string;
+  reporting_period_start: string | null;
+  reporting_period_end: string | null;
   reporting_year: number;
   total_employees: number;
   total_fte: number | null;
@@ -62,6 +65,16 @@ export interface GenderRepresentation {
   female_percentage: number;
 }
 
+export interface PeriodChanges {
+  total_employees: { delta: number; percentage: number | null };
+  female_percentage: { delta: number; percentage: number | null };
+  turnover_rate: { delta: number; percentage: number | null };
+  new_hires: { delta: number; percentage: number | null };
+  departures: { delta: number; percentage: number | null };
+  previous_period_label: string | null;
+  current_period_label: string | null;
+}
+
 export interface DiversityMetrics {
   demographics: WorkforceDemographics | null;
   demographics_history: WorkforceDemographics[];
@@ -75,11 +88,14 @@ export interface DiversityMetrics {
   gender_representation: GenderRepresentation[];
   representation_trends: {
     period: string;
+    period_start: string | null;
+    period_end: string | null;
     female_percentage: number;
     total_employees: number;
   }[];
   turnover_rate: number | null;
   voluntary_turnover_rate: number | null;
+  period_changes: PeriodChanges | null;
 }
 
 export function useDiversityMetrics(year?: number) {
@@ -101,26 +117,56 @@ export function useDiversityMetrics(year?: number) {
       const currentYear = year || new Date().getFullYear();
 
       // Fetch latest demographics
-      const { data: latestDemographics, error: demoError } = await supabase
+      // Try ordering by reporting_period_start first; fall back to reporting_period
+      // if the column hasn't been added by migration yet
+      let latestDemographics: WorkforceDemographics | null = null;
+      let demographicsHistory: WorkforceDemographics[] = [];
+
+      const { data: latestData, error: demoError } = await supabase
         .from('people_workforce_demographics')
         .select('*')
         .eq('organization_id', currentOrganization.id)
+        .order('reporting_period_start', { ascending: false, nullsFirst: false })
         .order('reporting_period', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (demoError && demoError.code !== 'PGRST116') throw demoError;
+      if (demoError && demoError.code !== 'PGRST116') {
+        // Column may not exist yet; retry with old ordering
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('people_workforce_demographics')
+          .select('*')
+          .eq('organization_id', currentOrganization.id)
+          .order('reporting_period', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (fallbackError && fallbackError.code !== 'PGRST116') throw fallbackError;
+        latestDemographics = fallbackData;
+      } else {
+        latestDemographics = latestData;
+      }
 
       // Fetch demographics history for trends
-      const { data: demographicsHistory, error: historyError } = await supabase
+      const { data: historyData, error: historyError } = await supabase
         .from('people_workforce_demographics')
         .select('*')
         .eq('organization_id', currentOrganization.id)
+        .order('reporting_period_start', { ascending: false, nullsFirst: false })
         .order('reporting_period', { ascending: false })
         .limit(12);
 
       if (historyError && historyError.code !== 'PGRST116') {
-        console.warn('Error fetching demographics history:', historyError);
+        // Fallback ordering
+        const { data: fallbackHistory } = await supabase
+          .from('people_workforce_demographics')
+          .select('*')
+          .eq('organization_id', currentOrganization.id)
+          .order('reporting_period', { ascending: false })
+          .limit(12);
+        demographicsHistory = fallbackHistory || [];
+      } else {
+        demographicsHistory = historyData || [];
       }
 
       // Fetch DEI actions
@@ -185,8 +231,16 @@ export function useDiversityMetrics(year?: number) {
         const female = genderData.female || 0;
         const total = demo.total_employees || 1;
 
+        // Build period label from date range or fallback to single date
+        let periodLabel = demo.reporting_period || '';
+        if (demo.reporting_period_start && demo.reporting_period_end) {
+          periodLabel = formatPeriodRange(demo.reporting_period_start, demo.reporting_period_end);
+        }
+
         return {
-          period: demo.reporting_period,
+          period: periodLabel,
+          period_start: demo.reporting_period_start || null,
+          period_end: demo.reporting_period_end || null,
           female_percentage: (female / total) * 100,
           total_employees: total,
         };
@@ -204,6 +258,45 @@ export function useDiversityMetrics(year?: number) {
         }
       }
 
+      // Calculate period-over-period changes
+      let periodChanges: PeriodChanges | null = null;
+      if (history.length >= 2) {
+        const current = history[0]; // most recent
+        const previous = history[1]; // second most recent
+
+        const currentFemale = (current.gender_data?.female || 0) / (current.total_employees || 1) * 100;
+        const previousFemale = (previous.gender_data?.female || 0) / (previous.total_employees || 1) * 100;
+
+        const currentTurnover = current.total_employees > 0
+          ? (current.departures / current.total_employees) * 100 : 0;
+        const previousTurnover = previous.total_employees > 0
+          ? (previous.departures / previous.total_employees) * 100 : 0;
+
+        const calcChange = (curr: number, prev: number) => ({
+          delta: curr - prev,
+          percentage: prev !== 0 ? ((curr - prev) / prev) * 100 : null,
+        });
+
+        let currentLabel: string | null = null;
+        if (current.reporting_period_start && current.reporting_period_end) {
+          currentLabel = formatPeriodRange(current.reporting_period_start, current.reporting_period_end);
+        }
+        let previousLabel: string | null = null;
+        if (previous.reporting_period_start && previous.reporting_period_end) {
+          previousLabel = formatPeriodRange(previous.reporting_period_start, previous.reporting_period_end);
+        }
+
+        periodChanges = {
+          total_employees: calcChange(current.total_employees, previous.total_employees),
+          female_percentage: calcChange(currentFemale, previousFemale),
+          turnover_rate: calcChange(currentTurnover, previousTurnover),
+          new_hires: calcChange(current.new_hires || 0, previous.new_hires || 0),
+          departures: calcChange(current.departures || 0, previous.departures || 0),
+          current_period_label: currentLabel,
+          previous_period_label: previousLabel,
+        };
+      }
+
       setMetrics({
         demographics: latestDemographics || null,
         demographics_history: history,
@@ -213,6 +306,7 @@ export function useDiversityMetrics(year?: number) {
         representation_trends: representationTrends,
         turnover_rate: turnoverRate,
         voluntary_turnover_rate: voluntaryTurnoverRate,
+        period_changes: periodChanges,
       });
 
     } catch (err) {

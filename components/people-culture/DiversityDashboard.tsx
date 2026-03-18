@@ -13,9 +13,15 @@ import {
   Clock,
   AlertCircle,
   TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Calendar,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { DiversityMetrics, DEIAction, GenderRepresentation } from '@/hooks/data/useDiversityMetrics';
+import { formatPeriodRange } from '@/lib/reporting-period-utils';
+import type { DiversityMetrics, DEIAction, GenderRepresentation, PeriodChanges } from '@/hooks/data/useDiversityMetrics';
 
 interface DiversityDashboardProps {
   metrics: DiversityMetrics | null;
@@ -38,6 +44,61 @@ const CATEGORY_LABELS: Record<string, string> = {
   accessibility: 'Accessibility',
   policy: 'Policy',
 };
+
+function ChangeIndicator({ delta, percentage, invertColor = false }: {
+  delta: number;
+  percentage: number | null;
+  invertColor?: boolean;
+}) {
+  if (delta === 0) {
+    return (
+      <span className="flex items-center text-xs text-muted-foreground">
+        <Minus className="h-3 w-3 mr-0.5" />
+        No change
+      </span>
+    );
+  }
+
+  const isPositive = delta > 0;
+  // For some metrics (like turnover), positive = bad, so we invert the colour
+  const isGood = invertColor ? !isPositive : isPositive;
+
+  return (
+    <span className={cn(
+      'flex items-center text-xs font-medium',
+      isGood ? 'text-emerald-600' : 'text-red-600'
+    )}>
+      {isPositive ? (
+        <ArrowUpRight className="h-3 w-3 mr-0.5" />
+      ) : (
+        <ArrowDownRight className="h-3 w-3 mr-0.5" />
+      )}
+      {percentage !== null ? `${Math.abs(percentage).toFixed(1)}%` : `${Math.abs(delta).toFixed(1)}`}
+    </span>
+  );
+}
+
+function ReportingPeriodBadge({ demographics }: { demographics: DiversityMetrics['demographics'] }) {
+  if (!demographics) return null;
+
+  let periodLabel: string;
+  if (demographics.reporting_period_start && demographics.reporting_period_end) {
+    periodLabel = formatPeriodRange(demographics.reporting_period_start, demographics.reporting_period_end);
+  } else if (demographics.reporting_period) {
+    periodLabel = new Date(demographics.reporting_period).toLocaleDateString('en-GB', {
+      month: 'short', year: 'numeric'
+    });
+  } else {
+    return null;
+  }
+
+  return (
+    <Badge variant="outline" className="gap-1 text-xs">
+      <Calendar className="h-3 w-3" />
+      {periodLabel}
+    </Badge>
+  );
+}
 
 function GenderBreakdownChart({ data }: { data: Record<string, number> }) {
   const total = Object.values(data).reduce((sum, val) => sum + val, 0);
@@ -193,11 +254,13 @@ function TurnoverCard({
   voluntaryTurnoverRate,
   newHires,
   departures,
+  periodChanges,
 }: {
   turnoverRate: number | null;
   voluntaryTurnoverRate: number | null;
   newHires: number;
   departures: number;
+  periodChanges: PeriodChanges | null;
 }) {
   return (
     <Card>
@@ -211,31 +274,97 @@ function TurnoverCard({
             <UserPlus className="h-6 w-6 mx-auto text-emerald-600" />
             <p className="text-2xl font-bold mt-2">{newHires}</p>
             <p className="text-xs text-muted-foreground">New Hires</p>
+            {periodChanges && (
+              <div className="mt-1">
+                <ChangeIndicator
+                  delta={periodChanges.new_hires.delta}
+                  percentage={periodChanges.new_hires.percentage}
+                />
+              </div>
+            )}
           </div>
           <div className="text-center p-4 rounded-lg bg-red-50 dark:bg-red-950/30">
             <UserMinus className="h-6 w-6 mx-auto text-red-600" />
             <p className="text-2xl font-bold mt-2">{departures}</p>
             <p className="text-xs text-muted-foreground">Departures</p>
+            {periodChanges && (
+              <div className="mt-1">
+                <ChangeIndicator
+                  delta={periodChanges.departures.delta}
+                  percentage={periodChanges.departures.percentage}
+                  invertColor
+                />
+              </div>
+            )}
           </div>
         </div>
 
         <div className="mt-4 space-y-3">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Total Turnover Rate</span>
-            <span className="font-medium">
-              {turnoverRate !== null ? `${turnoverRate.toFixed(1)}%` : '—'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">
+                {turnoverRate !== null ? `${turnoverRate.toFixed(1)}%` : '\u2014'}
+              </span>
+              {periodChanges && (
+                <ChangeIndicator
+                  delta={periodChanges.turnover_rate.delta}
+                  percentage={null}
+                  invertColor
+                />
+              )}
+            </div>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Voluntary Turnover</span>
             <span className="font-medium">
-              {voluntaryTurnoverRate !== null ? `${voluntaryTurnoverRate.toFixed(1)}%` : '—'}
+              {voluntaryTurnoverRate !== null ? `${voluntaryTurnoverRate.toFixed(1)}%` : '\u2014'}
             </span>
           </div>
         </div>
 
         <div className="mt-4 text-xs text-muted-foreground">
           <p>Industry average turnover: ~15-20% annually</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PeriodComparisonCard({ changes }: { changes: PeriodChanges }) {
+  const metrics = [
+    { label: 'Total Employees', ...changes.total_employees },
+    { label: 'Female Representation', ...changes.female_percentage, suffix: 'pp' },
+    { label: 'New Hires', ...changes.new_hires },
+    { label: 'Departures', ...changes.departures, invertColor: true },
+    { label: 'Turnover Rate', ...changes.turnover_rate, suffix: 'pp', invertColor: true },
+  ];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <TrendingUp className="h-4 w-4" />
+          Period Comparison
+        </CardTitle>
+        <CardDescription>
+          {changes.current_period_label && changes.previous_period_label
+            ? `${changes.current_period_label} vs ${changes.previous_period_label}`
+            : 'Current vs previous reporting period'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {metrics.map((m) => (
+            <div key={m.label} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+              <span className="text-sm text-muted-foreground">{m.label}</span>
+              <ChangeIndicator
+                delta={m.delta}
+                percentage={m.percentage}
+                invertColor={'invertColor' in m ? (m as { invertColor: boolean }).invertColor : false}
+              />
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -275,10 +404,24 @@ export function DiversityDashboard({ metrics, isLoading }: DiversityDashboardPro
     );
   }
 
-  const { demographics, dei_actions, dei_summary, gender_representation, turnover_rate, voluntary_turnover_rate } = metrics;
+  const { demographics, dei_actions, dei_summary, gender_representation, turnover_rate, voluntary_turnover_rate, period_changes } = metrics;
 
   return (
     <div className="space-y-6">
+      {/* Reporting Period Badge */}
+      {demographics && (
+        <div className="flex items-center gap-2">
+          <ReportingPeriodBadge demographics={demographics} />
+          {demographics.created_at && (
+            <span className="text-xs text-muted-foreground">
+              Data entered: {new Date(demographics.created_at).toLocaleDateString('en-GB', {
+                day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+              })}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Summary Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -290,6 +433,12 @@ export function DiversityDashboard({ metrics, isLoading }: DiversityDashboardPro
               <div>
                 <p className="text-sm text-muted-foreground">Total Employees</p>
                 <p className="text-2xl font-bold">{demographics?.total_employees || 0}</p>
+                {period_changes && (
+                  <ChangeIndicator
+                    delta={period_changes.total_employees.delta}
+                    percentage={period_changes.total_employees.percentage}
+                  />
+                )}
               </div>
             </div>
           </CardContent>
@@ -332,7 +481,7 @@ export function DiversityDashboard({ metrics, isLoading }: DiversityDashboardPro
               <div>
                 <p className="text-sm text-muted-foreground">Response Rate</p>
                 <p className="text-2xl font-bold">
-                  {demographics?.response_rate ? `${demographics.response_rate.toFixed(0)}%` : '—'}
+                  {demographics?.response_rate ? `${demographics.response_rate.toFixed(0)}%` : '\u2014'}
                 </p>
               </div>
             </div>
@@ -369,10 +518,16 @@ export function DiversityDashboard({ metrics, isLoading }: DiversityDashboardPro
           voluntaryTurnoverRate={voluntary_turnover_rate}
           newHires={demographics?.new_hires || 0}
           departures={demographics?.departures || 0}
+          periodChanges={period_changes}
         />
+
+        {/* Period Comparison */}
+        {period_changes && (
+          <PeriodComparisonCard changes={period_changes} />
+        )}
       </div>
     </div>
   );
 }
 
-export { GenderBreakdownChart, RepresentationCard, DEIActionsCard, TurnoverCard };
+export { GenderBreakdownChart, RepresentationCard, DEIActionsCard, TurnoverCard, PeriodComparisonCard, ChangeIndicator, ReportingPeriodBadge };

@@ -163,6 +163,8 @@ export async function POST(request: NextRequest) {
       effective_from: body.effective_from || null,
       effective_to: body.effective_to || null,
       reporting_year: body.reporting_year || new Date().getFullYear(),
+      reporting_period_start: body.reporting_period_start || null,
+      reporting_period_end: body.reporting_period_end || null,
     };
 
     const { data, error } = await supabase

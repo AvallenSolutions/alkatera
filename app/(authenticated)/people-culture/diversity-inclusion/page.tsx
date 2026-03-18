@@ -20,15 +20,18 @@ import {
   UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
+import { type DateRange } from 'react-day-picker';
 
 import { DiversityDashboard } from '@/components/people-culture/DiversityDashboard';
 import { useDiversityMetrics } from '@/hooks/data/useDiversityMetrics';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { getReportingPeriodPresets } from '@/lib/reporting-period-utils';
 
 function AddDemographicsDialog({ onSuccess }: { onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [formData, setFormData] = useState({
-    reporting_period: new Date().toISOString().split('T')[0],
     total_employees: '',
     male: '',
     female: '',
@@ -39,9 +42,16 @@ function AddDemographicsDialog({ onSuccess }: { onSuccess: () => void }) {
     voluntary_departures: '',
     response_rate: '',
   });
+  const periodPresets = getReportingPeriodPresets(new Date().getFullYear());
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!dateRange?.from || !dateRange?.to) {
+      alert('Please select a reporting period date range');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -64,12 +74,15 @@ function AddDemographicsDialog({ onSuccess }: { onSuccess: () => void }) {
         not_disclosed: parseInt(formData.not_disclosed) || 0,
       };
 
+      const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
       const response = await fetch('/api/people-culture/demographics', {
         method: 'POST',
         headers,
         credentials: 'include',
         body: JSON.stringify({
-          reporting_period: formData.reporting_period,
+          reporting_period_start: formatDate(dateRange.from),
+          reporting_period_end: formatDate(dateRange.to),
           total_employees: parseInt(formData.total_employees) || 0,
           gender_data: genderData,
           new_hires: parseInt(formData.new_hires) || 0,
@@ -112,27 +125,25 @@ function AddDemographicsDialog({ onSuccess }: { onSuccess: () => void }) {
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="reporting_period">Reporting Period *</Label>
-                <Input
-                  id="reporting_period"
-                  type="date"
-                  value={formData.reporting_period}
-                  onChange={(e) => setFormData({ ...formData, reporting_period: e.target.value })}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="total_employees">Total Employees *</Label>
-                <Input
-                  id="total_employees"
-                  type="number"
-                  value={formData.total_employees}
-                  onChange={(e) => setFormData({ ...formData, total_employees: e.target.value })}
-                  required
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Reporting Period *</Label>
+              <DateRangePicker
+                value={dateRange}
+                onChange={setDateRange}
+                placeholder="Select reporting period"
+                presets={periodPresets}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="total_employees">Total Employees *</Label>
+              <Input
+                id="total_employees"
+                type="number"
+                value={formData.total_employees}
+                onChange={(e) => setFormData({ ...formData, total_employees: e.target.value })}
+                required
+              />
             </div>
 
             <div className="space-y-2">

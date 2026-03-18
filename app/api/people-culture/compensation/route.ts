@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
     // Parse query params
     const searchParams = request.nextUrl.searchParams;
     const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : new Date().getFullYear();
+    const periodStart = searchParams.get('period_start');
+    const periodEnd = searchParams.get('period_end');
     const department = searchParams.get('department');
     const employmentType = searchParams.get('employment_type');
     const limit = parseInt(searchParams.get('limit') || '100');
@@ -44,10 +46,17 @@ export async function GET(request: NextRequest) {
       .from('people_employee_compensation')
       .select('*', { count: 'exact' })
       .eq('organization_id', organizationId)
-      .eq('reporting_year', year)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (periodStart && periodEnd) {
+      query = query
+        .gte('reporting_period_start', periodStart)
+        .lte('reporting_period_end', periodEnd);
+    } else {
+      query = query.eq('reporting_year', year);
+    }
 
     if (department) {
       query = query.eq('department', department);
@@ -145,6 +154,8 @@ export async function POST(request: NextRequest) {
       bonus_received: body.bonus_received || false,
       gender: body.gender || null,
       reporting_year: body.reporting_year || new Date().getFullYear(),
+      reporting_period_start: body.reporting_period_start || null,
+      reporting_period_end: body.reporting_period_end || null,
       effective_date: body.effective_date || new Date().toISOString().split('T')[0],
       data_source: body.data_source || 'manual',
       is_active: true,
@@ -215,7 +226,8 @@ export async function PUT(request: NextRequest) {
       'employment_type', 'contract_type', 'work_location', 'work_country',
       'work_region', 'is_remote', 'annual_salary', 'hourly_rate', 'currency',
       'hours_per_week', 'bonus_amount', 'bonus_received', 'gender',
-      'reporting_year', 'effective_date',
+      'reporting_year', 'reporting_period_start', 'reporting_period_end',
+      'effective_date',
     ];
 
     const updateData: Record<string, unknown> = {};

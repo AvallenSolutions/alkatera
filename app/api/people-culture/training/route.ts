@@ -33,6 +33,8 @@ export async function GET(request: NextRequest) {
     // Parse query params
     const searchParams = request.nextUrl.searchParams;
     const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : new Date().getFullYear();
+    const periodStart = searchParams.get('period_start');
+    const periodEnd = searchParams.get('period_end');
     const trainingType = searchParams.get('type');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
@@ -42,10 +44,17 @@ export async function GET(request: NextRequest) {
       .from('people_training_records')
       .select('*', { count: 'exact' })
       .eq('organization_id', organizationId)
-      .eq('reporting_year', year)
       .order('completion_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    if (periodStart && periodEnd) {
+      query = query
+        .gte('reporting_period_start', periodStart)
+        .lte('reporting_period_end', periodEnd);
+    } else {
+      query = query.eq('reporting_year', year);
+    }
 
     if (trainingType) {
       query = query.eq('training_type', trainingType);
@@ -156,6 +165,8 @@ export async function POST(request: NextRequest) {
       start_date: body.start_date || null,
       completion_date: body.completion_date || null,
       reporting_year: body.reporting_year || new Date().getFullYear(),
+      reporting_period_start: body.reporting_period_start || null,
+      reporting_period_end: body.reporting_period_end || null,
       certification_awarded: body.certification_awarded || false,
       certification_name: body.certification_name || null,
       cost_per_participant: body.cost_per_participant || null,

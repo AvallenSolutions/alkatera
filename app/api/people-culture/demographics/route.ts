@@ -35,14 +35,22 @@ export async function GET(request: NextRequest) {
     const year = searchParams.get('year') ? parseInt(searchParams.get('year')!) : null;
     const includeTrends = searchParams.get('trends') === 'true';
 
+    // Date range filtering
+    const periodStart = searchParams.get('period_start');
+    const periodEnd = searchParams.get('period_end');
+
     // Build query
     let query = supabase
       .from('people_workforce_demographics')
       .select('*')
       .eq('organization_id', organizationId)
-      .order('reporting_period', { ascending: false });
+      .order('reporting_period_start', { ascending: false });
 
-    if (year) {
+    if (periodStart && periodEnd) {
+      query = query
+        .gte('reporting_period_start', periodStart)
+        .lte('reporting_period_end', periodEnd);
+    } else if (year) {
       query = query.eq('reporting_year', year);
     }
 
@@ -100,19 +108,32 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate required fields
-    if (!body.reporting_period) {
+    if (!body.reporting_period_start && !body.reporting_period) {
       return NextResponse.json({ error: 'Reporting period is required' }, { status: 400 });
     }
     if (body.total_employees === undefined || body.total_employees === null) {
       return NextResponse.json({ error: 'Total employees is required' }, { status: 400 });
     }
 
+    // Resolve date range: prefer explicit start/end, fall back to single date
+    const periodStart = body.reporting_period_start || body.reporting_period;
+    const periodEnd = body.reporting_period_end || body.reporting_period;
+
+    if (new Date(periodStart) > new Date(periodEnd)) {
+      return NextResponse.json(
+        { error: 'Reporting period start must be before or equal to end' },
+        { status: 400 }
+      );
+    }
+
     // Prepare record data
-    const reportingDate = new Date(body.reporting_period);
+    const reportingDate = new Date(periodStart);
     const recordData = {
       organization_id: organizationId,
       created_by: user.id,
-      reporting_period: body.reporting_period,
+      reporting_period_start: periodStart,
+      reporting_period_end: periodEnd,
+      reporting_period: periodEnd, // backward compat
       reporting_year: body.reporting_year || reportingDate.getFullYear(),
       total_employees: body.total_employees,
       total_fte: body.total_fte || null,
