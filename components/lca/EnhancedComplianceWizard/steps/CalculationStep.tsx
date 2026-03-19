@@ -1,13 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
 import {
   CheckCircle2,
   Loader2,
   Calculator,
   Info,
+  Pin,
 } from 'lucide-react';
 import {
   OperationOverlay,
@@ -17,6 +19,7 @@ import { calculateProductLCA } from '@/lib/product-lca-calculator';
 import { getBoundaryLabel } from '@/lib/system-boundaries';
 import { toast } from 'sonner';
 import { useWizardContext, getStepIdsForBoundary } from '../WizardContext';
+import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 
 // ============================================================================
 // MAIN COMPONENT
@@ -32,6 +35,27 @@ export function CalculationStep() {
     goToStep,
     showGuide,
   } = useWizardContext();
+
+  // Pinned-mode state: re-use emission factors from a previous calculation
+  const [usePinnedFactors, setUsePinnedFactors] = useState(false);
+  const [previousPcfId, setPreviousPcfId] = useState<string | null>(null);
+
+  // Check for a previous completed PCF for this product
+  useEffect(() => {
+    if (!productId) return;
+    const supabase = getSupabaseBrowserClient();
+    supabase
+      .from('product_carbon_footprints')
+      .select('id')
+      .eq('product_id', productId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.id) setPreviousPcfId(data.id);
+      });
+  }, [productId]);
 
   // Compute step numbers for navigation links
   const stepIds = getStepIdsForBoundary(formData.systemBoundary || 'cradle-to-gate', showGuide);
@@ -118,6 +142,7 @@ export function CalculationStep() {
         eolConfig: formData.eolConfig,
         distributionConfig: formData.distributionConfig,
         productLossConfig: formData.productLossConfig,
+        pinnedPcfId: usePinnedFactors && previousPcfId ? previousPcfId : undefined,
         onProgress: (step: string, percent: number) => {
           setPreCalcState((prev) => ({
             ...prev,
@@ -233,6 +258,28 @@ export function CalculationStep() {
             <p className="font-medium">{new Date().getFullYear()}</p>
           </div>
         </div>
+
+        {/* Pinned-mode toggle: re-use factors from previous calculation */}
+        {previousPcfId && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
+            <Switch
+              checked={usePinnedFactors}
+              onCheckedChange={setUsePinnedFactors}
+              id="pinned-factors"
+            />
+            <label htmlFor="pinned-factors" className="flex-1 cursor-pointer">
+              <div className="flex items-center gap-1.5">
+                <Pin className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-sm font-medium">Use pinned emission factors</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Re-use the exact same emission factor values from the previous calculation
+                for deterministic comparison. Useful for verifying that results are
+                consistent when no data has changed.
+              </p>
+            </label>
+          </div>
+        )}
       </div>
 
       {!canCalculate && (

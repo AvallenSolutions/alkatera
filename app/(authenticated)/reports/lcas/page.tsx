@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,8 @@ export default function LcasPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [reports, setReports] = useState<LCAReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPdf, setLoadingPdf] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const { currentOrganization } = useOrganization();
 
   useEffect(() => {
@@ -42,11 +44,15 @@ export default function LcasPage() {
       setLoading(true);
       const supabase = getSupabaseBrowserClient();
 
-      // Fetch all product LCAs for the organization
+      // Fetch product LCAs for the organisation, excluding superseded/failed records.
+      // Only show 'completed' and 'draft' (in-progress wizard) records.
+      // 'pending' records are mid-calculation and not meaningful to display.
+      // 'superseded' records are old calculations replaced by newer ones.
       const { data: lcas, error: lcaError } = await supabase
         .from('product_carbon_footprints')
         .select('*')
         .eq('organization_id', currentOrganization!.id)
+        .in('status', ['completed', 'draft'])
         .order('created_at', { ascending: false });
 
       if (lcaError) {
@@ -65,17 +71,12 @@ export default function LcasPage() {
         // Get total GHG emissions from aggregated_impacts JSONB field (single source of truth)
         const totalCO2e = lca.aggregated_impacts?.climate_change_gwp100 || 0;
 
-        // Calculate DQI score based on status and data completeness
-        let dqiScore = 50;
-        if (lca.status === 'completed') dqiScore = 85;
+        // Use the real DQI score from the database when available (set by the aggregator).
+        // Only fall back to heuristic if the DB value is missing.
+        const dqiScore = typeof lca.dqi_score === 'number' && lca.dqi_score > 0
+          ? lca.dqi_score
+          : lca.status === 'completed' ? 85 : 50;
 
-        // Check if lifecycle data exists in aggregated_impacts
-        const hasLifecycleData =
-          lca.aggregated_impacts?.breakdown?.by_lifecycle_stage &&
-          Object.keys(lca.aggregated_impacts.breakdown.by_lifecycle_stage).length > 0;
-        if (hasLifecycleData) dqiScore += 10;
-
-        // Get product name from stored value in product_lcas
         const productName = lca.product_name || 'Unknown Product';
         const functionalUnit = lca.functional_unit || 'per unit';
 
@@ -85,7 +86,7 @@ export default function LcasPage() {
           product_name: productName,
           title: `${new Date(lca.created_at).getFullYear()} LCA Study`,
           version: '1.0',
-          status: lca.status === 'completed' ? 'completed' : 'draft',
+          status: lca.status as 'completed' | 'draft' | 'in_progress',
           dqi_score: dqiScore,
           system_boundary: lca.system_boundary || 'cradle-to-gate',
           functional_unit: functionalUnit,
@@ -103,6 +104,72 @@ export default function LcasPage() {
       setLoading(false);
     }
   };
+
+  /**
+   * Fetch PDF from the generate-pdf API with the user's auth token.
+   * Returns the blob on success, or null on failure.
+   */
+  const fetchPdfBlob = useCallback(async (pcfId: string): Promise<Blob | null> => {
+    const supabase = getSupabaseBrowserClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      console.error('Not authenticated');
+      return null;
+    }
+
+    const response = await fetch(`/api/lca/${pcfId}/generate-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ includeNarratives: false, inline: true }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error('PDF generation failed:', err);
+      return null;
+    }
+
+    return response.blob();
+  }, []);
+
+  /** Open the PDF in a new browser tab for viewing. */
+  const handleViewReport = useCallback(async (pcfId: string) => {
+    setLoadingPdf(pcfId);
+    try {
+      const blob = await fetchPdfBlob(pcfId);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        // Revoke after a short delay so the new tab has time to load
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
+    } finally {
+      setLoadingPdf(null);
+    }
+  }, [fetchPdfBlob]);
+
+  /** Download the PDF to the user's device. */
+  const handleDownloadReport = useCallback(async (pcfId: string, productName: string) => {
+    setDownloadingPdf(pcfId);
+    try {
+      const blob = await fetchPdfBlob(pcfId);
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `LCA_Report_${productName.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } finally {
+      setDownloadingPdf(null);
+    }
+  }, [fetchPdfBlob]);
 
   const filteredReports = reports.filter(report =>
     report.product_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -299,18 +366,45 @@ export default function LcasPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Link href={`/products/${report.product_id}/compliance-wizard`}>
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Eye className="h-4 w-4" />
-                          View Report
-                        </Button>
-                      </Link>
-                      <Link href={`/products/${report.product_id}/compliance-wizard`}>
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Download className="h-4 w-4" />
-                          Download
-                        </Button>
-                      </Link>
+                      {report.status === 'completed' ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            disabled={loadingPdf === report.id}
+                            onClick={() => handleViewReport(report.id)}
+                          >
+                            {loadingPdf === report.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                            View Report
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-2"
+                            disabled={downloadingPdf === report.id}
+                            onClick={() => handleDownloadReport(report.id, report.product_name)}
+                          >
+                            {downloadingPdf === report.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                            Download
+                          </Button>
+                        </>
+                      ) : (
+                        <Link href={`/products/${report.product_id}/compliance-wizard`}>
+                          <Button variant="outline" size="sm" className="gap-2">
+                            <Eye className="h-4 w-4" />
+                            Continue Wizard
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   </div>
                 </CardContent>

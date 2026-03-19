@@ -23,6 +23,7 @@ import {
   Loader2,
   Download,
   RefreshCw,
+  Database,
 } from 'lucide-react';
 import { useWizardContext, getStepIdsForBoundary } from '../WizardContext';
 import { cn } from '@/lib/utils';
@@ -226,6 +227,38 @@ export function SummaryStep() {
     saveProgress,
     finishWizard,
   } = useWizardContext();
+
+  // Data resolution summary from aggregated_impacts
+  const [resolutionSummary, setResolutionSummary] = useState<{
+    supplier_data: number;
+    openlca: number;
+    staging_factors: number;
+    hybrid: number;
+    total: number;
+  } | null>(null);
+  const [fallbackWarnings, setFallbackWarnings] = useState<Array<{
+    material_name: string;
+    attempted_priority: string;
+    resolved_priority: number;
+    fallback_reason: string;
+  }>>([]);
+  const [calculationFingerprint, setCalculationFingerprint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!pcfId) return;
+    supabase
+      .from('product_carbon_footprints')
+      .select('aggregated_impacts')
+      .eq('id', pcfId)
+      .single()
+      .then(({ data }) => {
+        if (data?.aggregated_impacts) {
+          setResolutionSummary(data.aggregated_impacts.data_resolution_summary || null);
+          setFallbackWarnings(data.aggregated_impacts.fallback_events || []);
+          setCalculationFingerprint(data.aggregated_impacts.calculation_fingerprint || null);
+        }
+      });
+  }, [pcfId]);
 
   const checklist = useComplianceChecklist();
   const completedCount = checklist.filter((item) => item.completed).length;
@@ -467,6 +500,67 @@ export function SummaryStep() {
           ]}
         />
       </div>
+
+      {/* Data Resolution Summary (Rec 4: Fallback Transparency) */}
+      {resolutionSummary && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Database className="h-4 w-4" />
+              Data Resolution Summary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-4 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-green-600">{resolutionSummary.supplier_data}</div>
+                <div className="text-xs text-muted-foreground">Supplier data</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-blue-600">{resolutionSummary.openlca}</div>
+                <div className="text-xs text-muted-foreground">OpenLCA</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-amber-600">{resolutionSummary.staging_factors}</div>
+                <div className="text-xs text-muted-foreground">Generic factors</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-purple-600">{resolutionSummary.hybrid}</div>
+                <div className="text-xs text-muted-foreground">Hybrid</div>
+              </div>
+            </div>
+
+            {fallbackWarnings.length > 0 && (
+              <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/10 dark:border-amber-800">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-900 dark:text-amber-300">Data Resolution Warnings</AlertTitle>
+                <AlertDescription>
+                  <ul className="mt-1 space-y-1 text-sm text-amber-800 dark:text-amber-400">
+                    {fallbackWarnings.map((fw, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                        <span>
+                          <strong>{fw.material_name}</strong>: resolved via Priority {fw.resolved_priority}
+                          {' '}instead of {fw.attempted_priority} ({fw.fallback_reason})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {calculationFingerprint && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Fingerprint:</span>
+                <code className="font-mono bg-muted px-1.5 py-0.5 rounded">
+                  {calculationFingerprint.slice(0, 16)}...
+                </code>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Separator />
 

@@ -1,5 +1,5 @@
 import { getSupabaseBrowserClient } from './supabase/browser-client';
-import { resolveImpactFactors, normalizeToKg, type ProductMaterial } from './impact-waterfall-resolver';
+import { resolveImpactFactors, normalizeToKg, type ProductMaterial, type WaterfallResult, type FallbackEvent } from './impact-waterfall-resolver';
 import { calculateTransportEmissions, type TransportMode } from './utils/transport-emissions-calculator';
 import { calculateDistributionEmissions } from './distribution-factors';
 import { resolveImpactSource } from './utils/data-quality-mapper';
@@ -33,6 +33,9 @@ export interface CalculatePCFParams {
   eolConfig?: import('./end-of-life-factors').EoLConfig;
   distributionConfig?: import('./distribution-factors').DistributionConfig;
   productLossConfig?: import('./system-boundaries').ProductLossConfig;
+  /** When set, re-use the exact emission factor values from this PCF instead of
+   *  re-resolving through the waterfall. Enables deterministic re-calculation. */
+  pinnedPcfId?: string;
 }
 
 /** @deprecated Use CalculatePCFParams instead */
@@ -48,6 +51,97 @@ export interface CalculatePCFResult {
 
 /** @deprecated Use CalculatePCFResult instead */
 export type CalculateLCAResult = CalculatePCFResult;
+
+// ============================================================================
+// CALCULATION DETERMINISM HELPERS
+// ============================================================================
+
+/**
+ * Generate a SHA-256 fingerprint of all inputs that affect the calculation result.
+ * Two calculations with identical fingerprints must produce identical outputs.
+ * Uses the Web Crypto API (available in both browser and Next.js).
+ */
+async function generateCalculationFingerprint(params: {
+  materials: Array<{ name: string; quantity_kg: number; data_source_id?: string | null }>;
+  factorValues: Array<{ name: string; impact_climate_per_kg: number; gwp_data_source?: string }>;
+  facilityAllocations?: FacilityAllocationInput[];
+  systemBoundary: string;
+  referenceYear: number;
+}): Promise<string> {
+  // Build a canonical JSON with sorted keys for reproducibility
+  const canonical = JSON.stringify({
+    boundary: params.systemBoundary,
+    facilities: (params.facilityAllocations || []).map(f => ({
+      id: f.facilityId,
+      production: f.productionVolume,
+      total: f.facilityTotalProduction,
+    })).sort((a, b) => a.id.localeCompare(b.id)),
+    factors: params.factorValues
+      .map(f => ({ n: f.name, v: Number(f.impact_climate_per_kg.toFixed(8)), s: f.gwp_data_source }))
+      .sort((a, b) => a.n.localeCompare(b.n)),
+    materials: params.materials
+      .map(m => ({ n: m.name, q: Number(m.quantity_kg.toFixed(6)), d: m.data_source_id || '' }))
+      .sort((a, b) => a.n.localeCompare(b.n)),
+    year: params.referenceYear,
+  });
+  const encoder = new TextEncoder();
+  const data = encoder.encode(canonical);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Reconstruct a WaterfallResult from a previously stored product_carbon_footprint_materials row.
+ * Used in pinned-mode to skip the waterfall resolver and use the exact same factor values.
+ */
+function buildResultFromPinnedMaterial(pinned: any, newQuantityKg: number): WaterfallResult {
+  // The pinned material stores total impacts for its original quantity.
+  // Scale to the new quantity: scale = newQty / oldQty
+  const oldQuantity = Number(pinned.quantity) || 1;
+  const scale = newQuantityKg / oldQuantity;
+
+  return {
+    impact_climate: (pinned.impact_climate || 0) * scale,
+    impact_climate_fossil: (pinned.impact_climate_fossil || 0) * scale,
+    impact_climate_biogenic: (pinned.impact_climate_biogenic || 0) * scale,
+    impact_climate_dluc: (pinned.impact_climate_dluc || 0) * scale,
+    impact_water: (pinned.impact_water || 0) * scale,
+    impact_water_scarcity: (pinned.impact_water_scarcity || 0) * scale,
+    impact_land: (pinned.impact_land || 0) * scale,
+    impact_waste: (pinned.impact_waste || 0) * scale,
+    impact_ozone_depletion: (pinned.impact_ozone_depletion || 0) * scale,
+    impact_photochemical_ozone_formation: (pinned.impact_photochemical_ozone_formation || 0) * scale,
+    impact_ionising_radiation: (pinned.impact_ionising_radiation || 0) * scale,
+    impact_particulate_matter: (pinned.impact_particulate_matter || 0) * scale,
+    impact_human_toxicity_carcinogenic: (pinned.impact_human_toxicity_carcinogenic || 0) * scale,
+    impact_human_toxicity_non_carcinogenic: (pinned.impact_human_toxicity_non_carcinogenic || 0) * scale,
+    impact_terrestrial_ecotoxicity: (pinned.impact_terrestrial_ecotoxicity || 0) * scale,
+    impact_freshwater_ecotoxicity: (pinned.impact_freshwater_ecotoxicity || 0) * scale,
+    impact_marine_ecotoxicity: (pinned.impact_marine_ecotoxicity || 0) * scale,
+    impact_freshwater_eutrophication: (pinned.impact_freshwater_eutrophication || 0) * scale,
+    impact_marine_eutrophication: (pinned.impact_marine_eutrophication || 0) * scale,
+    impact_terrestrial_acidification: (pinned.impact_terrestrial_acidification || 0) * scale,
+    impact_mineral_resource_scarcity: (pinned.impact_mineral_resource_scarcity || 0) * scale,
+    impact_fossil_resource_scarcity: (pinned.impact_fossil_resource_scarcity || 0) * scale,
+    ch4_kg: (pinned.ch4_kg || 0) * scale,
+    ch4_fossil_kg: (pinned.ch4_fossil_kg || 0) * scale,
+    ch4_biogenic_kg: (pinned.ch4_biogenic_kg || 0) * scale,
+    n2o_kg: (pinned.n2o_kg || 0) * scale,
+    data_priority: pinned.data_priority || 3,
+    data_quality_tag: pinned.data_quality_tag || 'Secondary_Estimated',
+    data_quality_grade: pinned.data_quality_grade || 'LOW',
+    source_reference: `Pinned from previous calculation: ${pinned.source_reference || 'unknown'}`,
+    confidence_score: pinned.confidence_score || 50,
+    methodology: `${pinned.methodology || 'Unknown'} (pinned)`,
+    gwp_data_source: `Pinned: ${pinned.gwp_data_source || 'unknown'}`,
+    non_gwp_data_source: `Pinned: ${pinned.non_gwp_data_source || 'unknown'}`,
+    gwp_reference_id: pinned.gwp_reference_id,
+    non_gwp_reference_id: pinned.non_gwp_reference_id,
+    is_hybrid_source: pinned.is_hybrid_source || false,
+    resolved_factor_id: pinned.resolved_factor_id,
+    category_type: pinned.category_type || 'MANUFACTURING_MATERIAL',
+  };
+}
 
 /**
  * Build a valid ISO 14044 / ISO 14067 functional unit string.
@@ -743,6 +837,23 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     // 5. Resolve impact factors for each material using waterfall logic
     const lcaMaterialsWithImpacts = [];
+    const fallbackEvents: FallbackEvent[] = [];
+
+    // Load pinned factors if pinnedPcfId is set (idempotent recalculation mode)
+    let pinnedMaterials: Map<string, any> | null = null;
+    if (params.pinnedPcfId) {
+      console.log(`[calculateProductCarbonFootprint] Pinned mode: loading factors from PCF ${params.pinnedPcfId}`);
+      const { data: prevMaterials } = await supabase
+        .from('product_carbon_footprint_materials')
+        .select('*')
+        .eq('product_carbon_footprint_id', params.pinnedPcfId);
+      if (prevMaterials && prevMaterials.length > 0) {
+        pinnedMaterials = new Map(prevMaterials.map((m: any) => [m.material_name, m]));
+        console.log(`[calculateProductCarbonFootprint] Pinned mode: loaded ${pinnedMaterials.size} material factors`);
+      } else {
+        console.warn(`[calculateProductCarbonFootprint] Pinned mode: no materials found for PCF ${params.pinnedPcfId}, falling back to live resolution`);
+      }
+    }
 
     for (const material of materials) {
       try {
@@ -758,7 +869,14 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
         // Apply waterfall logic to get impact factors
         // Pass organization ID to enable OpenLCA lookups (Priority 2.5)
-        const resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id);
+        // In pinned mode, use stored factors directly for deterministic re-calculation
+        let resolved: WaterfallResult;
+        if (pinnedMaterials?.has(material.material_name)) {
+          console.log(`[calculateProductCarbonFootprint] Using pinned factors for: ${material.material_name}`);
+          resolved = buildResultFromPinnedMaterial(pinnedMaterials.get(material.material_name)!, quantityKg);
+        } else {
+          resolved = await resolveImpactFactors(material as ProductMaterial, quantityKg, product.organization_id, fallbackEvents);
+        }
 
         // Calculate transport emissions (multi-modal preferred, single-leg fallback)
         let transportEmissions = 0;
@@ -1448,6 +1566,54 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
     onProgress?.('Aggregating lifecycle impacts...', 75);
     console.log(`[calculateProductCarbonFootprint] Calling aggregation engine...`);
 
+    // 8a. Finalise pending fallback events with actual resolution data.
+    // Events pushed by the waterfall resolver have resolved_priority=0; update them
+    // with the final resolved priority and factor value from the material that was saved.
+    for (const evt of fallbackEvents) {
+      if (evt.resolved_priority === 0) {
+        const mat = lcaMaterialsWithImpacts.find((m: any) => m.material_name === evt.material_name);
+        if (mat) {
+          evt.resolved_priority = mat.data_priority || 3;
+          evt.factor_value_kg_co2e = mat.quantity > 0 ? mat.impact_climate / mat.quantity : 0;
+          evt.source_reference = mat.source_reference || '';
+        }
+      }
+    }
+
+    // 8b. Build per-material resolution snapshot for fingerprinting and audit
+    const materialResolutions = lcaMaterialsWithImpacts.map((m: any) => ({
+      name: m.material_name,
+      quantity_kg: m.quantity,
+      impact_climate_per_kg: m.quantity > 0 ? m.impact_climate / m.quantity : 0,
+      priority_resolved: m.data_priority,
+      source: m.source_reference,
+      confidence: m.confidence_score,
+      gwp_data_source: m.gwp_data_source,
+    }));
+
+    // 8c. Generate calculation fingerprint for determinism verification
+    let calculationFingerprint = '';
+    try {
+      calculationFingerprint = await generateCalculationFingerprint({
+        materials: materials.map(m => ({
+          name: m.material_name,
+          quantity_kg: normalizeToKg(m.quantity, m.unit),
+          data_source_id: m.data_source_id,
+        })),
+        factorValues: materialResolutions.map((r: any) => ({
+          name: r.name,
+          impact_climate_per_kg: r.impact_climate_per_kg,
+          gwp_data_source: r.gwp_data_source,
+        })),
+        facilityAllocations: params.facilityAllocations,
+        systemBoundary: systemBoundary || 'cradle-to-gate',
+        referenceYear: referenceYear || new Date().getFullYear(),
+      });
+      console.log(`[calculateProductCarbonFootprint] Calculation fingerprint: ${calculationFingerprint.slice(0, 16)}...`);
+    } catch (fpErr) {
+      console.warn('[calculateProductCarbonFootprint] Fingerprint generation failed (non-fatal):', fpErr);
+    }
+
     console.log(`[calculateProductCarbonFootprint] Passing ${collectedFacilityEmissions.length} facility emissions to aggregator (boundary: ${systemBoundary || 'cradle-to-gate'})`);
     const aggregationResult = await aggregateProductImpacts(
       supabase,
@@ -1457,7 +1623,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       params.usePhaseConfig,
       params.eolConfig,
       params.distributionConfig,
-      params.productLossConfig
+      params.productLossConfig,
+      calculationFingerprint,
+      fallbackEvents,
+      materialResolutions,
     );
 
     if (!aggregationResult.success) {
@@ -1467,7 +1636,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
 
     console.log(`[calculateProductCarbonFootprint] ✓ Calculation complete for LCA: ${lca.id}`);
 
-    // 8b. Write to immutable calculation audit log (LOW FIX #23).
+    // 8d. Write to immutable calculation audit log (LOW FIX #23).
     //
     // ISO 14067 §6.5.6 and GHG Protocol Product Standard Annex B require that
     // calculation parameters are retained to enable third-party verification.
@@ -1499,6 +1668,10 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
             reference_year: referenceYear || new Date().getFullYear(),
             materials_count: lcaMaterialsWithImpacts.length,
             facility_allocations_count: facilityAllocations?.length || 0,
+            calculation_fingerprint: calculationFingerprint || null,
+            pinned_from_pcf_id: params.pinnedPcfId || null,
+            material_resolutions: materialResolutions,
+            fallback_events: fallbackEvents.length > 0 ? fallbackEvents : undefined,
           },
           output_value: aggregationResult.total_carbon_footprint,
           output_unit: 'kg CO2e per functional unit',

@@ -127,6 +127,20 @@ export interface WaterfallResult {
 }
 
 /**
+ * Tracks when a material falls through from one data resolution priority to another.
+ * Collected during calculation and stored in aggregated_impacts for transparency.
+ */
+export interface FallbackEvent {
+  material_name: string;
+  material_id: string;
+  attempted_priority: string;     // e.g. "1 (Supplier)" or "2.5 (OpenLCA/ecoinvent)"
+  resolved_priority: number;      // The priority that ultimately resolved (2, 3, etc.)
+  fallback_reason: string;        // e.g. "OpenLCA API timeout (15s)"
+  factor_value_kg_co2e: number;   // The per-kg factor that was eventually used
+  source_reference: string;       // Where the resolved factor came from
+}
+
+/**
  * Type for supplier product impact data (from supplier_products or platform_supplier_products tables)
  */
 interface SupplierProductImpacts {
@@ -423,7 +437,8 @@ function detectMaterialCategory(material: ProductMaterial): MaterialCategoryType
 export async function resolveImpactFactors(
   material: ProductMaterial,
   quantity_kg: number,
-  organizationId?: string
+  organizationId?: string,
+  fallbackEvents?: FallbackEvent[],
 ): Promise<WaterfallResult> {
   const supabase = getSupabaseBrowserClient();
   const category = detectMaterialCategory(material);
@@ -540,8 +555,27 @@ export async function resolveImpactFactors(
         `Checked: supplier_products, platform_supplier_products, product_carbon_footprints — ` +
         `none had impact data. Falling through to Priority 2/3 generic factors.`
       );
+      // Track the fallback for audit trail and UI transparency
+      fallbackEvents?.push({
+        material_name: material.material_name,
+        material_id: material.id,
+        attempted_priority: '1 (Supplier)',
+        resolved_priority: 0, // Will be updated when final resolution occurs
+        fallback_reason: 'Supplier product has no impact data on file',
+        factor_value_kg_co2e: 0,
+        source_reference: '',
+      });
     } catch (error) {
       console.warn(`[Waterfall] Priority 1 failed for ${material.material_name}:`, error);
+      fallbackEvents?.push({
+        material_name: material.material_name,
+        material_id: material.id,
+        attempted_priority: '1 (Supplier)',
+        resolved_priority: 0,
+        fallback_reason: `Supplier lookup error: ${error instanceof Error ? error.message : 'unknown'}`,
+        factor_value_kg_co2e: 0,
+        source_reference: '',
+      });
     }
   }
 
@@ -758,17 +792,39 @@ export async function resolveImpactFactors(
           }
         } else {
           const errorData = await response.json().catch(() => ({}));
-          console.warn(`[Waterfall] OpenLCA API error (${materialDatabase}):`, errorData.error || response.statusText);
+          const errMsg = errorData.error || response.statusText;
+          console.warn(`[Waterfall] OpenLCA API error (${materialDatabase}):`, errMsg);
+          fallbackEvents?.push({
+            material_name: material.material_name,
+            material_id: material.id,
+            attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
+            resolved_priority: 0,
+            fallback_reason: `OpenLCA API error: ${errMsg}`,
+            factor_value_kg_co2e: 0,
+            source_reference: '',
+          });
         }
       }
     } catch (error: any) {
       // AbortError means we hit the 15-second timeout — this is expected when
       // OpenLCA is slow/unavailable. Other errors are unexpected but handled the same way.
+      const reason = error.name === 'AbortError'
+        ? 'OpenLCA API timeout (15s)'
+        : `OpenLCA error: ${error.message}`;
       if (error.name === 'AbortError') {
         console.warn(`[Waterfall] OpenLCA API timed out for ${material.material_name} — falling through to Priority 3 staging factors`);
       } else {
         console.warn(`[Waterfall] Priority 2.5 (OpenLCA/${materialDatabase}) failed for ${material.material_name}:`, error.message);
       }
+      fallbackEvents?.push({
+        material_name: material.material_name,
+        material_id: material.id,
+        attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
+        resolved_priority: 0,
+        fallback_reason: reason,
+        factor_value_kg_co2e: 0,
+        source_reference: '',
+      });
       // Fall through to Priority 3
     }
   }

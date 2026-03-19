@@ -11,6 +11,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import type { FallbackEvent } from './impact-waterfall-resolver';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
 import { calculateMaterialEoL, getMaterialFactorKey, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
@@ -108,7 +109,10 @@ export async function aggregateProductImpacts(
   usePhaseConfig?: UsePhaseConfig,
   eolConfig?: EoLConfig,
   distributionConfig?: DistributionConfig,
-  productLossConfig?: ProductLossConfig
+  productLossConfig?: ProductLossConfig,
+  calculationFingerprint?: string,
+  fallbackEvents?: FallbackEvent[],
+  materialResolutions?: any[],
 ): Promise<AggregationResult> {
   console.log(`[aggregateProductImpacts] Processing PCF: ${productCarbonFootprintId}`);
 
@@ -805,6 +809,15 @@ export async function aggregateProductImpacts(
   console.log(`[aggregateProductImpacts] Uncertainty: ±${uncertaintyDisplayPct}% (σ_g=${propagatedUncertaintyPct}%, 95% CI: ${ci95Lower.toFixed(4)} – ${ci95Upper.toFixed(4)} kg CO₂e)`);
   console.log(`[aggregateProductImpacts] Sensitivity: ${sensitivityResults.length} parameters tested, ${highlySensitiveParams.length} highly sensitive`);
 
+  // 10b. Append fallback events to calculation warnings for UI visibility
+  if (fallbackEvents && fallbackEvents.length > 0) {
+    for (const evt of fallbackEvents) {
+      calculationWarnings.push(
+        `${evt.material_name}: resolved via Priority ${evt.resolved_priority} instead of ${evt.attempted_priority} (${evt.fallback_reason})`
+      );
+    }
+  }
+
   // 11. Build aggregated impacts object
   const aggregatedImpacts = {
     climate_change_gwp100: totalCarbonFootprint,
@@ -1025,15 +1038,37 @@ export async function aggregateProductImpacts(
     materials_count: materials.length,
     production_sites_count: facilityEmissions?.length || 0,
     calculated_at: new Date().toISOString(),
-    calculation_version: '2.2.0',
+    calculation_version: '2.3.0',
     // Store non-fatal warnings so they appear in the LCA report
     calculation_warnings: calculationWarnings.length > 0 ? calculationWarnings : undefined,
+
+    // Calculation determinism (Rec 1: Fingerprinting)
+    // Two calculations with identical fingerprints must produce identical outputs.
+    calculation_fingerprint: calculationFingerprint || null,
+
+    // Rec 3: Per-material resolution audit trail
+    material_resolutions: materialResolutions || null,
+
+    // Rec 4: Fallback transparency
+    // Tracks when materials fell through from one data priority to another
+    fallback_events: fallbackEvents && fallbackEvents.length > 0 ? fallbackEvents : undefined,
+
+    // Rec 4: Data resolution summary for UI display
+    data_resolution_summary: {
+      supplier_data: materials.filter((m: any) => m.data_priority === 1).length,
+      openlca: materials.filter((m: any) =>
+        (m.gwp_data_source || '').toLowerCase().includes('openlca')
+      ).length,
+      staging_factors: materials.filter((m: any) => m.data_priority === 3).length,
+      hybrid: materials.filter((m: any) => m.is_hybrid_source).length,
+      total: materials.length,
+    },
 
     // ISSUE E: Report metadata for version tracking (ISO 14044 §4.2.1)
     report_metadata: {
       version: '2.0',
       generated_at: new Date().toISOString(),
-      calculation_engine: 'alkatera-aggregator-v2.2.0',
+      calculation_engine: 'alkatera-aggregator-v2.3.0',
     },
 
     // ISO 14044 §4.5: Interpretation — generated below and attached here
