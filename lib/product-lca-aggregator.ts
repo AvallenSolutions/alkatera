@@ -13,7 +13,7 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { FallbackEvent } from './impact-waterfall-resolver';
 import { calculateUsePhaseEmissions, type UsePhaseConfig } from './use-phase-factors';
-import { calculateMaterialEoL, getMaterialFactorKey, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
+import { calculateMaterialEoL, getMaterialFactorKey, getRegionalDefaults, EOL_DATA_YEAR, REGION_LABELS, type EoLRegion, type RegionalDefaults, type EoLConfig } from './end-of-life-factors';
 import { calculateDistributionEmissions, type DistributionConfig } from './distribution-factors';
 import { isStageIncluded, calculateLossMultiplier, type ProductLossConfig } from './system-boundaries';
 import { IPCC_AR6_GWP } from './ghg-constants';
@@ -462,6 +462,14 @@ export async function aggregateProductImpacts(
   }
 
   // 9b. End-of-life emissions (Cradle-to-Grave only)
+  // Collect per-material EoL breakdown for report transparency (ISO 14044 §4.4)
+  const eolMaterialBreakdown: Array<{
+    material: string; massKg: number; factorKey: string; region: string;
+    recyclingPct: number; landfillPct: number; incinerationPct: number;
+    compostingPct: number; adPct: number;
+    grossEmissions: number; avoidedEmissions: number; netEmissions: number;
+  }> = [];
+
   if (isStageIncluded(effectiveBoundary, 'end_of_life')) {
     const eolRegion: EoLRegion = eolConfig?.region || 'eu';
 
@@ -500,20 +508,44 @@ export async function aggregateProductImpacts(
       scope3Emissions += eolResult.net;
       totalClimate += eolResult.net;
 
-      // HIGH FIX #14: The EoL fossil/biogenic split was previously two identical
-      // branches (if/else) that both did `totalClimateFossil += eolResult.net`,
-      // which was a redundant no-op but obscured intent. Now:
-      //   - Gross landfill/incineration emissions → fossil CO2 (fossil-based materials)
-      //   - Recycling credits (negative) → reduce fossil CO2 (avoided virgin production)
-      //   - Organic material decomposition (paper landfill methane) → biogenic CO2
-      // For simplicity, all EoL net emissions are attributed to fossil CO2 since
-      // the dominant materials (glass, aluminium, plastic) are fossil-origin.
-      // TODO: Split by material when biogenic tracking per material is available.
-      totalClimateFossil += eolResult.gross;   // Gross landfill/incineration → fossil
-      totalCO2Fossil += eolResult.gross;
-      // Recycling credits: net reduction in fossil CO2 (negative avoided burden)
-      totalClimateFossil += eolResult.avoided; // avoided is negative, reduces total
-      totalCO2Fossil += eolResult.avoided;
+      // FIX #14 (biogenic/fossil split per ISO 14067 §6.4.9):
+      // Paper and organic materials produce biogenic CH₄/CO₂ when decomposing in
+      // landfill or composting/AD. Fossil-origin materials (glass, aluminium, plastics,
+      // steel) produce fossil CO₂. Recycling credits always reduce fossil CO₂
+      // (avoiding virgin production of fossil-origin materials).
+      const isBiogenicMaterial = factorKey === 'paper' || factorKey === 'organic' || factorKey === 'cork';
+      if (isBiogenicMaterial) {
+        // Biogenic materials: landfill/composting/AD emissions are biogenic CO₂
+        // Incineration of biogenic materials is also biogenic (short-cycle carbon)
+        totalClimateBiogenic += eolResult.gross;
+        totalCO2Biogenic += eolResult.gross;
+        // Recycling credits for paper/cork still displace virgin fossil production
+        totalClimateFossil += eolResult.avoided;
+        totalCO2Fossil += eolResult.avoided;
+      } else {
+        // Fossil-origin materials: all EoL emissions are fossil
+        totalClimateFossil += eolResult.gross;
+        totalCO2Fossil += eolResult.gross;
+        totalClimateFossil += eolResult.avoided;
+        totalCO2Fossil += eolResult.avoided;
+      }
+
+      // Collect per-material EoL data for report transparency
+      const resolvedPathways = pathwayOverrides || getRegionalDefaults(eolRegion, factorKey);
+      eolMaterialBreakdown.push({
+        material: material.material_name || 'Packaging',
+        massKg: quantity,
+        factorKey,
+        region: eolRegion,
+        recyclingPct: resolvedPathways.recycling ?? 0,
+        landfillPct: resolvedPathways.landfill ?? 0,
+        incinerationPct: resolvedPathways.incineration ?? 0,
+        compostingPct: resolvedPathways.composting ?? 0,
+        adPct: resolvedPathways.anaerobic_digestion ?? 0,
+        grossEmissions: eolResult.gross,
+        avoidedEmissions: eolResult.avoided,
+        netEmissions: eolResult.net,
+      });
 
       console.log(`[aggregateProductImpacts] EoL ${material.material_name} (${factorKey}): net=${eolResult.net.toFixed(6)}, avoided=${eolResult.avoided.toFixed(6)}, gross=${eolResult.gross.toFixed(6)}`);
     }
@@ -942,6 +974,20 @@ export async function aggregateProductImpacts(
         economic_allocation_materials: [] as Array<{ material: string; method: string; justification: string; economic_ratio?: string }>,
       },
     },
+
+    // EoL per-material breakdown for report transparency (ISO 14044 §4.4)
+    eol_material_breakdown: eolMaterialBreakdown,
+    eol_methodology: eolMaterialBreakdown.length > 0 ? {
+      region: eolConfig?.region || 'eu',
+      region_label: REGION_LABELS[eolConfig?.region || 'eu'] || 'European Union',
+      avoided_burden_method: 'Ecoinvent 3.12 recycling credits (avoided burden)',
+      data_source: 'DEFRA 2024, Ecoinvent 3.12, EU Packaging Directive, EPA 2024',
+      data_year: EOL_DATA_YEAR,
+      total_gross_emissions: eolMaterialBreakdown.reduce((s, m) => s + m.grossEmissions, 0),
+      total_avoided_emissions: eolMaterialBreakdown.reduce((s, m) => s + m.avoidedEmissions, 0),
+      total_net_emissions: eolMaterialBreakdown.reduce((s, m) => s + m.netEmissions, 0),
+      has_user_overrides: eolConfig?.pathways ? Object.keys(eolConfig.pathways).length > 0 : false,
+    } : null,
 
     // ISO 14044 §4.5.3: Uncertainty propagation and sensitivity analysis
     uncertainty_sensitivity: {

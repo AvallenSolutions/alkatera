@@ -177,6 +177,50 @@ function renderExecSummaryPage(data: LCAReportData): string {
     </div>`;
 }
 
+/**
+ * Renders the EoL Methodology disclosure section (ISO 14044 §4.1 / §4.4).
+ * Shows region, per-material disposal pathways, avoided burden method, and data sources.
+ */
+function renderEolMethodologySection(data: LCAReportData): string {
+  const eol = data.eolMethodology;
+  if (!eol || !eol.materialPathways || eol.materialPathways.length === 0) return '';
+
+  const pathwayRows = eol.materialPathways.map(m =>
+    `<tr>
+      <td style="font-weight: 500; font-size: 10px;">${escapeHtml(m.material)}</td>
+      <td style="text-align: center; font-size: 10px;">${m.recyclingPct}%</td>
+      <td style="text-align: center; font-size: 10px;">${m.landfillPct}%</td>
+      <td style="text-align: center; font-size: 10px;">${m.incinerationPct}%</td>
+      <td style="text-align: center; font-size: 10px;">${m.compostingPct}%</td>
+      <td style="text-align: center; font-size: 10px;">${m.adPct}%</td>
+    </tr>`
+  ).join('');
+
+  return `
+    <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+      <div style="font-size: 11px; font-weight: 600; color: #0c4a6e; margin-bottom: 10px;">End-of-Life Modelling Assumptions (ISO 14044 &sect;4.4)</div>
+      <div style="display: flex; gap: 16px; margin-bottom: 10px;">
+        <div style="font-size: 10px; color: #44403c;"><strong>Region:</strong> ${escapeHtml(eol.regionLabel)}</div>
+        <div style="font-size: 10px; color: #44403c;"><strong>Method:</strong> ${escapeHtml(eol.avoidedBurdenMethod)}</div>
+        <div style="font-size: 10px; color: #44403c;"><strong>Data Year:</strong> ${eol.dataYear}</div>
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 8px;">
+        <thead>
+          <tr style="border-bottom: 1px solid #bae6fd;">
+            <th style="text-align: left; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Material</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Recycling</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Landfill</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Incineration</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">Composting</th>
+            <th style="text-align: center; padding: 4px 6px; color: #0c4a6e; font-size: 9px;">AD</th>
+          </tr>
+        </thead>
+        <tbody>${pathwayRows}</tbody>
+      </table>
+      <div style="font-size: 9px; color: #64748b;">Sources: ${escapeHtml(eol.dataSource)}</div>
+    </div>`;
+}
+
 function renderGoalAndScopePage(data: LCAReportData): string {
   const assumptions = data.goalAndScope.assumptionsAndLimitations.map(al =>
     `<div style="display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f5f5f4;">
@@ -236,10 +280,12 @@ function renderGoalAndScopePage(data: LCAReportData): string {
         </div>
       </div>
 
-      <div style="margin-bottom: 48px;">
+      <div style="margin-bottom: 20px;">
         <div style="font-size: 11px; font-weight: 600; color: #1c1917; margin-bottom: 8px;">Assumptions &amp; Limitations</div>
         ${assumptions}
       </div>
+
+      ${renderEolMethodologySection(data)}
 
       ${renderPageFooter(2)}
     </div>`;
@@ -862,22 +908,44 @@ function renderWaterPage(data: LCAReportData): string {
 }
 
 function renderCircularityPage(data: LCAReportData): string {
+  const hasEolBreakdown = data.circularity.eolBreakdown && data.circularity.eolBreakdown.length > 0;
+  const eolRecyclingRate = data.circularity.eolRecyclingRate || 0;
+  const recycledContentRate = data.circularity.recycledContentRate || 0;
+
+  // EoL gross/avoided split
+  const totalGross = hasEolBreakdown
+    ? data.circularity.eolBreakdown.reduce((s, m) => s + m.grossEmissions, 0) : 0;
+  const totalAvoided = hasEolBreakdown
+    ? data.circularity.eolBreakdown.reduce((s, m) => s + m.avoidedEmissions, 0) : 0;
+  const totalNet = hasEolBreakdown
+    ? data.circularity.eolBreakdown.reduce((s, m) => s + m.netEmissions, 0) : 0;
+
   return `
     <div class="page light-page">
       ${renderSectionHeader('10', 'Circularity & Waste')}
 
-      <div style="display: flex; gap: 24px; margin-bottom: 32px;">
-        <div style="flex: 1; text-align: center;">
-          <div style="width: 160px; height: 160px; border-radius: 50%; margin: 0 auto 16px; position: relative; background: conic-gradient(#22c55e ${data.circularity.recyclingRate * 3.6}deg, #e7e5e4 0deg);">
-            <div style="position: absolute; inset: 16px; background: #f5f5f4; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-              <span style="font-size: 36px; font-weight: 700; font-family: 'Playfair Display', serif; color: #22c55e;">${data.circularity.recyclingRate}%</span>
+      <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+        <div style="flex: 1; text-align: center; background: white; border: 1px solid #e7e5e4; border-radius: 16px; padding: 20px;">
+          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#22c55e ${recycledContentRate * 3.6}deg, #e7e5e4 0deg);">
+            <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #22c55e;">${recycledContentRate}%</span>
             </div>
           </div>
-          <div style="font-size: 14px; color: #78716c;">Recycling Rate</div>
+          <div style="font-size: 12px; font-weight: 600; color: #1c1917;">Recycled Content</div>
+          <div style="font-size: 9px; color: #78716c;">Input: recycled material used</div>
+        </div>
+        <div style="flex: 1; text-align: center; background: white; border: 1px solid #e7e5e4; border-radius: 16px; padding: 20px;">
+          <div style="width: 120px; height: 120px; border-radius: 50%; margin: 0 auto 12px; position: relative; background: conic-gradient(#3b82f6 ${eolRecyclingRate * 3.6}deg, #e7e5e4 0deg);">
+            <div style="position: absolute; inset: 12px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <span style="font-size: 28px; font-weight: 700; font-family: 'Playfair Display', serif; color: #3b82f6;">${eolRecyclingRate}%</span>
+            </div>
+          </div>
+          <div style="font-size: 12px; font-weight: 600; color: #1c1917;">EoL Recycling Rate</div>
+          <div style="font-size: 9px; color: #78716c;">Output: packaging recycled at disposal</div>
         </div>
         <div style="flex: 1;">
-          <div class="metric-card" style="margin-bottom: 16px;">
-            <div class="metric-label">Total Waste</div>
+          <div class="metric-card" style="margin-bottom: 12px;">
+            <div class="metric-label">Total Packaging Waste</div>
             <div class="metric-value">${escapeHtml(data.circularity.totalWaste)}</div>
           </div>
           <div class="metric-card">
@@ -887,31 +955,80 @@ function renderCircularityPage(data: LCAReportData): string {
         </div>
       </div>
 
-      ${data.circularity.wasteStream.length > 0 ? `
-        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Waste Streams</h3>
-        <table class="data-table">
-          <thead><tr><th>Stream</th><th>Volume</th><th>Status</th></tr></thead>
+      ${hasEolBreakdown ? `
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;">
+          <div class="metric-card" style="text-align: center; border-left: 3px solid #ef4444;">
+            <div class="metric-label">Gross EoL Emissions</div>
+            <div style="font-size: 18px; font-weight: 700; color: #ef4444;">${totalGross.toFixed(4)}</div>
+            <div class="metric-unit">kg CO&#8322;e</div>
+          </div>
+          <div class="metric-card" style="text-align: center; border-left: 3px solid #22c55e;">
+            <div class="metric-label">Recycling Credits</div>
+            <div style="font-size: 18px; font-weight: 700; color: #22c55e;">${totalAvoided.toFixed(4)}</div>
+            <div class="metric-unit">kg CO&#8322;e (avoided)</div>
+          </div>
+          <div class="metric-card" style="text-align: center; border-left: 3px solid ${totalNet < 0 ? '#22c55e' : '#f97316'};">
+            <div class="metric-label">Net EoL Impact</div>
+            <div style="font-size: 18px; font-weight: 700; color: ${totalNet < 0 ? '#22c55e' : '#f97316'};">${totalNet.toFixed(4)}</div>
+            <div class="metric-unit">kg CO&#8322;e</div>
+          </div>
+        </div>
+
+        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 10px;">Per-Material Disposal Pathways</h3>
+        <table class="data-table" style="font-size: 10px;">
+          <thead><tr>
+            <th>Material</th>
+            <th>Mass</th>
+            <th style="text-align: center;">Recycle</th>
+            <th style="text-align: center;">Landfill</th>
+            <th style="text-align: center;">Incin.</th>
+            <th style="text-align: center;">Compost</th>
+            <th style="text-align: center;">AD</th>
+            <th style="text-align: right;">Net (kg CO&#8322;e)</th>
+          </tr></thead>
           <tbody>
-            ${data.circularity.wasteStream.map(ws => `
+            ${data.circularity.eolBreakdown.map(m => `
               <tr>
-                <td>${escapeHtml(ws.label)}</td>
-                <td>${escapeHtml(ws.value)}</td>
-                <td>${ws.recycled
-                  ? '<span class="badge badge-low">Recycled</span>'
-                  : '<span class="badge badge-medium">Waste</span>'
-                }</td>
+                <td style="font-weight: 500;">${escapeHtml(m.material)}</td>
+                <td>${m.massKg.toFixed(3)} kg</td>
+                <td style="text-align: center;">${m.recyclingPct}%</td>
+                <td style="text-align: center;">${m.landfillPct}%</td>
+                <td style="text-align: center;">${m.incinerationPct}%</td>
+                <td style="text-align: center;">${m.compostingPct}%</td>
+                <td style="text-align: center;">${m.adPct}%</td>
+                <td style="text-align: right; color: ${m.netEmissions < 0 ? '#22c55e' : '#44403c'};">${m.netEmissions.toFixed(4)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
-      ` : ''}
+      ` : `
+        ${data.circularity.wasteStream.length > 0 ? `
+          <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Waste Streams</h3>
+          <table class="data-table">
+            <thead><tr><th>Stream</th><th>Volume</th><th>Status</th></tr></thead>
+            <tbody>
+              ${data.circularity.wasteStream.map(ws => `
+                <tr>
+                  <td>${escapeHtml(ws.label)}</td>
+                  <td>${escapeHtml(ws.value)}</td>
+                  <td>${ws.recycled
+                    ? '<span class="badge badge-low">Recycled</span>'
+                    : '<span class="badge badge-medium">Waste</span>'
+                  }</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        ` : ''}
+      `}
 
-      ${/* ISSUE D FIX: Proprietary metric disclaimer and recycling rate methodology (ISO 14044 §4.4.5). */ ''}
       ${data.circularityMethodology ? `
-        <div style="margin-top: 20px; padding: 12px 16px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
-          <p style="font-size: 12px; line-height: 1.5; color: #0c4a6e;">
-            <strong>Methodology Note:</strong> ${escapeHtml(data.circularityMethodology.description)}
-            ${data.circularityMethodology.reference ? ` Reference: ${escapeHtml(data.circularityMethodology.reference)}` : ''}
+        <div style="margin-top: 16px; padding: 10px 14px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
+          <p style="font-size: 10px; line-height: 1.5; color: #0c4a6e;">
+            <strong>Note:</strong> Recycled Content measures circular input (recycled material used in production).
+            EoL Recycling Rate measures circular output (packaging recycled at end-of-life, based on regional defaults).
+            These are independent metrics per ISO 14044 &sect;4.4.5.
+            ${data.circularityMethodology.reference ? ` ${escapeHtml(data.circularityMethodology.reference)}` : ''}
           </p>
         </div>
       ` : ''}
@@ -1044,14 +1161,28 @@ function renderInterpretationPage(data: LCAReportData): string {
       </table>`
     : '<p style="font-size: 12px; color: #78716c;">No individual material exceeds the 5% significance threshold.</p>';
 
-  // ISSUE F FIX: Show footnote when hotspot contributions exceed 100% due to EoL credits.
+  // FIX #5: Always explain EoL recycling credits in interpretation, not just when >100%.
+  // Users need to understand avoided burden credits regardless of hotspot sum.
   const hotspotSum = interp.significant_issues.hotspots.reduce((s, h) => s + h.contribution_pct, 0);
-  const exceedsNote = hotspotSum > 100
-    ? `<p style="font-size: 10px; font-style: italic; color: #78716c; margin-top: 6px;">
-        * Contributions sum to ${hotspotSum.toFixed(1)}% because end-of-life avoided-burden credits
-        reduce the net total carbon footprint, against which individual percentages are calculated.
-      </p>`
-    : '';
+  const hasEolCredits = data.eolMethodology && data.eolMethodology.totalAvoidedEmissions < 0;
+  const eolCreditNote = hasEolCredits
+    ? `<div style="margin-top: 10px; padding: 10px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+        <p style="font-size: 10px; color: #166534; line-height: 1.5; margin: 0;">
+          <strong>Recycling Credits (Avoided Burden):</strong> End-of-life recycling generates
+          ${Math.abs(data.eolMethodology!.totalAvoidedEmissions).toFixed(4)} kg CO&#8322;e in avoided emissions
+          by displacing virgin material production. Gross disposal emissions are
+          ${data.eolMethodology!.totalGrossEmissions.toFixed(4)} kg CO&#8322;e, giving a net EoL impact of
+          ${data.eolMethodology!.totalNetEmissions.toFixed(4)} kg CO&#8322;e.
+          ${hotspotSum > 100 ? ` Hotspot contributions sum to ${hotspotSum.toFixed(1)}% because these credits reduce the denominator.` : ''}
+        </p>
+      </div>`
+    : (hotspotSum > 100
+      ? `<p style="font-size: 10px; font-style: italic; color: #78716c; margin-top: 6px;">
+          * Contributions sum to ${hotspotSum.toFixed(1)}% because end-of-life avoided-burden credits
+          reduce the net total carbon footprint, against which individual percentages are calculated.
+        </p>`
+      : '');
+  const exceedsNote = eolCreditNote;
 
   // Split across two pages when there are many bullet points to avoid footer overflow.
   // Page 1: Significant issues, hotspots table, metric cards, key findings

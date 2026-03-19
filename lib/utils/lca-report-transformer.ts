@@ -381,12 +381,11 @@ export function transformLCADataForReport(
     }));
   })();
 
-  // Compute recycling rate — prefer aggregated circularity_percentage from the LCA calculation,
-  // fall back to computing from material-level recycled_content_percentage
+  // Compute RECYCLED CONTENT rate (input metric: how much recycled material went in)
   const aggregatedCircularity = impacts.circularity_percentage;
-  let recyclingRate: number;
+  let recycledContentRate: number;
   if (aggregatedCircularity != null && aggregatedCircularity > 0) {
-    recyclingRate = Math.round(aggregatedCircularity);
+    recycledContentRate = Math.round(aggregatedCircularity);
   } else {
     const totalMassForRecycling = materials.reduce((sum: number, m: any) => sum + (m.quantity || 0), 0);
     const recycledMass = materials.reduce((sum: number, m: any) => {
@@ -394,10 +393,24 @@ export function transformLCADataForReport(
       const recycledPct = m.recycled_content_percentage || 0;
       return sum + (qty * recycledPct / 100);
     }, 0);
-    recyclingRate = totalMassForRecycling > 0
+    recycledContentRate = totalMassForRecycling > 0
       ? Math.round((recycledMass / totalMassForRecycling) * 100)
       : 0;
   }
+
+  // Compute EoL RECYCLING RATE (output metric: what % of packaging will be recycled at end-of-life)
+  // Derived from the per-material EoL pathway breakdown
+  const eolBreakdown: any[] = (impacts as any).eol_material_breakdown || [];
+  let eolRecyclingRate = 0;
+  if (eolBreakdown.length > 0) {
+    const totalEolMass = eolBreakdown.reduce((s: number, m: any) => s + (m.massKg || 0), 0);
+    const recycledEolMass = eolBreakdown.reduce((s: number, m: any) =>
+      s + (m.massKg || 0) * ((m.recyclingPct || 0) / 100), 0);
+    eolRecyclingRate = totalEolMass > 0 ? Math.round((recycledEolMass / totalEolMass) * 100) : 0;
+  }
+
+  // For backward compatibility, recyclingRate uses the higher of the two metrics
+  const recyclingRate = Math.max(recycledContentRate, eolRecyclingRate);
 
   // Count primary/secondary/proxy data sources
   const primaryCount = materials.filter((m: any) => m.impact_source === 'primary_verified').length;
@@ -1096,8 +1109,24 @@ export function transformLCADataForReport(
         return `${wasteValue.toFixed(3)}kg`;
       })(),
       recyclingRate,
+      recycledContentRate,
+      eolRecyclingRate,
       circularityScore: `${(recyclingRate / 10).toFixed(1)} / 10`,
       wasteStream,
+      eolBreakdown: eolBreakdown.map((m: any) => ({
+        material: m.material || 'Packaging',
+        massKg: m.massKg || 0,
+        factorKey: m.factorKey || 'other',
+        region: m.region || 'eu',
+        recyclingPct: m.recyclingPct || 0,
+        landfillPct: m.landfillPct || 0,
+        incinerationPct: m.incinerationPct || 0,
+        compostingPct: m.compostingPct || 0,
+        adPct: m.adPct || 0,
+        grossEmissions: m.grossEmissions || 0,
+        avoidedEmissions: m.avoidedEmissions || 0,
+        netEmissions: m.netEmissions || 0,
+      })),
       methodology: {
         formula: {
           text: "MCI = (LFI \u00D7 U/L) + (V/2) + (W/2) \u00D7 F(X)",
@@ -1288,6 +1317,32 @@ export function transformLCADataForReport(
         methodName: cm.method_name,
         description: cm.description,
         reference: cm.reference,
+      };
+    })(),
+
+    eolMethodology: (() => {
+      const eolMeta = (impacts as any).eol_methodology;
+      if (!eolMeta) return undefined;
+      const eolBreakdownData: any[] = (impacts as any).eol_material_breakdown || [];
+      return {
+        region: eolMeta.region,
+        regionLabel: eolMeta.region_label,
+        materialPathways: eolBreakdownData.map((m: any) => ({
+          material: m.material,
+          factorKey: m.factorKey,
+          recyclingPct: m.recyclingPct,
+          landfillPct: m.landfillPct,
+          incinerationPct: m.incinerationPct,
+          compostingPct: m.compostingPct,
+          adPct: m.adPct,
+          isUserOverride: false, // TODO: detect user overrides from eolConfig
+        })),
+        avoidedBurdenMethod: eolMeta.avoided_burden_method,
+        dataSource: eolMeta.data_source,
+        dataYear: eolMeta.data_year,
+        totalGrossEmissions: eolMeta.total_gross_emissions,
+        totalAvoidedEmissions: eolMeta.total_avoided_emissions,
+        totalNetEmissions: eolMeta.total_net_emissions,
       };
     })(),
   };

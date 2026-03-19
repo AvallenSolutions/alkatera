@@ -159,8 +159,27 @@ export interface LCAReportData {
   circularity: {
     totalWaste: string;
     recyclingRate: number;
+    /** Recycled content percentage (input metric: how much recycled material was used) */
+    recycledContentRate: number;
+    /** EoL recycling rate (output metric: what % of packaging will be recycled at end-of-life) */
+    eolRecyclingRate: number;
     circularityScore: string;
     wasteStream: Array<{ label: string; value: string; recycled: boolean }>;
+    /** Per-material EoL disposal pathway breakdown */
+    eolBreakdown: Array<{
+      material: string;
+      massKg: number;
+      factorKey: string;
+      region: string;
+      recyclingPct: number;
+      landfillPct: number;
+      incinerationPct: number;
+      compostingPct: number;
+      adPct: number;
+      grossEmissions: number;
+      avoidedEmissions: number;
+      netEmissions: number;
+    }>;
     methodology: {
       formula: {
         text: string;
@@ -269,6 +288,28 @@ export interface LCAReportData {
     totalTransportKgCo2e: number;
     isEmbeddedInMaterials: boolean;
     outboundIncluded: boolean;
+  };
+
+  /** End-of-Life modelling assumptions (ISO 14044 §4.1 / §4.4) */
+  eolMethodology?: {
+    region: string;
+    regionLabel: string;
+    materialPathways: Array<{
+      material: string;
+      factorKey: string;
+      recyclingPct: number;
+      landfillPct: number;
+      incinerationPct: number;
+      compostingPct: number;
+      adPct: number;
+      isUserOverride: boolean;
+    }>;
+    avoidedBurdenMethod: string;
+    dataSource: string;
+    dataYear: number;
+    totalGrossEmissions: number;
+    totalAvoidedEmissions: number;
+    totalNetEmissions: number;
   };
 
   /** Circularity methodology disclaimer */
