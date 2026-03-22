@@ -100,6 +100,15 @@ export default function SettingsPage() {
       toast.info('Organisation created! Now select a plan to get started.')
       router.replace('/settings')
     }
+    // Xero OAuth callback results
+    if (searchParams.get('xero') === 'connected') {
+      toast.success('Xero connected successfully!')
+      router.replace('/settings?tab=integrations')
+    }
+    if (searchParams.get('xero') === 'error') {
+      toast.error(searchParams.get('message') || 'Failed to connect Xero')
+      router.replace('/settings?tab=integrations')
+    }
   }, [searchParams, router])
 
   useEffect(() => {
@@ -383,7 +392,7 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <Tabs defaultValue={isOrgAdmin ? "subscription" : "profile"} className="space-y-4">
+      <Tabs defaultValue={searchParams.get('tab') || (isOrgAdmin ? "subscription" : "profile")} className="space-y-4">
         <TabsList>
           {isOrgAdmin && (
             <>
