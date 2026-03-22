@@ -114,6 +114,7 @@ export async function syncOrganisation(
     const rules: SupplierRule[] = supplierRules || []
 
     // ── 3. Fetch purchase invoices (ACCPAY) ───────────────────────────
+    // Limit to last 12 months to stay within serverless timeout
 
     const transactions: Array<{
       xeroId: string
@@ -128,14 +129,18 @@ export async function syncOrganisation(
       date: string
     }> = []
 
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+
     let page = 1
     let hasMore = true
+    const MAX_PAGES = 5 // Safety cap: 500 invoices max per sync
 
-    while (hasMore) {
+    while (hasMore && page <= MAX_PAGES) {
       try {
         const invoicesResponse = await xero.accountingApi.getInvoices(
           tenantId,
-          undefined, // ifModifiedSince
+          twelveMonthsAgo, // ifModifiedSince - only recent invoices
           'Type=="ACCPAY"', // where - purchase invoices only
           'Date DESC', // order
           undefined, // IDs
@@ -189,11 +194,11 @@ export async function syncOrganisation(
     page = 1
     hasMore = true
 
-    while (hasMore) {
+    while (hasMore && page <= MAX_PAGES) {
       try {
         const bankTxResponse = await xero.accountingApi.getBankTransactions(
           tenantId,
-          undefined, // ifModifiedSince
+          twelveMonthsAgo, // ifModifiedSince - only recent transactions
           'Type=="SPEND"', // where
           'Date DESC', // order
           page

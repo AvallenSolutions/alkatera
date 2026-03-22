@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { syncOrganisation } from '@/lib/xero/sync-service'
+import { updateSyncStatus } from '@/lib/xero/token-store'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60 // Xero sync can take a while for large accounts
 
 /**
  * POST /api/xero/sync
  *
- * Triggers a manual sync of Xero data for an organisation.
- * Fetches chart of accounts, purchase invoices, and bank transactions,
- * classifies them into emission categories, and calculates spend-based baselines.
+ * Triggers a sync of Xero data. Validates auth and permissions first,
+ * then runs the sync inline (Netlify Pro allows ~26s).
+ *
+ * The sync service uses batched upserts and limits pagination to stay
+ * within the function timeout. If it still times out, the sync status
+ * will show 'syncing' and the user can retry.
  *
  * Body: { organizationId: string }
  */
@@ -37,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    // 4. Run sync
+    // 4. Run sync (batched for speed)
     const result = await syncOrganisation(organizationId, user.id)
 
     return NextResponse.json({
@@ -50,6 +53,15 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Error syncing Xero data:', error)
     const message = error instanceof Error ? error.message : 'Sync failed'
+
+    // Try to reset sync status on error so UI doesn't get stuck on "Syncing..."
+    try {
+      const body = await request.clone().json().catch(() => ({}))
+      if (body.organizationId) {
+        await updateSyncStatus(body.organizationId, 'error', message)
+      }
+    } catch { /* best effort */ }
+
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
