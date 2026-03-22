@@ -27,7 +27,7 @@ export const XERO_SCOPES = [
  * Create a bare XeroClient configured with app credentials.
  * Used for OAuth flows (consent URL, token exchange).
  */
-export function getXeroClient(): XeroClient {
+export function getXeroClient(state?: string): XeroClient {
   const clientId = process.env.XERO_CLIENT_ID
   const clientSecret = process.env.XERO_CLIENT_SECRET
   const redirectUri = process.env.XERO_REDIRECT_URI
@@ -41,6 +41,9 @@ export function getXeroClient(): XeroClient {
     clientSecret,
     redirectUris: [redirectUri],
     scopes: XERO_SCOPES,
+    // state must be set when the client is used for apiCallback(),
+    // so the OpenID client can validate the returned state parameter
+    ...(state ? { state } : {}),
   })
 }
 

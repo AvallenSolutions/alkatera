@@ -51,15 +51,11 @@ export async function POST(request: NextRequest) {
       path: '/',
     })
 
-    // 5. Build consent URL
-    const xero = getXeroClient()
+    // 5. Build consent URL with state baked in
+    const xero = getXeroClient(state)
     const consentUrl = await xero.buildConsentUrl()
 
-    // Append our state parameter
-    const url = new URL(consentUrl)
-    url.searchParams.set('state', state)
-
-    return NextResponse.json({ url: url.toString() })
+    return NextResponse.json({ url: consentUrl })
   } catch (error: unknown) {
     console.error('Error initiating Xero connection:', error)
     const message = error instanceof Error ? error.message : 'Failed to initiate Xero connection'

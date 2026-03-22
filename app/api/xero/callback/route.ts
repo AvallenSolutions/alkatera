@@ -73,7 +73,8 @@ export async function GET(request: NextRequest) {
     cookieStore.delete('xero_oauth_state')
 
     // 3. Exchange code for tokens
-    const xero = getXeroClient()
+    // Pass the original state so the OpenID client can validate it
+    const xero = getXeroClient(storedState.state)
     const callbackUrl = `${process.env.XERO_REDIRECT_URI}?code=${code}&state=${returnedState}`
     const tokenSet = await xero.apiCallback(callbackUrl)
 
