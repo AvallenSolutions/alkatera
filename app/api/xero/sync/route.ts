@@ -4,6 +4,7 @@ import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { syncOrganisation } from '@/lib/xero/sync-service'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // Xero sync can take a while for large accounts
 
 /**
  * POST /api/xero/sync

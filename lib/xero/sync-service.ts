@@ -79,22 +79,22 @@ export async function syncOrganisation(
 
     result.accountsFetched = expenseAccounts.length
 
-    // Upsert into xero_account_mappings
-    for (const account of expenseAccounts) {
-      if (!account.accountID) continue
+    // Batch upsert into xero_account_mappings
+    const accountRows = expenseAccounts
+      .filter(a => a.accountID)
+      .map(account => ({
+        organization_id: organizationId,
+        xero_account_id: account.accountID!,
+        xero_account_code: account.code || null,
+        xero_account_name: account.name || 'Unknown',
+        xero_account_type: String(account.type || '') || null,
+        updated_at: new Date().toISOString(),
+      }))
+
+    if (accountRows.length > 0) {
       await db
         .from('xero_account_mappings')
-        .upsert(
-          {
-            organization_id: organizationId,
-            xero_account_id: account.accountID,
-            xero_account_code: account.code || null,
-            xero_account_name: account.name || 'Unknown',
-            xero_account_type: String(account.type || '') || null,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'organization_id,xero_account_id', ignoreDuplicates: false }
-        )
+        .upsert(accountRows, { onConflict: 'organization_id,xero_account_id', ignoreDuplicates: false })
     }
 
     // ── 2. Load classification data ───────────────────────────────────
@@ -238,8 +238,10 @@ export async function syncOrganisation(
     // ── 5. Classify and upsert transactions ──────────────────────────
 
     const batchId = crypto.randomUUID()
+    const now = new Date().toISOString()
 
-    for (const tx of transactions) {
+    // Build all rows first, then batch upsert for performance
+    const upsertRows = transactions.map(tx => {
       const classification = classifyTransaction(
         {
           xeroAccountId: tx.accountId,
@@ -263,37 +265,40 @@ export async function syncOrganisation(
         result.transactionsClassified++
       }
 
-      const transactionDate = tx.date
-      const reportingYear = new Date(transactionDate).getFullYear()
+      const reportingYear = new Date(tx.date).getFullYear()
 
+      return {
+        organization_id: organizationId,
+        xero_transaction_id: tx.xeroId,
+        xero_transaction_type: tx.type,
+        xero_contact_name: tx.contactName,
+        xero_contact_id: tx.contactId,
+        xero_account_id: tx.accountId,
+        xero_account_code: tx.accountCode,
+        description: tx.description,
+        amount: tx.amount,
+        currency: tx.currency,
+        transaction_date: tx.date,
+        emission_category: emissionCategory,
+        classification_source: classification?.source || null,
+        classification_confidence: classification?.confidence || null,
+        spend_based_emissions_kg: spendBasedEmissions,
+        data_quality_tier: 4,
+        upgrade_status: emissionCategory ? 'pending' : 'not_applicable',
+        extracted_metadata: extractedMetadata,
+        sync_batch_id: batchId,
+        reporting_year: reportingYear,
+        updated_at: now,
+      }
+    })
+
+    // Batch upsert in chunks of 200 to avoid payload limits
+    const BATCH_SIZE = 200
+    for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
+      const chunk = upsertRows.slice(i, i + BATCH_SIZE)
       await db
         .from('xero_transactions')
-        .upsert(
-          {
-            organization_id: organizationId,
-            xero_transaction_id: tx.xeroId,
-            xero_transaction_type: tx.type,
-            xero_contact_name: tx.contactName,
-            xero_contact_id: tx.contactId,
-            xero_account_id: tx.accountId,
-            xero_account_code: tx.accountCode,
-            description: tx.description,
-            amount: tx.amount,
-            currency: tx.currency,
-            transaction_date: transactionDate,
-            emission_category: emissionCategory,
-            classification_source: classification?.source || null,
-            classification_confidence: classification?.confidence || null,
-            spend_based_emissions_kg: spendBasedEmissions,
-            data_quality_tier: 4,
-            upgrade_status: emissionCategory ? 'pending' : 'not_applicable',
-            extracted_metadata: extractedMetadata,
-            sync_batch_id: batchId,
-            reporting_year: reportingYear,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'organization_id,xero_transaction_id' }
-        )
+        .upsert(chunk, { onConflict: 'organization_id,xero_transaction_id' })
     }
 
     // ── 6. Update sync status ─────────────────────────────────────────
