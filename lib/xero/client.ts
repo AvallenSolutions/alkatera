@@ -4,12 +4,19 @@ import { getTokens, updateTokens } from './token-store'
 
 // ── Scopes ────────────────────────────────────────────────────────────
 
+// Xero moved to granular scopes on 2 March 2026.
+// Apps created after that date MUST use granular scopes.
+// See: https://www.apideck.com/blog/xero-scopes
 export const XERO_SCOPES = [
   'openid',
   'profile',
   'email',
   'offline_access',
-  'accounting.transactions.read',
+  // Granular transaction scopes (replaces broad accounting.transactions.read)
+  'accounting.invoices.read',
+  'accounting.payments.read',
+  'accounting.banktransactions.read',
+  // Contacts and settings (unchanged)
   'accounting.contacts.read',
   'accounting.settings.read',
 ]
