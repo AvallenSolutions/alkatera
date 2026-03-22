@@ -21,29 +21,63 @@ export interface SyncResult {
   errors: string[]
 }
 
+export interface StageResult {
+  done: boolean
+  nextStage?: string
+  cursor?: any
+  progress: string
+  stats?: Partial<SyncResult>
+  error?: string
+}
+
 /**
- * Synchronise financial data from Xero for an organisation.
+ * Execute a single sync stage. Each stage is designed to complete
+ * within Netlify's ~10-26s serverless timeout.
  *
- * 1. Fetches chart of accounts (expense accounts only)
- * 2. Fetches purchase invoices (ACCPAY) and bank transactions (SPEND)
- * 3. Classifies each transaction using account mappings + supplier rules
- * 4. Calculates spend-based emission baselines
- * 5. Upserts into xero_transactions
+ * The client calls stages sequentially:
+ *   accounts → invoices (page 1..N) → bank_transactions (page 1..N) → classify → complete
  */
-export async function syncOrganisation(
+export async function syncStage(
+  organizationId: string,
+  triggeredBy: string,
+  stage: string,
+  cursor?: any
+): Promise<StageResult> {
+  const db = getServiceClient()
+
+  try {
+    switch (stage) {
+      case 'accounts':
+        return await stageAccounts(db, organizationId, triggeredBy)
+      case 'invoices':
+        return await stageInvoices(db, organizationId, cursor)
+      case 'bank_transactions':
+        return await stageBankTransactions(db, organizationId, cursor)
+      case 'classify':
+        return await stageClassify(db, organizationId)
+      case 'complete':
+        return await stageComplete(db, organizationId)
+      default:
+        return { done: false, nextStage: 'accounts', progress: 'Starting...' }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Sync stage failed'
+    await updateSyncStatus(organizationId, 'error', message)
+    return { done: true, progress: 'Failed', error: message }
+  }
+}
+
+// ── Stage: Accounts ──────────────────────────────────────────────────
+
+async function stageAccounts(
+  db: ReturnType<typeof getServiceClient>,
   organizationId: string,
   triggeredBy: string
-): Promise<SyncResult> {
-  const db = getServiceClient()
-  const result: SyncResult = {
-    transactionsFetched: 0,
-    transactionsClassified: 0,
-    accountsFetched: 0,
-    errors: [],
-  }
+): Promise<StageResult> {
+  await updateSyncStatus(organizationId, 'syncing')
 
-  // Create sync log entry
-  const { data: syncLog } = await db
+  // Create sync log
+  await db
     .from('xero_sync_logs')
     .insert({
       organization_id: organizationId,
@@ -51,206 +85,236 @@ export async function syncOrganisation(
       status: 'started',
       triggered_by: triggeredBy,
     })
-    .select('id')
-    .single()
 
-  const syncLogId = syncLog?.id
+  const auth = await getAuthenticatedClient(organizationId)
+  if (!auth) throw new Error('No Xero connection found. Please connect to Xero first.')
 
-  try {
-    await updateSyncStatus(organizationId, 'syncing')
+  const { client: xero, tenantId } = auth
 
-    // Get authenticated Xero client
-    const auth = await getAuthenticatedClient(organizationId)
-    if (!auth) {
-      throw new Error('No Xero connection found. Please connect to Xero first.')
-    }
+  // Fetch chart of accounts
+  const accountsResponse = await xero.accountingApi.getAccounts(tenantId)
+  const accounts = accountsResponse.body?.accounts || []
+  const expenseAccounts = accounts.filter(a =>
+    ['EXPENSE', 'DIRECTCOSTS', 'OVERHEADS'].includes(String(a.type || ''))
+  )
 
-    const { client: xero, tenantId } = auth
+  // Batch upsert
+  const accountRows = expenseAccounts
+    .filter(a => a.accountID)
+    .map(account => ({
+      organization_id: organizationId,
+      xero_account_id: account.accountID!,
+      xero_account_code: account.code || null,
+      xero_account_name: account.name || 'Unknown',
+      xero_account_type: String(account.type || '') || null,
+      updated_at: new Date().toISOString(),
+    }))
 
-    // ── 1. Fetch and store chart of accounts ──────────────────────────
-
-    const accountsResponse = await xero.accountingApi.getAccounts(tenantId)
-    const accounts = accountsResponse.body?.accounts || []
-
-    // Filter to expense-type accounts
-    const expenseAccounts = accounts.filter(a =>
-      ['EXPENSE', 'DIRECTCOSTS', 'OVERHEADS'].includes(String(a.type || ''))
-    )
-
-    result.accountsFetched = expenseAccounts.length
-
-    // Batch upsert into xero_account_mappings
-    const accountRows = expenseAccounts
-      .filter(a => a.accountID)
-      .map(account => ({
-        organization_id: organizationId,
-        xero_account_id: account.accountID!,
-        xero_account_code: account.code || null,
-        xero_account_name: account.name || 'Unknown',
-        xero_account_type: String(account.type || '') || null,
-        updated_at: new Date().toISOString(),
-      }))
-
-    if (accountRows.length > 0) {
-      await db
-        .from('xero_account_mappings')
-        .upsert(accountRows, { onConflict: 'organization_id,xero_account_id', ignoreDuplicates: false })
-    }
-
-    // ── 2. Load classification data ───────────────────────────────────
-
-    const { data: accountMappings } = await db
+  if (accountRows.length > 0) {
+    await db
       .from('xero_account_mappings')
-      .select('xero_account_id, emission_category, is_excluded')
+      .upsert(accountRows, { onConflict: 'organization_id,xero_account_id', ignoreDuplicates: false })
+  }
+
+  // Clear any stale sync state (best effort)
+  try {
+    await db
+      .from('xero_sync_staging')
+      .delete()
       .eq('organization_id', organizationId)
+  } catch {
+    // Table may not exist - that's fine
+  }
 
-    const { data: supplierRules } = await db
-      .from('xero_supplier_rules')
-      .select('supplier_pattern, emission_category, priority, organization_id')
-      .or(`organization_id.eq.${organizationId},organization_id.is.null`)
-      .order('priority', { ascending: false })
+  return {
+    done: false,
+    nextStage: 'invoices',
+    cursor: { page: 1 },
+    progress: `Accounts synced (${expenseAccounts.length} expense accounts)`,
+    stats: { accountsFetched: expenseAccounts.length },
+  }
+}
 
-    const mappings: AccountMapping[] = accountMappings || []
-    const rules: SupplierRule[] = supplierRules || []
+// ── Stage: Invoices (one page per call) ──────────────────────────────
 
-    // ── 3. Fetch purchase invoices (ACCPAY) ───────────────────────────
-    // Limit to last 12 months to stay within serverless timeout
+async function stageInvoices(
+  db: ReturnType<typeof getServiceClient>,
+  organizationId: string,
+  cursor?: { page?: number }
+): Promise<StageResult> {
+  const page = cursor?.page || 1
 
-    const transactions: Array<{
-      xeroId: string
-      type: string
-      contactName: string | null
-      contactId: string | null
-      accountId: string | null
-      accountCode: string | null
-      description: string | null
-      amount: number
-      currency: string
-      date: string
-    }> = []
+  const auth = await getAuthenticatedClient(organizationId)
+  if (!auth) throw new Error('No Xero connection found.')
 
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+  const { client: xero, tenantId } = auth
 
-    let page = 1
-    let hasMore = true
-    const MAX_PAGES = 5 // Safety cap: 500 invoices max per sync
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
 
-    while (hasMore && page <= MAX_PAGES) {
-      try {
-        const invoicesResponse = await xero.accountingApi.getInvoices(
-          tenantId,
-          twelveMonthsAgo, // ifModifiedSince - only recent invoices
-          'Type=="ACCPAY"', // where - purchase invoices only
-          'Date DESC', // order
-          undefined, // IDs
-          undefined, // invoiceNumbers
-          undefined, // contactIDs
-          undefined, // statuses
-          page,
-          undefined, // includeArchived
-          undefined, // createdByMyApp
-          undefined, // unitdp
-          true // summaryOnly
-        )
+  const invoicesResponse = await xero.accountingApi.getInvoices(
+    tenantId,
+    twelveMonthsAgo,
+    'Type=="ACCPAY"',
+    'Date DESC',
+    undefined, undefined, undefined, undefined,
+    page,
+    undefined, undefined, undefined,
+    true // summaryOnly
+  )
 
-        const invoices = invoicesResponse.body?.invoices || []
-        if (invoices.length === 0) {
-          hasMore = false
-          break
-        }
+  const invoices = invoicesResponse.body?.invoices || []
+  let inserted = 0
 
-        for (const inv of invoices) {
-          if (!inv.invoiceID) continue
-          // Skip draft invoices
-          const invStatus = String(inv.status || '')
-          if (invStatus === 'DRAFT' || invStatus === 'DELETED' || invStatus === 'VOIDED') continue
+  // Store raw transactions in a staging pattern (directly into xero_transactions with pending classification)
+  const batchId = `sync_${Date.now()}`
+  const rows = invoices
+    .filter(inv => inv.invoiceID && !['DRAFT', 'DELETED', 'VOIDED'].includes(String(inv.status || '')))
+    .map(inv => ({
+      organization_id: organizationId,
+      xero_transaction_id: inv.invoiceID!,
+      xero_transaction_type: 'invoice',
+      xero_contact_name: inv.contact?.name || null,
+      xero_contact_id: inv.contact?.contactID || null,
+      xero_account_id: null,
+      xero_account_code: null,
+      description: inv.reference || null,
+      amount: inv.total || 0,
+      currency: String(inv.currencyCode || 'GBP'),
+      transaction_date: inv.date ? new Date(inv.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      reporting_year: inv.date ? new Date(inv.date).getFullYear() : new Date().getFullYear(),
+      data_quality_tier: 4,
+      upgrade_status: 'pending',
+      sync_batch_id: batchId,
+      updated_at: new Date().toISOString(),
+    }))
 
-          transactions.push({
-            xeroId: inv.invoiceID,
-            type: 'invoice',
-            contactName: inv.contact?.name || null,
-            contactId: inv.contact?.contactID || null,
-            accountId: null, // Invoices don't have a single account - handled via line items
-            accountCode: null,
-            description: inv.reference || null,
-            amount: inv.total || 0,
-            currency: String(inv.currencyCode || 'GBP'),
-            date: inv.date ? new Date(inv.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          })
-        }
+  if (rows.length > 0) {
+    await db
+      .from('xero_transactions')
+      .upsert(rows, { onConflict: 'organization_id,xero_transaction_id' })
+    inserted = rows.length
+  }
 
-        page++
-        // Xero returns up to 100 per page
-        if (invoices.length < 100) hasMore = false
-      } catch (err) {
-        result.errors.push(`Failed to fetch invoices page ${page}: ${err instanceof Error ? err.message : 'Unknown error'}`)
-        hasMore = false
+  const hasMore = invoices.length >= 100 && page < 5
+
+  return {
+    done: false,
+    nextStage: hasMore ? 'invoices' : 'bank_transactions',
+    cursor: hasMore ? { page: page + 1 } : { page: 1 },
+    progress: `Invoices page ${page}: ${inserted} imported${hasMore ? ', fetching more...' : ' (done)'}`,
+    stats: { transactionsFetched: inserted },
+  }
+}
+
+// ── Stage: Bank Transactions (one page per call) ─────────────────────
+
+async function stageBankTransactions(
+  db: ReturnType<typeof getServiceClient>,
+  organizationId: string,
+  cursor?: { page?: number }
+): Promise<StageResult> {
+  const page = cursor?.page || 1
+
+  const auth = await getAuthenticatedClient(organizationId)
+  if (!auth) throw new Error('No Xero connection found.')
+
+  const { client: xero, tenantId } = auth
+
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+
+  const bankTxResponse = await xero.accountingApi.getBankTransactions(
+    tenantId,
+    twelveMonthsAgo,
+    'Type=="SPEND"',
+    'Date DESC',
+    page
+  )
+
+  const bankTxs = bankTxResponse.body?.bankTransactions || []
+  let inserted = 0
+
+  const batchId = `sync_${Date.now()}`
+  const rows = bankTxs
+    .filter(tx => tx.bankTransactionID && String(tx.status || '') !== 'DELETED')
+    .map(tx => {
+      const lineItem = tx.lineItems?.[0]
+      return {
+        organization_id: organizationId,
+        xero_transaction_id: tx.bankTransactionID!,
+        xero_transaction_type: 'bank_transaction',
+        xero_contact_name: tx.contact?.name || null,
+        xero_contact_id: tx.contact?.contactID || null,
+        xero_account_id: lineItem?.accountID || null,
+        xero_account_code: lineItem?.accountCode || null,
+        description: lineItem?.description || null,
+        amount: tx.total || 0,
+        currency: String(tx.currencyCode || 'GBP'),
+        transaction_date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        reporting_year: tx.date ? new Date(tx.date).getFullYear() : new Date().getFullYear(),
+        data_quality_tier: 4,
+        upgrade_status: 'pending',
+        sync_batch_id: batchId,
+        updated_at: new Date().toISOString(),
       }
-    }
+    })
 
-    // ── 4. Fetch bank transactions (SPEND type) ──────────────────────
+  if (rows.length > 0) {
+    await db
+      .from('xero_transactions')
+      .upsert(rows, { onConflict: 'organization_id,xero_transaction_id' })
+    inserted = rows.length
+  }
 
-    page = 1
-    hasMore = true
+  const hasMore = bankTxs.length >= 100 && page < 5
 
-    while (hasMore && page <= MAX_PAGES) {
-      try {
-        const bankTxResponse = await xero.accountingApi.getBankTransactions(
-          tenantId,
-          twelveMonthsAgo, // ifModifiedSince - only recent transactions
-          'Type=="SPEND"', // where
-          'Date DESC', // order
-          page
-        )
+  return {
+    done: false,
+    nextStage: hasMore ? 'bank_transactions' : 'classify',
+    cursor: hasMore ? { page: page + 1 } : undefined,
+    progress: `Bank transactions page ${page}: ${inserted} imported${hasMore ? ', fetching more...' : ' (done)'}`,
+    stats: { transactionsFetched: inserted },
+  }
+}
 
-        const bankTxs = bankTxResponse.body?.bankTransactions || []
-        if (bankTxs.length === 0) {
-          hasMore = false
-          break
-        }
+// ── Stage: Classify ──────────────────────────────────────────────────
 
-        for (const tx of bankTxs) {
-          if (!tx.bankTransactionID) continue
-          if (String(tx.status || '') === 'DELETED') continue
+async function stageClassify(
+  db: ReturnType<typeof getServiceClient>,
+  organizationId: string
+): Promise<StageResult> {
+  // Load classification data
+  const { data: accountMappings } = await db
+    .from('xero_account_mappings')
+    .select('xero_account_id, emission_category, is_excluded')
+    .eq('organization_id', organizationId)
 
-          // Bank transactions have line items with account codes
-          const lineItem = tx.lineItems?.[0]
-          transactions.push({
-            xeroId: tx.bankTransactionID,
-            type: 'bank_transaction',
-            contactName: tx.contact?.name || null,
-            contactId: tx.contact?.contactID || null,
-            accountId: lineItem?.accountID || null,
-            accountCode: lineItem?.accountCode || null,
-            description: lineItem?.description || null,
-            amount: tx.total || 0,
-            currency: String(tx.currencyCode || 'GBP'),
-            date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          })
-        }
+  const { data: supplierRules } = await db
+    .from('xero_supplier_rules')
+    .select('supplier_pattern, emission_category, priority, organization_id')
+    .or(`organization_id.eq.${organizationId},organization_id.is.null`)
+    .order('priority', { ascending: false })
 
-        page++
-        if (bankTxs.length < 100) hasMore = false
-      } catch (err) {
-        result.errors.push(`Failed to fetch bank transactions page ${page}: ${err instanceof Error ? err.message : 'Unknown error'}`)
-        hasMore = false
-      }
-    }
+  const mappings: AccountMapping[] = accountMappings || []
+  const rules: SupplierRule[] = supplierRules || []
 
-    result.transactionsFetched = transactions.length
+  // Fetch unclassified transactions
+  const { data: unclassified } = await db
+    .from('xero_transactions')
+    .select('id, xero_account_id, xero_contact_name, description, amount, emission_category')
+    .eq('organization_id', organizationId)
+    .is('emission_category', null)
+    .limit(500)
 
-    // ── 5. Classify and upsert transactions ──────────────────────────
+  let classified = 0
 
-    const batchId = crypto.randomUUID()
-    const now = new Date().toISOString()
-
-    // Build all rows first, then batch upsert for performance
-    const upsertRows = transactions.map(tx => {
+  if (unclassified && unclassified.length > 0) {
+    const updates = unclassified.map(tx => {
       const classification = classifyTransaction(
         {
-          xeroAccountId: tx.accountId,
-          contactName: tx.contactName,
+          xeroAccountId: tx.xero_account_id,
+          contactName: tx.xero_contact_name,
           description: tx.description,
         },
         mappings,
@@ -262,87 +326,114 @@ export async function syncOrganisation(
         ? calculateSpendBasedEmissions(tx.amount, emissionCategory)
         : null
 
-      // Auto-extract structured data from descriptions
-      const extracted = extractFromDescription(tx.description, tx.contactName)
+      const extracted = extractFromDescription(tx.description, tx.xero_contact_name)
       const extractedMetadata = hasExtractedData(extracted) ? extracted : null
 
-      if (classification) {
-        result.transactionsClassified++
-      }
-
-      const reportingYear = new Date(tx.date).getFullYear()
+      if (classification) classified++
 
       return {
-        organization_id: organizationId,
-        xero_transaction_id: tx.xeroId,
-        xero_transaction_type: tx.type,
-        xero_contact_name: tx.contactName,
-        xero_contact_id: tx.contactId,
-        xero_account_id: tx.accountId,
-        xero_account_code: tx.accountCode,
-        description: tx.description,
-        amount: tx.amount,
-        currency: tx.currency,
-        transaction_date: tx.date,
+        id: tx.id,
         emission_category: emissionCategory,
         classification_source: classification?.source || null,
         classification_confidence: classification?.confidence || null,
         spend_based_emissions_kg: spendBasedEmissions,
-        data_quality_tier: 4,
         upgrade_status: emissionCategory ? 'pending' : 'not_applicable',
         extracted_metadata: extractedMetadata,
-        sync_batch_id: batchId,
-        reporting_year: reportingYear,
-        updated_at: now,
       }
     })
 
-    // Batch upsert in chunks of 200 to avoid payload limits
-    const BATCH_SIZE = 200
-    for (let i = 0; i < upsertRows.length; i += BATCH_SIZE) {
-      const chunk = upsertRows.slice(i, i + BATCH_SIZE)
+    // Batch update via individual calls (can't batch-update with different values easily)
+    for (const update of updates) {
+      const { id, ...fields } = update
       await db
         .from('xero_transactions')
-        .upsert(chunk, { onConflict: 'organization_id,xero_transaction_id' })
+        .update(fields)
+        .eq('id', id)
+    }
+  }
+
+  return {
+    done: false,
+    nextStage: 'complete',
+    progress: `Classified ${classified} of ${unclassified?.length || 0} transactions`,
+    stats: { transactionsClassified: classified },
+  }
+}
+
+// ── Stage: Complete ──────────────────────────────────────────────────
+
+async function stageComplete(
+  db: ReturnType<typeof getServiceClient>,
+  organizationId: string
+): Promise<StageResult> {
+  await updateSyncStatus(organizationId, 'idle')
+
+  // Count totals for the log
+  const { count: totalTx } = await db
+    .from('xero_transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+
+  const { count: classifiedTx } = await db
+    .from('xero_transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+    .not('emission_category', 'is', null)
+
+  // Update sync log
+  await db
+    .from('xero_sync_logs')
+    .update({
+      status: 'completed',
+      transactions_fetched: totalTx || 0,
+      transactions_classified: classifiedTx || 0,
+      completed_at: new Date().toISOString(),
+    })
+    .eq('organization_id', organizationId)
+    .eq('status', 'started')
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  return {
+    done: true,
+    progress: `Sync complete: ${totalTx || 0} transactions (${classifiedTx || 0} classified)`,
+    stats: {
+      transactionsFetched: totalTx || 0,
+      transactionsClassified: classifiedTx || 0,
+    },
+  }
+}
+
+// Legacy export for backward compatibility (cron route)
+export async function syncOrganisation(
+  organizationId: string,
+  triggeredBy: string
+): Promise<SyncResult> {
+  // Run all stages sequentially
+  let stage = 'accounts'
+  let cursor: any = undefined
+  const result: SyncResult = {
+    transactionsFetched: 0,
+    transactionsClassified: 0,
+    accountsFetched: 0,
+    errors: [],
+  }
+
+  while (stage) {
+    const stageResult = await syncStage(organizationId, triggeredBy, stage, cursor)
+
+    if (stageResult.stats) {
+      result.transactionsFetched += stageResult.stats.transactionsFetched || 0
+      result.transactionsClassified += stageResult.stats.transactionsClassified || 0
+      result.accountsFetched += stageResult.stats.accountsFetched || 0
+    }
+    if (stageResult.error) {
+      result.errors.push(stageResult.error)
+      break
     }
 
-    // ── 6. Update sync status ─────────────────────────────────────────
-
-    await updateSyncStatus(organizationId, 'idle')
-
-    if (syncLogId) {
-      await db
-        .from('xero_sync_logs')
-        .update({
-          status: 'completed',
-          transactions_fetched: result.transactionsFetched,
-          transactions_classified: result.transactionsClassified,
-          accounts_fetched: result.accountsFetched,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', syncLogId)
-    }
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Sync failed'
-    result.errors.push(errorMessage)
-
-    await updateSyncStatus(organizationId, 'error', errorMessage)
-
-    if (syncLogId) {
-      await db
-        .from('xero_sync_logs')
-        .update({
-          status: 'failed',
-          error_message: errorMessage,
-          transactions_fetched: result.transactionsFetched,
-          transactions_classified: result.transactionsClassified,
-          accounts_fetched: result.accountsFetched,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', syncLogId)
-    }
-
-    throw err
+    stage = stageResult.done ? '' : (stageResult.nextStage || '')
+    cursor = stageResult.cursor
   }
 
   return result

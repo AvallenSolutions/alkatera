@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
-import { syncOrganisation } from '@/lib/xero/sync-service'
-import { updateSyncStatus } from '@/lib/xero/token-store'
+import { syncStage } from '@/lib/xero/sync-service'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/xero/sync
  *
- * Triggers a sync of Xero data. Validates auth and permissions first,
- * then runs the sync inline (Netlify Pro allows ~26s).
+ * Staged sync of Xero data. Each call processes one stage and returns
+ * the next stage to call. This keeps each request within Netlify's
+ * serverless function timeout (~26s on Pro).
  *
- * The sync service uses batched upserts and limits pagination to stay
- * within the function timeout. If it still times out, the sync status
- * will show 'syncing' and the user can retry.
+ * Body: { organizationId: string, stage?: string, cursor?: any }
  *
- * Body: { organizationId: string }
+ * Stages:
+ *   1. "accounts" - Fetch chart of accounts
+ *   2. "invoices" - Fetch purchase invoices (paginated)
+ *   3. "bank_transactions" - Fetch bank transactions (paginated)
+ *   4. "classify" - Classify and upsert all staged transactions
+ *   5. "complete" - Final status update
+ *
+ * Returns: { nextStage, cursor, progress, done }
  */
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. Parse body
-    const { organizationId } = await request.json()
+    const { organizationId, stage, cursor } = await request.json()
     if (!organizationId) {
       return NextResponse.json({ error: 'organizationId is required' }, { status: 400 })
     }
@@ -40,28 +45,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
-    // 4. Run sync (batched for speed)
-    const result = await syncOrganisation(organizationId, user.id)
+    // 4. Run the requested stage
+    const result = await syncStage(organizationId, user.id, stage || 'accounts', cursor)
 
-    return NextResponse.json({
-      success: true,
-      transactionsFetched: result.transactionsFetched,
-      transactionsClassified: result.transactionsClassified,
-      accountsFetched: result.accountsFetched,
-      errors: result.errors,
-    })
+    return NextResponse.json(result)
   } catch (error: unknown) {
-    console.error('Error syncing Xero data:', error)
+    console.error('Error in Xero sync stage:', error)
     const message = error instanceof Error ? error.message : 'Sync failed'
-
-    // Try to reset sync status on error so UI doesn't get stuck on "Syncing..."
-    try {
-      const body = await request.clone().json().catch(() => ({}))
-      if (body.organizationId) {
-        await updateSyncStatus(body.organizationId, 'error', message)
-      }
-    } catch { /* best effort */ }
-
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

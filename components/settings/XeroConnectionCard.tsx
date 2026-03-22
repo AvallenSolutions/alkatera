@@ -110,23 +110,54 @@ export function XeroConnectionCard() {
     }
   }
 
+  const [syncProgress, setSyncProgress] = useState<string>('')
+
   async function handleSync() {
     if (!currentOrganization?.id) return
     setIsSyncing(true)
+    setSyncProgress('Starting sync...')
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/api/xero/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({ organizationId: currentOrganization.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token}`,
+      }
+
+      // Run stages sequentially until done
+      let stage = 'accounts'
+      let cursor: any = undefined
+      let totalFetched = 0
+      let totalClassified = 0
+
+      while (stage) {
+        setSyncProgress(`${stage.replace('_', ' ')}...`)
+
+        const res = await fetch('/api/xero/sync', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            organizationId: currentOrganization.id,
+            stage,
+            cursor,
+          }),
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+
+        setSyncProgress(data.progress || stage)
+
+        if (data.stats?.transactionsFetched) totalFetched += data.stats.transactionsFetched
+        if (data.stats?.transactionsClassified) totalClassified += data.stats.transactionsClassified
+
+        if (data.done) break
+        stage = data.nextStage || ''
+        cursor = data.cursor
+      }
+
       toast.success(
-        `Sync complete: ${data.transactionsFetched || 0} transactions, ${data.accountsFetched || 0} accounts`
+        `Sync complete: ${totalFetched} transactions imported, ${totalClassified} classified`
       )
       fetchStatus()
     } catch (err: unknown) {
@@ -134,6 +165,7 @@ export function XeroConnectionCard() {
       toast.error(message)
     } finally {
       setIsSyncing(false)
+      setSyncProgress('')
     }
   }
 
@@ -278,7 +310,7 @@ export function XeroConnectionCard() {
                   ) : (
                     <RefreshCw className="h-4 w-4 mr-2" />
                   )}
-                  {isSyncing ? 'Syncing...' : 'Sync Now'}
+                  {isSyncing ? (syncProgress || 'Syncing...') : 'Sync Now'}
                 </Button>
 
                 <AlertDialog>
