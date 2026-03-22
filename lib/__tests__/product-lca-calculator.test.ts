@@ -92,7 +92,7 @@ function createQueryMock(response: MockResponse) {
   const mock: Record<string, unknown> = {};
 
   // All chainable methods return self
-  const chainableMethods = ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'ilike', 'lte', 'gte', 'order', 'limit', 'in'];
+  const chainableMethods = ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'not', 'ilike', 'lte', 'gte', 'order', 'limit', 'in'];
   chainableMethods.forEach(method => {
     mock[method] = vi.fn().mockReturnValue(mock);
   });
@@ -795,6 +795,9 @@ describe('calculateProductCarbonFootprint', () => {
         undefined,         // eolConfig (not set in params)
         undefined,         // distributionConfig (not set in params)
         undefined,         // productLossConfig (not set in params)
+        expect.anything(), // calculationFingerprint
+        expect.anything(), // fallbackEvents
+        expect.anything(), // materialResolutions
       );
     });
 
@@ -853,7 +856,7 @@ describe('calculateProductCarbonFootprint', () => {
       const result = await calculateProductCarbonFootprint(params);
 
       expect(result.success).toBe(true);
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0, 'org-456');
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0, 'org-456', expect.anything());
     });
 
     it('should handle materials with string quantity', async () => {
@@ -873,7 +876,7 @@ describe('calculateProductCarbonFootprint', () => {
 
       expect(result.success).toBe(true);
       // 150g should be normalized to 0.15kg
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.15, 'org-456');
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.15, 'org-456', expect.anything());
     });
 
     it('should handle packaging materials', async () => {
@@ -903,7 +906,7 @@ describe('calculateProductCarbonFootprint', () => {
 
       expect(result.success).toBe(true);
       // 350g should be normalized to 0.35kg
-      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.35, 'org-456');
+      expect(mockResolveImpactFactors).toHaveBeenCalledWith(expect.anything(), 0.35, 'org-456', expect.anything());
     });
 
     it('should handle materials with supplier data source', async () => {

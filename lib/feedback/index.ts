@@ -148,6 +148,42 @@ export async function createTicket(
 }
 
 /**
+ * Request beta access for a feature.
+ *
+ * Creates a feedback ticket with a standardised title and description
+ * so the admin team can action it without the user filling in a form.
+ */
+export async function requestBetaAccess(
+  organizationId: string,
+  featureName: string,
+  organizationName?: string
+): Promise<void> {
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) {
+    throw new Error('Not authenticated');
+  }
+
+  const orgLabel = organizationName || organizationId;
+
+  const { error } = await supabase
+    .from('feedback_tickets')
+    .insert({
+      organization_id: organizationId,
+      created_by: userData.user.id,
+      title: `Beta access request: ${featureName}`,
+      description: `${orgLabel} is requesting beta access to ${featureName}.`,
+      category: 'feature',
+      priority: 'medium',
+      page_url: typeof window !== 'undefined' ? window.location.pathname : undefined,
+    });
+
+  if (error) {
+    console.error('Error requesting beta access:', error);
+    throw error;
+  }
+}
+
+/**
  * Update a ticket
  */
 export async function updateTicket(

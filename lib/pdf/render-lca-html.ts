@@ -598,6 +598,115 @@ function renderClimatePage(data: LCAReportData): string {
     </div>`;
 }
 
+function renderViticulturePage(data: LCAReportData): string {
+  const viti = data.viticultureDetail;
+  const removals = data.flagRemovals;
+  if (!viti) return ''; // No viticulture data — skip this page entirely
+
+  // Extended impact rows (only non-zero)
+  const extImpacts = [
+    { label: 'Freshwater ecotoxicity', ...viti.extendedImpacts.freshwaterEcotoxicity },
+    { label: 'Terrestrial ecotoxicity', ...viti.extendedImpacts.terrestrialEcotoxicity },
+    { label: 'Human toxicity (non-carcinogenic)', ...viti.extendedImpacts.humanToxicity },
+    { label: 'Freshwater eutrophication', ...viti.extendedImpacts.freshwaterEutrophication },
+    { label: 'Water scarcity (AWARE)', ...viti.extendedImpacts.waterScarcity },
+  ].filter(i => i.value > 0);
+
+  const vintageText = viti.vintageYears.length > 0
+    ? `Based on ${viti.vintageYears.length} vintage${viti.vintageYears.length > 1 ? 's' : ''} (${viti.vintageYears.join(', ')}), ${viti.averagingMethod === 'median_3yr' ? 'median averaging' : viti.averagingMethod === 'average_2yr' ? '2-year average' : 'single vintage'}.`
+    : '';
+
+  const fmtNum = (n: number, d = 4) => n < 0.001 && n > 0 ? n.toExponential(2) : n.toFixed(d);
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('05b', 'Viticulture & Land Stewardship')}
+
+      <!-- Primary data badge -->
+      <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-bottom: 20px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></div>
+        <span style="font-size: 11px; font-weight: 600; color: #166534;">Primary Data (Vineyard)</span>
+        <span style="font-size: 10px; color: #78716c; margin-left: 4px;">Quality: ${viti.dataQualityGrade}</span>
+      </div>
+
+      <!-- Headline metrics -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Viticulture Emissions</div>
+          <div class="metric-value" style="font-size: 28px;">${fmtNum(viti.emissionsTotal)}</div>
+          <div class="metric-unit">kg CO&#8322;e per functional unit</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Share of Product Footprint</div>
+          <div class="metric-value" style="font-size: 28px;">${viti.percentOfTotal}%</div>
+          <div class="metric-unit">of total lifecycle emissions</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Primary Data</div>
+          <div class="metric-value" style="font-size: 28px;">${viti.primaryDataPercent}%</div>
+          <div class="metric-unit">of emissions from primary data</div>
+        </div>
+      </div>
+
+      ${removals && removals.soilCarbonCo2e > 0 ? `
+      <!-- FLAG Removals section -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+        <div style="background: #1c1917; border-radius: 12px; padding: 20px; color: white;">
+          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #ccff00; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Emissions (FLAG)</div>
+          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; margin-bottom: 12px;">${fmtNum(viti.emissionsTotal)} <span style="font-size: 12px; color: #a8a29e;">kg CO&#8322;e</span></div>
+          <div style="font-size: 11px; color: #a8a29e;">Includes N&#8322;O from soils, fuel combustion, pesticide production, and irrigation energy</div>
+        </div>
+        <div style="background: #052e16; border-radius: 12px; padding: 20px; color: white;">
+          <div style="font-size: 10px; font-family: 'Fira Code', monospace; color: #22c55e; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px;">Removals (FLAG)</div>
+          <div style="font-size: 24px; font-family: 'Playfair Display', serif; font-weight: 700; color: #22c55e; margin-bottom: 12px;">${fmtNum(removals.soilCarbonCo2e)} <span style="font-size: 12px; color: #6ee7b7;">kg CO&#8322;e</span></div>
+          <div style="font-size: 11px; color: #6ee7b7;">Soil carbon sequestration (${removals.isVerified ? 'verified measurement' : 'practice-based default'})</div>
+        </div>
+      </div>
+      <div style="font-size: 10px; color: #78716c; margin-bottom: 20px; padding: 10px; background: #fafaf9; border-radius: 6px; border-left: 3px solid #ccff00;">
+        <strong>SBTi FLAG Compliance:</strong> Emissions and removals are reported separately and never netted, in accordance with SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2. Removals represent soil organic carbon sequestration and are reported as positive values.
+      </div>
+      ` : ''}
+
+      ${extImpacts.length > 0 ? `
+      <!-- Extended impact categories -->
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 600; margin-bottom: 10px;">Extended Environmental Impact Categories</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Impact Category</th>
+              <th style="text-align: right;">Value</th>
+              <th>Unit</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${extImpacts.map(i => `
+              <tr>
+                <td>${i.label}</td>
+                <td style="text-align: right; font-family: 'Fira Code', monospace; font-size: 11px;">${fmtNum(i.value)}</td>
+                <td style="font-size: 11px; color: #78716c;">${i.unit}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="font-size: 10px; color: #a8a29e; margin-top: 6px;">
+          Ecotoxicity characterisation: USEtox 2.0 (UNEP-SETAC consensus model). Water scarcity: AWARE method (ISO 14046).
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Data provenance -->
+      <div style="background: #fafaf9; border-radius: 8px; padding: 14px; font-size: 11px; color: #57534e;">
+        <div style="font-weight: 600; margin-bottom: 6px; color: #1c1917;">Data Provenance</div>
+        ${vintageText ? `<div style="margin-bottom: 4px;">${vintageText}</div>` : ''}
+        <div style="margin-bottom: 4px;"><strong>Primary data collected:</strong> Fertiliser type, quantity, and N content; pesticide applications and type; diesel and petrol consumption; irrigation volume and energy source; grape yield; soil management practice.</div>
+        <div><strong>Secondary emission factors:</strong> IPCC 2019 Refinement Tier 1 (N&#8322;O); DEFRA 2025 (fuel combustion); USEtox 2.0 (ecotoxicity); AWARE (water scarcity); ecoinvent 3.12 (grid electricity).</div>
+      </div>
+
+      ${renderPageFooter(8, true)}
+    </div>`;
+}
+
 function renderGhgDetailedPage(data: LCAReportData): string {
   const ghg = data.ghgDetailed;
 
@@ -784,14 +893,14 @@ function renderIngredientBreakdownPage(data: LCAReportData): string {
     const rows = pageIngredients.map(ing => {
       // Ingredient cell: show real name, then proxy factor below if different
       const ingredientCell = ing.isProxy
-        ? `<td style="max-width: 110px;">
-            <div style="font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(ing.name)}</div>
-            <div style="font-size: 8px; color: #f59e0b; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        ? `<td style="min-width: 160px; max-width: 220px;">
+            <div style="font-weight: 500; word-wrap: break-word;">${escapeHtml(ing.name)}</div>
+            <div style="font-size: 8px; color: #f59e0b; margin-top: 2px; word-wrap: break-word;">
               &#8627; Proxy: ${escapeHtml(ing.calculationFactor)}
             </div>
             <div style="font-size: 7.5px; color: #78716c;">${escapeHtml(ing.factorDatabase)}</div>
            </td>`
-        : `<td style="font-weight: 500; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        : `<td style="font-weight: 500; min-width: 160px; max-width: 220px; word-wrap: break-word;">
             ${escapeHtml(ing.name)}
             <div style="font-size: 7.5px; color: #78716c; margin-top: 2px;">${escapeHtml(ing.factorDatabase)}</div>
            </td>`;
@@ -1472,6 +1581,7 @@ export function renderLcaReportHtml(data: LCAReportData): string {
     renderMethodologyPage(data),
     renderDataQualityPage(data),
     renderClimatePage(data),
+    renderViticulturePage(data),
     renderGhgDetailedPage(data),
     renderEnvironmentalImpactsPages(data),
     renderIngredientBreakdownPage(data),

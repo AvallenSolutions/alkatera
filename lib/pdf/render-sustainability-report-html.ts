@@ -157,6 +157,18 @@ interface CommunityImpactData {
   localSourcingRate: number | null;
 }
 
+interface VineyardReportData {
+  name: string;
+  hectares: number;
+  certification: string;
+  climateZone: string;
+  vintages: number;
+  emissionsPerHa: number;
+  waterPerHa: number;
+  removalsPerHa: number;
+  yieldPerHa: number;
+}
+
 interface ReportData {
   organization: OrganizationInfo;
   emissions: EmissionsData;
@@ -164,6 +176,7 @@ interface ReportData {
   products: ProductFootprint[];
   facilities: FacilityInfo[];
   suppliers?: SupplierData[];
+  vineyards?: VineyardReportData[];
   standards: StandardStatus[];
   dataQuality?: DataQualityMetrics;
   peopleCulture?: PeopleCultureData;
@@ -175,6 +188,7 @@ interface ReportData {
     hasProducts: boolean;
     hasFacilities: boolean;
     hasSuppliers?: boolean;
+    hasVineyards?: boolean;
     hasPeopleCulture?: boolean;
     hasGovernance?: boolean;
     hasCommunityImpact?: boolean;
@@ -714,6 +728,77 @@ function renderProductsPage(config: ReportConfig, data: ReportData): string {
     </div>`;
 }
 
+function renderVineyardsPage(config: ReportConfig, data: ReportData): string {
+  if (!data.vineyards || data.vineyards.length === 0) return '';
+
+  const totalHa = data.vineyards.reduce((sum, v) => sum + v.hectares, 0);
+  const avgEmissions = data.vineyards.reduce((sum, v) => sum + v.emissionsPerHa, 0) / data.vineyards.length;
+  const totalRemovals = data.vineyards.reduce((sum, v) => sum + v.removalsPerHa * v.hectares, 0);
+
+  const vineyardRows = data.vineyards.map(v => `
+    <tr>
+      <td style="font-weight: 500;">${escapeHtml(v.name)}</td>
+      <td style="text-align: center;">${formatNumber(v.hectares, 1)}</td>
+      <td style="text-align: center; text-transform: capitalize;">${escapeHtml(v.certification)}</td>
+      <td style="text-align: right;">${formatNumber(v.emissionsPerHa, 1)}</td>
+      <td style="text-align: right;">${formatNumber(v.waterPerHa, 0)}</td>
+      <td style="text-align: right; color: #22c55e;">${formatNumber(v.removalsPerHa, 1)}</td>
+      <td style="text-align: center;">${v.vintages}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('05', 'Viticulture &amp; Land Stewardship')}
+
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px;">
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Vineyard Area</div>
+          <div class="metric-value" style="font-size: 32px;">${formatNumber(totalHa, 1)}</div>
+          <div class="metric-unit">hectares</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Avg Emissions</div>
+          <div class="metric-value" style="font-size: 24px;">${formatNumber(avgEmissions, 1)}</div>
+          <div class="metric-unit">kg CO&#8322;e per hectare</div>
+        </div>
+        <div class="metric-card" style="text-align: center; border-left: 3px solid #22c55e;">
+          <div class="metric-label">Soil Carbon Removals</div>
+          <div class="metric-value" style="font-size: 24px; color: #22c55e;">${formatNumber(totalRemovals, 0)}</div>
+          <div class="metric-unit">kg CO&#8322;e sequestered</div>
+        </div>
+        <div class="metric-card" style="text-align: center;">
+          <div class="metric-label">Vineyards</div>
+          <div class="metric-value" style="font-size: 32px;">${data.vineyards.length}</div>
+          <div class="metric-unit">assessed</div>
+        </div>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Vineyard</th>
+            <th style="text-align: center;">Hectares</th>
+            <th style="text-align: center;">Certification</th>
+            <th style="text-align: right;">kg CO&#8322;e/ha</th>
+            <th style="text-align: right;">Water m&#179;/ha</th>
+            <th style="text-align: right;">Removals/ha</th>
+            <th style="text-align: center;">Vintages</th>
+          </tr>
+        </thead>
+        <tbody>${vineyardRows}</tbody>
+      </table>
+
+      <div style="margin-top: 20px; padding: 16px; background: #f5f5f4; border-radius: 8px; font-size: 11px; color: #78716c;">
+        <strong style="color: #1c1917;">SBTi FLAG Compliance:</strong> Emissions and soil carbon removals are reported
+        separately in accordance with SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2. Removals are never netted
+        against emissions. N&#8322;O calculations use IPCC 2019 Refinement Tier 1 methodology with climate zone disaggregation.
+      </div>
+
+      ${renderPageFooter(5)}
+    </div>`;
+}
+
 function renderPeopleCulturePage(config: ReportConfig, data: ReportData): string {
   if (!data.peopleCulture) return '';
   const pc = data.peopleCulture;
@@ -1209,6 +1294,8 @@ export function renderSustainabilityReportHtml(
       ? renderTrendsPage(config, data) : '',
     sections.has('products') && data.dataAvailability.hasProducts
       ? renderProductsPage(config, data) : '',
+    data.dataAvailability.hasVineyards && data.vineyards && data.vineyards.length > 0
+      ? renderVineyardsPage(config, data) : '',
     sections.has('people') && data.dataAvailability.hasPeopleCulture
       ? renderPeopleCulturePage(config, data) : '',
     sections.has('governance') && data.dataAvailability.hasGovernance

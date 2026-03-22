@@ -210,6 +210,9 @@ export async function aggregateProductImpacts(
 
   let rawMaterialsEmissions = 0;
   let containerEmissions = 0; // sub-total of rawMaterialsEmissions: inbound delivery container embodied carbon
+  let viticultureEmissions = 0; // sub-total of rawMaterialsEmissions: on-site vineyard growing
+  let viticultureRemovalsCo2e = 0; // FLAG: soil carbon removals (tracked separately, never netted)
+  let viticultureMethodology: string | null = null; // Captured from first viticulture row
   let packagingEmissions = 0;
   let processingEmissions = 0;
   let distributionEmissions = 0;
@@ -272,6 +275,18 @@ export async function aggregateProductImpacts(
       packagingEmissions += climateImpact;
     } else if (material.material_name?.startsWith('[Maturation]')) {
       processingEmissions += climateImpact;
+    } else if (material.material_name?.startsWith('[Viticulture Removals]')) {
+      // FLAG: Soil carbon removals tracked separately, never netted against emissions.
+      // The impact_removals_co2e field stores the positive removal value.
+      viticultureRemovalsCo2e += Math.abs(Number((material as any).impact_removals_co2e || 0));
+      // Do NOT add to any emission bucket — removals are reported independently.
+    } else if (material.material_name?.startsWith('[Viticulture]')) {
+      // On-site vineyard growing emissions (fertiliser, fuel, irrigation, land)
+      rawMaterialsEmissions += climateImpact;
+      viticultureEmissions += climateImpact;
+      if (!viticultureMethodology && (material as any).methodology) {
+        viticultureMethodology = (material as any).methodology;
+      }
     } else {
       rawMaterialsEmissions += climateImpact;
       // Track inbound container sub-total (already included in climateImpact)
@@ -895,11 +910,20 @@ export async function aggregateProductImpacts(
       by_lifecycle_stage: {
         raw_materials: rawMaterialsEmissions,
         inbound_containers: containerEmissions, // sub-item of raw_materials (already included in that total)
+        viticulture: viticultureEmissions, // sub-item of raw_materials: on-site vineyard growing (already included)
         processing: processingEmissions,
         packaging: packagingEmissions,
         distribution: distributionEmissions,
         use_phase: usePhaseEmissions,
         end_of_life: endOfLifeEmissions,
+      },
+      // FLAG (SBTi Forest, Land and Agriculture): soil carbon removals
+      // reported SEPARATELY from emissions per FLAG Guidance v1.2.
+      // These are NEVER subtracted from total_carbon_footprint.
+      flag_removals: {
+        soil_carbon_co2e: viticultureRemovalsCo2e,
+        methodology: viticultureRemovalsCo2e > 0 ? 'practice_based_default' : null,
+        viticulture_notes: viticultureMethodology,
       },
       by_ghg: {
         co2_fossil: totalCO2Fossil,

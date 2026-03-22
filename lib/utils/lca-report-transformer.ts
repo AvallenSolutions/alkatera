@@ -26,12 +26,19 @@ interface AggregatedImpacts {
   breakdown?: {
     by_lifecycle_stage?: {
       raw_materials?: number;
+      viticulture?: number;       // Sub-total of raw_materials: self-grown vineyard
+      inbound_containers?: number; // Sub-total of raw_materials: delivery containers
       packaging?: number;
       packaging_stage?: number; // Legacy alias
       distribution?: number;
       processing?: number;
       use_phase?: number;
       end_of_life?: number;
+    };
+    flag_removals?: {
+      soil_carbon_co2e?: number;
+      methodology?: string | null;
+      viticulture_notes?: string | null;
     };
     by_scope?: {
       scope1?: number;
@@ -298,13 +305,22 @@ export function transformLCADataForReport(
   const landUse = impacts.land_use || 0;
 
   const rawMaterials = lifecycleStages.raw_materials || 0;
+  const viticulture = lifecycleStages.viticulture || 0;
+  const purchasedIngredients = rawMaterials - viticulture; // viticulture is a sub-total already included in raw_materials
   const packaging = lifecycleStages.packaging ?? lifecycleStages.packaging_stage ?? 0;
   const distribution = lifecycleStages.distribution || 0;
   const processing = lifecycleStages.processing || 0;
   const usePhase = lifecycleStages.use_phase || 0;
   const endOfLife = lifecycleStages.end_of_life || 0;
 
+  // FLAG removals (SBTi - reported separately from emissions)
+  const flagRemovals = breakdown.flag_removals || null;
+
   const totalFromStages = rawMaterials + packaging + distribution + processing + usePhase + endOfLife;
+  const hasViticulture = viticulture > 0;
+  // When viticulture data exists, split the stages for the chart
+  const viticulturePct = totalFromStages > 0 ? (viticulture / totalFromStages) * 100 : 0;
+  const purchasedIngredientsPct = totalFromStages > 0 ? (purchasedIngredients / totalFromStages) * 100 : 0;
   const rawMaterialsPct = totalFromStages > 0 ? (rawMaterials / totalFromStages) * 100 : 0;
   const packagingPct = totalFromStages > 0 ? (packaging / totalFromStages) * 100 : 0;
   const distributionPct = totalFromStages > 0 ? (distribution / totalFromStages) * 100 : 0;
@@ -331,14 +347,24 @@ export function transformLCADataForReport(
   const dqScore = dataQuality.score ?? 40;
   const dqRating = dataQuality.rating || (dqScore >= 80 ? 'Good' : dqScore >= 50 ? 'Fair' : 'Poor');
 
-  const chartBreakdown = [
-    { name: "Raw Materials", value: rawMaterialsPct, color: "#22c55e" },
-    { name: "Packaging", value: packagingPct, color: "#eab308" },
-    { name: "Distribution", value: distributionPct, color: "#f97316" },
-    { name: "Processing", value: processingPct, color: "#3b82f6" },
-    { name: "Use Phase", value: usePhasePct, color: "#8b5cf6" },
-    { name: "End of Life", value: endOfLifePct, color: "#ef4444" },
-  ].filter(item => item.value > 0);
+  const chartBreakdown = hasViticulture
+    ? [
+        { name: "Viticulture", value: viticulturePct, color: "#ccff00" },
+        { name: "Purchased Ingredients", value: purchasedIngredientsPct, color: "#22c55e" },
+        { name: "Packaging", value: packagingPct, color: "#eab308" },
+        { name: "Distribution", value: distributionPct, color: "#f97316" },
+        { name: "Processing", value: processingPct, color: "#3b82f6" },
+        { name: "Use Phase", value: usePhasePct, color: "#8b5cf6" },
+        { name: "End of Life", value: endOfLifePct, color: "#ef4444" },
+      ].filter(item => item.value > 0)
+    : [
+        { name: "Raw Materials", value: rawMaterialsPct, color: "#22c55e" },
+        { name: "Packaging", value: packagingPct, color: "#eab308" },
+        { name: "Distribution", value: distributionPct, color: "#f97316" },
+        { name: "Processing", value: processingPct, color: "#3b82f6" },
+        { name: "Use Phase", value: usePhasePct, color: "#8b5cf6" },
+        { name: "End of Life", value: endOfLifePct, color: "#ef4444" },
+      ].filter(item => item.value > 0);
 
   // Build waste stream from actual material data where possible
   const packagingMaterials = materials.filter((m: any) =>
@@ -960,14 +986,21 @@ export function transformLCADataForReport(
       // Previously only 4 stages were listed, so cradle-to-consumer/grave reports
       // had a mismatch between the pie chart (which included all stages) and the
       // stages table (which silently omitted use phase and end of life).
-      stages: [
-        { label: "Raw Materials", value: rawMaterials, unit: "kg CO\u2082eq", percentage: rawMaterialsPct.toFixed(1), color: "green" },
+      stages: (hasViticulture
+        ? [
+            { label: "Viticulture", value: viticulture, unit: "kg CO\u2082eq", percentage: viticulturePct.toFixed(1), color: "lime" },
+            { label: "Purchased Ingredients", value: purchasedIngredients, unit: "kg CO\u2082eq", percentage: purchasedIngredientsPct.toFixed(1), color: "green" },
+          ]
+        : [
+            { label: "Raw Materials", value: rawMaterials, unit: "kg CO\u2082eq", percentage: rawMaterialsPct.toFixed(1), color: "green" },
+          ]
+      ).concat([
         { label: "Packaging", value: packaging, unit: "kg CO\u2082eq", percentage: packagingPct.toFixed(1), color: "yellow" },
         { label: "Distribution", value: distribution, unit: "kg CO\u2082eq", percentage: distributionPct.toFixed(1), color: "orange" },
         { label: "Processing", value: processing, unit: "kg CO\u2082eq", percentage: processingPct.toFixed(1), color: "blue" },
         { label: "Use Phase", value: usePhase, unit: "kg CO\u2082eq", percentage: usePhasePct.toFixed(1), color: "purple" },
         { label: "End of Life", value: endOfLife, unit: "kg CO\u2082eq", percentage: endOfLifePct.toFixed(1), color: "red" },
-      ].filter(stage => stage.value !== 0), // include negatives (EoL can be negative via recycling credits)
+      ]).filter(stage => stage.value !== 0), // include negatives (EoL can be negative via recycling credits)
       scopes: [
         { name: "Scope 1 (Direct)", value: scope1Pct.toFixed(1) },
         { name: "Scope 2 (Energy)", value: scope2Pct.toFixed(1) },
@@ -1061,26 +1094,40 @@ export function transformLCADataForReport(
                item.name === "Packaging" ? "#3b82f6" :
                item.name === "Processing" ? "#60a5fa" : "#1d4ed8"
       })),
-      sources: materials.slice(0, 8).map((m: any) => {
-        const origin = (m.origin_country || m.country_of_origin || '').toLowerCase();
-        // Per-source water stress risk based on origin country rather than
-        // a single global scarcity threshold.
-        let risk: string;
-        if (['spain', 'italy', 'india', 'south africa', 'mexico', 'australia', 'egypt', 'pakistan'].some(c => origin.includes(c))) {
-          risk = 'HIGH';
-        } else if (['china', 'usa', 'united states', 'france', 'turkey', 'portugal'].some(c => origin.includes(c))) {
-          risk = 'MEDIUM';
-        } else {
-          risk = 'LOW';
+      sources: (() => {
+        const materialSources = materials.slice(0, 8).map((m: any) => {
+          const origin = (m.origin_country || m.country_of_origin || '').toLowerCase();
+          let risk: string;
+          if (['spain', 'italy', 'india', 'south africa', 'mexico', 'australia', 'egypt', 'pakistan'].some(c => origin.includes(c))) {
+            risk = 'HIGH';
+          } else if (['china', 'usa', 'united states', 'france', 'turkey', 'portugal'].some(c => origin.includes(c))) {
+            risk = 'MEDIUM';
+          } else {
+            risk = 'LOW';
+          }
+          return {
+            source: m.material_name || "Material",
+            location: m.origin_country || m.country_of_origin || "Unknown",
+            volume: `${(m.impact_water || 0).toFixed(3)} L`,
+            risk,
+            score: parseFloat((10.0).toFixed(3))
+          };
+        });
+        // Add "Processing & Facility" row for water not attributed to materials
+        // (facility overheads, winery operations, loss multiplier adjustments)
+        const materialWaterSum = materials.reduce((sum: number, m: any) => sum + (m.impact_water || 0), 0);
+        const otherWater = waterConsumption - materialWaterSum;
+        if (otherWater > 0.0005) {
+          materialSources.push({
+            source: 'Processing & Facility Overheads',
+            location: 'Allocated from production sites',
+            volume: `${otherWater.toFixed(3)} L`,
+            risk: 'LOW',
+            score: 10,
+          });
         }
-        return {
-          source: m.material_name || "Material",
-          location: m.origin_country || m.country_of_origin || "Unknown",
-          volume: `${((m.impact_water || 0) * (m.quantity || 1)).toFixed(3)} L`,
-          risk,
-          score: parseFloat((10.0).toFixed(3))
-        };
-      }),
+        return materialSources;
+      })(),
       methodology: {
         steps: [
           { step: 1, title: "Inventory Phase", description: "Quantify water consumption (litres) for each process and material in the product system" },
@@ -1148,13 +1195,28 @@ export function transformLCADataForReport(
     },
     landUse: {
       totalLandUse: `${landUse.toFixed(3)}m\u00B2`,
-      breakdown: materials.slice(0, 8).map((m: any) => ({
-        material: m.material_name || "Material",
-        origin: m.origin_country || m.country_of_origin || "Unknown",
-        mass: `${(m.quantity || 0).toFixed(3)} kg`,
-        intensity: parseFloat(((m.impact_land || 0) / (m.quantity || 1)).toFixed(3)),
-        footprint: `${(m.impact_land || landUse / Math.max(materials.length, 1)).toFixed(3)} m\u00B2`
-      })),
+      breakdown: (() => {
+        const materialRows = materials.slice(0, 8).map((m: any) => ({
+          material: m.material_name || "Material",
+          origin: m.origin_country || m.country_of_origin || "Unknown",
+          mass: `${(m.quantity || 0).toFixed(3)} kg`,
+          intensity: m.quantity > 0 ? parseFloat(((m.impact_land || 0) / m.quantity).toFixed(3)) : 0,
+          footprint: `${(m.impact_land || 0).toFixed(3)} m\u00B2`,
+        }));
+        // Add "Other" row for land use from facility overheads and loss multiplier
+        const materialLandSum = materials.reduce((sum: number, m: any) => sum + (m.impact_land || 0), 0);
+        const otherLand = landUse - materialLandSum;
+        if (otherLand > 0.0005) {
+          materialRows.push({
+            material: 'Processing & Facility Overheads',
+            origin: 'Allocated from production sites',
+            mass: '-',
+            intensity: 0,
+            footprint: `${otherLand.toFixed(3)} m\u00B2`,
+          });
+        }
+        return materialRows;
+      })(),
       methodology: {
         categories: [
           { title: "Land Occupation", value: "m\u00B2 \u00B7 year", description: "Area \u00D7 time (m\u00B2\u00B7yr) that land is occupied for production processes" },
@@ -1345,5 +1407,63 @@ export function transformLCADataForReport(
         totalNetEmissions: eolMeta.total_net_emissions,
       };
     })(),
+
+    // Viticulture detail (only present when product has self-grown vineyard data)
+    viticultureDetail: hasViticulture ? (() => {
+      // Extract viticulture-specific data from the synthetic materials
+      const vitiMaterials = materials.filter((m: any) => m.material_name?.startsWith('[Viticulture]'));
+      const vitiRemovalMaterials = materials.filter((m: any) => m.material_name?.startsWith('[Viticulture Removals]'));
+
+      // Parse vintage info from source_reference of first viticulture material
+      const firstVitiMaterial = vitiMaterials[0];
+      const sourceRef = firstVitiMaterial?.source_reference || '';
+      const vintageMatch = sourceRef.match(/vintages?\s*([\d,\s]+)/i);
+      const vintageYears = vintageMatch
+        ? vintageMatch[1].split(',').map((y: string) => parseInt(y.trim())).filter((y: number) => !isNaN(y))
+        : [];
+      const methodMatch = sourceRef.match(/(single|average_2yr|median_3yr)/);
+      const averagingMethod = methodMatch ? methodMatch[1] : vintageYears.length >= 3 ? 'median_3yr' : vintageYears.length === 2 ? 'average_2yr' : 'single';
+
+      // Calculate primary data percentage (viticulture materials are primary, others are secondary)
+      const vitiClimate = viticulture;
+      const totalClimateAbs = totalFromStages > 0 ? totalFromStages : 1;
+      const primaryDataPercent = (vitiClimate / totalClimateAbs) * 100;
+
+      // Extract extended impact categories from viticulture materials
+      const sumField = (field: string) => vitiMaterials.reduce((s: number, m: any) => s + (Number(m[field]) || 0), 0);
+
+      return {
+        emissionsTotal: viticulture,
+        percentOfTotal: viticulturePct.toFixed(1),
+        vintageYears,
+        averagingMethod,
+        dataQualityGrade: firstVitiMaterial?.data_quality_grade || 'MEDIUM',
+        primaryDataPercent: Math.round(primaryDataPercent),
+        extendedImpacts: {
+          freshwaterEcotoxicity: { value: sumField('impact_freshwater_ecotoxicity'), unit: 'CTUe' },
+          terrestrialEcotoxicity: { value: sumField('impact_terrestrial_ecotoxicity'), unit: 'CTUe' },
+          humanToxicity: { value: sumField('impact_human_toxicity_non_carcinogenic'), unit: 'CTUh' },
+          freshwaterEutrophication: { value: sumField('impact_freshwater_eutrophication'), unit: 'kg P eq' },
+          waterScarcity: { value: sumField('impact_water_scarcity'), unit: 'm\u00B3 eq' },
+        },
+        emissionBreakdown: {
+          n2oDirect: 0,   // Not individually stored on synthetic rows - shown at vineyard level
+          n2oIndirect: 0,
+          n2oCropResidue: 0,
+          fertiliserProduction: 0,
+          machineryFuel: 0,
+          irrigationEnergy: 0,
+          pesticideProduction: 0,
+        },
+      };
+    })() : undefined,
+
+    // FLAG removals (SBTi Forest, Land and Agriculture)
+    flagRemovals: flagRemovals && (flagRemovals.soil_carbon_co2e || 0) > 0 ? {
+      soilCarbonCo2e: flagRemovals.soil_carbon_co2e || 0,
+      methodology: flagRemovals.methodology || 'practice_based_default',
+      isVerified: flagRemovals.methodology === 'measured',
+      notes: flagRemovals.viticulture_notes || null,
+    } : undefined,
   };
 }

@@ -43,6 +43,16 @@ const BETA_FEATURES = [
     label: 'EPR Compliance',
     description: 'Access to the UK Extended Producer Responsibility compliance tools',
   },
+  {
+    code: 'xero_integration_beta',
+    label: 'Xero Integration',
+    description: 'Connect Xero accounting software for automated spend-based carbon accounting',
+  },
+  {
+    code: 'viticulture_beta',
+    label: 'Viticulture (Self-Grown)',
+    description: 'Vineyard management and self-grown ingredient LCA calculations with FLAG-aligned soil carbon',
+  },
 ] as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

@@ -47,3 +47,182 @@ export const IPCC_AR6_GWP = {
 
 /** Type for the GWP constants object */
 export type IPCC_AR6_GWP_Type = typeof IPCC_AR6_GWP;
+
+// ---------------------------------------------------------------------------
+// IPCC 2019 Refinement: N2O Emission Factors from Managed Soils (Chapter 11)
+// ---------------------------------------------------------------------------
+// Used by viticulture-calculator.ts for field-level N2O from fertiliser
+// application. These are IPCC Tier 1 defaults, disaggregated by climate zone
+// per the 2019 Refinement to the 2006 Guidelines.
+//
+// Source: IPCC (2019) 2019 Refinement to the 2006 IPCC Guidelines for
+// National Greenhouse Gas Inventories, Volume 4, Chapter 11, Table 11.1
+// https://www.ipcc-nggip.iges.or.jp/public/2019rf/vol4.html
+
+/**
+ * Direct N2O emission factor (EF1): fraction of applied N emitted as N2O-N
+ *
+ * The 2019 Refinement disaggregates EF1 by climate zone:
+ *   - Wet climates: 0.016 (1.6%)
+ *   - Dry climates: 0.005 (0.5%)
+ *   - IPCC 2006 global default: 0.01 (1.0%)
+ *
+ * For organic N inputs, a lower factor applies (EF1_organic).
+ */
+export const IPCC_N2O_FACTORS = {
+  /** Direct N2O EF1 by climate zone (kg N2O-N per kg N applied) */
+  EF1: {
+    wet: 0.016,
+    dry: 0.005,
+    temperate: 0.01, // UK default (IPCC 2006 global value)
+  },
+  /** Direct N2O EF1 for organic N inputs (manure, compost) */
+  EF1_ORGANIC: {
+    wet: 0.006,
+    dry: 0.005,
+    temperate: 0.006,
+  },
+  /** Indirect N2O from volatilisation (EF4): kg N2O-N per kg NH3-N + NOx-N volatilised */
+  EF4: 0.014,
+  /** Indirect N2O from leaching/runoff (EF5): kg N2O-N per kg N leached */
+  EF5: 0.011,
+  /** Fraction of synthetic N that volatilises (FracGASF) */
+  FRAC_GASF: 0.11,
+  /** Fraction of organic N that volatilises (FracGASM) */
+  FRAC_GASM: 0.21,
+  /** Fraction of N lost to leaching/runoff (FracLEACH) */
+  FRAC_LEACH: 0.24,
+  /** Molecular weight conversion: N2O-N to N2O (44/28) */
+  N2O_N_TO_N2O: 44 / 28,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Soil Carbon Removal Defaults (practice-based)
+// ---------------------------------------------------------------------------
+// Conservative defaults for soil organic carbon sequestration by management
+// practice. Used when verified soil measurements are not available.
+//
+// FLAG Alignment: These values are reported as POSITIVE removals, never
+// subtracted from emissions. The platform reports them separately per SBTi
+// FLAG Guidance v1.2.
+//
+// Sources:
+//   - WineGB Carbon Calculator (Carbon Trust reviewed, Oct 2025)
+//   - OIV GHG Methodological Recommendations (2024 update)
+//   - Conservative end of published ranges to avoid over-claiming
+
+/** Soil carbon sequestration (kg CO2e removed per hectare per year) */
+export const SOIL_CARBON_REMOVAL_DEFAULTS: Record<string, number> = {
+  conventional_tillage: 0,
+  minimum_tillage: 150,
+  no_till: 350,
+  cover_cropping: 500,
+  composting: 300,
+  biochar_compost: 700,           // Biochar-compost amendment (Frontiers in Sustainable Food Systems, 2023)
+  regenerative_integrated: 600,   // Integrated regenerative (cover crops + min till + compost)
+} as const;
+
+// ---------------------------------------------------------------------------
+// Fuel Combustion Factors (DEFRA 2025)
+// ---------------------------------------------------------------------------
+// Subset of DEFRA factors relevant to viticulture field operations.
+// The full DEFRA library is in the staging_emission_factors table;
+// these are hardcoded for the calculator's direct use.
+
+export const DEFRA_FUEL_FACTORS = {
+  /** Diesel, including well-to-tank (kg CO2e per litre) */
+  DIESEL_PER_LITRE: 2.54,
+  /** Petrol, average biofuel blend (kg CO2e per litre) */
+  PETROL_PER_LITRE: 2.31,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Pesticide/Herbicide Production Factors
+// ---------------------------------------------------------------------------
+// Generic production emission factors for agrochemical active ingredients.
+// Phase 2 will add specific active ingredient mapping.
+
+export const AGROCHEMICAL_PRODUCTION_FACTORS = {
+  /** Generic pesticide active ingredient (kg CO2e per kg a.i.) */
+  PESTICIDE_GENERIC: 10.97,
+  /** Generic herbicide active ingredient (kg CO2e per kg a.i.) */
+  HERBICIDE_GENERIC: 6.30,
+  /** Average kg active ingredient per application per hectare (conservative estimate) */
+  AVG_AI_KG_PER_APPLICATION_PER_HA: 1.5,
+} as const;
+
+// ---------------------------------------------------------------------------
+// Crop Residue N2O (IPCC 2019 Refinement, Chapter 11, Table 11.2)
+// ---------------------------------------------------------------------------
+// N2O from decomposition of crop residues returned to soil (vine prunings).
+// Vine prunings are classified as "above-ground residue" with known N content.
+
+export const CROP_RESIDUE_FACTORS = {
+  /** Dry matter of vine prunings returned to soil (t DM/ha/yr, established vines) */
+  VINE_PRUNING_DM_PER_HA: 2.5,
+  /** N content of vine prunings (fraction of DM, IPCC Table 11.2) */
+  VINE_PRUNING_N_FRACTION: 0.008,  // 0.8%
+  /** Ratio of above-ground to below-ground residue N (R_BG:AG for perennial crops) */
+  ROOT_TURNOVER_RATIO: 0.4,        // 40% of above-ground N is also released by root turnover
+} as const;
+
+// ---------------------------------------------------------------------------
+// Pesticide Application Ecotoxicity Factors (USEtox 2.0 / PestLCI consensus)
+// ---------------------------------------------------------------------------
+// Characterisation factors for pesticide application-phase impacts per kg a.i.
+// applied. These capture toxicity from field application, NOT manufacturing
+// (which is already covered by AGROCHEMICAL_PRODUCTION_FACTORS).
+//
+// Sources:
+//   - USEtox 2.0 characterisation model (consensus, UNEP-SETAC)
+//   - PestLCI 2.0.6 (Birkved & Hauschild, 2006)
+//   - EU PEFCR for Wine (2018)
+
+export interface PesticideEcotoxProfile {
+  /** Freshwater ecotoxicity (CTUe per kg a.i.) */
+  freshwater_ecotox: number;
+  /** Terrestrial ecotoxicity (CTUe per kg a.i.) */
+  terrestrial_ecotox: number;
+  /** Human toxicity, non-carcinogenic (CTUh per kg a.i.) */
+  human_toxicity_nc: number;
+  /** Freshwater eutrophication (kg P eq per kg a.i.) */
+  freshwater_eutroph: number;
+}
+
+export const PESTICIDE_ECOTOX_PROFILES: Record<string, PesticideEcotoxProfile> = {
+  /** Copper fungicide (Bordeaux mixture) - high freshwater ecotoxicity */
+  copper_fungicide: {
+    freshwater_ecotox: 8500,    // CTUe/kg - copper is highly toxic to aquatic life
+    terrestrial_ecotox: 1200,   // CTUe/kg
+    human_toxicity_nc: 2.5e-5,  // CTUh/kg
+    freshwater_eutroph: 0.002,  // kg P eq/kg
+  },
+  /** Elemental sulfur - relatively low toxicity */
+  sulfur: {
+    freshwater_ecotox: 350,
+    terrestrial_ecotox: 180,
+    human_toxicity_nc: 1.0e-6,
+    freshwater_eutroph: 0.0005,
+  },
+  /** Synthetic fungicide (mancozeb/folpet class) */
+  synthetic_fungicide: {
+    freshwater_ecotox: 4200,
+    terrestrial_ecotox: 850,
+    human_toxicity_nc: 1.8e-5,
+    freshwater_eutroph: 0.001,
+  },
+  /** Glyphosate-based herbicide */
+  herbicide_glyphosate: {
+    freshwater_ecotox: 2800,
+    terrestrial_ecotox: 450,
+    human_toxicity_nc: 8.0e-6,
+    freshwater_eutroph: 0.015,  // Higher due to phosphonate structure
+  },
+  /** Generic pesticide (weighted average when type unknown) */
+  generic: {
+    freshwater_ecotox: 3500,
+    terrestrial_ecotox: 650,
+    human_toxicity_nc: 1.2e-5,
+    freshwater_eutroph: 0.003,
+  },
+} as const;

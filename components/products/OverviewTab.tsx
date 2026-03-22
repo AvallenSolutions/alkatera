@@ -64,22 +64,32 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
     }
 
     const rawMaterialsTotal = stages.raw_materials || 0;
-    const packagingTotal = stages.packaging ?? stages.packaging_stage ?? 0;
+    const viticultureTotal = (stages as any).viticulture || 0;
+    const purchasedIngredients = rawMaterialsTotal - viticultureTotal;
+    const packagingTotal = stages.packaging ?? (stages as any).packaging_stage ?? 0;
     const processingTotal = stages.processing || 0;
     const transportationTotal = stages.distribution || 0;
     const endOfLifeTotal = stages.end_of_life || 0;
     const usePhaseTotal = stages.use_phase || 0;
+
+    // FLAG removals (reported separately, never netted)
+    const flagRemovals = latestLCA.aggregated_impacts?.breakdown?.flag_removals;
+    const soilCarbonRemovals = (flagRemovals as any)?.soil_carbon_co2e || 0;
 
     const total = rawMaterialsTotal + packagingTotal + processingTotal + transportationTotal + endOfLifeTotal + usePhaseTotal;
     if (total === 0) return null;
 
     return {
       rawMaterials: rawMaterialsTotal,
+      viticulture: viticultureTotal,
+      purchasedIngredients,
+      hasViticulture: viticultureTotal > 0,
       packaging: packagingTotal,
       processing: processingTotal,
       transport: transportationTotal,
       endOfLife: endOfLifeTotal,
       usePhase: usePhaseTotal,
+      soilCarbonRemovals,
     };
   };
 
@@ -247,7 +257,15 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         >
           <SimpleBreakdownTable
             data={[
-              { name: 'Raw Materials', value: breakdown.rawMaterials, unit: 'kg CO₂e' },
+              ...(breakdown.hasViticulture
+                ? [
+                    { name: 'Viticulture (Primary)', value: breakdown.viticulture, unit: 'kg CO₂e' },
+                    { name: 'Purchased Ingredients', value: breakdown.purchasedIngredients, unit: 'kg CO₂e' },
+                  ]
+                : [
+                    { name: 'Raw Materials', value: breakdown.rawMaterials, unit: 'kg CO₂e' },
+                  ]
+              ),
               { name: 'Processing', value: breakdown.processing, unit: 'kg CO₂e' },
               { name: 'Packaging', value: breakdown.packaging, unit: 'kg CO₂e' },
               { name: 'Transport', value: breakdown.transport, unit: 'kg CO₂e' },
@@ -256,6 +274,22 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
             ]}
             showPercentages
           />
+          {breakdown.soilCarbonRemovals > 0 && (
+            <div className="mt-3 p-3 rounded-lg border border-[#ccff00]/20 bg-[#ccff00]/5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-[#ccff00]" />
+                  <span className="text-sm text-muted-foreground">Soil Carbon Removals (FLAG)</span>
+                </div>
+                <span className="text-sm font-medium text-[#ccff00]">
+                  -{breakdown.soilCarbonRemovals.toFixed(4)} kg CO₂e
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Reported separately per SBTi FLAG Guidance v1.2. Not netted against emissions.
+              </p>
+            </div>
+          )}
         </ImpactAccordion>
 
         <ImpactAccordion

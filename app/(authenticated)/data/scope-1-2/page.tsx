@@ -55,6 +55,7 @@ import { LogisticsDistributionCard } from '@/components/reports/LogisticsDistrib
 import { OperationalWasteCard } from '@/components/reports/OperationalWasteCard';
 import { MarketingMaterialsCard } from '@/components/reports/MarketingMaterialsCard';
 import { SpendImportCard } from '@/components/reports/SpendImportCard';
+import { XeroBaselineCard } from '@/components/reports/XeroBaselineCard';
 // New GHG Protocol Scope 3 category cards
 import { UpstreamTransportCard } from '@/components/reports/UpstreamTransportCard';
 import { DownstreamTransportCard } from '@/components/reports/DownstreamTransportCard';
@@ -195,6 +196,7 @@ export default function CompanyEmissionsPage() {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [scope3OverheadsCO2e, setScope3OverheadsCO2e] = useState(0);
+  const [xeroBaselineKg, setXeroBaselineKg] = useState(0);
 
   // New state for facility-based utility data
   const [utilityData, setUtilityData] = useState<UtilityDataEntry[]>([]);
@@ -1042,7 +1044,7 @@ export default function CompanyEmissionsPage() {
       // Fleet values are in tCO2e, utility values are in kgCO2e
       const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e;
       const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e;
-      const totalScope3Tonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e;
+      const totalScope3Tonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e + (xeroBaselineKg / 1000);
       const totalEmissionsTonnes = totalScope1Tonnes + totalScope2Tonnes + totalScope3Tonnes;
 
       // Only persist if we have actual data
@@ -1060,6 +1062,7 @@ export default function CompanyEmissionsPage() {
           products: scope3Cat1CO2e,          // in tonnes
           products_breakdown: scope3Cat1Breakdown,
           overheads: calculatedScope3OverheadsCO2e / 1000, // in tonnes
+          xero_baseline: xeroBaselineKg / 1000,           // in tonnes (spend-based)
           business_travel_fleet: fleetScope3CO2e,           // in tonnes (grey fleet)
           total: totalScope3Tonnes,
         },
@@ -1085,7 +1088,7 @@ export default function CompanyEmissionsPage() {
     // Debounce to avoid too many updates
     const timeoutId = setTimeout(persistEmissions, 1000);
     return () => clearTimeout(timeoutId);
-  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, scope3Cat1Breakdown]);
+  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, xeroBaselineKg, scope3Cat1Breakdown]);
 
   return (
     <div className="space-y-6">
@@ -1276,7 +1279,8 @@ export default function CompanyEmissionsPage() {
                               // Sum ALL Scope 3 categories:
                               // - scope3Cat1CO2e (Category 1 from LCAs) is in tonnes
                               // - calculatedScope3OverheadsCO2e (all other categories) is in kg
-                              const totalTonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000);
+                              // - xeroBaselineKg (spend-based estimates from Xero) is in kg
+                              const totalTonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + (xeroBaselineKg / 1000);
 
                               if (totalTonnes > 0) {
                                 return `${totalTonnes.toFixed(3)} tCO₂e`;
@@ -1691,6 +1695,16 @@ export default function CompanyEmissionsPage() {
                 organizationId={currentOrganization.id}
                 year={selectedYear}
                 onUpdate={fetchReportData}
+              />
+            )}
+
+            {/* Xero Spend Baselines */}
+            {currentOrganization && (
+              <XeroBaselineCard
+                organizationId={currentOrganization.id}
+                yearStart={`${selectedYear}-01-01`}
+                yearEnd={`${selectedYear}-12-31`}
+                onTotalCalculated={setXeroBaselineKg}
               />
             )}
 

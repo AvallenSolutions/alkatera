@@ -23,6 +23,11 @@ import { ProfileSettings } from '@/components/settings/ProfileSettings'
 import { TeamSettings } from '@/components/settings/TeamSettings'
 import { OrganisationSettings } from '@/components/settings/OrganisationSettings'
 import { SupportSettings } from '@/components/settings/SupportSettings'
+import { IntegrationsSettings } from '@/components/settings/IntegrationsSettings'
+import { FeatureGate } from '@/components/subscription/FeatureGate'
+import { VineyardSettings } from '@/components/settings/VineyardSettings'
+import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
+import { isViticultureEligible } from '@/lib/viticulture-utils'
 
 type BillingInterval = 'monthly' | 'annual'
 
@@ -54,6 +59,8 @@ export default function SettingsPage() {
 
   // Check if user is an admin (owner or admin)
   const isOrgAdmin = userRole === 'owner' || userRole === 'admin'
+  const { isAlkateraAdmin } = useIsAlkateraAdmin()
+  const showVineyards = isViticultureEligible(currentOrganization, isAlkateraAdmin)
   const {
     usage,
     tierName,
@@ -389,6 +396,8 @@ export default function SettingsPage() {
             <>
               <TabsTrigger value="team">Team</TabsTrigger>
               <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
+              {showVineyards && <TabsTrigger value="vineyards">Vineyards</TabsTrigger>}
+              <TabsTrigger value="integrations">Integrations</TabsTrigger>
             </>
           )}
           <TabsTrigger value="organisation">Organisation</TabsTrigger>
@@ -1076,6 +1085,18 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>}
+
+        {isOrgAdmin && showVineyards && <TabsContent value="vineyards" className="space-y-4">
+          <FeatureGate feature="viticulture_beta">
+            <VineyardSettings />
+          </FeatureGate>
+        </TabsContent>}
+
+        {isOrgAdmin && <TabsContent value="integrations" className="space-y-4">
+          <FeatureGate feature="xero_integration_beta">
+            <IntegrationsSettings showHeader={false} />
+          </FeatureGate>
         </TabsContent>}
 
         <TabsContent value="organisation" className="space-y-4">

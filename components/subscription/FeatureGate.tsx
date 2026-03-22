@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import {
   Lock,
@@ -18,7 +18,8 @@ import {
   Scale,
   Gift,
   FlaskConical,
-  Mail,
+  Link2,
+  Loader2,
 } from "lucide-react";
 import { useFeatureGate, FeatureCode, TierName } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TIER_PRICING } from "@/lib/stripe-config";
+import { useOrganization } from "@/lib/organizationContext";
+import { useToast } from "@/hooks/use-toast";
+import { requestBetaAccess } from "@/lib/feedback";
 
 interface FeatureGateProps {
   feature: FeatureCode;
@@ -436,6 +440,34 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Shield,
     category: "Compliance",
   },
+  xero_integration_beta: {
+    name: "Xero Integration",
+    description:
+      "Connect your Xero accounting software to automatically import financial data for spend-based carbon accounting. Currently in private beta.",
+    benefits: [
+      "Automatically import expense data from Xero",
+      "Classify transactions into emission categories",
+      "Calculate spend-based emission baselines",
+      "Upgrade data quality with activity-based detail prompts",
+      "Map supplier spend to Scope 3 supply chain emissions",
+    ],
+    icon: Link2,
+    category: "Integrations",
+  },
+  viticulture_beta: {
+    name: "Viticulture (Self-Grown Ingredients)",
+    description:
+      "Manage your vineyards and calculate the environmental impact of self-grown ingredients using primary data. Currently in private beta with SBTi FLAG-aligned soil carbon accounting.",
+    benefits: [
+      "Model vineyard-level climate, water, and land use impacts",
+      "SBTi FLAG-compliant reporting with separate emissions and removals",
+      "IPCC Tier 1 N\u2082O calculations for field-level accuracy",
+      "Soil carbon sequestration credits from regenerative practices",
+      "Growing profile questionnaire for easy data capture",
+    ],
+    icon: Leaf,
+    category: "Products & LCA",
+  },
   knowledge_bank_manage: {
     name: "Knowledge Bank (Upload & Manage)",
     description:
@@ -522,6 +554,8 @@ const featureNames: Record<FeatureCode, string> = {
   lca_end_of_life: "LCA End of Life (Cradle-to-Grave)",
   impact_valuation_beta: "Impact Valuation (Beta)",
   epr_beta: "EPR Compliance (Beta)",
+  xero_integration_beta: "Xero Integration (Beta)",
+  viticulture_beta: "Viticulture (Beta)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {
@@ -577,6 +611,11 @@ function LockedFeaturePage({
   requiredTier,
   className,
 }: LockedFeaturePageProps) {
+  const { currentOrganization } = useOrganization();
+  const { toast } = useToast();
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [hasRequested, setHasRequested] = useState(false);
+
   const info = featureInfo[feature];
   const name = info?.name || featureNames[feature];
   const description =
@@ -647,17 +686,54 @@ function LockedFeaturePage({
 
             <p className="text-sm text-muted-foreground mb-4 flex-1 leading-relaxed">
               {name} is available to select organisations during the beta period.
-              Contact the alka<strong>tera</strong> team to request access for
-              your organisation.
+              Request access and the alka<strong>tera</strong> team will get
+              back to you.
             </p>
 
-            <a href="mailto:hello@alkatera.com">
-              <Button className="w-full gap-2" size="default">
-                <Mail className="h-4 w-4" />
-                Contact alkatera for Access
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </a>
+            <Button
+              className="w-full gap-2"
+              size="default"
+              disabled={isRequesting || hasRequested}
+              onClick={async () => {
+                if (!currentOrganization) return;
+                setIsRequesting(true);
+                try {
+                  await requestBetaAccess(
+                    currentOrganization.id,
+                    name,
+                    currentOrganization.name
+                  );
+                  setHasRequested(true);
+                  toast({
+                    title: "Request sent",
+                    description: `We've received your request for ${name}. We'll be in touch shortly.`,
+                  });
+                } catch {
+                  toast({
+                    title: "Something went wrong",
+                    description: "Please try again or contact us at hello@alkatera.com",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsRequesting(false);
+                }
+              }}
+            >
+              {isRequesting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : hasRequested ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Request Sent
+                </>
+              ) : (
+                <>
+                  <FlaskConical className="h-4 w-4" />
+                  Request Beta Access
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </Button>
 
             <p className="mt-2.5 text-center text-xs text-muted-foreground">
               You&apos;re currently on the{" "}

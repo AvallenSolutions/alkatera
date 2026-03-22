@@ -319,6 +319,40 @@ export interface LCAReportData {
     description: string;
     reference: string;
   };
+
+  /** Viticulture detail (only present when product has self-grown vineyard data) */
+  viticultureDetail?: {
+    emissionsTotal: number;
+    percentOfTotal: string;
+    vintageYears: number[];
+    averagingMethod: string;
+    dataQualityGrade: string;
+    primaryDataPercent: number;
+    extendedImpacts: {
+      freshwaterEcotoxicity: { value: number; unit: string };
+      terrestrialEcotoxicity: { value: number; unit: string };
+      humanToxicity: { value: number; unit: string };
+      freshwaterEutrophication: { value: number; unit: string };
+      waterScarcity: { value: number; unit: string };
+    };
+    emissionBreakdown: {
+      n2oDirect: number;
+      n2oIndirect: number;
+      n2oCropResidue: number;
+      fertiliserProduction: number;
+      machineryFuel: number;
+      irrigationEnergy: number;
+      pesticideProduction: number;
+    };
+  };
+
+  /** FLAG removals (SBTi Forest, Land and Agriculture) - only when viticulture data exists */
+  flagRemovals?: {
+    soilCarbonCo2e: number;
+    methodology: string;
+    isVerified: boolean;
+    notes: string | null;
+  };
 }
 
 export interface PageWrapperProps {

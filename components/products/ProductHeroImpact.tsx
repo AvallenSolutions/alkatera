@@ -33,6 +33,10 @@ interface CarbonBreakdown {
   transport: number;
   endOfLife?: number;
   usePhase?: number;
+  viticulture?: number;
+  purchasedIngredients?: number;
+  hasViticulture?: boolean;
+  soilCarbonRemovals?: number;
 }
 
 interface ProductHeroImpactProps {
@@ -54,8 +58,10 @@ interface ProductHeroImpactProps {
   className?: string;
 }
 
-const LAYER_COLORS = {
+const LAYER_COLORS: Record<string, { fill: string; glow: string; label: string }> = {
   rawMaterials: { fill: '#84cc16', glow: 'rgba(132, 204, 22, 0.4)', label: 'Raw Materials' },
+  viticulture: { fill: '#ccff00', glow: 'rgba(204, 255, 0, 0.4)', label: 'Viticulture' },
+  purchasedIngredients: { fill: '#84cc16', glow: 'rgba(132, 204, 22, 0.4)', label: 'Purchased Ingredients' },
   processing: { fill: '#a855f7', glow: 'rgba(168, 85, 247, 0.4)', label: 'Processing' },
   packaging: { fill: '#f97316', glow: 'rgba(249, 115, 22, 0.4)', label: 'Packaging' },
   transport: { fill: '#06b6d4', glow: 'rgba(6, 182, 212, 0.4)', label: 'Transport' },
@@ -611,9 +617,9 @@ export function ProductHeroImpact({
           <div className="flex flex-wrap gap-4">
             {(() => {
               const entries = Object.entries(carbonBreakdown).filter(
-                ([key, value]) => !((key === 'endOfLife' || key === 'usePhase') && !value)
+                ([key, value]) => key in LAYER_COLORS && typeof value === 'number' && !((key === 'endOfLife' || key === 'usePhase') && !value)
               );
-              const total = Object.values(carbonBreakdown).reduce((sum, v) => sum + (v || 0), 0);
+              const total = entries.reduce((sum, [, v]) => sum + ((v as number) || 0), 0);
               const rawPcts = entries.map(([, value]) => total > 0 ? ((value || 0) / total) * 100 : 0);
 
               // Largest Remainder Method for integer percentages summing to 100

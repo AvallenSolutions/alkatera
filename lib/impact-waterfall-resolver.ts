@@ -30,6 +30,8 @@ export interface ProductMaterial {
   category_type?: MaterialCategoryType;
   /** Which OpenLCA database this process belongs to (ecoinvent or agribalyse) */
   openlca_database?: OpenLCADatabaseSource;
+  /** Whether this ingredient is grown on the producer's own vineyard/farm */
+  is_self_grown?: boolean;
 
   // Inbound delivery container (ingredient rows only)
   inbound_container_type?: string | null;
@@ -442,6 +444,38 @@ export async function resolveImpactFactors(
 ): Promise<WaterfallResult> {
   const supabase = getSupabaseBrowserClient();
   const category = detectMaterialCategory(material);
+
+  // ── VITICULTURE: Self-grown ingredients ───────────────────────────────
+  // When a producer grows their own ingredient (e.g. grapes from own vineyard),
+  // impacts are calculated by viticulture-calculator.ts and injected as
+  // synthetic [Viticulture] rows. Return zero here to avoid double-counting.
+  if (material.is_self_grown) {
+    console.log(
+      `[Waterfall] Self-grown ingredient "${material.material_name}" — impacts handled by viticulture calculator, returning zero`
+    );
+    return {
+      impact_climate: 0, impact_climate_fossil: 0, impact_climate_biogenic: 0,
+      impact_climate_dluc: 0, impact_water: 0, impact_water_scarcity: 0,
+      impact_land: 0, impact_waste: 0,
+      impact_ozone_depletion: 0, impact_photochemical_ozone_formation: 0,
+      impact_ionising_radiation: 0, impact_particulate_matter: 0,
+      impact_human_toxicity_carcinogenic: 0, impact_human_toxicity_non_carcinogenic: 0,
+      impact_terrestrial_ecotoxicity: 0, impact_freshwater_ecotoxicity: 0,
+      impact_marine_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+      impact_marine_eutrophication: 0, impact_terrestrial_acidification: 0,
+      impact_mineral_resource_scarcity: 0, impact_fossil_resource_scarcity: 0,
+      data_priority: 1,
+      data_quality_tag: 'Primary_Verified',
+      data_quality_grade: 'MEDIUM',
+      source_reference: 'Self-grown ingredient: impacts calculated by viticulture-calculator.ts',
+      confidence_score: 70,
+      methodology: 'Viticulture questionnaire (IPCC Tier 1, DEFRA 2025)',
+      gwp_data_source: 'viticulture_primary',
+      non_gwp_data_source: 'viticulture_primary',
+      is_hybrid_source: false,
+      category_type: 'MANUFACTURING_MATERIAL',
+    };
+  }
 
   // Get location-specific AWARE factor for water scarcity weighting
   // Uses AWARE methodology (Available Water Remaining) v1.3

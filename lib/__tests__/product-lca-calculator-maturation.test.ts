@@ -75,7 +75,7 @@ interface MockResponse {
 function createQueryMock(response: MockResponse) {
   const mock: Record<string, unknown> = {};
 
-  const chainableMethods = ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'ilike', 'lte', 'gte', 'order', 'limit', 'in'];
+  const chainableMethods = ['select', 'insert', 'update', 'delete', 'eq', 'neq', 'not', 'ilike', 'lte', 'gte', 'order', 'limit', 'in'];
   chainableMethods.forEach(method => {
     mock[method] = vi.fn().mockReturnValue(mock);
   });

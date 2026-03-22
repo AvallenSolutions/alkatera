@@ -102,7 +102,7 @@ interface MockResponse {
 
 function createQueryMock(response: MockResponse) {
   const mock: Record<string, unknown> = {};
-  const chainable = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'ilike', 'lte', 'gte', 'order', 'limit', 'in'];
+  const chainable = ['select', 'insert', 'update', 'delete', 'upsert', 'eq', 'neq', 'not', 'ilike', 'lte', 'gte', 'order', 'limit', 'in'];
   chainable.forEach(m => { mock[m] = vi.fn().mockReturnValue(mock); });
   mock.single = vi.fn().mockResolvedValue(response);
   mock.maybeSingle = vi.fn().mockResolvedValue(response);
@@ -483,6 +483,9 @@ describe('calculateProductCarbonFootprint', () => {
         undefined, // eolConfig
         undefined, // distributionConfig
         undefined, // productLossConfig
+        expect.anything(), // calculationFingerprint
+        expect.anything(), // fallbackEvents
+        expect.anything(), // materialResolutions
       );
     });
 
@@ -516,6 +519,9 @@ describe('calculateProductCarbonFootprint', () => {
         eolConfig,
         undefined, // distributionConfig
         undefined, // productLossConfig
+        expect.anything(), // calculationFingerprint
+        expect.anything(), // fallbackEvents
+        expect.anything(), // materialResolutions
       );
     });
   });

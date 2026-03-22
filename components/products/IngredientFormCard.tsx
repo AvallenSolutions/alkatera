@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,9 +18,15 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2 } from "lucide-react";
+import { Trash2, Building2, Database, Sprout, Info, MapPin, Calculator, Award, Layers, Package, ChevronDown, ChevronUp, Plus, Loader2, Leaf } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InlineIngredientSearch } from "@/components/lca/InlineIngredientSearch";
+import { VineyardSelector, type VineyardOption } from "@/components/vineyards/VineyardSelector";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useOrganization } from "@/lib/organizationContext";
+import { useIsAlkateraAdmin } from "@/hooks/usePermissions";
+import { isViticultureEligible } from "@/lib/viticulture-utils";
+import type { VineyardGrowingProfile } from "@/lib/types/viticulture";
 import { LocationPicker, LocationData } from "@/components/shared/LocationPicker";
 import type { DataSource } from "@/lib/types/lca";
 import { calculateDistance } from "@/lib/utils/distance-calculator";
@@ -64,6 +70,9 @@ export interface IngredientFormData {
   inbound_container_tare_kg?: number | null;
   inbound_container_reuse_cycles?: number | null;
   inbound_container_ef?: number | null;
+  // Self-grown ingredient (e.g. vineyard grapes)
+  is_self_grown?: boolean;
+  vineyard_id?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -249,11 +258,35 @@ export function IngredientFormCard({
   onRemove,
   canRemove,
 }: IngredientFormCardProps) {
+  const { hasFeature } = useSubscription();
+  const { currentOrganization } = useOrganization();
+  const { isAlkateraAdmin } = useIsAlkateraAdmin();
+  const showViticultureToggle = hasFeature('viticulture_beta') && isViticultureEligible(currentOrganization, isAlkateraAdmin);
+
   const [containerOpen, setContainerOpen] = useState<boolean>(
     !!(ingredient.inbound_container_type)
   );
   const [transportPreview, setTransportPreview] = useState<DistributionResult | null>(null);
   const [transportPreviewLoading, setTransportPreviewLoading] = useState(false);
+
+  // Viticulture growing profile state
+  const [selectedVineyard, setSelectedVineyard] = useState<VineyardOption | null>(null);
+  const [growingProfile, setGrowingProfile] = useState<VineyardGrowingProfile | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+
+  // Fetch growing profile when vineyard changes
+  useEffect(() => {
+    if (!ingredient.vineyard_id || !ingredient.is_self_grown) {
+      setGrowingProfile(null);
+      return;
+    }
+    setLoadingProfile(true);
+    fetch(`/api/vineyards/${ingredient.vineyard_id}/growing-profile`)
+      .then((res) => res.ok ? res.json() : { data: null })
+      .then(({ data }) => setGrowingProfile(data || null))
+      .catch(() => setGrowingProfile(null))
+      .finally(() => setLoadingProfile(false));
+  }, [ingredient.vineyard_id, ingredient.is_self_grown]);
 
   const getContainerPreset = (key: string | null | undefined): ContainerPreset | undefined =>
     CONTAINER_PRESETS.find((p) => p.key === key);
@@ -643,6 +676,7 @@ export function IngredientFormCard({
             </p>
           </div>
 
+          {!ingredient.is_self_grown && (
           <div>
             <Label htmlFor={`search-${ingredient.tempId}`} className="flex items-center gap-2">
               Emission Factor <span className="text-destructive">*</span>
@@ -711,6 +745,7 @@ export function IngredientFormCard({
               </TooltipProvider>
             )}
           </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -765,22 +800,119 @@ export function IngredientFormCard({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id={`organic-${ingredient.tempId}`}
-              checked={ingredient.is_organic_certified}
-              onCheckedChange={(checked) =>
-                onUpdate(ingredient.tempId, { is_organic_certified: checked as boolean })
-              }
-            />
-            <Label
-              htmlFor={`organic-${ingredient.tempId}`}
-              className="text-sm font-normal cursor-pointer"
-            >
-              Organic certified
-            </Label>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={`organic-${ingredient.tempId}`}
+                checked={ingredient.is_organic_certified}
+                onCheckedChange={(checked) =>
+                  onUpdate(ingredient.tempId, { is_organic_certified: checked as boolean })
+                }
+              />
+              <Label
+                htmlFor={`organic-${ingredient.tempId}`}
+                className="text-sm font-normal cursor-pointer"
+              >
+                Organic certified
+              </Label>
+            </div>
+
+            {showViticultureToggle && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={`self-grown-${ingredient.tempId}`}
+                checked={ingredient.is_self_grown || false}
+                onCheckedChange={(checked) => {
+                  const isSelfGrown = checked as boolean;
+                  onUpdate(ingredient.tempId, {
+                    is_self_grown: isSelfGrown,
+                    // Clear emission factor data when toggling on (viticulture calculator handles it)
+                    ...(isSelfGrown ? {
+                      data_source: 'viticulture_primary' as any,
+                      matched_source_name: undefined,
+                      data_source_id: undefined,
+                      carbon_intensity: undefined,
+                      ef_source: undefined,
+                      ef_source_type: undefined,
+                      ef_data_quality_grade: undefined,
+                      ef_uncertainty_percent: undefined,
+                    } : {
+                      data_source: null,
+                      vineyard_id: null,
+                    }),
+                  });
+                }}
+              />
+              <Label
+                htmlFor={`self-grown-${ingredient.tempId}`}
+                className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
+              >
+                <Leaf className="h-3.5 w-3.5 text-[#ccff00]" />
+                Grown on our own vineyard
+              </Label>
+            </div>
+            )}
           </div>
 
+          {ingredient.is_self_grown && (
+            <div className="rounded-lg border border-[#ccff00]/30 bg-[#ccff00]/5 p-4 space-y-3">
+              <VineyardSelector
+                organizationId={organizationId}
+                value={ingredient.vineyard_id || ''}
+                onValueChange={(vineyardId, vineyard) => {
+                  setSelectedVineyard(vineyard);
+                  onUpdate(ingredient.tempId, { vineyard_id: vineyardId });
+                }}
+              />
+
+              {/* Growing profile status (read-only, editing happens on the Vineyards page) */}
+              {ingredient.vineyard_id && (
+                <>
+                  {loadingProfile && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Checking growing profile...
+                    </div>
+                  )}
+
+                  {!loadingProfile && growingProfile && (
+                    <div className="rounded-md bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 px-3 py-2 space-y-1">
+                      <Badge variant="outline" className="bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700">
+                        <Sprout className="h-3 w-3 mr-1.5" />
+                        Growing profile complete
+                      </Badge>
+                      <p className="text-xs text-muted-foreground">
+                        {growingProfile.area_ha} ha, {growingProfile.grape_yield_tonnes} t yield,{' '}
+                        {(growingProfile.soil_management || 'conventional tillage').replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  )}
+
+                  {!loadingProfile && !growingProfile && (
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
+                      <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
+                        This vineyard needs a growing profile before we can calculate its environmental impact.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs border-amber-300 dark:border-amber-700"
+                        asChild
+                      >
+                        <a href="/vineyards/">
+                          <Sprout className="mr-1.5 h-3 w-3" />
+                          Complete on Vineyards page
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {!ingredient.is_self_grown && (
+          <>
           <div className="pt-2 border-t">
             <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
               <MapPin className="h-4 w-4" />
@@ -1297,11 +1429,23 @@ export function IngredientFormCard({
               )}
             </CollapsibleContent>
           </Collapsible>
+          </>
+          )}
 
           {ingredient.data_source && (
             <div className="flex items-center justify-between pt-2 border-t">
               <div className="flex-1">
-                {getDataSourceBadge()}
+                {ingredient.is_self_grown ? (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-[#ccff00]/10 text-[#ccff00] border-[#ccff00]/30">
+                      <Leaf className="h-3 w-3 mr-1.5" />
+                      Self-Grown (Viticulture)
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">Calculated from growing profile</span>
+                  </div>
+                ) : (
+                  getDataSourceBadge()
+                )}
               </div>
             </div>
           )}

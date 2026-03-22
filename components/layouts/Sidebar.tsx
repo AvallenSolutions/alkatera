@@ -52,9 +52,11 @@ import {
   Library,
   Lock,
   Database,
+  ArrowUpCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
+import { isViticultureEligible } from '@/lib/viticulture-utils'
 import { Badge } from '@/components/ui/badge'
 import { useSubscription } from '@/hooks/useSubscription'
 import { TierBadge } from '@/components/subscription/TierBadge'
@@ -76,6 +78,7 @@ interface NavItem {
   featureCode?: string // Optional feature code requirement
   locked?: boolean // Set dynamically when user's tier is insufficient
   requiredTierName?: string // Display name of the required tier
+  viticultureOnly?: boolean // Only shown for Wine orgs + platform admin
   type?: 'link' | 'divider' // Non-clickable section dividers
 }
 
@@ -97,6 +100,7 @@ const navigationStructure: NavItem[] = [
     minTier: 1,
     children: [
       { name: 'Facilities',   href: '/company/facilities/', icon: Warehouse,      minTier: 1 },
+      { name: 'Vineyards',   href: '/vineyards/',          icon: Leaf,           minTier: 1, featureCode: 'viticulture_beta', viticultureOnly: true },
       { name: 'Fleet',        href: '/company/fleet/',      icon: Truck,          minTier: 2, featureCode: 'vehicle_registry' },
       { name: 'Log Data',     href: '/company/log-data/',   icon: ClipboardCheck, minTier: 1 },
       { name: 'Suppliers',    href: '/suppliers/',          icon: Users,          minTier: 1 },
@@ -109,6 +113,7 @@ const navigationStructure: NavItem[] = [
     minTier: 1,
     children: [
       { name: 'Company Emissions', href: '/data/scope-1-2/', icon: Flame,     minTier: 1 },
+      { name: 'Xero Upgrades',    href: '/data/xero-upgrades/', icon: ArrowUpCircle, minTier: 1, featureCode: 'xero_integration_beta' },
       { name: 'Data Quality',      href: '/data/quality/',   icon: BarChart3, minTier: 1 },
       { name: 'Data Sources',      href: '/data/sources/',   icon: BookOpen,  minTier: 1 },
     ],
@@ -331,24 +336,32 @@ export function Sidebar({ className }: SidebarProps) {
 
   const tierDisplayNames: Record<number, string> = { 1: 'Seed', 2: 'Blossom', 3: 'Canopy' }
 
+  const viticultureVisible = isViticultureEligible(currentOrganization, isAlkateraAdmin)
+
   // Mark navigation items as locked instead of hiding them
   const filterNavItems = (items: NavItem[]): NavItem[] => {
-    return items.map((item) => {
-      // Dividers pass through unchanged
-      if (item.type === 'divider') return item
+    return items
+      .filter((item) => {
+        // Completely hide viticulture-only items for non-wine orgs
+        if (item.viticultureOnly && !viticultureVisible) return false
+        return true
+      })
+      .map((item) => {
+        // Dividers pass through unchanged
+        if (item.type === 'divider') return item
 
-      const isLocked = (item.minTier && tierLevel < item.minTier) ||
-        (item.featureCode && !hasFeature(item.featureCode as any))
-      const requiredTierName = item.minTier ? tierDisplayNames[item.minTier] : undefined
+        const isLocked = (item.minTier && tierLevel < item.minTier) ||
+          (item.featureCode && !hasFeature(item.featureCode as any))
+        const requiredTierName = item.minTier ? tierDisplayNames[item.minTier] : undefined
 
-      return {
-        ...item,
-        locked: !!isLocked,
-        requiredTierName,
-        // Recursively process children (but keep them even if locked)
-        children: item.children ? filterNavItems(item.children) : undefined,
-      }
-    })
+        return {
+          ...item,
+          locked: !!isLocked,
+          requiredTierName,
+          // Recursively process children (but keep them even if locked)
+          children: item.children ? filterNavItems(item.children) : undefined,
+        }
+      })
   }
 
   // Build final navigation structure (all items are now in the main array)

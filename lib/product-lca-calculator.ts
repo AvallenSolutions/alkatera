@@ -9,6 +9,9 @@ import { calculateDistance } from './utils/distance-calculator';
 import { boundaryToDbEnum } from './system-boundaries';
 import { calculateMaturationImpacts } from './maturation-calculator';
 import type { MaturationProfile } from './types/maturation';
+import { calculateViticultureImpacts } from './viticulture-calculator';
+import { calculateMultiVintageAverage } from './viticulture-multi-vintage';
+import type { VineyardGrowingProfile, Vineyard } from './types/viticulture';
 import { getGridFactor } from './grid-emission-factors';
 
 export interface FacilityAllocationInput {
@@ -1458,10 +1461,276 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       console.log(`[calculateProductCarbonFootprint] ✓ Maturation impacts (per-bottle): barrel=${barrelPerBottle.toFixed(4)} kg CO2e, warehouse=${warehousePerBottle.toFixed(4)} kg CO2e, angel's share=${matResult.angel_share_loss_percent_total.toFixed(1)}% volume loss, VOC=${vocPerBottle.toFixed(4)} kg/bottle`);
     }
 
+    // 5c. Check for vineyard growing profile and calculate viticulture impacts
+    //
+    // For producers who grow their own agricultural inputs (e.g. vineyards
+    // growing grapes), the viticulture calculator computes field-level emissions
+    // from fertiliser N2O, machinery fuel, irrigation, and soil carbon removals.
+    //
+    // FLAG Alignment: Emissions and removals are injected as separate synthetic
+    // rows. Removals use impact_removals_co2e (never impact_climate) per SBTi
+    // FLAG Guidance v1.2.
+    // Find vineyard_id from self-grown ingredients linked to this product
+    const { data: selfGrownIngredients } = await supabase
+      .from('product_materials')
+      .select('vineyard_id')
+      .eq('product_id', parseInt(productId))
+      .eq('is_self_grown', true)
+      .not('vineyard_id', 'is', null);
+
+    const vineyardIds = Array.from(new Set(
+      (selfGrownIngredients || []).map((m: any) => m.vineyard_id).filter(Boolean)
+    ));
+
+    // Process the first linked vineyard (most products have one vineyard)
+    const vineyardId = vineyardIds[0];
+    const { data: viticultureProfiles } = vineyardId
+      ? await supabase
+          .from('vineyard_growing_profiles')
+          .select('*, vineyards(*)')
+          .eq('vineyard_id', vineyardId)
+          .order('vintage_year', { ascending: false })
+      : { data: null };
+
+    // Use the first profile for vineyard metadata (all profiles share the same vineyard)
+    const viticultureProfile = viticultureProfiles?.[0];
+
+    if (viticultureProfile) {
+      const vineyard = viticultureProfile.vineyards as unknown as Vineyard;
+      const profileCount = viticultureProfiles!.length;
+      console.log(`[calculateProductCarbonFootprint] Processing viticulture for vineyard "${vineyard?.name || 'unknown'}" (${profileCount} vintage${profileCount > 1 ? 's' : ''})...`);
+
+      // Build inputs for all available vintages
+      const vintageInputs = viticultureProfiles!.map((p: any) => ({
+        vintage_year: p.vintage_year,
+        input: {
+          climate_zone: vineyard?.climate_zone || 'temperate',
+          certification: vineyard?.certification || 'conventional',
+          location_country_code: vineyard?.location_country_code || null,
+          area_ha: p.area_ha,
+          soil_management: p.soil_management,
+          pruning_residue_returned: p.pruning_residue_returned ?? true,
+          fertiliser_type: p.fertiliser_type,
+          fertiliser_quantity_kg: p.fertiliser_quantity_kg,
+          fertiliser_n_content_percent: p.fertiliser_n_content_percent,
+          uses_pesticides: p.uses_pesticides,
+          pesticide_applications_per_year: p.pesticide_applications_per_year,
+          pesticide_type: p.pesticide_type || 'generic',
+          uses_herbicides: p.uses_herbicides,
+          herbicide_applications_per_year: p.herbicide_applications_per_year,
+          herbicide_type: p.herbicide_type || 'generic',
+          diesel_litres_per_year: p.diesel_litres_per_year,
+          petrol_litres_per_year: p.petrol_litres_per_year,
+          is_irrigated: p.is_irrigated,
+          water_m3_per_ha: p.water_m3_per_ha,
+          irrigation_energy_source: p.irrigation_energy_source,
+          grape_yield_tonnes: p.grape_yield_tonnes,
+          soil_carbon_override_kg_co2e_per_ha: p.soil_carbon_override_kg_co2e_per_ha,
+        },
+      }));
+
+      // Multi-vintage averaging (median for 3+, mean for 2, single for 1)
+      const multiVintageResult = calculateMultiVintageAverage(vintageInputs);
+      const vitResult = multiVintageResult.averaged_impacts;
+      const vintageNote = profileCount > 1
+        ? ` (${multiVintageResult.method}: vintages ${multiVintageResult.vintages_used.join(', ')})`
+        : '';
+
+      // --- Per-bottle allocation ---
+      // Viticulture impacts are computed for the entire vineyard area.
+      // Normalise to per-bottle using grape yield and bottle size.
+      const rawBottleSize = product.unit_size_unit === 'ml'
+        ? Number(product.unit_size_value) / 1000.0
+        : Number(product.unit_size_value || 0.75);
+      const bottleSizeLitres = rawBottleSize > 0 ? rawBottleSize : 0.75;
+
+      // Grapes per bottle: typical wine yield ~0.7-0.8 L per kg grapes
+      // Using 1.3 kg grapes per 0.75L bottle as industry average
+      const grapeKgPerBottle = (viticultureProfile.grape_yield_tonnes * 1000) > 0
+        ? bottleSizeLitres / 0.75 * 1.3 // Scale by bottle size relative to 750ml
+        : 1.3;
+      const totalBottles = (viticultureProfile.grape_yield_tonnes * 1000) / grapeKgPerBottle;
+
+      // Per-bottle factors
+      const fertFieldPerBottle = totalBottles > 0
+        ? (vitResult.flag_emissions.total_flag_co2e + vitResult.non_flag_emissions.fertiliser_production_co2e) / totalBottles
+        : 0;
+      const fuelPerBottle = totalBottles > 0
+        ? vitResult.non_flag_emissions.machinery_fuel_co2e / totalBottles
+        : 0;
+      const irrigationPerBottle = totalBottles > 0
+        ? vitResult.non_flag_emissions.irrigation_energy_co2e / totalBottles
+        : 0;
+      const waterPerBottle = totalBottles > 0
+        ? vitResult.water_m3 / totalBottles
+        : 0;
+      const landPerBottle = totalBottles > 0
+        ? vitResult.flag_emissions.land_use_m2 / totalBottles
+        : 0;
+      const removalsPerBottle = totalBottles > 0
+        ? vitResult.total_removals / totalBottles
+        : 0;
+      const pesticidePerBottle = totalBottles > 0
+        ? vitResult.non_flag_emissions.pesticide_production_co2e / totalBottles
+        : 0;
+      const n2oKgPerBottle = totalBottles > 0
+        ? vitResult.n2o_kg / totalBottles
+        : 0;
+
+      console.log(`[calculateProductCarbonFootprint] Viticulture per-bottle: ${totalBottles.toFixed(0)} bottles, fert+N2O=${fertFieldPerBottle.toFixed(4)}, fuel=${fuelPerBottle.toFixed(4)}, irrigation=${irrigationPerBottle.toFixed(4)}, removals=${removalsPerBottle.toFixed(4)}`);
+
+      // Synthetic row template (shared fields)
+      const vitBaseRow = {
+        product_carbon_footprint_id: lca.id,
+        material_type: 'ingredient' as const,
+        quantity: bottleSizeLitres,
+        unit: 'L',
+        unit_name: 'L',
+        packaging_category: null,
+        origin_country: vineyard?.address_country || null,
+        country_of_origin: vineyard?.address_country || null,
+        is_organic: vineyard?.certification === 'organic' || vineyard?.certification === 'biodynamic',
+        is_organic_certified: vineyard?.certification === 'organic',
+        supplier_product_id: null,
+        data_source: null,
+        data_source_id: null,
+        transport_mode: null,
+        distance_km: null,
+        impact_transport: 0,
+        origin_address: null,
+        origin_lat: vineyard?.address_lat || null,
+        origin_lng: vineyard?.address_lng || null,
+        origin_country_code: vineyard?.location_country_code || null,
+        data_priority: 2 as const,
+        data_quality_tag: 'Secondary_Modelled' as const,
+        supplier_lca_id: null,
+        impact_source: 'secondary_modelled' as const,
+        impact_reference_id: null,
+        gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+        non_gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+        is_hybrid_source: false,
+        category_type: 'MANUFACTURING_MATERIAL',
+      };
+
+      // Row 1: Fertiliser & Field Emissions (N2O + production)
+      lcaMaterialsWithImpacts.push({
+        ...vitBaseRow,
+        name: '[Viticulture] Fertiliser & Field Emissions',
+        material_name: '[Viticulture] Fertiliser & Field Emissions',
+        impact_climate: fertFieldPerBottle + pesticidePerBottle,
+        impact_climate_fossil: fertFieldPerBottle * 0.95 + pesticidePerBottle, // Fertiliser production is mostly fossil
+        impact_climate_biogenic: 0,
+        impact_climate_dluc: 0,
+        ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0,
+        n2o_kg: n2oKgPerBottle,
+        impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+        impact_freshwater_ecotoxicity: totalBottles > 0 ? vitResult.freshwater_ecotoxicity / totalBottles : 0,
+        impact_terrestrial_ecotoxicity: totalBottles > 0 ? vitResult.terrestrial_ecotoxicity / totalBottles : 0,
+        impact_human_toxicity_non_carcinogenic: totalBottles > 0 ? vitResult.human_toxicity_non_carcinogenic / totalBottles : 0,
+        impact_freshwater_eutrophication: totalBottles > 0 ? vitResult.freshwater_eutrophication / totalBottles : 0,
+        impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+        confidence_score: 65,
+        methodology: vitResult.methodology_notes,
+        source_reference: `Fertiliser: ${vitResult.flag_emissions.n2o_direct_co2e.toFixed(1)} kg CO2e direct N2O + ${vitResult.flag_emissions.n2o_indirect_co2e.toFixed(1)} kg indirect + ${vitResult.non_flag_emissions.fertiliser_production_co2e.toFixed(1)} kg production${vintageNote}`,
+        data_quality_grade: vitResult.data_quality_grade,
+      });
+
+      // Row 2: Machinery Fuel
+      if (fuelPerBottle > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...vitBaseRow,
+          name: '[Viticulture] Machinery Fuel',
+          material_name: '[Viticulture] Machinery Fuel',
+          impact_climate: fuelPerBottle,
+          impact_climate_fossil: fuelPerBottle,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 70,
+          methodology: 'DEFRA 2025 fuel combustion factors',
+          source_reference: `Diesel: ${viticultureProfile.diesel_litres_per_year} L/yr, Petrol: ${viticultureProfile.petrol_litres_per_year} L/yr. Total: ${vitResult.non_flag_emissions.machinery_fuel_co2e.toFixed(1)} kg CO2e / ${totalBottles.toFixed(0)} bottles`,
+          data_quality_grade: vitResult.data_quality_grade,
+        });
+      }
+
+      // Row 3: Irrigation
+      if (irrigationPerBottle > 0 || waterPerBottle > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...vitBaseRow,
+          name: '[Viticulture] Irrigation',
+          material_name: '[Viticulture] Irrigation',
+          impact_climate: irrigationPerBottle,
+          impact_climate_fossil: irrigationPerBottle,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: waterPerBottle,
+          impact_water_scarcity: waterPerBottle, // Simplified; AWARE weighting could be added
+          impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 60,
+          methodology: 'DEFRA 2025 / grid emission factors',
+          source_reference: `Irrigation: ${vitResult.water_m3.toFixed(0)} m3 water, ${viticultureProfile.irrigation_energy_source}. Energy: ${vitResult.non_flag_emissions.irrigation_energy_co2e.toFixed(1)} kg CO2e`,
+          data_quality_grade: vitResult.data_quality_grade,
+        });
+      }
+
+      // Row 4: Land Occupation
+      lcaMaterialsWithImpacts.push({
+        ...vitBaseRow,
+        name: '[Viticulture] Land Occupation',
+        material_name: '[Viticulture] Land Occupation',
+        impact_climate: 0, // Land occupation itself has no direct climate impact
+        impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+        ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+        impact_water: 0, impact_water_scarcity: 0,
+        impact_land: landPerBottle,
+        impact_waste: 0,
+        impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+        impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+        confidence_score: 80,
+        methodology: 'Direct land occupation measurement',
+        source_reference: `Vineyard: ${viticultureProfile.area_ha} ha (${vitResult.flag_emissions.land_use_m2.toFixed(0)} m2) / ${totalBottles.toFixed(0)} bottles`,
+        data_quality_grade: 'HIGH',
+      });
+
+      // Row 5: Soil Carbon Removals (FLAG: separate from emissions)
+      if (removalsPerBottle > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...vitBaseRow,
+          name: '[Viticulture Removals] Soil Carbon',
+          material_name: '[Viticulture Removals] Soil Carbon',
+          impact_climate: 0, // FLAG: removals NEVER stored in impact_climate
+          impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          // FLAG-compliant: removals in dedicated column
+          impact_removals_co2e: removalsPerBottle,
+          confidence_score: vitResult.flag_removals.is_verified ? 75 : 45,
+          methodology: `Soil carbon: ${vitResult.flag_removals.methodology}`,
+          source_reference: `Soil management: ${viticultureProfile.soil_management}. Total removals: ${vitResult.total_removals.toFixed(1)} kg CO2e/yr (${vitResult.flag_removals.methodology}). Per bottle: ${removalsPerBottle.toFixed(4)} kg CO2e`,
+          data_quality_grade: vitResult.flag_removals.is_verified ? 'MEDIUM' : 'LOW',
+        });
+      }
+
+      console.log(`[calculateProductCarbonFootprint] ✓ Viticulture impacts: emissions=${vitResult.total_emissions.toFixed(1)} kg CO2e, removals=${vitResult.total_removals.toFixed(1)} kg CO2e (${vitResult.flag_removals.methodology}), per-kg=${vitResult.total_emissions_per_kg.toFixed(4)} kg CO2e/kg grapes`);
+    }
+
     // 6. Insert all materials with impact values into product_lca_materials
+    // Ensure every row has impact_removals_co2e set (NOT NULL column, DEFAULT 0).
+    // The Supabase JS client sends undefined as null which violates the constraint.
+    const materialsWithDefaults = lcaMaterialsWithImpacts.map((m: any) => ({
+      ...m,
+      impact_removals_co2e: m.impact_removals_co2e ?? 0,
+    }));
+
     const { error: insertError } = await supabase
       .from('product_carbon_footprint_materials')
-      .insert(lcaMaterialsWithImpacts);
+      .insert(materialsWithDefaults);
 
     if (insertError) {
       // Clean up
