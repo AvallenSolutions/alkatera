@@ -168,6 +168,8 @@ export async function POST(
         soil_carbon_override_kg_co2e_per_ha: merged.soil_carbon_override_kg_co2e_per_ha || null,
         soil_carbon_measurement_date: merged.soil_carbon_measurement_date || null,
         soil_carbon_methodology: merged.soil_carbon_methodology || null,
+        soil_carbon_lab_name: merged.soil_carbon_lab_name || null,
+        soil_carbon_sampling_points: merged.soil_carbon_sampling_points || null,
       })
       .select()
       .single();

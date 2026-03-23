@@ -61,6 +61,14 @@ export type IrrigationEnergySource =
 
 export type VineyardClimateZone = 'wet' | 'dry' | 'temperate';
 
+export type SoilCarbonMethodology =
+  | 'soc_0_30cm_fixed'
+  | 'soc_0_30cm_multi_increment'
+  | 'soc_0_60cm_fixed'
+  | 'soc_0_60cm_multi_increment'
+  | 'full_soil_profile'
+  | 'other';
+
 // ---------------------------------------------------------------------------
 // Database row - mirrors public.vineyards
 // ---------------------------------------------------------------------------
@@ -135,6 +143,8 @@ export interface VineyardGrowingProfile {
   soil_carbon_override_kg_co2e_per_ha: number | null;
   soil_carbon_measurement_date: string | null;
   soil_carbon_methodology: string | null;
+  soil_carbon_lab_name: string | null;
+  soil_carbon_sampling_points: number | null;
 
   created_at: string;
   updated_at: string;
@@ -281,4 +291,23 @@ export interface MultiVintageAveragedResult {
   averaged_impacts: ViticultureImpactResult;
   vintages_used: number[];
   method: 'single' | 'average_2yr' | 'median_3yr';
+}
+
+// ---------------------------------------------------------------------------
+// Soil carbon evidence (uploaded lab reports)
+// ---------------------------------------------------------------------------
+
+export interface VineyardSoilCarbonEvidence {
+  id: string;
+  growing_profile_id: string;
+  vineyard_id: string;
+  organization_id: string;
+  document_name: string;
+  storage_object_path: string;
+  file_size_bytes: number | null;
+  mime_type: string | null;
+  uploaded_by: string;
+  created_at: string;
+  /** Signed URL for downloading (populated client-side, not stored in DB) */
+  signed_url?: string;
 }

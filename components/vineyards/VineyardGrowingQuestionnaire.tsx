@@ -32,12 +32,20 @@ import {
   Check,
   Info,
   Loader2,
+  Upload,
+  FileText,
+  AlertTriangle,
+  Trash2,
+  Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateViticultureImpacts } from '@/lib/viticulture-calculator';
+import { SOIL_CARBON_REMOVAL_DEFAULTS } from '@/lib/ghg-constants';
 import type {
   VineyardGrowingProfile,
+  VineyardSoilCarbonEvidence,
   SoilManagement,
+  SoilCarbonMethodology,
   FertiliserType,
   PesticideType,
   IrrigationEnergySource,
@@ -87,6 +95,15 @@ const SOIL_PRACTICES: { value: SoilManagement; label: string; description: strin
   { value: 'composting', label: 'Composting (active)', description: 'Regular compost application to vineyard soils' },
   { value: 'biochar_compost', label: 'Biochar + compost', description: 'Biochar-amended compost for enhanced carbon storage' },
   { value: 'regenerative_integrated', label: 'Regenerative integrated', description: 'Holistic approach combining cover crops, no-till, and organic inputs' },
+];
+
+const SOIL_CARBON_METHODOLOGIES: { value: SoilCarbonMethodology; label: string; description: string }[] = [
+  { value: 'soc_0_30cm_fixed', label: 'SOC sampling 0-30 cm, fixed depth', description: 'IPCC minimum depth. Single composite sample per point.' },
+  { value: 'soc_0_30cm_multi_increment', label: 'SOC sampling 0-30 cm, multi-increment', description: 'IPCC recommended: 0-10, 10-20, 20-30 cm increments.' },
+  { value: 'soc_0_60cm_fixed', label: 'SOC sampling 0-60 cm, fixed depth', description: 'Verra/IWCA best practice depth. Single composite per point.' },
+  { value: 'soc_0_60cm_multi_increment', label: 'SOC sampling 0-60 cm, multi-increment', description: 'Gold standard: 0-15, 15-30, 30-45, 45-60 cm increments with ESM accounting.' },
+  { value: 'full_soil_profile', label: 'Full soil profile (> 60 cm)', description: 'Deep profile analysis, typically for research or baseline studies.' },
+  { value: 'other', label: 'Other methodology', description: 'Modelling, remote sensing, or other approach.' },
 ];
 
 const FERTILISER_TYPES: { value: FertiliserType; label: string }[] = [
@@ -140,7 +157,28 @@ export function VineyardGrowingQuestionnaire({
     water_m3_per_ha: initSource?.water_m3_per_ha ?? 0,
     irrigation_energy_source: (initSource?.irrigation_energy_source ?? 'none') as IrrigationEnergySource,
     grape_yield_tonnes: initSource?.grape_yield_tonnes ?? 0,
+    // Soil carbon measured data
+    has_measured_soil_carbon: !!(initSource?.soil_carbon_override_kg_co2e_per_ha),
+    soil_carbon_override_kg_co2e_per_ha: initSource?.soil_carbon_override_kg_co2e_per_ha ?? null as number | null,
+    soil_carbon_measurement_date: initSource?.soil_carbon_measurement_date ?? '',
+    soil_carbon_methodology: (initSource?.soil_carbon_methodology ?? '') as string,
+    soil_carbon_lab_name: initSource?.soil_carbon_lab_name ?? '',
+    soil_carbon_sampling_points: initSource?.soil_carbon_sampling_points ?? null as number | null,
   });
+
+  // Soil carbon evidence state
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [evidenceUploading, setEvidenceUploading] = useState(false);
+  const [existingEvidence, setExistingEvidence] = useState<VineyardSoilCarbonEvidence[]>([]);
+
+  // Load existing evidence when editing a profile
+  useEffect(() => {
+    if (!existingProfile?.id) return;
+    fetch(`/api/vineyards/${vineyardId}/growing-profile/evidence?profile_id=${existingProfile.id}`)
+      .then((res) => res.json())
+      .then(({ data }) => { if (data) setExistingEvidence(data); })
+      .catch(() => { /* silently fail - evidence is optional */ });
+  }, [existingProfile?.id, vineyardId]);
 
   // Build vintage year options (current year down to current-10)
   const vintageYearOptions = Array.from({ length: 11 }, (_, i) => currentYear - i);
@@ -155,6 +193,21 @@ export function VineyardGrowingQuestionnaire({
     if (form.grape_yield_tonnes <= 0) {
       toast.error('Please enter the annual grape yield (tonnes)');
       return;
+    }
+
+    if (form.has_measured_soil_carbon) {
+      if (!form.soil_carbon_override_kg_co2e_per_ha || form.soil_carbon_override_kg_co2e_per_ha <= 0) {
+        toast.error('Please enter a measured soil carbon removal value');
+        return;
+      }
+      if (!form.soil_carbon_measurement_date) {
+        toast.error('Please enter the soil carbon measurement date');
+        return;
+      }
+      if (!form.soil_carbon_methodology) {
+        toast.error('Please select a sampling methodology');
+        return;
+      }
     }
 
     setSaving(true);
@@ -183,6 +236,22 @@ export function VineyardGrowingQuestionnaire({
         water_m3_per_ha: form.water_m3_per_ha,
         irrigation_energy_source: form.irrigation_energy_source,
         grape_yield_tonnes: form.grape_yield_tonnes,
+        // Soil carbon measured data
+        soil_carbon_override_kg_co2e_per_ha: form.has_measured_soil_carbon
+          ? form.soil_carbon_override_kg_co2e_per_ha
+          : null,
+        soil_carbon_measurement_date: form.has_measured_soil_carbon
+          ? form.soil_carbon_measurement_date || null
+          : null,
+        soil_carbon_methodology: form.has_measured_soil_carbon
+          ? form.soil_carbon_methodology || null
+          : null,
+        soil_carbon_lab_name: form.has_measured_soil_carbon
+          ? form.soil_carbon_lab_name || null
+          : null,
+        soil_carbon_sampling_points: form.has_measured_soil_carbon
+          ? form.soil_carbon_sampling_points
+          : null,
       };
 
       const res = await fetch(url, {
@@ -197,6 +266,29 @@ export function VineyardGrowingQuestionnaire({
       }
 
       const { data } = await res.json();
+
+      // Upload evidence file if pending
+      if (evidenceFile && data?.id) {
+        setEvidenceUploading(true);
+        try {
+          const evidenceFormData = new FormData();
+          evidenceFormData.append('file', evidenceFile);
+          evidenceFormData.append('profile_id', data.id);
+
+          const evidenceRes = await fetch(
+            `/api/vineyards/${vineyardId}/growing-profile/evidence`,
+            { method: 'POST', body: evidenceFormData }
+          );
+          if (!evidenceRes.ok) {
+            toast.error('Profile saved but evidence upload failed. You can re-upload later.');
+          }
+        } catch {
+          toast.error('Profile saved but evidence upload failed. You can re-upload later.');
+        } finally {
+          setEvidenceUploading(false);
+        }
+      }
+
       toast.success('Growing profile saved');
       onComplete(data);
     } catch (err: any) {
@@ -229,7 +321,9 @@ export function VineyardGrowingQuestionnaire({
     water_m3_per_ha: form.water_m3_per_ha,
     irrigation_energy_source: form.irrigation_energy_source,
     grape_yield_tonnes: form.grape_yield_tonnes,
-    soil_carbon_override_kg_co2e_per_ha: null,
+    soil_carbon_override_kg_co2e_per_ha: form.has_measured_soil_carbon
+      ? form.soil_carbon_override_kg_co2e_per_ha
+      : null,
   });
 
   return (
@@ -403,6 +497,277 @@ export function VineyardGrowingQuestionnaire({
                     checked={form.pruning_residue_returned}
                     onCheckedChange={(v) => updateForm({ pruning_residue_returned: v })}
                   />
+                </div>
+
+                <Separator />
+
+                {/* Measured Soil Carbon Section */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Measured soil carbon data</Label>
+                      <p className="text-xs text-muted-foreground">
+                        If you have laboratory soil carbon measurements, enter them here for higher accuracy
+                      </p>
+                    </div>
+                    <Switch
+                      checked={form.has_measured_soil_carbon}
+                      onCheckedChange={(v) => updateForm({ has_measured_soil_carbon: v })}
+                    />
+                  </div>
+
+                  {!form.has_measured_soil_carbon && (
+                    <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="text-xs text-muted-foreground">
+                        Using practice-based default for <span className="font-medium text-foreground">
+                          {SOIL_PRACTICES.find((p) => p.value === form.soil_management)?.label ?? form.soil_management}
+                        </span>:{' '}
+                        <span className="font-medium text-foreground">
+                          {SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0} kg CO2e/ha/yr
+                        </span>{' '}
+                        removal (WineGB/OIV conservative estimate).
+                      </p>
+                    </div>
+                  )}
+
+                  {form.has_measured_soil_carbon && (
+                    <div className="space-y-4 mt-4">
+                      {/* Row 1: Value + Date */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label htmlFor="soil-carbon-value">
+                            Measured removal (kg CO2e/ha/yr) *
+                          </Label>
+                          <Input
+                            id="soil-carbon-value"
+                            type="number"
+                            min="0"
+                            max="2000"
+                            step="1"
+                            value={form.soil_carbon_override_kg_co2e_per_ha ?? ''}
+                            onChange={(e) =>
+                              updateForm({
+                                soil_carbon_override_kg_co2e_per_ha:
+                                  e.target.value ? parseFloat(e.target.value) : null,
+                              })
+                            }
+                            placeholder="e.g. 480"
+                          />
+                          {form.soil_carbon_override_kg_co2e_per_ha != null && form.soil_carbon_override_kg_co2e_per_ha > 1500 && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Unusually high. Please verify your measurement.
+                            </p>
+                          )}
+                          {form.soil_carbon_override_kg_co2e_per_ha != null &&
+                            form.soil_carbon_override_kg_co2e_per_ha > 0 &&
+                            (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) > 0 &&
+                            form.soil_carbon_override_kg_co2e_per_ha > (SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0) * 3 && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Significantly above the practice-based estimate.
+                            </p>
+                          )}
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="soil-carbon-date">Measurement date *</Label>
+                          <Input
+                            id="soil-carbon-date"
+                            type="date"
+                            value={form.soil_carbon_measurement_date || ''}
+                            onChange={(e) =>
+                              updateForm({ soil_carbon_measurement_date: e.target.value })
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 2: Methodology + Lab */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-2">
+                          <Label>Sampling methodology *</Label>
+                          <Select
+                            value={form.soil_carbon_methodology}
+                            onValueChange={(v) => updateForm({ soil_carbon_methodology: v })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select methodology" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SOIL_CARBON_METHODOLOGIES.map((m) => (
+                                <SelectItem key={m.value} value={m.value}>
+                                  <div>
+                                    <div>{m.label}</div>
+                                    <div className="text-xs text-muted-foreground">{m.description}</div>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="soil-carbon-lab">Lab / verifier name</Label>
+                          <Input
+                            id="soil-carbon-lab"
+                            value={form.soil_carbon_lab_name || ''}
+                            onChange={(e) => updateForm({ soil_carbon_lab_name: e.target.value })}
+                            placeholder="e.g. NRM Laboratories"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Row 3: Sampling points (optional) */}
+                      <div className="grid gap-2 max-w-[200px]">
+                        <Label htmlFor="sampling-points">Sampling points (optional)</Label>
+                        <Input
+                          id="sampling-points"
+                          type="number"
+                          min="1"
+                          value={form.soil_carbon_sampling_points ?? ''}
+                          onChange={(e) =>
+                            updateForm({
+                              soil_carbon_sampling_points:
+                                e.target.value ? parseInt(e.target.value) : null,
+                            })
+                          }
+                          placeholder="e.g. 12"
+                        />
+                      </div>
+
+                      {/* Comparison card */}
+                      {form.soil_carbon_override_kg_co2e_per_ha != null && form.soil_carbon_override_kg_co2e_per_ha > 0 && (
+                        <div className="rounded-lg border border-border bg-muted/20 p-3">
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div>
+                              <div className="text-muted-foreground">Practice default</div>
+                              <div className="font-medium text-foreground">
+                                {SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0} kg CO2e/ha/yr
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground">Your measurement</div>
+                              <div className="font-medium text-foreground">
+                                {form.soil_carbon_override_kg_co2e_per_ha} kg CO2e/ha/yr
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground">Difference</div>
+                              <div className="font-medium text-foreground">
+                                {(() => {
+                                  const defaultVal = SOIL_CARBON_REMOVAL_DEFAULTS[form.soil_management] ?? 0;
+                                  if (defaultVal === 0) return 'N/A (no default)';
+                                  const diff = ((form.soil_carbon_override_kg_co2e_per_ha! - defaultVal) / defaultVal) * 100;
+                                  return `${diff >= 0 ? '+' : ''}${diff.toFixed(0)}%`;
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Evidence upload */}
+                      <div className="space-y-2">
+                        <Label>Lab report (PDF)</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Upload the laboratory report as supporting evidence. Optional but recommended for credibility.
+                        </p>
+
+                        {/* Existing evidence files */}
+                        {existingEvidence.map((doc) => (
+                          <div
+                            key={doc.id}
+                            className="flex items-center justify-between rounded-lg border border-border p-2"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="text-sm truncate">{doc.document_name}</span>
+                              {doc.file_size_bytes && (
+                                <span className="text-xs text-muted-foreground shrink-0">
+                                  ({(doc.file_size_bytes / 1024).toFixed(0)} KB)
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {doc.signed_url && (
+                                <a
+                                  href={doc.signed_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1 text-muted-foreground hover:text-foreground"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const res = await fetch(
+                                    `/api/vineyards/${vineyardId}/growing-profile/evidence?evidence_id=${doc.id}`,
+                                    { method: 'DELETE' }
+                                  );
+                                  if (res.ok) {
+                                    setExistingEvidence((prev) => prev.filter((d) => d.id !== doc.id));
+                                    toast.success('Evidence removed');
+                                  } else {
+                                    toast.error('Failed to remove evidence');
+                                  }
+                                }}
+                                className="p-1 text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Pending upload indicator */}
+                        {evidenceFile && (
+                          <div className="flex items-center gap-2 rounded-lg border border-dashed border-[#ccff00]/50 bg-[#ccff00]/5 p-2">
+                            <Upload className="h-4 w-4 text-[#ccff00]" />
+                            <span className="text-sm">{evidenceFile.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              (will upload on save)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEvidenceFile(null)}
+                              className="ml-auto p-1 text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* File input */}
+                        {!evidenceFile && (
+                          <label className="flex items-center gap-2 rounded-lg border border-dashed border-border p-3 cursor-pointer hover:border-muted-foreground/50 transition-colors">
+                            <Upload className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                              Choose PDF file (max 20 MB)
+                            </span>
+                            <input
+                              type="file"
+                              accept=".pdf,application/pdf"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                if (file.type !== 'application/pdf') {
+                                  toast.error('Only PDF files are accepted');
+                                  return;
+                                }
+                                if (file.size > 20 * 1024 * 1024) {
+                                  toast.error('File must be under 20 MB');
+                                  return;
+                                }
+                                setEvidenceFile(file);
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
