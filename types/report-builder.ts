@@ -130,6 +130,13 @@ export const AVAILABLE_SECTIONS: SectionDefinition[] = [
     category: 'Operations',
   },
   {
+    id: 'key-findings',
+    label: 'Key Findings & Change Drivers',
+    description: 'AI-generated narrative explaining the most significant drivers of year-on-year emission changes',
+    required: false,
+    category: 'Performance',
+  },
+  {
     id: 'trends',
     label: 'Year-over-Year Trends',
     description: 'Historical emissions data and trajectory analysis',
@@ -215,6 +222,7 @@ export const SECTION_LABELS: Record<string, string> = {
   'community-impact': 'Community Impact',
   'supply-chain': 'Supply Chain Analysis',
   facilities: 'Facility Emissions Breakdown',
+  'key-findings': 'Key Findings & Change Drivers',
   trends: 'Year-over-Year Trends',
   targets: 'Targets & Action Plans',
   methodology: 'Methodology & Data Quality',

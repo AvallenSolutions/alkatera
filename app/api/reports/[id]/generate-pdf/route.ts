@@ -151,6 +151,67 @@ export async function POST(
       }
     }
 
+    // Key Findings (AI-generated, if section selected)
+    if (config.sections.includes('key-findings')) {
+      try {
+        const { calculateCorporateEmissions } = await import('@/lib/calculations/corporate-emissions');
+        const { detectEmissionChanges } = await import('@/lib/calculations/emission-change-detection');
+        const { generateKeyFindings } = await import('@/lib/claude/key-findings-assistant');
+
+        const previousYear = year - 1;
+        const [currentEmissions, previousEmissions] = await Promise.all([
+          calculateCorporateEmissions(supabase, orgId, year),
+          calculateCorporateEmissions(supabase, orgId, previousYear),
+        ]);
+
+        if (previousEmissions.hasData) {
+          const { data: changeEvents } = await supabase
+            .from('operational_change_events')
+            .select('description, event_date, scope, category, impact_direction, estimated_impact_kgco2e')
+            .eq('organization_id', orgId)
+            .gte('event_date', `${previousYear}-01-01`)
+            .lte('event_date', `${year}-12-31`);
+
+          const utilityChanges = await detectEmissionChanges(supabase, orgId, year, previousYear);
+
+          const result = await generateKeyFindings({
+            organisationName: org?.name || 'Organisation',
+            currentYear: year,
+            previousYear,
+            currentEmissions: {
+              scope1: currentEmissions.breakdown.scope1,
+              scope2: currentEmissions.breakdown.scope2,
+              scope3Total: currentEmissions.breakdown.scope3.total,
+              scope3Breakdown: { ...currentEmissions.breakdown.scope3 },
+              total: currentEmissions.breakdown.total,
+            },
+            previousEmissions: {
+              scope1: previousEmissions.breakdown.scope1,
+              scope2: previousEmissions.breakdown.scope2,
+              scope3Total: previousEmissions.breakdown.scope3.total,
+              scope3Breakdown: { ...previousEmissions.breakdown.scope3 },
+              total: previousEmissions.breakdown.total,
+            },
+            operationalChanges: changeEvents || [],
+            utilityPatternChanges: utilityChanges.map((c) => ({
+              description: c.description,
+              scope: c.scope,
+              category: c.category,
+              magnitude_pct: c.magnitude_pct,
+            })),
+          });
+
+          if (result.findings.length > 0) {
+            reportData.keyFindings = result.findings;
+            reportData.dataAvailability.hasKeyFindings = true;
+          }
+        }
+      } catch (err) {
+        console.error('[generate-pdf] Key findings generation failed (non-fatal):', err);
+        // Non-fatal - report generates without key findings
+      }
+    }
+
     // Render HTML
     const html = renderSustainabilityReportHtml(config as any, reportData as any);
 

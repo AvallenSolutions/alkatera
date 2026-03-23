@@ -52,7 +52,7 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
       const orgId = organizationId;
       const year = config.reportYear;
 
-      const [corporateData, productData, facilitiesData, suppliersData] = await Promise.all([
+      const [corporateData, productData, facilitiesData, suppliersData, multiYearCorporateData] = await Promise.all([
         supabase
           .from('corporate_reports')
           .select('id, total_emissions, breakdown_json')
@@ -72,6 +72,11 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
           .from('suppliers')
           .select('id')
           .eq('organization_id', orgId),
+        supabase
+          .from('corporate_reports')
+          .select('id, year')
+          .eq('organization_id', orgId)
+          .order('year', { ascending: false }),
       ]);
 
       const hasCorporate = !!corporateData.data;
@@ -85,14 +90,19 @@ export function ContentSelectionStep({ config, onChange, organizationId }: Conte
       recs['executive-summary'] = { id: 'executive-summary', priority: 'high', dataCompleteness: 100, rationale: 'Required overview section' };
       recs['company-overview'] = { id: 'company-overview', priority: 'high', dataCompleteness: 100, rationale: 'Establishes context' };
 
+      const corporateYearCount = multiYearCorporateData.data?.length || 0;
+      const hasMultiYearCorporate = corporateYearCount >= 2;
+
       if (hasCorporate) {
         const scope3 = corporateData.data?.breakdown_json?.scope3 || 0;
         recs['scope-1-2-3'] = { id: 'scope-1-2-3', priority: 'high', dataCompleteness: scope3 > 0 ? 100 : 75, rationale: 'Corporate emissions data available' };
         recs['ghg-inventory'] = { id: 'ghg-inventory', priority: 'medium', dataCompleteness: 70, rationale: 'Gas-level breakdown from corporate data' };
-        recs['trends'] = { id: 'trends', priority: config.isMultiYear ? 'high' : 'medium', dataCompleteness: config.isMultiYear ? 100 : 50, rationale: config.isMultiYear ? 'Multi-year data selected' : 'Single year — enable multi-year for trends' };
+        recs['trends'] = { id: 'trends', priority: config.isMultiYear ? 'high' : 'medium', dataCompleteness: config.isMultiYear ? 100 : 50, rationale: config.isMultiYear ? 'Multi-year data selected' : 'Single year - enable multi-year for trends' };
+        recs['key-findings'] = { id: 'key-findings', priority: hasMultiYearCorporate ? 'high' : 'low', dataCompleteness: hasMultiYearCorporate ? 90 : 0, rationale: hasMultiYearCorporate ? `${corporateYearCount} years of corporate data available for change analysis` : 'Requires multiple years of corporate reports' };
       } else {
         recs['scope-1-2-3'] = { id: 'scope-1-2-3', priority: 'low', dataCompleteness: 0, rationale: 'No corporate footprint data' };
         recs['ghg-inventory'] = { id: 'ghg-inventory', priority: 'low', dataCompleteness: 0, rationale: 'No emissions data available' };
+        recs['key-findings'] = { id: 'key-findings', priority: 'low', dataCompleteness: 0, rationale: 'Requires multiple years of corporate reports' };
       }
 
       if (productCount > 0) {

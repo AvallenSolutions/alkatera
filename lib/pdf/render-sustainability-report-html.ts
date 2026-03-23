@@ -169,6 +169,15 @@ interface VineyardReportData {
   yieldPerHa: number;
 }
 
+interface KeyFinding {
+  title: string;
+  narrative: string;
+  scope: string;
+  direction: string;
+  magnitude_pct: number;
+  confidence: string;
+}
+
 interface ReportData {
   organization: OrganizationInfo;
   emissions: EmissionsData;
@@ -182,6 +191,7 @@ interface ReportData {
   peopleCulture?: PeopleCultureData;
   governance?: GovernanceData;
   communityImpact?: CommunityImpactData;
+  keyFindings?: KeyFinding[];
   dataAvailability: {
     hasOrganization: boolean;
     hasEmissions: boolean;
@@ -587,6 +597,51 @@ function renderEmissionsPage(config: ReportConfig, data: ReportData): string {
           </tr>
         </tbody>
       </table>
+
+      ${renderPageFooter(2)}
+    </div>`;
+}
+
+function renderKeyFindingsPage(config: ReportConfig, data: ReportData): string {
+  if (!data.keyFindings || data.keyFindings.length === 0) return '';
+
+  const findings = data.keyFindings;
+
+  const findingCards = findings.map((f) => {
+    const isDecrease = f.direction === 'decrease';
+    const directionIcon = isDecrease ? '&#9660;' : '&#9650;';
+    const directionColour = isDecrease ? '#22c55e' : '#ef4444';
+    const directionLabel = isDecrease ? 'Decrease' : 'Increase';
+
+    const confidenceColour =
+      f.confidence === 'high' ? '#22c55e' :
+      f.confidence === 'medium' ? '#f59e0b' : '#a8a29e';
+
+    return `
+      <div style="background: white; border: 1px solid #e7e5e4; border-radius: 12px; padding: 20px; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+          <span style="font-size: 20px; color: ${directionColour}; line-height: 1;">${directionIcon}</span>
+          <span style="font-size: 15px; font-weight: 600; color: #1c1917; flex: 1;">${escapeHtml(f.title)}</span>
+        </div>
+        <p style="font-size: 13px; color: #44403c; line-height: 1.6; margin-bottom: 14px;">${escapeHtml(f.narrative)}</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <span style="display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 500; font-family: 'Fira Code', monospace; background: #f5f5f4; color: #78716c; text-transform: uppercase; letter-spacing: 1px;">${escapeHtml(f.scope)}</span>
+          <span style="display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; background: ${isDecrease ? '#dcfce7' : '#fee2e2'}; color: ${isDecrease ? '#166534' : '#991b1b'};">${directionLabel} ${Math.abs(f.magnitude_pct).toFixed(1)}%</span>
+          <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 500; background: #fafaf9; color: ${confidenceColour};">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: ${confidenceColour}; display: inline-block;"></span>
+            ${escapeHtml(f.confidence)} confidence
+          </span>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="page light-page">
+      ${renderSectionHeader('02', 'Key Findings')}
+
+      <div style="font-size: 9px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px;">CHANGE DRIVERS &amp; ANALYSIS</div>
+
+      ${findingCards}
 
       ${renderPageFooter(2)}
     </div>`;
@@ -1290,6 +1345,8 @@ export function renderSustainabilityReportHtml(
     renderExecSummaryPage(config, data),
     renderEmissionsPage(config, data),
     // Conditional sections
+    sections.has('key-findings') && data.keyFindings && data.keyFindings.length > 0
+      ? renderKeyFindingsPage(config, data) : '',
     sections.has('trends') && data.emissionsTrends && data.emissionsTrends.length >= 2
       ? renderTrendsPage(config, data) : '',
     sections.has('products') && data.dataAvailability.hasProducts

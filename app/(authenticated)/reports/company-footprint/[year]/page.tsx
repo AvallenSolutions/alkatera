@@ -46,6 +46,8 @@ import { MarketingMaterialsCard } from "@/components/reports/MarketingMaterialsC
 import { FootprintSummaryDashboard } from "@/components/reports/FootprintSummaryDashboard";
 import { FootprintHeroSummary } from "@/components/reports/FootprintHeroSummary";
 import { FootprintProgressBanner } from "@/components/reports/FootprintProgressBanner";
+import { OperationalChangesCard } from "@/components/reports/OperationalChangesCard";
+import { KeyFindingsPanel } from "@/components/reports/KeyFindingsPanel";
 // New GHG Protocol Scope 3 category cards
 import { UpstreamTransportCard } from "@/components/reports/UpstreamTransportCard";
 import { DownstreamTransportCard } from "@/components/reports/DownstreamTransportCard";
@@ -411,6 +413,17 @@ export default function FootprintBuilderPage() {
       />
 
       {/* ================================================================= */}
+      {/* AI Key Findings                                                   */}
+      {/* ================================================================= */}
+      {currentOrganization?.id && (
+        <KeyFindingsPanel
+          organizationId={currentOrganization.id}
+          year={year}
+          hasPreviousYearData={year > 2020}
+        />
+      )}
+
+      {/* ================================================================= */}
       {/* Progress Banner                                                   */}
       {/* ================================================================= */}
       <FootprintProgressBanner
@@ -420,6 +433,17 @@ export default function FootprintBuilderPage() {
         score={completeness.score}
         firstIncompleteCategory={completeness.firstIncompleteCategory}
       />
+
+      {/* ================================================================= */}
+      {/* Operational Changes Log                                           */}
+      {/* ================================================================= */}
+      {currentOrganization?.id && (
+        <OperationalChangesCard
+          organizationId={currentOrganization.id}
+          year={year}
+          onUpdate={() => fetchReportData()}
+        />
+      )}
 
       {/* ================================================================= */}
       {/* Scope-Grouped Activity Cards (Accordion)                          */}
