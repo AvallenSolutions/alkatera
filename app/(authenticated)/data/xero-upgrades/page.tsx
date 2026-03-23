@@ -38,7 +38,9 @@ export default function XeroUpgradesPage() {
             <ActionCentre />
             <SupplierMatchingPanel />
             <SupplierEngagementPrompts />
-            <AIClassificationPanel />
+            <div id="ai-classification">
+              <AIClassificationPanel />
+            </div>
           </TabsContent>
 
           <TabsContent value="transactions">

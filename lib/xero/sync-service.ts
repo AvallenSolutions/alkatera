@@ -5,6 +5,7 @@ import { updateSyncStatus } from './token-store'
 import { classifyTransaction, type AccountMapping, type SupplierRule } from './classifier'
 import { calculateSpendBasedEmissions } from './spend-factors'
 import { extractFromDescription, hasExtractedData } from './description-extractor'
+import { classifyWithAI } from './ai-classifier'
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -55,6 +56,8 @@ export async function syncStage(
         return await stageBankTransactions(db, organizationId, cursor)
       case 'classify':
         return await stageClassify(db, organizationId)
+      case 'ai_classify':
+        return await stageAIClassify(db, organizationId)
       case 'complete':
         return await stageComplete(db, organizationId)
       default:
@@ -354,9 +357,77 @@ async function stageClassify(
 
   return {
     done: false,
-    nextStage: 'complete',
+    nextStage: 'ai_classify',
     progress: `Classified ${classified} of ${unclassified?.length || 0} transactions`,
     stats: { transactionsClassified: classified },
+  }
+}
+
+// ── Stage: AI Classify ───────────────────────────────────────────────
+
+async function stageAIClassify(
+  db: ReturnType<typeof getServiceClient>,
+  organizationId: string
+): Promise<StageResult> {
+  // Fetch up to 50 unclassified transactions (those the rule-based classifier missed)
+  const { data: unclassified } = await db
+    .from('xero_transactions')
+    .select('id, xero_contact_name, description, amount')
+    .eq('organization_id', organizationId)
+    .is('emission_category', null)
+    .eq('upgrade_status', 'not_applicable')
+    .order('amount', { ascending: false })
+    .limit(50)
+
+  if (!unclassified || unclassified.length === 0) {
+    return {
+      done: false,
+      nextStage: 'complete',
+      progress: 'No unclassified transactions for AI',
+    }
+  }
+
+  const aiResults = await classifyWithAI(
+    unclassified.map(tx => ({
+      id: tx.id,
+      contactName: tx.xero_contact_name,
+      description: tx.description,
+      amount: tx.amount,
+    }))
+  )
+
+  let autoClassified = 0
+  let needsReview = 0
+
+  for (const result of aiResults) {
+    if (result.suggestedCategory && result.confidence >= 0.7) {
+      const spendBasedEmissions = calculateSpendBasedEmissions(
+        unclassified.find(tx => tx.id === result.transactionId)?.amount || 0,
+        result.suggestedCategory
+      )
+
+      await db
+        .from('xero_transactions')
+        .update({
+          emission_category: result.suggestedCategory,
+          classification_source: 'ai',
+          classification_confidence: result.confidence,
+          upgrade_status: 'pending',
+          spend_based_emissions_kg: spendBasedEmissions,
+        })
+        .eq('id', result.transactionId)
+
+      autoClassified++
+    } else {
+      needsReview++
+    }
+  }
+
+  return {
+    done: false,
+    nextStage: 'complete',
+    progress: `AI classified ${autoClassified} transactions (${needsReview} need review)`,
+    stats: { transactionsClassified: autoClassified },
   }
 }
 

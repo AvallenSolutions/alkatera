@@ -13,6 +13,7 @@ import { AccommodationUpgradeForm } from './AccommodationUpgradeForm'
 import { FreightUpgradeForm } from './FreightUpgradeForm'
 import { SupplyChainUpgradeForm } from './SupplyChainUpgradeForm'
 import { DuplicateWarningBanner } from './DuplicateWarningBanner'
+import { UnclassifiedAlertBanner } from './UnclassifiedAlertBanner'
 
 interface CategorySummary {
   emission_category: string
@@ -21,6 +22,8 @@ interface CategorySummary {
   transaction_count: number
   pending_count: number
   upgraded_count: number
+  earliest_date: string
+  latest_date: string
 }
 
 // Categories that have upgrade forms available
@@ -58,7 +61,7 @@ export function ActionCentre() {
     // Fetch transactions grouped by category
     const { data: transactions } = await supabase
       .from('xero_transactions')
-      .select('emission_category, amount, spend_based_emissions_kg, upgrade_status')
+      .select('emission_category, amount, spend_based_emissions_kg, upgrade_status, transaction_date')
       .eq('organization_id', currentOrganization.id)
       .not('emission_category', 'is', null)
 
@@ -79,6 +82,8 @@ export function ActionCentre() {
         transaction_count: 0,
         pending_count: 0,
         upgraded_count: 0,
+        earliest_date: tx.transaction_date || '',
+        latest_date: tx.transaction_date || '',
       }
 
       existing.total_amount += Math.abs(tx.amount || 0)
@@ -86,6 +91,10 @@ export function ActionCentre() {
       existing.transaction_count++
       if (tx.upgrade_status === 'pending') existing.pending_count++
       if (tx.upgrade_status === 'upgraded') existing.upgraded_count++
+      if (tx.transaction_date) {
+        if (!existing.earliest_date || tx.transaction_date < existing.earliest_date) existing.earliest_date = tx.transaction_date
+        if (!existing.latest_date || tx.transaction_date > existing.latest_date) existing.latest_date = tx.transaction_date
+      }
 
       grouped.set(tx.emission_category, existing)
     }
@@ -195,6 +204,11 @@ export function ActionCentre() {
         </CardContent>
       </Card>
 
+      {/* Unclassified transactions alert */}
+      {currentOrganization && (
+        <UnclassifiedAlertBanner organizationId={currentOrganization.id} />
+      )}
+
       {/* Pending upgrades */}
       {pendingCategories.length > 0 && (
         <div className="space-y-3">
@@ -208,6 +222,8 @@ export function ActionCentre() {
               totalSpend={category.total_amount}
               estimatedEmissionsKg={category.total_emissions_kg}
               transactionCount={category.pending_count}
+              earliestDate={category.earliest_date}
+              latestDate={category.latest_date}
               canUpgrade={UPGRADEABLE_CATEGORIES.includes(category.emission_category)}
               onUpgrade={() => setUpgradeCategory(category.emission_category)}
               onDismiss={() => handleDismiss(category.emission_category)}

@@ -9,6 +9,7 @@ import { Loader2, Save, MapPin, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
+import { suggestCategory } from '@/lib/xero/account-suggestions'
 
 // Emission categories that users can map Xero accounts to
 const EMISSION_CATEGORIES = [
@@ -49,6 +50,7 @@ export function XeroAccountMapping() {
   const [isSaving, setIsSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
+  const [suggestions, setSuggestions] = useState<Map<string, string>>(new Map())
 
   const fetchMappings = useCallback(async () => {
     if (!currentOrganization?.id) return
@@ -77,7 +79,26 @@ export function XeroAccountMapping() {
     if (error) {
       console.error('Failed to fetch account mappings:', error)
     } else {
-      setMappings(data || [])
+      const rows = data || []
+
+      // Compute smart suggestions for unmapped, non-excluded accounts
+      const newSuggestions = new Map<string, string>()
+      const withSuggestions = rows.map(m => {
+        if (m.emission_category === null && !m.is_excluded) {
+          const suggested = suggestCategory(m.xero_account_name)
+          if (suggested) {
+            newSuggestions.set(m.xero_account_id, suggested)
+            return { ...m, emission_category: suggested }
+          }
+        }
+        return m
+      })
+
+      setSuggestions(newSuggestions)
+      setMappings(withSuggestions)
+      if (newSuggestions.size > 0) {
+        setHasChanges(true)
+      }
     }
     setIsLoading(false)
   }, [currentOrganization?.id])
@@ -118,6 +139,7 @@ export function XeroAccountMapping() {
 
       toast.success('Account mappings saved')
       setHasChanges(false)
+      setSuggestions(new Map())
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save mappings'
       toast.error(message)
@@ -156,16 +178,24 @@ export function XeroAccountMapping() {
               </span>
             </CardDescription>
           </div>
-          {hasChanges && (
-            <Button onClick={handleSave} disabled={isSaving} size="sm">
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              Save Mappings
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {suggestions.size > 0 && (
+              <Button onClick={handleSave} disabled={isSaving} size="sm" variant="outline">
+                <Check className="h-4 w-4 mr-2" />
+                Accept all suggestions
+              </Button>
+            )}
+            {hasChanges && (
+              <Button onClick={handleSave} disabled={isSaving} size="sm">
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Mappings
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -192,27 +222,34 @@ export function XeroAccountMapping() {
                 )}
               </div>
 
-              <Select
-                value={mapping.is_excluded ? 'skip' : mapping.emission_category || ''}
-                onValueChange={val => handleCategoryChange(mapping.xero_account_id, val)}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Select category..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="skip" className="text-muted-foreground italic">
-                    Skip (ignore)
-                  </SelectItem>
-                  {EMISSION_CATEGORIES.map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                      {cat.scope && (
-                        <span className="text-muted-foreground ml-1">({cat.scope})</span>
-                      )}
+              <div className="flex items-center gap-2">
+                <Select
+                  value={mapping.is_excluded ? 'skip' : mapping.emission_category || ''}
+                  onValueChange={val => handleCategoryChange(mapping.xero_account_id, val)}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Select category..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="skip" className="text-muted-foreground italic">
+                      Skip (ignore)
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {EMISSION_CATEGORIES.map(cat => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                        {cat.scope && (
+                          <span className="text-muted-foreground ml-1">({cat.scope})</span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {suggestions.has(mapping.xero_account_id) && (
+                  <Badge variant="outline" className="text-xs shrink-0 border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    Suggested
+                  </Badge>
+                )}
+              </div>
 
               <div className="w-16 flex justify-center">
                 {mapping.emission_category || mapping.is_excluded ? (

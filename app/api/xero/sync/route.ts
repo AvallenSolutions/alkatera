@@ -18,8 +18,9 @@ export const dynamic = 'force-dynamic'
  *   1. "accounts" - Fetch chart of accounts
  *   2. "invoices" - Fetch purchase invoices (paginated)
  *   3. "bank_transactions" - Fetch bank transactions (paginated)
- *   4. "classify" - Classify and upsert all staged transactions
- *   5. "complete" - Final status update
+ *   4. "classify" - Rule-based classification of transactions
+ *   5. "ai_classify" - AI classification for remaining unclassified transactions
+ *   6. "complete" - Final status update
  *
  * Returns: { nextStage, cursor, progress, done }
  */

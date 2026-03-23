@@ -1,6 +1,7 @@
 'use client'
 
 import { XeroConnectionCard } from './XeroConnectionCard'
+import { XeroSetupStepper } from './XeroSetupStepper'
 import { XeroAccountMapping } from './XeroAccountMapping'
 
 interface IntegrationsSettingsProps {
@@ -20,6 +21,7 @@ export function IntegrationsSettings({ showHeader = true }: IntegrationsSettings
       )}
 
       <XeroConnectionCard />
+      <XeroSetupStepper />
       <XeroAccountMapping />
 
       {/* Placeholder for future integrations */}

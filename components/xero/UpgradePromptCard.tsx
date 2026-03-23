@@ -48,6 +48,8 @@ interface UpgradePromptCardProps {
   totalSpend: number
   estimatedEmissionsKg: number
   transactionCount: number
+  earliestDate?: string
+  latestDate?: string
   canUpgrade: boolean
   isUpgraded?: boolean
   onUpgrade?: () => void
@@ -59,6 +61,8 @@ export function UpgradePromptCard({
   totalSpend,
   estimatedEmissionsKg,
   transactionCount,
+  earliestDate,
+  latestDate,
   canUpgrade,
   isUpgraded = false,
   onUpgrade,
@@ -77,6 +81,15 @@ export function UpgradePromptCard({
   const formattedEmissions = estimatedEmissionsKg >= 1000
     ? `${(estimatedEmissionsKg / 1000).toFixed(1)} tCO2e`
     : `${Math.round(estimatedEmissionsKg)} kg CO2e`
+
+  const formatShortDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+
+  const dateRange = earliestDate && latestDate
+    ? earliestDate.slice(0, 7) === latestDate.slice(0, 7)
+      ? formatShortDate(earliestDate)
+      : `${formatShortDate(earliestDate)} \u2013 ${formatShortDate(latestDate)}`
+    : null
 
   return (
     <Card className={isUpgraded ? 'border-emerald-500/20 bg-emerald-50/50 dark:bg-emerald-950/10' : undefined}>
@@ -113,7 +126,8 @@ export function UpgradePromptCard({
             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
               <span>{formattedSpend} identified</span>
               <span>{formattedEmissions} estimated</span>
-              <span>{transactionCount} transactions</span>
+              <span>{transactionCount} transaction{transactionCount !== 1 ? 's' : ''}</span>
+              {dateRange && <span>{dateRange}</span>}
             </div>
           </div>
 

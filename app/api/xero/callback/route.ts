@@ -106,9 +106,9 @@ export async function GET(request: NextRequest) {
       connectedBy: storedState.userId,
     })
 
-    // 6. Redirect to settings with success
+    // 6. Redirect to settings with success + auto-sync trigger
     return NextResponse.redirect(
-      `${baseUrl}/settings?tab=integrations&xero=connected`
+      `${baseUrl}/settings?tab=integrations&xero=connected&auto-sync=true`
     )
   } catch (err: unknown) {
     console.error('Error in Xero OAuth callback:', err)

@@ -38,6 +38,7 @@ export function XeroConnectionCard() {
   const [isConnecting, setIsConnecting] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
+  const [autoSyncRequested, setAutoSyncRequested] = useState(false)
 
   const fetchStatus = useCallback(async () => {
     if (!currentOrganization?.id) return
@@ -72,9 +73,14 @@ export function XeroConnectionCard() {
     if (xeroParam === 'connected') {
       toast.success('Xero connected successfully')
       fetchStatus()
+      // Trigger auto-sync if requested
+      if (params.get('auto-sync') === 'true') {
+        setAutoSyncRequested(true)
+      }
       // Clean URL
       const url = new URL(window.location.href)
       url.searchParams.delete('xero')
+      url.searchParams.delete('auto-sync')
       window.history.replaceState({}, '', url.toString())
     } else if (xeroParam === 'error') {
       const message = params.get('message') || 'Failed to connect to Xero'
@@ -85,6 +91,15 @@ export function XeroConnectionCard() {
       window.history.replaceState({}, '', url.toString())
     }
   }, [fetchStatus])
+
+  // Auto-sync after fresh connection
+  useEffect(() => {
+    if (autoSyncRequested && status?.connected && !isSyncing) {
+      setAutoSyncRequested(false)
+      handleSync()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSyncRequested, status?.connected, isSyncing])
 
   async function handleConnect() {
     if (!currentOrganization?.id) return
@@ -156,9 +171,27 @@ export function XeroConnectionCard() {
         cursor = data.cursor
       }
 
-      toast.success(
-        `Sync complete: ${totalFetched} transactions imported, ${totalClassified} classified`
-      )
+      // Check for remaining unclassified transactions
+      const { count: unclassifiedCount } = await supabase
+        .from('xero_transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('organization_id', currentOrganization.id)
+        .is('emission_category', null)
+        .eq('upgrade_status', 'not_applicable')
+
+      if (unclassifiedCount && unclassifiedCount > 0) {
+        toast.success(
+          `Sync complete: ${totalFetched} transactions imported, ${totalClassified} classified`,
+          {
+            description: `${unclassifiedCount} transaction${unclassifiedCount !== 1 ? 's' : ''} still need classification.`,
+            duration: 8000,
+          }
+        )
+      } else {
+        toast.success(
+          `Sync complete: ${totalFetched} transactions imported, ${totalClassified} classified. All transactions categorised.`
+        )
+      }
       fetchStatus()
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Sync failed'
