@@ -121,12 +121,16 @@ export async function POST(
     // Merge: body overrides copy-forward defaults
     const merged = { ...defaults, ...body };
 
-    // Validate required fields
-    if (!merged.area_ha || !merged.grape_yield_tonnes) {
-      return NextResponse.json(
-        { error: 'area_ha and grape_yield_tonnes are required' },
-        { status: 400 }
-      );
+    const isDraft = merged.is_draft !== false; // default to draft
+
+    // Validate required fields (relaxed for drafts)
+    if (!isDraft) {
+      if (!merged.area_ha || !merged.grape_yield_tonnes) {
+        return NextResponse.json(
+          { error: 'area_ha and grape_yield_tonnes are required to finalise' },
+          { status: 400 }
+        );
+      }
     }
 
     const { data, error } = await supabase
@@ -170,6 +174,9 @@ export async function POST(
         soil_carbon_methodology: merged.soil_carbon_methodology || null,
         soil_carbon_lab_name: merged.soil_carbon_lab_name || null,
         soil_carbon_sampling_points: merged.soil_carbon_sampling_points || null,
+
+        // Draft
+        is_draft: isDraft,
       })
       .select()
       .single();
@@ -219,6 +226,22 @@ export async function PATCH(
 
     // Remove fields that shouldn't be updated directly
     const { id, organization_id, vineyard_id, product_id, created_at, ...updateFields } = body;
+
+    // If finalising (is_draft changing to false), validate required fields
+    if (updateFields.is_draft === false) {
+      if (!updateFields.grape_yield_tonnes || updateFields.grape_yield_tonnes <= 0) {
+        return NextResponse.json(
+          { error: 'Grape yield is required to finalise the profile' },
+          { status: 400 }
+        );
+      }
+      if (!updateFields.area_ha || updateFields.area_ha <= 0) {
+        return NextResponse.json(
+          { error: 'Vineyard area is required to finalise the profile' },
+          { status: 400 }
+        );
+      }
+    }
 
     const { data, error } = await supabase
       .from('vineyard_growing_profiles')

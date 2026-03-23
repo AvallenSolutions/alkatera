@@ -140,7 +140,14 @@ export function VintageHistoryTable({
                           : <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         }
                       </TableCell>
-                      <TableCell className="font-medium">{v.vintage_year}</TableCell>
+                      <TableCell className="font-medium">
+                        {v.vintage_year}
+                        {v.is_draft && (
+                          <Badge variant="outline" className="ml-2 text-xs font-normal text-amber-500 border-amber-500/50">
+                            Draft
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         {v.yield_tonnes_per_ha.toFixed(1)}
                         {prev && <DeltaIndicator current={v.yield_tonnes_per_ha} previous={prev.yield_tonnes_per_ha} invert />}

@@ -146,6 +146,9 @@ export interface VineyardGrowingProfile {
   soil_carbon_lab_name: string | null;
   soil_carbon_sampling_points: number | null;
 
+  // Draft support
+  is_draft: boolean;
+
   created_at: string;
   updated_at: string;
 }
@@ -278,6 +281,7 @@ export interface VintageImpactSummary {
   vintage_year: number;
   profile_id: string;
   is_complete: boolean;
+  is_draft: boolean;
   impacts: ViticultureImpactResult;
   // Normalised headline metrics for charts (per hectare)
   emissions_per_ha: number;

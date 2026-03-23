@@ -91,6 +91,7 @@ export function useVineyardDashboard(vineyardId: string): UseVineyardDashboardRe
           vintage_year: profile.vintage_year,
           profile_id: profile.id,
           is_complete: isComplete,
+          is_draft: profile.is_draft ?? false,
           impacts: result,
           emissions_per_ha: result.total_emissions / areaHa,
           water_per_ha: result.water_m3 / areaHa,

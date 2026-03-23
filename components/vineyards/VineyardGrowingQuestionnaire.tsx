@@ -37,6 +37,7 @@ import {
   AlertTriangle,
   Trash2,
   Download,
+  Save,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateViticultureImpacts } from '@/lib/viticulture-calculator';
@@ -189,24 +190,27 @@ export function VineyardGrowingQuestionnaire({
     setForm((prev) => ({ ...prev, ...updates }));
   }
 
-  async function handleSave() {
-    if (form.grape_yield_tonnes <= 0) {
-      toast.error('Please enter the annual grape yield (tonnes)');
-      return;
-    }
+  async function handleSave(asDraft: boolean) {
+    // Full validation only when finalising
+    if (!asDraft) {
+      if (form.grape_yield_tonnes <= 0) {
+        toast.error('Please enter the annual grape yield (tonnes) to finalise');
+        return;
+      }
 
-    if (form.has_measured_soil_carbon) {
-      if (!form.soil_carbon_override_kg_co2e_per_ha || form.soil_carbon_override_kg_co2e_per_ha <= 0) {
-        toast.error('Please enter a measured soil carbon removal value');
-        return;
-      }
-      if (!form.soil_carbon_measurement_date) {
-        toast.error('Please enter the soil carbon measurement date');
-        return;
-      }
-      if (!form.soil_carbon_methodology) {
-        toast.error('Please select a sampling methodology');
-        return;
+      if (form.has_measured_soil_carbon) {
+        if (!form.soil_carbon_override_kg_co2e_per_ha || form.soil_carbon_override_kg_co2e_per_ha <= 0) {
+          toast.error('Please enter a measured soil carbon removal value');
+          return;
+        }
+        if (!form.soil_carbon_measurement_date) {
+          toast.error('Please enter the soil carbon measurement date');
+          return;
+        }
+        if (!form.soil_carbon_methodology) {
+          toast.error('Please select a sampling methodology');
+          return;
+        }
       }
     }
 
@@ -252,6 +256,7 @@ export function VineyardGrowingQuestionnaire({
         soil_carbon_sampling_points: form.has_measured_soil_carbon
           ? form.soil_carbon_sampling_points
           : null,
+        is_draft: asDraft,
       };
 
       const res = await fetch(url, {
@@ -289,7 +294,7 @@ export function VineyardGrowingQuestionnaire({
         }
       }
 
-      toast.success('Growing profile saved');
+      toast.success(asDraft ? 'Draft saved' : 'Growing profile saved');
       onComplete(data);
     } catch (err: any) {
       toast.error(err.message);
@@ -1187,18 +1192,32 @@ export function VineyardGrowingQuestionnaire({
             <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         ) : (
-          <Button
-            onClick={handleSave}
-            disabled={saving || form.grape_yield_tonnes <= 0}
-            className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
-          >
-            {saving ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Check className="mr-2 h-4 w-4" />
-            )}
-            Save Growing Profile
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleSave(true)}
+              disabled={saving}
+            >
+              {saving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save Draft
+            </Button>
+            <Button
+              onClick={() => handleSave(false)}
+              disabled={saving}
+              className="bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+            >
+              {saving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="mr-2 h-4 w-4" />
+              )}
+              Save &amp; Finalise
+            </Button>
+          </div>
         )}
       </div>
     </div>
