@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { XeroSpendEntries } from "@/components/reports/XeroSpendEntries";
+import type { XeroEntry } from "@/lib/xero/scope-card-mapping";
 import {
   getWasteEmissionFactor,
   getTreatmentMethodLabel,
@@ -37,15 +39,17 @@ interface WasteEntry {
   weight_kg: number;
   entry_date: string;
   computed_co2e: number;
+  data_source?: string | null;
 }
 
 interface OperationalWasteCardProps {
   reportId: string;
   entries: WasteEntry[];
+  xeroEntries?: XeroEntry[];
   onUpdate: () => void;
 }
 
-export function OperationalWasteCard({ reportId, entries, onUpdate }: OperationalWasteCardProps) {
+export function OperationalWasteCard({ reportId, entries, xeroEntries, onUpdate }: OperationalWasteCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [materialType, setMaterialType] = useState("");
   const [disposalMethod, setDisposalMethod] = useState("recycling");
@@ -54,6 +58,8 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
   const [isSaving, setIsSaving] = useState(false);
 
   const totalCO2e = entries.reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
+  const xeroTotal = (xeroEntries || []).reduce((sum, e) => sum + e.emissionsKg, 0);
+  const combinedTotal = totalCO2e + xeroTotal;
   const totalWeight = entries.reduce((sum, entry) => sum + entry.weight_kg, 0);
 
   const formatEmissions = (value: number) => {
@@ -132,23 +138,25 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
                 <CardDescription>Facility waste & disposal</CardDescription>
               </div>
             </div>
-            {entries.length > 0 && (
+            {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
               <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100">
                 {entries.length} {entries.length === 1 ? "entry" : "entries"}
+                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
               </Badge>
             )}
           </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {entries.length > 0 ? (
+          {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
                 <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                  {formatEmissions(totalCO2e)}
+                  {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
                   {totalWeight.toLocaleString()}kg total waste
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} Xero entries`}
                 </div>
               </div>
 
@@ -165,7 +173,12 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
                           {getTreatmentMethodLabel(entry.disposal_method)}
                         </Badge>
                       </div>
-                      <div className="font-medium text-sm truncate">{entry.material_type}</div>
+                      <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                        {entry.material_type}
+                        {entry.data_source === 'xero_upgrade' && (
+                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {entry.weight_kg.toLocaleString()}kg • {formatEmissions(entry.computed_co2e)}
                       </div>
@@ -179,6 +192,8 @@ export function OperationalWasteCard({ reportId, entries, onUpdate }: Operationa
                   </div>
                 ))}
               </div>
+
+              <XeroSpendEntries entries={xeroEntries || []} />
             </>
           ) : (
             <div className="py-8 text-center">

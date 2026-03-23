@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { XeroSpendEntries } from "@/components/reports/XeroSpendEntries";
+import type { XeroEntry } from "@/lib/xero/scope-card-mapping";
 
 interface ServiceEntry {
   id: string;
@@ -24,15 +26,17 @@ interface ServiceEntry {
   currency: string;
   entry_date: string;
   computed_co2e: number;
+  data_source?: string | null;
 }
 
 interface ServicesOverheadCardProps {
   reportId: string;
   entries: ServiceEntry[];
+  xeroEntries?: XeroEntry[];
   onUpdate: () => void;
 }
 
-export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOverheadCardProps) {
+export function ServicesOverheadCard({ reportId, entries, xeroEntries, onUpdate }: ServicesOverheadCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -40,6 +44,8 @@ export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOv
   const [isSaving, setIsSaving] = useState(false);
 
   const totalCO2e = entries.reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
+  const xeroTotal = (xeroEntries || []).reduce((sum, e) => sum + e.emissionsKg, 0);
+  const combinedTotal = totalCO2e + xeroTotal;
   const totalSpend = entries.reduce((sum, entry) => sum + entry.spend_amount, 0);
 
   const formatEmissions = (value: number) => {
@@ -106,23 +112,25 @@ export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOv
                 <CardDescription>Marketing, legal, IT, consulting</CardDescription>
               </div>
             </div>
-            {entries.length > 0 && (
+            {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
               <Badge className="bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100">
                 {entries.length} {entries.length === 1 ? "entry" : "entries"}
+                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
               </Badge>
             )}
           </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {entries.length > 0 ? (
+          {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
                 <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                  {formatEmissions(totalCO2e)}
+                  {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
                   £{totalSpend.toLocaleString()} total spend
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} Xero entries`}
                 </div>
               </div>
 
@@ -133,7 +141,12 @@ export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOv
                     className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{entry.description}</div>
+                      <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                        {entry.description}
+                        {entry.data_source === 'xero_upgrade' && (
+                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         £{entry.spend_amount.toLocaleString()} • {formatEmissions(entry.computed_co2e)}
                       </div>
@@ -147,6 +160,8 @@ export function ServicesOverheadCard({ reportId, entries, onUpdate }: ServicesOv
                   </div>
                 ))}
               </div>
+
+              <XeroSpendEntries entries={xeroEntries || []} />
             </>
           ) : (
             <div className="py-8 text-center">

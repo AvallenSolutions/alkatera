@@ -24,6 +24,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
+import { XeroSpendEntries } from "@/components/reports/XeroSpendEntries";
+import type { XeroEntry } from "@/lib/xero/scope-card-mapping";
 import { LocationAutocomplete } from "@/components/ui/location-autocomplete";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
@@ -47,11 +49,13 @@ interface TravelEntry {
   origin_location?: string;
   destination_location?: string;
   cabin_class?: string;
+  data_source?: string | null;
 }
 
 interface BusinessTravelCardProps {
   reportId: string;
   entries: TravelEntry[];
+  xeroEntries?: XeroEntry[];
   onUpdate: () => void;
 }
 
@@ -71,7 +75,7 @@ const cabinClassOptions = [
   { value: "First", label: "First", icon: "👑", description: "First class" },
 ];
 
-export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTravelCardProps) {
+export function BusinessTravelCard({ reportId, entries, xeroEntries, onUpdate }: BusinessTravelCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState("");
   const [transportMode, setTransportMode] = useState("");
@@ -97,6 +101,8 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
   const [emissionComparison, setEmissionComparison] = useState<Record<string, number>>({});
 
   const totalCO2e = entries.reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
+  const xeroTotal = (xeroEntries || []).reduce((sum, e) => sum + e.emissionsKg, 0);
+  const combinedTotal = totalCO2e + xeroTotal;
 
   const formatEmissions = (value: number) => {
     // Always display in tonnes
@@ -346,23 +352,25 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
                 <CardDescription>Activity-based tracking</CardDescription>
               </div>
             </div>
-            {entries.length > 0 && (
+            {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
               <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
                 {entries.length} {entries.length === 1 ? "trip" : "trips"}
+                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
               </Badge>
             )}
           </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {entries.length > 0 ? (
+          {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
                 <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                  {formatEmissions(totalCO2e)}
+                  {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
                   From {entries.length} business {entries.length === 1 ? "trip" : "trips"}
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} Xero entries`}
                 </div>
               </div>
 
@@ -373,7 +381,12 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
                     className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{entry.description}</div>
+                      <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                        {entry.description}
+                        {entry.data_source === 'xero_upgrade' && (
+                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {entry.origin_location && entry.destination_location && (
                           <>
@@ -397,6 +410,8 @@ export function BusinessTravelCard({ reportId, entries, onUpdate }: BusinessTrav
                   </div>
                 ))}
               </div>
+
+              <XeroSpendEntries entries={xeroEntries || []} />
             </>
           ) : (
             <div className="py-8 text-center">

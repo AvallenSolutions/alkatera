@@ -24,6 +24,8 @@ import {
 import { DataProvenanceBadge } from "@/components/ui/data-provenance-badge";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
+import { XeroSpendEntries } from "@/components/reports/XeroSpendEntries";
+import type { XeroEntry } from "@/lib/xero/scope-card-mapping";
 
 interface MaterialEntry {
   id: string;
@@ -32,11 +34,13 @@ interface MaterialEntry {
   weight_kg?: number;
   entry_date: string;
   computed_co2e: number;
+  data_source?: string | null;
 }
 
 interface MarketingMaterialsCardProps {
   reportId: string;
   entries: MaterialEntry[];
+  xeroEntries?: XeroEntry[];
   onUpdate: () => void;
 }
 
@@ -48,7 +52,7 @@ interface EmissionFactor {
   material_type: string;
 }
 
-export function MarketingMaterialsCard({ reportId, entries, onUpdate }: MarketingMaterialsCardProps) {
+export function MarketingMaterialsCard({ reportId, entries, xeroEntries, onUpdate }: MarketingMaterialsCardProps) {
   const [showModal, setShowModal] = useState(false);
   const [description, setDescription] = useState("");
   const [materialType, setMaterialType] = useState("");
@@ -60,6 +64,8 @@ export function MarketingMaterialsCard({ reportId, entries, onUpdate }: Marketin
   const [estimatedCO2e, setEstimatedCO2e] = useState<number | null>(null);
 
   const totalCO2e = entries.reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
+  const xeroTotal = (xeroEntries || []).reduce((sum, e) => sum + e.emissionsKg, 0);
+  const combinedTotal = totalCO2e + xeroTotal;
 
   const formatEmissions = (value: number) => {
     // Always display in tonnes
@@ -193,23 +199,25 @@ export function MarketingMaterialsCard({ reportId, entries, onUpdate }: Marketin
                 <CardDescription>Merchandise & POS materials</CardDescription>
               </div>
             </div>
-            {entries.length > 0 && (
+            {(entries.length > 0 || (xeroEntries && xeroEntries.length > 0)) && (
               <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100">
                 {entries.length} {entries.length === 1 ? "item" : "items"}
+                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
               </Badge>
             )}
           </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {entries.length > 0 ? (
+          {(entries.length > 0 || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
                 <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                  {formatEmissions(totalCO2e)}
+                  {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
                   From {entries.length} marketing {entries.length === 1 ? "item" : "items"}
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} Xero entries`}
                 </div>
               </div>
 
@@ -220,7 +228,12 @@ export function MarketingMaterialsCard({ reportId, entries, onUpdate }: Marketin
                     className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{entry.description}</div>
+                      <div className="font-medium text-sm truncate flex items-center gap-1.5">
+                        {entry.description}
+                        {entry.data_source === 'xero_upgrade' && (
+                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {entry.material_type} • {entry.weight_kg}kg • {formatEmissions(entry.computed_co2e)}
                       </div>
@@ -234,6 +247,8 @@ export function MarketingMaterialsCard({ reportId, entries, onUpdate }: Marketin
                   </div>
                 ))}
               </div>
+
+              <XeroSpendEntries entries={xeroEntries || []} />
             </>
           ) : (
             <div className="py-8 text-center">

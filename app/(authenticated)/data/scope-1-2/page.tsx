@@ -55,7 +55,8 @@ import { LogisticsDistributionCard } from '@/components/reports/LogisticsDistrib
 import { OperationalWasteCard } from '@/components/reports/OperationalWasteCard';
 import { MarketingMaterialsCard } from '@/components/reports/MarketingMaterialsCard';
 import { SpendImportCard } from '@/components/reports/SpendImportCard';
-import { XeroBaselineCard } from '@/components/reports/XeroBaselineCard';
+import { XeroEnergyBaselineAlert } from '@/components/reports/XeroEnergyBaselineAlert';
+import { useXeroTransactions } from '@/hooks/useXeroTransactions';
 // New GHG Protocol Scope 3 category cards
 import { UpstreamTransportCard } from '@/components/reports/UpstreamTransportCard';
 import { DownstreamTransportCard } from '@/components/reports/DownstreamTransportCard';
@@ -196,7 +197,16 @@ export default function CompanyEmissionsPage() {
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [scope3OverheadsCO2e, setScope3OverheadsCO2e] = useState(0);
-  const [xeroBaselineKg, setXeroBaselineKg] = useState(0);
+
+  // Xero transaction data for display in scope cards
+  const {
+    xeroByCategory,
+    scope1Entries: xeroScope1Entries,
+    scope2Entries: xeroScope2Entries,
+    totalScope1Kg: xeroScope1Kg,
+    totalScope2Kg: xeroScope2Kg,
+    totalScope3Kg: xeroScope3Kg,
+  } = useXeroTransactions(currentOrganization?.id, selectedYearStart, selectedYearEnd);
 
   // New state for facility-based utility data
   const [utilityData, setUtilityData] = useState<UtilityDataEntry[]>([]);
@@ -1042,9 +1052,9 @@ export default function CompanyEmissionsPage() {
 
       // Calculate total emissions (matching the display logic)
       // Fleet values are in tCO2e, utility values are in kgCO2e
-      const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e;
-      const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e;
-      const totalScope3Tonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e + (xeroBaselineKg / 1000);
+      const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e + (xeroScope1Kg / 1000);
+      const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e + (xeroScope2Kg / 1000);
+      const totalScope3Tonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + fleetScope3CO2e + (xeroScope3Kg / 1000);
       const totalEmissionsTonnes = totalScope1Tonnes + totalScope2Tonnes + totalScope3Tonnes;
 
       // Only persist if we have actual data
@@ -1062,7 +1072,7 @@ export default function CompanyEmissionsPage() {
           products: scope3Cat1CO2e,          // in tonnes
           products_breakdown: scope3Cat1Breakdown,
           overheads: calculatedScope3OverheadsCO2e / 1000, // in tonnes
-          xero_baseline: xeroBaselineKg / 1000,           // in tonnes (spend-based)
+          xero_baseline: xeroScope3Kg / 1000,           // in tonnes (spend-based)
           business_travel_fleet: fleetScope3CO2e,           // in tonnes (grey fleet)
           total: totalScope3Tonnes,
         },
@@ -1088,7 +1098,7 @@ export default function CompanyEmissionsPage() {
     // Debounce to avoid too many updates
     const timeoutId = setTimeout(persistEmissions, 1000);
     return () => clearTimeout(timeoutId);
-  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, xeroBaselineKg, scope3Cat1Breakdown]);
+  }, [report?.id, currentOrganization?.id, scope1CO2e, scope2CO2e, fleetScope1CO2e, fleetScope2CO2e, fleetScope3CO2e, scope3Cat1CO2e, calculatedScope3OverheadsCO2e, xeroScope1Kg, xeroScope2Kg, xeroScope3Kg, scope3Cat1Breakdown]);
 
   return (
     <div className="space-y-6">
@@ -1239,7 +1249,7 @@ export default function CompanyEmissionsPage() {
                           <div className="text-2xl font-bold">
                             {(() => {
                               // Scope 1 = facility utilities (kg) + company-owned fleet (tonnes)
-                              const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e;
+                              const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e + (xeroScope1Kg / 1000);
                               return totalScope1Tonnes > 0
                                 ? `${totalScope1Tonnes.toFixed(3)} tCO₂e`
                                 : 'No data';
@@ -1258,7 +1268,7 @@ export default function CompanyEmissionsPage() {
                           <div className="text-2xl font-bold">
                             {(() => {
                               // Scope 2 = purchased energy (kg) + electric fleet (tonnes)
-                              const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e;
+                              const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e + (xeroScope2Kg / 1000);
                               return totalScope2Tonnes > 0
                                 ? `${totalScope2Tonnes.toFixed(3)} tCO₂e`
                                 : 'No data';
@@ -1279,8 +1289,8 @@ export default function CompanyEmissionsPage() {
                               // Sum ALL Scope 3 categories:
                               // - scope3Cat1CO2e (Category 1 from LCAs) is in tonnes
                               // - calculatedScope3OverheadsCO2e (all other categories) is in kg
-                              // - xeroBaselineKg (spend-based estimates from Xero) is in kg
-                              const totalTonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + (xeroBaselineKg / 1000);
+                              // - xeroScope3Kg (spend-based estimates from Xero) is in kg
+                              const totalTonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + (xeroScope3Kg / 1000);
 
                               if (totalTonnes > 0) {
                                 return `${totalTonnes.toFixed(3)} tCO₂e`;
@@ -1350,19 +1360,25 @@ export default function CompanyEmissionsPage() {
                     <div className="text-center py-6 bg-gradient-to-br from-orange-100 to-amber-100 dark:from-orange-900/30 dark:to-amber-900/30 rounded-lg border border-orange-200 dark:border-orange-800">
                       <div className="text-sm text-muted-foreground mb-2">Total Scope 1 Emissions ({selectedYear})</div>
                       <div className="text-4xl font-bold text-orange-900 dark:text-orange-100 mb-2">
-                        {((scope1CO2e / 1000) + fleetScope1CO2e) > 0
-                          ? `${((scope1CO2e / 1000) + fleetScope1CO2e).toFixed(3)} tCO2e`
+                        {((scope1CO2e / 1000) + fleetScope1CO2e + (xeroScope1Kg / 1000)) > 0
+                          ? `${((scope1CO2e / 1000) + fleetScope1CO2e + (xeroScope1Kg / 1000)).toFixed(3)} tCO2e`
                           : 'No data'}
                       </div>
-                      {scope1CO2e > 0 && (
+                      {(scope1CO2e > 0 || xeroScope1Kg > 0) && (
                         <div className="text-xs text-muted-foreground">
-                          Utilities: {(scope1CO2e / 1000).toFixed(3)} tCO2e | Fleet: {fleetScope1CO2e.toFixed(3)} tCO2e
+                          {scope1CO2e > 0 && `Utilities: ${(scope1CO2e / 1000).toFixed(3)} tCO2e`}
+                          {scope1CO2e > 0 && fleetScope1CO2e > 0 && ' | '}
+                          {fleetScope1CO2e > 0 && `Fleet: ${fleetScope1CO2e.toFixed(3)} tCO2e`}
+                          {xeroScope1Kg > 0 && ` | Xero (spend-based): ${(xeroScope1Kg / 1000).toFixed(3)} tCO2e`}
                         </div>
                       )}
                     </div>
 
+                    {/* Xero energy baseline for Scope 1 */}
+                    <XeroEnergyBaselineAlert entries={xeroScope1Entries} scope="Scope 1" />
+
                     {/* Link to add data */}
-                    {sourceBreakdown.filter(s => s.scope === 'Scope 1').length === 0 && (
+                    {sourceBreakdown.filter(s => s.scope === 'Scope 1').length === 0 && xeroScope1Entries.length === 0 && (
                       <Alert>
                         <Building2 className="h-4 w-4" />
                         <AlertDescription className="flex items-center justify-between">
@@ -1525,19 +1541,23 @@ export default function CompanyEmissionsPage() {
                     <div className="text-center py-6 bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 rounded-lg border border-blue-200 dark:border-blue-800">
                       <div className="text-sm text-muted-foreground mb-2">Total Scope 2 Emissions ({selectedYear})</div>
                       <div className="text-4xl font-bold text-blue-900 dark:text-blue-100 mb-2">
-                        {scope2CO2e > 0
-                          ? `${(scope2CO2e / 1000).toFixed(3)} tCO2e`
+                        {(scope2CO2e + xeroScope2Kg) > 0
+                          ? `${((scope2CO2e + xeroScope2Kg) / 1000).toFixed(3)} tCO2e`
                           : 'No data'}
                       </div>
-                      {scope2CO2e > 0 && (
+                      {(scope2CO2e > 0 || xeroScope2Kg > 0) && (
                         <div className="text-xs text-muted-foreground">
-                          Location-based method (UK grid average)
+                          {scope2CO2e > 0 && 'Location-based method (UK grid average)'}
+                          {xeroScope2Kg > 0 && ` | Xero (spend-based): ${(xeroScope2Kg / 1000).toFixed(3)} tCO2e`}
                         </div>
                       )}
                     </div>
 
+                    {/* Xero energy baseline for Scope 2 */}
+                    <XeroEnergyBaselineAlert entries={xeroScope2Entries} scope="Scope 2" />
+
                     {/* Link to add data */}
-                    {sourceBreakdown.filter(s => s.scope === 'Scope 2').length === 0 && (
+                    {sourceBreakdown.filter(s => s.scope === 'Scope 2').length === 0 && xeroScope2Entries.length === 0 && (
                       <Alert>
                         <Building2 className="h-4 w-4" />
                         <AlertDescription className="flex items-center justify-between">
@@ -1698,16 +1718,6 @@ export default function CompanyEmissionsPage() {
               />
             )}
 
-            {/* Xero Spend Baselines */}
-            {currentOrganization && (
-              <XeroBaselineCard
-                organizationId={currentOrganization.id}
-                yearStart={`${selectedYear}-01-01`}
-                yearEnd={`${selectedYear}-12-31`}
-                onTotalCalculated={setXeroBaselineKg}
-              />
-            )}
-
             <Card className="border-green-200 dark:border-green-900 bg-green-50/30 dark:bg-green-950/20">
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -1846,18 +1856,21 @@ export default function CompanyEmissionsPage() {
                   reportId={report.id}
                   entries={travelEntries}
                   onUpdate={fetchReportData}
+                  xeroEntries={xeroByCategory.get('business_travel')}
                 />
 
                 <MarketingMaterialsCard
                   reportId={report.id}
                   entries={marketingEntries}
                   onUpdate={fetchReportData}
+                  xeroEntries={xeroByCategory.get('purchased_services_materials')}
                 />
 
                 <ServicesOverheadCard
                   reportId={report.id}
                   entries={serviceEntries}
                   onUpdate={fetchReportData}
+                  xeroEntries={xeroByCategory.get('purchased_services')}
                 />
 
                 <TeamCommutingCard
@@ -1879,6 +1892,7 @@ export default function CompanyEmissionsPage() {
                     year={selectedYear}
                     entries={logisticsEntries}
                     onUpdate={fetchReportData}
+                    xeroEntries={xeroByCategory.get('downstream_logistics')}
                   />
                 )}
 
@@ -1886,6 +1900,7 @@ export default function CompanyEmissionsPage() {
                   reportId={report.id}
                   entries={wasteEntries}
                   onUpdate={fetchReportData}
+                  xeroEntries={xeroByCategory.get('operational_waste')}
                 />
 
                 {/* New GHG Protocol Scope 3 category cards */}

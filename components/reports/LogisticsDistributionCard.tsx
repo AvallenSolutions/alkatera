@@ -24,6 +24,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { XeroSpendEntries } from "@/components/reports/XeroSpendEntries";
+import type { XeroEntry } from "@/lib/xero/scope-card-mapping";
 
 interface LogisticsEntry {
   id: string;
@@ -32,6 +34,7 @@ interface LogisticsEntry {
   distance_km: number;
   weight_kg: number;
   computed_co2e: number;
+  data_source?: string | null;
 }
 
 interface LogisticsDistributionCardProps {
@@ -39,6 +42,7 @@ interface LogisticsDistributionCardProps {
   organizationId: string;
   year: number;
   entries: LogisticsEntry[];
+  xeroEntries?: XeroEntry[];
   onUpdate: () => void;
 }
 
@@ -47,6 +51,7 @@ export function LogisticsDistributionCard({
   organizationId,
   year,
   entries,
+  xeroEntries,
   onUpdate,
 }: LogisticsDistributionCardProps) {
   const [showModal, setShowModal] = useState(false);
@@ -57,6 +62,8 @@ export function LogisticsDistributionCard({
   const [isSaving, setIsSaving] = useState(false);
 
   const totalCO2e = entries.reduce((sum, entry) => sum + (entry.computed_co2e || 0), 0);
+  const xeroTotal = (xeroEntries || []).reduce((sum, e) => sum + e.emissionsKg, 0);
+  const combinedTotal = totalCO2e + xeroTotal;
 
   const formatEmissions = (value: number) => {
     // Always display in tonnes
@@ -207,10 +214,11 @@ export function LogisticsDistributionCard({
                 <CardDescription>Downstream transport emissions</CardDescription>
               </div>
             </div>
-            {isConfigured ? (
+            {(isConfigured || (xeroEntries && xeroEntries.length > 0)) ? (
               <Badge className="bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-100">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Configured
+                {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} from Xero`}
               </Badge>
             ) : (
               <Badge variant="secondary">Not configured</Badge>
@@ -219,14 +227,15 @@ export function LogisticsDistributionCard({
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {isConfigured ? (
+          {(isConfigured || xeroTotal > 0) ? (
             <>
               <div className="text-center py-4 border-b">
                 <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-                  {formatEmissions(totalCO2e)}
+                  {formatEmissions(combinedTotal)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
                   From product distribution
+                  {xeroEntries && xeroEntries.length > 0 && ` + ${xeroEntries.length} Xero entries`}
                 </div>
               </div>
 
@@ -237,7 +246,12 @@ export function LogisticsDistributionCard({
                     className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-900"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm">{entry.description}</div>
+                      <div className="font-medium text-sm flex items-center gap-1.5">
+                        {entry.description}
+                        {entry.data_source === 'xero_upgrade' && (
+                          <Badge variant="outline" className="text-[9px] shrink-0 border-teal-300 text-teal-700 dark:text-teal-400 dark:border-teal-700">Xero</Badge>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {(entry.weight_kg / 1000).toFixed(2)} tonnes • {entry.distance_km.toLocaleString()}km
                       </div>
@@ -246,6 +260,8 @@ export function LogisticsDistributionCard({
                   </div>
                 ))}
               </div>
+
+              <XeroSpendEntries entries={xeroEntries || []} />
             </>
           ) : (
             <div className="py-8 text-center">
