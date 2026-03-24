@@ -333,6 +333,7 @@ export async function GET(request: NextRequest) {
     // Optional material_type filter: 'ingredient' or 'packaging'
     // When set, supplier products are filtered to only show matching product_type
     const materialType = searchParams.get('material_type'); // 'ingredient' | 'packaging' | null
+    const packagingCategory = searchParams.get('packaging_category'); // 'container' | 'closure' | etc. | null
 
     // Run all searches in parallel for better performance
     const [
@@ -341,6 +342,7 @@ export async function GET(request: NextRequest) {
       ecoinventProxyResults,
       openLCAResults,
       agribalyseResults,
+      boostResults,
     ] = await Promise.all([
       // SOURCE 1: Verified Supplier Products (Primary Data)
       organizationId ? (async () => {
@@ -556,6 +558,14 @@ export async function GET(request: NextRequest) {
 
       // SOURCE 5: Live Agribalyse Search (if configured)
       searchAgribalyseOpenLCAProcesses(query),
+
+      // SOURCE 6: Favourites & popularity boost data
+      supabase.rpc('get_ef_search_boosts', {
+        p_user_id: user.user.id,
+        p_search_query: normalizedQuery,
+        p_material_type: materialType || null,
+        p_packaging_category: packagingCategory || null,
+      }).then(({ data }) => data || []).catch(() => []),
     ]);
 
     // Combine all results
@@ -564,6 +574,15 @@ export async function GET(request: NextRequest) {
     allResults.push(...ecoinventProxyResults);
     allResults.push(...openLCAResults);
     allResults.push(...agribalyseResults);
+
+    // Build boost map from favourites/popularity data
+    const boostMap = new Map<string, { isUserFavourite: boolean; globalCount: number }>();
+    for (const row of boostResults) {
+      boostMap.set(row.selected_ef_id, {
+        isUserFavourite: row.is_user_favourite,
+        globalCount: Number(row.global_selection_count) || 0,
+      });
+    }
 
     // Score each result by name relevance to the query, then use source type
     // as a tiebreaker. This prevents irrelevant staging results (e.g. "Heat,
@@ -580,18 +599,31 @@ export async function GET(request: NextRequest) {
     };
 
     allResults.sort((a, b) => {
+      const aBoostData = boostMap.get(a.id);
+      const bBoostData = boostMap.get(b.id);
+
+      // Tier 0: User favourites always first
+      const aFav = aBoostData?.isUserFavourite ? 1 : 0;
+      const bFav = bBoostData?.isUserFavourite ? 1 : 0;
+      if (aFav !== bFav) return bFav - aFav;
+
       const aRelevance = computeSearchRelevance(a.name, normalizedQuery);
       const bRelevance = computeSearchRelevance(b.name, normalizedQuery);
 
-      // Primary sort: relevance score (higher is better)
+      // Tier 1: Relevance score (higher is better)
       if (aRelevance !== bRelevance) return bRelevance - aRelevance;
 
-      // Secondary sort: source type boost (tiebreaker only)
+      // Tier 2: Global popularity as tiebreaker within same relevance
+      const aGlobal = aBoostData?.globalCount || 0;
+      const bGlobal = bBoostData?.globalCount || 0;
+      if (aGlobal !== bGlobal) return bGlobal - aGlobal;
+
+      // Tier 3: Source type boost
       const aBoost = sourceBoost[a.source_type] ?? 0;
       const bBoost = sourceBoost[b.source_type] ?? 0;
       if (aBoost !== bBoost) return bBoost - aBoost;
 
-      // Tertiary: alphabetical
+      // Tier 4: Alphabetical
       return a.name.localeCompare(b.name);
     });
 
@@ -643,7 +675,14 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      results: allResults.slice(0, 50), // Limit total results
+      results: allResults.slice(0, 50).map(r => {
+        const bd = boostMap.get(r.id);
+        return {
+          ...r,
+          is_user_favourite: bd?.isUserFavourite || false,
+          global_selection_count: bd?.globalCount || 0,
+        };
+      }),
       total_found: allResults.length,
       sources: {
         primary: supplierResults.length,

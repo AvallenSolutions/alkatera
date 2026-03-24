@@ -24,11 +24,12 @@ import { SetupProgressBanner } from '@/components/dashboard/SetupProgressBanner'
 import { useSetupProgress } from '@/hooks/data/useSetupProgress';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { InlineErrorBoundary } from '@/components/ErrorBoundary';
-import { usePersistedYear } from '@/hooks/usePersistedYear';
+import { usePersistedYear, useLatestDataYear } from '@/hooks/usePersistedYear';
 
 import {
   RecentActivityWidget,
   ImpactValueWidget,
+  CanopyCreditsWidget,
 } from '@/components/dashboard/widgets';
 
 /** Animated loading visual shown while dashboard data is streaming in. */
@@ -121,7 +122,8 @@ const LCA_BADGE: Record<string, { label: string; className: string }> = {
 
 export default function DashboardPage() {
   const { currentOrganization } = useOrganization();
-  const { selectedYear, setSelectedYear } = usePersistedYear(AVAILABLE_YEARS);
+  const latestDataYear = useLatestDataYear(currentOrganization?.id);
+  const { selectedYear, setSelectedYear } = usePersistedYear(AVAILABLE_YEARS, latestDataYear);
   const { footprint, loading: footprintLoading } = useCompanyFootprint(selectedYear);
   const { footprint: previousYearFootprint } = useCompanyFootprint(selectedYear - 1);
   const { metrics: wasteMetrics, loading: wasteLoading } = useWasteMetrics(selectedYear);
@@ -398,9 +400,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Zone 3 — Impact Value (beta feature gate) */}
-          <div className="lg:col-span-4">
+          <div className="lg:col-span-4 space-y-4">
             <InlineErrorBoundary>
               <ImpactValueWidget />
+            </InlineErrorBoundary>
+            <InlineErrorBoundary>
+              <CanopyCreditsWidget />
             </InlineErrorBoundary>
           </div>
         </div>

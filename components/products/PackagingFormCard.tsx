@@ -777,6 +777,7 @@ export function PackagingFormCard({
                   value={packaging.matched_source_name || ''}
                   placeholder="Search databases for emission factor..."
                   materialType="packaging"
+                  packagingCategory={packaging.packaging_category || undefined}
                   onSelect={handleSearchSelect}
                   onChange={() => onUpdate(packaging.tempId, { matched_source_name: undefined, data_source: null, data_source_id: undefined, ef_source: undefined, ef_source_type: undefined, ef_data_quality_grade: undefined, ef_uncertainty_percent: undefined })}
                 />

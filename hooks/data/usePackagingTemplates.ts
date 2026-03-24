@@ -224,6 +224,31 @@ export function usePackagingTemplates(organizationId: string) {
     []
   );
 
+  const updateTemplateItems = useCallback(
+    async (id: string, items: PackagingFormData[]) => {
+      const supabase = getSupabaseBrowserClient();
+      const templateItems = items
+        .filter((item) => item.name.trim())
+        .map(packagingToTemplateItem);
+
+      const { error } = await supabase
+        .from("packaging_templates")
+        .update({ items: templateItems })
+        .eq("id", id);
+
+      if (error) {
+        toast.error(error.message || "Failed to update template");
+        throw error;
+      }
+
+      toast.success("Template updated with current packaging");
+      setTemplates((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, items: templateItems } : t))
+      );
+    },
+    []
+  );
+
   return {
     templates,
     loading,
@@ -231,5 +256,6 @@ export function usePackagingTemplates(organizationId: string) {
     saveTemplate,
     deleteTemplate,
     renameTemplate,
+    updateTemplateItems,
   };
 }

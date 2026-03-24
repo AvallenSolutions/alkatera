@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search, Lightbulb, Droplets, TreePine } from "lucide-react";
+import { Loader2, Building2, Database, Layers, CheckCircle2, AlertCircle, Shield, Leaf, Sprout, BookOpen, FlaskConical, Info, Sparkles, Search, Lightbulb, Droplets, TreePine, Star, TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { findBrandNameMatch } from "@/lib/openlca/drinks-aliases";
 import type { DataSource } from "@/lib/types/lca";
@@ -49,6 +49,9 @@ export interface SearchResult {
   supplier_primary_material?: string | null;
   supplier_epr_material_code?: string | null;
   supplier_epr_is_drinks_container?: boolean | null;
+  // Favourites / popularity boost data
+  is_user_favourite?: boolean;
+  global_selection_count?: number;
 }
 
 interface SearchResponse {
@@ -71,6 +74,8 @@ interface InlineIngredientSearchProps {
   placeholder?: string;
   /** Whether this search is for an ingredient or packaging material. Affects filtering and AI proxy suggestions. */
   materialType?: 'ingredient' | 'packaging';
+  /** Packaging category context for smarter ranking (e.g. 'closure', 'container'). Only relevant when materialType='packaging'. */
+  packagingCategory?: string;
   onSelect: (selection: {
     name: string;
     data_source: DataSource;
@@ -104,6 +109,7 @@ export function InlineIngredientSearch({
   value,
   placeholder = "Search for ingredient...",
   materialType = 'ingredient',
+  packagingCategory,
   onSelect,
   onChange,
   className,
@@ -175,7 +181,7 @@ export function InlineIngredientSearch({
         throw new Error("Not authenticated");
       }
 
-      const searchUrl = `/api/ingredients/search?q=${encodeURIComponent(searchQuery)}&organization_id=${organizationId}${materialType ? `&material_type=${materialType}` : ''}`;
+      const searchUrl = `/api/ingredients/search?q=${encodeURIComponent(searchQuery)}&organization_id=${organizationId}${materialType ? `&material_type=${materialType}` : ''}${packagingCategory ? `&packaging_category=${encodeURIComponent(packagingCategory)}` : ''}`;
       const response = await fetch(
         searchUrl,
         {
@@ -361,6 +367,17 @@ export function InlineIngredientSearch({
     });
 
     onSelect(selectedData);
+
+    // Fire-and-forget: log selection for favourites and global popularity ranking
+    void supabase.rpc('log_ef_selection', {
+      p_search_query: overrideUserQuery || query,
+      p_material_type: materialType || null,
+      p_packaging_category: packagingCategory || null,
+      p_selected_ef_id: result.id,
+      p_selected_ef_name: result.name,
+      p_ef_source_type: result.source_type || 'unknown',
+      p_organization_id: organizationId,
+    }).then(() => {}, () => {}); // silently ignore errors
 
     isTypingRef.current = false;
     setQuery(result.name);
@@ -626,6 +643,15 @@ export function InlineIngredientSearch({
                         {result.friendly_name || result.name}
                       </span>
                       {getSourceBadge(result)}
+                      {result.is_user_favourite && (
+                        <Star className="h-3 w-3 text-amber-500 fill-amber-500 flex-shrink-0" />
+                      )}
+                      {!result.is_user_favourite && (result.global_selection_count || 0) >= 3 && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-muted-foreground border-muted-foreground/30">
+                          <TrendingUp className="h-2.5 w-2.5 mr-0.5" />
+                          Popular
+                        </Badge>
+                      )}
                       <EmissionFactorDetailPopover result={result}>
                         <button
                           type="button"

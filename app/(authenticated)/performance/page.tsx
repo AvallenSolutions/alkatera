@@ -33,7 +33,7 @@ import { useWasteMetrics } from '@/hooks/data/useWasteMetrics';
 import { useVitalityBenchmarks } from '@/hooks/data/useVitalityBenchmarks';
 import { useFacilityWaterData } from '@/hooks/data/useFacilityWaterData';
 import { useOrganization } from '@/lib/organizationContext';
-import { usePersistedYear } from '@/hooks/usePersistedYear';
+import { usePersistedYear, useLatestDataYear } from '@/hooks/usePersistedYear';
 import type {
   Scope3CategoryData,
   ProductEmissionDetail,
@@ -428,8 +428,9 @@ function generateStrengthsAndImprovements(
 const AVAILABLE_YEARS = Array.from({ length: 4 }, (_, i) => new Date().getFullYear() - i);
 
 export default function PerformancePage() {
-  const { selectedYear, setSelectedYear } = usePersistedYear(AVAILABLE_YEARS);
   const { currentOrganization } = useOrganization();
+  const latestDataYear = useLatestDataYear(currentOrganization?.id);
+  const { selectedYear, setSelectedYear } = usePersistedYear(AVAILABLE_YEARS, latestDataYear);
   // All hooks now consistently use selectedYear for reporting period
   const hookResult = useCompanyMetrics(selectedYear);
   const { footprint: footprintData, loading: footprintLoading, refetch: refetchFootprint } = useCompanyFootprint(selectedYear);

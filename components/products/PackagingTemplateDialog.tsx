@@ -21,6 +21,7 @@ import {
   X,
   Package,
   FileDown,
+  RefreshCw,
   AlertTriangle,
 } from "lucide-react";
 import {
@@ -64,6 +65,7 @@ export function PackagingTemplateDialog({
     saveTemplate,
     deleteTemplate,
     renameTemplate,
+    updateTemplateItems,
   } = usePackagingTemplates(organizationId);
 
   // Save mode state
@@ -78,6 +80,7 @@ export function PackagingTemplateDialog({
   // Inline confirm states (avoids nested dialog z-index issues)
   const [confirmApplyId, setConfirmApplyId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmUpdateId, setConfirmUpdateId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -87,6 +90,7 @@ export function PackagingTemplateDialog({
       setRenamingId(null);
       setConfirmApplyId(null);
       setConfirmDeleteId(null);
+      setConfirmUpdateId(null);
     }
   }, [open, fetchTemplates]);
 
@@ -132,6 +136,15 @@ export function PackagingTemplateDialog({
       // Error already toasted
     }
     setRenamingId(null);
+  };
+
+  const handleUpdate = async (id: string) => {
+    try {
+      await updateTemplateItems(id, validPackaging);
+    } catch {
+      // Error already toasted
+    }
+    setConfirmUpdateId(null);
   };
 
   const startRename = (template: PackagingTemplate) => {
@@ -274,6 +287,21 @@ export function PackagingTemplateDialog({
                         <Badge variant="secondary" className="text-xs">
                           {template.items.length} item{template.items.length !== 1 ? "s" : ""}
                         </Badge>
+                        {validPackaging.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Update template with current packaging"
+                            onClick={() => {
+                              setConfirmUpdateId(template.id);
+                              setConfirmApplyId(null);
+                              setConfirmDeleteId(null);
+                            }}
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -286,7 +314,11 @@ export function PackagingTemplateDialog({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => setConfirmDeleteId(template.id)}
+                          onClick={() => {
+                            setConfirmDeleteId(template.id);
+                            setConfirmApplyId(null);
+                            setConfirmUpdateId(null);
+                          }}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -318,8 +350,30 @@ export function PackagingTemplateDialog({
                     ))}
                   </div>
 
-                  {/* Inline delete confirmation */}
-                  {confirmDeleteId === template.id ? (
+                  {/* Inline confirmations */}
+                  {confirmUpdateId === template.id ? (
+                    <div className="flex items-center gap-2 p-2 rounded bg-amber-500/10 border border-amber-500/30">
+                      <RefreshCw className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                      <span className="text-xs text-amber-400 flex-1">
+                        Replace this template&apos;s items with your current packaging?
+                      </span>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleUpdate(template.id)}
+                      >
+                        Update
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setConfirmUpdateId(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : confirmDeleteId === template.id ? (
                     <div className="flex items-center gap-2 p-2 rounded bg-red-500/10 border border-red-500/30">
                       <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
                       <span className="text-xs text-red-400 flex-1">
@@ -369,7 +423,11 @@ export function PackagingTemplateDialog({
                       variant="outline"
                       size="sm"
                       className="w-full"
-                      onClick={() => setConfirmApplyId(template.id)}
+                      onClick={() => {
+                        setConfirmApplyId(template.id);
+                        setConfirmDeleteId(null);
+                        setConfirmUpdateId(null);
+                      }}
                     >
                       <FileDown className="h-3.5 w-3.5 mr-1.5" />
                       Apply Template
