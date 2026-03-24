@@ -1896,6 +1896,7 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       calculationFingerprint,
       fallbackEvents,
       materialResolutions,
+      referenceYear,
     );
 
     if (!aggregationResult.success) {

@@ -471,9 +471,17 @@ export function WizardProvider({
         const annualVolume = productData.annual_production_volume;
         const annualUnit = productData.annual_production_unit || 'units';
 
+        const initYear = new Date().getFullYear(); // matches INITIAL_FORM_DATA.referenceYear
+
         allocations = facilities.map((f) => {
           const facilitySessions = allSessions[f.facility_id] || [];
-          const latestSession = facilitySessions[0];
+          // Prefer session matching the default reference year over just "latest"
+          const yearMatchSession = facilitySessions.find((s) => {
+            const sy = new Date(s.reporting_period_start).getFullYear();
+            const ey = new Date(s.reporting_period_end).getFullYear();
+            return initYear >= sy && initYear <= ey;
+          });
+          const latestSession = yearMatchSession || facilitySessions[0];
 
           // Get allocation percentage from the assignment record
           const assignmentRecord = facilitiesData!.find((fd: any) => fd.facility_id === f.facility_id);
@@ -803,6 +811,40 @@ export function WizardProvider({
             ? Math.min(prev.currentStep, newStepIds.length)
             : prev.currentStep,
         }));
+      }
+
+      // When the user changes the reference year, auto-select the facility
+      // reporting session that best matches the new year so that facility data
+      // (energy, production runs, etc.) aligns with the stated reference period.
+      if (field === 'referenceYear' && typeof value === 'number') {
+        const selectedYear = value as number;
+        setPreCalcState((prev) => {
+          const sessions = prev.reportingSessions;
+          const updatedAllocations = prev.facilityAllocations.map((alloc) => {
+            const facilitySessions = sessions[alloc.facilityId] || [];
+            if (facilitySessions.length === 0) return alloc;
+
+            // Find session whose reporting period overlaps the selected year
+            const matchingSession = facilitySessions.find((s) => {
+              const startYear = new Date(s.reporting_period_start).getFullYear();
+              const endYear = new Date(s.reporting_period_end).getFullYear();
+              return selectedYear >= startYear && selectedYear <= endYear;
+            });
+
+            const bestSession = matchingSession || facilitySessions[0];
+            if (bestSession.id === alloc.selectedSessionId) return alloc;
+
+            return {
+              ...alloc,
+              reportingPeriodStart: bestSession.reporting_period_start,
+              reportingPeriodEnd: bestSession.reporting_period_end,
+              facilityTotalProduction: String(bestSession.total_production_volume || ''),
+              productionVolumeUnit: bestSession.volume_unit || alloc.productionVolumeUnit,
+              selectedSessionId: bestSession.id,
+            };
+          });
+          return { ...prev, facilityAllocations: updatedAllocations };
+        });
       }
 
       // Trigger debounced auto-save (only when pcfId exists)

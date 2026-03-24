@@ -113,6 +113,7 @@ export async function aggregateProductImpacts(
   calculationFingerprint?: string,
   fallbackEvents?: FallbackEvent[],
   materialResolutions?: any[],
+  referenceYear?: number,
 ): Promise<AggregationResult> {
   console.log(`[aggregateProductImpacts] Processing PCF: ${productCarbonFootprintId}`);
 
@@ -790,7 +791,7 @@ export async function aggregateProductImpacts(
       dataYear,
       dataRegion: material.origin_country_code || 'GLO',
       studyRegion: 'GLO',
-      referenceYear: new Date().getFullYear(),
+      referenceYear: referenceYear || new Date().getFullYear(),
     }));
   }
 
