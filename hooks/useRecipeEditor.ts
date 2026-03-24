@@ -225,7 +225,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
 
       if (ingredientItems.length > 0) {
         const mappedIngredients = ingredientItems.map(item => ({
-          tempId: item.id,
+          tempId: item.id.toString(),
           name: item.material_name,
           matched_source_name: item.matched_source_name || undefined,
           data_source: item.data_source as any,
@@ -278,7 +278,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         const mappedPackaging = packagingItems.map(item => {
           const categoryMatch = item.notes?.match(/Category: (\w+)/);
           return {
-            tempId: item.id,
+            tempId: item.id.toString(),
             name: item.material_name,
             matched_source_name: item.matched_source_name || undefined,
             data_source: item.data_source as any,

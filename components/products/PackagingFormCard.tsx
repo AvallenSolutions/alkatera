@@ -888,7 +888,7 @@ export function PackagingFormCard({
                 <Input
                   id={`net-weight-${packaging.tempId}`}
                   type="number"
-                  step="0.01"
+                  step="0.0001"
                   min="0"
                   placeholder="0"
                   value={packaging.net_weight_g}
