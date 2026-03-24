@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { VerificationCard } from '@/components/partners/VerificationCard'
 
 export default function ReportsPage() {
   return (
@@ -105,6 +106,9 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Expert Verification */}
+      <VerificationCard variant="report" />
     </div>
   )
 }

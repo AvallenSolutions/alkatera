@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe } from '@/lib/stripe-config';
+import { stripe, getBillingIntervalFromPriceId } from '@/lib/stripe-config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/db_types';
 import Stripe from 'stripe';
@@ -184,6 +184,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     ? new Date(itemPeriodEnd * 1000).toISOString()
     : null;
 
+  const billingInterval = getBillingIntervalFromPriceId(priceId);
   const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId,
     p_stripe_customer_id: customerId,
@@ -191,6 +192,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     p_price_id: priceId,
     p_status: subscription.status,
     p_current_period_end: currentPeriodEnd,
+    p_billing_interval: billingInterval,
   });
 
   if (error) {
@@ -280,6 +282,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     ? new Date(subItemPeriodEnd * 1000).toISOString()
     : null;
 
+  const subBillingInterval = getBillingIntervalFromPriceId(priceId);
   const { error } = await getSupabaseAdmin().rpc('update_subscription_from_stripe', {
     p_organization_id: organizationId,
     p_stripe_customer_id: subscription.customer as string,
@@ -287,6 +290,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     p_price_id: priceId,
     p_status: subscription.status,
     p_current_period_end: currentPeriodEnd,
+    p_billing_interval: subBillingInterval,
   });
 
   if (error) {

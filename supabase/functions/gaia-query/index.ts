@@ -327,13 +327,14 @@ async function fetchOrganizationContext(
     // Always fetch org basics (cheap, 1 query)
     const { data: org } = await supabase
       .from('organizations')
-      .select('id, name, industry')
+      .select('id, name, industry, subscription_tier')
       .eq('id', organizationId)
       .maybeSingle();
 
     if (org) {
       contextParts.push(`Organization: ${org.name}`);
       if (org.industry) contextParts.push(`Industry: ${org.industry}`);
+      if (org.subscription_tier) contextParts.push(`Subscription tier: ${org.subscription_tier}`);
     }
 
     // Build parallel fetch promises based on intents

@@ -9,6 +9,7 @@ import { Award, Eye, Download, Search, Filter, Package, Calendar, Shield, Loader
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
 import { useOrganization } from '@/lib/organizationContext';
+import { VerificationCard } from '@/components/partners/VerificationCard';
 
 interface LCAReport {
   id: string;
@@ -413,6 +414,9 @@ export default function LcasPage() {
           })
         )}
       </div>
+
+      {/* Expert Verification */}
+      <VerificationCard variant="lca" />
 
       {/* Info Card */}
       <Card className="bg-blue-50 border-blue-200">

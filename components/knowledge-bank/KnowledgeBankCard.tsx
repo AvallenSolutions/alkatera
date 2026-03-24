@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { KnowledgeBankItem } from '@/hooks/data/useKnowledgeBank'
+import { PartnerAuthorBadge } from '@/components/knowledge-bank/PartnerAuthorBadge'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 
@@ -180,20 +181,28 @@ export function KnowledgeBankCard({ item, onFavoriteToggle }: KnowledgeBankCardP
         </CardContent>
 
         <CardFooter className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
-          <div className="flex items-center gap-1.5">
-            {item.author?.avatar_url ? (
-              <img
-                src={item.author.avatar_url}
-                alt={item.author.full_name || 'Author'}
-                className="h-5 w-5 rounded-full"
-              />
-            ) : (
-              <User className="h-4 w-4" />
-            )}
-            <span className="truncate max-w-[120px]">
-              {item.author?.full_name || (item.organization_id === null ? 'AlkaTera' : 'Unknown')}
-            </span>
-          </div>
+          {item.partner_attribution && item.external_author_name ? (
+            <PartnerAuthorBadge
+              authorName={item.external_author_name}
+              photoUrl={item.external_author_photo_url}
+              variant="compact"
+            />
+          ) : (
+            <div className="flex items-center gap-1.5">
+              {item.author?.avatar_url ? (
+                <img
+                  src={item.author.avatar_url}
+                  alt={item.author.full_name || 'Author'}
+                  className="h-5 w-5 rounded-full"
+                />
+              ) : (
+                <User className="h-4 w-4" />
+              )}
+              <span className="truncate max-w-[120px]">
+                {item.author?.full_name || (item.organization_id === null ? 'AlkaTera' : 'Unknown')}
+              </span>
+            </div>
+          )}
           <div className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
             <span>

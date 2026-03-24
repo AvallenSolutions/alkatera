@@ -22,6 +22,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { useKnowledgeBankItem, KnowledgeBankItem } from '@/hooks/data/useKnowledgeBank'
+import { PartnerAuthorBadge } from '@/components/knowledge-bank/PartnerAuthorBadge'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -392,13 +393,22 @@ export default function ItemDetailPage() {
 
                 <Separator />
 
-                <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Author:</span>
-                  <span className="font-medium ml-auto truncate">
-                    {item.author?.full_name || (item.organization_id === null ? 'AlkaTera' : 'Unknown')}
-                  </span>
-                </div>
+                {item.partner_attribution && item.external_author_name ? (
+                  <PartnerAuthorBadge
+                    authorName={item.external_author_name}
+                    photoUrl={item.external_author_photo_url}
+                    bio={item.external_author_bio}
+                    variant="full"
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 text-sm">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Author:</span>
+                    <span className="font-medium ml-auto truncate">
+                      {item.author?.full_name || (item.organization_id === null ? 'AlkaTera' : 'Unknown')}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-muted-foreground" />

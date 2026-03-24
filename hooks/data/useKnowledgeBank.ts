@@ -45,6 +45,10 @@ export interface KnowledgeBankItem {
   }
   tags?: string[]
   is_favorited?: boolean
+  external_author_name?: string | null
+  external_author_photo_url?: string | null
+  external_author_bio?: string | null
+  partner_attribution?: string | null
 }
 
 export interface KnowledgeBankTag {

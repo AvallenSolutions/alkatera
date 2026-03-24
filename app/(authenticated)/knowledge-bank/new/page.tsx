@@ -18,12 +18,14 @@ import {
 import { ChevronLeft, Upload, Loader2 } from 'lucide-react'
 import { useKnowledgeBankCategories } from '@/hooks/data/useKnowledgeBank'
 import { useOrganization } from '@/lib/organizationContext'
+import { useIsAlkateraAdmin } from '@/hooks/usePermissions'
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'sonner'
 
 export default function NewResourcePage() {
   const router = useRouter()
   const { currentOrganization } = useOrganization()
+  const { isAlkateraAdmin } = useIsAlkateraAdmin()
   const { categories, loading: categoriesLoading } = useKnowledgeBankCategories()
 
   const [title, setTitle] = useState('')
@@ -87,10 +89,13 @@ export default function NewResourcePage() {
 
       const { data: { user } } = await supabase.auth.getUser()
 
+      // Platform admins create global content (visible to all orgs)
+      const itemOrgId = isAlkateraAdmin ? null : currentOrganization.id
+
       const { data: item, error: insertError } = await supabase
         .from('knowledge_bank_items')
         .insert({
-          organization_id: currentOrganization.id,
+          organization_id: itemOrgId,
           category_id: categoryId,
           title,
           description: description || null,
@@ -112,14 +117,42 @@ export default function NewResourcePage() {
         const tagNames = tags.split(',').map(t => t.trim()).filter(Boolean)
 
         for (const tagName of tagNames) {
-          const { data: tagData, error: tagError } = await supabase
-            .from('knowledge_bank_tags')
-            .upsert(
-              { organization_id: currentOrganization.id, name: tagName },
-              { onConflict: 'organization_id,name' }
-            )
-            .select()
-            .single()
+          let tagData = null
+          let tagError = null
+
+          if (isAlkateraAdmin) {
+            // Global tags use a partial unique index (org_id IS NULL),
+            // so we select-or-insert instead of upsert
+            const { data: existing } = await supabase
+              .from('knowledge_bank_tags')
+              .select()
+              .is('organization_id', null)
+              .ilike('name', tagName)
+              .maybeSingle()
+
+            if (existing) {
+              tagData = existing
+            } else {
+              const { data, error } = await supabase
+                .from('knowledge_bank_tags')
+                .insert({ organization_id: null, name: tagName })
+                .select()
+                .single()
+              tagData = data
+              tagError = error
+            }
+          } else {
+            const { data, error } = await supabase
+              .from('knowledge_bank_tags')
+              .upsert(
+                { organization_id: currentOrganization.id, name: tagName },
+                { onConflict: 'organization_id,name' }
+              )
+              .select()
+              .single()
+            tagData = data
+            tagError = error
+          }
 
           if (!tagError && tagData) {
             await supabase
