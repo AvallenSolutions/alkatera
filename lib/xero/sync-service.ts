@@ -161,9 +161,7 @@ async function stageInvoices(
     'Type=="ACCPAY"',
     'Date DESC',
     undefined, undefined, undefined, undefined,
-    page,
-    undefined, undefined, undefined,
-    true // summaryOnly
+    page
   )
 
   const invoices = invoicesResponse.body?.invoices || []
@@ -173,15 +171,17 @@ async function stageInvoices(
   const batchId = `sync_${Date.now()}`
   const rows = invoices
     .filter(inv => inv.invoiceID && !['DRAFT', 'DELETED', 'VOIDED'].includes(String(inv.status || '')))
-    .map(inv => ({
+    .map(inv => {
+      const lineItem = inv.lineItems?.[0]
+      return {
       organization_id: organizationId,
       xero_transaction_id: inv.invoiceID!,
       xero_transaction_type: 'invoice',
       xero_contact_name: inv.contact?.name || null,
       xero_contact_id: inv.contact?.contactID || null,
-      xero_account_id: null,
-      xero_account_code: null,
-      description: inv.reference || null,
+      xero_account_id: lineItem?.accountID || null,
+      xero_account_code: lineItem?.accountCode || null,
+      description: inv.reference || lineItem?.description || null,
       amount: inv.total || 0,
       currency: String(inv.currencyCode || 'GBP'),
       transaction_date: inv.date ? new Date(inv.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -190,7 +190,8 @@ async function stageInvoices(
       upgrade_status: 'pending',
       sync_batch_id: batchId,
       updated_at: new Date().toISOString(),
-    }))
+    }
+    })
 
   if (rows.length > 0) {
     await db
@@ -227,10 +228,12 @@ async function stageBankTransactions(
   const twelveMonthsAgo = new Date()
   twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
 
+  // Fetch ALL bank transactions (not just SPEND type) to capture bank feed
+  // items, overpayments, and prepayments that represent actual spending
   const bankTxResponse = await xero.accountingApi.getBankTransactions(
     tenantId,
     twelveMonthsAgo,
-    'Type=="SPEND"',
+    undefined, // No type filter - get all types
     'Date DESC',
     page
   )
@@ -238,9 +241,17 @@ async function stageBankTransactions(
   const bankTxs = bankTxResponse.body?.bankTransactions || []
   let inserted = 0
 
+  // Filter to spend-related types only (exclude RECEIVE types)
+  const spendTypes = ['SPEND', 'SPEND-OVERPAYMENT', 'SPEND-PREPAYMENT', 'SPEND-TRANSFER']
   const batchId = `sync_${Date.now()}`
   const rows = bankTxs
-    .filter(tx => tx.bankTransactionID && String(tx.status || '') !== 'DELETED')
+    .filter(tx => {
+      if (!tx.bankTransactionID) return false
+      if (String(tx.status || '') === 'DELETED') return false
+      // Accept SPEND types, or any transaction with a positive total (money going out)
+      const txType = String(tx.type || '')
+      return spendTypes.includes(txType) || (tx.total && tx.total > 0 && !txType.startsWith('RECEIVE'))
+    })
     .map(tx => {
       const lineItem = tx.lineItems?.[0]
       return {
