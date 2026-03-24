@@ -71,17 +71,16 @@ export function XeroConnectionCard() {
     const params = new URLSearchParams(window.location.search)
     const xeroParam = params.get('xero')
     if (xeroParam === 'connected') {
-      toast.success('Xero connected successfully')
-      fetchStatus()
-      // Trigger auto-sync if requested
-      if (params.get('auto-sync') === 'true') {
-        setAutoSyncRequested(true)
-      }
-      // Clean URL
+      toast.success('Xero connected successfully. Starting sync...')
+      // Clean URL immediately
       const url = new URL(window.location.href)
       url.searchParams.delete('xero')
       url.searchParams.delete('auto-sync')
       window.history.replaceState({}, '', url.toString())
+      // Fetch fresh status, then auto-sync
+      fetchStatus().then(() => {
+        setAutoSyncRequested(true)
+      })
     } else if (xeroParam === 'error') {
       const message = params.get('message') || 'Failed to connect to Xero'
       toast.error(message)
@@ -92,14 +91,14 @@ export function XeroConnectionCard() {
     }
   }, [fetchStatus])
 
-  // Auto-sync after fresh connection
+  // Auto-sync after fresh connection (waits for status to be loaded)
   useEffect(() => {
-    if (autoSyncRequested && status?.connected && !isSyncing) {
+    if (autoSyncRequested && !isSyncing && currentOrganization?.id) {
       setAutoSyncRequested(false)
       handleSync()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoSyncRequested, status?.connected, isSyncing])
+  }, [autoSyncRequested, isSyncing, currentOrganization?.id])
 
   async function handleConnect() {
     if (!currentOrganization?.id) return
