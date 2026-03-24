@@ -560,12 +560,19 @@ export async function GET(request: NextRequest) {
       searchAgribalyseOpenLCAProcesses(query),
 
       // SOURCE 6: Favourites & popularity boost data
-      supabase.rpc('get_ef_search_boosts', {
-        p_user_id: user.user.id,
-        p_search_query: normalizedQuery,
-        p_material_type: materialType || null,
-        p_packaging_category: packagingCategory || null,
-      }).then(({ data }) => data || []).catch(() => []),
+      (async () => {
+        try {
+          const { data } = await supabase.rpc('get_ef_search_boosts', {
+            p_user_id: user.user.id,
+            p_search_query: normalizedQuery,
+            p_material_type: materialType || null,
+            p_packaging_category: packagingCategory || null,
+          });
+          return data || [];
+        } catch {
+          return [];
+        }
+      })(),
     ]);
 
     // Combine all results
