@@ -19,8 +19,10 @@ import {
   ArrowUpCircle,
   CheckCircle2,
   XCircle,
+  AlertTriangle,
   type LucideIcon,
 } from 'lucide-react'
+import { getUncertainty } from '@/lib/xero/spend-factors'
 
 const CATEGORY_META: Record<string, { label: string; icon: LucideIcon; scope: string }> = {
   grid_electricity:   { label: 'Electricity',           icon: Zap,       scope: 'Scope 2' },
@@ -70,6 +72,8 @@ export function UpgradePromptCard({
 }: UpgradePromptCardProps) {
   const meta = CATEGORY_META[category] || CATEGORY_META.other
   const Icon = meta.icon
+  const uncertainty = getUncertainty(category)
+  const uncertaintyPercent = Math.round(uncertainty * 100)
 
   const formattedSpend = new Intl.NumberFormat('en-GB', {
     style: 'currency',
@@ -125,7 +129,18 @@ export function UpgradePromptCard({
             </div>
             <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
               <span>{formattedSpend} identified</span>
-              <span>{formattedEmissions} estimated</span>
+              <span className="inline-flex items-center gap-1">
+                {formattedEmissions} estimated
+                {!isUpgraded && (
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] ml-0.5 border-red-300 text-red-700 dark:text-red-400 dark:border-red-700"
+                  >
+                    <AlertTriangle className="h-2.5 w-2.5 mr-0.5" />
+                    &plusmn;{uncertaintyPercent}%
+                  </Badge>
+                )}
+              </span>
               <span>{transactionCount} transaction{transactionCount !== 1 ? 's' : ''}</span>
               {dateRange && <span>{dateRange}</span>}
             </div>

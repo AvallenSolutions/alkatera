@@ -11,6 +11,10 @@ export const dynamic = 'force-dynamic'
  * Handles the OAuth 2.0 callback from Xero after user authorisation.
  * Exchanges the authorisation code for tokens, fetches connected tenants,
  * stores encrypted tokens, and redirects to the settings page.
+ *
+ * If the user has multiple Xero organisations (tenants), the token data and
+ * tenant list are stored in a secure cookie and the user is redirected to
+ * a tenant-selection UI instead of auto-picking the first one.
  */
 export async function GET(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
@@ -90,10 +94,43 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // 5. Store tokens for the first tenant (most common case)
-    // If multi-tenant support is needed later, we can store all and let user choose
-    const tenant = tenants[0]
     const expiresAt = new Date(Date.now() + (tokenSet.expires_in || 1800) * 1000)
+
+    // 5. If multiple tenants, let the user choose which one to connect
+    if (tenants.length > 1) {
+      // Store token data + tenant list in a secure httpOnly cookie so the
+      // select-tenant endpoint can finalise the connection without another
+      // round-trip to Xero.
+      const pendingData = {
+        organizationId: storedState.organizationId,
+        userId: storedState.userId,
+        accessToken: tokenSet.access_token!,
+        refreshToken: tokenSet.refresh_token!,
+        expiresAt: expiresAt.toISOString(),
+        scopes: (tokenSet.scope || '').split(' ').filter(Boolean),
+        tenants: tenants.map((t: { tenantId: string; tenantName?: string }) => ({
+          tenantId: t.tenantId,
+          tenantName: t.tenantName || null,
+        })),
+      }
+
+      const response = NextResponse.redirect(
+        `${baseUrl}/settings?tab=integrations&xero=select-tenant`
+      )
+
+      response.cookies.set('xero_pending_tenants', JSON.stringify(pendingData), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 600, // 10 minutes to pick a tenant
+        path: '/',
+      })
+
+      return response
+    }
+
+    // 6. Single tenant - auto-connect as before
+    const tenant = tenants[0]
 
     await storeTokens({
       organizationId: storedState.organizationId,
@@ -106,7 +143,7 @@ export async function GET(request: NextRequest) {
       connectedBy: storedState.userId,
     })
 
-    // 6. Redirect to settings with success + auto-sync trigger
+    // 7. Redirect to settings with success + auto-sync trigger
     return NextResponse.redirect(
       `${baseUrl}/settings?tab=integrations&xero=connected&auto-sync=true`
     )

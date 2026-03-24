@@ -20,6 +20,7 @@ import {
 import { ArrowUpCircle, ChevronDown, ChevronRight, Zap } from 'lucide-react'
 import Link from 'next/link'
 import type { XeroEntry } from '@/lib/xero/scope-card-mapping'
+import { TIER_CONFIG } from '@/lib/xero/category-labels'
 
 interface XeroEnergyBaselineAlertProps {
   entries: XeroEntry[]
@@ -64,8 +65,8 @@ export function XeroEnergyBaselineAlert({ entries, scope }: XeroEnergyBaselineAl
                 <span className="text-sm font-medium">
                   Xero spend baseline: {formatEmissions(totalEmissions)}
                 </span>
-                <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 dark:text-amber-400 dark:border-amber-700">
-                  Tier 4 Spend
+                <Badge variant="outline" className={`text-[9px] ${TIER_CONFIG[4].colour}`}>
+                  {TIER_CONFIG[4].label}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">

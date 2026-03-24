@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Link2, Loader2, CheckCircle2, AlertCircle, RefreshCw, Unlink } from 'lucide-react'
+import { Link2, Loader2, CheckCircle2, AlertCircle, RefreshCw, Unlink, Building2 } from 'lucide-react'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +16,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -29,6 +36,11 @@ interface XeroStatus {
   syncError: string | null
 }
 
+interface XeroTenant {
+  tenantId: string
+  tenantName: string | null
+}
+
 export function XeroConnectionCard() {
   const { currentOrganization, userRole } = useOrganization()
   const isAdmin = userRole === 'owner' || userRole === 'admin'
@@ -39,6 +51,11 @@ export function XeroConnectionCard() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [autoSyncRequested, setAutoSyncRequested] = useState(false)
+
+  // Tenant picker state (multi-tenant flow)
+  const [showTenantPicker, setShowTenantPicker] = useState(false)
+  const [pendingTenants, setPendingTenants] = useState<XeroTenant[]>([])
+  const [isSelectingTenant, setIsSelectingTenant] = useState(false)
 
   const fetchStatus = useCallback(async () => {
     if (!currentOrganization?.id) return
@@ -81,6 +98,30 @@ export function XeroConnectionCard() {
       fetchStatus().then(() => {
         setAutoSyncRequested(true)
       })
+    } else if (xeroParam === 'select-tenant') {
+      // Multi-tenant flow: fetch the pending tenant list and show picker
+      const url = new URL(window.location.href)
+      url.searchParams.delete('xero')
+      window.history.replaceState({}, '', url.toString())
+
+      ;(async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const res = await fetch('/api/xero/select-tenant', {
+            headers: { Authorization: `Bearer ${session?.access_token}` },
+          })
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error || 'Failed to load Xero organisations')
+          }
+          const data = await res.json()
+          setPendingTenants(data.tenants)
+          setShowTenantPicker(true)
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to load Xero organisations'
+          toast.error(message)
+        }
+      })()
     } else if (xeroParam === 'error') {
       const message = params.get('message') || 'Failed to connect to Xero'
       toast.error(message)
@@ -99,6 +140,35 @@ export function XeroConnectionCard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSyncRequested, isSyncing, currentOrganization?.id])
+
+  async function handleSelectTenant(tenantId: string) {
+    setIsSelectingTenant(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/xero/select-tenant', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ tenantId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+
+      setShowTenantPicker(false)
+      setPendingTenants([])
+      toast.success('Xero connected successfully. Starting sync...')
+      fetchStatus().then(() => {
+        setAutoSyncRequested(true)
+      })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to connect to Xero organisation'
+      toast.error(message)
+    } finally {
+      setIsSelectingTenant(false)
+    }
+  }
 
   async function handleConnect() {
     if (!currentOrganization?.id) return
@@ -424,6 +494,46 @@ export function XeroConnectionCard() {
           </div>
         )}
       </CardContent>
+
+      {/* Tenant picker dialog (multi-org flow) */}
+      <Dialog open={showTenantPicker} onOpenChange={(open) => {
+        if (!open && !isSelectingTenant) {
+          setShowTenantPicker(false)
+          setPendingTenants([])
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Choose a Xero Organisation</DialogTitle>
+            <DialogDescription>
+              Your Xero account has access to multiple organisations.
+              Select the one you would like to connect to alka<strong>tera</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            {pendingTenants.map((tenant) => (
+              <button
+                key={tenant.tenantId}
+                onClick={() => handleSelectTenant(tenant.tenantId)}
+                disabled={isSelectingTenant}
+                className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent hover:border-[#13B5EA]/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#13B5EA]/10">
+                  <Building2 className="h-4 w-4 text-[#13B5EA]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">
+                    {tenant.tenantName || 'Unnamed Organisation'}
+                  </p>
+                </div>
+                {isSelectingTenant && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

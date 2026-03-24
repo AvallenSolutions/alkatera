@@ -48,6 +48,7 @@ export function XeroAccountMapping() {
   const [mappings, setMappings] = useState<AccountMapping[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isReclassifying, setIsReclassifying] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [suggestions, setSuggestions] = useState<Map<string, string>>(new Map())
@@ -137,9 +138,35 @@ export function XeroAccountMapping() {
         if (error) throw error
       }
 
-      toast.success('Account mappings saved')
       setHasChanges(false)
       setSuggestions(new Map())
+      toast.success('Account mappings saved. Reclassifying transactions...')
+
+      // Reclassify existing transactions in the background
+      setIsReclassifying(true)
+      try {
+        const res = await fetch('/api/xero/reclassify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ organizationId: currentOrganization.id }),
+        })
+
+        if (res.ok) {
+          const { reclassified, total } = await res.json()
+          if (reclassified > 0) {
+            toast.success(`${reclassified} of ${total} transactions reclassified`)
+          } else {
+            toast.info('No transactions needed reclassification')
+          }
+        } else {
+          const { error } = await res.json()
+          toast.error(`Reclassification failed: ${error}`)
+        }
+      } catch {
+        toast.error('Failed to reclassify transactions')
+      } finally {
+        setIsReclassifying(false)
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to save mappings'
       toast.error(message)
@@ -179,14 +206,20 @@ export function XeroAccountMapping() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
+            {isReclassifying && (
+              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Reclassifying transactions...
+              </span>
+            )}
             {suggestions.size > 0 && (
-              <Button onClick={handleSave} disabled={isSaving} size="sm" variant="outline">
+              <Button onClick={handleSave} disabled={isSaving || isReclassifying} size="sm" variant="outline">
                 <Check className="h-4 w-4 mr-2" />
                 Accept all suggestions
               </Button>
             )}
             {hasChanges && (
-              <Button onClick={handleSave} disabled={isSaving} size="sm">
+              <Button onClick={handleSave} disabled={isSaving || isReclassifying} size="sm">
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (

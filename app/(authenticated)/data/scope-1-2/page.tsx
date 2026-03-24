@@ -56,6 +56,7 @@ import { OperationalWasteCard } from '@/components/reports/OperationalWasteCard'
 import { MarketingMaterialsCard } from '@/components/reports/MarketingMaterialsCard';
 import { SpendImportCard } from '@/components/reports/SpendImportCard';
 import { XeroEnergyBaselineAlert } from '@/components/reports/XeroEnergyBaselineAlert';
+import { ScopeDuplicateWarning } from '@/components/xero/ScopeDuplicateWarning';
 import { useXeroTransactions } from '@/hooks/useXeroTransactions';
 // New GHG Protocol Scope 3 category cards
 import { UpstreamTransportCard } from '@/components/reports/UpstreamTransportCard';
@@ -1374,6 +1375,9 @@ export default function CompanyEmissionsPage() {
                       )}
                     </div>
 
+                    {/* Duplicate detection: Xero spend vs utility meter readings */}
+                    <ScopeDuplicateWarning scope={1} yearStart={selectedYearStart} yearEnd={selectedYearEnd} />
+
                     {/* Xero energy baseline for Scope 1 */}
                     <XeroEnergyBaselineAlert entries={xeroScope1Entries} scope="Scope 1" />
 
@@ -1552,6 +1556,9 @@ export default function CompanyEmissionsPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Duplicate detection: Xero spend vs utility meter readings */}
+                    <ScopeDuplicateWarning scope={2} yearStart={selectedYearStart} yearEnd={selectedYearEnd} />
 
                     {/* Xero energy baseline for Scope 2 */}
                     <XeroEnergyBaselineAlert entries={xeroScope2Entries} scope="Scope 2" />

@@ -43,21 +43,31 @@ const CATEGORY_LABELS: Record<string, string> = {
  * 1. utility_data_entries - for energy/water categories (facility-level kWh, m³, etc.)
  * 2. corporate_overheads - for travel/freight/accommodation (manual entries without xero source)
  *
- * Returns overlap warnings to show in the Action Centre.
+ * When yearStart/yearEnd are provided, only checks for overlaps within that
+ * reporting period. Without them, checks all pending transactions.
+ *
+ * Returns overlap warnings to show in the Action Centre and scope pages.
  */
 export async function detectOverlaps(
   supabase: SupabaseClient,
-  organizationId: string
+  organizationId: string,
+  yearStart?: string,
+  yearEnd?: string
 ): Promise<OverlapResult[]> {
   const overlaps: OverlapResult[] = []
 
   // 1. Find which emission categories have pending Xero transactions
-  const { data: xeroCategories } = await supabase
+  let xeroQuery = supabase
     .from('xero_transactions')
     .select('emission_category, amount')
     .eq('organization_id', organizationId)
     .eq('upgrade_status', 'pending')
     .not('emission_category', 'is', null)
+
+  if (yearStart) xeroQuery = xeroQuery.gte('transaction_date', yearStart)
+  if (yearEnd) xeroQuery = xeroQuery.lte('transaction_date', yearEnd)
+
+  const { data: xeroCategories } = await xeroQuery
 
   if (!xeroCategories || xeroCategories.length === 0) return overlaps
 
@@ -89,11 +99,17 @@ export async function detectOverlaps(
         const utilityType = CATEGORY_TO_UTILITY_TYPE[cat]
         if (!utilityType) continue
 
-        const { count: existingCount } = await supabase
+        let utilityQuery = supabase
           .from('utility_data_entries')
           .select('id', { count: 'exact', head: true })
           .in('facility_id', facilityIds)
           .eq('utility_type', utilityType)
+
+        // Filter utility entries to the same reporting period when dates are provided
+        if (yearStart) utilityQuery = utilityQuery.gte('reporting_period_start', yearStart)
+        if (yearEnd) utilityQuery = utilityQuery.lte('reporting_period_end', yearEnd)
+
+        const { count: existingCount } = await utilityQuery
 
         if (existingCount && existingCount > 0) {
           const xeroData = xeroByCat.get(cat)!
@@ -104,7 +120,7 @@ export async function detectOverlaps(
             existingSource: 'utility_data_entries',
             existingCount,
             xeroSpend: xeroData.spend,
-            message: `${label}: you already have ${existingCount} utility data ${existingCount === 1 ? 'entry' : 'entries'} with actual readings. Xero spend data for the same category may be a duplicate.`,
+            message: `Your ${label.toLowerCase()} data may be double-counted. You have both Xero spend data and ${existingCount} utility meter ${existingCount === 1 ? 'reading' : 'readings'} for this period.`,
           })
         }
       }
@@ -160,7 +176,7 @@ export async function detectOverlaps(
               existingSource: 'corporate_overheads',
               existingCount: manualCount,
               xeroSpend: xeroData.spend,
-              message: `${label}: you have ${manualCount} manually entered ${overheadCat.replace('_', ' ')} ${manualCount === 1 ? 'entry' : 'entries'}. Check these are not duplicated by Xero spend data.`,
+              message: `Your ${label.toLowerCase()} data may be double-counted. You have both Xero spend data and ${manualCount} manually entered ${overheadCat.replace('_', ' ')} ${manualCount === 1 ? 'entry' : 'entries'} for this period.`,
             })
           }
         }

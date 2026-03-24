@@ -38,12 +38,13 @@ export function AIClassificationPanel() {
   const loadData = useCallback(async () => {
     if (!currentOrganization?.id) return
 
+    // Fetch both fully unclassified and needs_review transactions
     const { data } = await supabase
       .from('xero_transactions')
-      .select('id, xero_contact_name, description, amount, transaction_date, currency')
+      .select('id, xero_contact_name, description, amount, transaction_date, currency, upgrade_status, ai_suggested_category, ai_suggested_confidence, ai_suggested_reasoning')
       .eq('organization_id', currentOrganization.id)
       .is('emission_category', null)
-      .eq('upgrade_status', 'not_applicable')
+      .in('upgrade_status', ['not_applicable', 'needs_review'])
       .order('amount', { ascending: false })
       .limit(50)
 
@@ -56,6 +57,22 @@ export function AIClassificationPanel() {
         date: t.transaction_date,
         currency: t.currency || 'GBP',
       })))
+
+      // Pre-populate suggestions from stored AI results (needs_review items)
+      const storedSuggestions = new Map<string, AISuggestion>()
+      for (const t of data) {
+        if (t.ai_suggested_category) {
+          storedSuggestions.set(t.id, {
+            transactionId: t.id,
+            suggestedCategory: t.ai_suggested_category,
+            confidence: t.ai_suggested_confidence || 0,
+            reasoning: t.ai_suggested_reasoning || 'Suggested during sync',
+          })
+        }
+      }
+      if (storedSuggestions.size > 0) {
+        setSuggestions(storedSuggestions)
+      }
     }
 
     setIsLoading(false)
@@ -147,6 +164,12 @@ export function AIClassificationPanel() {
       next.add(txId)
       return next
     })
+
+    // Persist dismissal to database
+    await supabase
+      .from('xero_transactions')
+      .update({ upgrade_status: 'dismissed', updated_at: new Date().toISOString() })
+      .eq('id', txId)
   }
 
   async function handleConfirmAll() {
@@ -190,7 +213,7 @@ export function AIClassificationPanel() {
     }
   }
 
-  function handleDismissAll() {
+  async function handleDismissAll() {
     const toDismiss = visibleTransactions.filter(t => suggestions.has(t.id))
     if (toDismiss.length === 0) return
 
@@ -201,6 +224,14 @@ export function AIClassificationPanel() {
       }
       return next
     })
+
+    // Persist dismissals to database in batch
+    const dismissIds = toDismiss.map(t => t.id)
+    await supabase
+      .from('xero_transactions')
+      .update({ upgrade_status: 'dismissed', updated_at: new Date().toISOString() })
+      .in('id', dismissIds)
+
     toast.success(`Dismissed ${toDismiss.length} suggestions`)
   }
 

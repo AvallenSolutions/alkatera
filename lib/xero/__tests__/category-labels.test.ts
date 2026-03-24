@@ -75,9 +75,9 @@ describe('TIER_CONFIG', () => {
   })
 
   it('tier labels follow quality hierarchy', () => {
-    expect(TIER_CONFIG[1].label).toContain('Supplier')
-    expect(TIER_CONFIG[2].label).toContain('Activity')
-    expect(TIER_CONFIG[3].label).toContain('Proxy')
-    expect(TIER_CONFIG[4].label).toContain('Spend')
+    expect(TIER_CONFIG[1].label.toLowerCase()).toContain('supplier')
+    expect(TIER_CONFIG[2].label.toLowerCase()).toContain('activity')
+    expect(TIER_CONFIG[3].label.toLowerCase()).toContain('proxy')
+    expect(TIER_CONFIG[4].label.toLowerCase()).toContain('spend')
   })
 })

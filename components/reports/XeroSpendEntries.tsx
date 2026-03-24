@@ -18,6 +18,7 @@ import {
 import { ChevronDown, ChevronRight, ArrowUpCircle } from 'lucide-react'
 import Link from 'next/link'
 import type { XeroEntry } from '@/lib/xero/scope-card-mapping'
+import { TIER_CONFIG } from '@/lib/xero/category-labels'
 
 interface XeroSpendEntriesProps {
   entries: XeroEntry[]
@@ -60,8 +61,8 @@ export function XeroSpendEntries({ entries, upgradeHref = '/data/xero-upgrades/'
               <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
                 {entries.length} Xero transaction{entries.length !== 1 ? 's' : ''}
               </span>
-              <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-700 dark:text-amber-400 dark:border-amber-700">
-                Tier 4 Spend
+              <Badge variant="outline" className={`text-[9px] ${TIER_CONFIG[4].colour}`}>
+                {TIER_CONFIG[4].label}
               </Badge>
             </div>
             <span className="text-xs font-medium text-amber-600 dark:text-amber-400">

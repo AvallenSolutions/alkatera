@@ -79,12 +79,32 @@ async function stageAccounts(
 ): Promise<StageResult> {
   await updateSyncStatus(organizationId, 'syncing')
 
+  // Determine if this is an incremental sync by finding last successful sync
+  const { data: lastSync } = await db
+    .from('xero_sync_logs')
+    .select('completed_at')
+    .eq('organization_id', organizationId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  const twelveMonthsAgo = new Date()
+  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+
+  // Use last sync time as watermark, but never older than 12 months
+  const syncSince = lastSync?.completed_at
+    ? new Date(Math.max(new Date(lastSync.completed_at).getTime(), twelveMonthsAgo.getTime()))
+    : twelveMonthsAgo
+
+  const syncType = lastSync?.completed_at ? 'incremental' : 'full'
+
   // Create sync log
   await db
     .from('xero_sync_logs')
     .insert({
       organization_id: organizationId,
-      sync_type: 'full',
+      sync_type: syncType,
       status: 'started',
       triggered_by: triggeredBy,
     })
@@ -132,8 +152,8 @@ async function stageAccounts(
   return {
     done: false,
     nextStage: 'invoices',
-    cursor: { page: 1 },
-    progress: `Accounts synced (${expenseAccounts.length} expense accounts)`,
+    cursor: { page: 1, syncSince: syncSince.toISOString() },
+    progress: `Accounts synced (${expenseAccounts.length} expense accounts, ${syncType} sync)`,
     stats: { accountsFetched: expenseAccounts.length },
   }
 }
@@ -143,7 +163,7 @@ async function stageAccounts(
 async function stageInvoices(
   db: ReturnType<typeof getServiceClient>,
   organizationId: string,
-  cursor?: { page?: number }
+  cursor?: { page?: number; syncSince?: string }
 ): Promise<StageResult> {
   const page = cursor?.page || 1
 
@@ -152,12 +172,14 @@ async function stageInvoices(
 
   const { client: xero, tenantId } = auth
 
-  const twelveMonthsAgo = new Date()
-  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+  // Use watermark from accounts stage for incremental sync
+  const syncSince = cursor?.syncSince ? new Date(cursor.syncSince) : (() => {
+    const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d
+  })()
 
   const invoicesResponse = await xero.accountingApi.getInvoices(
     tenantId,
-    twelveMonthsAgo,
+    syncSince,
     'Type=="ACCPAY"',
     'Date DESC',
     undefined, undefined, undefined, undefined,
@@ -169,28 +191,50 @@ async function stageInvoices(
 
   // Store raw transactions in a staging pattern (directly into xero_transactions with pending classification)
   const batchId = `sync_${Date.now()}`
+  // Split multi-line invoices into separate rows per line item so each
+  // gets the correct account code for classification. Single-line invoices
+  // use the invoice ID directly; multi-line ones get a suffix per line.
   const rows = invoices
     .filter(inv => inv.invoiceID && !['DRAFT', 'DELETED', 'VOIDED'].includes(String(inv.status || '')))
-    .map(inv => {
-      const lineItem = inv.lineItems?.[0]
-      return {
-      organization_id: organizationId,
-      xero_transaction_id: inv.invoiceID!,
-      xero_transaction_type: 'invoice',
-      xero_contact_name: inv.contact?.name || null,
-      xero_contact_id: inv.contact?.contactID || null,
-      xero_account_id: lineItem?.accountID || null,
-      xero_account_code: lineItem?.accountCode || null,
-      description: inv.reference || lineItem?.description || null,
-      amount: inv.total || 0,
-      currency: String(inv.currencyCode || 'GBP'),
-      transaction_date: inv.date ? new Date(inv.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-      reporting_year: inv.date ? new Date(inv.date).getFullYear() : new Date().getFullYear(),
-      data_quality_tier: 4,
-      upgrade_status: 'pending',
-      sync_batch_id: batchId,
-      updated_at: new Date().toISOString(),
-    }
+    .flatMap(inv => {
+      const txDate = inv.date ? new Date(inv.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+      const reportingYear = inv.date ? new Date(inv.date).getFullYear() : new Date().getFullYear()
+      const baseCols = {
+        organization_id: organizationId,
+        xero_transaction_type: 'invoice' as const,
+        xero_contact_name: inv.contact?.name || null,
+        xero_contact_id: inv.contact?.contactID || null,
+        currency: String(inv.currencyCode || 'GBP'),
+        transaction_date: txDate,
+        reporting_year: reportingYear,
+        data_quality_tier: 4,
+        upgrade_status: 'pending' as const,
+        sync_batch_id: batchId,
+        updated_at: new Date().toISOString(),
+      }
+
+      const lines = inv.lineItems?.filter(li => li.lineAmount && li.lineAmount !== 0) || []
+
+      if (lines.length <= 1) {
+        const li = lines[0]
+        return [{
+          ...baseCols,
+          xero_transaction_id: inv.invoiceID!,
+          xero_account_id: li?.accountID || null,
+          xero_account_code: li?.accountCode || null,
+          description: inv.reference || li?.description || null,
+          amount: inv.total || 0,
+        }]
+      }
+
+      return lines.map((li, idx) => ({
+        ...baseCols,
+        xero_transaction_id: `${inv.invoiceID!}_L${idx}`,
+        xero_account_id: li.accountID || null,
+        xero_account_code: li.accountCode || null,
+        description: li.description || inv.reference || null,
+        amount: li.lineAmount || 0,
+      }))
     })
 
   if (rows.length > 0) {
@@ -200,12 +244,14 @@ async function stageInvoices(
     inserted = rows.length
   }
 
-  const hasMore = invoices.length >= 100 && page < 5
+  const hasMore = invoices.length >= 100 && page < 50
 
   return {
     done: false,
     nextStage: hasMore ? 'invoices' : 'bank_transactions',
-    cursor: hasMore ? { page: page + 1 } : { page: 1 },
+    cursor: hasMore
+      ? { page: page + 1, syncSince: cursor?.syncSince }
+      : { page: 1, syncSince: cursor?.syncSince },
     progress: `Invoices page ${page}: ${inserted} imported${hasMore ? ', fetching more...' : ' (done)'}`,
     stats: { transactionsFetched: inserted },
   }
@@ -216,7 +262,7 @@ async function stageInvoices(
 async function stageBankTransactions(
   db: ReturnType<typeof getServiceClient>,
   organizationId: string,
-  cursor?: { page?: number }
+  cursor?: { page?: number; syncSince?: string }
 ): Promise<StageResult> {
   const page = cursor?.page || 1
 
@@ -225,14 +271,16 @@ async function stageBankTransactions(
 
   const { client: xero, tenantId } = auth
 
-  const twelveMonthsAgo = new Date()
-  twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
+  // Use watermark from accounts stage for incremental sync
+  const syncSince = cursor?.syncSince ? new Date(cursor.syncSince) : (() => {
+    const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d
+  })()
 
   // Fetch ALL bank transactions (not just SPEND type) to capture bank feed
   // items, overpayments, and prepayments that represent actual spending
   const bankTxResponse = await xero.accountingApi.getBankTransactions(
     tenantId,
-    twelveMonthsAgo,
+    syncSince,
     undefined, // No type filter - get all types
     'Date DESC',
     page
@@ -252,26 +300,45 @@ async function stageBankTransactions(
       const txType = String(tx.type || '')
       return spendTypes.includes(txType) || (tx.total && tx.total > 0 && !txType.startsWith('RECEIVE'))
     })
-    .map(tx => {
-      const lineItem = tx.lineItems?.[0]
-      return {
+    .flatMap(tx => {
+      const txDate = tx.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+      const reportingYear = tx.date ? new Date(tx.date).getFullYear() : new Date().getFullYear()
+      const baseCols = {
         organization_id: organizationId,
-        xero_transaction_id: tx.bankTransactionID!,
-        xero_transaction_type: 'bank_transaction',
+        xero_transaction_type: 'bank_transaction' as const,
         xero_contact_name: tx.contact?.name || null,
         xero_contact_id: tx.contact?.contactID || null,
-        xero_account_id: lineItem?.accountID || null,
-        xero_account_code: lineItem?.accountCode || null,
-        description: lineItem?.description || null,
-        amount: tx.total || 0,
         currency: String(tx.currencyCode || 'GBP'),
-        transaction_date: tx.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-        reporting_year: tx.date ? new Date(tx.date).getFullYear() : new Date().getFullYear(),
+        transaction_date: txDate,
+        reporting_year: reportingYear,
         data_quality_tier: 4,
-        upgrade_status: 'pending',
+        upgrade_status: 'pending' as const,
         sync_batch_id: batchId,
         updated_at: new Date().toISOString(),
       }
+
+      const lines = tx.lineItems?.filter(li => li.lineAmount && li.lineAmount !== 0) || []
+
+      if (lines.length <= 1) {
+        const li = lines[0]
+        return [{
+          ...baseCols,
+          xero_transaction_id: tx.bankTransactionID!,
+          xero_account_id: li?.accountID || null,
+          xero_account_code: li?.accountCode || null,
+          description: li?.description || null,
+          amount: tx.total || 0,
+        }]
+      }
+
+      return lines.map((li, idx) => ({
+        ...baseCols,
+        xero_transaction_id: `${tx.bankTransactionID!}_L${idx}`,
+        xero_account_id: li.accountID || null,
+        xero_account_code: li.accountCode || null,
+        description: li.description || null,
+        amount: li.lineAmount || 0,
+      }))
     })
 
   if (rows.length > 0) {
@@ -281,7 +348,7 @@ async function stageBankTransactions(
     inserted = rows.length
   }
 
-  const hasMore = bankTxs.length >= 100 && page < 5
+  const hasMore = bankTxs.length >= 100 && page < 50
 
   return {
     done: false,
@@ -319,7 +386,7 @@ async function stageClassify(
     .select('id, xero_account_id, xero_contact_name, description, amount, emission_category')
     .eq('organization_id', organizationId)
     .is('emission_category', null)
-    .limit(500)
+    .limit(2000)
 
   let classified = 0
 
@@ -412,6 +479,7 @@ async function stageAIClassify(
 
   for (const result of aiResults) {
     if (result.suggestedCategory && result.confidence >= 0.7) {
+      // High confidence: auto-apply
       const spendBasedEmissions = calculateSpendBasedEmissions(
         unclassified.find(tx => tx.id === result.transactionId)?.amount || 0,
         result.suggestedCategory
@@ -429,6 +497,19 @@ async function stageAIClassify(
         .eq('id', result.transactionId)
 
       autoClassified++
+    } else if (result.suggestedCategory && result.confidence >= 0.3) {
+      // Low confidence: store suggestion for manual review without applying
+      await db
+        .from('xero_transactions')
+        .update({
+          upgrade_status: 'needs_review',
+          ai_suggested_category: result.suggestedCategory,
+          ai_suggested_confidence: result.confidence,
+          ai_suggested_reasoning: result.reasoning || null,
+        })
+        .eq('id', result.transactionId)
+
+      needsReview++
     } else {
       needsReview++
     }

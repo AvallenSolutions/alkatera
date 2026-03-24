@@ -106,10 +106,10 @@ export function DuplicateWarningBanner({ onDismissed }: DuplicateWarningBannerPr
                 size="sm"
                 className="h-7 text-xs text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700"
                 onClick={() => handleDismiss(overlap.category)}
-                title="Dismiss the Xero transactions for this category"
+                title="Keep your utility/manual data and dismiss the Xero spend transactions for this category"
               >
                 <X className="h-3 w-3 mr-1" />
-                Dismiss Xero
+                Use utility data only
               </Button>
             </div>
           </div>

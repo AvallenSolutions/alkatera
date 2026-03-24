@@ -61,8 +61,8 @@ export const UPGRADE_STATUS_LABELS: Record<string, string> = {
  * Data quality tier labels and colours.
  */
 export const TIER_CONFIG: Record<number, { label: string; colour: string }> = {
-  1: { label: 'Tier 1 (Supplier)', colour: 'text-emerald-700 dark:text-emerald-400 border-emerald-300' },
-  2: { label: 'Tier 2 (Activity)', colour: 'text-blue-700 dark:text-blue-400 border-blue-300' },
-  3: { label: 'Tier 3 (Proxy)', colour: 'text-amber-700 dark:text-amber-400 border-amber-300' },
-  4: { label: 'Tier 4 (Spend)', colour: 'text-red-700 dark:text-red-400 border-red-300' },
+  1: { label: 'Verified (supplier data)', colour: 'text-emerald-700 dark:text-emerald-400 border-emerald-300' },
+  2: { label: 'Good (activity data)', colour: 'text-blue-700 dark:text-blue-400 border-blue-300' },
+  3: { label: 'Estimated (proxy data)', colour: 'text-amber-700 dark:text-amber-400 border-amber-300' },
+  4: { label: 'Estimated (spend data)', colour: 'text-red-700 dark:text-red-400 border-red-300' },
 }

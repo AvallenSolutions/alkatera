@@ -67,7 +67,7 @@ describe('detectOverlaps', () => {
     const electricityOverlap = result.find(r => r.category === 'grid_electricity')
     expect(electricityOverlap).toBeDefined()
     expect(electricityOverlap!.existingSource).toBe('utility_data_entries')
-    expect(electricityOverlap!.message).toContain('Electricity')
+    expect(electricityOverlap!.message).toContain('electricity')
   })
 
   it('detects air_travel overlap with corporate_overheads', async () => {
@@ -105,7 +105,7 @@ describe('detectOverlaps', () => {
     const travelOverlap = result.find(r => r.category === 'air_travel')
     expect(travelOverlap).toBeDefined()
     expect(travelOverlap!.existingSource).toBe('corporate_overheads')
-    expect(travelOverlap!.message).toContain('Air Travel')
+    expect(travelOverlap!.message).toContain('air travel')
   })
 
   it('does not flag categories where no existing data exists', async () => {

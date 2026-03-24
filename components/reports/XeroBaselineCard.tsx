@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/collapsible'
 import { ChevronDown, ChevronRight, ArrowUpCircle, ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
-import { CATEGORY_LABELS } from '@/lib/xero/category-labels'
+import { CATEGORY_LABELS, TIER_CONFIG } from '@/lib/xero/category-labels'
 import Link from 'next/link'
 
 interface CategoryBreakdown {
@@ -134,8 +134,8 @@ export function XeroBaselineCard({
             <CardTitle className="flex items-center gap-2 text-base">
               <ArrowUpCircle className="h-4 w-4 text-amber-500" />
               Xero Spend Baselines
-              <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-700 dark:text-amber-400">
-                Tier 4
+              <Badge variant="outline" className={`text-[10px] ${TIER_CONFIG[4].colour}`}>
+                {TIER_CONFIG[4].label}
               </Badge>
             </CardTitle>
             <div className="flex items-center gap-2">

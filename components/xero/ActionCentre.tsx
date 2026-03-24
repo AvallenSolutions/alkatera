@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { Loader2, TrendingUp } from 'lucide-react'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
+import { getUncertainty } from '@/lib/xero/spend-factors'
 import { UpgradePromptCard } from './UpgradePromptCard'
 import { EnergyUpgradeForm } from './EnergyUpgradeForm'
 import { TravelUpgradeForm } from './TravelUpgradeForm'
@@ -99,8 +100,13 @@ export function ActionCentre() {
       grouped.set(tx.emission_category, existing)
     }
 
-    // Sort by total amount descending (highest impact first)
-    const sorted = Array.from(grouped.values()).sort((a, b) => b.total_amount - a.total_amount)
+    // Sort by uncertainty (highest first), then by total emissions as tiebreaker
+    const sorted = Array.from(grouped.values()).sort((a, b) => {
+      const uncA = getUncertainty(a.emission_category)
+      const uncB = getUncertainty(b.emission_category)
+      if (uncB !== uncA) return uncB - uncA
+      return b.total_emissions_kg - a.total_emissions_kg
+    })
     setCategories(sorted)
     setIsLoading(false)
   }, [currentOrganization?.id])
@@ -158,7 +164,19 @@ export function ActionCentre() {
   // If showing an upgrade form, route to the correct one
   if (upgradeCategory) {
     const formProps = {
-      onComplete: () => { setUpgradeCategory(null); fetchData() },
+      onComplete: async () => {
+        // Mark matching xero_transactions as upgraded
+        if (currentOrganization?.id) {
+          await supabase
+            .from('xero_transactions')
+            .update({ upgrade_status: 'upgraded', data_quality_tier: 2, updated_at: new Date().toISOString() })
+            .eq('organization_id', currentOrganization.id)
+            .eq('emission_category', upgradeCategory)
+            .eq('upgrade_status', 'pending')
+        }
+        setUpgradeCategory(null)
+        fetchData()
+      },
       onCancel: () => setUpgradeCategory(null),
     }
 

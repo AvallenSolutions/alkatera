@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServerClient } from '@/lib/supabase/server-client'
+import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { classifyWithAI } from '@/lib/xero/ai-classifier'
-
-function getServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)!
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
 
 interface ClassifyRequest {
   organizationId: string
@@ -27,10 +20,25 @@ const RATE_WINDOW = 60 * 60 * 1000 // 1 hour
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabaseServerClient()
+
+    // 1. Authenticate
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    }
+
+    // 2. Parse body
     const body = (await request.json()) as ClassifyRequest
 
     if (!body.organizationId || !body.transactions?.length) {
       return NextResponse.json({ error: 'Missing organizationId or transactions' }, { status: 400 })
+    }
+
+    // 3. Check membership
+    const role = await getMemberRole(supabase, body.organizationId, user.id)
+    if (!role) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 })
     }
 
     // Limit batch size
@@ -54,9 +62,8 @@ export async function POST(request: NextRequest) {
       rateLimitMap.set(rateKey, { count: 1, resetAt: now + RATE_WINDOW })
     }
 
-    // Verify org access
-    const db = getServiceClient()
-    const { count } = await db
+    // Verify Xero connection exists
+    const { count } = await supabase
       .from('xero_connections')
       .select('id', { count: 'exact', head: true })
       .eq('organization_id', body.organizationId)
