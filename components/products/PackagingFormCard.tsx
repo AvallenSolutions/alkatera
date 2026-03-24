@@ -596,7 +596,8 @@ export function PackagingFormCard({
       ef_source_type: selection.ef_source_type,
       ef_data_quality_grade: selection.ef_data_quality_grade,
       ef_uncertainty_percent: selection.ef_uncertainty_percent,
-      packaging_category: detectedCategory,
+      // Only auto-detect category if user hasn't already chosen one
+      ...(!packaging.packaging_category ? { packaging_category: detectedCategory } : {}),
       // Only prefill unit from search result when packaging has no amount set yet (first selection).
       // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
       ...(!packaging.amount ? { unit: selection.unit } : {}),
