@@ -135,7 +135,7 @@ export function CalculationStep() {
         productId,
         functionalUnit: `1 ${product?.unit || 'unit'} of ${product?.name || 'product'}`,
         systemBoundary: boundaryValue,
-        referenceYear: new Date().getFullYear(),
+        referenceYear: formData.referenceYear,
         facilityAllocations:
           validAllocations.length > 0 ? validAllocations : undefined,
         usePhaseConfig: formData.usePhaseConfig,
