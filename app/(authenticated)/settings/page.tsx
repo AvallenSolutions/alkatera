@@ -100,11 +100,8 @@ export default function SettingsPage() {
       toast.info('Organisation created! Now select a plan to get started.')
       router.replace('/settings')
     }
-    // Xero OAuth callback results
-    if (searchParams.get('xero') === 'connected') {
-      toast.success('Xero connected successfully!')
-      router.replace('/settings?tab=integrations')
-    }
+    // Xero OAuth callback results - pass through to XeroConnectionCard
+    // which handles auto-sync. Only intercept errors here.
     if (searchParams.get('xero') === 'error') {
       toast.error(searchParams.get('message') || 'Failed to connect Xero')
       router.replace('/settings?tab=integrations')
