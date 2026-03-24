@@ -349,6 +349,7 @@ export default function ProductRecipePage() {
           data_source: item.data_source as any,
           data_source_id: item.data_source_id,
           supplier_product_id: item.supplier_product_id,
+          carbon_intensity: item.cached_co2_factor ?? undefined,
           amount: item.quantity,
           unit: item.unit || 'kg',
           origin_country: item.origin_country || '',
@@ -412,6 +413,7 @@ export default function ProductRecipePage() {
             data_source: item.data_source as any,
             data_source_id: item.data_source_id,
             supplier_product_id: item.supplier_product_id,
+            carbon_intensity: item.cached_co2_factor ?? undefined,
             amount: item.quantity,
             unit: item.unit || 'g',
             packaging_category: item.packaging_category || (categoryMatch ? categoryMatch[1] : 'container'),
@@ -593,6 +595,11 @@ export default function ProductRecipePage() {
         materialData.data_source = 'supplier';
         materialData.supplier_product_id = form.supplier_product_id;
       }
+      // Cache the emission factor value so the resolver always has a local
+      // fallback even when the original data source is unreachable.
+      if (form.carbon_intensity != null && !isNaN(Number(form.carbon_intensity))) {
+        materialData.cached_co2_factor = Number(form.carbon_intensity);
+      }
       if (form.transport_legs && form.transport_legs.length > 0) {
         materialData.transport_legs = form.transport_legs;
         materialData.transport_mode = form.transport_legs[0].transportMode;
@@ -667,6 +674,11 @@ export default function ProductRecipePage() {
       } else if (form.data_source === 'supplier' && form.supplier_product_id) {
         materialData.data_source = 'supplier';
         materialData.supplier_product_id = form.supplier_product_id;
+      }
+      // Cache the emission factor value so the resolver always has a local
+      // fallback even when the original data source is unreachable.
+      if (form.carbon_intensity != null && !isNaN(Number(form.carbon_intensity))) {
+        materialData.cached_co2_factor = Number(form.carbon_intensity);
       }
       if (form.transport_legs && form.transport_legs.length > 0) {
         materialData.transport_legs = form.transport_legs;

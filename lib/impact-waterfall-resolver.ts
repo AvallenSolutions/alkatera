@@ -43,6 +43,11 @@ export interface ProductMaterial {
   // Multi-modal inbound transport (ingredient rows only).
   // When present, overrides transport_mode + distance_km.
   transport_legs?: DistributionLeg[] | null;
+
+  // Cached emission factor (kg CO2e per reference unit) saved at assignment
+  // time.  Used as a last-resort fallback when the original data source
+  // cannot be resolved.
+  cached_co2_factor?: number | null;
 }
 
 export interface WaterfallResult {
@@ -959,22 +964,50 @@ export async function resolveImpactFactors(
     }
 
     // If ID lookups failed (e.g. live ecoinvent process not in local proxy table),
-    // try name-based lookup in ecoinvent_material_proxies using matched_source_name.
+    // try name-based lookup in ecoinvent_material_proxies.
+    // Try matched_source_name first, then the simpler material_name (user's name).
     // This handles the case where a user selected a live ecoinvent result but the
     // OpenLCA API is unavailable during validation — we can still find a cached proxy
     // with the same or similar name.
     if (!directProxy || !directProxy.impact_climate) {
-      const proxySearchName = material.matched_source_name || material.material_name;
-      const { data: nameProxy } = await supabase
-        .from('ecoinvent_material_proxies')
-        .select('*')
-        .ilike('material_name', `%${proxySearchName}%`)
-        .not('impact_climate', 'is', null)
-        .limit(1)
-        .maybeSingle();
-      if (nameProxy && nameProxy.impact_climate) {
-        console.log(`[Waterfall] ✓ Name-based proxy lookup SUCCESS: "${proxySearchName}" → ${nameProxy.material_name}`);
+      // Try both names sequentially: the technical DB name, then the user's name
+      const namesToTry = [material.matched_source_name, material.material_name]
+        .filter((n): n is string => !!n && n.length > 0);
+      // Deduplicate (if they're the same string, only search once)
+      const uniqueNames = Array.from(new Set(namesToTry));
 
+      let nameProxy: any = null;
+      for (const searchName of uniqueNames) {
+        const { data: match } = await supabase
+          .from('ecoinvent_material_proxies')
+          .select('*')
+          .ilike('material_name', `%${searchName}%`)
+          .not('impact_climate', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        if (match && match.impact_climate) {
+          nameProxy = match;
+          console.log(`[Waterfall] ✓ Name-based proxy lookup SUCCESS: "${searchName}" → ${match.material_name}`);
+          break;
+        }
+      }
+
+      // Also try searching ecoinvent_process_name (the technical process name)
+      if (!nameProxy && material.matched_source_name) {
+        const { data: processMatch } = await supabase
+          .from('ecoinvent_material_proxies')
+          .select('*')
+          .ilike('ecoinvent_process_name', `%${material.matched_source_name}%`)
+          .not('impact_climate', 'is', null)
+          .limit(1)
+          .maybeSingle();
+        if (processMatch && processMatch.impact_climate) {
+          nameProxy = processMatch;
+          console.log(`[Waterfall] ✓ Process-name proxy lookup SUCCESS: "${material.matched_source_name}" → ${processMatch.material_name}`);
+        }
+      }
+
+      if (nameProxy && nameProxy.impact_climate) {
         const climateTotal = Number(nameProxy.impact_climate || 0) * quantity_kg;
         const hasGHGBreakdown = nameProxy.impact_climate_fossil || nameProxy.impact_climate_biogenic;
         const fossilCO2 = hasGHGBreakdown
@@ -1257,6 +1290,56 @@ export async function resolveImpactFactors(
       gwp_reference_id: ecoinventProxy.id,
       non_gwp_reference_id: ecoinventProxy.id,
       resolved_factor_id: ecoinventProxy.id,
+      is_hybrid_source: false,
+      category_type: category,
+    };
+  }
+
+  // ===========================================================
+  // LAST RESORT: Use cached emission factor from assignment time
+  // ===========================================================
+  if (material.cached_co2_factor && Number(material.cached_co2_factor) > 0) {
+    console.warn(`[Waterfall] ⚠ Using cached CO2 factor for: ${material.material_name} (${material.cached_co2_factor} kg CO2e/unit)`);
+
+    const co2Total = Number(material.cached_co2_factor) * quantity_kg;
+    return {
+      impact_climate: co2Total,
+      impact_climate_fossil: co2Total * 0.85,
+      impact_climate_biogenic: co2Total * 0.15,
+      impact_climate_dluc: 0,
+      ch4_kg: 0,
+      ch4_fossil_kg: 0,
+      ch4_biogenic_kg: 0,
+      n2o_kg: 0,
+      impact_water: 0,
+      impact_water_scarcity: 0,
+      impact_land: 0,
+      impact_waste: 0,
+      impact_ozone_depletion: 0,
+      impact_photochemical_ozone_formation: 0,
+      impact_ionising_radiation: 0,
+      impact_particulate_matter: 0,
+      impact_human_toxicity_carcinogenic: 0,
+      impact_human_toxicity_non_carcinogenic: 0,
+      impact_terrestrial_ecotoxicity: 0,
+      impact_freshwater_ecotoxicity: 0,
+      impact_marine_ecotoxicity: 0,
+      impact_freshwater_eutrophication: 0,
+      impact_marine_eutrophication: 0,
+      impact_terrestrial_acidification: 0,
+      impact_mineral_resource_scarcity: 0,
+      impact_fossil_resource_scarcity: 0,
+      data_priority: 3,
+      data_quality_tag: 'Secondary_Modelled',
+      data_quality_grade: 'LOW' as const,
+      source_reference: `Cached factor from assignment (${material.matched_source_name || material.material_name})`,
+      confidence_score: 30,
+      methodology: 'Cached CO2e factor from emission factor assignment',
+      gwp_data_source: 'Cached',
+      non_gwp_data_source: 'Cached',
+      gwp_reference_id: material.data_source_id || material.id,
+      non_gwp_reference_id: material.data_source_id || material.id,
+      resolved_factor_id: material.data_source_id || material.id,
       is_hybrid_source: false,
       category_type: category,
     };
