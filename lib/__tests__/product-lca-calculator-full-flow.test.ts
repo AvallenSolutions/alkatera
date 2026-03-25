@@ -486,6 +486,7 @@ describe('calculateProductCarbonFootprint', () => {
         expect.anything(), // calculationFingerprint
         expect.anything(), // fallbackEvents
         expect.anything(), // materialResolutions
+        undefined,         // referenceYear (not set in params)
       );
     });
 
@@ -522,6 +523,7 @@ describe('calculateProductCarbonFootprint', () => {
         expect.anything(), // calculationFingerprint
         expect.anything(), // fallbackEvents
         expect.anything(), // materialResolutions
+        undefined,         // referenceYear (not set in params)
       );
     });
   });
