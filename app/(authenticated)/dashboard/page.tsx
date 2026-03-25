@@ -404,9 +404,11 @@ export default function DashboardPage() {
             <InlineErrorBoundary>
               <ImpactValueWidget />
             </InlineErrorBoundary>
+            {/* Hidden - Expert Consulting not ready for public viewing
             <InlineErrorBoundary>
               <CanopyCreditsWidget />
             </InlineErrorBoundary>
+            */}
           </div>
         </div>
       )}
