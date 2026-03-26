@@ -520,9 +520,22 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
 }
 
 function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): number {
-  const claimLines = pdf.splitTextToSize(`"${claim.claim_text}"`, innerW - 4);
-  const issueLines = pdf.splitTextToSize(claim.issue_description, innerW);
-  const suggestionLines = pdf.splitTextToSize(claim.suggestion, innerW - 8);
+  // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
+  const textW = innerW - 4;
+  const claimLines = pdf.splitTextToSize(`"${claim.claim_text}"`, textW);
+  const issueLines = pdf.splitTextToSize(claim.issue_description, textW);
+  const suggestionLines = pdf.splitTextToSize(claim.suggestion, textW - 8);
+  const legText = `${claim.legislation_name}${claim.legislation_article ? ` (${claim.legislation_article})` : ''}`;
+  const jurisdiction = getJurisdictionLabel(claim.legislation_jurisdiction);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(6.5);
+  const jurBadgeW = pdf.getTextWidth(jurisdiction) + 5;
+  const legAvailW = textW - jurBadgeW - 3;
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  const legLines = pdf.splitTextToSize(legText, legAvailW);
 
   let h = 6;  // top padding
   h += 7;     // badge row
@@ -530,11 +543,11 @@ function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): numbe
   h += 5;     // separator + gap
   h += 4;     // issue description heading
   h += issueLines.length * 4 + 5;  // issue description
-  h += 7;     // legislation row
+  h += legLines.length * 4 + 5;    // legislation row (wrapped)
   h += suggestionLines.length * 4 + 13; // suggestion box
 
   if (claim.suggested_revision) {
-    const revLines = pdf.splitTextToSize(`"${claim.suggested_revision}"`, innerW - 8);
+    const revLines = pdf.splitTextToSize(`"${claim.suggested_revision}"`, textW - 8);
     h += revLines.length * 4 + 12;
   }
 
@@ -548,13 +561,15 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   const cardW = CONTENT_WIDTH;
   const innerPad = 8;
   const innerW = cardW - innerPad * 2;
+  // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
+  const textW = innerW - 4;
 
   // Pre-measure text
-  const claimLines = pdf.splitTextToSize(`"${claim.claim_text}"`, innerW - 4);
-  const issueLines = pdf.splitTextToSize(claim.issue_description, innerW);
-  const suggestionLines = pdf.splitTextToSize(claim.suggestion, innerW - 8);
+  const claimLines = pdf.splitTextToSize(`"${claim.claim_text}"`, textW);
+  const issueLines = pdf.splitTextToSize(claim.issue_description, textW);
+  const suggestionLines = pdf.splitTextToSize(claim.suggestion, textW - 8);
   const revisionLines = claim.suggested_revision
-    ? pdf.splitTextToSize(`"${claim.suggested_revision}"`, innerW - 8)
+    ? pdf.splitTextToSize(`"${claim.suggested_revision}"`, textW - 8)
     : [];
   const issueType = claim.issue_type?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
   const jurisdiction = getJurisdictionLabel(claim.legislation_jurisdiction);
@@ -653,15 +668,17 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8);
   pdf.setTextColor(MID_GREY.r, MID_GREY.g, MID_GREY.b);
-  pdf.text(legText, cardX + innerPad + jurBadgeW + 3, yPos);
-  yPos += 7;
+  const legAvailW = textW - jurBadgeW - 3;
+  const legLines = pdf.splitTextToSize(legText, legAvailW);
+  pdf.text(legLines, cardX + innerPad + jurBadgeW + 3, yPos);
+  yPos += legLines.length * 4 + 3;
 
   // Suggestion box
   const suggBoxHeight = suggestionLines.length * 4 + 10;
   pdf.setFillColor(236, 253, 245);
   pdf.setDrawColor(34, 197, 94);
   pdf.setLineWidth(0.3);
-  pdf.roundedRect(cardX + innerPad, yPos - 1, innerW, suggBoxHeight, 2, 2, 'FD');
+  pdf.roundedRect(cardX + innerPad, yPos - 1, textW, suggBoxHeight, 2, 2, 'FD');
 
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(7);
@@ -678,7 +695,7 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   if (claim.suggested_revision && revisionLines.length > 0) {
     const revBoxHeight = revisionLines.length * 4 + 9;
     pdf.setFillColor(248, 248, 248);
-    pdf.roundedRect(cardX + innerPad, yPos - 1, innerW, revBoxHeight, 2, 2, 'F');
+    pdf.roundedRect(cardX + innerPad, yPos - 1, textW, revBoxHeight, 2, 2, 'F');
 
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(7);
