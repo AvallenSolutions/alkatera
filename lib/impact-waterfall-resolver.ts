@@ -768,36 +768,27 @@ export async function resolveImpactFactors(
   if (willAttemptOpenLCA) {
     console.log(`[Waterfall] Attempting Priority 2.5 (OpenLCA / ${materialDatabase}) for: ${material.material_name}`);
 
-    try {
-      // Get auth token for API call
-      const { data: { session } } = await supabase.auth.getSession();
+    // Helper: call the OpenLCA calculate API for a specific database server
+    const tryOpenLCAServer = async (
+      db: OpenLCADatabaseSource,
+      token: string,
+    ): Promise<{ ok: true; result: any } | { ok: false; is404: boolean; error: string }> => {
+      const timeoutMs = db === 'agribalyse' ? 30000 : 15000;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-      if (session?.access_token) {
-        // CRITICAL FIX #5: Add timeout to the OpenLCA API call.
-        // Without a timeout, a hung OpenLCA server would block the entire LCA
-        // calculation indefinitely. We use AbortController with a 15-second
-        // timeout — long enough for a real calculation but short enough to fail
-        // fast and fall through to Priority 3 staging factors.
-        // Agribalyse calculations can be slower (EF method discovery + calculation)
-        const timeoutMs = materialDatabase === 'agribalyse' ? 30000 : 15000;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          console.warn(`[Waterfall] OpenLCA API timeout (${timeoutMs / 1000}s) for ${material.material_name} — falling through to Priority 3`);
-        }, timeoutMs);
-
-        // Call server-side OpenLCA calculation API with database parameter
+      try {
         const response = await fetch('/api/openlca/calculate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
             processId: material.data_source_id,
             quantity: quantity_kg,
             organizationId: organizationId,
-            database: materialDatabase,
+            database: db,
           }),
           signal: controller.signal,
         });
@@ -805,84 +796,136 @@ export async function resolveImpactFactors(
 
         if (response.ok) {
           const result = await response.json();
-
           if (result.success && result.impacts) {
-            const dbLabel = result.database === 'agribalyse' ? 'Agribalyse 3.2' : 'ecoinvent 3.12';
-            const gwpSource = result.database === 'agribalyse' ? 'OpenLCA/Agribalyse' : 'OpenLCA/ecoinvent';
-            console.log(`[Waterfall] ✓ Priority 2.5 SUCCESS: OpenLCA calculation for ${material.material_name} via ${dbLabel}`);
-            console.log(`[Waterfall] Climate impact: ${result.impacts.impact_climate?.toFixed(4)} kg CO2e`);
-
-            // Build WaterfallResult from API response
-            return {
-              impact_climate: result.impacts.impact_climate || 0,
-              impact_climate_fossil: result.impacts.impact_climate_fossil || 0,
-              impact_climate_biogenic: result.impacts.impact_climate_biogenic || 0,
-              impact_climate_dluc: result.impacts.impact_climate_dluc || 0,
-              impact_water: result.impacts.impact_water || 0,
-              impact_water_scarcity: (result.impacts.impact_water || 0) * awareFactor,
-              impact_land: result.impacts.impact_land || 0,
-              impact_waste: result.impacts.impact_waste || 0,
-              impact_ozone_depletion: result.impacts.impact_ozone_depletion || 0,
-              impact_photochemical_ozone_formation: result.impacts.impact_photochemical_ozone_formation || 0,
-              impact_ionising_radiation: result.impacts.impact_ionising_radiation || 0,
-              impact_particulate_matter: result.impacts.impact_particulate_matter || 0,
-              impact_human_toxicity_carcinogenic: 0,
-              impact_human_toxicity_non_carcinogenic: 0,
-              impact_terrestrial_ecotoxicity: result.impacts.impact_terrestrial_ecotoxicity || 0,
-              impact_freshwater_ecotoxicity: result.impacts.impact_freshwater_ecotoxicity || 0,
-              impact_marine_ecotoxicity: result.impacts.impact_marine_ecotoxicity || 0,
-              impact_freshwater_eutrophication: result.impacts.impact_freshwater_eutrophication || 0,
-              impact_marine_eutrophication: result.impacts.impact_marine_eutrophication || 0,
-              impact_terrestrial_acidification: result.impacts.impact_terrestrial_acidification || 0,
-              impact_mineral_resource_scarcity: result.impacts.impact_mineral_resource_scarcity || 0,
-              impact_fossil_resource_scarcity: result.impacts.impact_fossil_resource_scarcity || 0,
-              data_priority: 2,
-              data_quality_tag: 'Secondary_Modelled',
-              data_quality_grade: 'HIGH',
-              source_reference: result.source || `OpenLCA: ${result.processName} (${result.geography}) via ${dbLabel}`,
-              confidence_score: 85,
-              methodology: `ReCiPe 2016 Midpoint (H) / ${dbLabel}`,
-              gwp_data_source: gwpSource,
-              non_gwp_data_source: gwpSource,
-              gwp_reference_id: material.data_source_id,
-              non_gwp_reference_id: material.data_source_id,
-              resolved_factor_id: material.data_source_id,
-              is_hybrid_source: false,
-              category_type: category,
-            };
+            return { ok: true, result };
           }
+          return { ok: false, is404: false, error: 'No impact data in response' };
+        }
+        const errorData = await response.json().catch(() => ({}));
+        const errMsg = errorData.error || response.statusText;
+        const is404 = errMsg.includes('404') || response.status === 404;
+        return { ok: false, is404, error: errMsg };
+      } catch (err: any) {
+        clearTimeout(timeoutId);
+        if (err.name === 'AbortError') {
+          return { ok: false, is404: false, error: `OpenLCA API timeout (${timeoutMs / 1000}s)` };
+        }
+        return { ok: false, is404: false, error: err.message };
+      }
+    };
+
+    // Helper: build WaterfallResult from API response
+    const buildOpenLCAResult = (result: any): WaterfallResult => {
+      const dbLabel = result.database === 'agribalyse' ? 'Agribalyse 3.2' : 'ecoinvent 3.12';
+      const gwpSource = result.database === 'agribalyse' ? 'OpenLCA/Agribalyse' : 'OpenLCA/ecoinvent';
+      console.log(`[Waterfall] ✓ Priority 2.5 SUCCESS: OpenLCA calculation for ${material.material_name} via ${dbLabel}`);
+      console.log(`[Waterfall] Climate impact: ${result.impacts.impact_climate?.toFixed(4)} kg CO2e`);
+
+      return {
+        impact_climate: result.impacts.impact_climate || 0,
+        impact_climate_fossil: result.impacts.impact_climate_fossil || 0,
+        impact_climate_biogenic: result.impacts.impact_climate_biogenic || 0,
+        impact_climate_dluc: result.impacts.impact_climate_dluc || 0,
+        impact_water: result.impacts.impact_water || 0,
+        impact_water_scarcity: (result.impacts.impact_water || 0) * awareFactor,
+        impact_land: result.impacts.impact_land || 0,
+        impact_waste: result.impacts.impact_waste || 0,
+        impact_ozone_depletion: result.impacts.impact_ozone_depletion || 0,
+        impact_photochemical_ozone_formation: result.impacts.impact_photochemical_ozone_formation || 0,
+        impact_ionising_radiation: result.impacts.impact_ionising_radiation || 0,
+        impact_particulate_matter: result.impacts.impact_particulate_matter || 0,
+        impact_human_toxicity_carcinogenic: 0,
+        impact_human_toxicity_non_carcinogenic: 0,
+        impact_terrestrial_ecotoxicity: result.impacts.impact_terrestrial_ecotoxicity || 0,
+        impact_freshwater_ecotoxicity: result.impacts.impact_freshwater_ecotoxicity || 0,
+        impact_marine_ecotoxicity: result.impacts.impact_marine_ecotoxicity || 0,
+        impact_freshwater_eutrophication: result.impacts.impact_freshwater_eutrophication || 0,
+        impact_marine_eutrophication: result.impacts.impact_marine_eutrophication || 0,
+        impact_terrestrial_acidification: result.impacts.impact_terrestrial_acidification || 0,
+        impact_mineral_resource_scarcity: result.impacts.impact_mineral_resource_scarcity || 0,
+        impact_fossil_resource_scarcity: result.impacts.impact_fossil_resource_scarcity || 0,
+        data_priority: 2,
+        data_quality_tag: 'Secondary_Modelled',
+        data_quality_grade: 'HIGH',
+        source_reference: result.source || `OpenLCA: ${result.processName} (${result.geography}) via ${dbLabel}`,
+        confidence_score: 85,
+        methodology: `ReCiPe 2016 Midpoint (H) / ${dbLabel}`,
+        gwp_data_source: gwpSource,
+        non_gwp_data_source: gwpSource,
+        gwp_reference_id: material.data_source_id,
+        non_gwp_reference_id: material.data_source_id,
+        resolved_factor_id: material.data_source_id,
+        is_hybrid_source: false,
+        category_type: category,
+      };
+    };
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        // Try the primary database first
+        const primaryResult = await tryOpenLCAServer(materialDatabase, session.access_token);
+
+        if (primaryResult.ok) {
+          return buildOpenLCAResult(primaryResult.result);
+        }
+
+        // If process not found (404), try the OTHER server before giving up.
+        // This handles materials assigned before openlca_database was saved,
+        // e.g. Agribalyse processes stored without openlca_database='agribalyse'
+        // that default to ecoinvent.
+        if (primaryResult.is404) {
+          const altDatabase: OpenLCADatabaseSource = materialDatabase === 'ecoinvent' ? 'agribalyse' : 'ecoinvent';
+          console.log(`[Waterfall] Process not found on ${materialDatabase}, trying ${altDatabase} for: ${material.material_name}`);
+
+          const altResult = await tryOpenLCAServer(altDatabase, session.access_token);
+
+          if (altResult.ok) {
+            // Update the material's openlca_database in the DB so future
+            // calculations go directly to the right server
+            // Fire-and-forget: auto-correct the database for future calculations
+            void supabase.from('product_materials')
+              .update({ openlca_database: altDatabase })
+              .eq('id', material.id)
+              .then(() => console.log(`[Waterfall] Auto-corrected openlca_database to '${altDatabase}' for ${material.material_name}`));
+            return buildOpenLCAResult(altResult.result);
+          }
+
+          // Both servers failed
+          const errMsg = `Not found on ${materialDatabase} (404), also failed on ${altDatabase}: ${altResult.error}`;
+          console.warn(`[Waterfall] OpenLCA API error for ${material.material_name}:`, errMsg);
+          fallbackEvents?.push({
+            material_name: material.material_name,
+            material_id: material.id,
+            attempted_priority: `2.5 (OpenLCA/${materialDatabase}+${altDatabase})`,
+            resolved_priority: 0,
+            fallback_reason: `OpenLCA API error: ${errMsg}`,
+            factor_value_kg_co2e: 0,
+            source_reference: '',
+          });
         } else {
-          const errorData = await response.json().catch(() => ({}));
-          const errMsg = errorData.error || response.statusText;
-          console.warn(`[Waterfall] OpenLCA API error (${materialDatabase}):`, errMsg);
+          // Non-404 error (timeout, server down, etc.) — don't try alt server
+          console.warn(`[Waterfall] OpenLCA API error (${materialDatabase}):`, primaryResult.error);
           fallbackEvents?.push({
             material_name: material.material_name,
             material_id: material.id,
             attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
             resolved_priority: 0,
-            fallback_reason: `OpenLCA API error: ${errMsg}`,
+            fallback_reason: `OpenLCA API error: ${primaryResult.error}`,
             factor_value_kg_co2e: 0,
             source_reference: '',
           });
         }
       }
     } catch (error: any) {
-      // AbortError means we hit the 15-second timeout — this is expected when
-      // OpenLCA is slow/unavailable. Other errors are unexpected but handled the same way.
-      const reason = error.name === 'AbortError'
-        ? 'OpenLCA API timeout (15s)'
-        : `OpenLCA error: ${error.message}`;
-      if (error.name === 'AbortError') {
-        console.warn(`[Waterfall] OpenLCA API timed out for ${material.material_name} — falling through to Priority 3 staging factors`);
-      } else {
-        console.warn(`[Waterfall] Priority 2.5 (OpenLCA/${materialDatabase}) failed for ${material.material_name}:`, error.message);
-      }
+      console.warn(`[Waterfall] Priority 2.5 unexpected error for ${material.material_name}:`, error.message);
       fallbackEvents?.push({
         material_name: material.material_name,
         material_id: material.id,
         attempted_priority: `2.5 (OpenLCA/${materialDatabase})`,
         resolved_priority: 0,
-        fallback_reason: reason,
+        fallback_reason: `OpenLCA error: ${error.message}`,
         factor_value_kg_co2e: 0,
         source_reference: '',
       });
