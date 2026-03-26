@@ -351,7 +351,9 @@ export function InlineIngredientSearch({
       ef_source_type: result.source_type,
       // Track which OpenLCA database the factor comes from so the resolver
       // routes the calculation to the correct gdt-server instance.
-      openlca_database: result.source_type === 'agribalyse_live' ? 'agribalyse' : undefined,
+      openlca_database: result.source_type === 'agribalyse_live' ? 'agribalyse'
+        : result.source_type === 'ecoinvent_live' ? 'ecoinvent'
+        : undefined,
       ef_data_quality_grade: result.data_quality_grade || result.metadata?.data_quality_grade,
       ef_uncertainty_percent: result.uncertainty_percent || result.metadata?.uncertainty_percent,
       // Pass through packaging supplier product data for auto-population

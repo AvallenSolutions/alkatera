@@ -736,7 +736,11 @@ export async function resolveImpactFactors(
   const materialDatabase: OpenLCADatabaseSource =
     material.openlca_database || getPreferredDatabase(material.material_name);
 
-  const willAttemptOpenLCA = material.data_source === 'openlca' && !!material.data_source_id && !!organizationId;
+  // Only attempt the live OpenLCA API when openlca_database is explicitly set.
+  // Many materials have data_source='openlca' but point at local staging/proxy
+  // table rows (not actual OpenLCA process UUIDs).  Calling the API with those
+  // IDs always fails and produces misleading "Server Unavailable" fallback events.
+  const willAttemptOpenLCA = material.data_source === 'openlca' && !!material.data_source_id && !!material.openlca_database && !!organizationId;
   console.log(`[Waterfall] Priority 2.5 check for ${material.material_name}:`, {
     data_source: material.data_source,
     data_source_id: material.data_source_id,
@@ -745,7 +749,7 @@ export async function resolveImpactFactors(
     preferred_database: materialDatabase,
   });
 
-  if (material.data_source === 'openlca' && material.data_source_id && organizationId) {
+  if (willAttemptOpenLCA) {
     console.log(`[Waterfall] Attempting Priority 2.5 (OpenLCA / ${materialDatabase}) for: ${material.material_name}`);
 
     try {

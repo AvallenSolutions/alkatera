@@ -532,34 +532,38 @@ export function SummaryStep() {
             </div>
 
             {fallbackWarnings.length > 0 && (() => {
-              // Separate OpenLCA server fallbacks (expected when server is offline)
-              // from genuine data quality issues (e.g. missing supplier data)
-              const openlcaFallbacks = fallbackWarnings.filter(fw =>
-                fw.fallback_reason?.includes('OpenLCA') || fw.attempted_priority?.includes('OpenLCA')
+              // Separate OpenLCA server errors (timeout/connection) from
+              // materials that simply used generic factors (no live process linked)
+              const openlcaServerErrors = fallbackWarnings.filter(fw =>
+                fw.fallback_reason?.includes('OpenLCA API timeout') ||
+                fw.fallback_reason?.includes('OpenLCA API error') ||
+                fw.fallback_reason?.includes('OpenLCA error')
               );
               const otherWarnings = fallbackWarnings.filter(fw =>
-                !fw.fallback_reason?.includes('OpenLCA') && !fw.attempted_priority?.includes('OpenLCA')
+                !fw.fallback_reason?.includes('OpenLCA API timeout') &&
+                !fw.fallback_reason?.includes('OpenLCA API error') &&
+                !fw.fallback_reason?.includes('OpenLCA error')
               );
 
               return (
                 <>
-                  {openlcaFallbacks.length > 0 && (
+                  {openlcaServerErrors.length > 0 && (
                     <Alert className="border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800">
                       <Info className="h-4 w-4 text-blue-600" />
-                      <AlertTitle className="text-blue-900 dark:text-blue-300">OpenLCA Server Unavailable</AlertTitle>
+                      <AlertTitle className="text-blue-900 dark:text-blue-300">OpenLCA Calculation Issue</AlertTitle>
                       <AlertDescription>
                         <p className="text-sm text-blue-800 dark:text-blue-400 mb-1">
-                          {openlcaFallbacks.length} material{openlcaFallbacks.length > 1 ? 's' : ''} could not be resolved
-                          via the OpenLCA database (server offline or process not found). These materials were resolved
-                          using verified generic emission factors instead. This is normal when the OpenLCA server is
-                          not running and does not affect calculation validity.
+                          {openlcaServerErrors.length} material{openlcaServerErrors.length > 1 ? 's' : ''} had an OpenLCA
+                          emission factor assigned but the live calculation failed (server may be temporarily unavailable).
+                          These materials were resolved using verified generic emission factors instead.
+                          Re-running the calculation when the server is available will use the higher-quality live data.
                         </p>
                         <details className="text-xs text-blue-700 dark:text-blue-500">
                           <summary className="cursor-pointer hover:underline">Show affected materials</summary>
                           <ul className="mt-1 space-y-0.5 ml-4">
-                            {openlcaFallbacks.map((fw, i) => (
+                            {openlcaServerErrors.map((fw, i) => (
                               <li key={i}>
-                                {fw.material_name} - resolved via Priority {fw.resolved_priority} generic factor
+                                {fw.material_name} - {fw.fallback_reason}
                               </li>
                             ))}
                           </ul>
