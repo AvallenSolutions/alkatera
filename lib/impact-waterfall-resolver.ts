@@ -758,11 +758,13 @@ export async function resolveImpactFactors(
         // calculation indefinitely. We use AbortController with a 15-second
         // timeout — long enough for a real calculation but short enough to fail
         // fast and fall through to Priority 3 staging factors.
+        // Agribalyse calculations can be slower (EF method discovery + calculation)
+        const timeoutMs = materialDatabase === 'agribalyse' ? 30000 : 15000;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
           controller.abort();
-          console.warn(`[Waterfall] OpenLCA API timeout (15s) for ${material.material_name} — falling through to Priority 3`);
-        }, 15000);
+          console.warn(`[Waterfall] OpenLCA API timeout (${timeoutMs / 1000}s) for ${material.material_name} — falling through to Priority 3`);
+        }, timeoutMs);
 
         // Call server-side OpenLCA calculation API with database parameter
         const response = await fetch('/api/openlca/calculate', {

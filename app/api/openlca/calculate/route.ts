@@ -186,32 +186,31 @@ export async function POST(request: NextRequest) {
     let endpointImpacts: ImpactResult[] = [];
 
     if (database === 'agribalyse') {
-      // Agribalyse uses EF 3.1 — try common method name variants
-      const efMethodNames = [
-        'EF Method (adapted)',
-        'Environmental Footprint',
-        'EF 3.1',
-        'EF Method',
-      ];
-      let resolved = false;
-      for (const methodName of efMethodNames) {
-        try {
-          midpointImpacts = await client.calculateProcess(processId, methodName, 1);
-          resolved = true;
-          break;
-        } catch {
-          // Try next method name
-        }
+      // Agribalyse uses EF 3.1 (Environmental Footprint), not ReCiPe.
+      // First, list available methods once, then pick the best match.
+      const allMethods = await client.getAllImpactMethods();
+      console.log(`[OpenLCA API] Agribalyse has ${allMethods.length} impact methods:`,
+        allMethods.map(m => m.name).join(', '));
+
+      // Prefer EF method names (order of preference)
+      const efPreference = ['ef method (adapted)', 'environmental footprint', 'ef 3.1', 'ef method'];
+      let bestMethod = allMethods.find(m => {
+        const name = m.name?.toLowerCase() || '';
+        return efPreference.some(pref => name.includes(pref));
+      });
+
+      // Fall back to any available method
+      if (!bestMethod && allMethods.length > 0) {
+        bestMethod = allMethods[0];
+        console.warn(`[OpenLCA API] No EF method found, using: ${bestMethod.name}`);
       }
-      if (!resolved) {
-        // Last resort: list available methods and try the first one
-        const methods = await client.getAllImpactMethods();
-        if (methods.length > 0) {
-          midpointImpacts = await client.calculateProcess(processId, methods[0].name!, 1);
-        } else {
-          throw new Error('No impact methods available on the Agribalyse server');
-        }
+
+      if (!bestMethod?.name) {
+        throw new Error('No impact methods available on the Agribalyse server');
       }
+
+      console.log(`[OpenLCA API] Using Agribalyse method: ${bestMethod.name}`);
+      midpointImpacts = await client.calculateProcess(processId, bestMethod.name, 1);
     } else {
       // ecoinvent uses ReCiPe 2016 (midpoint + endpoint)
       [midpointImpacts, endpointImpacts] = await Promise.all([
