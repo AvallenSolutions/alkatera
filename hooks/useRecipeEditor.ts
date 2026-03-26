@@ -241,6 +241,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           is_organic_certified: item.is_organic_certified || false,
           transport_mode: item.transport_mode || 'truck',
           distance_km: item.distance_km || '',
+          carbon_intensity: item.cached_co2_factor || undefined,
         }));
         setIngredientForms(mappedIngredients);
         savedIngredientSnapshot.current = formFingerprint(mappedIngredients);
@@ -458,6 +459,13 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           materialData.supplier_product_id = form.supplier_product_id;
         }
 
+        // Cache the emission factor value so the LCA calculator has a local
+        // fallback when the original data source (e.g. OpenLCA API) is
+        // unavailable at calculation time.
+        if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
+          materialData.cached_co2_factor = Number(form.carbon_intensity);
+        }
+
         if (form.transport_mode && form.distance_km) {
           materialData.transport_mode = form.transport_mode;
           materialData.distance_km = Number(form.distance_km);
@@ -593,6 +601,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           materialData.origin_lng = form.origin_lng;
           materialData.origin_address = form.origin_address || null;
           materialData.origin_country_code = form.origin_country_code || null;
+        }
+
+        if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
+          materialData.cached_co2_factor = Number(form.carbon_intensity);
         }
 
         materialData.has_component_breakdown = form.has_component_breakdown || false;
@@ -807,6 +819,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         materialData.distance_km = Number(form.distance_km);
       }
 
+      if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
+        materialData.cached_co2_factor = Number(form.carbon_intensity);
+      }
+
       if (form.origin_lat && form.origin_lng) {
         materialData.origin_lat = form.origin_lat;
         materialData.origin_lng = form.origin_lng;
@@ -898,6 +914,10 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         materialData.origin_lng = form.origin_lng;
         materialData.origin_address = form.origin_address || null;
         materialData.origin_country_code = form.origin_country_code || null;
+      }
+
+      if (form.carbon_intensity != null && Number(form.carbon_intensity) > 0) {
+        materialData.cached_co2_factor = Number(form.carbon_intensity);
       }
 
       materialData.has_component_breakdown = form.has_component_breakdown || false;

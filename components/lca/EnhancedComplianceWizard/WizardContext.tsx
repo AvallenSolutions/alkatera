@@ -960,6 +960,7 @@ export function WizardProvider({
         critical_review_type: formData.criticalReviewType,
         critical_review_justification:
           formData.criticalReviewJustification || null,
+        reference_year: formData.referenceYear,
         wizard_progress: wizardProgress,
         updated_at: new Date().toISOString(),
       };
