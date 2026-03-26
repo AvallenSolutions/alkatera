@@ -340,7 +340,7 @@ export const LandingGreenwashGuardian = () => {
               </div>
               <h3 className="font-serif text-2xl text-white mb-3">Scanning {url}</h3>
               <p className="text-sm text-gray-400 font-mono mb-6">
-                Our AI is analysing your website content against UK and EU anti-greenwashing legislation...
+                We're analysing your website content against UK and EU anti-greenwashing legislation...
               </p>
               <div className="w-64 h-1 bg-white/10 rounded-full mx-auto overflow-hidden">
                 <motion.div

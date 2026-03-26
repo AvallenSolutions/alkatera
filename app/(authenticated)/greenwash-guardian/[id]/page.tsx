@@ -329,7 +329,7 @@ export default function AssessmentReportPage() {
               <Loader2 className="h-12 w-12 animate-spin text-emerald-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">Analyzing Content</h3>
               <p className="text-slate-400">
-                Our AI is reviewing your content against UK and EU anti-greenwashing legislation...
+                We're reviewing your content against UK and EU anti-greenwashing legislation...
               </p>
             </CardContent>
           </Card>
