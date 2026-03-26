@@ -255,7 +255,7 @@ export function CalculationStep() {
           </div>
           <div>
             <p className="text-muted-foreground">Reference Year</p>
-            <p className="font-medium">{new Date().getFullYear()}</p>
+            <p className="font-medium">{formData.referenceYear}</p>
           </div>
         </div>
 
