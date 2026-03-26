@@ -21,7 +21,7 @@ import {
 import Link from 'next/link';
 
 import { PolicyDashboard } from '@/components/governance/PolicyDashboard';
-import { usePolicies } from '@/hooks/data/usePolicies';
+import { usePolicies, Policy } from '@/hooks/data/usePolicies';
 import { uploadPolicyDocument, PolicyAttachment } from '@/lib/governance/policies';
 
 function AddPolicyDialog({ onSuccess }: { onSuccess: () => void }) {
@@ -377,8 +377,258 @@ function AddPolicyDialog({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+function EditPolicyDialog({
+  policy,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  policy: Policy;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    policy_name: policy.policy_name,
+    policy_code: policy.policy_code || '',
+    policy_type: policy.policy_type,
+    description: policy.description || '',
+    scope: policy.scope || '',
+    owner_name: policy.owner_name || '',
+    owner_department: policy.owner_department || '',
+    status: policy.status,
+    effective_date: policy.effective_date || '',
+    review_date: policy.review_date || '',
+    is_public: policy.is_public,
+    public_url: policy.public_url || '',
+    bcorp_requirement: policy.bcorp_requirement || '',
+    csrd_requirement: policy.csrd_requirement || '',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch('/api/governance/policies', {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({
+          id: policy.id,
+          ...formData,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update policy');
+      }
+
+      onOpenChange(false);
+      onSuccess();
+    } catch (error) {
+      console.error('Error updating policy:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update policy');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Policy</DialogTitle>
+          <DialogDescription>
+            Update policy details and status
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_policy_name">Policy Name *</Label>
+                <Input
+                  id="edit_policy_name"
+                  value={formData.policy_name}
+                  onChange={(e) => setFormData({ ...formData, policy_name: e.target.value })}
+                  placeholder="e.g., Code of Ethics"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_policy_code">Policy Code</Label>
+                <Input
+                  id="edit_policy_code"
+                  value={formData.policy_code}
+                  onChange={(e) => setFormData({ ...formData, policy_code: e.target.value })}
+                  placeholder="e.g., POL-001"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_policy_type">Policy Type *</Label>
+                <Select
+                  value={formData.policy_type}
+                  onValueChange={(value) => setFormData({ ...formData, policy_type: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ethics">Ethics</SelectItem>
+                    <SelectItem value="environmental">Environmental</SelectItem>
+                    <SelectItem value="social">Social</SelectItem>
+                    <SelectItem value="governance">Governance</SelectItem>
+                    <SelectItem value="compliance">Compliance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value as Policy['status'] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="under_review">Under Review</SelectItem>
+                    <SelectItem value="archived">Archived</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_description">Description</Label>
+              <Textarea
+                id="edit_description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Brief description of the policy..."
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_scope">Scope</Label>
+              <Input
+                id="edit_scope"
+                value={formData.scope}
+                onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
+                placeholder="e.g., All employees and contractors"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_owner_name">Policy Owner</Label>
+                <Input
+                  id="edit_owner_name"
+                  value={formData.owner_name}
+                  onChange={(e) => setFormData({ ...formData, owner_name: e.target.value })}
+                  placeholder="e.g., Jane Smith"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_owner_department">Department</Label>
+                <Input
+                  id="edit_owner_department"
+                  value={formData.owner_department}
+                  onChange={(e) => setFormData({ ...formData, owner_department: e.target.value })}
+                  placeholder="e.g., Legal"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_effective_date">Effective Date</Label>
+                <Input
+                  id="edit_effective_date"
+                  type="date"
+                  value={formData.effective_date}
+                  onChange={(e) => setFormData({ ...formData, effective_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_review_date">Review Date</Label>
+                <Input
+                  id="edit_review_date"
+                  type="date"
+                  value={formData.review_date}
+                  onChange={(e) => setFormData({ ...formData, review_date: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit_is_public"
+                checked={formData.is_public}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, is_public: checked as boolean })
+                }
+              />
+              <Label htmlFor="edit_is_public" className="text-sm font-normal">
+                Publicly available
+              </Label>
+            </div>
+
+            {formData.is_public && (
+              <div className="space-y-2">
+                <Label htmlFor="edit_public_url">Public URL</Label>
+                <Input
+                  id="edit_public_url"
+                  type="url"
+                  value={formData.public_url}
+                  onChange={(e) => setFormData({ ...formData, public_url: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function PoliciesPage() {
   const { policies, metrics, loading, refetch } = usePolicies();
+  const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null);
 
   if (loading) {
     return (
@@ -438,7 +688,26 @@ export default function PoliciesPage() {
       </Card>
 
       {/* Dashboard */}
-      <PolicyDashboard policies={policies} metrics={metrics} isLoading={loading} />
+      <PolicyDashboard
+        policies={policies}
+        metrics={metrics}
+        isLoading={loading}
+        onEditPolicy={(policy) => setEditingPolicy(policy)}
+      />
+
+      {/* Edit Policy Dialog */}
+      {editingPolicy && (
+        <EditPolicyDialog
+          key={editingPolicy.id}
+          policy={editingPolicy}
+          open={!!editingPolicy}
+          onOpenChange={(open) => { if (!open) setEditingPolicy(null); }}
+          onSuccess={() => {
+            setEditingPolicy(null);
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

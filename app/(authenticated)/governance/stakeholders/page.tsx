@@ -18,6 +18,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
+  Pencil,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -278,7 +279,261 @@ function AddStakeholderDialog({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-function StakeholderCard({ stakeholder }: { stakeholder: Stakeholder }) {
+function EditStakeholderDialog({
+  stakeholder,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  stakeholder: Stakeholder;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    stakeholder_name: stakeholder.stakeholder_name || '',
+    stakeholder_type: stakeholder.stakeholder_type || '',
+    contact_name: stakeholder.contact_name || '',
+    contact_email: stakeholder.contact_email || '',
+    contact_role: stakeholder.contact_role || '',
+    engagement_frequency: stakeholder.engagement_frequency || '',
+    engagement_method: stakeholder.engagement_method || '',
+    relationship_quality: stakeholder.relationship_quality || '',
+    key_interests: stakeholder.key_interests || '',
+    influence_level: stakeholder.influence_level || '',
+    impact_level: stakeholder.impact_level || '',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch('/api/governance/stakeholders', {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: stakeholder.id, ...formData }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update stakeholder');
+      }
+
+      onOpenChange(false);
+      onSuccess();
+    } catch (error) {
+      console.error('Error updating stakeholder:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update stakeholder');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Stakeholder</DialogTitle>
+          <DialogDescription>
+            Update stakeholder details and engagement
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label htmlFor="edit_stakeholder_name">Stakeholder Name *</Label>
+              <Input
+                id="edit_stakeholder_name"
+                value={formData.stakeholder_name}
+                onChange={(e) => setFormData({ ...formData, stakeholder_name: e.target.value })}
+                placeholder="e.g., Local Community Group"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_stakeholder_type">Stakeholder Type *</Label>
+              <Select
+                value={formData.stakeholder_type}
+                onValueChange={(value) => setFormData({ ...formData, stakeholder_type: value })}
+                required
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employees">Employees</SelectItem>
+                  <SelectItem value="customers">Customers</SelectItem>
+                  <SelectItem value="suppliers">Suppliers</SelectItem>
+                  <SelectItem value="investors">Investors</SelectItem>
+                  <SelectItem value="community">Community</SelectItem>
+                  <SelectItem value="regulators">Regulators</SelectItem>
+                  <SelectItem value="ngos">NGOs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_contact_name">Contact Name</Label>
+                <Input
+                  id="edit_contact_name"
+                  value={formData.contact_name}
+                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                  placeholder="Primary contact"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_contact_email">Contact Email</Label>
+                <Input
+                  id="edit_contact_email"
+                  type="email"
+                  value={formData.contact_email}
+                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+                  placeholder="email@example.com"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_contact_role">Contact Role</Label>
+              <Input
+                id="edit_contact_role"
+                value={formData.contact_role}
+                onChange={(e) => setFormData({ ...formData, contact_role: e.target.value })}
+                placeholder="e.g., Sustainability Manager"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_engagement_frequency">Engagement Frequency</Label>
+                <Select
+                  value={formData.engagement_frequency}
+                  onValueChange={(value) => setFormData({ ...formData, engagement_frequency: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                    <SelectItem value="ad_hoc">Ad Hoc</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_engagement_method">Engagement Method</Label>
+                <Select
+                  value={formData.engagement_method}
+                  onValueChange={(value) => setFormData({ ...formData, engagement_method: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="survey">Survey</SelectItem>
+                    <SelectItem value="meeting">Meeting</SelectItem>
+                    <SelectItem value="report">Report</SelectItem>
+                    <SelectItem value="newsletter">Newsletter</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_key_interests">Key Interests</Label>
+              <Textarea
+                id="edit_key_interests"
+                value={formData.key_interests}
+                onChange={(e) => setFormData({ ...formData, key_interests: e.target.value })}
+                placeholder="What matters most to this stakeholder..."
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_relationship_quality">Relationship</Label>
+                <Select
+                  value={formData.relationship_quality}
+                  onValueChange={(value) => setFormData({ ...formData, relationship_quality: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="excellent">Excellent</SelectItem>
+                    <SelectItem value="good">Good</SelectItem>
+                    <SelectItem value="developing">Developing</SelectItem>
+                    <SelectItem value="challenging">Challenging</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_influence_level">Influence</Label>
+                <Select
+                  value={formData.influence_level}
+                  onValueChange={(value) => setFormData({ ...formData, influence_level: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_impact_level">Impact</Label>
+                <Select
+                  value={formData.impact_level}
+                  onValueChange={(value) => setFormData({ ...formData, impact_level: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StakeholderCard({ stakeholder, onEdit }: { stakeholder: Stakeholder; onEdit?: (stakeholder: Stakeholder) => void }) {
   const qualityColors: Record<string, string> = {
     excellent: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
     good: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
@@ -358,6 +613,12 @@ function StakeholderCard({ stakeholder }: { stakeholder: Stakeholder }) {
                 New
               </Badge>
             )}
+            {onEdit && (
+              <Button variant="ghost" size="sm" onClick={() => onEdit(stakeholder)}>
+                <Pencil className="h-3.5 w-3.5 mr-1" />
+                Edit
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
@@ -367,6 +628,7 @@ function StakeholderCard({ stakeholder }: { stakeholder: Stakeholder }) {
 
 export default function StakeholdersPage() {
   const { stakeholders, metrics, loading, refetch } = useStakeholders();
+  const [editingStakeholder, setEditingStakeholder] = useState<Stakeholder | null>(null);
 
   if (loading) {
     return (
@@ -509,7 +771,7 @@ export default function StakeholdersPage() {
           <h3 className="font-semibold text-lg">All Stakeholders</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {stakeholders.map((stakeholder) => (
-              <StakeholderCard key={stakeholder.id} stakeholder={stakeholder} />
+              <StakeholderCard key={stakeholder.id} stakeholder={stakeholder} onEdit={setEditingStakeholder} />
             ))}
           </div>
         </div>
@@ -523,6 +785,19 @@ export default function StakeholdersPage() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {editingStakeholder && (
+        <EditStakeholderDialog
+          key={editingStakeholder.id}
+          stakeholder={editingStakeholder}
+          open={!!editingStakeholder}
+          onOpenChange={(open) => { if (!open) setEditingStakeholder(null); }}
+          onSuccess={() => {
+            setEditingStakeholder(null);
+            refetch();
+          }}
+        />
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -86,6 +87,7 @@ export default function PeopleCulturePage() {
 }
 
 function PeopleCulturePageContent() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [isRecalculating, setIsRecalculating] = useState(false);
 
@@ -295,7 +297,12 @@ function PeopleCulturePageContent() {
         </TabsContent>
 
         <TabsContent value="fair-work">
-          <FairWorkDashboard metrics={fairWorkMetrics} isLoading={fairWorkLoading} />
+          <FairWorkDashboard
+            metrics={fairWorkMetrics}
+            isLoading={fairWorkLoading}
+            onEditRecord={() => router.push('/people-culture/fair-work')}
+            onDeleteRecord={() => router.push('/people-culture/fair-work')}
+          />
         </TabsContent>
 
         <TabsContent value="diversity">

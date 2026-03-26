@@ -35,9 +35,10 @@ interface OverviewTabProps {
   packaging: ProductPackaging[];
   lcaReports: ProductLCA[];
   isHealthy: boolean;
+  onEditMultipack?: () => void;
 }
 
-export function OverviewTab({ product, ingredients, packaging, lcaReports, isHealthy }: OverviewTabProps) {
+export function OverviewTab({ product, ingredients, packaging, lcaReports, isHealthy, onEditMultipack }: OverviewTabProps) {
   const latestLCA = lcaReports[0];
   const hasLCAData = latestLCA && latestLCA.aggregated_impacts;
   // Use the product's assigned facility, not just any organization facility
@@ -234,6 +235,7 @@ export function OverviewTab({ product, ingredients, packaging, lcaReports, isHea
         <MultipackContentsCard
           productId={String(product.id)}
           productName={product.name}
+          onEdit={onEditMultipack}
         />
       )}
 

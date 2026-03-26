@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -18,6 +19,7 @@ import {
   ArrowDownRight,
   Minus,
   Calendar,
+  Pencil,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPeriodRange } from '@/lib/reporting-period-utils';
@@ -26,6 +28,7 @@ import type { DiversityMetrics, DEIAction, GenderRepresentation, PeriodChanges }
 interface DiversityDashboardProps {
   metrics: DiversityMetrics | null;
   isLoading?: boolean;
+  onEditAction?: (action: DEIAction) => void;
 }
 
 const STATUS_CONFIG = {
@@ -174,7 +177,7 @@ function RepresentationCard({ representation }: { representation: GenderRepresen
   );
 }
 
-function DEIActionsCard({ actions, summary }: { actions: DEIAction[]; summary: DiversityMetrics['dei_summary'] }) {
+function DEIActionsCard({ actions, summary, onEditAction }: { actions: DEIAction[]; summary: DiversityMetrics['dei_summary']; onEditAction?: (action: DEIAction) => void }) {
   const recentActions = actions.slice(0, 5);
 
   return (
@@ -220,24 +223,31 @@ function DEIActionsCard({ actions, summary }: { actions: DEIAction[]; summary: D
                 return (
                   <div
                     key={action.id}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800"
+                    className="flex items-center justify-between w-full p-3 rounded-lg bg-slate-50 dark:bg-slate-800"
                   >
-                    <div className={cn('p-1.5 rounded-full', config.color)}>
-                      <Icon className="h-3 w-3" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{action.action_name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline" className="text-xs">
-                          {CATEGORY_LABELS[action.action_category] || action.action_category}
-                        </Badge>
-                        {action.target_date && (
-                          <span className="text-xs text-muted-foreground">
-                            Due: {new Date(action.target_date).toLocaleDateString()}
-                          </span>
-                        )}
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <div className={cn('p-1.5 rounded-full', config.color)}>
+                        <Icon className="h-3 w-3" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{action.action_name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs">
+                            {CATEGORY_LABELS[action.action_category] || action.action_category}
+                          </Badge>
+                          {action.target_date && (
+                            <span className="text-xs text-muted-foreground">
+                              Due: {new Date(action.target_date).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    {onEditAction && (
+                      <Button variant="ghost" size="sm" className="h-7 px-2 ml-2 shrink-0" onClick={() => onEditAction(action)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    )}
                   </div>
                 );
               })
@@ -371,7 +381,7 @@ function PeriodComparisonCard({ changes }: { changes: PeriodChanges }) {
   );
 }
 
-export function DiversityDashboard({ metrics, isLoading }: DiversityDashboardProps) {
+export function DiversityDashboard({ metrics, isLoading, onEditAction }: DiversityDashboardProps) {
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -510,7 +520,7 @@ export function DiversityDashboard({ metrics, isLoading }: DiversityDashboardPro
         )}
 
         {/* DEI Actions */}
-        <DEIActionsCard actions={dei_actions} summary={dei_summary} />
+        <DEIActionsCard actions={dei_actions} summary={dei_summary} onEditAction={onEditAction} />
 
         {/* Turnover */}
         <TurnoverCard

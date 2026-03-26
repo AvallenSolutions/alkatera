@@ -306,6 +306,7 @@ export default function ProductDashboardPage() {
               packaging={packaging}
               lcaReports={lcaReports}
               isHealthy={isHealthy}
+              onEditMultipack={() => setActiveTab('specification')}
             />
           </TabsContent>
 

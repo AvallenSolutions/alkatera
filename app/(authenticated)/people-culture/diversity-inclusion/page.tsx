@@ -18,12 +18,14 @@ import {
   ArrowLeft,
   Target,
   UserPlus,
+  Pencil,
 } from 'lucide-react';
 import Link from 'next/link';
 import { type DateRange } from 'react-day-picker';
 
 import { DiversityDashboard } from '@/components/people-culture/DiversityDashboard';
 import { useDiversityMetrics } from '@/hooks/data/useDiversityMetrics';
+import type { DEIAction } from '@/hooks/data/useDiversityMetrics';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { getReportingPeriodPresets } from '@/lib/reporting-period-utils';
 
@@ -505,6 +507,239 @@ function AddDEIActionDialog({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+function EditDEIActionDialog({ action, open, onOpenChange, onSuccess }: { action: DEIAction; open: boolean; onOpenChange: (open: boolean) => void; onSuccess: () => void }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    action_name: action.action_name || '',
+    action_category: action.action_category || '',
+    description: action.description || '',
+    target_group: action.target_group || '',
+    status: action.status || 'planned',
+    priority: action.priority || 'medium',
+    start_date: action.start_date || '',
+    target_date: action.target_date || '',
+    owner_name: action.owner_name || '',
+    owner_department: action.owner_department || '',
+    success_metrics: action.success_metrics || '',
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const { supabase } = await import('@/lib/supabaseClient');
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      const response = await fetch('/api/people-culture/dei-actions', {
+        method: 'PUT',
+        headers,
+        credentials: 'include',
+        body: JSON.stringify({ id: action.id, ...formData }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update DEI action');
+      }
+
+      onOpenChange(false);
+      onSuccess();
+    } catch (error) {
+      console.error('Error updating DEI action:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update action');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit DEI Action</DialogTitle>
+          <DialogDescription>
+            Update action details and status
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
+              <Label htmlFor="edit_action_name">Action Name *</Label>
+              <Input
+                id="edit_action_name"
+                value={formData.action_name}
+                onChange={(e) => setFormData({ ...formData, action_name: e.target.value })}
+                placeholder="e.g., Inclusive hiring training"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_action_category">Category *</Label>
+                <Select
+                  value={formData.action_category}
+                  onValueChange={(value) => setFormData({ ...formData, action_category: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="recruitment">Recruitment</SelectItem>
+                    <SelectItem value="retention">Retention</SelectItem>
+                    <SelectItem value="development">Development</SelectItem>
+                    <SelectItem value="culture">Culture</SelectItem>
+                    <SelectItem value="accessibility">Accessibility</SelectItem>
+                    <SelectItem value="policy">Policy</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_target_group">Target Group</Label>
+                <Select
+                  value={formData.target_group}
+                  onValueChange={(value) => setFormData({ ...formData, target_group: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Employees</SelectItem>
+                    <SelectItem value="gender">Gender</SelectItem>
+                    <SelectItem value="ethnicity">Ethnicity</SelectItem>
+                    <SelectItem value="disability">Disability</SelectItem>
+                    <SelectItem value="age">Age</SelectItem>
+                    <SelectItem value="lgbtq">LGBTQ+</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_description">Description</Label>
+              <Textarea
+                id="edit_description"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Describe the action and its objectives..."
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_status">Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value) => setFormData({ ...formData, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="planned">Planned</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="on_hold">On Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_priority">Priority</Label>
+                <Select
+                  value={formData.priority}
+                  onValueChange={(value) => setFormData({ ...formData, priority: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_start_date">Start Date</Label>
+                <Input
+                  id="edit_start_date"
+                  type="date"
+                  value={formData.start_date}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_target_date">Target Date</Label>
+                <Input
+                  id="edit_target_date"
+                  type="date"
+                  value={formData.target_date}
+                  onChange={(e) => setFormData({ ...formData, target_date: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit_owner_name">Owner Name</Label>
+                <Input
+                  id="edit_owner_name"
+                  value={formData.owner_name}
+                  onChange={(e) => setFormData({ ...formData, owner_name: e.target.value })}
+                  placeholder="e.g., Jane Smith"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit_owner_department">Department</Label>
+                <Input
+                  id="edit_owner_department"
+                  value={formData.owner_department}
+                  onChange={(e) => setFormData({ ...formData, owner_department: e.target.value })}
+                  placeholder="e.g., HR"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit_success_metrics">Success Metrics</Label>
+              <Textarea
+                id="edit_success_metrics"
+                value={formData.success_metrics}
+                onChange={(e) => setFormData({ ...formData, success_metrics: e.target.value })}
+                placeholder="How will success be measured?"
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DiversityInclusionPage() {
   return (
     <FeatureGate feature="people_diversity_inclusion">
@@ -515,6 +750,7 @@ export default function DiversityInclusionPage() {
 
 function DiversityInclusionPageContent() {
   const { metrics, loading, refetch } = useDiversityMetrics();
+  const [editingAction, setEditingAction] = useState<DEIAction | null>(null);
 
   if (loading) {
     return (
@@ -575,7 +811,20 @@ function DiversityInclusionPageContent() {
       </Card>
 
       {/* Dashboard */}
-      <DiversityDashboard metrics={metrics} isLoading={loading} />
+      <DiversityDashboard metrics={metrics} isLoading={loading} onEditAction={setEditingAction} />
+
+      {editingAction && (
+        <EditDEIActionDialog
+          key={editingAction.id}
+          action={editingAction}
+          open={!!editingAction}
+          onOpenChange={(open) => { if (!open) setEditingAction(null); }}
+          onSuccess={() => {
+            setEditingAction(null);
+            refetch();
+          }}
+        />
+      )}
     </div>
   );
 }

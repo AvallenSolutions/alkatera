@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FeatureGate } from '@/components/subscription/FeatureGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,6 +85,7 @@ export default function GovernancePage() {
 }
 
 function GovernancePageContent() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
   const [isRecalculating, setIsRecalculating] = useState(false);
 
@@ -292,6 +294,7 @@ function GovernancePageContent() {
             policies={policies}
             metrics={policyMetrics}
             isLoading={policiesLoading}
+            onEditPolicy={() => router.push('/governance/policies')}
           />
         </TabsContent>
 
@@ -335,6 +338,8 @@ function GovernancePageContent() {
             members={members}
             metrics={boardMetrics}
             isLoading={boardLoading}
+            onEditMember={() => router.push('/governance/board')}
+            onDeleteMember={() => router.push('/governance/board')}
           />
         </TabsContent>
       </Tabs>
