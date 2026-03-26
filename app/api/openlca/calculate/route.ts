@@ -186,31 +186,20 @@ export async function POST(request: NextRequest) {
     let endpointImpacts: ImpactResult[] = [];
 
     if (database === 'agribalyse') {
-      // Agribalyse uses EF 3.1 (Environmental Footprint), not ReCiPe.
-      // First, list available methods once, then pick the best match.
-      const allMethods = await client.getAllImpactMethods();
-      console.log(`[OpenLCA API] Agribalyse has ${allMethods.length} impact methods:`,
-        allMethods.map(m => m.name).join(', '));
-
-      // Prefer EF method names (order of preference)
-      const efPreference = ['ef method (adapted)', 'environmental footprint', 'ef 3.1', 'ef method'];
-      let bestMethod = allMethods.find(m => {
-        const name = m.name?.toLowerCase() || '';
-        return efPreference.some(pref => name.includes(pref));
-      });
-
-      // Fall back to any available method
-      if (!bestMethod && allMethods.length > 0) {
-        bestMethod = allMethods[0];
-        console.warn(`[OpenLCA API] No EF method found, using: ${bestMethod.name}`);
+      // Agribalyse server has both EF 3.1 and ReCiPe 2016 methods.
+      // Use ReCiPe 2016 Midpoint (H) for consistency with ecoinvent results,
+      // plus EF 3.1 Method (adapted) for EU-compliant impact categories.
+      // Fall back to EF 3.1 only if ReCiPe is unavailable.
+      try {
+        [midpointImpacts, endpointImpacts] = await Promise.all([
+          client.calculateProcess(processId, 'ReCiPe 2016 Midpoint (H)', 1),
+          client.calculateProcess(processId, 'ReCiPe 2016 Endpoint (I)', 1),
+        ]);
+      } catch {
+        // ReCiPe failed — fall back to EF 3.1 Method (adapted)
+        console.warn('[OpenLCA API] ReCiPe not available on Agribalyse, falling back to EF 3.1');
+        midpointImpacts = await client.calculateProcess(processId, 'EF 3.1 Method (adapted)', 1);
       }
-
-      if (!bestMethod?.name) {
-        throw new Error('No impact methods available on the Agribalyse server');
-      }
-
-      console.log(`[OpenLCA API] Using Agribalyse method: ${bestMethod.name}`);
-      midpointImpacts = await client.calculateProcess(processId, bestMethod.name, 1);
     } else {
       // ecoinvent uses ReCiPe 2016 (midpoint + endpoint)
       [midpointImpacts, endpointImpacts] = await Promise.all([
