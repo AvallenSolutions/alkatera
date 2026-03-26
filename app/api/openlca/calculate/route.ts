@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createOpenLCAClientForDatabase } from '@/lib/openlca/client';
+import type { ImpactResult } from '@/lib/openlca/schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -174,13 +175,50 @@ export async function POST(request: NextRequest) {
       }, { status: 503 });
     }
 
-    // Get process info and calculate impacts using DUAL methods (per 1 kg)
+    // Get process info and calculate impacts (per 1 kg)
     // No database switching needed — client is already pointed at the correct server
     const processInfo = await client.getProcess(processId);
-    const [midpointImpacts, endpointImpacts] = await Promise.all([
-      client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
-      client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
-    ]);
+
+    // Agribalyse 3.2 ships with EF 3.1 (Environmental Footprint), not ReCiPe.
+    // Use the correct impact method for each database. EF 3.1 is midpoint-only
+    // so we skip the endpoint call for Agribalyse.
+    let midpointImpacts: ImpactResult[] = [];
+    let endpointImpacts: ImpactResult[] = [];
+
+    if (database === 'agribalyse') {
+      // Agribalyse uses EF 3.1 — try common method name variants
+      const efMethodNames = [
+        'EF Method (adapted)',
+        'Environmental Footprint',
+        'EF 3.1',
+        'EF Method',
+      ];
+      let resolved = false;
+      for (const methodName of efMethodNames) {
+        try {
+          midpointImpacts = await client.calculateProcess(processId, methodName, 1);
+          resolved = true;
+          break;
+        } catch {
+          // Try next method name
+        }
+      }
+      if (!resolved) {
+        // Last resort: list available methods and try the first one
+        const methods = await client.getAllImpactMethods();
+        if (methods.length > 0) {
+          midpointImpacts = await client.calculateProcess(processId, methods[0].name!, 1);
+        } else {
+          throw new Error('No impact methods available on the Agribalyse server');
+        }
+      }
+    } else {
+      // ecoinvent uses ReCiPe 2016 (midpoint + endpoint)
+      [midpointImpacts, endpointImpacts] = await Promise.all([
+        client.calculateProcess(processId, 'ReCiPe 2016 v1.03, midpoint (H)', 1),
+        client.calculateProcess(processId, 'ReCiPe 2016 v1.03, endpoint (I) no LT', 1),
+      ]);
+    }
 
     // Parse impacts into our format - combining midpoint and endpoint values
     const parsedImpacts: Record<string, number> = {
@@ -282,7 +320,7 @@ export async function POST(request: NextRequest) {
         impact_terrestrial_acidification: parsedImpacts.impact_terrestrial_acidification,
         impact_mineral_resource_scarcity: parsedImpacts.impact_mineral_resource_scarcity,
         impact_fossil_resource_scarcity: parsedImpacts.impact_fossil_resource_scarcity,
-        impact_method: 'ReCiPe 2016 Midpoint (H) + Endpoint (I)',
+        impact_method: database === 'agribalyse' ? 'EF 3.1' : 'ReCiPe 2016 Midpoint (H) + Endpoint (I)',
         ecoinvent_version: database === 'agribalyse' ? 'agribalyse_3.2' : '3.12',
         system_model: database === 'agribalyse' ? 'attributional' : 'cutoff',
         calculated_at: new Date().toISOString(),
