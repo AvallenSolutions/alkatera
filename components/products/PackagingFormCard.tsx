@@ -74,6 +74,8 @@ export interface PackagingFormData {
   // Multi-modal transport legs (replaces single transport_mode/distance_km when present)
   transport_legs?: DistributionLeg[] | null;
   carbon_intensity?: number;
+  // Which OpenLCA database this factor comes from (ecoinvent or agribalyse)
+  openlca_database?: string;
   // Emission factor metadata (for detail tooltip)
   ef_source?: string;
   ef_source_type?: string;

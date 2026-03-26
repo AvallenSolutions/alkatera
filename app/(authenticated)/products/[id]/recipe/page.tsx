@@ -591,6 +591,9 @@ export default function ProductRecipePage() {
       if (form.data_source === 'openlca' && form.data_source_id) {
         materialData.data_source = 'openlca';
         materialData.data_source_id = form.data_source_id;
+        if (form.openlca_database) {
+          materialData.openlca_database = form.openlca_database;
+        }
       } else if (form.data_source === 'supplier' && form.supplier_product_id) {
         materialData.data_source = 'supplier';
         materialData.supplier_product_id = form.supplier_product_id;
@@ -671,6 +674,9 @@ export default function ProductRecipePage() {
       if (form.data_source === 'openlca' && form.data_source_id) {
         materialData.data_source = 'openlca';
         materialData.data_source_id = form.data_source_id;
+        if (form.openlca_database) {
+          materialData.openlca_database = form.openlca_database;
+        }
       } else if (form.data_source === 'supplier' && form.supplier_product_id) {
         materialData.data_source = 'supplier';
         materialData.supplier_product_id = form.supplier_product_id;
@@ -983,6 +989,9 @@ export default function ProductRecipePage() {
           console.log('[Recipe Save] ✅ OpenLCA data will be saved:', form.data_source_id);
           materialData.data_source = 'openlca';
           materialData.data_source_id = form.data_source_id;
+          if (form.openlca_database) {
+            materialData.openlca_database = form.openlca_database;
+          }
         } else if (form.data_source === 'openlca') {
           console.error('[Recipe Save] ❌ OpenLCA selected but NO data_source_id!');
         } else if (form.data_source === 'supplier' && form.supplier_product_id) {
@@ -1187,6 +1196,9 @@ export default function ProductRecipePage() {
         if (form.data_source === 'openlca' && form.data_source_id) {
           materialData.data_source = 'openlca';
           materialData.data_source_id = form.data_source_id;
+          if (form.openlca_database) {
+            materialData.openlca_database = form.openlca_database;
+          }
         } else if (form.data_source === 'supplier' && form.supplier_product_id) {
           materialData.data_source = 'supplier';
           materialData.supplier_product_id = form.supplier_product_id;

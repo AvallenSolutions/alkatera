@@ -242,6 +242,7 @@ export function useRecipeEditor(productId: string, organizationId: string) {
           transport_mode: item.transport_mode || 'truck',
           distance_km: item.distance_km || '',
           carbon_intensity: item.cached_co2_factor || undefined,
+          openlca_database: item.openlca_database || undefined,
         }));
         setIngredientForms(mappedIngredients);
         savedIngredientSnapshot.current = formFingerprint(mappedIngredients);
@@ -454,6 +455,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         if (form.data_source === 'openlca' && form.data_source_id) {
           materialData.data_source = 'openlca';
           materialData.data_source_id = form.data_source_id;
+          if (form.openlca_database) {
+            materialData.openlca_database = form.openlca_database;
+          }
         } else if (form.data_source === 'supplier' && form.supplier_product_id) {
           materialData.data_source = 'supplier';
           materialData.supplier_product_id = form.supplier_product_id;
@@ -586,6 +590,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
         if (form.data_source === 'openlca' && form.data_source_id) {
           materialData.data_source = 'openlca';
           materialData.data_source_id = form.data_source_id;
+          if (form.openlca_database) {
+            materialData.openlca_database = form.openlca_database;
+          }
         } else if (form.data_source === 'supplier' && form.supplier_product_id) {
           materialData.data_source = 'supplier';
           materialData.supplier_product_id = form.supplier_product_id;
@@ -809,6 +816,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       if (form.data_source === 'openlca' && form.data_source_id) {
         materialData.data_source = 'openlca';
         materialData.data_source_id = form.data_source_id;
+        if (form.openlca_database) {
+          materialData.openlca_database = form.openlca_database;
+        }
       } else if (form.data_source === 'supplier' && form.supplier_product_id) {
         materialData.data_source = 'supplier';
         materialData.supplier_product_id = form.supplier_product_id;
@@ -899,6 +909,9 @@ export function useRecipeEditor(productId: string, organizationId: string) {
       if (form.data_source === 'openlca' && form.data_source_id) {
         materialData.data_source = 'openlca';
         materialData.data_source_id = form.data_source_id;
+        if (form.openlca_database) {
+          materialData.openlca_database = form.openlca_database;
+        }
       } else if (form.data_source === 'supplier' && form.supplier_product_id) {
         materialData.data_source = 'supplier';
         materialData.supplier_product_id = form.supplier_product_id;

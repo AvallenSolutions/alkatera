@@ -59,6 +59,8 @@ export interface IngredientFormData {
   // Multi-modal transport legs (replaces single transport_mode/distance_km when present)
   transport_legs?: DistributionLeg[] | null;
   carbon_intensity?: number;
+  // Which OpenLCA database this factor comes from (ecoinvent or agribalyse)
+  openlca_database?: string;
   // Emission factor metadata (for detail tooltip)
   ef_source?: string;
   ef_source_type?: string;
@@ -593,6 +595,7 @@ export function IngredientFormCard({
     ef_source_type?: string;
     ef_data_quality_grade?: string;
     ef_uncertainty_percent?: number;
+    openlca_database?: string;
   }) => {
     // Preserve the user's real ingredient name, store DB match name separately
     const userOriginalName = selection.user_query || selection.name;
@@ -619,6 +622,7 @@ export function IngredientFormCard({
       ef_source_type: selection.ef_source_type,
       ef_data_quality_grade: selection.ef_data_quality_grade,
       ef_uncertainty_percent: selection.ef_uncertainty_percent,
+      openlca_database: selection.openlca_database,
       // Only prefill unit from search result when ingredient has no amount set yet (first selection).
       // This prevents overriding a unit the user already chose (e.g., user picked "g" but DB has "kg").
       ...(!ingredient.amount ? { unit: selection.unit } : {}),
