@@ -197,7 +197,7 @@ export const LandingGreenwashGuardian = () => {
                 </button>
               </div>
               <p className="mt-3 text-xs text-gray-500 font-mono text-center">
-                e.g. brewdog.com/sustainability or yourcompany.com/about
+                e.g. www.avallenspirits.com or yourcompany.com/about
               </p>
             </div>
           </motion.div>
