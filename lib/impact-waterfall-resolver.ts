@@ -736,15 +736,31 @@ export async function resolveImpactFactors(
   const materialDatabase: OpenLCADatabaseSource =
     material.openlca_database || getPreferredDatabase(material.material_name);
 
-  // Only attempt the live OpenLCA API when openlca_database is explicitly set.
-  // Many materials have data_source='openlca' but point at local staging/proxy
-  // table rows (not actual OpenLCA process UUIDs).  Calling the API with those
-  // IDs always fails and produces misleading "Server Unavailable" fallback events.
-  const willAttemptOpenLCA = material.data_source === 'openlca' && !!material.data_source_id && !!material.openlca_database && !!organizationId;
+  // Before attempting the live OpenLCA API, check if this data_source_id exists
+  // in our local tables (staging_emission_factors or ecoinvent_material_proxies).
+  // Many materials have data_source='openlca' but their IDs actually point at
+  // local DB rows, not OpenLCA process UUIDs.  Resolving locally is faster,
+  // more reliable, and avoids 404 errors from the OpenLCA server.
+  let resolvedFromLocalTable = false;
+  if (material.data_source === 'openlca' && material.data_source_id) {
+    // Quick check: does this ID exist in either local table?
+    const [{ data: localStaging }, { data: localProxy }] = await Promise.all([
+      supabase.from('staging_emission_factors').select('id').eq('id', material.data_source_id).maybeSingle(),
+      supabase.from('ecoinvent_material_proxies').select('id').eq('id', material.data_source_id).maybeSingle(),
+    ]);
+    if (localStaging || localProxy) {
+      console.log(`[Waterfall] data_source_id ${material.data_source_id} found in local table — skipping OpenLCA API for ${material.material_name}`);
+      resolvedFromLocalTable = true;
+    }
+  }
+
+  const willAttemptOpenLCA = !resolvedFromLocalTable && material.data_source === 'openlca' && !!material.data_source_id && !!organizationId;
   console.log(`[Waterfall] Priority 2.5 check for ${material.material_name}:`, {
     data_source: material.data_source,
     data_source_id: material.data_source_id,
+    openlca_database: material.openlca_database,
     organizationId: organizationId,
+    resolved_from_local_table: resolvedFromLocalTable,
     will_attempt_openlca: willAttemptOpenLCA,
     preferred_database: materialDatabase,
   });
