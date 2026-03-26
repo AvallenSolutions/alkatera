@@ -213,20 +213,11 @@ export default function GreenwashGuardianPage() {
         organization_id: currentOrganization.id,
       });
 
-      // Trigger analysis
-      toast.info("Analyzing content for greenwashing risks...");
-      const result = await triggerAnalysis(
-        assessment.id,
-        content,
-        activeTab,
-        inputSource
-      );
+      // Fire-and-forget: analysis runs in the background via Supabase Edge Function.
+      // The detail page polls for completion every 3 seconds.
+      toast.info("Analysis started. You'll see results shortly...");
+      triggerAnalysis(assessment.id, content, activeTab, inputSource);
 
-      if (!result.success) {
-        throw new Error(result.error || "Analysis failed");
-      }
-
-      toast.success("Analysis complete!");
       router.push(`/greenwash-guardian/${assessment.id}`);
     } catch (err: any) {
       console.error("Error:", err);

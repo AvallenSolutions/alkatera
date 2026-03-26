@@ -1,8 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import crypto from 'crypto';
 
 // In-memory rate limiting: one scan per email (resets on server restart)
 const usedEmails = new Map<string, number>();
+
+// In-memory job store for async polling
+interface ScanJob {
+  status: 'fetching' | 'analysing' | 'completed' | 'failed';
+  url: string;
+  result?: Record<string, unknown>;
+  error?: string;
+  createdAt: number;
+}
+const scanJobs = new Map<string, ScanJob>();
+
+// Clean up old jobs every 10 minutes (keep for 1 hour)
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  Array.from(scanJobs.entries()).forEach(([id, job]) => {
+    if (job.createdAt < cutoff) {
+      scanJobs.delete(id);
+    }
+  });
+}, 10 * 60 * 1000);
 
 // SSRF protection: block private/internal IP ranges
 const BLOCKED_HOSTS = [
@@ -31,7 +52,7 @@ const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
 
-const SYSTEM_PROMPT = `You are a legal compliance expert specializing in environmental marketing claims and anti-greenwashing legislation. You analyze content for potential greenwashing risks.
+const SYSTEM_PROMPT = `You are a legal compliance expert specialising in environmental marketing claims and anti-greenwashing legislation. You analyse content for potential greenwashing risks.
 
 ## LEGISLATION FRAMEWORK
 
@@ -48,7 +69,7 @@ const SYSTEM_PROMPT = `You are a legal compliance expert specializing in environ
 
 ### EU Legislation
 **Directive on Empowering Consumers for the Green Transition (2024/825)**:
-- Bans generic environmental claims ('eco-friendly', 'green', 'climate neutral') unless backed by recognized certification
+- Bans generic environmental claims ('eco-friendly', 'green', 'climate neutral') unless backed by recognised certification
 - Sustainability labels require third-party certification
 - Carbon offsetting claims are restricted - cannot claim 'climate neutral' based only on offsets
 
@@ -69,7 +90,7 @@ const SYSTEM_PROMPT = `You are a legal compliance expert specializing in environ
 
 ## RESPONSE REQUIREMENTS
 
-Analyze the content thoroughly and respond with ONLY a valid JSON object (no markdown, no explanation outside JSON):
+Analyse the content thoroughly and respond with ONLY a valid JSON object (no markdown, no explanation outside JSON):
 
 {
   "overall_risk_level": "low" | "medium" | "high",
@@ -224,6 +245,120 @@ async function addToSender(email: string, name?: string, company?: string) {
   }
 }
 
+/**
+ * Run the AI analysis in the background and update the job store.
+ * This runs outside the request lifecycle so it's not subject to
+ * Netlify's serverless function timeout.
+ */
+async function runAnalysis(jobId: string, content: string) {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
+    console.error('ANTHROPIC_API_KEY not configured');
+    const job = scanJobs.get(jobId);
+    if (job) {
+      job.status = 'failed';
+      job.error = 'Analysis service is temporarily unavailable. Please try again later.';
+    }
+    return;
+  }
+
+  const job = scanJobs.get(jobId);
+  if (!job) return;
+  job.status = 'analysing';
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 90000);
+
+    const aiResponse = await fetch(ANTHROPIC_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': ANTHROPIC_VERSION,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 8192,
+        temperature: 0.2,
+        system: SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: `Analyse the following content for greenwashing risks:\n\n${content.substring(0, 30000)}`,
+          },
+        ],
+      }),
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!aiResponse.ok) {
+      const errorText = await aiResponse.text();
+      console.error(`Anthropic API error ${aiResponse.status}:`, errorText);
+      job.status = 'failed';
+      job.error = 'Analysis failed. Please try again later.';
+      return;
+    }
+
+    const data = await aiResponse.json();
+
+    if (!data.content?.[0]?.text) {
+      job.status = 'failed';
+      job.error = 'Unexpected response from analysis service.';
+      return;
+    }
+
+    const responseText = data.content[0].text;
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      job.status = 'failed';
+      job.error = 'Failed to parse analysis results.';
+      return;
+    }
+
+    const analysisResult = JSON.parse(jsonMatch[0]);
+    job.status = 'completed';
+    job.result = {
+      success: true,
+      url: job.url,
+      ...analysisResult,
+    };
+  } catch (error) {
+    console.error('Analysis error:', error);
+    job.status = 'failed';
+    job.error = error instanceof Error && error.name === 'AbortError'
+      ? 'Analysis timed out. The page content may be too large.'
+      : 'An unexpected error occurred. Please try again.';
+  }
+}
+
+// GET: Poll for job status
+export async function GET(request: NextRequest) {
+  const jobId = request.nextUrl.searchParams.get('jobId');
+  if (!jobId) {
+    return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
+  }
+
+  const job = scanJobs.get(jobId);
+  if (!job) {
+    return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+  }
+
+  if (job.status === 'completed') {
+    return NextResponse.json(job.result);
+  }
+
+  if (job.status === 'failed') {
+    return NextResponse.json({ error: job.error || 'Analysis failed' }, { status: 500 });
+  }
+
+  // Still processing
+  return NextResponse.json({ status: job.status }, { status: 202 });
+}
+
+// POST: Start a scan job
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -284,7 +419,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch page content (single page, no crawling)
+    // Fetch page content synchronously (fast, within timeout)
     const content = await fetchPageContent(normalizedUrl);
 
     if (!content) {
@@ -294,95 +429,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Content fetched successfully - now mark email as used and add to Sender
+    // Content fetched - mark email as used and add to Sender
     usedEmails.set(emailKey, Date.now());
     addToSender(email, name, company);
 
-    // Call Anthropic API
-    const anthropicKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicKey) {
-      console.error('ANTHROPIC_API_KEY not configured');
-      return NextResponse.json(
-        { error: 'Analysis service is temporarily unavailable. Please try again later.' },
-        { status: 503 }
-      );
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-    let aiResponse: Response;
-    try {
-      aiResponse = await fetch(ANTHROPIC_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': anthropicKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: ANTHROPIC_MODEL,
-          max_tokens: 8192,
-          temperature: 0.2,
-          system: SYSTEM_PROMPT,
-          messages: [
-            {
-              role: 'user',
-              content: `Analyse the following content for greenwashing risks:\n\n${content.substring(0, 30000)}`,
-            },
-          ],
-        }),
-      });
-    } catch (fetchError: unknown) {
-      clearTimeout(timeoutId);
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        return NextResponse.json(
-          { error: 'Analysis timed out. The page content may be too large.' },
-          { status: 504 }
-        );
-      }
-      throw fetchError;
-    }
-
-    clearTimeout(timeoutId);
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error(`Anthropic API error ${aiResponse.status}:`, errorText);
-      return NextResponse.json(
-        { error: 'Analysis failed. Please try again later.' },
-        { status: 502 }
-      );
-    }
-
-    const data = await aiResponse.json();
-
-    if (!data.content?.[0]?.text) {
-      return NextResponse.json(
-        { error: 'Unexpected response from analysis service.' },
-        { status: 502 }
-      );
-    }
-
-    const responseText = data.content[0].text;
-
-    // Extract JSON from response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json(
-        { error: 'Failed to parse analysis results.' },
-        { status: 502 }
-      );
-    }
-
-    const analysisResult = JSON.parse(jsonMatch[0]);
-
-    return NextResponse.json({
-      success: true,
+    // Create job and start analysis in the background
+    const jobId = crypto.randomUUID();
+    scanJobs.set(jobId, {
+      status: 'fetching',
       url: normalizedUrl,
-      ...analysisResult,
+      createdAt: Date.now(),
     });
+
+    // Fire-and-forget: runs outside request lifecycle
+    runAnalysis(jobId, content);
+
+    return NextResponse.json({ jobId, status: 'analysing' });
   } catch (error) {
     console.error('Public greenwash scan error:', error);
     return NextResponse.json(

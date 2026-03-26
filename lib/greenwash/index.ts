@@ -102,7 +102,10 @@ export async function triggerAnalysis(
     throw new Error('No active session');
   }
 
-  const response = await fetch(`${supabaseUrl}/functions/v1/analyze-greenwash-content`, {
+  // Fire-and-forget: the Edge Function writes results to the DB,
+  // and the assessment detail page polls for completion.
+  // This avoids Netlify's serverless function timeout (26s on Pro).
+  fetch(`${supabaseUrl}/functions/v1/analyze-greenwash-content`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -114,13 +117,9 @@ export async function triggerAnalysis(
       input_type: inputType,
       input_source: inputSource,
     }),
+  }).catch((err) => {
+    console.error('Failed to trigger greenwash analysis:', err);
   });
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    return { success: false, error: result.error || 'Analysis failed' };
-  }
 
   return { success: true };
 }

@@ -85,30 +85,67 @@ export const LandingGreenwashGuardian = () => {
     setError('');
 
     try {
-      const response = await fetch('/api/greenwash/public', {
+      // Step 1: Start the scan (returns a job ID immediately)
+      const startResponse = await fetch('/api/greenwash/public', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, email, name, company }),
       });
 
-      const data = await response.json();
+      const contentType = startResponse.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Service temporarily unavailable. Please try again.');
+      }
 
-      if (!response.ok) {
-        if (data.rateLimited) {
-          setError(data.error);
+      const startData = await startResponse.json();
+
+      if (!startResponse.ok) {
+        if (startData.rateLimited) {
+          setError(startData.error);
           setViewState('error');
           return;
         }
-        throw new Error(data.error || 'Analysis failed');
+        throw new Error(startData.error || 'Analysis failed');
       }
 
-      setResult(data);
-      setViewState('results');
+      const { jobId } = startData;
+      if (!jobId) {
+        throw new Error('Failed to start analysis');
+      }
 
-      // Scroll to results after a brief delay
-      setTimeout(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 300);
+      // Step 2: Poll for results every 3 seconds (up to 2 minutes)
+      const maxAttempts = 40;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const pollResponse = await fetch(`/api/greenwash/public?jobId=${jobId}`);
+        const pollContentType = pollResponse.headers.get('content-type') || '';
+
+        if (!pollContentType.includes('application/json')) {
+          continue; // Transient error, keep polling
+        }
+
+        const pollData = await pollResponse.json();
+
+        if (pollResponse.status === 202) {
+          continue; // Still processing
+        }
+
+        if (!pollResponse.ok) {
+          throw new Error(pollData.error || 'Analysis failed');
+        }
+
+        // Analysis complete
+        setResult(pollData);
+        setViewState('results');
+
+        setTimeout(() => {
+          resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+        return;
+      }
+
+      throw new Error('Analysis is taking longer than expected. Please try again.');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
       setViewState('error');
