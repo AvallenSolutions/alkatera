@@ -14,6 +14,8 @@ import {
   Upload,
   X,
   Image as ImageIcon,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,10 +24,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { useOrganization } from "@/lib/organizationContext";
 import { PRODUCT_TYPE_OPTIONS } from "@/lib/industry-benchmarks";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 const COMPANY_SIZES = [
@@ -75,10 +89,14 @@ interface OrganisationSettingsProps {
 }
 
 export function OrganisationSettings({ showHeader = true }: OrganisationSettingsProps) {
-  const { currentOrganization, refreshOrganizations } = useOrganization();
+  const { currentOrganization, refreshOrganizations, userRole } = useOrganization();
+  const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [orgData, setOrgData] = useState<OrganizationData | null>(null);
 
   // Form state
@@ -283,6 +301,39 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
       toast.error("Failed to update organisation details");
     } finally {
       setIsSaving(false);
+    }
+  }
+
+  async function handleDeleteOrganization() {
+    if (!currentOrganization?.id) return;
+    if (deleteConfirmName !== currentOrganization.name) return;
+
+    setIsDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/organizations/${currentOrganization.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to delete organisation");
+      }
+
+      toast.success("Organisation deleted successfully");
+      setDeleteDialogOpen(false);
+
+      // Refresh orgs and redirect
+      await refreshOrganizations();
+      router.push("/");
+    } catch (error: any) {
+      console.error("Error deleting organization:", error);
+      toast.error(error.message || "Failed to delete organisation");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -653,6 +704,94 @@ export function OrganisationSettings({ showHeader = true }: OrganisationSettings
           )}
         </Button>
       </div>
+
+      {/* Danger Zone - Owner only */}
+      {userRole === "owner" && (
+        <>
+          <Separator />
+          <Card className="border-destructive/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Danger Zone
+              </CardTitle>
+              <CardDescription>
+                Irreversible actions that permanently affect your organisation
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Delete this organisation</p>
+                  <p className="text-sm text-muted-foreground">
+                    Permanently delete <strong>{currentOrganization?.name}</strong> and all of its
+                    data, including products, facilities, reports, team members, and supplier records.
+                    This action cannot be undone.
+                  </p>
+                </div>
+                <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
+                  setDeleteDialogOpen(open);
+                  if (!open) setDeleteConfirmName("");
+                }}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="ml-4 shrink-0">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete Organisation
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div className="space-y-3">
+                          <p>
+                            This will permanently delete <strong>{currentOrganization?.name}</strong> and
+                            all associated data. This includes all products, facilities, LCA reports,
+                            emissions data, team members, supplier records, and any active subscriptions.
+                          </p>
+                          <p>
+                            <strong>This action cannot be undone.</strong>
+                          </p>
+                          <div className="space-y-2 pt-2">
+                            <Label htmlFor="delete-confirm">
+                              Type <strong>{currentOrganization?.name}</strong> to confirm
+                            </Label>
+                            <Input
+                              id="delete-confirm"
+                              value={deleteConfirmName}
+                              onChange={(e) => setDeleteConfirmName(e.target.value)}
+                              placeholder={currentOrganization?.name || ""}
+                              disabled={isDeleting}
+                              autoComplete="off"
+                            />
+                          </div>
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                      <Button
+                        variant="destructive"
+                        disabled={deleteConfirmName !== currentOrganization?.name || isDeleting}
+                        onClick={handleDeleteOrganization}
+                      >
+                        {isDeleting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          "Delete Organisation"
+                        )}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
