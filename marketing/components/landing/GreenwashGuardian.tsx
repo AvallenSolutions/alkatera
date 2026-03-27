@@ -85,7 +85,7 @@ export const LandingGreenwashGuardian = () => {
     setError('');
 
     try {
-      // Step 1: Start the scan (returns a job ID immediately)
+      // Step 1: Start the scan (fetches page, creates DB row, returns scanId)
       const startResponse = await fetch('/api/greenwash/public', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -108,17 +108,32 @@ export const LandingGreenwashGuardian = () => {
         throw new Error(startData.error || 'Analysis failed');
       }
 
-      const { jobId } = startData;
-      if (!jobId) {
+      const { scanId } = startData;
+      if (!scanId) {
         throw new Error('Failed to start analysis');
       }
 
-      // Step 2: Poll for results every 3 seconds (up to 2 minutes)
+      // Step 2: Trigger the Supabase Edge Function from the browser
+      // (fire-and-forget, same pattern as authenticated Greenwash Guardian)
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (supabaseUrl && supabaseAnonKey) {
+        fetch(`${supabaseUrl}/functions/v1/analyze-public-greenwash`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({ scan_id: scanId }),
+        }).catch(err => console.error('Failed to trigger analysis:', err));
+      }
+
+      // Step 3: Poll for results every 3 seconds (up to 2 minutes)
       const maxAttempts = 40;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise(resolve => setTimeout(resolve, 3000));
 
-        const pollResponse = await fetch(`/api/greenwash/public?jobId=${jobId}`);
+        const pollResponse = await fetch(`/api/greenwash/public?scanId=${scanId}`);
         const pollContentType = pollResponse.headers.get('content-type') || '';
 
         if (!pollContentType.includes('application/json')) {

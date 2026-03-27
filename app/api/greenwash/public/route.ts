@@ -1,29 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import * as cheerio from 'cheerio';
-import crypto from 'crypto';
-
-// In-memory rate limiting: one scan per email (resets on server restart)
-const usedEmails = new Map<string, number>();
-
-// In-memory job store for async polling
-interface ScanJob {
-  status: 'fetching' | 'analysing' | 'completed' | 'failed';
-  url: string;
-  result?: Record<string, unknown>;
-  error?: string;
-  createdAt: number;
-}
-const scanJobs = new Map<string, ScanJob>();
-
-// Clean up old jobs every 10 minutes (keep for 1 hour)
-setInterval(() => {
-  const cutoff = Date.now() - 60 * 60 * 1000;
-  Array.from(scanJobs.entries()).forEach(([id, job]) => {
-    if (job.createdAt < cutoff) {
-      scanJobs.delete(id);
-    }
-  });
-}, 10 * 60 * 1000);
 
 // SSRF protection: block private/internal IP ranges
 const BLOCKED_HOSTS = [
@@ -48,82 +25,16 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const ANTHROPIC_VERSION = '2023-06-01';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
-
-const SYSTEM_PROMPT = `You are a legal compliance expert specialising in environmental marketing claims and anti-greenwashing legislation. You analyse content for potential greenwashing risks.
-
-## LEGISLATION FRAMEWORK
-
-### UK Legislation
-**Green Claims Code (CMA, 2021)** - 6 Principles:
-1. Claims must be truthful and accurate
-2. Claims must be clear and unambiguous
-3. Claims must not omit or hide important information
-4. Comparisons must be fair and meaningful
-5. Claims must consider the full life cycle
-6. Claims must be substantiated
-
-**Digital Markets, Competition and Consumers Act 2024**: Enables direct enforcement with penalties up to 10% of global turnover.
-
-### EU Legislation
-**Directive on Empowering Consumers for the Green Transition (2024/825)**:
-- Bans generic environmental claims ('eco-friendly', 'green', 'climate neutral') unless backed by recognised certification
-- Sustainability labels require third-party certification
-- Carbon offsetting claims are restricted - cannot claim 'climate neutral' based only on offsets
-
-**Green Claims Directive (Proposed)**:
-- All environmental claims must be substantiated based on scientific evidence
-- Must clearly communicate scope, limitations, and supporting evidence
-- Comparative claims must use equivalent methods and data
-
-## COMMON GREENWASHING ISSUES
-- vague_claim: Generic environmental terms without specifics
-- unsubstantiated: Claims without evidence
-- misleading_comparison: Unfair comparisons
-- hidden_tradeoff: Highlighting benefits while hiding impacts
-- false_label: Using labels without proper certification
-- carbon_offset_claim: Climate neutrality based only on offsets
-- absolute_claim: Blanket claims like "100% sustainable"
-- future_promise: Unverifiable future commitments
-
-## RESPONSE REQUIREMENTS
-
-Analyse the content thoroughly and respond with ONLY a valid JSON object (no markdown, no explanation outside JSON):
-
-{
-  "overall_risk_level": "low" | "medium" | "high",
-  "overall_risk_score": 0-100,
-  "summary": "2-3 sentence summary of findings",
-  "recommendations": ["Array of 3-5 top recommendations"],
-  "legislation_applied": [
-    {"name": "Legislation name", "jurisdiction": "uk" | "eu" | "both", "key_requirement": "Brief description"}
-  ],
-  "claims": [
-    {
-      "claim_text": "Exact text of the problematic claim",
-      "claim_context": "Surrounding context if helpful",
-      "risk_level": "low" | "medium" | "high",
-      "risk_score": 0-100,
-      "issue_type": "One of the common issue types",
-      "issue_description": "Clear explanation of why this is problematic",
-      "legislation_name": "Specific law being potentially violated",
-      "legislation_article": "Specific article/principle if applicable",
-      "legislation_jurisdiction": "uk" | "eu" | "both",
-      "suggestion": "Actionable advice to fix this issue",
-      "suggested_revision": "Optional: How to reword the claim"
-    }
-  ]
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!url || !serviceKey) {
+    throw new Error('Supabase configuration missing');
+  }
+  return createClient(url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }
-
-IMPORTANT:
-- Be thorough but fair - not every environmental statement is greenwashing
-- Focus on claims that could genuinely mislead consumers
-- Provide constructive, actionable feedback
-- If content has no environmental claims, return overall_risk_level "low" with empty claims array
-- Risk scores: high (70-100), medium (40-69), low (0-39)
-- Return ONLY the JSON object, no other text`;
 
 async function fetchPageContent(url: string): Promise<string | null> {
   try {
@@ -149,7 +60,6 @@ async function fetchPageContent(url: string): Promise<string | null> {
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // Remove unwanted elements
     $('script').remove();
     $('style').remove();
     $('noscript').remove();
@@ -245,126 +155,60 @@ async function addToSender(email: string, name?: string, company?: string) {
   }
 }
 
-/**
- * Run the AI analysis in the background and update the job store.
- * This runs outside the request lifecycle so it's not subject to
- * Netlify's serverless function timeout.
- */
-async function runAnalysis(jobId: string, content: string) {
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (!anthropicKey) {
-    console.error('ANTHROPIC_API_KEY not configured');
-    const job = scanJobs.get(jobId);
-    if (job) {
-      job.status = 'failed';
-      job.error = 'Analysis service is temporarily unavailable. Please try again later.';
-    }
-    return;
+// GET: Poll for scan status
+export async function GET(request: NextRequest) {
+  const scanId = request.nextUrl.searchParams.get('scanId');
+  if (!scanId) {
+    return NextResponse.json({ error: 'scanId is required' }, { status: 400 });
   }
-
-  const job = scanJobs.get(jobId);
-  if (!job) return;
-  job.status = 'analysing';
 
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000);
+    const supabase = getSupabaseAdmin();
 
-    const aiResponse = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': ANTHROPIC_VERSION,
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 8192,
-        temperature: 0.2,
-        system: SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: `Analyse the following content for greenwashing risks:\n\n${content.substring(0, 30000)}`,
-          },
-        ],
-      }),
-    });
+    const { data: scan, error } = await supabase
+      .from('public_greenwash_scans')
+      .select('status, url, overall_risk_level, overall_risk_score, summary, recommendations, legislation_applied, claims, error_message')
+      .eq('id', scanId)
+      .single();
 
-    clearTimeout(timeoutId);
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error(`Anthropic API error ${aiResponse.status}:`, errorText);
-      job.status = 'failed';
-      job.error = 'Analysis failed. Please try again later.';
-      return;
+    if (error || !scan) {
+      return NextResponse.json({ error: 'Scan not found' }, { status: 404 });
     }
 
-    const data = await aiResponse.json();
-
-    if (!data.content?.[0]?.text) {
-      job.status = 'failed';
-      job.error = 'Unexpected response from analysis service.';
-      return;
+    if (scan.status === 'completed') {
+      return NextResponse.json({
+        success: true,
+        url: scan.url,
+        overall_risk_level: scan.overall_risk_level,
+        overall_risk_score: scan.overall_risk_score,
+        summary: scan.summary,
+        recommendations: scan.recommendations,
+        legislation_applied: scan.legislation_applied,
+        claims: scan.claims,
+      });
     }
 
-    const responseText = data.content[0].text;
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      job.status = 'failed';
-      job.error = 'Failed to parse analysis results.';
-      return;
+    if (scan.status === 'failed') {
+      return NextResponse.json(
+        { error: scan.error_message || 'Analysis failed' },
+        { status: 500 }
+      );
     }
 
-    const analysisResult = JSON.parse(jsonMatch[0]);
-    job.status = 'completed';
-    job.result = {
-      success: true,
-      url: job.url,
-      ...analysisResult,
-    };
-  } catch (error) {
-    console.error('Analysis error:', error);
-    job.status = 'failed';
-    job.error = error instanceof Error && error.name === 'AbortError'
-      ? 'Analysis timed out. The page content may be too large.'
-      : 'An unexpected error occurred. Please try again.';
+    // Still processing
+    return NextResponse.json({ status: scan.status }, { status: 202 });
+  } catch (err) {
+    console.error('Poll error:', err);
+    return NextResponse.json({ error: 'Failed to check scan status' }, { status: 500 });
   }
 }
 
-// GET: Poll for job status
-export async function GET(request: NextRequest) {
-  const jobId = request.nextUrl.searchParams.get('jobId');
-  if (!jobId) {
-    return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
-  }
-
-  const job = scanJobs.get(jobId);
-  if (!job) {
-    return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-  }
-
-  if (job.status === 'completed') {
-    return NextResponse.json(job.result);
-  }
-
-  if (job.status === 'failed') {
-    return NextResponse.json({ error: job.error || 'Analysis failed' }, { status: 500 });
-  }
-
-  // Still processing
-  return NextResponse.json({ status: job.status }, { status: 202 });
-}
-
-// POST: Start a scan job
+// POST: Start a scan
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { url, email, name, company } = body;
 
-    // Validate required fields
     if (!url || !email) {
       return NextResponse.json(
         { error: 'URL and email are required' },
@@ -379,9 +223,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limit: one scan per email
+    const supabase = getSupabaseAdmin();
+
+    // Rate limit: check if this email has already scanned
     const emailKey = email.toLowerCase().trim();
-    if (usedEmails.has(emailKey)) {
+    const { count } = await supabase
+      .from('public_greenwash_scans')
+      .select('*', { count: 'exact', head: true })
+      .eq('email', emailKey);
+
+    if (count && count > 0) {
       return NextResponse.json(
         { error: 'You have already used your free scan. Sign up to unlock unlimited scans.', rateLimited: true },
         { status: 429 }
@@ -394,7 +245,6 @@ export async function POST(request: NextRequest) {
       normalizedUrl = `https://${normalizedUrl}`;
     }
 
-    // Validate URL
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(normalizedUrl);
@@ -419,7 +269,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fetch page content synchronously (fast, within timeout)
+    // Fetch page content
     const content = await fetchPageContent(normalizedUrl);
 
     if (!content) {
@@ -429,22 +279,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Content fetched - mark email as used and add to Sender
-    usedEmails.set(emailKey, Date.now());
+    // Add to Sender (fire-and-forget)
     addToSender(email, name, company);
 
-    // Create job and start analysis in the background
-    const jobId = crypto.randomUUID();
-    scanJobs.set(jobId, {
-      status: 'fetching',
-      url: normalizedUrl,
-      createdAt: Date.now(),
-    });
+    // Insert scan row into DB
+    const { data: scan, error: insertError } = await supabase
+      .from('public_greenwash_scans')
+      .insert({
+        url: normalizedUrl,
+        email: emailKey,
+        status: 'processing',
+        input_content: content.substring(0, 50000),
+      })
+      .select('id')
+      .single();
 
-    // Fire-and-forget: runs outside request lifecycle
-    runAnalysis(jobId, content);
+    if (insertError || !scan) {
+      console.error('Failed to create scan:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to start analysis. Please try again.' },
+        { status: 500 }
+      );
+    }
 
-    return NextResponse.json({ jobId, status: 'analysing' });
+    return NextResponse.json({ scanId: scan.id });
   } catch (error) {
     console.error('Public greenwash scan error:', error);
     return NextResponse.json(
