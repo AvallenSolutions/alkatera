@@ -272,40 +272,40 @@ function renderClaimCard(claim: ClaimResult, index: number): string {
   const legText = `${claim.legislation_name}${claim.legislation_article ? ` (${claim.legislation_article})` : ''}`;
 
   return `
-        <div style="border-radius: 8px; overflow: hidden; border: 1px solid #e7e5e4; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div class="claim-card" style="border-radius: 8px; overflow: hidden; border: 1px solid #e7e5e4; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
           <!-- Card header -->
-          <div style="background: ${colour}; padding: 7px 14px; display: flex; align-items: center; gap: 8px;">
+          <div style="background: ${colour}; padding: 9px 16px; display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 10px; font-family: 'Fira Code', monospace; font-weight: 700; color: rgba(255,255,255,0.4); letter-spacing: 2px;">${String(index).padStart(2, '0')}</span>
-            <span style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 7px; font-weight: 700; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">${claim.risk_level.toUpperCase()}</span>
-            <span style="font-size: 8px; color: rgba(255,255,255,0.8); font-family: 'Fira Code', monospace;">Score: ${claim.risk_score}/100</span>
-            <span style="font-size: 8px; color: rgba(255,255,255,0.7); margin-left: auto;">${esc(issueTypeLabel(claim.issue_type))}</span>
+            <span style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; font-size: 7px; font-weight: 700; padding: 2px 8px; border-radius: 10px; text-transform: uppercase; letter-spacing: 1px;">${claim.risk_level.toUpperCase()}</span>
+            <span style="font-size: 8.5px; color: rgba(255,255,255,0.8); font-family: 'Fira Code', monospace;">Score: ${claim.risk_score}/100</span>
+            <span style="font-size: 8.5px; color: rgba(255,255,255,0.7); margin-left: auto;">${esc(issueTypeLabel(claim.issue_type))}</span>
           </div>
 
           <!-- Card body -->
-          <div style="padding: 12px 14px; background: white;">
-            <div style="font-size: 10.5px; font-weight: 600; color: #1c1917; line-height: 1.4; margin-bottom: 8px; padding-left: 10px; border-left: 3px solid ${colour};">
+          <div style="padding: 14px 16px; background: white; flex: 1; display: flex; flex-direction: column;">
+            <div style="font-size: 11px; font-weight: 600; color: #1c1917; line-height: 1.45; margin-bottom: 10px; padding-left: 12px; border-left: 3px solid ${colour};">
               &ldquo;${esc(claim.claim_text)}&rdquo;
             </div>
 
-            <div style="margin-bottom: 8px;">
-              <div style="font-size: 7px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3px;">Issue Description</div>
-              <p style="font-size: 8.5px; color: #57534e; line-height: 1.6;">${esc(claim.issue_description)}</p>
+            <div style="margin-bottom: 10px; flex: 1;">
+              <div style="font-size: 7.5px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px;">Issue Description</div>
+              <p style="font-size: 9px; color: #57534e; line-height: 1.65;">${esc(claim.issue_description)}</p>
             </div>
 
-            <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px;">
-              <span style="display: inline-block; background: #ccff00; color: #0a0a0a; font-size: 6px; font-weight: 700; font-family: 'Fira Code', monospace; padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; flex-shrink: 0; margin-top: 1px;">${jurisdictionLabel(claim.legislation_jurisdiction)}</span>
-              <span style="font-size: 8px; color: #78716c; line-height: 1.4;">${esc(legText)}</span>
+            <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
+              <span style="display: inline-block; background: #ccff00; color: #0a0a0a; font-size: 6.5px; font-weight: 700; font-family: 'Fira Code', monospace; padding: 2px 7px; border-radius: 3px; letter-spacing: 1px; flex-shrink: 0; margin-top: 1px;">${jurisdictionLabel(claim.legislation_jurisdiction)}</span>
+              <span style="font-size: 8.5px; color: #78716c; line-height: 1.4;">${esc(legText)}</span>
             </div>
 
             <div style="display: flex; gap: 8px;">
-              <div style="flex: 1; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 8px 10px;">
-                <div style="font-size: 7px; font-family: 'Fira Code', monospace; color: #16a34a; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3px; font-weight: 700;">Suggestion</div>
-                <p style="font-size: 8px; color: #166534; line-height: 1.5;">${esc(claim.suggestion)}</p>
+              <div style="flex: 1; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 10px 12px;">
+                <div style="font-size: 7.5px; font-family: 'Fira Code', monospace; color: #16a34a; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; font-weight: 700;">Suggestion</div>
+                <p style="font-size: 8.5px; color: #166534; line-height: 1.55;">${esc(claim.suggestion)}</p>
               </div>
               ${claim.suggested_revision ? `
-              <div style="flex: 1; background: ${bg}; border: 1px solid ${border}; border-radius: 6px; padding: 8px 10px;">
-                <div style="font-size: 7px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3px; font-weight: 600;">Suggested Revision</div>
-                <p style="font-size: 8px; color: #57534e; line-height: 1.5; font-style: italic;">&ldquo;${esc(claim.suggested_revision)}&rdquo;</p>
+              <div style="flex: 1; background: ${bg}; border: 1px solid ${border}; border-radius: 6px; padding: 10px 12px;">
+                <div style="font-size: 7.5px; font-family: 'Fira Code', monospace; color: #78716c; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; font-weight: 600;">Suggested Revision</div>
+                <p style="font-size: 8.5px; color: #57534e; line-height: 1.55; font-style: italic;">&ldquo;${esc(claim.suggested_revision)}&rdquo;</p>
               </div>` : ''}
             </div>
           </div>
@@ -336,13 +336,13 @@ function renderClaimsPage(slots: ClaimSlot[], pageNum: number, isFirstClaimsPage
   const slotsHtml = slots.map(s => {
     if (s.type === 'group-header') return riskGroupHeader(s.level);
     return renderClaimCard(s.claim, s.index);
-  }).join('\n        <div style="height: 10px;"></div>\n');
+  }).join('\n        <div style="height: 12px; flex-shrink: 0;"></div>\n');
 
   return `
     <div class="page light-page">
       ${pageHeader()}
 
-      <div class="page-body">
+      <div class="page-body" style="display: flex; flex-direction: column;">
         ${isFirstClaimsPage ? sectionHeader('02', 'Claim Analysis') : `
         <div style="display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; padding-bottom: 8px;">
           <span style="color: #ccff00; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px; text-shadow: 0 0 8px rgba(204,255,0,0.3);">02</span>
@@ -565,6 +565,9 @@ export function renderGreenwashHtml(result: AnalysisResult): string {
       margin-top: 16px;
       flex: 1;
     }
+
+    /* Claim cards expand to fill available space */
+    .claim-card { flex: 1; }
 
     @media print {
       body { background: white; }
