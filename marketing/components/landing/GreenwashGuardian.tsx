@@ -19,7 +19,6 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { generateGreenwashPDF } from '@/lib/pdf/render-greenwash-pdf';
 
 interface ClaimResult {
   claim_text: string;
@@ -190,9 +189,38 @@ export const LandingGreenwashGuardian = () => {
     setViewState('idle');
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   const handleExportPDF = async () => {
-    if (!result) return;
-    await generateGreenwashPDF(result);
+    if (!result || isExporting) return;
+    setIsExporting(true);
+    try {
+      const response = await fetch('/api/greenwash/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(result),
+      });
+
+      if (!response.ok) throw new Error('PDF generation failed');
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      const hostname = (() => {
+        try { return new URL(result.url).hostname; }
+        catch { return 'website'; }
+      })();
+      a.download = `greenwash-assessment-${hostname}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -425,10 +453,11 @@ export const LandingGreenwashGuardian = () => {
                 </button>
                 <button
                   onClick={handleExportPDF}
-                  className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white px-4 py-2 rounded-lg font-mono text-xs uppercase tracking-widest hover:bg-white/10 transition-all"
+                  disabled={isExporting}
+                  className="inline-flex items-center gap-2 bg-white/5 border border-white/10 text-white px-4 py-2 rounded-lg font-mono text-xs uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Download className="h-4 w-4" />
-                  Download PDF
+                  {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  {isExporting ? 'Generating...' : 'Download PDF'}
                 </button>
               </div>
 
