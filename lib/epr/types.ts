@@ -224,6 +224,118 @@ export interface NationEstimationResult {
 }
 
 // =============================================================================
+// HMRC Registration Template Types
+// =============================================================================
+
+/** Organisation type (Companies House entity type) */
+export type HMRCOrganisationType = 'SOL' | 'PAR' | 'REG' | 'PLC' | 'LLP' | 'LTD' | 'CIO' | 'OTH';
+
+/** Packaging activity level for each of the 7 HMRC activity flags */
+export type HMRCPackagingActivityLevel = 'Primary' | 'Secondary' | 'No';
+
+/** Address type for HMRC Template 1 */
+export type HMRCAddressType = 'registered' | 'audit' | 'service_of_notice' | 'principal';
+
+/** Contact type for HMRC Template 1 */
+export type HMRCContactType = 'approved_person' | 'delegated_person' | 'primary_contact' | 'secondary_contact';
+
+/** Brand type code for HMRC Template 2 */
+export type HMRCBrandTypeCode = 'BN' | 'TM' | 'OT';
+
+/** HMRC Template 1: Organisation-level registration details */
+export interface HMRCOrgDetails {
+  id: string;
+  organization_id: string;
+  companies_house_number: string | null;
+  home_nation_code: RPDNation | null;
+  main_activity_sic: string | null;
+  organisation_type_code: HMRCOrganisationType;
+  organisation_sub_type_code: string | null;
+  registration_type_code: string | null;
+  activity_so: HMRCPackagingActivityLevel;
+  activity_pf: HMRCPackagingActivityLevel;
+  activity_im: HMRCPackagingActivityLevel;
+  activity_se: HMRCPackagingActivityLevel;
+  activity_hl: HMRCPackagingActivityLevel;
+  activity_om: HMRCPackagingActivityLevel;
+  activity_sl: HMRCPackagingActivityLevel;
+  produce_blank_packaging_flag: boolean;
+  liable_for_disposal_costs_flag: boolean;
+  meet_reporting_requirements_flag: boolean;
+  sole_trader_first_name: string | null;
+  sole_trader_last_name: string | null;
+  sole_trader_phone: string | null;
+  sole_trader_email: string | null;
+  leaver_code: string | null;
+  leaver_date: string | null;
+  organisation_change_reason: string | null;
+  joiner_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** HMRC address record (up to 4 per org) */
+export interface HMRCAddress {
+  id: string;
+  organization_id: string;
+  address_type: HMRCAddressType;
+  line_1: string;
+  line_2: string | null;
+  city: string;
+  county: string | null;
+  postcode: string;
+  country: string;
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** HMRC contact record (up to 4 per org) */
+export interface HMRCContact {
+  id: string;
+  organization_id: string;
+  contact_type: HMRCContactType;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  job_title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** HMRC Template 2: Brand details */
+export interface HMRCBrand {
+  id: string;
+  organization_id: string;
+  brand_name: string;
+  brand_type_code: HMRCBrandTypeCode;
+  created_at: string;
+  updated_at: string;
+}
+
+/** HMRC Template 3: Partner details (partnerships only) */
+export interface HMRCPartner {
+  id: string;
+  organization_id: string;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Combined HMRC data for a single organisation */
+export interface HMRCRegistrationData {
+  orgDetails: HMRCOrgDetails | null;
+  addresses: HMRCAddress[];
+  contacts: HMRCContact[];
+  brands: HMRCBrand[];
+  partners: HMRCPartner[];
+}
+
+// =============================================================================
 // Data Completeness Types
 // =============================================================================
 

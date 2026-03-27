@@ -16,7 +16,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useEPRDataCompleteness } from '@/hooks/data/useEPRDataCompleteness'
+import { useEPRHMRCDetails } from '@/hooks/data/useEPRHMRCDetails'
 import type { EPRDataCompletenessResult } from '@/lib/epr/types'
+import { Building2, MapPin, Users, Tag } from 'lucide-react'
 
 interface ValidationStepProps {
   onComplete: () => void
@@ -26,10 +28,21 @@ interface ValidationStepProps {
 
 export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
   const { completeness, loading, error, refresh } = useEPRDataCompleteness()
+  const { data: hmrcData, loading: hmrcLoading } = useEPRHMRCDetails()
   const [refreshing, setRefreshing] = useState(false)
 
   const pct = completeness?.completeness_pct ?? 0
-  const isComplete = pct === 100
+
+  // HMRC completeness checks
+  const hmrcChecks = [
+    { label: 'Company details', icon: Building2, pass: !!hmrcData.orgDetails?.companies_house_number },
+    { label: 'Registered address', icon: MapPin, pass: hmrcData.addresses.some(a => a.address_type === 'registered') },
+    { label: 'Approved person', icon: Users, pass: hmrcData.contacts.some(c => c.contact_type === 'approved_person') },
+    { label: 'Primary contact', icon: Users, pass: hmrcData.contacts.some(c => c.contact_type === 'primary_contact') },
+    { label: 'Brand details', icon: Tag, pass: hmrcData.brands.length > 0 },
+  ]
+  const hmrcComplete = hmrcChecks.every(c => c.pass)
+  const isComplete = pct === 100 && hmrcComplete
   const totalItems = completeness?.total_packaging_items ?? 0
   const completeItems = completeness?.complete_items ?? 0
   const incompleteItems = completeness?.incomplete_items ?? 0
@@ -153,7 +166,7 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
           <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-emerald-400">
-              All packaging data is complete!
+              All packaging data and HMRC registration details are complete!
             </p>
             <p className="text-xs text-emerald-400/70 mt-1">
               You&apos;re ready to generate your submission.
@@ -165,15 +178,19 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
           <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-amber-400">
-              Some packaging items are missing EPR data
+              {pct < 100 && !hmrcComplete
+                ? 'Packaging data and HMRC registration details need attention'
+                : pct < 100
+                ? 'Some packaging items are missing EPR data'
+                : 'HMRC registration details are incomplete'}
             </p>
             <p className="text-xs text-amber-400/70 mt-1">
-              Please complete them before generating your submission.{' '}
+              Please complete the missing items before generating your submission.{' '}
               <button
                 onClick={onBack}
                 className="underline hover:text-amber-300 transition-colors"
               >
-                Go to Data Review
+                Go back to fix
               </button>
             </p>
           </div>
@@ -257,6 +274,60 @@ export function ValidationStep({ onComplete, onBack }: ValidationStepProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* HMRC Registration Completeness */}
+      <Card className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              HMRC Registration Data
+            </h3>
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                hmrcComplete
+                  ? 'border-emerald-500/20 text-emerald-400'
+                  : 'border-amber-500/20 text-amber-400'
+              }`}
+            >
+              {hmrcComplete ? 'Complete' : 'Incomplete'}
+            </Badge>
+          </div>
+
+          <div className="space-y-1.5">
+            {hmrcChecks.map((check) => {
+              const Icon = check.icon
+              return (
+                <div
+                  key={check.label}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg"
+                >
+                  {check.pass ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                  )}
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground/70" />
+                  <span className="text-sm text-muted-foreground">{check.label}</span>
+                </div>
+              )
+            })}
+          </div>
+
+          {!hmrcComplete && (
+            <p className="text-xs text-amber-400/70 mt-3 px-3">
+              Complete the missing HMRC registration data to export all templates.{' '}
+              <button
+                onClick={onBack}
+                className="underline hover:text-amber-300 transition-colors"
+              >
+                Go back to fix
+              </button>
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Actions */}
       <div className="flex items-center justify-between pt-2">

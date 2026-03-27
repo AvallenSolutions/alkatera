@@ -34,6 +34,13 @@ interface ExportResult {
   line_count: number
 }
 
+interface HMRCExportResult {
+  downloadUrl: string | null
+  checksum: string
+  filename: string
+  sizeBytes: number
+}
+
 const NEXT_STEPS = [
   {
     href: '/epr/submissions',
@@ -62,7 +69,38 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
   const [exportResult, setExportResult] = useState<ExportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // HMRC template exports
+  const [hmrcExporting, setHmrcExporting] = useState<Record<string, boolean>>({})
+  const [hmrcResults, setHmrcResults] = useState<Record<string, HMRCExportResult>>({})
+
   const exported = !!exportResult
+
+  const handleHMRCExport = async (template: 'organisation' | 'brands' | 'partners') => {
+    if (!currentOrganization?.id) return
+
+    setHmrcExporting(prev => ({ ...prev, [template]: true }))
+    try {
+      const res = await fetch('/api/epr/export-hmrc-csv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: currentOrganization.id,
+          template,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `Failed to export ${template} CSV`)
+
+      setHmrcResults(prev => ({ ...prev, [template]: data }))
+      toast.success(`${template.charAt(0).toUpperCase() + template.slice(1)} details CSV exported!`)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Export failed'
+      toast.error(message)
+    } finally {
+      setHmrcExporting(prev => ({ ...prev, [template]: false }))
+    }
+  }
 
   const handleExport = async () => {
     if (!currentOrganization?.id) {
@@ -294,6 +332,78 @@ export function ExportCompleteStep({ onComplete, onBack }: ExportCompleteStepPro
               </div>
             </CardContent>
           </Card>
+
+          {/* HMRC Registration Templates */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              HMRC Registration Templates
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {(['organisation', 'brands', 'partners'] as const).map((template) => {
+                const result = hmrcResults[template]
+                const isExporting = hmrcExporting[template]
+                const labels = {
+                  organisation: 'Organisation Details',
+                  brands: 'Brand Details',
+                  partners: 'Partner Details',
+                }
+                const descriptions = {
+                  organisation: '78-column registration template',
+                  brands: 'Brands you sell products under',
+                  partners: 'Partnership members (if applicable)',
+                }
+
+                return (
+                  <Card key={template} className="bg-muted/50 backdrop-blur-md border border-border rounded-2xl">
+                    <CardContent className="p-4">
+                      <p className="text-sm font-medium text-foreground">{labels[template]}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{descriptions[template]}</p>
+
+                      {result ? (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs text-muted-foreground font-mono truncate">
+                            {result.filename}
+                          </p>
+                          {result.downloadUrl && (
+                            <a
+                              href={result.downloadUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-neon-lime hover:text-neon-lime/80 transition-colors"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              Download
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleHMRCExport(template)}
+                          disabled={isExporting}
+                          className="mt-3 text-xs"
+                        >
+                          {isExporting ? (
+                            <>
+                              <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                              Exporting...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="w-3 h-3 mr-1.5" />
+                              Export
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
 
           {/* Rosa Celebration */}
           <div className="flex items-start gap-4 p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">

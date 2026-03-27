@@ -21,8 +21,14 @@ import {
 // Step components
 import { WelcomeStep } from '@/components/epr/wizard/steps/WelcomeStep'
 import { RegistrationStep } from '@/components/epr/wizard/steps/RegistrationStep'
+import { CompanyDetailsStep } from '@/components/epr/wizard/steps/CompanyDetailsStep'
+import { PackagingActivitiesStep } from '@/components/epr/wizard/steps/PackagingActivitiesStep'
 import { ObligationStep } from '@/components/epr/wizard/steps/ObligationStep'
 import { NationSplitStep } from '@/components/epr/wizard/steps/NationSplitStep'
+import { AddressesStep } from '@/components/epr/wizard/steps/AddressesStep'
+import { ContactsStep } from '@/components/epr/wizard/steps/ContactsStep'
+import { BrandsStep } from '@/components/epr/wizard/steps/BrandsStep'
+import { PartnersStep } from '@/components/epr/wizard/steps/PartnersStep'
 import { DefaultsStep } from '@/components/epr/wizard/steps/DefaultsStep'
 import { DataReviewStep } from '@/components/epr/wizard/steps/DataReviewStep'
 import { BulkEditStep } from '@/components/epr/wizard/steps/BulkEditStep'
@@ -33,8 +39,14 @@ import { ExportCompleteStep } from '@/components/epr/wizard/steps/ExportComplete
 const STEP_COMPONENTS: Record<string, React.ComponentType<{ onComplete: () => void; onBack: () => void; onSkip?: () => void }>> = {
   'welcome': WelcomeStep,
   'registration': RegistrationStep,
+  'company-details': CompanyDetailsStep,
+  'packaging-activities': PackagingActivitiesStep,
   'obligation': ObligationStep,
   'nation-split': NationSplitStep,
+  'addresses': AddressesStep,
+  'contacts': ContactsStep,
+  'brands': BrandsStep,
+  'partners': PartnersStep,
   'defaults': DefaultsStep,
   'data-review': DataReviewStep,
   'bulk-edit': BulkEditStep,
