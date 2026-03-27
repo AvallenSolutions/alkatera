@@ -39,6 +39,34 @@ interface AnalysisResult {
   claims: ClaimResult[];
 }
 
+/**
+ * Sanitise text for jsPDF's built-in Helvetica font.
+ * jsPDF cannot render many Unicode characters and falls back to Courier,
+ * which is wider and breaks line-width calculations, causing text overflow.
+ */
+function sanitise(text: string): string {
+  return text
+    // Dashes
+    .replace(/[\u2013\u2014]/g, '-')    // en dash, em dash → hyphen
+    .replace(/\u2015/g, '-')            // horizontal bar
+    // Quotes
+    .replace(/[\u2018\u2019\u201A]/g, "'") // curly single quotes
+    .replace(/[\u201C\u201D\u201E]/g, '"') // curly double quotes
+    // Subscripts / superscripts
+    .replace(/\u2082/g, '2')            // ₂
+    .replace(/\u2083/g, '3')            // ₃
+    .replace(/\u00B2/g, '2')            // ²
+    .replace(/\u00B3/g, '3')            // ³
+    // Ellipsis
+    .replace(/\u2026/g, '...')          // …
+    // Bullets
+    .replace(/\u2022/g, '-')            // •
+    // Non-breaking space
+    .replace(/\u00A0/g, ' ')
+    // Any remaining non-ASCII that Helvetica can't render
+    .replace(/[^\x00-\xFF]/g, '');
+}
+
 function getRiskColour(level: string) {
   switch (level) {
     case 'high': return RED;
@@ -253,7 +281,7 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
     pdf.setTextColor(60, 60, 60);
-    const summaryLines = pdf.splitTextToSize(result.summary, CONTENT_WIDTH);
+    const summaryLines = pdf.splitTextToSize(sanitise(result.summary), CONTENT_WIDTH);
     pdf.text(summaryLines, MARGIN, yPos);
     yPos += summaryLines.length * 5 + 8;
   }
@@ -379,7 +407,7 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(60, 60, 60);
-      const recLines = pdf.splitTextToSize(result.recommendations[i], CONTENT_WIDTH - 14);
+      const recLines = pdf.splitTextToSize(sanitise(result.recommendations[i]), CONTENT_WIDTH - 14);
       pdf.text(recLines, MARGIN + 10, yPos);
       yPos += recLines.length * 4.5 + 5;
     }
@@ -522,10 +550,10 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
 function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): number {
   // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
   const textW = innerW - 4;
-  const claimLines = pdf.splitTextToSize(`"${claim.claim_text}"`, textW);
-  const issueLines = pdf.splitTextToSize(claim.issue_description, textW);
-  const suggestionLines = pdf.splitTextToSize(claim.suggestion, textW - 8);
-  const legText = `${claim.legislation_name}${claim.legislation_article ? ` (${claim.legislation_article})` : ''}`;
+  const claimLines = pdf.splitTextToSize(sanitise(`"${claim.claim_text}"`), textW);
+  const issueLines = pdf.splitTextToSize(sanitise(claim.issue_description), textW);
+  const suggestionLines = pdf.splitTextToSize(sanitise(claim.suggestion), textW - 8);
+  const legText = sanitise(`${claim.legislation_name}${claim.legislation_article ? ` (${claim.legislation_article})` : ''}`);
   const jurisdiction = getJurisdictionLabel(claim.legislation_jurisdiction);
 
   pdf.setFont('helvetica', 'bold');
@@ -547,7 +575,7 @@ function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): numbe
   h += suggestionLines.length * 4 + 13; // suggestion box
 
   if (claim.suggested_revision) {
-    const revLines = pdf.splitTextToSize(`"${claim.suggested_revision}"`, textW - 8);
+    const revLines = pdf.splitTextToSize(sanitise(`"${claim.suggested_revision}"`), textW - 8);
     h += revLines.length * 4 + 12;
   }
 
@@ -564,16 +592,16 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
   const textW = innerW - 4;
 
-  // Pre-measure text
-  const claimLines = pdf.splitTextToSize(`"${claim.claim_text}"`, textW);
-  const issueLines = pdf.splitTextToSize(claim.issue_description, textW);
-  const suggestionLines = pdf.splitTextToSize(claim.suggestion, textW - 8);
+  // Pre-measure text (sanitised for jsPDF's built-in Helvetica)
+  const claimLines = pdf.splitTextToSize(sanitise(`"${claim.claim_text}"`), textW);
+  const issueLines = pdf.splitTextToSize(sanitise(claim.issue_description), textW);
+  const suggestionLines = pdf.splitTextToSize(sanitise(claim.suggestion), textW - 8);
   const revisionLines = claim.suggested_revision
-    ? pdf.splitTextToSize(`"${claim.suggested_revision}"`, textW - 8)
+    ? pdf.splitTextToSize(sanitise(`"${claim.suggested_revision}"`), textW - 8)
     : [];
   const issueType = claim.issue_type?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
   const jurisdiction = getJurisdictionLabel(claim.legislation_jurisdiction);
-  const legText = `${claim.legislation_name}${claim.legislation_article ? ` (${claim.legislation_article})` : ''}`;
+  const legText = sanitise(`${claim.legislation_name}${claim.legislation_article ? ` (${claim.legislation_article})` : ''}`);
 
   // Calculate card height
   const cardHeight = measureClaimHeight(pdf, claim, innerW);
