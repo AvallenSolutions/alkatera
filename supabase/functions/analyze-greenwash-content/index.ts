@@ -224,19 +224,53 @@ Deno.serve(async (req: Request) => {
 
     let responseContent = data.content[0].text;
     let analysisResult: AnalysisResult;
+    console.log('Raw response length:', responseContent.length, 'stop_reason:', data.stop_reason);
+
+    // Strip markdown code fences if present
+    responseContent = responseContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+    responseContent = responseContent.trim();
 
     try {
-      // Strip markdown code fences if present
-      responseContent = responseContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
-
-      const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('No JSON found in response');
+      // Attempt 1: parse the whole response directly
+      analysisResult = JSON.parse(responseContent);
+    } catch {
+      // Attempt 2: extract balanced JSON object
+      const startIdx = responseContent.indexOf('{');
+      if (startIdx === -1) {
+        console.error('No JSON object found in response:', responseContent.substring(0, 500));
+        throw new Error('Failed to parse AI analysis results');
       }
-      analysisResult = JSON.parse(jsonMatch[0]);
-    } catch (parseError) {
-      console.error('Failed to parse Anthropic response:', parseError, '\nExcerpt:', responseContent?.substring(0, 500));
-      throw new Error('Failed to parse AI analysis results');
+
+      // Walk the string to find the matching closing brace
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      let endIdx = -1;
+      for (let i = startIdx; i < responseContent.length; i++) {
+        const ch = responseContent[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') depth++;
+        if (ch === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+      }
+
+      if (endIdx === -1) {
+        console.error('Unbalanced JSON braces. Response excerpt:', responseContent.substring(0, 1000));
+        throw new Error('Failed to parse AI analysis results. Incomplete JSON.');
+      }
+
+      let jsonStr = responseContent.substring(startIdx, endIdx + 1);
+      // Fix trailing commas before } or ]
+      jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+
+      try {
+        analysisResult = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError, '\nExcerpt:', jsonStr.substring(0, 1000));
+        throw new Error('Failed to parse AI analysis results. Invalid JSON.');
+      }
     }
     // Update the assessment with results
     const { error: updateError } = await supabase

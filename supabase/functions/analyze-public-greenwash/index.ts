@@ -194,22 +194,54 @@ Deno.serve(async (req: Request) => {
     }
 
     let responseText = data.content[0].text;
+    console.log('Raw response length:', responseText.length, 'stop_reason:', data.stop_reason);
 
     // Strip markdown code fences if present
     responseText = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
-
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('No JSON object found in response:', responseText.substring(0, 500));
-      throw new Error('Failed to parse analysis results');
-    }
+    responseText = responseText.trim();
 
     let result;
     try {
-      result = JSON.parse(jsonMatch[0]);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError, '\nResponse excerpt:', jsonMatch[0].substring(0, 500));
-      throw new Error('Failed to parse analysis results. The AI response contained invalid JSON.');
+      // Attempt 1: parse the whole response directly
+      result = JSON.parse(responseText);
+    } catch {
+      // Attempt 2: extract balanced JSON object
+      const startIdx = responseText.indexOf('{');
+      if (startIdx === -1) {
+        console.error('No JSON object found in response:', responseText.substring(0, 500));
+        throw new Error('Failed to parse analysis results');
+      }
+
+      // Walk the string to find the matching closing brace
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      let endIdx = -1;
+      for (let i = startIdx; i < responseText.length; i++) {
+        const ch = responseText[i];
+        if (escape) { escape = false; continue; }
+        if (ch === '\\' && inString) { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === '{') depth++;
+        if (ch === '}') { depth--; if (depth === 0) { endIdx = i; break; } }
+      }
+
+      if (endIdx === -1) {
+        console.error('Unbalanced JSON braces. Response excerpt:', responseText.substring(0, 1000));
+        throw new Error('Failed to parse analysis results. The AI response contained incomplete JSON.');
+      }
+
+      let jsonStr = responseText.substring(startIdx, endIdx + 1);
+      // Fix trailing commas before } or ]
+      jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+
+      try {
+        result = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError, '\nExcerpt:', jsonStr.substring(0, 1000));
+        throw new Error('Failed to parse analysis results. The AI response contained invalid JSON.');
+      }
     }
 
     // Update the scan row with results
