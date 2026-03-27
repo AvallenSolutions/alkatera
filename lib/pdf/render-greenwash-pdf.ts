@@ -226,7 +226,7 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
   pdf.setTextColor(200, 200, 200);
-  pdf.text(result.url, PAGE_WIDTH / 2, 74, { align: 'center' });
+  pdf.text(result.url.toLowerCase(), PAGE_WIDTH / 2, 74, { align: 'center' });
   pdf.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, PAGE_WIDTH / 2, 80, { align: 'center' });
 
   // ─── RISK SCORE BOX ──────────────────────────────────────
@@ -550,9 +550,20 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
 function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): number {
   // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
   const textW = innerW - 4;
+
+  // Must set correct font before each splitTextToSize call for accurate measurement
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(10);
   const claimLines = pdf.splitTextToSize(sanitise(`"${claim.claim_text}"`), textW);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
   const issueLines = pdf.splitTextToSize(sanitise(claim.issue_description), textW);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
   const suggestionLines = pdf.splitTextToSize(sanitise(claim.suggestion), textW - 8);
+
   const legText = sanitise(`${claim.legislation_name}${claim.legislation_article ? ` (${claim.legislation_article})` : ''}`);
   const jurisdiction = getJurisdictionLabel(claim.legislation_jurisdiction);
 
@@ -575,6 +586,8 @@ function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): numbe
   h += suggestionLines.length * 4 + 13; // suggestion box
 
   if (claim.suggested_revision) {
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(8);
     const revLines = pdf.splitTextToSize(sanitise(`"${claim.suggested_revision}"`), textW - 8);
     h += revLines.length * 4 + 12;
   }
@@ -592,10 +605,21 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
   const textW = innerW - 4;
 
-  // Pre-measure text (sanitised for jsPDF's built-in Helvetica)
+  // Pre-measure text (must set correct font before each splitTextToSize call)
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(10);
   const claimLines = pdf.splitTextToSize(sanitise(`"${claim.claim_text}"`), textW);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(9);
   const issueLines = pdf.splitTextToSize(sanitise(claim.issue_description), textW);
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
   const suggestionLines = pdf.splitTextToSize(sanitise(claim.suggestion), textW - 8);
+
+  pdf.setFont('helvetica', 'italic');
+  pdf.setFontSize(8);
   const revisionLines = claim.suggested_revision
     ? pdf.splitTextToSize(sanitise(`"${claim.suggested_revision}"`), textW - 8)
     : [];
