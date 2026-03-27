@@ -47,20 +47,20 @@ interface AnalysisResult {
 function sanitise(text: string): string {
   return text
     // Dashes
-    .replace(/[\u2013\u2014]/g, '-')    // en dash, em dash → hyphen
+    .replace(/[\u2013\u2014]/g, '-')    // en dash, em dash -> hyphen
     .replace(/\u2015/g, '-')            // horizontal bar
     // Quotes
     .replace(/[\u2018\u2019\u201A]/g, "'") // curly single quotes
     .replace(/[\u201C\u201D\u201E]/g, '"') // curly double quotes
     // Subscripts / superscripts
-    .replace(/\u2082/g, '2')            // ₂
-    .replace(/\u2083/g, '3')            // ₃
-    .replace(/\u00B2/g, '2')            // ²
-    .replace(/\u00B3/g, '3')            // ³
+    .replace(/\u2082/g, '2')            // subscript 2
+    .replace(/\u2083/g, '3')            // subscript 3
+    .replace(/\u00B2/g, '2')            // superscript 2
+    .replace(/\u00B3/g, '3')            // superscript 3
     // Ellipsis
-    .replace(/\u2026/g, '...')          // …
+    .replace(/\u2026/g, '...')
     // Bullets
-    .replace(/\u2022/g, '-')            // •
+    .replace(/\u2022/g, '-')
     // Non-breaking space
     .replace(/\u00A0/g, ' ')
     // Any remaining non-ASCII that Helvetica can't render
@@ -92,6 +92,7 @@ const MARGIN = 20;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const HEADER_HEIGHT = 18;
 const FOOTER_HEIGHT = 16;
+const CARD_HEADER_H = 12;
 
 /**
  * Draw "alkatera" with "tera" in bold, matching brand guidelines.
@@ -186,6 +187,122 @@ function ensureSpace(pdf: PDF, yPos: number, needed: number): number {
   return yPos;
 }
 
+/**
+ * Draw a donut chart (score arc) using polygon fill.
+ * jsPDF has no arc primitive, so we approximate with a filled polygon pie slice
+ * then cut out the inner circle.
+ */
+function drawDonut(
+  pdf: PDF, cx: number, cy: number,
+  outerR: number, innerR: number,
+  score: number, riskLevel: string,
+  colour: { r: number; g: number; b: number },
+) {
+  // Grey track (full ring)
+  pdf.setFillColor(LIGHT_GREY.r, LIGHT_GREY.g, LIGHT_GREY.b);
+  pdf.circle(cx, cy, outerR, 'F');
+  pdf.setFillColor(WHITE.r, WHITE.g, WHITE.b);
+  pdf.circle(cx, cy, innerR, 'F');
+
+  // Score arc
+  if (score > 0) {
+    const startAngle = -Math.PI / 2; // 12 o'clock
+    const endAngle = startAngle + (score / 100) * 2 * Math.PI;
+    const steps = Math.max(Math.round((score / 100) * 72), 2);
+
+    // Build polygon: center -> arc points -> closed back to center
+    const segments: [number, number][] = [];
+    // First segment: from center to first point on arc
+    segments.push([outerR * Math.cos(startAngle), outerR * Math.sin(startAngle)]);
+    // Subsequent segments: along the arc (relative to previous point)
+    for (let i = 1; i <= steps; i++) {
+      const prevA = startAngle + ((i - 1) / steps) * (endAngle - startAngle);
+      const currA = startAngle + (i / steps) * (endAngle - startAngle);
+      segments.push([
+        outerR * Math.cos(currA) - outerR * Math.cos(prevA),
+        outerR * Math.sin(currA) - outerR * Math.sin(prevA),
+      ]);
+    }
+
+    pdf.setFillColor(colour.r, colour.g, colour.b);
+    pdf.lines(segments, cx, cy, [1, 1], 'F', true);
+
+    // Cut out inner circle to create the donut hole
+    pdf.setFillColor(WHITE.r, WHITE.g, WHITE.b);
+    pdf.circle(cx, cy, innerR, 'F');
+  }
+
+  // Score number centred in the donut
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(24);
+  pdf.setTextColor(DARK_GREY.r, DARK_GREY.g, DARK_GREY.b);
+  pdf.text(`${score}`, cx, cy + 2, { align: 'center' });
+
+  // "/ 100" below score
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.setTextColor(MID_GREY.r, MID_GREY.g, MID_GREY.b);
+  pdf.text('/ 100', cx, cy + 7, { align: 'center' });
+
+  // Risk level label below donut
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(13);
+  pdf.setTextColor(colour.r, colour.g, colour.b);
+  pdf.text(`${riskLevel.toUpperCase()} RISK`, cx, cy + outerR + 8, { align: 'center' });
+}
+
+/**
+ * Draw the claims overview row: three boxes showing HIGH / MEDIUM / LOW counts.
+ */
+function drawClaimsOverview(pdf: PDF, claims: ClaimResult[], yPos: number): number {
+  const highCount = claims.filter(c => c.risk_level === 'high').length;
+  const medCount = claims.filter(c => c.risk_level === 'medium').length;
+  const lowCount = claims.filter(c => c.risk_level === 'low').length;
+
+  const gap = 4;
+  const boxW = (CONTENT_WIDTH - gap * 2) / 3;
+  const boxH = 16;
+
+  const boxes = [
+    { count: highCount, label: 'HIGH', colour: RED },
+    { count: medCount, label: 'MEDIUM', colour: AMBER },
+    { count: lowCount, label: 'LOW', colour: GREEN },
+  ];
+
+  for (let i = 0; i < 3; i++) {
+    const bx = MARGIN + i * (boxW + gap);
+    const box = boxes[i];
+
+    // Light background
+    pdf.setFillColor(250, 250, 250);
+    pdf.roundedRect(bx, yPos, boxW, boxH, 2, 2, 'F');
+
+    // Left colour accent
+    pdf.setFillColor(box.colour.r, box.colour.g, box.colour.b);
+    pdf.roundedRect(bx, yPos, 3, boxH, 2, 2, 'F');
+    pdf.rect(bx + 1.5, yPos, 1.5, boxH, 'F'); // square off right side of accent
+
+    // Count number
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(18);
+    pdf.setTextColor(box.colour.r, box.colour.g, box.colour.b);
+    pdf.text(`${box.count}`, bx + 10, yPos + 11);
+
+    // Label
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    pdf.setTextColor(MID_GREY.r, MID_GREY.g, MID_GREY.b);
+    pdf.text(box.label, bx + 20, yPos + 8.5);
+
+    // "RISK" below label
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(6);
+    pdf.text('RISK', bx + 20, yPos + 12.5);
+  }
+
+  return yPos + boxH + 8;
+}
+
 export async function generateGreenwashPDF(result: AnalysisResult): Promise<void> {
   const { default: jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -229,45 +346,12 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
   pdf.text(result.url.toLowerCase(), PAGE_WIDTH / 2, 74, { align: 'center' });
   pdf.text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`, PAGE_WIDTH / 2, 80, { align: 'center' });
 
-  // ─── RISK SCORE BOX ──────────────────────────────────────
+  // ─── RISK SCORE DONUT ──────────────────────────────────────
 
-  let yPos = 105;
   const riskColour = getRiskColour(result.overall_risk_level);
+  drawDonut(pdf, PAGE_WIDTH / 2, 118, 18, 12, result.overall_risk_score, result.overall_risk_level, riskColour);
 
-  // Risk box background
-  pdf.setFillColor(248, 248, 248);
-  pdf.roundedRect(MARGIN, yPos, CONTENT_WIDTH, 40, 3, 3, 'F');
-
-  // Left colour strip
-  pdf.setFillColor(riskColour.r, riskColour.g, riskColour.b);
-  pdf.rect(MARGIN, yPos, 4, 40, 'F');
-
-  // Risk level text
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(18);
-  pdf.setTextColor(riskColour.r, riskColour.g, riskColour.b);
-  pdf.text(`${result.overall_risk_level.toUpperCase()} RISK`, MARGIN + 12, yPos + 16);
-
-  // Score
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(11);
-  pdf.setTextColor(MID_GREY.r, MID_GREY.g, MID_GREY.b);
-  pdf.text(`Score: ${result.overall_risk_score} / 100`, MARGIN + 12, yPos + 25);
-
-  // Score bar
-  const barX = MARGIN + 12;
-  const barY = yPos + 30;
-  const barWidth = CONTENT_WIDTH - 20;
-  const barHeight = 4;
-
-  pdf.setFillColor(LIGHT_GREY.r, LIGHT_GREY.g, LIGHT_GREY.b);
-  pdf.roundedRect(barX, barY, barWidth, barHeight, 2, 2, 'F');
-
-  const filledWidth = (result.overall_risk_score / 100) * barWidth;
-  pdf.setFillColor(riskColour.r, riskColour.g, riskColour.b);
-  pdf.roundedRect(barX, barY, filledWidth, barHeight, 2, 2, 'F');
-
-  yPos += 50;
+  let yPos = 148;
 
   // ─── SUMMARY ──────────────────────────────────────────────
 
@@ -362,7 +446,10 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
     pdf.setFontSize(8);
     pdf.setTextColor(MID_GREY.r, MID_GREY.g, MID_GREY.b);
     pdf.text('Environmental claims found in your content with risk assessments', MARGIN, yPos + 4);
-    yPos += 12;
+    yPos += 14;
+
+    // Claims overview: HIGH / MEDIUM / LOW count boxes
+    yPos = drawClaimsOverview(pdf, result.claims, yPos);
 
     for (const claim of result.claims) {
       yPos = drawClaim(pdf, claim, yPos);
@@ -548,7 +635,6 @@ export async function generateGreenwashPDF(result: AnalysisResult): Promise<void
 }
 
 function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): number {
-  // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
   const textW = innerW - 4;
 
   // Must set correct font before each splitTextToSize call for accurate measurement
@@ -576,13 +662,13 @@ function measureClaimHeight(pdf: PDF, claim: ClaimResult, innerW: number): numbe
   pdf.setFontSize(8);
   const legLines = pdf.splitTextToSize(legText, legAvailW);
 
-  let h = 6;  // top padding
-  h += 7;     // badge row
-  h += claimLines.length * 5 + 4;  // claim text
-  h += 5;     // separator + gap
-  h += 4;     // issue description heading
-  h += issueLines.length * 4 + 5;  // issue description
-  h += legLines.length * 4 + 5;    // legislation row (wrapped)
+  let h = CARD_HEADER_H;              // coloured header band
+  h += 4;                             // gap after header
+  h += claimLines.length * 5 + 4;     // claim text
+  h += 5;                             // separator + gap
+  h += 4;                             // issue description heading
+  h += issueLines.length * 4 + 5;     // issue description
+  h += legLines.length * 4 + 5;       // legislation row
   h += suggestionLines.length * 4 + 13; // suggestion box
 
   if (claim.suggested_revision) {
@@ -602,7 +688,6 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   const cardW = CONTENT_WIDTH;
   const innerPad = 8;
   const innerW = cardW - innerPad * 2;
-  // Use a tighter text width to prevent edge-case overflow from font measurement inaccuracies
   const textW = innerW - 4;
 
   // Pre-measure text (must set correct font before each splitTextToSize call)
@@ -634,45 +719,52 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   let yPos = ensureSpace(pdf, startY, Math.min(cardHeight, 110));
   const cardTopY = yPos;
 
-  // --- 1. Draw card background (risk-tinted) ---
-  const bgTint = {
-    r: Math.round(255 - (255 - riskColour.r) * 0.07),
-    g: Math.round(255 - (255 - riskColour.g) * 0.07),
-    b: Math.round(255 - (255 - riskColour.b) * 0.07),
-  };
-  pdf.setFillColor(bgTint.r, bgTint.g, bgTint.b);
+  // --- 1. Draw card structure: coloured header band + white body ---
+
+  // Full card coloured fill (header colour shows through at top)
+  pdf.setFillColor(riskColour.r, riskColour.g, riskColour.b);
   pdf.roundedRect(cardX, cardTopY, cardW, cardHeight, 3, 3, 'F');
+
+  // White body below header band
+  const bodyY = cardTopY + CARD_HEADER_H;
+  pdf.setFillColor(WHITE.r, WHITE.g, WHITE.b);
+  pdf.rect(cardX + 0.3, bodyY, cardW - 0.6, cardHeight - CARD_HEADER_H - 0.3, 'F');
+  // Round the bottom corners by redrawing a small white rounded rect at the bottom
+  pdf.roundedRect(cardX + 0.3, cardTopY + cardHeight - 6, cardW - 0.6, 5.7, 2, 2, 'F');
 
   // Card border
   pdf.setDrawColor(riskColour.r, riskColour.g, riskColour.b);
   pdf.setLineWidth(0.4);
   pdf.roundedRect(cardX, cardTopY, cardW, cardHeight, 3, 3, 'S');
 
-  // Left accent bar
-  pdf.setFillColor(riskColour.r, riskColour.g, riskColour.b);
-  pdf.rect(cardX + 0.5, cardTopY + 3, 2.5, cardHeight - 6, 'F');
+  // --- 2. Draw header band content (white text on coloured bg) ---
 
-  // --- 2. Draw content on top ---
-  yPos += 6; // top padding
+  yPos = cardTopY + 4;
 
-  // Badge row
+  // Badge text (risk level)
   const badgeText = claim.risk_level.toUpperCase();
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(7);
+  pdf.setFontSize(8);
+  // White badge outline on coloured background
+  pdf.setDrawColor(WHITE.r, WHITE.g, WHITE.b);
+  pdf.setLineWidth(0.3);
   const badgeW = pdf.getTextWidth(badgeText) + 6;
-  pdf.setFillColor(riskColour.r, riskColour.g, riskColour.b);
-  pdf.roundedRect(cardX + innerPad, yPos - 3, badgeW, 5.5, 1.5, 1.5, 'F');
+  pdf.roundedRect(cardX + innerPad, yPos - 3, badgeW, 5.5, 1.5, 1.5, 'S');
   pdf.setTextColor(WHITE.r, WHITE.g, WHITE.b);
   pdf.text(badgeText, cardX + innerPad + 3, yPos);
 
+  // Score
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(7);
-  pdf.setTextColor(MID_GREY.r, MID_GREY.g, MID_GREY.b);
+  pdf.setFontSize(7.5);
+  pdf.setTextColor(255, 255, 255);
   pdf.text(`Score: ${claim.risk_score}/100`, cardX + innerPad + badgeW + 5, yPos);
 
   // Issue type (right-aligned)
   pdf.text(issueType, cardX + cardW - innerPad, yPos, { align: 'right' });
-  yPos += 7;
+
+  // --- 3. Draw body content (dark text on white bg) ---
+
+  yPos = bodyY + 4;
 
   // Claim text
   pdf.setFont('helvetica', 'bold');
@@ -682,15 +774,8 @@ function drawClaim(pdf: PDF, claim: ClaimResult, startY: number): number {
   yPos += claimLines.length * 5 + 4;
 
   // Separator
-  pdf.setDrawColor(riskColour.r, riskColour.g, riskColour.b);
-  pdf.setLineWidth(0.15);
-  const lineAlpha = 0.2;
-  // Simulate lighter separator by using a muted version of risk colour
-  pdf.setDrawColor(
-    Math.round(bgTint.r * (1 - lineAlpha) + riskColour.r * lineAlpha),
-    Math.round(bgTint.g * (1 - lineAlpha) + riskColour.g * lineAlpha),
-    Math.round(bgTint.b * (1 - lineAlpha) + riskColour.b * lineAlpha),
-  );
+  pdf.setDrawColor(LIGHT_GREY.r, LIGHT_GREY.g, LIGHT_GREY.b);
+  pdf.setLineWidth(0.2);
   pdf.line(cardX + innerPad, yPos, cardX + cardW - innerPad, yPos);
   yPos += 5;
 
