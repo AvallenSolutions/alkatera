@@ -98,142 +98,60 @@ export default function AssessmentReportPage() {
     }
   };
 
+  const [isExporting, setIsExporting] = useState(false);
+
   const handleExportPDF = async () => {
-    if (!assessment) return;
+    if (!assessment || isExporting) return;
+    setIsExporting(true);
 
-    const { default: jsPDF } = await import("jspdf");
-    const pdf = new jsPDF();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    let yPos = 20;
+    try {
+      // Map assessment data to the format expected by the PDF API
+      const pdfData = {
+        url: assessment.input_source || assessment.title,
+        overall_risk_level: assessment.overall_risk_level || 'medium',
+        overall_risk_score: assessment.overall_risk_score || 0,
+        summary: assessment.summary || '',
+        recommendations: assessment.recommendations || [],
+        legislation_applied: assessment.legislation_applied || [],
+        claims: (assessment.claims || []).map(c => ({
+          claim_text: c.claim_text,
+          claim_context: c.claim_context,
+          risk_level: c.risk_level,
+          risk_score: c.risk_score || 0,
+          issue_type: c.issue_type || 'unsubstantiated',
+          issue_description: c.issue_description,
+          legislation_name: c.legislation_name,
+          legislation_article: c.legislation_article,
+          legislation_jurisdiction: c.legislation_jurisdiction,
+          suggestion: c.suggestion,
+          suggested_revision: c.suggested_revision,
+        })),
+      };
 
-    // Title
-    pdf.setFontSize(20);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Greenwash Risk Assessment Report", pageWidth / 2, yPos, { align: "center" });
-    yPos += 15;
+      const response = await fetch('/api/greenwash/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pdfData),
+      });
 
-    // Assessment title
-    pdf.setFontSize(14);
-    pdf.setFont("helvetica", "normal");
-    pdf.text(assessment.title, pageWidth / 2, yPos, { align: "center" });
-    yPos += 10;
+      if (!response.ok) throw new Error('PDF generation failed');
 
-    // Date
-    pdf.setFontSize(10);
-    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, yPos, { align: "center" });
-    yPos += 15;
-
-    // Disclaimer
-    pdf.setFillColor(255, 243, 205);
-    pdf.rect(15, yPos, pageWidth - 30, 20, "F");
-    pdf.setFontSize(9);
-    pdf.text(
-      "DISCLAIMER: This report provides guidance only and is not legal advice.",
-      pageWidth / 2,
-      yPos + 8,
-      { align: "center" }
-    );
-    pdf.text(
-      "Consult qualified legal counsel for compliance decisions.",
-      pageWidth / 2,
-      yPos + 14,
-      { align: "center" }
-    );
-    yPos += 30;
-
-    // Overall Risk
-    pdf.setFontSize(14);
-    pdf.setFont("helvetica", "bold");
-    pdf.text("Overall Risk Assessment", 15, yPos);
-    yPos += 8;
-
-    const riskColor = assessment.overall_risk_level === "high" ? [220, 38, 38] :
-                      assessment.overall_risk_level === "medium" ? [217, 119, 6] :
-                      [34, 197, 94];
-    pdf.setFillColor(riskColor[0], riskColor[1], riskColor[2]);
-    pdf.circle(20, yPos + 3, 4, "F");
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(12);
-    pdf.text(
-      `${assessment.overall_risk_level?.toUpperCase()} RISK (Score: ${assessment.overall_risk_score}/100)`,
-      30,
-      yPos + 5
-    );
-    yPos += 15;
-
-    // Summary
-    if (assessment.summary) {
-      pdf.setFontSize(11);
-      const summaryLines = pdf.splitTextToSize(assessment.summary, pageWidth - 30);
-      pdf.text(summaryLines, 15, yPos);
-      yPos += summaryLines.length * 5 + 10;
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `greenwash-assessment-${assessmentId.substring(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success("PDF exported successfully");
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      toast.error("Failed to export PDF");
+    } finally {
+      setIsExporting(false);
     }
-
-    // Claims
-    if (assessment.claims && assessment.claims.length > 0) {
-      pdf.setFontSize(14);
-      pdf.setFont("helvetica", "bold");
-      pdf.text(`Identified Claims (${assessment.claims.length})`, 15, yPos);
-      yPos += 10;
-
-      for (const claim of assessment.claims) {
-        // Check if we need a new page
-        if (yPos > 250) {
-          pdf.addPage();
-          yPos = 20;
-        }
-
-        const claimRiskColor = claim.risk_level === "high" ? [220, 38, 38] :
-                               claim.risk_level === "medium" ? [217, 119, 6] :
-                               [34, 197, 94];
-        pdf.setFillColor(claimRiskColor[0], claimRiskColor[1], claimRiskColor[2]);
-        pdf.circle(18, yPos + 3, 3, "F");
-
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(10);
-        const claimText = pdf.splitTextToSize(`"${claim.claim_text}"`, pageWidth - 40);
-        pdf.text(claimText, 25, yPos + 4);
-        yPos += claimText.length * 5 + 5;
-
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(9);
-        const issueText = pdf.splitTextToSize(`Issue: ${claim.issue_description}`, pageWidth - 40);
-        pdf.text(issueText, 25, yPos);
-        yPos += issueText.length * 4 + 3;
-
-        pdf.text(`Legislation: ${claim.legislation_name}`, 25, yPos);
-        yPos += 5;
-
-        const suggestionText = pdf.splitTextToSize(`Suggestion: ${claim.suggestion}`, pageWidth - 40);
-        pdf.text(suggestionText, 25, yPos);
-        yPos += suggestionText.length * 4 + 10;
-      }
-    }
-
-    // Recommendations
-    if (assessment.recommendations && assessment.recommendations.length > 0) {
-      if (yPos > 230) {
-        pdf.addPage();
-        yPos = 20;
-      }
-
-      pdf.setFontSize(14);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("Recommendations", 15, yPos);
-      yPos += 10;
-
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(10);
-      for (const rec of assessment.recommendations) {
-        const recText = pdf.splitTextToSize(`• ${rec}`, pageWidth - 35);
-        pdf.text(recText, 20, yPos);
-        yPos += recText.length * 5 + 3;
-      }
-    }
-
-    // Save
-    pdf.save(`greenwash-assessment-${assessmentId.substring(0, 8)}.pdf`);
-    toast.success("PDF exported successfully");
   };
 
   if (loading) {
@@ -297,11 +215,11 @@ export default function AssessmentReportPage() {
             <Button
               variant="outline"
               onClick={handleExportPDF}
-              disabled={isProcessing || isFailed}
+              disabled={isProcessing || isFailed || isExporting}
               className="bg-white/5 border-white/10 text-white hover:bg-white/10"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Export PDF
+              {isExporting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {isExporting ? 'Generating...' : 'Export PDF'}
             </Button>
             <Button
               variant="outline"
