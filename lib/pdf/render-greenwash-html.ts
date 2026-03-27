@@ -312,8 +312,31 @@ function renderClaimCard(claim: ClaimResult, index: number): string {
         </div>`;
 }
 
-function renderClaimsPage(claims: Array<{ claim: ClaimResult; index: number }>, pageNum: number, isFirstClaimsPage: boolean): string {
-  const cardsHtml = claims.map(c => renderClaimCard(c.claim, c.index)).join('\n        <div style="height: 14px;"></div>\n');
+function riskGroupHeader(level: string): string {
+  const colour = riskColour(level);
+  const label = level.charAt(0).toUpperCase() + level.slice(1);
+  return `
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+          <div style="width: 10px; height: 10px; border-radius: 50%; background: ${colour}; flex-shrink: 0;"></div>
+          <span style="font-size: 11px; font-family: 'Fira Code', monospace; font-weight: 700; color: ${colour}; text-transform: uppercase; letter-spacing: 2px;">${label} Risk</span>
+          <div style="flex: 1; height: 1px; background: ${colour}; opacity: 0.2;"></div>
+        </div>`;
+}
+
+type ClaimSlot = {
+  type: 'group-header';
+  level: string;
+} | {
+  type: 'card';
+  claim: ClaimResult;
+  index: number;
+}
+
+function renderClaimsPage(slots: ClaimSlot[], pageNum: number, isFirstClaimsPage: boolean): string {
+  const slotsHtml = slots.map(s => {
+    if (s.type === 'group-header') return riskGroupHeader(s.level);
+    return renderClaimCard(s.claim, s.index);
+  }).join('\n        <div style="height: 10px;"></div>\n');
 
   return `
     <div class="page light-page">
@@ -325,7 +348,7 @@ function renderClaimsPage(claims: Array<{ claim: ClaimResult; index: number }>, 
           <span style="color: #ccff00; font-family: 'Fira Code', monospace; font-size: 14px; font-weight: 700; letter-spacing: 3px; text-shadow: 0 0 8px rgba(204,255,0,0.3);">02</span>
           <h2 style="font-size: 18px; font-family: 'Playfair Display', serif; font-weight: 300; color: #a8a29e;">Claim Analysis <span style="font-size: 12px; color: #d6d3d1;">(continued)</span></h2>
         </div>`}
-        ${cardsHtml}
+        ${slotsHtml}
       </div>
 
       ${pageFooter(pageNum)}
@@ -418,17 +441,70 @@ export function renderGreenwashHtml(result: AnalysisResult): string {
   // Page 2: Executive Summary
   pages.push(renderSummaryPage(result, 2));
 
-  // Pages 3–N: Two claims per page
-  const claimsPerPage = 2;
-  let claimPageCount = 0;
-  for (let i = 0; i < result.claims.length; i += claimsPerPage) {
-    const batch = result.claims.slice(i, i + claimsPerPage).map((claim, j) => ({
-      claim,
-      index: i + j + 1,
-    }));
-    claimPageCount++;
-    pages.push(renderClaimsPage(batch, 2 + claimPageCount, i === 0));
+  // Pages 3–N: Claims grouped by risk level (high → medium → low), two per page
+  const riskOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const sortedClaims = [...result.claims].sort(
+    (a, b) => (riskOrder[a.risk_level] ?? 3) - (riskOrder[b.risk_level] ?? 3)
+  );
+
+  // Build a flat list of slots: group headers + cards
+  const allSlots: ClaimSlot[] = [];
+  let currentGroup = '';
+  sortedClaims.forEach((claim, i) => {
+    if (claim.risk_level !== currentGroup) {
+      currentGroup = claim.risk_level;
+      allSlots.push({ type: 'group-header', level: claim.risk_level });
+    }
+    allSlots.push({ type: 'card', claim, index: i + 1 });
+  });
+
+  // Paginate: max 2 cards per page (group headers don't count towards the limit,
+  // but a header always stays with at least one card on the same page)
+  const claimPages: ClaimSlot[][] = [];
+  let currentPageSlots: ClaimSlot[] = [];
+  let cardsOnPage = 0;
+
+  for (let i = 0; i < allSlots.length; i++) {
+    const slot = allSlots[i];
+
+    if (slot.type === 'group-header') {
+      // If we already have 2 cards, start a new page
+      if (cardsOnPage >= 2) {
+        claimPages.push(currentPageSlots);
+        currentPageSlots = [];
+        cardsOnPage = 0;
+      }
+      // If we have 1 card and the header + next card won't fit, start new page
+      // (header must stay with at least one card)
+      if (cardsOnPage === 1) {
+        // Check: is there a card after this header? If so we'd need room for 1 more card
+        const nextIsCard = i + 1 < allSlots.length && allSlots[i + 1].type === 'card';
+        if (nextIsCard && cardsOnPage + 1 > 2) {
+          claimPages.push(currentPageSlots);
+          currentPageSlots = [];
+          cardsOnPage = 0;
+        }
+      }
+      currentPageSlots.push(slot);
+    } else {
+      // It's a card
+      if (cardsOnPage >= 2) {
+        claimPages.push(currentPageSlots);
+        currentPageSlots = [];
+        cardsOnPage = 0;
+      }
+      currentPageSlots.push(slot);
+      cardsOnPage++;
+    }
   }
+  if (currentPageSlots.length > 0) {
+    claimPages.push(currentPageSlots);
+  }
+
+  claimPages.forEach((slots, i) => {
+    pages.push(renderClaimsPage(slots, 3 + i, i === 0));
+  });
+  const claimPageCount = claimPages.length;
 
   // Recommendations page
   const recsPageNum = 3 + claimPageCount;
