@@ -153,7 +153,7 @@ Deno.serve(async (req: Request) => {
         signal: controller.signal,
         body: JSON.stringify({
           model: ANTHROPIC_MODEL,
-          max_tokens: 8192,
+          max_tokens: 16384,
           temperature: 0.2,
           system: SYSTEM_PROMPT,
           messages: [
@@ -187,13 +187,30 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unexpected AI response format');
     }
 
-    const responseText = data.content[0].text;
+    // Check if the response was truncated
+    if (data.stop_reason === 'max_tokens') {
+      console.error('AI response was truncated (hit max_tokens limit)');
+      throw new Error('Analysis response was too large. Please try a smaller page.');
+    }
+
+    let responseText = data.content[0].text;
+
+    // Strip markdown code fences if present
+    responseText = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error('No JSON object found in response:', responseText.substring(0, 500));
       throw new Error('Failed to parse analysis results');
     }
 
-    const result = JSON.parse(jsonMatch[0]);
+    let result;
+    try {
+      result = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError, '\nResponse excerpt:', jsonMatch[0].substring(0, 500));
+      throw new Error('Failed to parse analysis results. The AI response contained invalid JSON.');
+    }
 
     // Update the scan row with results
     const { error: updateError } = await supabase

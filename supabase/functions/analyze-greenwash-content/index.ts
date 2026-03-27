@@ -182,7 +182,7 @@ Deno.serve(async (req: Request) => {
         signal: controller.signal,
         body: JSON.stringify({
           model: ANTHROPIC_MODEL,
-          max_tokens: 8192,
+          max_tokens: 16384,
           temperature: 0.2,
           system: SYSTEM_PROMPT,
           messages: [
@@ -216,18 +216,26 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unexpected AI response format');
     }
 
-    const content = data.content[0].text;
+    // Check if the response was truncated
+    if (data.stop_reason === 'max_tokens') {
+      console.error('AI response was truncated (hit max_tokens limit)');
+      throw new Error('Analysis response was too large. Please try a smaller page.');
+    }
+
+    let responseContent = data.content[0].text;
     let analysisResult: AnalysisResult;
 
     try {
-      // Extract JSON from the response (in case Claude wraps it in markdown)
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      // Strip markdown code fences if present
+      responseContent = responseContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
+
+      const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('No JSON found in response');
       }
       analysisResult = JSON.parse(jsonMatch[0]);
     } catch (parseError) {
-      console.error('Failed to parse Anthropic response:', content?.substring(0, 500));
+      console.error('Failed to parse Anthropic response:', parseError, '\nExcerpt:', responseContent?.substring(0, 500));
       throw new Error('Failed to parse AI analysis results');
     }
     // Update the assessment with results
