@@ -79,6 +79,11 @@ export default function ComplianceTracker({ pcfId, lcaData, onNavigateToTab, onO
       // no review
     }
 
+    // FLAG compliance data from aggregated impacts breakdown
+    const breakdown = lcaData?.aggregated_impacts?.breakdown;
+    const flagRemovals = breakdown?.flag_removals;
+    const hasViticultureData = !!(breakdown?.viticulture && breakdown.viticulture > 0);
+
     const complianceData: PcfComplianceData = {
       intended_application: lcaData?.intended_application,
       reasons_for_study: lcaData?.reasons_for_study,
@@ -98,6 +103,12 @@ export default function ComplianceTracker({ pcfId, lcaData, onNavigateToTab, onO
       interpretationData: interpRow || null,
       hasReview: !!reviewRow,
       reviewData: reviewRow || null,
+      // FLAG compliance
+      hasViticultureData,
+      hasViticultureLUC: hasViticultureData && flagRemovals?.luc_assessed !== false,
+      hasVerifiedRemovals: flagRemovals?.methodology === 'measured',
+      flagRemovalsMeetLsr: flagRemovals?.methodology === 'measured',
+      emissionsRemovalsSeparated: true, // Platform enforces this by design
     };
 
     setResult(evaluateCompliance(complianceData));

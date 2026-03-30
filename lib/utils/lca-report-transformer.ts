@@ -1450,6 +1450,7 @@ export function transformLCADataForReport(
           n2oDirect: 0,   // Not individually stored on synthetic rows - shown at vineyard level
           n2oIndirect: 0,
           n2oCropResidue: 0,
+          lucCo2e: 0,
           fertiliserProduction: 0,
           machineryFuel: 0,
           irrigationEnergy: 0,
@@ -1463,6 +1464,10 @@ export function transformLCADataForReport(
       soilCarbonCo2e: flagRemovals.soil_carbon_co2e || 0,
       methodology: flagRemovals.methodology || 'practice_based_default',
       isVerified: flagRemovals.methodology === 'measured',
+      meetsLsrStandard: flagRemovals.methodology === 'measured',
+      removalWarning: flagRemovals.methodology !== 'measured'
+        ? 'Practice-based removal defaults have not been independently verified per GHG Protocol Land Sector and Removals Standard V1.0 Section 3.1.4.'
+        : null,
       notes: flagRemovals.viticulture_notes || null,
     } : undefined,
   };

@@ -137,6 +137,8 @@ export default function VineyardsPage() {
             vineyardClimateZone={questionnaireVineyard.climate_zone as VineyardClimateZone}
             vineyardCertification={questionnaireVineyard.certification as VineyardCertification}
             vineyardCountryCode={questionnaireVineyard.location_country_code}
+            vineyardPreviousLandUse={questionnaireVineyard.previous_land_use_type}
+            vineyardLandConversionYear={questionnaireVineyard.land_conversion_year}
             existingProfile={profileMap[questionnaireVineyard.id] || null}
             onComplete={(profile) => {
               setProfileMap((prev) => ({ ...prev, [questionnaireVineyard.id]: profile }));

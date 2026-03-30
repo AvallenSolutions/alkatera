@@ -339,6 +339,7 @@ export interface LCAReportData {
       n2oDirect: number;
       n2oIndirect: number;
       n2oCropResidue: number;
+      lucCo2e: number;
       fertiliserProduction: number;
       machineryFuel: number;
       irrigationEnergy: number;
@@ -351,6 +352,8 @@ export interface LCAReportData {
     soilCarbonCo2e: number;
     methodology: string;
     isVerified: boolean;
+    meetsLsrStandard: boolean;
+    removalWarning: string | null;
     notes: string | null;
   };
 }

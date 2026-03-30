@@ -97,14 +97,59 @@ export const IPCC_N2O_FACTORS = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Soil Carbon Removal Defaults (practice-based)
+// IPCC Carbon Stock Defaults (for dLUC calculation, FLAG-C3)
 // ---------------------------------------------------------------------------
-// Conservative defaults for soil organic carbon sequestration by management
-// practice. Used when verified soil measurements are not available.
+// Carbon stock values per IPCC land use category by climate zone.
+// Used to calculate direct Land Use Change (dLUC) emissions when land is
+// converted to vineyard. Emissions are amortised over 20 years with linear
+// discounting per FLAG Guidance v1.2 Section 4.3.
+//
+// Source: IPCC 2019 Refinement to the 2006 IPCC Guidelines,
+// Volume 4, Chapter 2, Table 2.3 (above-ground + below-ground + soil carbon)
+// Conservative defaults; measured data preferred where available.
+
+/** Total carbon stock per land use type (tonnes C per hectare) */
+export const IPCC_CARBON_STOCK_DEFAULTS: Record<
+  string,
+  Record<string, number>
+> = {
+  permanent_vineyard: { wet: 80, dry: 50, temperate: 63 },
+  grassland:          { wet: 90, dry: 45, temperate: 63 },
+  forest:             { wet: 180, dry: 90, temperate: 130 },
+  arable:             { wet: 55, dry: 30, temperate: 40 },
+  wetland:            { wet: 250, dry: 80, temperate: 150 },
+  settlement:         { wet: 10, dry: 5, temperate: 8 },
+  other_land:         { wet: 20, dry: 10, temperate: 15 },
+};
+
+/** Current vineyard carbon stock (perennial cropland, tonnes C per hectare) */
+export const VINEYARD_CARBON_STOCK: Record<string, number> = {
+  wet: 80,
+  dry: 50,
+  temperate: 63,
+};
+
+/** Carbon to CO2 equivalent conversion factor (molecular weight ratio 44/12) */
+export const C_TO_CO2E = 44 / 12;
+
+/** LUC amortisation period in years (IPCC / GHG Protocol standard) */
+export const LUC_AMORTISATION_YEARS = 20;
+
+// ---------------------------------------------------------------------------
+// Soil Carbon Removal Defaults (carbon stock change approach)
+// ---------------------------------------------------------------------------
+// Conservative defaults for annual soil organic carbon stock changes by
+// management practice. Used when verified soil measurements are not available.
 //
 // FLAG Alignment: These values are reported as POSITIVE removals, never
 // subtracted from emissions. The platform reports them separately per SBTi
-// FLAG Guidance v1.2.
+// FLAG Guidance v1.2 and the GHG Protocol Land Sector and Removals Standard
+// V1.0 (January 2026). Values approximate annual carbon stock changes and
+// should be replaced with measured data where possible.
+//
+// Note: Practice-based defaults have not been independently verified per
+// GHG Protocol LSR Section 3.1.4. They may not be used for removal claims
+// in FLAG targets without third-party verification.
 //
 // Sources:
 //   - WineGB Carbon Calculator (Carbon Trust reviewed, Oct 2025)

@@ -14,7 +14,7 @@
  *   - IPCC 2019 Refinement, Chapter 11 (N2O from managed soils)
  *   - IPCC AR6 GWP-100 (N2O = 273)
  *   - SBTi FLAG Guidance v1.2 (March 2026)
- *   - GHG Protocol Land Sector and Removals (LSR) Guidance
+ *   - GHG Protocol Land Sector and Removals Standard V1.0 (January 2026)
  *   - OIV Resolution OIV-VITI 641-2020
  *   - WineGB Carbon Calculator (Carbon Trust reviewed)
  */
@@ -61,6 +61,16 @@ export type IrrigationEnergySource =
 
 export type VineyardClimateZone = 'wet' | 'dry' | 'temperate';
 
+/** IPCC land use categories for dLUC calculation (FLAG-C3) */
+export type PreviousLandUseType =
+  | 'permanent_vineyard'
+  | 'grassland'
+  | 'forest'
+  | 'arable'
+  | 'wetland'
+  | 'settlement'
+  | 'other_land';
+
 export type SoilCarbonMethodology =
   | 'soc_0_30cm_fixed'
   | 'soc_0_30cm_multi_increment'
@@ -91,6 +101,10 @@ export interface Vineyard {
   address_lat: number | null;
   address_lng: number | null;
   location_country_code: string | null;
+  /** Land use before vineyard establishment (FLAG dLUC) */
+  previous_land_use_type: PreviousLandUseType | null;
+  /** Year land was converted to vineyard (FLAG 20-year amortisation) */
+  land_conversion_year: number | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -185,6 +199,14 @@ export interface ViticultureCalculatorInput {
   soil_carbon_override_kg_co2e_per_ha: number | null;
   /** AWARE water scarcity factor for the vineyard location (caller resolves from DB) */
   aware_factor?: number;
+
+  // LUC (land use change) - from vineyard record (FLAG-C3)
+  /** IPCC land use category before vineyard establishment */
+  previous_land_use_type?: PreviousLandUseType | null;
+  /** Year land was converted to vineyard */
+  land_conversion_year?: number | null;
+  /** Current vintage year (for LUC amortisation calculation) */
+  vintage_year?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,10 +226,21 @@ export interface ViticultureImpactResult {
     n2o_indirect_co2e: number;
     /** N2O from crop residue decomposition (vine prunings, IPCC Ch 11) */
     n2o_crop_residue_co2e: number;
+    /** dLUC emissions amortised over 20 years (kg CO2e, FLAG-C3) */
+    luc_co2e: number;
     /** Land occupation (m2 per year) */
     land_use_m2: number;
     /** Total FLAG emissions (kg CO2e) */
     total_flag_co2e: number;
+    /** Gas-level breakdown within FLAG scope (Section 3.1.6) */
+    gas_inventory?: {
+      /** kg CO2 from land use change */
+      co2_luc: number;
+      /** kg N2O (actual mass, not CO2e) */
+      n2o_total: number;
+      /** kg CH4 (currently 0 for viticulture) */
+      ch4_total: number;
+    };
   };
 
   // FLAG removals (soil carbon sequestration - reported SEPARATELY)
@@ -218,6 +251,10 @@ export interface ViticultureImpactResult {
     methodology: 'practice_based_default' | 'measured';
     /** Whether the value has been independently verified */
     is_verified: boolean;
+    /** Whether removals meet GHG Protocol Land Sector and Removals Standard */
+    removals_meet_lsr_standard: boolean;
+    /** Warning when removals use practice-based defaults without third-party verification */
+    removals_warning?: string;
   };
 
   // Non-FLAG emissions (energy/industrial)

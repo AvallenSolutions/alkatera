@@ -1526,6 +1526,9 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
           irrigation_energy_source: p.irrigation_energy_source,
           grape_yield_tonnes: p.grape_yield_tonnes,
           soil_carbon_override_kg_co2e_per_ha: p.soil_carbon_override_kg_co2e_per_ha,
+          previous_land_use_type: vineyard?.previous_land_use_type,
+          land_conversion_year: vineyard?.land_conversion_year,
+          vintage_year: p.vintage_year,
         },
       }));
 

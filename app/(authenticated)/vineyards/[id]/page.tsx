@@ -127,6 +127,8 @@ export default function VineyardDetailPage() {
             vineyardClimateZone={vineyard.climate_zone as VineyardClimateZone}
             vineyardCertification={vineyard.certification as VineyardCertification}
             vineyardCountryCode={vineyard.location_country_code}
+            vineyardPreviousLandUse={vineyard.previous_land_use_type}
+            vineyardLandConversionYear={vineyard.land_conversion_year}
             existingProfile={editProfile}
             vintageYear={questionnaireYear}
             copyFromData={!editProfile ? copyFromData : undefined}

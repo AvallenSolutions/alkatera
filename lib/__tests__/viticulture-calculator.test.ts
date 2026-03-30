@@ -7,6 +7,10 @@ import {
   DEFRA_FUEL_FACTORS,
   CROP_RESIDUE_FACTORS,
   PESTICIDE_ECOTOX_PROFILES,
+  IPCC_CARBON_STOCK_DEFAULTS,
+  VINEYARD_CARBON_STOCK,
+  C_TO_CO2E,
+  LUC_AMORTISATION_YEARS,
 } from '../ghg-constants';
 import type { ViticultureCalculatorInput } from '../types/viticulture';
 
@@ -173,7 +177,8 @@ describe('calculateViticultureImpacts', () => {
       expect(result.flag_emissions.total_flag_co2e).toEqual(
         result.flag_emissions.n2o_direct_co2e +
         result.flag_emissions.n2o_indirect_co2e +
-        result.flag_emissions.n2o_crop_residue_co2e
+        result.flag_emissions.n2o_crop_residue_co2e +
+        result.flag_emissions.luc_co2e
       );
     });
   });
@@ -637,7 +642,7 @@ describe('calculateViticultureImpacts', () => {
       const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
 
       expect(result.methodology_notes).toContain('Viticulture LCA');
-      expect(result.methodology_notes).toContain('FLAG-compliant');
+      expect(result.methodology_notes).toContain('FLAG v1.2');
       expect(result.methodology_notes).toContain('temperate');
       expect(result.methodology_notes).toContain('Crop residue N2O');
       expect(result.methodology_notes).toContain('USEtox');
@@ -672,6 +677,171 @@ describe('calculateViticultureImpacts', () => {
       const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
 
       expect(result.flag_emissions.land_use_m2).toEqual(5 * 10000);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Land Use Change (dLUC) Tests - FLAG-C3
+  // --------------------------------------------------------------------------
+
+  describe('land use change (dLUC): FLAG-C3 compliance', () => {
+    it('should return zero LUC for permanent vineyard', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        previous_land_use_type: 'permanent_vineyard',
+        land_conversion_year: 2000,
+        vintage_year: 2025,
+      });
+
+      expect(result.flag_emissions.luc_co2e).toBe(0);
+    });
+
+    it('should return zero LUC when no previous land use specified', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      expect(result.flag_emissions.luc_co2e).toBe(0);
+    });
+
+    it('should return zero LUC when conversion was 20+ years ago', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        previous_land_use_type: 'forest',
+        land_conversion_year: 2000,
+        vintage_year: 2025,
+      });
+
+      expect(result.flag_emissions.luc_co2e).toBe(0);
+    });
+
+    it('should calculate correct dLUC for recent forest-to-vineyard conversion', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        previous_land_use_type: 'forest',
+        land_conversion_year: 2020,
+        vintage_year: 2025,
+        area_ha: 5,
+        climate_zone: 'temperate',
+      });
+
+      // Manual calculation:
+      // Forest stock (temperate) = 130 tonnes C/ha
+      // Vineyard stock (temperate) = 63 tonnes C/ha
+      // Stock change = 130 - 63 = 67 tonnes C/ha
+      // Total CO2e = 67 * (44/12) * 1000 * 5 = 67 * 3.667 * 1000 * 5 = 1,228,333 kg CO2e
+      // Annual amortised = 1,228,333 / 20 = 61,416.7 kg CO2e/year
+      const stockChange = IPCC_CARBON_STOCK_DEFAULTS.forest.temperate - VINEYARD_CARBON_STOCK.temperate;
+      const totalCo2e = stockChange * C_TO_CO2E * 1000 * 5;
+      const annualLuc = totalCo2e / LUC_AMORTISATION_YEARS;
+
+      expect(result.flag_emissions.luc_co2e).toBeCloseTo(annualLuc, 1);
+      expect(result.flag_emissions.luc_co2e).toBeGreaterThan(0);
+    });
+
+    it('should return zero LUC when grassland-to-vineyard has no stock loss (temperate)', () => {
+      // Grassland temperate = 63, vineyard temperate = 63 (same stock)
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        previous_land_use_type: 'grassland',
+        land_conversion_year: 2020,
+        vintage_year: 2025,
+      });
+
+      expect(result.flag_emissions.luc_co2e).toBe(0);
+    });
+
+    it('should include LUC in total_flag_co2e', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        previous_land_use_type: 'forest',
+        land_conversion_year: 2020,
+        vintage_year: 2025,
+      });
+
+      expect(result.flag_emissions.total_flag_co2e).toEqual(
+        result.flag_emissions.n2o_direct_co2e +
+        result.flag_emissions.n2o_indirect_co2e +
+        result.flag_emissions.n2o_crop_residue_co2e +
+        result.flag_emissions.luc_co2e
+      );
+    });
+
+    it('should include LUC in total_emissions', () => {
+      const withLuc = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        previous_land_use_type: 'forest',
+        land_conversion_year: 2020,
+        vintage_year: 2025,
+      });
+
+      const withoutLuc = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      expect(withLuc.total_emissions).toBeGreaterThan(withoutLuc.total_emissions);
+    });
+
+    it('should populate gas_inventory with CO2 from LUC', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        previous_land_use_type: 'forest',
+        land_conversion_year: 2020,
+        vintage_year: 2025,
+      });
+
+      expect(result.flag_emissions.gas_inventory).toBeDefined();
+      expect(result.flag_emissions.gas_inventory!.co2_luc).toEqual(result.flag_emissions.luc_co2e);
+      expect(result.flag_emissions.gas_inventory!.n2o_total).toEqual(result.n2o_kg);
+      expect(result.flag_emissions.gas_inventory!.ch4_total).toBe(0);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // LSR (Land Sector and Removals Standard) Alignment Tests
+  // --------------------------------------------------------------------------
+
+  describe('GHG Protocol LSR alignment', () => {
+    it('should set removals_meet_lsr_standard to false for practice-based defaults', () => {
+      const result = calculateViticultureImpacts(ORGANIC_VINEYARD);
+
+      expect(result.flag_removals.removals_meet_lsr_standard).toBe(false);
+    });
+
+    it('should set removals_meet_lsr_standard to true for measured values', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        soil_carbon_override_kg_co2e_per_ha: 800,
+      });
+
+      expect(result.flag_removals.removals_meet_lsr_standard).toBe(true);
+    });
+
+    it('should include warning for practice-based removals with positive values', () => {
+      const result = calculateViticultureImpacts(ORGANIC_VINEYARD);
+
+      expect(result.flag_removals.removals_warning).toBeDefined();
+      expect(result.flag_removals.removals_warning).toContain('Land Sector and Removals Standard');
+      expect(result.flag_removals.removals_warning).toContain('third-party verification');
+    });
+
+    it('should not include warning when removals are zero', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      // Conventional tillage has 0 removals
+      expect(result.flag_removals.soil_carbon_co2e).toBe(0);
+      expect(result.flag_removals.removals_warning).toBeUndefined();
+    });
+
+    it('should not include warning for measured removals', () => {
+      const result = calculateViticultureImpacts({
+        ...UK_VINEYARD_BASELINE,
+        soil_carbon_override_kg_co2e_per_ha: 500,
+      });
+
+      expect(result.flag_removals.removals_warning).toBeUndefined();
+    });
+
+    it('should reference GHG Protocol LSR V1.0 in methodology notes', () => {
+      const result = calculateViticultureImpacts(UK_VINEYARD_BASELINE);
+
+      expect(result.methodology_notes).toContain('GHG Protocol LSR V1.0');
     });
   });
 });

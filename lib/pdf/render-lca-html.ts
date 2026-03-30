@@ -662,8 +662,13 @@ function renderViticulturePage(data: LCAReportData): string {
           <div style="font-size: 11px; color: #6ee7b7;">Soil carbon sequestration (${removals.isVerified ? 'verified measurement' : 'practice-based default'})</div>
         </div>
       </div>
+      ${removals.removalWarning ? `
+      <div style="font-size: 10px; color: #92400e; margin-bottom: 12px; padding: 10px; background: #fffbeb; border-radius: 6px; border-left: 3px solid #f59e0b;">
+        <strong>Verification note:</strong> ${removals.removalWarning}
+      </div>
+      ` : ''}
       <div style="font-size: 10px; color: #78716c; margin-bottom: 20px; padding: 10px; background: #fafaf9; border-radius: 6px; border-left: 3px solid #ccff00;">
-        <strong>SBTi FLAG Compliance:</strong> Emissions and removals are reported separately and never netted, in accordance with SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2. Removals represent soil organic carbon sequestration and are reported as positive values.
+        <strong>SBTi FLAG Compliance:</strong> Emissions and removals are reported separately and never netted, in accordance with SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2 and the GHG Protocol Land Sector and Removals Standard V1.0. Removals represent soil organic carbon sequestration using the carbon stock change approach and are reported as positive values.
       </div>
       ` : ''}
 

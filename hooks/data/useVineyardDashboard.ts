@@ -82,6 +82,9 @@ export function useVineyardDashboard(vineyardId: string): UseVineyardDashboardRe
           irrigation_energy_source: profile.irrigation_energy_source,
           grape_yield_tonnes: profile.grape_yield_tonnes,
           soil_carbon_override_kg_co2e_per_ha: profile.soil_carbon_override_kg_co2e_per_ha,
+          previous_land_use_type: found.previous_land_use_type,
+          land_conversion_year: found.land_conversion_year,
+          vintage_year: profile.vintage_year,
         });
 
         const isComplete = profile.area_ha > 0 && profile.grape_yield_tonnes > 0;

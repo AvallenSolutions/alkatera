@@ -53,6 +53,7 @@ import type {
   ViticultureCalculatorInput,
   VineyardClimateZone,
   VineyardCertification,
+  PreviousLandUseType,
 } from '@/lib/types/viticulture';
 
 interface QuestionnaireProps {
@@ -62,12 +63,24 @@ interface QuestionnaireProps {
   vineyardClimateZone: VineyardClimateZone;
   vineyardCertification: VineyardCertification;
   vineyardCountryCode: string | null;
+  vineyardPreviousLandUse?: PreviousLandUseType | null;
+  vineyardLandConversionYear?: number | null;
   existingProfile?: VineyardGrowingProfile | null;
   vintageYear?: number;
   copyFromData?: Record<string, any>;
   onComplete: (profile: VineyardGrowingProfile) => void;
   onCancel: () => void;
 }
+
+const PREVIOUS_LAND_USE_OPTIONS: { value: PreviousLandUseType; label: string }[] = [
+  { value: 'permanent_vineyard', label: 'Already a vineyard (no land use change)' },
+  { value: 'grassland', label: 'Grassland / pasture' },
+  { value: 'arable', label: 'Arable cropland' },
+  { value: 'forest', label: 'Forest / woodland' },
+  { value: 'wetland', label: 'Wetland' },
+  { value: 'settlement', label: 'Settlement / urban land' },
+  { value: 'other_land', label: 'Other land' },
+];
 
 const PESTICIDE_TYPES: { value: PesticideType; label: string }[] = [
   { value: 'generic', label: 'Generic / mixed products' },
@@ -122,6 +135,8 @@ export function VineyardGrowingQuestionnaire({
   vineyardClimateZone,
   vineyardCertification,
   vineyardCountryCode,
+  vineyardPreviousLandUse,
+  vineyardLandConversionYear,
   existingProfile,
   vintageYear,
   copyFromData,
@@ -158,6 +173,9 @@ export function VineyardGrowingQuestionnaire({
     water_m3_per_ha: initSource?.water_m3_per_ha ?? 0,
     irrigation_energy_source: (initSource?.irrigation_energy_source ?? 'none') as IrrigationEnergySource,
     grape_yield_tonnes: initSource?.grape_yield_tonnes ?? 0,
+    // Land use change (FLAG-C3) - stored on vineyard, not growing profile
+    previous_land_use_type: (vineyardPreviousLandUse ?? 'permanent_vineyard') as PreviousLandUseType,
+    land_conversion_year: vineyardLandConversionYear ?? null as number | null,
     // Soil carbon measured data
     has_measured_soil_carbon: !!(initSource?.soil_carbon_override_kg_co2e_per_ha),
     soil_carbon_override_kg_co2e_per_ha: initSource?.soil_carbon_override_kg_co2e_per_ha ?? null as number | null,
@@ -259,6 +277,25 @@ export function VineyardGrowingQuestionnaire({
         is_draft: asDraft,
       };
 
+      // Save LUC fields to the vineyard record (not the growing profile)
+      const lucChanged =
+        form.previous_land_use_type !== (vineyardPreviousLandUse ?? 'permanent_vineyard') ||
+        form.land_conversion_year !== vineyardLandConversionYear;
+      if (lucChanged) {
+        await fetch(`/api/vineyards/${vineyardId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            previous_land_use_type: form.previous_land_use_type === 'permanent_vineyard'
+              ? null
+              : form.previous_land_use_type,
+            land_conversion_year: form.previous_land_use_type === 'permanent_vineyard'
+              ? null
+              : form.land_conversion_year,
+          }),
+        });
+      }
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
@@ -329,6 +366,9 @@ export function VineyardGrowingQuestionnaire({
     soil_carbon_override_kg_co2e_per_ha: form.has_measured_soil_carbon
       ? form.soil_carbon_override_kg_co2e_per_ha
       : null,
+    previous_land_use_type: form.previous_land_use_type,
+    land_conversion_year: form.land_conversion_year,
+    vintage_year: selectedVintageYear,
   });
 
   return (
@@ -502,6 +542,61 @@ export function VineyardGrowingQuestionnaire({
                     checked={form.pruning_residue_returned}
                     onCheckedChange={(v) => updateForm({ pruning_residue_returned: v })}
                   />
+                </div>
+
+                <Separator />
+
+                {/* Land Use Change (FLAG-C3) */}
+                <div className="grid gap-4">
+                  <div>
+                    <Label>Previous land use</Label>
+                    <p className="text-xs text-muted-foreground">
+                      What was this land used for before it became a vineyard?
+                      Required for FLAG-compliant land use change (dLUC) calculations.
+                    </p>
+                  </div>
+                  <Select
+                    value={form.previous_land_use_type}
+                    onValueChange={(v) => updateForm({ previous_land_use_type: v as PreviousLandUseType })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PREVIOUS_LAND_USE_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {form.previous_land_use_type !== 'permanent_vineyard' && (
+                    <div className="grid gap-2 max-w-[200px]">
+                      <Label htmlFor="conversion-year">Year of conversion to vineyard</Label>
+                      <Input
+                        id="conversion-year"
+                        type="number"
+                        min="1900"
+                        max={currentYear}
+                        value={form.land_conversion_year ?? ''}
+                        onChange={(e) =>
+                          updateForm({
+                            land_conversion_year: e.target.value ? parseInt(e.target.value) : null,
+                          })
+                        }
+                        placeholder={`e.g. ${currentYear - 5}`}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Emissions from land use change are amortised over 20 years.
+                        {form.land_conversion_year && currentYear - form.land_conversion_year >= 20 && (
+                          <span className="block mt-1 text-green-600 dark:text-green-400">
+                            Conversion was 20+ years ago, so dLUC emissions are fully amortised (zero).
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />

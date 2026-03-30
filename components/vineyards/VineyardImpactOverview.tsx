@@ -21,6 +21,7 @@ import {
   Waves,
   ShieldAlert,
   Zap,
+  AlertTriangle,
 } from 'lucide-react';
 import type { ViticultureImpactResult, VineyardGrowingProfile } from '@/lib/types/viticulture';
 
@@ -210,13 +211,16 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <FlaskConical className="h-4 w-4 text-amber-500" />
-              N\u2082O Emissions (FLAG)
+              FLAG Emissions (N\u2082O + dLUC)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <DetailRow label="Direct N\u2082O (fertiliser)" value={`${fmt(impacts.flag_emissions.n2o_direct_co2e)} kg CO\u2082e`} />
             <DetailRow label="Indirect N\u2082O (volatilisation + leaching)" value={`${fmt(impacts.flag_emissions.n2o_indirect_co2e)} kg CO\u2082e`} />
             <DetailRow label="Crop residue N\u2082O (vine prunings)" value={`${fmt(impacts.flag_emissions.n2o_crop_residue_co2e)} kg CO\u2082e`} />
+            {impacts.flag_emissions.luc_co2e > 0 && (
+              <DetailRow label="Land use change (dLUC)" value={`${fmt(impacts.flag_emissions.luc_co2e)} kg CO\u2082e`} />
+            )}
             <div className="border-t pt-2 mt-2">
               <DetailRow label="Total FLAG emissions" value={`${fmt(impacts.flag_emissions.total_flag_co2e)} kg CO\u2082e`} bold />
             </div>
@@ -330,8 +334,16 @@ export function VineyardImpactOverview({ impacts, profile }: VineyardImpactOverv
                 </Badge>
               )}
             </div>
+            {impacts.flag_removals.removals_warning && (
+              <div className="flex items-start gap-2 mt-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/20">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {impacts.flag_removals.removals_warning}
+                </p>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground mt-2">
-              Removals are reported separately from emissions per SBTi FLAG Guidance v1.2 and are never netted against the emissions total.
+              Removals are reported separately from emissions per SBTi FLAG Guidance v1.2 and the GHG Protocol Land Sector and Removals Standard V1.0. They are never netted against the emissions total.
             </p>
           </CardContent>
         </Card>

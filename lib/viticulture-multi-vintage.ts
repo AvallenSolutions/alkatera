@@ -124,6 +124,7 @@ function combineImpacts(
       n2o_direct_co2e: reduce(results.map((r) => r.flag_emissions.n2o_direct_co2e)),
       n2o_indirect_co2e: reduce(results.map((r) => r.flag_emissions.n2o_indirect_co2e)),
       n2o_crop_residue_co2e: reduce(results.map((r) => r.flag_emissions.n2o_crop_residue_co2e)),
+      luc_co2e: reduce(results.map((r) => r.flag_emissions.luc_co2e)),
       land_use_m2: reduce(results.map((r) => r.flag_emissions.land_use_m2)),
       total_flag_co2e: reduce(results.map((r) => r.flag_emissions.total_flag_co2e)),
     },
@@ -131,6 +132,8 @@ function combineImpacts(
       soil_carbon_co2e: reduce(results.map((r) => r.flag_removals.soil_carbon_co2e)),
       methodology: first.flag_removals.methodology,
       is_verified: results.every((r) => r.flag_removals.is_verified),
+      removals_meet_lsr_standard: results.every((r) => r.flag_removals.removals_meet_lsr_standard),
+      removals_warning: first.flag_removals.removals_warning,
     },
     non_flag_emissions: {
       fertiliser_production_co2e: reduce(results.map((r) => r.non_flag_emissions.fertiliser_production_co2e)),

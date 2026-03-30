@@ -127,6 +127,11 @@ export function LcaReportGenerator({
         .eq('product_carbon_footprint_id', pcfId)
         .maybeSingle();
 
+      // FLAG compliance data
+      const breakdown = pcf.aggregated_impacts?.breakdown;
+      const flagRemovalsData = breakdown?.flag_removals;
+      const hasViticultureData = !!(breakdown?.viticulture && breakdown.viticulture > 0);
+
       const complianceData: PcfComplianceData = {
         intended_application: pcf.intended_application,
         reasons_for_study: pcf.reasons_for_study,
@@ -153,6 +158,12 @@ export function LcaReportGenerator({
               reviewer_statement: review.reviewer_statement,
             }
           : null,
+        // FLAG compliance
+        hasViticultureData,
+        hasViticultureLUC: hasViticultureData && flagRemovalsData?.luc_assessed !== false,
+        hasVerifiedRemovals: flagRemovalsData?.methodology === 'measured',
+        flagRemovalsMeetLsr: flagRemovalsData?.methodology === 'measured',
+        emissionsRemovalsSeparated: true,
       };
 
       const result = evaluateCompliance(complianceData);

@@ -30,6 +30,7 @@ import type {
   ViticultureCalculatorInput,
   ViticultureImpactResult,
   VineyardClimateZone,
+  PreviousLandUseType,
 } from './types/viticulture';
 
 import {
@@ -40,6 +41,10 @@ import {
   AGROCHEMICAL_PRODUCTION_FACTORS,
   CROP_RESIDUE_FACTORS,
   PESTICIDE_ECOTOX_PROFILES,
+  IPCC_CARBON_STOCK_DEFAULTS,
+  VINEYARD_CARBON_STOCK,
+  C_TO_CO2E,
+  LUC_AMORTISATION_YEARS,
 } from './ghg-constants';
 
 import { getGridFactor } from './grid-emission-factors';
@@ -68,6 +73,47 @@ const DEFAULT_IRRIGATION_KWH_PER_M3 = 0.5;
 
 /** Diesel pump energy: litres diesel per m3 of water pumped */
 const DIESEL_PUMP_L_PER_M3 = 0.15;
+
+// ---------------------------------------------------------------------------
+// LUC (land use change) calculation - FLAG-C3
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculate direct land use change (dLUC) emissions.
+ *
+ * When land is converted to vineyard, the carbon stock difference between
+ * the previous and current land use is amortised over 20 years with linear
+ * discounting, per IPCC Guidelines and FLAG Guidance v1.2 Section 4.3.
+ *
+ * Returns 0 if the vineyard is permanent (>20 years), if no conversion data
+ * is provided, or if the carbon stock increased (no net emission).
+ */
+function calculateLUC(
+  previousLandUse: PreviousLandUseType | null | undefined,
+  conversionYear: number | null | undefined,
+  climateZone: VineyardClimateZone,
+  areaHa: number,
+  currentYear: number,
+): number {
+  if (!previousLandUse || previousLandUse === 'permanent_vineyard') return 0;
+  if (!conversionYear) return 0;
+
+  const yearsElapsed = currentYear - conversionYear;
+  if (yearsElapsed >= LUC_AMORTISATION_YEARS) return 0; // Fully amortised
+  if (yearsElapsed < 0) return 0; // Future conversion date
+
+  const previousStock = IPCC_CARBON_STOCK_DEFAULTS[previousLandUse]?.[climateZone];
+  const currentStock = VINEYARD_CARBON_STOCK[climateZone];
+  if (previousStock == null || currentStock == null) return 0;
+
+  const stockChangeTonnesC = previousStock - currentStock;
+  if (stockChangeTonnesC <= 0) return 0; // No net carbon loss
+
+  // Convert tonnes C to kg CO2e, amortise linearly over 20 years
+  const totalCo2eKg = stockChangeTonnesC * C_TO_CO2E * 1000 * areaHa;
+  // Annual amortised portion (same each year for remaining period)
+  return totalCo2eKg / LUC_AMORTISATION_YEARS;
+}
 
 // ---------------------------------------------------------------------------
 // Main calculator
@@ -259,6 +305,21 @@ export function calculateViticultureImpacts(
   const landUseM2 = input.area_ha * 10000; // hectares to m2
 
   // ========================================================================
+  // 5b. LAND USE CHANGE - dLUC (FLAG-C3)
+  // ========================================================================
+  // Carbon stock change when land was converted to vineyard, amortised over
+  // 20 years per IPCC/GHG Protocol/FLAG Guidance v1.2 Section 4.3.
+
+  const currentYear = input.vintage_year || new Date().getFullYear();
+  const lucCo2e = calculateLUC(
+    input.previous_land_use_type,
+    input.land_conversion_year,
+    climateZone,
+    input.area_ha,
+    currentYear,
+  );
+
+  // ========================================================================
   // 6. SOIL CARBON REMOVALS (FLAG: reported separately)
   // ========================================================================
 
@@ -282,7 +343,7 @@ export function calculateViticultureImpacts(
   // TOTALS AND NORMALISATION
   // ========================================================================
 
-  const totalFlagEmissions = n2oDirectCo2e + n2oIndirectCo2e + n2oCropResidueCo2e;
+  const totalFlagEmissions = n2oDirectCo2e + n2oIndirectCo2e + n2oCropResidueCo2e + lucCo2e;
   const totalNonFlagEmissions =
     fertiliserProductionCo2e +
     machineryFuelCo2e +
@@ -303,18 +364,32 @@ export function calculateViticultureImpacts(
   // Methodology notes
   const methodologyNotes = buildMethodologyNotes(input, climateZone);
 
+  // LSR alignment: practice-based defaults do not meet verification requirements
+  const removalsMeetLsrStandard = soilCarbonMethodology === 'measured';
+  const removalsWarning = (!removalsMeetLsrStandard && soilCarbonCo2e > 0)
+    ? 'Practice-based removal estimates have not been independently verified per GHG Protocol Land Sector and Removals Standard V1.0, Section 3.1.4. Values may not be used for FLAG target removal claims without third-party verification.'
+    : undefined;
+
   return {
     flag_emissions: {
       n2o_direct_co2e: n2oDirectCo2e,
       n2o_indirect_co2e: n2oIndirectCo2e,
       n2o_crop_residue_co2e: n2oCropResidueCo2e,
+      luc_co2e: lucCo2e,
       land_use_m2: landUseM2,
       total_flag_co2e: totalFlagEmissions,
+      gas_inventory: {
+        co2_luc: lucCo2e, // LUC emissions are CO2
+        n2o_total: n2oKg,
+        ch4_total: 0, // No CH4 in viticulture scope currently
+      },
     },
     flag_removals: {
       soil_carbon_co2e: soilCarbonCo2e,
       methodology: soilCarbonMethodology,
       is_verified: soilCarbonVerified,
+      removals_meet_lsr_standard: removalsMeetLsrStandard,
+      removals_warning: removalsWarning,
     },
     non_flag_emissions: {
       fertiliser_production_co2e: fertiliserProductionCo2e,
@@ -474,11 +549,15 @@ function buildMethodologyNotes(
     parts.push('Crop residue N2O: vine prunings (IPCC Ch 11)');
   }
 
+  if (input.previous_land_use_type && input.previous_land_use_type !== 'permanent_vineyard') {
+    parts.push(`dLUC: converted from ${input.previous_land_use_type} (${input.land_conversion_year || 'unknown'}), 20-year amortisation`);
+  }
+
   if (input.aware_factor && input.aware_factor !== 1.0) {
     parts.push(`AWARE water scarcity factor: ${input.aware_factor.toFixed(2)}`);
   }
 
-  parts.push('IPCC 2019 Tier 1, DEFRA 2025, USEtox 2.0, FLAG-compliant');
+  parts.push('IPCC 2019 Tier 1, DEFRA 2025, USEtox 2.0. SBTi FLAG v1.2 and GHG Protocol LSR V1.0 compliant');
 
   return parts.join('. ');
 }

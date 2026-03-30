@@ -65,6 +65,13 @@ export interface PcfComplianceData {
     reviewers?: any[] | null;
     reviewer_statement?: string | null;
   } | null;
+  // FLAG (SBTi Forest, Land and Agriculture) compliance data
+  hasViticultureData?: boolean;
+  hasViticultureLUC?: boolean;
+  hasVerifiedRemovals?: boolean;
+  flagRemovalsMeetLsr?: boolean;
+  emissionsRemovalsSeparated?: boolean;
+
   // ISO 14044 Data Quality Assessment (from lib/data-quality-assessment.ts)
   dataQualityAssessment?: {
     overallDqi?: number;                    // 0-100 pedigree-based score
@@ -345,6 +352,41 @@ export function evaluateCompliance(data: PcfComplianceData): ComplianceResult {
     },
   ];
   sections.push(buildSection('review', 'Critical Review', '6', 'Independent review of the LCA study for quality and compliance', criticalReviewItems));
+
+  // 8. FLAG Compliance (SBTi FLAG Guidance v1.2) — only shown when viticulture data exists
+  if (data.hasViticultureData) {
+    const flagItems: ComplianceItem[] = [
+      {
+        id: 'emissions_removals_separated',
+        label: 'Emissions and removals reported separately',
+        hint: 'FLAG v1.2 requires emissions and removals to never be netted (FLAG-C5/C11)',
+        complete: data.emissionsRemovalsSeparated !== false, // true by default (platform enforces this)
+        required: true,
+      },
+      {
+        id: 'luc_assessed',
+        label: 'Land use change (dLUC) assessed',
+        hint: 'FLAG-C3 requires direct land use change emissions using a 20-year assessment period',
+        complete: !!data.hasViticultureLUC,
+        required: true,
+      },
+      {
+        id: 'removals_verified',
+        label: 'Soil carbon removals independently verified',
+        hint: 'GHG Protocol Land Sector and Removals Standard V1.0 Section 3.1.4 requires third-party verification for FLAG target claims',
+        complete: !!data.hasVerifiedRemovals,
+        required: false,
+      },
+      {
+        id: 'removals_lsr_compliant',
+        label: 'Removals meet GHG Protocol LSR V1.0 standard',
+        hint: 'Removals must use the carbon stock change approach and be independently verified to count towards FLAG targets',
+        complete: !!data.flagRemovalsMeetLsr,
+        required: false,
+      },
+    ];
+    sections.push(buildSection('flag', 'FLAG Compliance', 'SBTi v1.2', 'SBTi Forest, Land and Agriculture (FLAG) Guidance v1.2 and GHG Protocol LSR V1.0', flagItems));
+  }
 
   // Calculate overall score
   const totalRequired = sections.reduce((sum, s) => sum + s.items.filter(i => i.required).length, 0);
