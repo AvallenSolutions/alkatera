@@ -53,6 +53,7 @@ import {
   Lock,
   Database,
   ArrowUpCircle,
+  TreePine,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
@@ -101,6 +102,7 @@ const navigationStructure: NavItem[] = [
     children: [
       { name: 'Facilities',   href: '/company/facilities/', icon: Warehouse,      minTier: 1 },
       { name: 'Vineyards',   href: '/vineyards/',          icon: Leaf,           minTier: 1, featureCode: 'viticulture_beta', viticultureOnly: true },
+      { name: 'Orchards',    href: '/orchards/',           icon: TreePine,       minTier: 1, featureCode: 'orchard_beta' },
       { name: 'Fleet',        href: '/company/fleet/',      icon: Truck,          minTier: 2, featureCode: 'vehicle_registry' },
       { name: 'Log Data',     href: '/company/log-data/',   icon: ClipboardCheck, minTier: 1 },
       { name: 'Suppliers',    href: '/suppliers/',          icon: Users,          minTier: 1 },
@@ -231,8 +233,8 @@ const navigationStructure: NavItem[] = [
     minTier: 1,
     children: [
       { name: 'Knowledge Bank',     href: '/knowledge-bank/',     icon: GraduationCap, minTier: 1 },
-      // { name: 'Expert Partners',    href: '/expert-partners/',    icon: Handshake,     minTier: 1 }, // Hidden - not ready for public viewing
       { name: 'Greenwash Guardian', href: '/greenwash-guardian/', icon: Leaf,          minTier: 2 },
+      { name: 'Expert Partners',    href: '/expert-partners/',    icon: Handshake,     minTier: 1 },
     ],
   },
   {

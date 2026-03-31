@@ -12,6 +12,9 @@ import type { MaturationProfile } from './types/maturation';
 import { calculateViticultureImpacts } from './viticulture-calculator';
 import { calculateMultiVintageAverage } from './viticulture-multi-vintage';
 import type { VineyardGrowingProfile, Vineyard } from './types/viticulture';
+import { calculateOrchardImpacts } from './orchard-calculator';
+import { calculateMultiHarvestAverage } from './orchard-multi-harvest';
+import type { Orchard } from './types/orchard';
 import { getGridFactor } from './grid-emission-factors';
 
 export interface FacilityAllocationInput {
@@ -1721,6 +1724,321 @@ export async function calculateProductCarbonFootprint(params: CalculatePCFParams
       }
 
       console.log(`[calculateProductCarbonFootprint] ✓ Viticulture impacts: emissions=${vitResult.total_emissions.toFixed(1)} kg CO2e, removals=${vitResult.total_removals.toFixed(1)} kg CO2e (${vitResult.flag_removals.methodology}), per-kg=${vitResult.total_emissions_per_kg.toFixed(4)} kg CO2e/kg grapes`);
+    }
+
+    // ========================================================================
+    // 5b. ORCHARD (Fruit Growing) — Self-grown fruit integration
+    // ========================================================================
+    //
+    // Mirrors viticulture integration above. For producers who grow their own
+    // fruit (e.g. apples for calvados/cider, pears for perry), the orchard
+    // calculator computes field-level emissions from fertiliser N2O, machinery
+    // fuel, irrigation, transport, and soil carbon removals.
+    //
+    // Conversion factors (kg fruit per litre finished product):
+    //   Calvados / apple brandy: ~8 kg apples per litre (distillation concentration)
+    //   Cider:                   ~1.5 kg apples per litre
+    //   Perry:                   ~1.5 kg pears per litre
+    //   Fruit wine:              ~1.3 kg fruit per litre (similar to grape wine)
+    //   Fruit liqueur:           ~3 kg fruit per litre (maceration + sugar)
+    //   Default:                 ~2 kg fruit per litre
+
+    // Find orchard_id from self-grown ingredients linked to this product
+    const { data: selfGrownOrchardIngredients } = await supabase
+      .from('product_materials')
+      .select('orchard_id')
+      .eq('product_id', parseInt(productId))
+      .eq('is_self_grown', true)
+      .not('orchard_id', 'is', null);
+
+    const orchardIds = Array.from(new Set(
+      (selfGrownOrchardIngredients || []).map((m: any) => m.orchard_id).filter(Boolean)
+    ));
+
+    const orchardId = orchardIds[0]; // Process first linked orchard
+    const { data: orchardProfiles } = orchardId
+      ? await supabase
+          .from('orchard_growing_profiles')
+          .select('*, orchards(*)')
+          .eq('orchard_id', orchardId)
+          .order('harvest_year', { ascending: false })
+      : { data: null };
+
+    const orchardProfile = orchardProfiles?.[0];
+
+    if (orchardProfile) {
+      const orchard = orchardProfile.orchards as unknown as Orchard;
+      const orchardProfileCount = orchardProfiles!.length;
+      console.log(`[calculateProductCarbonFootprint] Processing orchard for "${orchard?.name || 'unknown'}" (${orchardProfileCount} harvest${orchardProfileCount > 1 ? 's' : ''})...`);
+
+      // Build inputs for all available harvests
+      const harvestInputs = orchardProfiles!.map((p: any) => ({
+        harvest_year: p.harvest_year,
+        input: {
+          orchard_type: orchard?.orchard_type || 'apple',
+          climate_zone: orchard?.climate_zone || 'temperate',
+          certification: orchard?.certification || 'conventional',
+          location_country_code: orchard?.location_country_code || null,
+          area_ha: p.area_ha,
+          soil_management: p.soil_management,
+          pruning_residue_returned: p.pruning_residue_returned ?? true,
+          fertiliser_type: p.fertiliser_type,
+          fertiliser_quantity_kg: p.fertiliser_quantity_kg,
+          fertiliser_n_content_percent: p.fertiliser_n_content_percent,
+          uses_pesticides: p.uses_pesticides,
+          pesticide_applications_per_year: p.pesticide_applications_per_year,
+          pesticide_type: p.pesticide_type || 'generic',
+          uses_herbicides: p.uses_herbicides,
+          herbicide_applications_per_year: p.herbicide_applications_per_year,
+          herbicide_type: p.herbicide_type || 'generic',
+          diesel_litres_per_year: p.diesel_litres_per_year,
+          petrol_litres_per_year: p.petrol_litres_per_year,
+          is_irrigated: p.is_irrigated,
+          water_m3_per_ha: p.water_m3_per_ha,
+          irrigation_energy_source: p.irrigation_energy_source,
+          fruit_yield_tonnes: p.fruit_yield_tonnes,
+          transport_distance_km: p.transport_distance_km || 0,
+          transport_mode: p.transport_mode || 'road',
+          soil_carbon_override_kg_co2e_per_ha: p.soil_carbon_override_kg_co2e_per_ha,
+          previous_land_use_type: orchard?.previous_land_use_type,
+          land_conversion_year: orchard?.land_conversion_year,
+          harvest_year: p.harvest_year,
+        },
+      }));
+
+      // Multi-harvest averaging (median for 3+, mean for 2, single for 1)
+      const multiHarvestResult = calculateMultiHarvestAverage(harvestInputs);
+      const orchResult = multiHarvestResult.averaged_impacts;
+      const harvestNote = orchardProfileCount > 1
+        ? ` (${multiHarvestResult.method}: harvests ${multiHarvestResult.harvests_used.join(', ')})`
+        : '';
+
+      // --- Per-unit allocation ---
+      // Orchard impacts are computed for the entire orchard area.
+      // Normalise to per-unit using fruit yield and product-specific conversion.
+      const rawUnitSize = product.unit_size_unit === 'ml'
+        ? Number(product.unit_size_value) / 1000.0
+        : Number(product.unit_size_value || 0.75);
+      const unitSizeLitres = rawUnitSize > 0 ? rawUnitSize : 0.75;
+
+      // Fruit-to-product conversion factor (kg fruit per litre finished product)
+      // Determined by product type and production process.
+      const FRUIT_CONVERSION_FACTORS: Record<string, number> = {
+        spirits: 8.0,    // Calvados, fruit brandy: ~8 kg apples per litre (distillation)
+        cider: 1.5,      // Cider/perry: ~1.5 kg fruit per litre
+        wine: 1.3,       // Fruit wine: ~1.3 kg per litre (similar to grape)
+        liqueur: 3.0,    // Fruit liqueur: ~3 kg per litre (maceration)
+      };
+      const productType = (product.product_type || '').toLowerCase();
+      let fruitKgPerLitre = FRUIT_CONVERSION_FACTORS[productType] || 2.0; // Default 2 kg/L
+
+      // Refine for specific spirit subtypes
+      if (productType === 'spirits' || productType.includes('spirit')) {
+        // Calvados and apple/pear brandy use high fruit concentration
+        const productName = (product.name || '').toLowerCase();
+        if (productName.includes('calvados') || productName.includes('brandy')) {
+          fruitKgPerLitre = 8.0;
+        } else if (productName.includes('liqueur')) {
+          fruitKgPerLitre = 3.0;
+        }
+      }
+      // Beer & Cider category
+      if (productType.includes('cider') || productType.includes('beer')) {
+        fruitKgPerLitre = 1.5;
+      }
+
+      const fruitKgPerUnit = unitSizeLitres * fruitKgPerLitre;
+      const totalUnits = (orchardProfile.fruit_yield_tonnes * 1000) / fruitKgPerUnit;
+
+      // Per-unit impact factors
+      const orchFertFieldPerUnit = totalUnits > 0
+        ? (orchResult.flag_emissions.total_flag_co2e + orchResult.non_flag_emissions.fertiliser_production_co2e) / totalUnits
+        : 0;
+      const orchFuelPerUnit = totalUnits > 0
+        ? orchResult.non_flag_emissions.machinery_fuel_co2e / totalUnits
+        : 0;
+      const orchIrrigationPerUnit = totalUnits > 0
+        ? orchResult.non_flag_emissions.irrigation_energy_co2e / totalUnits
+        : 0;
+      const orchTransportPerUnit = totalUnits > 0
+        ? orchResult.non_flag_emissions.transport_co2e / totalUnits
+        : 0;
+      const orchWaterPerUnit = totalUnits > 0
+        ? orchResult.water_m3 / totalUnits
+        : 0;
+      const orchLandPerUnit = totalUnits > 0
+        ? orchResult.flag_emissions.land_use_m2 / totalUnits
+        : 0;
+      const orchRemovalsPerUnit = totalUnits > 0
+        ? orchResult.total_removals / totalUnits
+        : 0;
+      const orchPesticidePerUnit = totalUnits > 0
+        ? orchResult.non_flag_emissions.pesticide_production_co2e / totalUnits
+        : 0;
+      const orchN2oKgPerUnit = totalUnits > 0
+        ? orchResult.n2o_kg / totalUnits
+        : 0;
+
+      console.log(`[calculateProductCarbonFootprint] Orchard per-unit: ${totalUnits.toFixed(0)} units (${fruitKgPerLitre} kg fruit/L), fert+N2O=${orchFertFieldPerUnit.toFixed(4)}, fuel=${orchFuelPerUnit.toFixed(4)}, transport=${orchTransportPerUnit.toFixed(4)}, removals=${orchRemovalsPerUnit.toFixed(4)}`);
+
+      // Synthetic row template (shared fields)
+      const orchBaseRow = {
+        product_carbon_footprint_id: lca.id,
+        material_type: 'ingredient' as const,
+        quantity: unitSizeLitres,
+        unit: 'L',
+        unit_name: 'L',
+        packaging_category: null,
+        origin_country: orchard?.address_country || null,
+        country_of_origin: orchard?.address_country || null,
+        is_organic: orchard?.certification === 'organic' || orchard?.certification === 'biodynamic',
+        is_organic_certified: orchard?.certification === 'organic',
+        supplier_product_id: null,
+        data_source: null,
+        data_source_id: null,
+        transport_mode: null,
+        distance_km: null,
+        impact_transport: 0,
+        origin_address: null,
+        origin_lat: orchard?.address_lat || null,
+        origin_lng: orchard?.address_lng || null,
+        origin_country_code: orchard?.location_country_code || null,
+        data_priority: 2 as const,
+        data_quality_tag: 'Secondary_Modelled' as const,
+        supplier_lca_id: null,
+        impact_source: 'secondary_modelled' as const,
+        impact_reference_id: null,
+        gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+        non_gwp_data_source: 'IPCC 2019 Tier 1 / DEFRA 2025',
+        is_hybrid_source: false,
+        category_type: 'MANUFACTURING_MATERIAL',
+      };
+
+      // Row 1: Fertiliser & Field Emissions (N2O + production)
+      lcaMaterialsWithImpacts.push({
+        ...orchBaseRow,
+        name: '[Orchard] Fertiliser & Field Emissions',
+        material_name: '[Orchard] Fertiliser & Field Emissions',
+        impact_climate: orchFertFieldPerUnit + orchPesticidePerUnit,
+        impact_climate_fossil: orchFertFieldPerUnit * 0.95 + orchPesticidePerUnit,
+        impact_climate_biogenic: 0,
+        impact_climate_dluc: 0,
+        ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0,
+        n2o_kg: orchN2oKgPerUnit,
+        impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+        impact_freshwater_ecotoxicity: totalUnits > 0 ? orchResult.freshwater_ecotoxicity / totalUnits : 0,
+        impact_terrestrial_ecotoxicity: totalUnits > 0 ? orchResult.terrestrial_ecotoxicity / totalUnits : 0,
+        impact_human_toxicity_non_carcinogenic: totalUnits > 0 ? orchResult.human_toxicity_non_carcinogenic / totalUnits : 0,
+        impact_freshwater_eutrophication: totalUnits > 0 ? orchResult.freshwater_eutrophication / totalUnits : 0,
+        impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+        confidence_score: 65,
+        methodology: orchResult.methodology_notes,
+        source_reference: `Fertiliser: ${orchResult.flag_emissions.n2o_direct_co2e.toFixed(1)} kg CO2e direct N2O + ${orchResult.flag_emissions.n2o_indirect_co2e.toFixed(1)} kg indirect + ${orchResult.non_flag_emissions.fertiliser_production_co2e.toFixed(1)} kg production${harvestNote}`,
+        data_quality_grade: orchResult.data_quality_grade,
+      });
+
+      // Row 2: Machinery Fuel
+      if (orchFuelPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...orchBaseRow,
+          name: '[Orchard] Machinery Fuel',
+          material_name: '[Orchard] Machinery Fuel',
+          impact_climate: orchFuelPerUnit,
+          impact_climate_fossil: orchFuelPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 70,
+          methodology: 'DEFRA 2025 fuel combustion factors',
+          source_reference: `Diesel: ${orchardProfile.diesel_litres_per_year} L/yr, Petrol: ${orchardProfile.petrol_litres_per_year} L/yr. Total: ${orchResult.non_flag_emissions.machinery_fuel_co2e.toFixed(1)} kg CO2e / ${totalUnits.toFixed(0)} units`,
+          data_quality_grade: orchResult.data_quality_grade,
+        });
+      }
+
+      // Row 3: Irrigation
+      if (orchIrrigationPerUnit > 0 || orchWaterPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...orchBaseRow,
+          name: '[Orchard] Irrigation',
+          material_name: '[Orchard] Irrigation',
+          impact_climate: orchIrrigationPerUnit,
+          impact_climate_fossil: orchIrrigationPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: orchWaterPerUnit,
+          impact_water_scarcity: orchWaterPerUnit,
+          impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 60,
+          methodology: 'DEFRA 2025 / grid emission factors',
+          source_reference: `Irrigation: ${orchResult.water_m3.toFixed(0)} m3 water, ${orchardProfile.irrigation_energy_source}. Energy: ${orchResult.non_flag_emissions.irrigation_energy_co2e.toFixed(1)} kg CO2e`,
+          data_quality_grade: orchResult.data_quality_grade,
+        });
+      }
+
+      // Row 4: Transport (orchard to processing facility)
+      if (orchTransportPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...orchBaseRow,
+          name: '[Orchard] Transport to Facility',
+          material_name: '[Orchard] Transport to Facility',
+          impact_climate: orchTransportPerUnit,
+          impact_climate_fossil: orchTransportPerUnit,
+          impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          confidence_score: 70,
+          methodology: 'DEFRA 2024 tonne-km factors',
+          source_reference: `Transport: ${orchardProfile.transport_distance_km || 0} km by ${orchardProfile.transport_mode || 'road'}. ${orchResult.non_flag_emissions.transport_co2e.toFixed(1)} kg CO2e / ${totalUnits.toFixed(0)} units`,
+          data_quality_grade: orchResult.data_quality_grade,
+        });
+      }
+
+      // Row 5: Land Occupation
+      lcaMaterialsWithImpacts.push({
+        ...orchBaseRow,
+        name: '[Orchard] Land Occupation',
+        material_name: '[Orchard] Land Occupation',
+        impact_climate: 0,
+        impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+        ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+        impact_water: 0, impact_water_scarcity: 0,
+        impact_land: orchLandPerUnit,
+        impact_waste: 0,
+        impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+        impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+        confidence_score: 80,
+        methodology: 'Direct land occupation measurement',
+        source_reference: `Orchard: ${orchardProfile.area_ha} ha (${orchResult.flag_emissions.land_use_m2.toFixed(0)} m2) / ${totalUnits.toFixed(0)} units`,
+        data_quality_grade: 'HIGH',
+      });
+
+      // Row 6: Soil Carbon Removals (FLAG: separate from emissions)
+      if (orchRemovalsPerUnit > 0) {
+        lcaMaterialsWithImpacts.push({
+          ...orchBaseRow,
+          name: '[Orchard Removals] Soil Carbon',
+          material_name: '[Orchard Removals] Soil Carbon',
+          impact_climate: 0, // FLAG: removals NEVER stored in impact_climate
+          impact_climate_fossil: 0, impact_climate_biogenic: 0, impact_climate_dluc: 0,
+          ch4_kg: 0, ch4_fossil_kg: 0, ch4_biogenic_kg: 0, n2o_kg: 0,
+          impact_water: 0, impact_water_scarcity: 0, impact_land: 0, impact_waste: 0,
+          impact_terrestrial_ecotoxicity: 0, impact_freshwater_eutrophication: 0,
+          impact_terrestrial_acidification: 0, impact_fossil_resource_scarcity: 0,
+          impact_removals_co2e: orchRemovalsPerUnit,
+          confidence_score: orchResult.flag_removals.is_verified ? 75 : 45,
+          methodology: `Soil carbon: ${orchResult.flag_removals.methodology}`,
+          source_reference: `Soil management: ${orchardProfile.soil_management}. Total removals: ${orchResult.total_removals.toFixed(1)} kg CO2e/yr (${orchResult.flag_removals.methodology}). Per unit: ${orchRemovalsPerUnit.toFixed(4)} kg CO2e`,
+          data_quality_grade: orchResult.flag_removals.is_verified ? 'MEDIUM' : 'LOW',
+        });
+      }
+
+      console.log(`[calculateProductCarbonFootprint] ✓ Orchard impacts: emissions=${orchResult.total_emissions.toFixed(1)} kg CO2e, removals=${orchResult.total_removals.toFixed(1)} kg CO2e (${orchResult.flag_removals.methodology}), transport=${orchResult.non_flag_emissions.transport_co2e.toFixed(1)} kg CO2e, per-kg=${orchResult.total_emissions_per_kg.toFixed(4)} kg CO2e/kg fruit`);
     }
 
     // 6. Insert all materials with impact values into product_lca_materials

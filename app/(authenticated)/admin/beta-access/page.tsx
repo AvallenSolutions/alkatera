@@ -53,6 +53,11 @@ const BETA_FEATURES = [
     label: 'Viticulture (Self-Grown)',
     description: 'Vineyard management and self-grown ingredient LCA calculations with FLAG-aligned soil carbon',
   },
+  {
+    code: 'orchard_beta',
+    label: 'Orchards (Fruit Growing)',
+    description: 'Fruit orchard management and LCA calculations with FLAG v1.2 compliance, transport tracking, and multi-harvest averaging',
+  },
 ] as const;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

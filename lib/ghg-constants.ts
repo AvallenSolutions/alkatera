@@ -114,6 +114,7 @@ export const IPCC_CARBON_STOCK_DEFAULTS: Record<
   Record<string, number>
 > = {
   permanent_vineyard: { wet: 80, dry: 50, temperate: 63 },
+  permanent_orchard:  { wet: 80, dry: 52, temperate: 65 },
   grassland:          { wet: 90, dry: 45, temperate: 63 },
   forest:             { wet: 180, dry: 90, temperate: 130 },
   arable:             { wet: 55, dry: 30, temperate: 40 },
@@ -271,3 +272,115 @@ export const PESTICIDE_ECOTOX_PROFILES: Record<string, PesticideEcotoxProfile> =
     freshwater_eutroph: 0.003,
   },
 } as const;
+
+// ---------------------------------------------------------------------------
+// Orchard-Specific Constants (Fruit Orchard LCA)
+// ---------------------------------------------------------------------------
+// Parameters for fruit orchard LCA calculations, parameterised by orchard type.
+// Used by orchard-calculator.ts alongside the shared constants above.
+//
+// Sources:
+//   - IPCC 2019 Refinement, Chapter 11, Table 11.2 (crop residue)
+//   - IPCC 2019 Refinement, Volume 4, Chapter 2, Table 2.3 (carbon stocks)
+//   - FAO Fruit Tree Guidelines (2020)
+//   - Conservative end of published ranges
+
+/** Orchard crop residue factors by fruit type (IPCC 2019 Ch11 Table 11.2) */
+export const ORCHARD_CROP_RESIDUE_FACTORS: Record<
+  string,
+  { pruning_dm_per_ha: number; pruning_n_fraction: number; root_turnover_ratio: number }
+> = {
+  apple:       { pruning_dm_per_ha: 4.0, pruning_n_fraction: 0.007, root_turnover_ratio: 0.4 },
+  pear:        { pruning_dm_per_ha: 3.0, pruning_n_fraction: 0.007, root_turnover_ratio: 0.4 },
+  cherry:      { pruning_dm_per_ha: 2.5, pruning_n_fraction: 0.008, root_turnover_ratio: 0.35 },
+  plum:        { pruning_dm_per_ha: 2.5, pruning_n_fraction: 0.008, root_turnover_ratio: 0.35 },
+  citrus:      { pruning_dm_per_ha: 3.5, pruning_n_fraction: 0.009, root_turnover_ratio: 0.45 },
+  stone_fruit: { pruning_dm_per_ha: 2.5, pruning_n_fraction: 0.008, root_turnover_ratio: 0.35 },
+  mixed:       { pruning_dm_per_ha: 3.5, pruning_n_fraction: 0.008, root_turnover_ratio: 0.4 },
+  other:       { pruning_dm_per_ha: 3.0, pruning_n_fraction: 0.008, root_turnover_ratio: 0.4 },
+};
+
+/** Orchard carbon stock by type and climate zone (tonnes C per hectare) */
+export const ORCHARD_CARBON_STOCK: Record<string, Record<string, number>> = {
+  apple:       { wet: 85, dry: 55, temperate: 70 },
+  pear:        { wet: 80, dry: 50, temperate: 65 },
+  cherry:      { wet: 75, dry: 48, temperate: 60 },
+  plum:        { wet: 75, dry: 48, temperate: 60 },
+  citrus:      { wet: 90, dry: 60, temperate: 72 },
+  stone_fruit: { wet: 75, dry: 48, temperate: 60 },
+  mixed:       { wet: 80, dry: 52, temperate: 65 },
+  other:       { wet: 78, dry: 50, temperate: 63 },
+};
+
+/**
+ * Orchard soil carbon removal defaults (kg CO2e removed per hectare per year).
+ * Slightly higher than vineyard defaults due to deeper root systems and
+ * greater above-ground biomass in fruit trees.
+ */
+export const ORCHARD_SOIL_CARBON_REMOVAL_DEFAULTS: Record<string, number> = {
+  conventional_tillage: 0,
+  minimum_tillage: 175,
+  no_till: 400,
+  cover_cropping: 550,
+  composting: 350,
+  biochar_compost: 750,
+  regenerative_integrated: 650,
+};
+
+/**
+ * Orchard pesticide ecotoxicity profiles (USEtox 2.0).
+ * Different profile from viticulture: less copper, more mancozeb/insecticide.
+ */
+export const ORCHARD_PESTICIDE_ECOTOX_PROFILES: Record<string, PesticideEcotoxProfile> = {
+  generic: {
+    freshwater_ecotox: 3500,
+    terrestrial_ecotox: 650,
+    human_toxicity_nc: 1.2e-5,
+    freshwater_eutroph: 0.003,
+  },
+  sulfur: {
+    freshwater_ecotox: 350,
+    terrestrial_ecotox: 180,
+    human_toxicity_nc: 1.0e-6,
+    freshwater_eutroph: 0.0005,
+  },
+  mancozeb: {
+    freshwater_ecotox: 5200,
+    terrestrial_ecotox: 950,
+    human_toxicity_nc: 2.0e-5,
+    freshwater_eutroph: 0.0012,
+  },
+  synthetic_fungicide: {
+    freshwater_ecotox: 4200,
+    terrestrial_ecotox: 850,
+    human_toxicity_nc: 1.8e-5,
+    freshwater_eutroph: 0.001,
+  },
+  insecticide_codling_moth: {
+    freshwater_ecotox: 6800,
+    terrestrial_ecotox: 1400,
+    human_toxicity_nc: 3.0e-5,
+    freshwater_eutroph: 0.002,
+  },
+  insecticide_aphid: {
+    freshwater_ecotox: 5500,
+    terrestrial_ecotox: 1100,
+    human_toxicity_nc: 2.5e-5,
+    freshwater_eutroph: 0.0018,
+  },
+  herbicide_glyphosate: {
+    freshwater_ecotox: 2800,
+    terrestrial_ecotox: 450,
+    human_toxicity_nc: 8.0e-6,
+    freshwater_eutroph: 0.015,
+  },
+};
+
+/**
+ * Transport emission factors for orchard-to-facility delivery (DEFRA 2024).
+ * Units: kg CO2e per tonne-km.
+ */
+export const ORCHARD_TRANSPORT_EF: Record<string, number> = {
+  road: 0.10516,
+  rail: 0.02768,
+};

@@ -20,6 +20,7 @@ import {
   FlaskConical,
   Link2,
   Loader2,
+  TreePine,
 } from "lucide-react";
 import { useFeatureGate, FeatureCode, TierName } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
@@ -468,6 +469,21 @@ const featureInfo: Partial<Record<FeatureCode, FeatureInfo>> = {
     icon: Leaf,
     category: "Products & LCA",
   },
+  orchard_beta: {
+    name: "Orchards (Fruit Growing)",
+    description:
+      "Manage your fruit orchards and calculate the environmental impact of self-grown fruit using primary data. Currently in private beta with SBTi FLAG v1.2 compliance and orchard-to-facility transport tracking.",
+    benefits: [
+      "Model orchard-level climate, water, and land use impacts by fruit type",
+      "SBTi FLAG v1.2 compliant with separate emissions and removals reporting",
+      "IPCC Tier 1 N\u2082O calculations with orchard-specific crop residue factors",
+      "Orchard-to-facility transport emissions (road and rail)",
+      "Multi-harvest averaging for representative environmental footprints",
+      "Downloadable data collection template for easy onboarding",
+    ],
+    icon: TreePine,
+    category: "Products & LCA",
+  },
   knowledge_bank_manage: {
     name: "Knowledge Bank (Upload & Manage)",
     description:
@@ -556,6 +572,7 @@ const featureNames: Record<FeatureCode, string> = {
   epr_beta: "EPR Compliance (Beta)",
   xero_integration_beta: "Xero Integration (Beta)",
   viticulture_beta: "Viticulture (Beta)",
+  orchard_beta: "Orchards (Beta)",
 };
 
 const tierDisplayNames: Record<TierName, string> = {

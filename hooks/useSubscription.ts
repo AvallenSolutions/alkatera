@@ -103,7 +103,9 @@ export type FeatureCode =
   // Xero Integration (beta)
   | "xero_integration_beta"
   // Viticulture / Self-Grown Ingredients (beta)
-  | "viticulture_beta";
+  | "viticulture_beta"
+  // Orchards / Fruit Growing (beta)
+  | "orchard_beta";
 
 export type TierName = "seed" | "blossom" | "canopy";
 export type TierLevel = 1 | 2 | 3;
@@ -420,7 +422,7 @@ export function useSubscription() {
   const hasFeature = useCallback(
     (featureCode: FeatureCode): boolean => {
       // Beta features require explicit admin grant via feature_flags — tier fallback is intentionally skipped
-      const betaOnlyFeatures: FeatureCode[] = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta'];
+      const betaOnlyFeatures: FeatureCode[] = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta', 'orchard_beta'];
       if (betaOnlyFeatures.includes(featureCode)) {
         return state.usage?.features?.includes(featureCode) ?? false;
       }
@@ -536,6 +538,8 @@ function getRequiredTierForFeature(featureCode: FeatureCode): TierName {
     "epr_beta",
     // Viticulture — canopy tier OR admin-granted via feature_flags
     "viticulture_beta",
+    // Orchards — canopy tier OR admin-granted via feature_flags
+    "orchard_beta",
   ];
 
   const blossomFeatures: FeatureCode[] = [

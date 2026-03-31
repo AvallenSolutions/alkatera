@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export const dynamic = 'force-dynamic';
 
 /** Whitelist of feature codes that admins can toggle per organisation */
-const ALLOWED_FEATURE_CODES = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta'] as const;
+const ALLOWED_FEATURE_CODES = ['impact_valuation_beta', 'epr_beta', 'xero_integration_beta', 'viticulture_beta', 'orchard_beta'] as const;
 
 /**
  * GET /api/admin/beta-access
