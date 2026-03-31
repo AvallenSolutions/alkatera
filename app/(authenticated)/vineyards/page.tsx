@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Leaf, Plus } from 'lucide-react';
+import { Download, Leaf, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOrganization } from '@/lib/organizationContext';
 import { PageLoader } from '@/components/ui/page-loader';
@@ -164,17 +164,32 @@ export default function VineyardsPage() {
               products to calculate the environmental impact of self-grown grapes.
             </p>
           </div>
-          <Button
-            onClick={() => {
-              setEditVineyard(null);
-              setDialogOpen(true);
-            }}
-            size="lg"
-            className="gap-2 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
-          >
-            <Plus className="h-5 w-5" />
-            Add Vineyard
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              className="gap-2"
+              onClick={() => {
+                import('@/lib/bulk-import/viticulture-template-generator').then(
+                  ({ downloadViticultureTemplateAsXLSX }) => downloadViticultureTemplateAsXLSX()
+                );
+              }}
+            >
+              <Download className="h-5 w-5" />
+              Download Template
+            </Button>
+            <Button
+              onClick={() => {
+                setEditVineyard(null);
+                setDialogOpen(true);
+              }}
+              size="lg"
+              className="gap-2 bg-[#ccff00] text-black hover:bg-[#ccff00]/90"
+            >
+              <Plus className="h-5 w-5" />
+              Add Vineyard
+            </Button>
+          </div>
         </div>
 
         {vineyards.length === 0 ? (
