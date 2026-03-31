@@ -241,8 +241,7 @@ export default function CriticalReviewPanel({ pcfId }: CriticalReviewPanelProps)
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="internal">Internal Review</SelectItem>
-                    <SelectItem value="external_expert">External Expert</SelectItem>
-                    <SelectItem value="external_panel">External Panel</SelectItem>
+                    <SelectItem value="external">Independent Third-Party Expert Review</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -265,8 +264,6 @@ export default function CriticalReviewPanel({ pcfId }: CriticalReviewPanelProps)
                   <SelectContent>
                     <SelectItem value="internal">Internal</SelectItem>
                     <SelectItem value="external_expert">External Expert</SelectItem>
-                    <SelectItem value="panel_chair">Panel Chair</SelectItem>
-                    <SelectItem value="panel_member">Panel Member</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

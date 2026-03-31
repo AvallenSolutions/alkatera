@@ -56,7 +56,7 @@ export async function POST(
   const body = await request.json();
   const { review_type, reviewers } = body;
 
-  if (!review_type || !['internal', 'external_expert', 'external_panel'].includes(review_type)) {
+  if (!review_type || !['internal', 'external'].includes(review_type)) {
     return NextResponse.json({ error: 'Invalid review_type' }, { status: 400 });
   }
 

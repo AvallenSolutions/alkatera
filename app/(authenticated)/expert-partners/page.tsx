@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import Image from 'next/image'
 import {
   Handshake,
   ExternalLink,
@@ -60,28 +61,51 @@ const SERVICE_AREAS = [
 const TEAM_MEMBERS = [
   {
     name: 'Rosie Davenport',
-    role: 'Founder & Lead Strategist',
-    bio: 'Over 25 years in sustainability strategy and communications for the food and drink industry. Former journalist turned strategist.',
+    role: 'Founder and Lead Consultant',
+    photo: '/images/partners/impact-focus/rosie.webp',
+    bio: 'Over 25 years in sustainability, communications, and journalism. Cambridge Institute for Sustainability Leadership graduate, accredited GRI Sustainability Professional, and trained B Leader. Former Group Editor of Harpers Wine and Spirit and Drinks Editor at The Grocer.',
   },
   {
-    name: 'Fleur',
-    role: 'Senior Consultant',
-    bio: 'Specialist in B Corp certification and ESG strategy for consumer brands.',
+    name: 'Fleur Record-Smith',
+    role: 'Sustainability and B Corp Consultant',
+    photo: '/images/partners/impact-focus/fleur.webp',
+    bio: 'Over 15 years hands-on sustainability experience in hospitality. Founded an award-winning, B Corp-certified hospitality venue. MSc in Sustainability and trained B Leader, with expertise in carbon management, environmental impact assessments, and net-zero goal-setting.',
   },
   {
-    name: 'Chipo',
-    role: 'Carbon & Climate Consultant',
-    bio: 'Expert in carbon management, emissions reduction strategies, and climate action planning.',
+    name: 'Chipo Mbawu',
+    role: 'Social Impact and Ethical Business Consultant',
+    photo: '/images/partners/impact-focus/chipo.webp',
+    bio: 'Specialises in human rights, environmental due diligence, stakeholder engagement, and social ESG dimensions. Three years as Project Manager at The Shift. Experience spans North-South partnerships, gender empowerment, and corporate sustainability strategy.',
   },
   {
-    name: 'Kate',
-    role: 'Communications Consultant',
-    bio: 'Sustainability communications specialist helping brands tell authentic impact stories.',
+    name: 'Kate Sweet',
+    role: 'PR and Communications Consultant',
+    photo: '/images/partners/impact-focus/kate-sweet.webp',
+    bio: '30 years wine industry experience. Developed communications strategies for organic, biodynamic, and regenerative viticulture brands. Eight years as PR and Events Manager at Brown-Forman Wines. Clients include Familia Torres and International Wineries for Climate Action.',
   },
   {
-    name: 'Lucy',
-    role: 'Impact Analyst',
-    bio: 'Data-driven sustainability reporting and impact measurement across ESG frameworks.',
+    name: 'Kate Hempsall',
+    role: 'PR and Communications Consultant',
+    photo: '/images/partners/impact-focus/kate-hempsall.webp',
+    bio: 'Communications strategist with a strong track record in brewing and hospitality. Twelve years as Head of Communications at Charles Wells, three years at Carlsberg. Member of the British Guild of Beer Writers and Chartered Institute of Public Relations.',
+  },
+  {
+    name: 'Lucy Savage-Mountain',
+    role: 'Creative and Reporting Design Lead',
+    photo: '/images/partners/impact-focus/lucy.webp',
+    bio: 'Over 24 years design and branding experience, beginning at William Reed Publishing. Expertise in making sustainability data compelling through infographics. Founded Brighton-based design agency Add Tonic in 2011.',
+  },
+  {
+    name: 'Caz Brunnen',
+    role: 'Digital Accessibility Consultant',
+    photo: '/images/partners/impact-focus/caz.webp',
+    bio: 'Over eight years web development with five years digital accessibility specialisation. Delivered accessibility programmes for McDonald\'s, Commonwealth Bank of Australia, and Rugby Australia. Advocates for embedding accessibility into organisational operations.',
+  },
+  {
+    name: 'Kim Jurriaans',
+    role: 'Editor and Content Consultant',
+    photo: '/images/partners/impact-focus/kim.webp',
+    bio: 'Writer and multimedia producer with 20 years international journalism and non-profit communication experience, including six years with the UN Food and Agriculture Organization. Passionate about helping sustainability-forward organisations tell evidence-backed stories.',
   },
 ]
 
@@ -213,22 +237,22 @@ export default function ExpertPartnersPage() {
       {/* Meet the Team */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Meet the Team</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {TEAM_MEMBERS.map((member) => (
-            <Card key={member.name}>
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                      {member.name.split(' ').map(n => n[0]).join('')}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium text-sm">{member.name}</p>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400">{member.role}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{member.bio}</p>
-                  </div>
-                </div>
+            <Card key={member.name} className="overflow-hidden">
+              <div className="aspect-[4/3] relative">
+                <Image
+                  src={member.photo}
+                  alt={member.name}
+                  fill
+                  className="object-cover object-top"
+                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 25vw, 25vw"
+                />
+              </div>
+              <CardContent className="pt-4 pb-5">
+                <p className="font-semibold text-sm">{member.name}</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{member.role}</p>
+                <p className="text-xs text-muted-foreground mt-2 leading-relaxed">{member.bio}</p>
               </CardContent>
             </Card>
           ))}

@@ -414,7 +414,7 @@ export interface DataQualityRequirements {
   completeness: number;
 }
 
-export type CriticalReviewType = 'none' | 'internal' | 'external_expert' | 'external_panel';
+export type CriticalReviewType = 'none' | 'internal' | 'external';
 
 /**
  * Contribution Analysis (ISO 14044 Section 4.5.2)

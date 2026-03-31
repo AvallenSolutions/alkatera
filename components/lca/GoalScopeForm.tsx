@@ -386,8 +386,7 @@ export default function GoalScopeForm({ pcfId }: GoalScopeFormProps) {
               <SelectContent>
                 <SelectItem value="none">None — No critical review planned</SelectItem>
                 <SelectItem value="internal">Internal — Review by qualified internal staff</SelectItem>
-                <SelectItem value="external_expert">External Expert — Independent LCA practitioner</SelectItem>
-                <SelectItem value="external_panel">External Panel — Panel of experts (required for comparative assertions)</SelectItem>
+                <SelectItem value="external">Independent Third-Party Expert Review</SelectItem>
               </SelectContent>
             </Select>
           </div>

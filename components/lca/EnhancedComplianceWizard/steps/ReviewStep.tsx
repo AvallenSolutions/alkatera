@@ -9,9 +9,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   Info,
   Shield,
-  Users,
   UserCheck,
   Building,
 } from 'lucide-react';
@@ -50,20 +50,12 @@ const REVIEW_TYPE_OPTIONS: ReviewTypeOption[] = [
     audience: ['internal', 'customers_b2b'],
   },
   {
-    value: 'external_expert',
-    label: 'External Single Expert',
-    description: 'Independent third-party expert review',
+    value: 'external',
+    label: 'Independent Third-Party Expert Review',
+    description: 'Verified by qualified independent experts, including for comparative assertions',
     icon: Shield,
-    requirement: 'Qualified external LCA practitioner',
-    audience: ['customers_b2b', 'customers_b2c', 'regulators', 'investors'],
-  },
-  {
-    value: 'external_panel',
-    label: 'External Panel Review',
-    description: 'Review by panel of independent experts',
-    icon: Users,
-    requirement: 'Panel of 3+ qualified experts (required for comparative assertions)',
-    audience: ['public', 'regulators', 'comparative assertions'],
+    requirement: 'Conducted by Impact Focus, our expert consulting partner',
+    audience: ['customers_b2b', 'customers_b2c', 'regulators', 'investors', 'public', 'comparative assertions'],
   },
 ];
 
@@ -75,12 +67,12 @@ function getRecommendedReviewType(
   audience: string[],
   isComparative: boolean
 ): CriticalReviewType {
-  if (isComparative) return 'external_panel';
+  if (isComparative) return 'external';
 
   const externalAudiences = ['public', 'regulators', 'investors', 'customers_b2c'];
   const hasExternalAudience = audience.some((a) => externalAudiences.includes(a));
 
-  if (hasExternalAudience) return 'external_expert';
+  if (hasExternalAudience) return 'external';
   if (audience.includes('customers_b2b')) return 'internal';
   return 'none';
 }
@@ -164,7 +156,7 @@ export function ReviewStep() {
                   className="peer sr-only"
                   disabled={
                     formData.isComparativeAssertion &&
-                    option.value !== 'external_panel'
+                    option.value !== 'external'
                   }
                 />
                 <Label
@@ -266,6 +258,31 @@ export function ReviewStep() {
         </Card>
       )}
 
+      {/* Impact Focus CTA */}
+      {formData.criticalReviewType === 'external' && (
+        <Card className="border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <CardContent className="flex items-start gap-3 p-4">
+            <Shield className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                Independent review provided by Impact Focus
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Our expert consulting partner Impact Focus will carry out the third-party verification
+                of your LCA report. This is an additional service at an external cost.
+              </p>
+              <a
+                href="/expert-partners/"
+                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 mt-1"
+              >
+                Learn more about Impact Focus
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ISO Info */}
       <Alert>
         <Info className="h-4 w-4" />
@@ -273,7 +290,7 @@ export function ReviewStep() {
           <strong>ISO 14044 Section 6:</strong> Critical review ensures that
           methods are consistent with the standard, data is appropriate, and
           conclusions are supported by the findings. Comparative assertions
-          disclosed to the public require panel review.
+          disclosed to the public require independent third-party review.
         </AlertDescription>
       </Alert>
     </div>

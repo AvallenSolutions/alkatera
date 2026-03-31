@@ -630,17 +630,16 @@ export default function ComplianceWizard({
                   <SelectContent>
                     <SelectItem value="none">None — No review planned</SelectItem>
                     <SelectItem value="internal">Internal — Qualified internal staff</SelectItem>
-                    <SelectItem value="external_expert">External Expert — Independent practitioner</SelectItem>
-                    <SelectItem value="external_panel">External Panel — Panel of experts</SelectItem>
+                    <SelectItem value="external">Independent Third-Party Expert Review</SelectItem>
                   </SelectContent>
                 </Select>
 
-                {isComparativeAssertion && criticalReviewType !== 'external_panel' && (
+                {isComparativeAssertion && criticalReviewType !== 'external' && (
                   <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
                       <p className="text-xs text-red-800 dark:text-red-200">
-                        You indicated this LCA makes comparative assertions. ISO 14044 <strong>requires</strong> an external panel review. Please select &quot;External Panel&quot;.
+                        You indicated this LCA makes comparative assertions. ISO 14044 <strong>requires</strong> independent third-party expert review. Please select that option above.
                       </p>
                     </div>
                   </div>
