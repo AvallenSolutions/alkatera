@@ -19,6 +19,11 @@ import {
 } from 'lucide-react'
 import { useSubscription } from '@/hooks/useSubscription'
 import { usePartnerCredits } from '@/hooks/data/usePartnerCredits'
+import { useOrganization } from '@/lib/organizationContext'
+import { redirect } from 'next/navigation'
+
+// Temporarily restrict to alkatera Demo org until Impact Focus contract is signed
+const EXPERT_PARTNERS_ALLOWED_ORGS = ['2d86de84-e24e-458b-84b9-fd4057998bda'];
 
 const SERVICE_AREAS = [
   {
@@ -112,7 +117,13 @@ const TEAM_MEMBERS = [
 export default function ExpertPartnersPage() {
   const { tierName } = useSubscription()
   const { creditStatus, creditAmount, isCanopy, isBetaProgramme } = usePartnerCredits()
+  const { currentOrganization } = useOrganization()
   const isCanopyWithCredit = isCanopy && !isBetaProgramme
+
+  // Restrict access until Impact Focus contract is signed
+  if (currentOrganization?.id && !EXPERT_PARTNERS_ALLOWED_ORGS.includes(currentOrganization.id)) {
+    redirect('/')
+  }
 
   return (
     <div className="space-y-8">

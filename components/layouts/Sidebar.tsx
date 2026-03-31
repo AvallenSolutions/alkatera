@@ -80,6 +80,7 @@ interface NavItem {
   locked?: boolean // Set dynamically when user's tier is insufficient
   requiredTierName?: string // Display name of the required tier
   viticultureOnly?: boolean // Only shown for Wine orgs + platform admin
+  allowedOrgs?: string[] // Restrict to specific org IDs (temporary gating)
   type?: 'link' | 'divider' // Non-clickable section dividers
 }
 
@@ -234,7 +235,7 @@ const navigationStructure: NavItem[] = [
     children: [
       { name: 'Knowledge Bank',     href: '/knowledge-bank/',     icon: GraduationCap, minTier: 1 },
       { name: 'Greenwash Guardian', href: '/greenwash-guardian/', icon: Leaf,          minTier: 2 },
-      { name: 'Expert Partners',    href: '/expert-partners/',    icon: Handshake,     minTier: 1 },
+      { name: 'Expert Partners',    href: '/expert-partners/',    icon: Handshake,     minTier: 1, allowedOrgs: ['2d86de84-e24e-458b-84b9-fd4057998bda'] },
     ],
   },
   {
@@ -347,6 +348,8 @@ export function Sidebar({ className }: SidebarProps) {
       .filter((item) => {
         // Completely hide viticulture-only items for non-wine orgs
         if (item.viticultureOnly && !viticultureVisible) return false
+        // Hide items restricted to specific orgs
+        if (item.allowedOrgs && currentOrganization?.id && !item.allowedOrgs.includes(currentOrganization.id)) return false
         return true
       })
       .map((item) => {
