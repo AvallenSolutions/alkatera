@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,6 +18,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
     }
 
+    // Verify user belongs to the requested organisation
+    const { organizationId: userOrgId } = await resolveUserOrganization(supabase, user);
+    if (organizationId !== userOrgId) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
     // Get score history (no PostgREST relationship joins - schema cache unreliable)
     let scoreQuery = supabase
       .from('certification_score_history')
@@ -32,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     if (scoreError) {
       console.error('Error fetching score history:', scoreError);
-      return NextResponse.json({ error: scoreError.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch score history' }, { status: 500 });
     }
 
     // Get latest scores per framework
@@ -127,7 +134,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const targetOrgId = body.organization_id || organizationId;
+    // Always use the authenticated user's org (ignore body.organization_id to prevent cross-org writes)
+    const targetOrgId = organizationId;
 
     if (!body.framework_id) {
       return NextResponse.json(
@@ -145,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     if (gapError) {
       console.error('Error fetching gap analyses:', gapError);
-      return NextResponse.json({ error: gapError.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to fetch gap analyses' }, { status: 500 });
     }
 
     // Fetch requirement details from both tables (IDs may live in either)
@@ -201,7 +209,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating score record:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Update organization certification with current score

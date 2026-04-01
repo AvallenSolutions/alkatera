@@ -260,7 +260,7 @@ export async function POST(
   } catch (error: any) {
     console.error('Error generating sustainability report PDF:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to generate PDF' },
+      { error: 'Failed to generate PDF' },
       { status: 500 }
     );
   }

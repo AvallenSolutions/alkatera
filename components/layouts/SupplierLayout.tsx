@@ -8,6 +8,7 @@ import {
   Building2,
   ClipboardList,
   Package,
+  Shield,
   LogOut,
   Leaf,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ const supplierNav = [
   { name: 'My Profile', href: '/supplier-portal/profile', icon: Building2 },
   { name: 'Data Requests', href: '/supplier-portal/requests', icon: ClipboardList },
   { name: 'Products', href: '/supplier-portal/products', icon: Package },
+  { name: 'ESG Assessment', href: '/supplier-portal/esg-assessment', icon: Shield },
 ];
 
 export function SupplierLayout({ children }: { children: React.ReactNode }) {

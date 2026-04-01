@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('[Vineyards GET] Query error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ data: data || [], total: count || 0 });
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Vineyards POST] Insert error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });

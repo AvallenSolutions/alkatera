@@ -1,50 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client'
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-function getServiceClient() {
-  return createClient(supabaseUrl, supabaseServiceKey)
-}
-
-async function getAuthenticatedUser() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    supabaseUrl,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-      },
-    }
-  )
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) return null
-  return user
-}
-
-/** GET /api/facility-production-volumes?facility_id=xxx&organization_id=xxx */
+/** GET /api/facility-production-volumes?facility_id=xxx */
 export async function GET(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser()
-    if (!user) {
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient()
+    if (!user || authError) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    }
+
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user)
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
     const facilityId = searchParams.get('facility_id')
-    const organizationId = searchParams.get('organization_id')
 
-    if (!facilityId || !organizationId) {
-      return NextResponse.json({ error: 'facility_id and organization_id required' }, { status: 400 })
+    if (!facilityId) {
+      return NextResponse.json({ error: 'facility_id required' }, { status: 400 })
     }
-
-    const supabase = getServiceClient()
 
     const { data, error } = await supabase
       .from('facility_production_volumes')
@@ -57,22 +33,27 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ data })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('[FacilityProductionVolumes GET] Error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 /** POST /api/facility-production-volumes */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser()
-    if (!user) {
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient()
+    if (!user || authError) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    }
+
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user)
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 })
     }
 
     const body = await request.json()
     const {
       facility_id,
-      organization_id,
       reporting_period_start,
       reporting_period_end,
       production_volume,
@@ -83,18 +64,16 @@ export async function POST(request: NextRequest) {
       notes,
     } = body
 
-    if (!facility_id || !organization_id || !reporting_period_start || !reporting_period_end || !production_volume || !volume_unit) {
+    if (!facility_id || !reporting_period_start || !reporting_period_end || !production_volume || !volume_unit) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
-
-    const supabase = getServiceClient()
 
     const { data, error } = await supabase
       .from('facility_production_volumes')
       .upsert(
         {
           facility_id,
-          organization_id,
+          organization_id: organizationId,
           reporting_period_start,
           reporting_period_end,
           production_volume: parseFloat(production_volume),
@@ -116,16 +95,22 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ data })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('[FacilityProductionVolumes POST] Error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 /** DELETE /api/facility-production-volumes?id=xxx */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await getAuthenticatedUser()
-    if (!user) {
+    const { client: supabase, user, error: authError } = await getSupabaseAPIClient()
+    if (!user || authError) {
       return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+    }
+
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user)
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -135,17 +120,17 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'id required' }, { status: 400 })
     }
 
-    const supabase = getServiceClient()
-
     const { error } = await supabase
       .from('facility_production_volumes')
       .delete()
       .eq('id', id)
+      .eq('organization_id', organizationId)
 
     if (error) throw error
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('[FacilityProductionVolumes DELETE] Error:', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -13,6 +13,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
 
 // ============================================================================
 // TYPES
@@ -124,7 +125,9 @@ export async function calculateScope1(
 
         let co2e = (entry as any).quantity * emissionConfig.factor;
 
-        // Handle unit conversion for natural gas (m³ to kWh)
+        // Handle unit conversion for natural gas (m³ to kWh).
+        // natural_gas factor is per kWh; natural_gas_m3 factor already includes the 10.55 conversion.
+        // Only apply m³→kWh conversion for the base 'natural_gas' type with m³ units.
         if ((entry as any).utility_type === 'natural_gas' && (entry as any).unit === 'm³') {
           co2e = (entry as any).quantity * 10.55 * emissionConfig.factor;
         }
@@ -179,10 +182,19 @@ export async function calculateScope2(
   // 1. First, fetch ALL facilities for this organization to ensure complete coverage
   const { data: allFacilities } = await supabase
     .from('facilities')
-    .select('id, name')
+    .select('id, name, address_country, location_country_code')
     .eq('organization_id', organizationId);
 
   const facilityIds = allFacilities?.map(f => f.id) || [];
+
+  // Build facility → country code map for country-specific grid factors
+  const facilityCountryMap = new Map<string, string>();
+  if (allFacilities) {
+    for (const f of allFacilities) {
+      const country = (f as any).location_country_code || (f as any).address_country || '';
+      if (country) facilityCountryMap.set(f.id, country.toUpperCase());
+    }
+  }
 
   // 2. Fetch utility data for ALL facilities (using LEFT JOIN approach via IN clause)
   // This ensures we query all facilities, even those without data
@@ -204,7 +216,16 @@ export async function calculateScope2(
         const emissionConfig = UTILITY_EMISSION_FACTORS[(entry as any).utility_type];
         if (!emissionConfig || emissionConfig.scope !== 'Scope 2') continue;
 
-        const co2e = (entry as any).quantity * emissionConfig.factor;
+        // Use country-specific grid factor for electricity, falling back to UK default
+        let factor = emissionConfig.factor;
+        if ((entry as any).utility_type === 'electricity_grid') {
+          const countryCode = facilityCountryMap.get((entry as any).facility_id);
+          if (countryCode && GRID_FACTORS_BY_COUNTRY[countryCode] !== undefined) {
+            factor = GRID_FACTORS_BY_COUNTRY[countryCode];
+          }
+        }
+
+        const co2e = (entry as any).quantity * factor;
         scope2Total += co2e;
       }
     }
@@ -512,9 +533,10 @@ export async function calculateScope3(
       calculateScope3Cat11(supabase, organizationId, yearStart, yearEnd),
     ]);
 
-    breakdown.upstream_transport = cat4.totalKgCO2e;
-    breakdown.downstream_transport = cat9.totalKgCO2e;
-    breakdown.use_phase = cat11.totalKgCO2e;
+    // Use += to preserve any manual data_log entries already accumulated above
+    breakdown.upstream_transport += cat4.totalKgCO2e;
+    breakdown.downstream_transport += cat9.totalKgCO2e;
+    breakdown.use_phase += cat11.totalKgCO2e;
 
     // Log data quality notes for visibility
     if (cat4.notes.length > 0 || cat9.notes.length > 0 || cat11.notes.length > 0) {

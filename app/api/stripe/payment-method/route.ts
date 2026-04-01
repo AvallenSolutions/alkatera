@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error getting payment method:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to get payment method' },
+      { error: 'Failed to get payment method' },
       { status: 500 }
     );
   }

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching board members:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Calculate board composition metrics
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating board member:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });
@@ -169,7 +169,7 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating board member:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data);
@@ -201,7 +201,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('Error deleting board member:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

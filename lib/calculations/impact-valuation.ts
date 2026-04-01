@@ -40,6 +40,14 @@ export interface ProxyValues {
   water_m3: number;
   land_ha: number;
   waste_tonne: number;
+  /**
+   * Proxy value per £1 of living wage gap per year.
+   * Methodology: Uses SROI (Social Return on Investment) proxy — £1 of living
+   * wage gap represents £1 of foregone wellbeing value to the employee. This is
+   * a 1:1 proxy (no multiplier) because the gap directly measures the shortfall
+   * between actual pay and the independently calculated living wage. The living
+   * wage itself is set by the Living Wage Foundation based on the cost of living.
+   */
   living_wage_gap_gbp: number;
   training_hour: number;
   wellbeing_score_point: number;
@@ -81,6 +89,7 @@ export interface ImpactValuationResult {
   human: CapitalBreakdown;
   social: CapitalBreakdown;
   governance: CapitalBreakdown;
+  /** @deprecated Use `net_impact` instead. Legacy alias kept for backwards compatibility. */
   grand_total: number;
   positive_total: number;  // sum of benefit values (human benefits + social + governance)
   negative_total: number;  // sum of cost values (natural capital + living wage gap)
@@ -186,6 +195,7 @@ export function calculateImpactValuation(
     human: { total: humanTotal, items: humanItems },
     social: { total: socialTotal, items: socialItems },
     governance: { total: governanceTotal, items: governanceItems },
+    /** @deprecated Use `net_impact` instead. `grand_total` is a legacy alias kept for backwards compatibility. */
     grand_total: netImpact,
     positive_total: positiveTotal,
     negative_total: negativeTotal,

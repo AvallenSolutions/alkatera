@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching evidence links:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Fetch requirement details separately
@@ -86,21 +87,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -115,7 +104,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('certification_evidence_links')
       .insert({
-        organization_id: body.organization_id || organizationId,
+        organization_id: organizationId,
         framework_id: body.framework_id,
         requirement_id: body.requirement_id,
         evidence_type: body.evidence_type || 'document',
@@ -134,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating evidence link:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });
@@ -152,21 +141,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -191,12 +168,13 @@ export async function PUT(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', body.id)
+      .eq('organization_id', organizationId)
       .select()
       .single();
 
     if (error) {
       console.error('Error updating evidence link:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data);
@@ -214,21 +192,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
     }
 
     const searchParams = request.nextUrl.searchParams;
@@ -241,11 +207,12 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('certification_evidence_links')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       console.error('Error deleting evidence link:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

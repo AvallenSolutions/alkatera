@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching volunteer activities:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Calculate summary metrics
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating volunteer activity:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });

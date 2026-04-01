@@ -87,7 +87,8 @@ export function useCompanyFootprint(year?: number) {
     } else {
       setLoading(false);
     }
-  }, [currentOrganization?.id, targetYear, fetchFootprint]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchFootprint is stable via useCallback([orgId, year])
+  }, [currentOrganization?.id, targetYear]);
 
   return {
     footprint,

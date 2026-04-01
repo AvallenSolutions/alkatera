@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,22 +10,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
-    const organizationId = searchParams.get('organization_id');
     const assessmentId = searchParams.get('id');
     const includeClaims = searchParams.get('include_claims') === 'true';
 
     if (assessmentId) {
-      // Fetch single assessment
+      // Fetch single assessment — scoped to user's org
       const { data: assessment, error } = await supabase
         .from('greenwash_assessments')
         .select('*')
         .eq('id', assessmentId)
+        .eq('organization_id', organizationId)
         .single();
 
       if (error) {
         console.error('Error fetching assessment:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
 
       if (includeClaims) {
@@ -44,11 +50,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(assessment);
     }
 
-    if (!organizationId) {
-      return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
-    }
-
-    // Fetch all assessments for organization
+    // Fetch all assessments for the user's org
     const { data, error } = await supabase
       .from('greenwash_assessments')
       .select('*')
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching assessments:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ assessments: data || [] });
@@ -75,16 +77,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-
-    if (!body.organization_id) {
-      return NextResponse.json({ error: 'organization_id is required' }, { status: 400 });
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
     }
+
+    const body = await request.json();
 
     // For non-URL input types, check document limit
     if (body.input_type && body.input_type !== 'url') {
       const { data: limitCheck } = await supabase
-        .rpc('check_greenwash_doc_limit', { p_organization_id: body.organization_id });
+        .rpc('check_greenwash_doc_limit', { p_organization_id: organizationId });
 
       if (limitCheck && !limitCheck.allowed) {
         return NextResponse.json({
@@ -99,7 +102,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('greenwash_assessments')
       .insert({
-        organization_id: body.organization_id,
+        organization_id: organizationId,
         created_by: user.id,
         title: body.title,
         input_type: body.input_type,
@@ -112,13 +115,13 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating assessment:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Increment document count for non-URL types
     if (body.input_type && body.input_type !== 'url') {
       await supabase.rpc('increment_greenwash_doc_count', {
-        p_organization_id: body.organization_id,
+        p_organization_id: organizationId,
         p_user_id: user.id,
       });
     }
@@ -138,6 +141,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const assessmentId = searchParams.get('id');
 
@@ -148,11 +156,12 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('greenwash_assessments')
       .delete()
-      .eq('id', assessmentId);
+      .eq('id', assessmentId)
+      .eq('organization_id', organizationId);
 
     if (error) {
       console.error('Error deleting assessment:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

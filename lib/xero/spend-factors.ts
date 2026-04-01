@@ -57,9 +57,30 @@ export function getUncertainty(category: string): number {
 }
 
 /**
- * Calculate spend-based emissions for a transaction amount.
+ * Approximate FX rates to GBP for spend-based emission factors.
+ * DEFRA factors are denominated in GBP, so non-GBP amounts must be converted.
+ * These are rough annual averages; precise FX is not critical for Tier 4 estimates.
  */
-export function calculateSpendBasedEmissions(amount: number, category: string): number {
+const CURRENCY_TO_GBP: Record<string, number> = {
+  GBP: 1.0,
+  EUR: 0.86,
+  USD: 0.79,
+  AUD: 0.52,
+  NZD: 0.48,
+  CAD: 0.58,
+  CHF: 0.90,
+  JPY: 0.0053,
+  SEK: 0.074,
+  NOK: 0.074,
+  DKK: 0.115,
+}
+
+/**
+ * Calculate spend-based emissions for a transaction amount.
+ * Converts non-GBP amounts using approximate FX rates since DEFRA factors are per GBP.
+ */
+export function calculateSpendBasedEmissions(amount: number, category: string, currency: string = 'GBP'): number {
   const factor = getSpendFactor(category)
-  return Math.abs(amount) * factor
+  const fxRate = CURRENCY_TO_GBP[currency.toUpperCase()] ?? 1.0
+  return Math.abs(amount) * fxRate * factor
 }

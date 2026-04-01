@@ -28,6 +28,34 @@ function createQueryMock(response: { data: any; error: any }) {
   return mock;
 }
 
+/**
+ * Creates a mock that returns null on the first maybeSingle() call (local ID check)
+ * and returns actual data on subsequent calls (name-based lookup).
+ * This simulates a table where the ID doesn't match but a name-based search does.
+ */
+function createSequenceQueryMock(firstResponse: { data: any; error: any }, laterResponse: { data: any; error: any }) {
+  const mock: Record<string, unknown> = {};
+  const chainableMethods = [
+    'select', 'insert', 'update', 'delete',
+    'eq', 'neq', 'gte', 'lte', 'order', 'limit',
+    'in', 'not', 'ilike', 'is',
+  ];
+  chainableMethods.forEach(method => {
+    mock[method] = vi.fn().mockReturnValue(mock);
+  });
+  let callCount = 0;
+  mock.maybeSingle = vi.fn().mockImplementation(() => {
+    callCount++;
+    return Promise.resolve(callCount === 1 ? firstResponse : laterResponse);
+  });
+  mock.single = vi.fn().mockResolvedValue(laterResponse);
+  mock.then = (resolve: (r: any) => void) => {
+    resolve(laterResponse);
+    return Promise.resolve(laterResponse);
+  };
+  return mock;
+}
+
 // Track all from() calls so individual tests can configure per-table behaviour
 let fromMocks: Record<string, ReturnType<typeof createQueryMock>> = {};
 
@@ -559,16 +587,20 @@ describe('resolveImpactFactors', () => {
         json: () => Promise.resolve({ error: 'Server unavailable' }),
       });
 
-      // Staging factor fallback
-      mockTable('staging_emission_factors', {
-        id: 'sef-001',
-        name: 'Barley malt',
-        co2_factor: 2.1,
-        water_factor: 0.5,
-        land_factor: 0.3,
-        waste_factor: 0.02,
-        source: 'DEFRA 2025',
-      });
+      // Staging factor fallback — sequence mock: first call (local ID check) returns null,
+      // subsequent calls (name-based lookup) return data
+      fromMocks['staging_emission_factors'] = createSequenceQueryMock(
+        { data: null, error: null },
+        { data: {
+          id: 'sef-001',
+          name: 'Barley malt',
+          co2_factor: 2.1,
+          water_factor: 0.5,
+          land_factor: 0.3,
+          waste_factor: 0.02,
+          source: 'DEFRA 2025',
+        }, error: null }
+      );
       mockTable('ecoinvent_material_proxies', null);
 
       const fallbackEvents: FallbackEvent[] = [];
@@ -591,13 +623,17 @@ describe('resolveImpactFactors', () => {
       abortError.name = 'AbortError';
       mockFetch.mockRejectedValue(abortError);
 
-      // Staging fallback
-      mockTable('staging_emission_factors', {
-        id: 'sef-002',
-        name: 'Wheat flour',
-        co2_factor: 0.7,
-        source: 'Ecoinvent 3.12',
-      });
+      // Staging fallback — sequence mock: first call (local ID check) returns null,
+      // subsequent calls (name-based lookup) return data
+      fromMocks['staging_emission_factors'] = createSequenceQueryMock(
+        { data: null, error: null },
+        { data: {
+          id: 'sef-002',
+          name: 'Wheat flour',
+          co2_factor: 0.7,
+          source: 'Ecoinvent 3.12',
+        }, error: null }
+      );
       mockTable('ecoinvent_material_proxies', null);
 
       const fallbackEvents: FallbackEvent[] = [];

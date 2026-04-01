@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error getting subscription history:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to get subscription history' },
+      { error: 'Failed to get subscription history' },
       { status: 500 }
     );
   }

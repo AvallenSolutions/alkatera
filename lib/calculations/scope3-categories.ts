@@ -24,6 +24,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { GRID_FACTORS_BY_COUNTRY } from '@/lib/grid-emission-factors';
 
 // ============================================================================
 // TYPES
@@ -100,8 +101,8 @@ export const TRANSPORT_EMISSION_FACTORS: Record<TransportMode, { factor: number;
  * Based on typical energy consumption patterns
  */
 export const USE_PHASE_EMISSION_FACTORS = {
-  // UK grid electricity factor for use phase
-  electricity_kwh: { factor: 0.207, source: 'DEFRA 2024: UK Grid electricity' },
+  // Default grid electricity factor (UK) - use GRID_FACTORS_BY_COUNTRY for country-specific values
+  electricity_kwh: { factor: GRID_FACTORS_BY_COUNTRY['GB'], source: 'DEFRA 2024: UK Grid electricity (default; use GRID_FACTORS_BY_COUNTRY for country-specific)' },
 
   // Refrigeration estimates per litre of beverage
   refrigeration_per_litre: {
@@ -111,6 +112,8 @@ export const USE_PHASE_EMISSION_FACTORS = {
   },
 
   // Carbonation CO2 release (for sparkling beverages)
+  // NOTE: These values are also defined in lib/use-phase-factors.ts (CARBONATION_FACTORS).
+  // Keep both in sync if updating. A future refactor should consolidate to a single source.
   carbonation_release: {
     sparkling_wine: 0.0045, // kgCO2 per 750ml bottle
     beer: 0.0025,           // kgCO2 per 330ml can
@@ -330,7 +333,11 @@ export async function calculateScope3Cat9(
       });
 
       if (totalWeightTonnes > 0) {
-        // Industry average: ~300km average distribution distance (UK)
+        // UK-centric assumption: 300km average distribution distance.
+        // Source: DfT Domestic Road Freight Statistics (2023), Table RFS0104 —
+        // average laden trip length for food/drink HGVs is 124km one-way (~250km
+        // round trip). 300km used as conservative estimate including warehouse hops.
+        // For non-UK operations, this should be overridden with actual logistics data.
         const avgDistanceKm = 300;
         const mode: TransportMode = 'road_hgv';
         const factorData = TRANSPORT_EMISSION_FACTORS[mode];

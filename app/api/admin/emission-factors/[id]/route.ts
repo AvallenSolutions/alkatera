@@ -60,7 +60,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Error fetching emission factor:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch factor' },
+      { error: 'Failed to fetch factor' },
       { status: 500 }
     );
   }
@@ -160,7 +160,7 @@ export async function PATCH(
   } catch (error: any) {
     console.error('Error updating emission factor:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to update factor' },
+      { error: 'Failed to update factor' },
       { status: 500 }
     );
   }

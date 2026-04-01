@@ -11,6 +11,7 @@ import {
   NI_POSTCODE_PREFIXES,
   SCOTLAND_POSTCODE_PREFIXES,
   WALES_POSTCODE_PREFIXES,
+  SY_WALES_DISTRICTS,
   ONS_POPULATION_WEIGHTS,
 } from './constants';
 
@@ -42,8 +43,15 @@ export function postcodeToNation(postcode: string): 'england' | 'scotland' | 'wa
   // Scotland
   if (SCOTLAND_POSTCODE_PREFIXES.includes(prefix)) return 'scotland';
 
-  // Wales
+  // Wales (excluding SY which needs district-level check)
   if (WALES_POSTCODE_PREFIXES.includes(prefix)) return 'wales';
+
+  // SY postcode: SY15-SY25 are in Wales (Powys), all other SY districts are England (Shropshire)
+  // Extract outward code by removing the last 3 characters (inward code is always 3 chars: digit + 2 letters)
+  if (prefix === 'SY') {
+    const outward = cleaned.length >= 5 ? cleaned.slice(0, -3) : cleaned;
+    return SY_WALES_DISTRICTS.includes(outward) ? 'wales' : 'england';
+  }
 
   // Default: England (all remaining valid UK postcodes)
   return 'england';

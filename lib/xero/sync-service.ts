@@ -7,6 +7,27 @@ import { calculateSpendBasedEmissions } from './spend-factors'
 import { extractFromDescription, hasExtractedData } from './description-extractor'
 import { classifyWithAI } from './ai-classifier'
 
+/**
+ * Retry a Xero API call once on 429 (rate limit), respecting the Retry-After
+ * header with a 60-second cap. Only retries once to avoid cascading delays.
+ */
+async function withRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (err: any) {
+    if (err?.statusCode === 429 || err?.response?.status === 429) {
+      const retryAfter = Math.min(
+        parseInt(err?.response?.headers?.['retry-after'] || '5', 10),
+        60
+      )
+      console.warn(`Xero 429 rate limit hit, retrying after ${retryAfter}s`)
+      await new Promise((r) => setTimeout(r, retryAfter * 1000))
+      return await fn()
+    }
+    throw err
+  }
+}
+
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY)!
@@ -115,7 +136,7 @@ async function stageAccounts(
   const { client: xero, tenantId } = auth
 
   // Fetch chart of accounts
-  const accountsResponse = await xero.accountingApi.getAccounts(tenantId)
+  const accountsResponse = await withRateLimit(() => xero.accountingApi.getAccounts(tenantId))
   const accounts = accountsResponse.body?.accounts || []
   const expenseAccounts = accounts.filter(a =>
     ['EXPENSE', 'DIRECTCOSTS', 'OVERHEADS'].includes(String(a.type || ''))
@@ -177,14 +198,14 @@ async function stageInvoices(
     const d = new Date(); d.setFullYear(d.getFullYear() - 1); return d
   })()
 
-  const invoicesResponse = await xero.accountingApi.getInvoices(
+  const invoicesResponse = await withRateLimit(() => xero.accountingApi.getInvoices(
     tenantId,
     syncSince,
     'Type=="ACCPAY"',
     'Date DESC',
     undefined, undefined, undefined, undefined,
     page
-  )
+  ))
 
   const invoices = invoicesResponse.body?.invoices || []
   let inserted = 0
@@ -278,13 +299,13 @@ async function stageBankTransactions(
 
   // Fetch ALL bank transactions (not just SPEND type) to capture bank feed
   // items, overpayments, and prepayments that represent actual spending
-  const bankTxResponse = await xero.accountingApi.getBankTransactions(
+  const bankTxResponse = await withRateLimit(() => xero.accountingApi.getBankTransactions(
     tenantId,
     syncSince,
     undefined, // No type filter - get all types
     'Date DESC',
     page
-  )
+  ))
 
   const bankTxs = bankTxResponse.body?.bankTransactions || []
   let inserted = 0
@@ -383,12 +404,19 @@ async function stageClassify(
   // Fetch unclassified transactions
   const { data: unclassified } = await db
     .from('xero_transactions')
-    .select('id, xero_account_id, xero_contact_name, description, amount, emission_category')
+    .select('id, xero_account_id, xero_contact_name, description, amount, currency, emission_category')
     .eq('organization_id', organizationId)
     .is('emission_category', null)
     .limit(2000)
 
   let classified = 0
+
+  if (unclassified && unclassified.length === 2000) {
+    console.warn(
+      `[Xero Sync] Classification query hit 2000-row limit for org ${organizationId}. ` +
+      'Some transactions may remain unclassified. Consider running sync again.'
+    )
+  }
 
   if (unclassified && unclassified.length > 0) {
     const updates = unclassified.map(tx => {
@@ -404,7 +432,7 @@ async function stageClassify(
 
       const emissionCategory = classification?.category || null
       const spendBasedEmissions = emissionCategory
-        ? calculateSpendBasedEmissions(tx.amount, emissionCategory)
+        ? calculateSpendBasedEmissions(tx.amount, emissionCategory, tx.currency || 'GBP')
         : null
 
       const extracted = extractFromDescription(tx.description, tx.xero_contact_name)
@@ -423,14 +451,12 @@ async function stageClassify(
       }
     })
 
-    // Batch update via individual calls (can't batch-update with different values easily)
-    for (const update of updates) {
-      const { id, ...fields } = update
-      await db
-        .from('xero_transactions')
-        .update(fields)
-        .eq('id', id)
-    }
+    // Batch update in parallel (each row has different values)
+    await Promise.all(
+      updates.map(({ id, ...fields }) =>
+        db.from('xero_transactions').update(fields).eq('id', id)
+      )
+    )
   }
 
   return {
@@ -450,7 +476,7 @@ async function stageAIClassify(
   // Fetch up to 50 unclassified transactions (those the rule-based classifier missed)
   const { data: unclassified } = await db
     .from('xero_transactions')
-    .select('id, xero_contact_name, description, amount')
+    .select('id, xero_contact_name, description, amount, currency')
     .eq('organization_id', organizationId)
     .is('emission_category', null)
     .eq('upgrade_status', 'not_applicable')
@@ -480,9 +506,11 @@ async function stageAIClassify(
   for (const result of aiResults) {
     if (result.suggestedCategory && result.confidence >= 0.7) {
       // High confidence: auto-apply
+      const matchedTx = unclassified.find(tx => tx.id === result.transactionId)
       const spendBasedEmissions = calculateSpendBasedEmissions(
-        unclassified.find(tx => tx.id === result.transactionId)?.amount || 0,
-        result.suggestedCategory
+        matchedTx?.amount || 0,
+        result.suggestedCategory,
+        matchedTx?.currency || 'GBP'
       )
 
       await db

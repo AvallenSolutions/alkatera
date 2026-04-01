@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching governance score:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Get score history
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error saving governance score:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(savedScore, { status: 201 });

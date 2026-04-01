@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { escapeHtml } from '@/lib/utils/escape-html';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -67,19 +68,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the user's current organisation
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      // Fallback: look up membership
-      const { data: membership } = await adminClient
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .single();
-      organizationId = membership?.organization_id;
-    }
+    // Get the user's current organisation (verified via membership, not user metadata)
+    const { data: membership } = await adminClient
+      .from('organization_members')
+      .select('organization_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single();
+    const organizationId = membership?.organization_id;
 
     if (!organizationId) {
       return NextResponse.json(
@@ -195,7 +191,15 @@ export async function POST(request: NextRequest) {
         const resend = new Resend(resendApiKey);
         const logoUrl = 'https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/uploads/5aedb0b2-3178-4623-b6e3-fc614d5f20ec/1767511420198-2822f942/alkatera_logo-transparent.png';
         const emailSubject = `${organizationName} has invited you to share sustainability data on alkatera`;
-        const greeting = contactPersonName || supplierName || 'there';
+        const greeting = escapeHtml(contactPersonName || supplierName || 'there');
+        const safeInviterName = escapeHtml(inviterName || '');
+        const safeOrgName = escapeHtml(organizationName || '');
+        const safeMaterialName = materialName ? escapeHtml(materialName) : '';
+        const safeMaterialType = materialType ? escapeHtml(materialType) : '';
+        const safePersonalMessage = personalMessage ? escapeHtml(personalMessage) : '';
+        const safeProductName = product?.name ? escapeHtml(product.name) : '';
+        const safeContactPersonName = contactPersonName ? escapeHtml(contactPersonName) : '';
+        const safeSupplierName = supplierName ? escapeHtml(supplierName) : '';
 
         const emailHtml = `
           <div style="font-family: 'Courier New', monospace; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #e0e0e0; padding: 40px; border: 1px solid #222;">
@@ -207,21 +211,21 @@ export async function POST(request: NextRequest) {
               Dear ${greeting},
             </p>
             <p style="color: #ccc; font-size: 14px; line-height: 1.8;">
-              <strong style="color: #fff;">${inviterName}</strong> at <strong style="color: #fff;">${organizationName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to ${materialName ? `provide verified sustainability data for <strong style="color: #fff;">${materialName}</strong>` : 'share your sustainability data'}.
+              <strong style="color: #fff;">${safeInviterName}</strong> at <strong style="color: #fff;">${safeOrgName}</strong> has invited you to join the alka<strong style="color: #fff;">tera</strong> platform to ${safeMaterialName ? `provide verified sustainability data for <strong style="color: #fff;">${safeMaterialName}</strong>` : 'share your sustainability data'}.
             </p>
-            ${personalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${inviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${personalMessage}</p></div>` : ''}
+            ${safePersonalMessage ? `<div style="margin: 20px 0; padding: 16px; border-left: 2px solid #ccff00; background: #111;"><p style="color: #999; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 8px 0;">Message from ${safeInviterName}:</p><p style="color: #ccc; font-size: 14px; line-height: 1.8; margin: 0;">${safePersonalMessage}</p></div>` : ''}
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr>
                 <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; width: 120px;">From</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${inviterName}, ${organizationName}</td>
+                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeInviterName}, ${safeOrgName}</td>
               </tr>
-              ${product ? `<tr>
+              ${safeProductName ? `<tr>
                 <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Product</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${product.name}</td>
+                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeProductName}</td>
               </tr>` : ''}
-              ${materialName ? `<tr>
+              ${safeMaterialName ? `<tr>
                 <td style="padding: 10px 0; color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 2px;">Material</td>
-                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${materialName} (${materialType})</td>
+                <td style="padding: 10px 0; color: #fff; font-size: 14px;">${safeMaterialName} (${safeMaterialType})</td>
               </tr>` : ''}
             </table>
             <div style="margin: 30px 0; text-align: center;">

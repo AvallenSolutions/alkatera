@@ -59,6 +59,7 @@ export function useXeroTransactions(
       return
     }
 
+    try {
     const supabase = getSupabaseBrowserClient()
 
     // Check for Xero connection
@@ -139,6 +140,10 @@ export function useXeroTransactions(
       isLoading: false,
       hasConnection: true,
     })
+    } catch (err) {
+      console.error('Error loading Xero transactions:', err)
+      setResult(prev => ({ ...prev, isLoading: false }))
+    }
   }, [organizationId, yearStart, yearEnd])
 
   useEffect(() => {

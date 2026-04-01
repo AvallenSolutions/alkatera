@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     // 6. Fetch ALL transactions for the org (not just unclassified)
     const { data: transactions } = await db
       .from('xero_transactions')
-      .select('id, xero_account_id, xero_contact_name, description, amount, emission_category, classification_source, spend_based_emissions_kg')
+      .select('id, xero_account_id, xero_contact_name, description, amount, currency, emission_category, classification_source, spend_based_emissions_kg')
       .eq('organization_id', organizationId)
 
     if (!transactions || transactions.length === 0) {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       const newSource = classification?.source || null
       const newConfidence = classification?.confidence || null
       const newEmissions = newCategory
-        ? calculateSpendBasedEmissions(tx.amount, newCategory)
+        ? calculateSpendBasedEmissions(tx.amount, newCategory, tx.currency || 'GBP')
         : null
 
       // Only update if classification actually changed

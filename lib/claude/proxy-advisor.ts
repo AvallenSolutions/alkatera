@@ -12,12 +12,17 @@
  * - JSON response parsing
  */
 
-// Dynamic import for Anthropic SDK to handle missing dependency gracefully
+// Lazy-loaded Anthropic SDK to avoid bundling in client code and handle missing dependency
 let Anthropic: any = null;
-try {
-  Anthropic = require('@anthropic-ai/sdk').default;
-} catch {
-  console.warn('[Proxy Advisor] @anthropic-ai/sdk not installed. Proxy suggestions will use fallbacks.');
+async function getAnthropic() {
+  if (!Anthropic) {
+    try {
+      Anthropic = (await import('@anthropic-ai/sdk')).default;
+    } catch {
+      console.warn('[Proxy Advisor] @anthropic-ai/sdk not installed. Proxy suggestions will use fallbacks.');
+    }
+  }
+  return Anthropic;
 }
 
 // ============================================================================
@@ -120,8 +125,9 @@ Respond ONLY with valid JSON (no markdown, no explanation outside JSON). Suggest
 
 let anthropicClient: any = null;
 
-function getClient(): any {
-  if (!Anthropic) {
+async function getClient(): Promise<any> {
+  const AnthropicSDK = await getAnthropic();
+  if (!AnthropicSDK) {
     throw new Error('@anthropic-ai/sdk is not installed');
   }
   if (!anthropicClient) {
@@ -129,7 +135,7 @@ function getClient(): any {
     if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY environment variable is not set');
     }
-    anthropicClient = new Anthropic({ apiKey });
+    anthropicClient = new AnthropicSDK({ apiKey });
   }
   return anthropicClient;
 }
@@ -332,7 +338,8 @@ export async function suggestProxy(input: ProxyAdvisorInput): Promise<ProxySugge
   if (cached) return cached;
 
   // Check if API is configured
-  if (!process.env.ANTHROPIC_API_KEY || !Anthropic) {
+  const AnthropicSDK = await getAnthropic();
+  if (!process.env.ANTHROPIC_API_KEY || !AnthropicSDK) {
     const fallbackResult: ProxySuggestionResult = {
       suggestions: getStaticFallback(input.ingredient_name, input.ingredient_type),
       cached: false,
@@ -343,7 +350,7 @@ export async function suggestProxy(input: ProxyAdvisorInput): Promise<ProxySugge
   }
 
   try {
-    const client = getClient();
+    const client = await getClient();
 
     const userPrompt = `Suggest proxy emission factors for this unmatched ${input.ingredient_type}:
 
@@ -377,7 +384,14 @@ What is this ingredient, what category does it belong to, and what would be the 
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const suggestions: ProxySuggestion[] = (parsed.suggestions || []).map((s: any) => ({
+    const VALID_CATEGORIES = new Set([
+      'Grains & cereals', 'Sugars & sweeteners', 'Fruits', 'Botanicals/spices',
+      'Flavourings', 'Acids & preservatives', 'Dairy & alternatives', 'Oils & fats',
+      'Water & liquids', 'Packaging', 'Chemicals', 'Yeast & fermentation',
+      'Unknown',
+    ]);
+
+    const rawSuggestions: ProxySuggestion[] = (parsed.suggestions || []).map((s: any) => ({
       proxy_name: s.proxy_name || s.name || 'Unknown proxy',
       search_query: s.search_query || s.proxy_name || '',
       category: s.category || 'Unknown',
@@ -385,6 +399,13 @@ What is this ingredient, what category does it belong to, and what would be the 
       confidence_note: (['high', 'medium', 'low'].includes(s.confidence_note) ? s.confidence_note : 'low') as 'high' | 'medium' | 'low',
       uncertainty_impact: s.uncertainty_impact,
     }));
+
+    // Filter suggestions with unrecognised categories (LLM hallucination guard)
+    const suggestions = rawSuggestions.filter((s) => {
+      if (VALID_CATEGORIES.has(s.category)) return true;
+      console.warn(`[Proxy Advisor] Discarding suggestion with unknown category "${s.category}": ${s.proxy_name}`);
+      return false;
+    });
 
     // Ensure at least one suggestion
     if (suggestions.length === 0) {

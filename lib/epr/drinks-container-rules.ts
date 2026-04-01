@@ -22,15 +22,18 @@ import { mapMaterialToRPD } from './mappings';
  * will enter the Deposit Return Scheme (Oct 2027).
  *
  * Conditions (ALL must be true):
- * 1. Item is flagged as a drinks container
- * 2. Product unit size is between 150ml and 3000ml (inclusive)
- * 3. Container material is aluminium, rigid plastic (PET), or steel
+ * 1. Fee year is 2027 or later (DRS launches Oct 2027)
+ * 2. Item is flagged as a drinks container
+ * 3. Product unit size is between 150ml and 3000ml (inclusive)
+ * 4. Container material is aluminium, rigid plastic (PET), or steel
  */
 export function isDRSExcluded(
   isDrinksContainer: boolean,
   unitSizeML: number | null | undefined,
-  materialType: EPRMaterialType
+  materialType: EPRMaterialType,
+  feeYear?: number
 ): boolean {
+  if (feeYear != null && feeYear < 2027) return false;
   if (!isDrinksContainer) return false;
   if (unitSizeML == null) return false;
   if (unitSizeML < DRS_MIN_SIZE_ML || unitSizeML > DRS_MAX_SIZE_ML) return false;

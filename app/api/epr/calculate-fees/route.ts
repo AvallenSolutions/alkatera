@@ -170,7 +170,8 @@ export async function POST(request: NextRequest) {
       const drsExcluded = drsApplies && isDRSExcluded(
         material.epr_is_drinks_container ?? false,
         unitSizeML,
-        materialType
+        materialType,
+        fee_year
       )
 
       // Find fee rate

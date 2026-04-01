@@ -9,12 +9,46 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
+// Rate limiter: 5 requests per 15 minutes per IP
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT_MAX = 5
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now()
+  // Prune expired entries
+  if (rateLimitMap.size > 500) {
+    rateLimitMap.forEach((entry, key) => {
+      if (now > entry.resetAt) rateLimitMap.delete(key)
+    })
+  }
+  const entry = rateLimitMap.get(ip)
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS })
+    return false
+  }
+  entry.count++
+  return entry.count > RATE_LIMIT_MAX
+}
+
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders })
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown'
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { success: true }, // Don't reveal rate limiting to prevent enumeration
+        { status: 200, headers: corsHeaders }
+      )
+    }
+
     const { email } = await request.json()
 
     if (!email) {
@@ -50,20 +84,9 @@ export async function POST(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    // Check if user exists (don't reveal this to the client)
-    const { data: userData, error: userError } = await adminClient.auth.admin.listUsers()
-
-    const user = userData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
-
-    if (!user) {
-      // User doesn't exist, but we return success to prevent email enumeration
-      return NextResponse.json(
-        { success: true },
-        { status: 200, headers: corsHeaders }
-      )
-    }
-
     // Generate password reset link using admin API
+    // generateLink will fail if the email doesn't exist; we handle both cases
+    // identically to prevent email enumeration
     const { data: linkData, error: linkError } = await adminClient.auth.admin.generateLink({
       type: 'recovery',
       email: email,
@@ -73,26 +96,20 @@ export async function POST(request: NextRequest) {
     })
 
     if (linkError || !linkData?.properties?.action_link) {
-      console.error('Error generating reset link:', linkError)
+      // User doesn't exist or link generation failed - return success to prevent enumeration
+      if (linkError) console.error('Error generating reset link:', linkError.message)
       return NextResponse.json(
-        { success: true }, // Don't reveal errors
+        { success: true },
         { status: 200, headers: corsHeaders }
       )
     }
 
     // The action_link from Supabase contains the token hash
-    // Format: https://xxx.supabase.co/auth/v1/verify?token=xxx&type=recovery&redirect_to=xxx
-    // We need to extract the token and build a link to our callback
-    const actionLink = new URL(linkData.properties.action_link)
-    const token = actionLink.searchParams.get('token')
     const tokenHash = linkData.properties.hashed_token
-
-    // Build reset link that goes through our auth callback
-    // Use the token_hash for PKCE flow
     const resetLink = `${siteUrl}/auth/confirm?token_hash=${tokenHash}&type=recovery&next=/update-password`
 
-    // Get user's first name if available
-    const firstName = user.user_metadata?.first_name || 'there'
+    // Get user's first name from the generated link data
+    const firstName = linkData.user?.user_metadata?.first_name || 'there'
 
     // Send branded email via Resend
     const emailHtml = buildPasswordResetEmail(firstName, resetLink, siteUrl)

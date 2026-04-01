@@ -36,10 +36,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user is a member of the organization
+    // Verify user is an admin/owner of the organization
     const role = await getMemberRole(supabase, organizationId, user.id);
     if (!role) {
       return NextResponse.json({ error: 'Not a member of this organization' }, { status: 403 });
+    }
+    if (!['owner', 'admin'].includes(role)) {
+      return NextResponse.json({ error: 'Only owners and admins can preview proration' }, { status: 403 });
     }
 
     // Get organization details
@@ -135,7 +138,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error getting proration preview:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to get proration preview' },
+      { error: 'Failed to get proration preview' },
       { status: 500 }
     );
   }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { timingSafeEqual } from 'crypto';
 import type { Database } from '@/types/db_types';
+import { safeCompare } from '@/lib/utils/safe-compare';
 
 /**
  * Process Grace Periods Cron Job
@@ -14,22 +14,6 @@ import type { Database } from '@/types/db_types';
  *
  * Authentication: Requires CRON_SECRET header
  */
-
-/** Constant-time string comparison to prevent timing attacks */
-function safeCompare(a: string, b: string): boolean {
-  try {
-    const bufA = Buffer.from(a)
-    const bufB = Buffer.from(b)
-    if (bufA.length !== bufB.length) {
-      // Compare anyway to avoid timing leak on length difference
-      timingSafeEqual(bufA, bufA)
-      return false
-    }
-    return timingSafeEqual(bufA, bufB)
-  } catch {
-    return false
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -128,7 +112,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Cron job error:', error);
     return NextResponse.json(
-      { error: error.message || 'Cron job failed' },
+      { error: 'Cron job failed' },
       { status: 500 }
     );
   }

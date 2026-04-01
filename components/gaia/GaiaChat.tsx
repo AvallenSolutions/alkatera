@@ -354,7 +354,7 @@ export function RosaChat({ fullPage = false, initialPrompt }: RosaChatProps) {
     setIsLoading(true);
     setError(null);
     try {
-      const conv = await getConversationWithMessages(id);
+      const conv = await getConversationWithMessages(id, currentOrganization?.id);
       setActiveConversation(conv);
 
       // Check feedback status and parse actions for all assistant messages

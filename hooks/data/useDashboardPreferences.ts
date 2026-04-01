@@ -179,14 +179,16 @@ export function useDashboardPreferences(): UseDashboardPreferencesResult {
         display_order: index,
       }));
 
-      for (const update of updates) {
-        await supabase
-          .from('user_dashboard_preferences')
-          .update({ display_order: update.display_order })
-          .eq('user_id', update.user_id)
-          .eq('organization_id', update.organization_id)
-          .eq('widget_id', update.widget_id);
-      }
+      await Promise.all(
+        updates.map((update) =>
+          supabase
+            .from('user_dashboard_preferences')
+            .update({ display_order: update.display_order })
+            .eq('user_id', update.user_id)
+            .eq('organization_id', update.organization_id)
+            .eq('widget_id', update.widget_id)
+        )
+      );
 
       setPreferences((prev) =>
         prev.map((p) => {

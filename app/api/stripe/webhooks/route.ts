@@ -21,6 +21,25 @@ import Stripe from 'stripe';
 // Disable body parsing, need raw body for signature verification
 export const runtime = 'nodejs';
 
+// Idempotency: track processed event IDs to prevent duplicate processing on Stripe retries.
+// In-memory is sufficient as Stripe retries within hours and serverless instances persist
+// for the duration of retries. For multi-instance deployments, consider a database table.
+const processedEvents = new Map<string, number>();
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function isEventProcessed(eventId: string): boolean {
+  const now = Date.now();
+  // Cleanup stale entries periodically
+  if (processedEvents.size > 5000) {
+    processedEvents.forEach((timestamp, id) => {
+      if (now - timestamp > IDEMPOTENCY_TTL_MS) processedEvents.delete(id);
+    });
+  }
+  if (processedEvents.has(eventId)) return true;
+  processedEvents.set(eventId, now);
+  return false;
+}
+
 // Lazy initialization to prevent build-time errors
 let _webhookSecret: string | null = null;
 let _supabaseAdmin: SupabaseClient<Database> | null = null;
@@ -72,29 +91,42 @@ export async function POST(request: NextRequest) {
       console.error('Webhook signature verification failed:', err.message);
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
-    // Handle the event
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
-        break;
 
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-        break;
+    // Idempotency check: skip already-processed events (Stripe retries)
+    if (isEventProcessed(event.id)) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
 
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
+    // Handle the event — each handler is wrapped individually so a permanent
+    // failure in one handler returns 200 (preventing Stripe retry storms).
+    // Only signature verification failures above return non-200.
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed':
+          await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session);
+          break;
 
-      case 'invoice.payment_failed':
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
-        break;
+        case 'customer.subscription.updated':
+          await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+          break;
 
-      case 'invoice.payment_succeeded':
-        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
-        break;
+        case 'customer.subscription.deleted':
+          await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+          break;
 
-      default:
+        case 'invoice.payment_failed':
+          await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+          break;
+
+        case 'invoice.payment_succeeded':
+          await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
+          break;
+
+        default:
+      }
+    } catch (handlerError: any) {
+      // Log but return 200 — retrying won't fix a permanent handler failure
+      console.error(`Webhook handler error for ${event.type}:`, handlerError.message);
     }
 
     return NextResponse.json({ received: true });
@@ -385,6 +417,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
       subscription_tier: 'seed',
       subscription_status: 'cancelled',
       stripe_subscription_id: null,
+      stripe_price_id: null,
       grace_period_end: null,
       grace_period_started_at: null,
       updated_at: new Date().toISOString(),

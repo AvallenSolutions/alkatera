@@ -1,36 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 /**
  * GET /api/advisor-messages?conversation_id=...
  * Fetch messages for a specific conversation.
  *
  * GET /api/advisor-messages?organization_id=...
- * Fetch all conversations for an organization (with last message preview).
+ * Fetch all conversations for the user's organisation (with last message preview).
  */
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader) {
+  const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const token = authHeader.replace('Bearer ', '');
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  // Verify the user
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+  if (orgError || !organizationId) {
+    return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
   }
 
   const { searchParams } = new URL(request.url);
   const conversationId = searchParams.get('conversation_id');
-  const organizationId = searchParams.get('organization_id');
 
   if (conversationId) {
+    // Verify conversation belongs to user's org before returning messages
+    const { data: conv } = await supabase
+      .from('advisor_conversations')
+      .select('id')
+      .eq('id', conversationId)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (!conv) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+
     // Fetch messages for a conversation
     const { data: messages, error } = await supabase
       .from('advisor_messages')
@@ -39,7 +44,8 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: true });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('Error fetching advisor messages:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Enrich with sender profiles
@@ -47,7 +53,7 @@ export async function GET(request: NextRequest) {
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, full_name, email, avatar_url')
-      .in('id', senderIds);
+      .in('id', senderIds.length > 0 ? senderIds : ['00000000-0000-0000-0000-000000000000']);
 
     const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
 
@@ -64,66 +70,63 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ messages: enriched });
   }
 
-  if (organizationId) {
-    // Fetch all conversations for the organization
-    const { data: conversations, error } = await supabase
-      .from('advisor_conversations')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('status', 'active')
-      .order('last_message_at', { ascending: false });
+  // Fetch all conversations for the user's org (ignore organizationId param from query)
+  const { data: conversations, error } = await supabase
+    .from('advisor_conversations')
+    .select('*')
+    .eq('organization_id', organizationId)
+    .eq('status', 'active')
+    .order('last_message_at', { ascending: false });
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Enrich conversations with advisor profile and unread count
-    const advisorIds = Array.from(new Set((conversations || []).map((c: any) => c.advisor_user_id)));
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, avatar_url')
-      .in('id', advisorIds.length > 0 ? advisorIds : ['00000000-0000-0000-0000-000000000000']);
-
-    const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
-
-    const enriched = await Promise.all(
-      (conversations || []).map(async (conv: any) => {
-        const advisorProfile = profileMap.get(conv.advisor_user_id);
-
-        // Get unread count for this user
-        const { count } = await supabase
-          .from('advisor_messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('conversation_id', conv.id)
-          .neq('sender_id', user.id)
-          .eq('is_read', false);
-
-        // Get last message preview
-        const { data: lastMsg } = await supabase
-          .from('advisor_messages')
-          .select('message, sender_id, created_at')
-          .eq('conversation_id', conv.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        return {
-          ...conv,
-          advisor_name: advisorProfile?.full_name || advisorProfile?.email || 'Advisor',
-          advisor_email: advisorProfile?.email,
-          advisor_avatar_url: advisorProfile?.avatar_url,
-          unread_count: count || 0,
-          last_message: lastMsg?.message,
-          last_message_sender_id: lastMsg?.sender_id,
-          last_message_at: lastMsg?.created_at || conv.created_at,
-        };
-      })
-    );
-
-    return NextResponse.json({ conversations: enriched });
+  if (error) {
+    console.error('Error fetching advisor conversations:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 
-  return NextResponse.json({ error: 'conversation_id or organization_id is required' }, { status: 400 });
+  // Enrich conversations with advisor profile and unread count
+  const advisorIds = Array.from(new Set((conversations || []).map((c: any) => c.advisor_user_id)));
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, full_name, email, avatar_url')
+    .in('id', advisorIds.length > 0 ? advisorIds : ['00000000-0000-0000-0000-000000000000']);
+
+  const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+
+  const enriched = await Promise.all(
+    (conversations || []).map(async (conv: any) => {
+      const advisorProfile = profileMap.get(conv.advisor_user_id);
+
+      // Get unread count for this user
+      const { count } = await supabase
+        .from('advisor_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', conv.id)
+        .neq('sender_id', user.id)
+        .eq('is_read', false);
+
+      // Get last message preview
+      const { data: lastMsg } = await supabase
+        .from('advisor_messages')
+        .select('message, sender_id, created_at')
+        .eq('conversation_id', conv.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      return {
+        ...conv,
+        advisor_name: advisorProfile?.full_name || advisorProfile?.email || 'Advisor',
+        advisor_email: advisorProfile?.email,
+        advisor_avatar_url: advisorProfile?.avatar_url,
+        unread_count: count || 0,
+        last_message: lastMsg?.message,
+        last_message_sender_id: lastMsg?.sender_id,
+        last_message_at: lastMsg?.created_at || conv.created_at,
+      };
+    })
+  );
+
+  return NextResponse.json({ conversations: enriched });
 }
 
 /**
@@ -131,7 +134,7 @@ export async function GET(request: NextRequest) {
  * Create a new conversation or send a message.
  *
  * Body for new conversation:
- *   { action: 'create_conversation', organization_id, advisor_user_id, subject, message }
+ *   { action: 'create_conversation', advisor_user_id, subject, message }
  *
  * Body for new message:
  *   { action: 'send_message', conversation_id, message }
@@ -140,34 +143,31 @@ export async function GET(request: NextRequest) {
  *   { action: 'mark_read', conversation_id }
  */
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization');
-  if (!authHeader) {
+  const { client: supabase, user, error: authError } = await getSupabaseAPIClient();
+  if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const token = authHeader.replace('Bearer ', '');
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+  if (orgError || !organizationId) {
+    return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
   }
 
   const body = await request.json();
   const { action } = body;
 
   if (action === 'create_conversation') {
-    const { organization_id, advisor_user_id, subject, message } = body;
+    const { advisor_user_id, subject, message } = body;
 
-    if (!organization_id || !advisor_user_id) {
-      return NextResponse.json({ error: 'organization_id and advisor_user_id are required' }, { status: 400 });
+    if (!advisor_user_id) {
+      return NextResponse.json({ error: 'advisor_user_id is required' }, { status: 400 });
     }
 
-    // Create conversation
+    // Always use verified org, never body.organization_id
     const { data: conv, error: convError } = await supabase
       .from('advisor_conversations')
       .insert({
-        organization_id,
+        organization_id: organizationId,
         advisor_user_id,
         subject: subject || '',
         created_by: user.id,
@@ -176,7 +176,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (convError) {
-      return NextResponse.json({ error: convError.message }, { status: 500 });
+      console.error('Error creating advisor conversation:', convError);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Send initial message if provided
@@ -204,6 +205,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'conversation_id and message are required' }, { status: 400 });
     }
 
+    // Verify conversation belongs to user's org
+    const { data: conv } = await supabase
+      .from('advisor_conversations')
+      .select('id')
+      .eq('id', conversation_id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (!conv) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+
     const { data: msg, error: msgError } = await supabase
       .from('advisor_messages')
       .insert({
@@ -215,7 +228,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (msgError) {
-      return NextResponse.json({ error: msgError.message }, { status: 500 });
+      console.error('Error sending advisor message:', msgError);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Fire-and-forget: send email notification
@@ -233,6 +247,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'conversation_id is required' }, { status: 400 });
     }
 
+    // Verify conversation belongs to user's org
+    const { data: conv } = await supabase
+      .from('advisor_conversations')
+      .select('id')
+      .eq('id', conversation_id)
+      .eq('organization_id', organizationId)
+      .maybeSingle();
+
+    if (!conv) {
+      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
+    }
+
     const { error } = await supabase
       .from('advisor_messages')
       .update({ is_read: true, read_at: new Date().toISOString() })
@@ -241,7 +267,8 @@ export async function POST(request: NextRequest) {
       .eq('is_read', false);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('Error marking advisor messages as read:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
@@ -251,7 +278,7 @@ export async function POST(request: NextRequest) {
 }
 
 // ============================================================================
-// Phase 3c: Email notification for advisor messages
+// Email notification for advisor messages
 // ============================================================================
 
 async function sendAdvisorMessageEmail(
@@ -296,7 +323,7 @@ async function sendAdvisorMessageEmail(
   let recipientEmails: string[] = [];
 
   if (senderId === conv.advisor_user_id) {
-    // Advisor sent → notify org members
+    // Advisor sent - notify org members
     const { data: members } = await supabase
       .from('organization_members')
       .select('user_id')
@@ -313,7 +340,7 @@ async function sendAdvisorMessageEmail(
       }
     }
   } else {
-    // Org member sent → notify advisor
+    // Org member sent - notify advisor
     const { data: advisorProfile } = await supabase
       .from('profiles')
       .select('email')

@@ -22,7 +22,10 @@ import {
   Globe,
   Calendar,
   TrendingUp,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck,
+  Shield,
+  Clock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
@@ -40,9 +43,13 @@ import {
 import { useSupplier } from "@/hooks/data/useSuppliers";
 import { useSupplierProducts } from "@/hooks/data/useSupplierProducts";
 import { useSupplierPermissions } from "@/hooks/useSupplierPermissions";
+import { useSupplierEsgAssessment } from "@/hooks/data/useSupplierEsgAssessment";
 import { AddSupplierProductModal } from "@/components/suppliers/AddSupplierProductModal";
 import { SupplierLocationTab } from "@/components/suppliers/SupplierLocationTab";
 import { SupplierEvidenceTab } from "@/components/suppliers/SupplierEvidenceTab";
+import { Progress } from "@/components/ui/progress";
+import { ESG_SECTIONS, getQuestionsBySection, type EsgResponse } from "@/lib/supplier-esg/questions";
+import { getRatingLabel } from "@/lib/supplier-esg/scoring";
 
 export default function SupplierDetailPage() {
   const params = useParams();
@@ -52,6 +59,7 @@ export default function SupplierDetailPage() {
   const { supplier, engagement, loading, refetch: refetchSupplier } = useSupplier(supplierId);
   const { products, refetch: refetchProducts } = useSupplierProducts(supplierId);
   const { canEditSuppliers, canDeleteSuppliers, canCreateSuppliers } = useSupplierPermissions();
+  const { assessment: esgAssessment } = useSupplierEsgAssessment(supplierId);
   const [activeTab, setActiveTab] = useState("overview");
   const [isDeleting, setIsDeleting] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -136,7 +144,21 @@ export default function SupplierDetailPage() {
               <Building2 className="h-8 w-8 text-muted-foreground" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">{supplier.name}</h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold">{supplier.name}</h1>
+                {esgAssessment?.is_verified && (
+                  <Badge className="text-xs bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                    <ShieldCheck className="h-3 w-3 mr-1" />
+                    ESG Verified — {esgAssessment.score_total ?? 'N/A'} ({getRatingLabel(esgAssessment.score_rating! as any)})
+                  </Badge>
+                )}
+                {esgAssessment && esgAssessment.submitted && !esgAssessment.is_verified && (
+                  <Badge className="text-xs bg-slate-500/20 text-slate-400 border-slate-500/30">
+                    <Clock className="h-3 w-3 mr-1" />
+                    ESG Assessment Pending
+                  </Badge>
+                )}
+              </div>
               <p className="text-muted-foreground">
                 {supplier.industry_sector || "No industry specified"}
               </p>
@@ -186,11 +208,12 @@ export default function SupplierDetailPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="products">
             Products ({products.length})
           </TabsTrigger>
+          <TabsTrigger value="esg">ESG</TabsTrigger>
           <TabsTrigger value="evidence">Evidence</TabsTrigger>
           <TabsTrigger value="location">Location</TabsTrigger>
         </TabsList>
@@ -450,6 +473,129 @@ export default function SupplierDetailPage() {
           </Card>
         </TabsContent>
 
+        {/* ESG Assessment Tab */}
+        <TabsContent value="esg" className="space-y-6">
+          {esgAssessment && (esgAssessment.submitted || esgAssessment.is_verified) ? (
+            <>
+              {/* Verification status */}
+              {esgAssessment.is_verified && (
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-3">
+                      <ShieldCheck className="h-6 w-6 text-emerald-500" />
+                      <div>
+                        <p className="font-semibold text-emerald-500">ESG Verified</p>
+                        <p className="text-sm text-muted-foreground">
+                          Verified on{" "}
+                          {new Date(esgAssessment.verified_at!).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                      <div className="ml-auto text-right">
+                        <p className="text-3xl font-bold">{esgAssessment.score_total ?? 'N/A'}</p>
+                        <EsgRatingBadge rating={esgAssessment.score_rating} />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Score breakdown */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Score Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {ESG_SECTIONS.map((section) => {
+                    const scoreKey = {
+                      labour_human_rights: "score_labour",
+                      environment: "score_environment",
+                      ethics: "score_ethics",
+                      health_safety: "score_health_safety",
+                      management_systems: "score_management",
+                    }[section.key] as keyof typeof esgAssessment;
+                    const score = (esgAssessment[scoreKey] as number) ?? 0;
+
+                    return (
+                      <div key={section.key} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>{section.label}</span>
+                          <span className="font-medium">{score}%</span>
+                        </div>
+                        <Progress value={score} className="h-2" />
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              {/* Section-by-section Q&A */}
+              {ESG_SECTIONS.map((section) => {
+                const questions = getQuestionsBySection(section.key);
+                const answers = (esgAssessment.answers || {}) as Record<string, EsgResponse>;
+
+                return (
+                  <Card key={section.key}>
+                    <CardHeader>
+                      <CardTitle className="text-base">{section.label}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {questions.map((q) => {
+                          const answer = answers[q.id];
+                          const answerStyles: Record<string, string> = {
+                            yes: "bg-emerald-500/20 text-emerald-400",
+                            partial: "bg-amber-500/20 text-amber-400",
+                            no: "bg-red-500/20 text-red-400",
+                            na: "bg-slate-500/20 text-slate-400",
+                          };
+                          const answerLabels: Record<string, string> = {
+                            yes: "Yes",
+                            partial: "Partial",
+                            no: "No",
+                            na: "N/A",
+                          };
+
+                          return (
+                            <div
+                              key={q.id}
+                              className="flex items-start justify-between gap-4 text-sm py-1.5 border-b border-border/50 last:border-0"
+                            >
+                              <span className="text-muted-foreground flex-1">{q.text}</span>
+                              {answer ? (
+                                <Badge className={`text-xs flex-shrink-0 ${answerStyles[answer] || ""}`}>
+                                  {answerLabels[answer] || answer}
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-xs">—</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No ESG Assessment</h3>
+                  <p className="text-muted-foreground">
+                    This supplier has not yet completed an ESG assessment.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         {/* Evidence Tab */}
         <TabsContent value="evidence" className="space-y-6">
           <SupplierEvidenceTab supplierId={supplierId} />
@@ -468,5 +614,20 @@ export default function SupplierDetailPage() {
         product={editingProduct}
       />
     </div>
+  );
+}
+
+function EsgRatingBadge({ rating }: { rating: string | null }) {
+  if (!rating) return null;
+  const styles: Record<string, string> = {
+    leader: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    progressing: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    needs_improvement: "bg-red-500/20 text-red-400 border-red-500/30",
+    not_assessed: "bg-slate-500/20 text-slate-400 border-slate-500/30",
+  };
+  return (
+    <Badge className={`text-xs ${styles[rating] || ""}`}>
+      {getRatingLabel(rating as any)}
+    </Badge>
   );
 }

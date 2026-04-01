@@ -16,7 +16,7 @@ const config: Config = {
         data: 'var(--font-data)',
         serif: ['var(--font-serif)', '"Playfair Display"', 'Georgia', 'serif'],
         sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['"Fira Code"', 'Consolas', 'monospace'],
+        mono: ['var(--font-data)', 'Consolas', 'monospace'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

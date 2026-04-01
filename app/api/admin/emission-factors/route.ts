@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching emission factors:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch factors' },
+      { error: 'Failed to fetch factors' },
       { status: 500 }
     );
   }
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error creating emission factor:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create factor' },
+      { error: 'Failed to create factor' },
       { status: 500 }
     );
   }

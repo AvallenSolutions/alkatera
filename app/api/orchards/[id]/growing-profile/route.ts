@@ -31,7 +31,7 @@ export async function GET(
 
       if (error) {
         console.error('[OrchardProfile GET] Query error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
 
       return NextResponse.json({ data });
@@ -45,7 +45,7 @@ export async function GET(
 
     if (error) {
       console.error('[OrchardProfile GET] Query error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ data: data || [] });
@@ -177,7 +177,7 @@ export async function POST(
         );
       }
       console.error('[OrchardProfile POST] Insert error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });
@@ -238,7 +238,7 @@ export async function PATCH(
 
     if (error) {
       console.error('[OrchardProfile PATCH] Update error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data });

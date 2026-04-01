@@ -85,10 +85,13 @@ const REUSED_BARREL_CO2E = 0.5;
  *   HIGH FIX #11: Previously used facility country (wrong) or hardcoded UK (wrong).
  *   Pass the warehouse country explicitly for accuracy. Defaults to global average
  *   (0.490 kg CO2e/kWh) when not specified.
+ * @param abv - Optional ABV override (0-1 fraction). Defaults to 0.63 (63% cask-strength).
+ *   Useful for non-Scotch spirits: bourbon (~62.5%), cognac (~70%), rum (varies).
  */
 export function calculateMaturationImpacts(
   profile: MaturationProfile,
-  warehouseCountryCode?: string | null
+  warehouseCountryCode?: string | null,
+  abv?: number
 ): MaturationImpactResult {
   const agingYears = profile.aging_duration_months / 12;
   const totalFillVolume = profile.fill_volume_litres * profile.number_of_barrels;
@@ -119,7 +122,7 @@ export function calculateMaturationImpacts(
 
   // Ethanol lost as VOC (NMVOC emission, NOT direct GHG)
   // Assume cask-strength ABV, ethanol density 0.789 kg/L
-  const ethanolLostLitres = volumeLoss * DEFAULT_ABV;
+  const ethanolLostLitres = volumeLoss * (abv ?? DEFAULT_ABV);
   const ethanolLostKg = ethanolLostLitres * ETHANOL_DENSITY;
 
   // POCP characterization: ethanol → photochemical ozone formation

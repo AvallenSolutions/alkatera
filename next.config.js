@@ -29,6 +29,7 @@ const nextConfig = {
       'recharts',
       'date-fns',
       '@radix-ui/react-icons',
+      'framer-motion',
     ],
   },
 };

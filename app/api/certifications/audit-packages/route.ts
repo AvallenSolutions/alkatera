@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
       if (error) {
         console.error('Error fetching audit package:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
 
       // Enrich with framework data
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching audit packages:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Enrich with framework data
@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating audit package:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });
@@ -210,7 +210,7 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating audit package:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data);
@@ -273,7 +273,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       console.error('Error deleting audit package:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

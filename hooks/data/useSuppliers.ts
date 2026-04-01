@@ -60,27 +60,37 @@ export function useSuppliers(organizationId: string | undefined) {
 
       if (suppliersError) throw suppliersError;
 
-      const suppliersWithEngagement = await Promise.all(
-        (suppliersData || []).map(async (supplier) => {
-          const { data: engagement } = await supabase
-            .from("supplier_engagements")
-            .select("*")
-            .eq("supplier_id", supplier.id)
-            .maybeSingle();
+      // Batch fetch engagements and product counts to avoid N+1 queries
+      const supplierIds = (suppliersData || []).map(s => s.id);
 
-          const { count: productCount } = await supabase
-            .from("supplier_products")
-            .select("*", { count: "exact", head: true })
-            .eq("supplier_id", supplier.id);
+      const [{ data: allEngagements }, { data: productCounts }] = await Promise.all([
+        supabase
+          .from("supplier_engagements")
+          .select("*")
+          .in("supplier_id", supplierIds),
+        supabase
+          .from("supplier_products")
+          .select("supplier_id")
+          .in("supplier_id", supplierIds),
+      ]);
 
-          return {
-            ...supplier,
-            engagement_status: engagement?.status || "no_engagement",
-            product_count: productCount || 0,
-            engagement: engagement || undefined,
-          };
-        })
+      const engagementMap = new Map(
+        (allEngagements || []).map(e => [e.supplier_id, e])
       );
+      const productCountMap = new Map<string, number>();
+      for (const p of (productCounts || [])) {
+        productCountMap.set(p.supplier_id, (productCountMap.get(p.supplier_id) || 0) + 1);
+      }
+
+      const suppliersWithEngagement = (suppliersData || []).map(supplier => {
+        const engagement = engagementMap.get(supplier.id);
+        return {
+          ...supplier,
+          engagement_status: engagement?.status || "no_engagement",
+          product_count: productCountMap.get(supplier.id) || 0,
+          engagement: engagement || undefined,
+        };
+      });
 
       setSuppliers(suppliersWithEngagement);
     } catch (err: any) {

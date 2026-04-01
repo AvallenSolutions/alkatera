@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getXeroClient } from '@/lib/xero/client'
 import { storeTokens } from '@/lib/xero/token-store'
+import { encryptCookiePayload } from '@/lib/xero/cookie-crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
         `${baseUrl}/settings?tab=integrations&xero=select-tenant`
       )
 
-      response.cookies.set('xero_pending_tenants', JSON.stringify(pendingData), {
+      response.cookies.set('xero_pending_tenants', encryptCookiePayload(JSON.stringify(pendingData)), {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',

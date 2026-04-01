@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('BOM parsing error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to parse BOM file' },
+      { error: 'Failed to parse BOM file' },
       { status: 500 }
     );
   }

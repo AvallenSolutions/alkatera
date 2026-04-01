@@ -117,8 +117,12 @@ describe('postcodeToNation', () => {
       expect(postcodeToNation('SA1 1AA')).toBe('wales');
     });
 
-    it('maps "SY1 1AA" to "wales" (SY treated as Wales per simplification)', () => {
-      expect(postcodeToNation('SY1 1AA')).toBe('wales');
+    it('maps "SY16 1AA" to "wales" (SY15-SY25 are Powys, Wales)', () => {
+      expect(postcodeToNation('SY16 1AA')).toBe('wales');
+    });
+
+    it('maps "SY1 1AA" to "england" (SY1-SY14 are Shropshire, England)', () => {
+      expect(postcodeToNation('SY1 1AA')).toBe('england');
     });
   });
 

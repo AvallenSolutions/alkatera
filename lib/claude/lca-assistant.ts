@@ -9,13 +9,17 @@
  * - Claude Opus 4 for final PDF narratives (highest quality)
  */
 
-// Dynamic import for Anthropic SDK to handle missing dependency gracefully
-// Install with: npm install @anthropic-ai/sdk
+// Lazy-loaded Anthropic SDK to avoid bundling in client code and handle missing dependency
 let Anthropic: any = null;
-try {
-  Anthropic = require('@anthropic-ai/sdk').default;
-} catch {
-  console.warn('[Claude LCA Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
+async function getAnthropic() {
+  if (!Anthropic) {
+    try {
+      Anthropic = (await import('@anthropic-ai/sdk')).default;
+    } catch {
+      console.warn('[Claude LCA Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
+    }
+  }
+  return Anthropic;
 }
 
 // ============================================================================
@@ -133,8 +137,9 @@ Always respond in valid JSON format with 'explanation' and optionally 'example' 
 
 let anthropicClient: any = null;
 
-function getClient(): any {
-  if (!Anthropic) {
+async function getClient(): Promise<any> {
+  const AnthropicSDK = await getAnthropic();
+  if (!AnthropicSDK) {
     throw new Error('@anthropic-ai/sdk is not installed. Run: npm install @anthropic-ai/sdk');
   }
   if (!anthropicClient) {
@@ -142,7 +147,7 @@ function getClient(): any {
     if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY environment variable is not set');
     }
-    anthropicClient = new Anthropic({ apiKey });
+    anthropicClient = new AnthropicSDK({ apiKey });
   }
   return anthropicClient;
 }
@@ -159,7 +164,7 @@ export async function generateSuggestion(
   field: SuggestionField,
   context: LcaContext
 ): Promise<SuggestionResult> {
-  const client = getClient();
+  const client = await getClient();
 
   const fieldPrompts: Record<SuggestionField, string> = {
     intended_application: `Generate a concise "intended application" statement for an LCA study of "${context.productName}".
@@ -271,7 +276,7 @@ export async function generateNarratives(
     staleMaterialCount: number;
   }
 ): Promise<NarrativeResult> {
-  const client = getClient();
+  const client = await getClient();
 
   const prompt = `Generate formal narrative sections for an ISO 14044 compliant LCA report.
 
@@ -356,7 +361,7 @@ Respond with JSON in this exact format:
  * Uses Claude 3.5 Sonnet for fast responses
  */
 export async function explainTerm(term: string): Promise<PlainEnglishExplanation> {
-  const client = getClient();
+  const client = await getClient();
 
   try {
     const response = await client.messages.create({

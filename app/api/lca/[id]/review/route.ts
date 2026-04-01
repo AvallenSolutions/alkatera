@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 /**
  * GET /api/lca/[id]/review
@@ -16,6 +17,22 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Verify user's org owns this PCF
+  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
+  if (orgError || !organizationId) {
+    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+  }
+
+  const { data: pcf } = await client
+    .from('product_carbon_footprints')
+    .select('organization_id')
+    .eq('id', pcfId)
+    .single();
+
+  if (!pcf || pcf.organization_id !== organizationId) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const { data: review, error } = await client
     .from('lca_critical_reviews')
     .select(`
@@ -28,7 +45,8 @@ export async function GET(
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error fetching LCA review:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 
   if (!review) {
@@ -60,7 +78,12 @@ export async function POST(
     return NextResponse.json({ error: 'Invalid review_type' }, { status: 400 });
   }
 
-  // Get organization_id from PCF
+  // Verify user's org owns this PCF
+  const { organizationId, error: orgError } = await resolveUserOrganization(client, user);
+  if (orgError || !organizationId) {
+    return NextResponse.json({ error: 'No organisation found' }, { status: 403 });
+  }
+
   const { data: pcf, error: pcfError } = await client
     .from('product_carbon_footprints')
     .select('organization_id')
@@ -69,6 +92,10 @@ export async function POST(
 
   if (pcfError || !pcf) {
     return NextResponse.json({ error: 'LCA not found' }, { status: 404 });
+  }
+
+  if (pcf.organization_id !== organizationId) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
   // Create review record
@@ -85,7 +112,8 @@ export async function POST(
     .single();
 
   if (reviewError || !review) {
-    return NextResponse.json({ error: `Failed to create review: ${reviewError?.message}` }, { status: 500 });
+    console.error('Failed to create review:', reviewError);
+    return NextResponse.json({ error: 'Failed to create review' }, { status: 500 });
   }
 
   // Add reviewers if provided

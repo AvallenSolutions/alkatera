@@ -56,15 +56,40 @@ export function buildRosaContext(params: {
   const enhancedContextStr = formatEnhancedContext(enhancedContext);
 
   // Build the user prompt from template
+  // Wrap user-supplied content in XML tags for structural isolation (prompt injection mitigation)
+  const wrappedQuery = `<user_query>\n${userQuery}\n</user_query>`;
+  const wrappedHistory = conversationHistory.length > 0
+    ? `<conversation_history>\n${historyStr}\n</conversation_history>`
+    : historyStr;
+
   let userPrompt = ROSA_CONTEXT_TEMPLATE
     .replace('{organization_context}', orgContextStr)
     .replace('{knowledge_base}', knowledgeStr)
-    .replace('{conversation_history}', historyStr)
-    .replace('{user_query}', userQuery);
+    .replace('{conversation_history}', wrappedHistory)
+    .replace('{user_query}', wrappedQuery);
 
   // Append enhanced context if available
   if (enhancedContextStr) {
     userPrompt = userPrompt + '\n\n## ENHANCED INSIGHTS\n' + enhancedContextStr;
+  }
+
+  // Enforce a token budget (~30k tokens). Truncate the largest sections first
+  // to keep conversation history and user query intact.
+  const MAX_CONTEXT_CHARS = 120_000;
+  if (userPrompt.length > MAX_CONTEXT_CHARS) {
+    const overhead = userPrompt.length - MAX_CONTEXT_CHARS;
+    // Rebuild with truncated org context (largest section)
+    const truncatedOrgContext = orgContextStr.length > overhead
+      ? orgContextStr.slice(0, orgContextStr.length - overhead) + '\n[... context truncated for token budget]'
+      : orgContextStr;
+    userPrompt = ROSA_CONTEXT_TEMPLATE
+      .replace('{organization_context}', truncatedOrgContext)
+      .replace('{knowledge_base}', knowledgeStr)
+      .replace('{conversation_history}', historyStr)
+      .replace('{user_query}', userQuery);
+    if (enhancedContextStr) {
+      userPrompt = userPrompt + '\n\n## ENHANCED INSIGHTS\n' + enhancedContextStr;
+    }
   }
 
   return {

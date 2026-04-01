@@ -87,7 +87,8 @@ export function checkMissingFields(item: PackagingItem): string[] {
   // Always required
   for (const field of ALWAYS_REQUIRED) {
     const value = item[field as keyof PackagingItem];
-    if (value == null || value === '' || value === 0) {
+    // net_weight_g of 0 is valid (e.g. negligible packaging); only reject null/undefined/empty
+    if (field === 'net_weight_g' ? (value == null || value === '') : (value == null || value === '' || value === 0)) {
       missing.push(FIELD_DISPLAY_NAMES[field] || field);
     }
   }

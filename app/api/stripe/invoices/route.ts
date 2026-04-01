@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching invoices:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch invoices' },
+      { error: 'Failed to fetch invoices' },
       { status: 500 }
     );
   }

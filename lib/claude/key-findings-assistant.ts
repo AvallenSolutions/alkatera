@@ -11,12 +11,17 @@
  * Called only from API routes - never from client code.
  */
 
-// Dynamic import for Anthropic SDK to handle missing dependency gracefully
+// Lazy-loaded Anthropic SDK to avoid bundling in client code and handle missing dependency
 let Anthropic: any = null;
-try {
-  Anthropic = require('@anthropic-ai/sdk').default;
-} catch {
-  console.warn('[Key Findings Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
+async function getAnthropic() {
+  if (!Anthropic) {
+    try {
+      Anthropic = (await import('@anthropic-ai/sdk')).default;
+    } catch {
+      console.warn('[Key Findings Assistant] @anthropic-ai/sdk not installed. AI features will use fallbacks.');
+    }
+  }
+  return Anthropic;
 }
 
 // ============================================================================
@@ -110,8 +115,9 @@ function setCache(key: string, result: KeyFindingsResult): void {
 
 let anthropicClient: any = null;
 
-function getClient(): any {
-  if (!Anthropic) {
+async function getClient(): Promise<any> {
+  const AnthropicSDK = await getAnthropic();
+  if (!AnthropicSDK) {
     throw new Error('@anthropic-ai/sdk is not installed');
   }
   if (!anthropicClient) {
@@ -119,7 +125,7 @@ function getClient(): any {
     if (!apiKey) {
       throw new Error('ANTHROPIC_API_KEY environment variable is not set');
     }
-    anthropicClient = new Anthropic({ apiKey });
+    anthropicClient = new AnthropicSDK({ apiKey });
   }
   return anthropicClient;
 }
@@ -215,7 +221,7 @@ export async function generateKeyFindings(
   }
 
   try {
-    const client = getClient();
+    const client = await getClient();
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',

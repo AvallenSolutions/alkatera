@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
 export async function GET(request: NextRequest) {
+  const { user, error: authError } = await getSupabaseAPIClient();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const input = searchParams.get('input');
 

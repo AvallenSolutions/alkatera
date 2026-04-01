@@ -51,9 +51,13 @@ export function getXeroClient(state?: string): XeroClient {
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
 
+// Prevent concurrent token refreshes for the same org (each refresh invalidates the previous token)
+const refreshLocks = new Map<string, Promise<void>>()
+
 /**
  * Get an authenticated XeroClient for an organisation.
  * Automatically refreshes the access token if it is within 5 minutes of expiry.
+ * Uses a per-org lock to prevent concurrent refresh attempts.
  *
  * Returns { client, tenantId } ready for API calls.
  * Returns null if no connection exists.
@@ -61,6 +65,12 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000
 export async function getAuthenticatedClient(
   organizationId: string
 ): Promise<{ client: XeroClient; tenantId: string } | null> {
+  // Wait for any in-flight refresh for this org to complete first
+  const existing = refreshLocks.get(organizationId)
+  if (existing) {
+    await existing
+  }
+
   const tokens = await getTokens(organizationId)
   if (!tokens) return null
 
@@ -71,34 +81,41 @@ export async function getAuthenticatedClient(
   const expiresAt = tokens.expiresAt.getTime()
 
   if (now >= expiresAt - REFRESH_BUFFER_MS) {
-    // Token is expired or about to expire, refresh it
-    try {
-      const newTokenSet = await xero.refreshWithRefreshToken(
-        process.env.XERO_CLIENT_ID!,
-        process.env.XERO_CLIENT_SECRET!,
-        tokens.refreshToken
-      )
+    // Token is expired or about to expire, refresh it with a lock
+    const refreshPromise = (async () => {
+      try {
+        const newTokenSet = await xero.refreshWithRefreshToken(
+          process.env.XERO_CLIENT_ID!,
+          process.env.XERO_CLIENT_SECRET!,
+          tokens.refreshToken
+        )
 
-      const newExpiresAt = new Date(Date.now() + (newTokenSet.expires_in || 1800) * 1000)
+        const newExpiresAt = new Date(Date.now() + (newTokenSet.expires_in || 1800) * 1000)
 
-      // CRITICAL: Always persist the new refresh token.
-      // Each refresh invalidates the previous refresh token.
-      await updateTokens(
-        organizationId,
-        tokens.tenantId,
-        newTokenSet.access_token!,
-        newTokenSet.refresh_token!,
-        newExpiresAt
-      )
+        // CRITICAL: Always persist the new refresh token.
+        // Each refresh invalidates the previous refresh token.
+        await updateTokens(
+          organizationId,
+          tokens.tenantId,
+          newTokenSet.access_token!,
+          newTokenSet.refresh_token!,
+          newExpiresAt
+        )
 
-      // Set the new token on the client
-      xero.setTokenSet(newTokenSet)
-    } catch (err) {
-      console.error('Failed to refresh Xero token:', err)
-      throw new Error(
-        'Xero token refresh failed. The connection may need to be re-authorised.'
-      )
-    }
+        // Set the new token on the client
+        xero.setTokenSet(newTokenSet)
+      } catch (err) {
+        console.error('Failed to refresh Xero token:', err)
+        throw new Error(
+          'Xero token refresh failed. The connection may need to be re-authorised.'
+        )
+      } finally {
+        refreshLocks.delete(organizationId)
+      }
+    })()
+
+    refreshLocks.set(organizationId, refreshPromise)
+    await refreshPromise
   } else {
     // Token is still valid, set it directly
     xero.setTokenSet({

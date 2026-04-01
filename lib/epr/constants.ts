@@ -51,7 +51,7 @@ export const RPD_ACTIVITY_NAMES: Record<RPDPackagingActivity, string> = {
   SO: 'Sold (Brand Owner)',
   PF: 'Packed/Filled',
   IM: 'Imported',
-  SE: 'Sold via online marketplace',
+  SE: 'Sold to Small Producers (Empty Packaging)',
   HL: 'Hired/Loaned',
   OM: 'Online marketplace operator',
 };
@@ -153,13 +153,19 @@ export const SCOTLAND_POSTCODE_PREFIXES = [
   'ML', 'PA', 'PH', 'TD', 'ZE',
 ];
 
-/** Postcode prefixes for Wales */
+/** Postcode prefixes for Wales (SY handled at district level below) */
 export const WALES_POSTCODE_PREFIXES = [
-  'CF', 'LD', 'LL', 'NP', 'SA', 'SY',
+  'CF', 'LD', 'LL', 'NP', 'SA',
 ];
 
-// Note: SY is shared (Shropshire/Powys) — SY15-SY25 are Wales, rest is England.
-// For simplicity, SY is counted as Wales; refinement can use full postcode lookup.
+/**
+ * SY postcode districts in Wales (Powys). SY15-SY25 are Wales; all other SY
+ * districts (SY1-SY14, SY26+) are in England (Shropshire).
+ */
+export const SY_WALES_DISTRICTS = [
+  'SY15', 'SY16', 'SY17', 'SY18', 'SY19', 'SY20',
+  'SY21', 'SY22', 'SY23', 'SY24', 'SY25',
+];
 
 /** ONS population-weighted fallback percentages (Census 2021) */
 export const ONS_POPULATION_WEIGHTS = {

@@ -242,6 +242,21 @@ export const REGIONAL_DEFAULTS: Record<EoLRegion, Record<string, RegionalDefault
   },
 };
 
+// Module-load validation: ensure all REGIONAL_DEFAULTS pathway percentages sum to 100
+if (process.env.NODE_ENV !== 'production') {
+  for (const [region, materials] of Object.entries(REGIONAL_DEFAULTS)) {
+    for (const [material, defaults] of Object.entries(materials)) {
+      const sum = defaults.recycling + defaults.landfill + defaults.incineration
+        + defaults.composting + defaults.anaerobic_digestion;
+      if (sum !== 100) {
+        console.warn(
+          `EoL pathway sum error: ${region}/${material} = ${sum}% (expected 100%)`
+        );
+      }
+    }
+  }
+}
+
 // ============================================================================
 // MATERIAL TYPE MAPPING
 // ============================================================================
@@ -458,6 +473,7 @@ export function getRegionalDefaults(
       landfill: 40,
       incineration: 30,
       composting: 0,
+      anaerobic_digestion: 0,
     }
   );
 }

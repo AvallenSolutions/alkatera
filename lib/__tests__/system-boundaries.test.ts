@@ -360,26 +360,26 @@ describe('calculateLossMultiplier', () => {
     expect(calculateLossMultiplier('cradle-to-gate', DEFAULT_PRODUCT_LOSS_CONFIG)).toBe(1.0);
   });
 
-  it('applies only distribution loss for cradle-to-shelf', () => {
+  it('applies distribution + retail loss for cradle-to-shelf', () => {
     const config: ProductLossConfig = {
       distributionLossPercent: 2,
       retailLossPercent: 3,
       consumerWastePercent: 10,
     };
     const result = calculateLossMultiplier('cradle-to-shelf', config);
-    // Only distribution: 1 / (1 - 0.02) = 1 / 0.98 ≈ 1.0204
-    expect(result).toBeCloseTo(1 / 0.98, 4);
+    // Distribution + retail (retail is a distribution-stage phenomenon): 1 / (0.98 × 0.97) ≈ 1.0520
+    expect(result).toBeCloseTo(1 / (0.98 * 0.97), 4);
   });
 
-  it('applies distribution + retail loss for cradle-to-consumer', () => {
+  it('applies distribution + retail + consumer loss for cradle-to-consumer', () => {
     const config: ProductLossConfig = {
       distributionLossPercent: 2,
       retailLossPercent: 3,
       consumerWastePercent: 10,
     };
     const result = calculateLossMultiplier('cradle-to-consumer', config);
-    // Distribution + retail: 1 / (0.98 × 0.97) ≈ 1.0520
-    expect(result).toBeCloseTo(1 / (0.98 * 0.97), 4);
+    // All distribution-chain + use-phase losses: 1 / (0.98 × 0.97 × 0.90) ≈ 1.1689
+    expect(result).toBeCloseTo(1 / (0.98 * 0.97 * 0.90), 4);
   });
 
   it('applies all three loss stages for cradle-to-grave', () => {

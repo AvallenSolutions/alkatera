@@ -35,10 +35,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user is a member of the organization
+    // Verify user is an admin/owner of the organization
     const role = await getMemberRole(supabase, organizationId, user.id);
     if (!role) {
       return NextResponse.json({ error: 'Not a member of this organization' }, { status: 403 });
+    }
+    if (!['owner', 'admin'].includes(role)) {
+      return NextResponse.json({ error: 'Only owners and admins can check downgrade limits' }, { status: 403 });
     }
 
     // Call the database function to check downgrade limits
@@ -80,7 +83,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error checking downgrade limits:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to check downgrade limits' },
+      { error: 'Failed to check downgrade limits' },
       { status: 500 }
     );
   }

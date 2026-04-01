@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { supabase } from './supabaseClient'
 import { useAuth } from '@/hooks/useAuth'
 import type { User } from '@supabase/supabase-js'
@@ -68,7 +68,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       return
     }
 
-    console.log('🔍 OrganizationContext: Fetching organizations for user:', user.id)
+    console.log('🔍 OrganizationContext: Fetching organizations')
 
     if (!session) {
       console.error('❌ OrganizationContext: No session available from AuthProvider')
@@ -76,10 +76,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
       return
     }
 
-    console.log('✅ OrganizationContext: Using session from AuthProvider:', {
-      userId: session.user.id,
-      hasAccessToken: !!session.access_token
-    })
+    console.log('✅ OrganizationContext: Session available')
 
     if (isFetchingRef.current) {
       console.log('⏳ OrganizationContext: Already fetching, skipping...')
@@ -133,7 +130,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
 
         if (!supplierError && supplierCtx && supplierCtx.length > 0) {
           const ctx = supplierCtx[0]
-          console.log('👤 OrganizationContext: User is a supplier', ctx.organization_name ? `for org: ${ctx.organization_name}` : '(no org linked)')
+          console.log('👤 OrganizationContext: User is a supplier')
 
           // Suppliers may not have an org link (self-registered).
           // Set role to 'supplier' regardless — the portal works without an org.
@@ -228,7 +225,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
   }, [user, session, authLoading])
 
-  const switchOrganization = async (orgId: string) => {
+  const switchOrganization = useCallback(async (orgId: string) => {
     const org = organizations.find(o => o.id === orgId)
     if (!org || !user) return
 
@@ -274,13 +271,13 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setUserRole(advisorAccess ? 'advisor' : null)
       }
     }
-  }
+  }, [organizations, user])
 
-  const refreshOrganizations = async () => {
+  const refreshOrganizations = useCallback(async () => {
     await fetchOrganizations()
-  }
+  }, [fetchOrganizations])
 
-  const mutate = async (newOrgPayload?: { organization: Organization; role: string; user: User }) => {
+  const mutate = useCallback(async (newOrgPayload?: { organization: Organization; role: string; user: User }) => {
     if (newOrgPayload) {
         const { organization, role } = newOrgPayload;
         setOrganizations(prev => [...prev, organization]);
@@ -300,7 +297,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     } else {
         await fetchOrganizations();
     }
-  };
+  }, [fetchOrganizations]);
 
   // Only fetch organizations when user ID changes (not on every user object reference change)
   useEffect(() => {
@@ -335,7 +332,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
   }, [onAuthStateChanged, fetchOrganizations])
 
-  const value = {
+  const value = useMemo(() => ({
     currentOrganization,
     organizations,
     isLoading,
@@ -343,7 +340,7 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     switchOrganization,
     refreshOrganizations,
     mutate,
-  }
+  }), [currentOrganization, organizations, isLoading, userRole, switchOrganization, refreshOrganizations, mutate])
 
   return (
     <OrganizationContext.Provider value={value}>

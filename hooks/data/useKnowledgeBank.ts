@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useOrganization } from '@/lib/organizationContext'
 
@@ -84,20 +84,25 @@ export function useKnowledgeBankCategories() {
 
         if (categoriesError) throw categoriesError
 
-        const categoriesWithCounts = await Promise.all(
-          (categoriesData || []).map(async (category) => {
-            const { count } = await supabase
-              .from('knowledge_bank_items')
-              .select('*', { count: 'exact', head: true })
-              .eq('category_id', category.id)
-              .eq('status', 'published')
+        // Batch count: single query for all published items, group in JS
+        const categoryIds = (categoriesData || []).map(c => c.id)
+        const { data: countData } = await supabase
+          .from('knowledge_bank_items')
+          .select('category_id', { count: 'exact', head: false })
+          .in('category_id', categoryIds)
+          .eq('status', 'published')
 
-            return {
-              ...category,
-              item_count: count || 0,
-            }
-          })
-        )
+        const countMap: Record<string, number> = {}
+        if (countData) {
+          for (const row of countData) {
+            countMap[row.category_id] = (countMap[row.category_id] || 0) + 1
+          }
+        }
+
+        const categoriesWithCounts = (categoriesData || []).map(category => ({
+          ...category,
+          item_count: countMap[category.id] || 0,
+        }))
 
         setCategories(categoriesWithCounts)
       } catch (err) {
@@ -111,7 +116,51 @@ export function useKnowledgeBankCategories() {
     fetchCategories()
   }, [currentOrganization?.id])
 
-  return { categories, loading, error, refetch: () => {} }
+  const refetch = useCallback(() => {
+    if (!currentOrganization?.id) return
+    setLoading(true)
+    setError(null)
+
+    ;(async () => {
+      try {
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('knowledge_bank_categories')
+          .select('*')
+          .or(`organization_id.eq.${currentOrganization.id},organization_id.is.null`)
+          .order('sort_order', { ascending: true })
+
+        if (categoriesError) throw categoriesError
+
+        const categoryIds = (categoriesData || []).map(c => c.id)
+        const { data: countData } = await supabase
+          .from('knowledge_bank_items')
+          .select('category_id', { count: 'exact', head: false })
+          .in('category_id', categoryIds)
+          .eq('status', 'published')
+
+        const countMap: Record<string, number> = {}
+        if (countData) {
+          for (const row of countData) {
+            countMap[row.category_id] = (countMap[row.category_id] || 0) + 1
+          }
+        }
+
+        const categoriesWithCounts = (categoriesData || []).map(category => ({
+          ...category,
+          item_count: countMap[category.id] || 0,
+        }))
+
+        setCategories(categoriesWithCounts)
+      } catch (err) {
+        console.error('Error fetching categories:', err)
+        setError(err instanceof Error ? err.message : 'Failed to fetch categories')
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [currentOrganization?.id])
+
+  return { categories, loading, error, refetch }
 }
 
 export function useKnowledgeBankItems(filters?: {

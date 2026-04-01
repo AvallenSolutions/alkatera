@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
 // Rate limiting map (in production, use Redis or similar)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -26,6 +27,11 @@ function checkRateLimit(ip: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, error: authError } = await getSupabaseAPIClient();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Rate limiting
     const ip = request.headers.get('x-forwarded-for') ||
                request.headers.get('x-real-ip') ||
@@ -133,7 +139,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error extracting document text:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to extract document text' },
+      { error: 'Failed to extract document text' },
       { status: 500 }
     );
   }

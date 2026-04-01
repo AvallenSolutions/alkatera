@@ -93,29 +93,35 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   // so nothing the user did during loading is lost.
   const pendingUpdatesRef = useRef<Array<(prev: OnboardingState) => OnboardingState>>([])
 
-  // Save onboarding state to the API — fires immediately, no debounce.
-  // Uses orgIdRef/flowRef so it doesn't depend on reactive values (avoids
-  // re-creating the callback on every reference change).
-  // Returns true on success, false on failure.
-  const saveState = useCallback(async (newState: OnboardingState): Promise<boolean> => {
-    const orgId = orgIdRef.current
-    if (!orgId) return false
+  // Save onboarding state to the API — debounced (300ms) to prevent
+  // overlapping saves when multiple rapid state updates fire (e.g. step
+  // transitions with completion toggles). Uses orgIdRef/flowRef so it
+  // doesn't depend on reactive values.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const saveState = useCallback((newState: OnboardingState): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = setTimeout(async () => {
+        const orgId = orgIdRef.current
+        if (!orgId) { resolve(false); return }
 
-    try {
-      const res = await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId: orgId,
-          state: newState,
-          flow: flowRef.current,
-        }),
-      })
-      return res.ok
-    } catch (err) {
-      console.error('Failed to save onboarding state:', err)
-      return false
-    }
+        try {
+          const res = await fetch('/api/onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              organizationId: orgId,
+              state: newState,
+              flow: flowRef.current,
+            }),
+          })
+          resolve(res.ok)
+        } catch (err) {
+          console.error('Failed to save onboarding state:', err)
+          resolve(false)
+        }
+      }, 300)
+    })
   }, []) // stable — no deps
 
   // Fetch state from the API for a given org ID
@@ -303,6 +309,13 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
     setState(fresh)
     saveState(fresh)
   }, [saveState])
+
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [])
 
   // Both owners and members see the onboarding wizard — just different flows.
   const shouldShowOnboarding =

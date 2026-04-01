@@ -138,12 +138,12 @@ describe('generateRPDCSV', () => {
       expect(cols[11]).toBe('1501');
     });
 
-    it('rounds 0.4 down to 0', () => {
+    it('rounds 0.4 up to minimum 1 (Defra whole-kg minimum for non-zero weights)', () => {
       const line = makeSubmissionLine({ rpd_material_weight_kg: 0.4 });
       const csv = generateRPDCSV([line]);
       const dataRow = csv.split('\r\n')[1];
       const cols = dataRow.split(',');
-      expect(cols[11]).toBe('0');
+      expect(cols[11]).toBe('1');
     });
 
     it('rounds 0.5 up to 1', () => {

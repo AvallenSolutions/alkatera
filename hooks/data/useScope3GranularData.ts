@@ -183,66 +183,88 @@ export function useScope3GranularData(
       let cat1Total = 0;
 
       if (productionLogs && productionLogs.length > 0) {
-        for (const log of productionLogs) {
-          const { data: lca } = await supabase
-            .from('product_carbon_footprints')
-            .select('id, aggregated_impacts, status')
-            .eq('product_id', log.product_id)
-            .eq('status', 'completed')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
+        // Batch fetch: get all completed LCAs for products in production logs
+        const uniqueProductIds = Array.from(new Set(productionLogs.map(l => l.product_id)));
 
-          // Extract carbon footprint from aggregated_impacts (single source of truth)
-          const emissionsPerUnit = (lca?.aggregated_impacts as any)?.climate_change_gwp100 || 0;
+        const { data: allLcas } = await supabase
+          .from('product_carbon_footprints')
+          .select('id, product_id, aggregated_impacts, status, created_at')
+          .in('product_id', uniqueProductIds)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false });
 
-          if (lca && emissionsPerUnit > 0) {
-            const unitsProduced = log.units_produced || 0;
-            if (unitsProduced <= 0) continue;
-
-            const totalEmissions = emissionsPerUnit * unitsProduced;
-            cat1Total += totalEmissions;
-
-            const { data: materials } = await supabase
-              .from('product_carbon_footprint_materials')
-              .select('name, quantity, unit, impact_climate, material_type')
-              .eq('product_carbon_footprint_id', lca.id);
-
-            const ingredientsList: ProductEmissionDetail['materials'] = [];
-            const packagingList: ProductEmissionDetail['packaging'] = [];
-
-            if (materials) {
-              materials.forEach(m => {
-                const item = {
-                  name: m.name || 'Unknown',
-                  quantity: (m.quantity || 0) * unitsProduced,
-                  unit: m.unit || 'kg',
-                  emissions: (m.impact_climate || 0) * unitsProduced,
-                  percentage: totalEmissions > 0 ? ((m.impact_climate || 0) * unitsProduced / totalEmissions) * 100 : 0,
-                };
-                if (m.material_type === 'packaging') {
-                  packagingList.push(item);
-                } else {
-                  ingredientsList.push(item);
-                }
-              });
-            }
-
-            ingredientsList.sort((a, b) => b.emissions - a.emissions);
-            packagingList.sort((a, b) => b.emissions - a.emissions);
-
-            const productInfo = log.products as any;
-            productDetailsArr.push({
-              productId: log.product_id,
-              productName: productInfo?.name || 'Unknown Product',
-              sku: productInfo?.sku,
-              unitsProduced,
-              emissionsPerUnit,
-              totalEmissions,
-              materials: ingredientsList,
-              packaging: packagingList,
-            });
+        // Build map: product_id → latest LCA (first match per product since ordered desc)
+        const lcaMap = new Map<string, typeof allLcas extends (infer T)[] | null ? NonNullable<T> : never>();
+        for (const lca of (allLcas || [])) {
+          if (!lcaMap.has(lca.product_id)) {
+            lcaMap.set(lca.product_id, lca);
           }
+        }
+
+        // Batch fetch: get all materials for the matched LCA IDs
+        const lcaIds = Array.from(lcaMap.values()).map(l => l.id);
+        const { data: allMaterials } = lcaIds.length > 0
+          ? await supabase
+              .from('product_carbon_footprint_materials')
+              .select('product_carbon_footprint_id, name, quantity, unit, impact_climate, material_type')
+              .in('product_carbon_footprint_id', lcaIds)
+          : { data: [] as any[] };
+
+        // Build map: lca_id → materials[]
+        const materialsMap = new Map<string, typeof allMaterials>();
+        for (const m of (allMaterials || [])) {
+          const arr = materialsMap.get(m.product_carbon_footprint_id) || [];
+          arr.push(m);
+          materialsMap.set(m.product_carbon_footprint_id, arr);
+        }
+
+        for (const log of productionLogs) {
+          const lca = lcaMap.get(log.product_id);
+          if (!lca) continue;
+
+          const emissionsPerUnit = (lca?.aggregated_impacts as any)?.climate_change_gwp100 || 0;
+          if (emissionsPerUnit <= 0) continue;
+
+          const unitsProduced = log.units_produced || 0;
+          if (unitsProduced <= 0) continue;
+
+          const totalEmissions = emissionsPerUnit * unitsProduced;
+          cat1Total += totalEmissions;
+
+          const materials = materialsMap.get(lca.id) || [];
+
+          const ingredientsList: ProductEmissionDetail['materials'] = [];
+          const packagingList: ProductEmissionDetail['packaging'] = [];
+
+          materials.forEach(m => {
+            const item = {
+              name: m.name || 'Unknown',
+              quantity: (m.quantity || 0) * unitsProduced,
+              unit: m.unit || 'kg',
+              emissions: (m.impact_climate || 0) * unitsProduced,
+              percentage: totalEmissions > 0 ? ((m.impact_climate || 0) * unitsProduced / totalEmissions) * 100 : 0,
+            };
+            if (m.material_type === 'packaging') {
+              packagingList.push(item);
+            } else {
+              ingredientsList.push(item);
+            }
+          });
+
+          ingredientsList.sort((a, b) => b.emissions - a.emissions);
+          packagingList.sort((a, b) => b.emissions - a.emissions);
+
+          const productInfo = log.products as any;
+          productDetailsArr.push({
+            productId: log.product_id,
+            productName: productInfo?.name || 'Unknown Product',
+            sku: productInfo?.sku,
+            unitsProduced,
+            emissionsPerUnit,
+            totalEmissions,
+            materials: ingredientsList,
+            packaging: packagingList,
+          });
         }
       }
 

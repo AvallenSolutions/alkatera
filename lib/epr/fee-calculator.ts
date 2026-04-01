@@ -50,6 +50,7 @@ export function calculateLineFee(
 
   // Modulated year but no RAM rating: default to RED (unassessed = worst case)
   if (feeRate.is_modulated && !ramRating && feeRate.red_rate_per_tonne != null) {
+    console.warn(`EPR fee: No RAM recyclability rating provided for modulated material "${feeRate.material_code}" — defaulting to red (worst-case) rate`)
     return roundToTwoDecimals(weightTonnes * feeRate.red_rate_per_tonne);
   }
 

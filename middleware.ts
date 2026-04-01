@@ -70,6 +70,8 @@ export const config = {
      * - public files (public folder)
      * - api/stripe/webhooks (Stripe webhook endpoint)
      */
+    // API routes are excluded (api/) because they use their own auth via Bearer tokens
+    // and getSupabaseAPIClient(), not cookie-based session middleware.
     '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|txt)$).*)',
   ],
 }

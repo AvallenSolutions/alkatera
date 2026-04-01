@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
         else if (unit === 'cl') unitSizeML = size * 10
       }
 
-      const drsExcluded = (settings.drs_applies ?? true) && isDRSExcluded(isDrinksContainer, unitSizeML, materialType)
+      const drsExcluded = (settings.drs_applies ?? true) && isDRSExcluded(isDrinksContainer, unitSizeML, materialType, fee_year)
 
       // Handle drinks container component rules
       const components = extractComponentWeights(material)
@@ -342,7 +342,12 @@ export async function POST(request: NextRequest) {
       .insert(linesWithSubmissionId)
 
     if (linesError) {
-      console.error('Error inserting submission lines:', linesError)
+      console.error(
+        'CRITICAL: Submission lines insert failed AFTER old lines were deleted. ' +
+        `Submission ${submissionId} may be in an inconsistent state (0 lines). ` +
+        'Manual intervention required.',
+        linesError
+      )
       return NextResponse.json({ error: 'Failed to create submission lines' }, { status: 500 })
     }
 

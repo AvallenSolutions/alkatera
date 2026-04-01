@@ -1,11 +1,12 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
+import { sanitizeRedirectPath } from '@/lib/utils/validate-redirect'
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') || '/dashboard'
+  const next = sanitizeRedirectPath(requestUrl.searchParams.get('next'))
   const type = requestUrl.searchParams.get('type')
 
   if (code) {

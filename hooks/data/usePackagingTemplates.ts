@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { toast } from "sonner";
 import type { PackagingFormData } from "@/components/products/PackagingFormCard";
@@ -145,6 +145,11 @@ export function usePackagingTemplates(organizationId: string) {
       setLoading(false);
     }
   }, [organizationId]);
+
+  // Auto-fetch templates when organizationId changes
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
 
   const saveTemplate = useCallback(
     async (name: string, description: string | null, items: PackagingFormData[]) => {

@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { renderGreenwashHtml } from '@/lib/pdf/render-greenwash-html';
 import { convertHtmlToPdf } from '@/lib/pdf/pdfshift-client';
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, error: authError } = await getSupabaseAPIClient();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const result = await request.json();
 
     // Basic validation

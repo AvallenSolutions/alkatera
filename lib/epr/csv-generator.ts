@@ -43,7 +43,7 @@ export function generateRPDCSV(lines: EPRSubmissionLine[]): string {
       escapeCSV(line.rpd_material_subtype ?? ''),
       escapeCSV(line.rpd_from_nation),
       escapeCSV(line.rpd_to_nation ?? ''),
-      String(Math.round(line.rpd_material_weight_kg)),  // Whole kg
+      String(line.rpd_material_weight_kg > 0 ? Math.max(1, Math.round(line.rpd_material_weight_kg)) : 0),  // Whole kg, minimum 1 for non-zero (Defra requirement)
       line.rpd_material_units != null ? String(line.rpd_material_units) : '',
       line.rpd_transitional_weight != null ? String(line.rpd_transitional_weight) : '',
       escapeCSV(line.rpd_recyclability_rating ?? ''),

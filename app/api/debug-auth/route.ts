@@ -8,8 +8,8 @@ export const dynamic = 'force-dynamic';
  * Debug endpoint to check authentication status and organisation membership
  */
 export async function GET(request: NextRequest) {
-  // Only available in development — disabled in production
-  if (process.env.NODE_ENV === 'production') {
+  // Only available when explicitly enabled in non-production environments
+  if (process.env.NODE_ENV === 'production' || process.env.DEBUG_AUTH_ENABLED !== 'true') {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 

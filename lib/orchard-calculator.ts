@@ -110,6 +110,17 @@ function calculateLUC(
 export function calculateOrchardImpacts(
   input: OrchardCalculatorInput
 ): OrchardImpactResult {
+  // Guard against negative numeric inputs which would produce nonsensical results
+  const numericFields = [
+    'area_ha', 'fertiliser_quantity_kg', 'diesel_litres_per_year',
+    'petrol_litres_per_year', 'water_m3_per_ha', 'fruit_yield_tonnes',
+  ] as const;
+  for (const field of numericFields) {
+    if ((input[field] as number) < 0) {
+      throw new Error(`Invalid input: ${field} cannot be negative`);
+    }
+  }
+
   const climateZone = input.climate_zone || 'temperate';
   const orchardType = input.orchard_type || 'apple';
 

@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching billing details:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch billing details' },
+      { error: 'Failed to fetch billing details' },
       { status: 500 }
     );
   }
@@ -216,7 +216,7 @@ export async function PUT(request: NextRequest) {
   } catch (error: any) {
     console.error('Error updating billing details:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to update billing details' },
+      { error: 'Failed to update billing details' },
       { status: 500 }
     );
   }

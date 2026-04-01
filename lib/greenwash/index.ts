@@ -117,8 +117,22 @@ export async function triggerAnalysis(
       input_type: inputType,
       input_source: inputSource,
     }),
-  }).catch((err) => {
+  }).catch(async (err) => {
     console.error('Failed to trigger greenwash analysis:', err);
+    // Mark the assessment as failed so the UI can show the error instead of
+    // spinning indefinitely waiting for a result that will never arrive.
+    try {
+      await supabase
+        .from('greenwash_assessments')
+        .update({
+          status: 'error',
+          error_message: err instanceof Error ? err.message : 'Analysis request failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', assessmentId);
+    } catch (updateErr) {
+      console.error('Failed to update assessment status after error:', updateErr);
+    }
   });
 
   return { success: true };

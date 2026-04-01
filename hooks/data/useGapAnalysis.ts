@@ -119,10 +119,23 @@ export function useGapAnalysis(frameworkId?: string) {
     if (!currentOrganization?.id || !frameworkId) return;
 
     try {
-      const updates = requirementIds.map(reqId =>
-        updateGapAnalysis(reqId, { compliance_status: status })
+      // Fire all updates in parallel without individual refetches
+      await Promise.all(
+        requirementIds.map(reqId =>
+          fetch('/api/certifications/gap-analysis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              organization_id: currentOrganization.id,
+              framework_id: frameworkId,
+              requirement_id: reqId,
+              compliance_status: status,
+            }),
+          })
+        )
       );
-      await Promise.all(updates);
+      // Single refetch after all updates complete
+      await fetchAnalyses();
     } catch (err) {
       console.error('Error bulk updating gap analyses:', err);
       throw err;

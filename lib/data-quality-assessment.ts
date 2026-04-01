@@ -278,6 +278,12 @@ export function calculateTemporalScore(
 
   const diff = Math.abs(referenceYear - dataYear);
 
+  // PEDIGREE matrix temporal scores (based on Weidema & Wesnaes 1996):
+  //   1 = <3 years: Data from same reporting period or very recent
+  //   2 = 3-5 years: Data from a recent but different reporting period
+  //   3 = 6-9 years: Data is aging; may not reflect current practices
+  //   4 = 10-14 years: Significantly outdated; use with caution
+  //   5 = 15+ years or unknown: Very old or no temporal information
   if (diff < 3) return { score: 1, isStale: false, isVeryStale: false };
   if (diff < 6) return { score: 2, isStale: false, isVeryStale: false };
   if (diff < 10) return { score: 3, isStale: true, isVeryStale: false };

@@ -1,8 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
+// Simple in-memory rate limiter for contact form
+const rateLimitMap = new Map<string, number>();
+const RATE_LIMIT_WINDOW_MS = 30_000; // 30 seconds
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const lastRequest = rateLimitMap.get(ip);
+  if (lastRequest && now - lastRequest < RATE_LIMIT_WINDOW_MS) return true;
+  rateLimitMap.set(ip, now);
+  // Cleanup old entries periodically to avoid memory leak
+  if (rateLimitMap.size > 10_000) {
+    rateLimitMap.forEach((time, key) => {
+      if (now - time > RATE_LIMIT_WINDOW_MS) rateLimitMap.delete(key);
+    });
+  }
+  return false;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again shortly.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, name, company, subscribe, interest } = body;
 

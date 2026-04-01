@@ -103,21 +103,24 @@ async function fetchEmissionsSummary(supabase: SupabaseClient, organizationId: s
   const { data: fleetData, count: fleetCount } = await supabase
     .from('fleet_activities')
     .select('total_emissions_kg', { count: 'exact' })
-    .eq('organization_id', organizationId);
+    .eq('organization_id', organizationId)
+    .limit(1000);
   const fleetActivities = fleetData as { total_emissions_kg: number | null }[] | null;
 
   // Fetch facility activities for Scope 1 & 2
   const { data: facilityData, count: facilityCount } = await supabase
     .from('facility_activity_entries')
     .select('emissions_kg_co2e, scope')
-    .eq('organization_id', organizationId);
+    .eq('organization_id', organizationId)
+    .limit(1000);
   const facilityActivities = facilityData as { emissions_kg_co2e: number | null; scope: number | null }[] | null;
 
   // Fetch corporate overheads for Scope 3
   const { data: overheadData, count: overheadCount } = await supabase
     .from('corporate_overheads')
     .select('total_emissions_kg')
-    .eq('organization_id', organizationId);
+    .eq('organization_id', organizationId)
+    .limit(1000);
   const overheads = overheadData as { total_emissions_kg: number | null }[] | null;
 
   // Calculate totals

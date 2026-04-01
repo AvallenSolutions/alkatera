@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { getSupabaseServerClient } from '@/lib/supabase/server-client'
 import { getMemberRole } from '@/app/api/stripe/_helpers/get-member-role'
 import { storeTokens } from '@/lib/xero/token-store'
+import { decryptCookiePayload } from '@/lib/xero/cookie-crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +50,7 @@ export async function GET() {
 
     let pendingData: PendingTenantData
     try {
-      pendingData = JSON.parse(pendingCookie.value)
+      pendingData = JSON.parse(decryptCookiePayload(pendingCookie.value))
     } catch {
       return NextResponse.json(
         { error: 'Invalid pending tenant data. Please reconnect to Xero.' },
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     let pendingData: PendingTenantData
     try {
-      pendingData = JSON.parse(pendingCookie.value)
+      pendingData = JSON.parse(decryptCookiePayload(pendingCookie.value))
     } catch {
       return NextResponse.json(
         { error: 'Invalid pending tenant data. Please reconnect to Xero.' },

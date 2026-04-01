@@ -19,9 +19,13 @@ export function useReportProgress(reportId: string | null) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastChangeRef = useRef<number>(Date.now());
   const lastStatusRef = useRef<string>('pending');
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     if (!reportId) return;
+
+    // Increment request ID so stale responses from a previous reportId are discarded
+    const currentRequestId = ++requestIdRef.current;
 
     // Fetch current state
     async function fetchStatus() {
@@ -32,6 +36,9 @@ export function useReportProgress(reportId: string | null) {
         .single();
 
       if (data) {
+        // Discard stale response if reportId changed since this request started
+        if (currentRequestId !== requestIdRef.current) return;
+
         // Track if status changed
         if (data.status !== lastStatusRef.current) {
           lastStatusRef.current = data.status;

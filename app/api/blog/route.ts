@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase/server-client';
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
 // GET /api/blog - List blog posts
 export async function GET(request: NextRequest) {
@@ -7,7 +8,20 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseServerClient();
     const searchParams = request.nextUrl.searchParams;
 
-    const status = searchParams.get('status') || 'published';
+    let status = searchParams.get('status') || 'published';
+
+    // Non-published statuses require admin access
+    if (status !== 'published') {
+      const { client: apiClient, user } = await getSupabaseAPIClient();
+      if (!user) {
+        status = 'published';
+      } else {
+        const { data: isAdmin } = await apiClient.rpc('is_alkatera_admin', { p_user_id: user.id });
+        if (!isAdmin) {
+          status = 'published';
+        }
+      }
+    }
     const tag = searchParams.get('tag');
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');

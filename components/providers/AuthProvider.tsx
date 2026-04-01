@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Only update user state if the user ID actually changed
     if (userChanged) {
-      console.log('🔐 AuthProvider: User changed from', currentUserIdRef.current, 'to', newUserId)
+      console.log('🔐 AuthProvider: User changed')
       currentUserIdRef.current = newUserId
       setUser(newUser)
       return true // User changed
@@ -65,10 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'INITIAL_SESSION') {
         // Single-pass initialisation — replaces the old getInitialSession() call
         if (currentSession) {
-          console.log('✅ AuthProvider: Session found', {
-            userId: currentSession.user.id,
-            email: currentSession.user.email,
-          })
+          console.log('✅ AuthProvider: Session found')
           currentUserIdRef.current = currentSession.user.id
           setSession(currentSession)
           setUser(currentSession.user)
@@ -80,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setLoading(false)
       } else if (event === 'SIGNED_IN' && currentSession) {
-        console.log('✅ User signed in:', currentSession.user.email)
+        console.log('✅ User signed in')
         const userChanged = updateUserIfChanged(currentSession.user, currentSession)
         setLoading(false)
         // Only trigger callback on actual sign-in (user changed)

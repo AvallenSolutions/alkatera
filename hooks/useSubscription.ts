@@ -296,14 +296,14 @@ export function useSubscription() {
       });
 
       if (error) {
-        console.warn("Product limit check failed, allowing creation:", error.message);
-        return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+        console.warn("Product limit check failed:", error.message);
+        return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
       }
 
       return data as LimitCheckResult;
     } catch (err) {
-      console.warn("Product limit check threw, allowing creation:", err);
-      return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+      console.warn("Product limit check threw:", err);
+      return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
     }
   }, [currentOrganization?.id]);
 
@@ -325,14 +325,14 @@ export function useSubscription() {
       });
 
       if (error) {
-        console.warn("Report limit check failed, allowing creation:", error.message);
-        return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+        console.warn("Report limit check failed:", error.message);
+        return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
       }
 
       return data as LimitCheckResult;
     } catch (err) {
-      console.warn("Report limit check threw, allowing creation:", err);
-      return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+      console.warn("Report limit check threw:", err);
+      return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
     }
   }, [currentOrganization?.id]);
 
@@ -354,14 +354,14 @@ export function useSubscription() {
       });
 
       if (error) {
-        console.warn("LCA limit check failed, allowing creation:", error.message);
-        return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+        console.warn("LCA limit check failed:", error.message);
+        return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
       }
 
       return data as LimitCheckResult;
     } catch (err) {
-      console.warn("LCA limit check threw, allowing creation:", err);
-      return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+      console.warn("LCA limit check threw:", err);
+      return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
     }
   }, [currentOrganization?.id]);
 
@@ -372,16 +372,13 @@ export function useSubscription() {
     try {
       const { data, error } = await supabase.rpc("check_facility_limit", { p_organization_id: currentOrganization.id });
       if (error) {
-        // If the RPC function doesn't exist (404) or has a network error, fail open
-        // to avoid blocking facility creation due to infrastructure issues
-        console.warn("Facility limit check failed, allowing creation:", error.message);
-        return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+        console.warn("Facility limit check failed:", error.message);
+        return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
       }
       return data as LimitCheckResult;
     } catch (err) {
-      // Network errors, connection closed, etc. — fail open
-      console.warn("Facility limit check threw, allowing creation:", err);
-      return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+      console.warn("Facility limit check threw:", err);
+      return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
     }
   }, [currentOrganization?.id]);
 
@@ -392,13 +389,13 @@ export function useSubscription() {
     try {
       const { data, error } = await supabase.rpc("check_supplier_limit", { p_organization_id: currentOrganization.id });
       if (error) {
-        console.warn("Supplier limit check failed, allowing creation:", error.message);
-        return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+        console.warn("Supplier limit check failed:", error.message);
+        return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
       }
       return data as LimitCheckResult;
     } catch (err) {
-      console.warn("Supplier limit check threw, allowing creation:", err);
-      return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+      console.warn("Supplier limit check threw:", err);
+      return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
     }
   }, [currentOrganization?.id]);
 
@@ -409,13 +406,13 @@ export function useSubscription() {
     try {
       const { data, error } = await supabase.rpc("check_team_member_limit", { p_organization_id: currentOrganization.id });
       if (error) {
-        console.warn("Team member limit check failed, allowing creation:", error.message);
-        return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+        console.warn("Team member limit check failed:", error.message);
+        return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
       }
       return data as LimitCheckResult;
     } catch (err) {
-      console.warn("Team member limit check threw, allowing creation:", err);
-      return { allowed: true, reason: null, current_count: 0, max_count: 0, tier: "seed", is_unlimited: true };
+      console.warn("Team member limit check threw:", err);
+      return { allowed: false, reason: "Unable to verify limits - please try again", current_count: 0, max_count: 0, tier: "seed", is_unlimited: false };
     }
   }, [currentOrganization?.id]);
 

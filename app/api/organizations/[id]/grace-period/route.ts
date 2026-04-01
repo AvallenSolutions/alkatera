@@ -64,7 +64,7 @@ export async function GET(
   } catch (error: any) {
     console.error('Error getting grace period:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to get grace period status' },
+      { error: 'Failed to get grace period status' },
       { status: 500 }
     );
   }
@@ -122,7 +122,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Error clearing grace period:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to clear grace period' },
+      { error: 'Failed to clear grace period' },
       { status: 500 }
     );
   }

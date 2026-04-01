@@ -62,7 +62,7 @@ export async function PATCH(
 
     if (error) {
       console.error('[Vineyard PATCH] Update error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data });
@@ -94,7 +94,7 @@ export async function DELETE(
 
     if (error) {
       console.error('[Vineyard DELETE] Error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });

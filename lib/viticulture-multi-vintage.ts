@@ -117,6 +117,9 @@ function combineImpacts(
   results: ViticultureImpactResult[],
   reduce: (values: number[]) => number
 ): ViticultureImpactResult {
+  // Median is used (rather than mean) per OIV Resolution VITI 564-2019 guidance
+  // on multi-vintage environmental accounting. Median is more robust to outlier
+  // vintages (e.g. frost years with abnormally low yield but normal input use).
   const first = results[0];
 
   return {

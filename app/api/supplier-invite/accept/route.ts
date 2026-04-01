@@ -115,6 +115,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Verify caller is the same user as user_id (prevent accepting on behalf of others)
+    const authHeader = request.headers.get('Authorization')
+    if (authHeader?.startsWith('Bearer ')) {
+      const callerToken = authHeader.replace('Bearer ', '')
+      const { data: { user: caller } } = await adminClient.auth.getUser(callerToken)
+      if (caller && caller.id !== user_id) {
+        return NextResponse.json(
+          { error: 'Authenticated user does not match user_id' },
+          { status: 403, headers: corsHeaders }
+        )
+      }
+    }
+
     // Verify user exists and email matches
     const { data: userData, error: userError } = await adminClient.auth.admin.getUserById(user_id)
 

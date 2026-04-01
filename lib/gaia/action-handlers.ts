@@ -278,6 +278,13 @@ export class RosaActionHandler {
   private handleHighlight(payload: RosaHighlightPayload): void {
     if (typeof window === 'undefined') return;
 
+    // Validate selector to prevent injection via crafted selectors
+    if (!payload.selector || payload.selector.length > 200 ||
+        !/^[a-zA-Z0-9\s\-_.\#\[\]=:"'*>+~,()]+$/.test(payload.selector)) {
+      console.warn('Rosa: Invalid highlight selector rejected');
+      return;
+    }
+
     const element = document.querySelector(payload.selector);
     if (element) {
       // Scroll element into view

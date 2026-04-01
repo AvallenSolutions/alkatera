@@ -32,7 +32,7 @@ export async function GET(
 
     if (error) {
       console.error('[SoilCarbonEvidence GET] Query error:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     // Generate signed URLs for each document
@@ -151,7 +151,7 @@ export async function POST(
       await supabase.storage
         .from('vineyard-soil-carbon-evidence')
         .remove([storagePath]);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, data }, { status: 201 });

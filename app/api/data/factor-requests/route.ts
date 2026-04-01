@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error creating factor request:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to submit request' },
+      { error: 'Failed to submit request' },
       { status: 500 }
     );
   }
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Error fetching factor requests:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch requests' },
+      { error: 'Failed to fetch requests' },
       { status: 500 }
     );
   }

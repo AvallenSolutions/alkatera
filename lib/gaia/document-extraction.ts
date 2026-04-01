@@ -373,7 +373,10 @@ function parseExtractedFields(
       fields.push({
         fieldName,
         value: value as string | number,
-        confidence: 0.85, // Default confidence - would be enhanced with actual model confidence
+        // Default confidence 0.85 for expected fields: the LLM was specifically asked
+        // to extract these fields, so high base confidence. Actual model logprobs are
+        // not available from the Claude API, so we use this heuristic default.
+        confidence: 0.85,
         needsReview: false,
         suggestedMapping: fieldName,
       });
@@ -386,8 +389,10 @@ function parseExtractedFields(
       fields.push({
         fieldName: key,
         value: value as string | number,
+        // Lower confidence (0.70) for unexpected fields: the LLM volunteered these
+        // without being asked, so they may be hallucinated or misinterpreted.
         confidence: 0.7,
-        needsReview: true, // Unknown fields need review
+        needsReview: true,
         suggestedMapping: undefined,
       });
     }

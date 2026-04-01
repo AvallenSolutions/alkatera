@@ -26,9 +26,31 @@ function getServiceRoleClient() {
 }
 
 /**
+ * Get a Supabase admin client using the service role key.
+ * This bypasses RLS entirely — use ONLY for:
+ *   - Admin panel routes (after verifying is_alkatera_admin)
+ *   - Cron jobs (after verifying CRON_SECRET)
+ *   - Operations that legitimately need cross-org access
+ *
+ * For normal user-facing API routes, use getSupabaseAPIClient() instead.
+ */
+export function getSupabaseAdminClient() {
+  const client = getServiceRoleClient()
+  if (!client) {
+    throw new Error('Service role key not configured — cannot create admin client')
+  }
+  return client
+}
+
+/**
  * Get a Supabase client for API routes that handles both cookie and token authentication.
  * Uses the service role key for DB operations when available (bypasses schema cache issues).
  * Falls back to the anon key if no service role key is configured.
+ *
+ * NOTE: This still returns the service role client for DB queries (to avoid PostgREST
+ * schema cache issues). All routes MUST enforce organisation scoping at the application
+ * level using resolveUserOrganization(). The service role client is never returned
+ * without a verified user.
  */
 export async function getSupabaseAPIClient() {
   const headersList = headers()

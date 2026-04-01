@@ -382,14 +382,16 @@ describe('calculateLossMultiplier (extended)', () => {
       expect(calculateLossMultiplier('cradle-to-gate', config)).toBe(1.0);
     });
 
-    it('cradle-to-shelf: only distribution loss', () => {
+    it('cradle-to-shelf: distribution + retail loss', () => {
+      // Retail loss is a distribution-chain event, included at distribution stage
       const result = calculateLossMultiplier('cradle-to-shelf', config);
-      expect(result).toBeCloseTo(1 / 0.9, 6);
+      expect(result).toBeCloseTo(1 / (0.9 * 0.9), 6);
     });
 
-    it('cradle-to-consumer: distribution + retail loss', () => {
+    it('cradle-to-consumer: distribution + retail + consumer loss', () => {
+      // Consumer waste is a use-phase event
       const result = calculateLossMultiplier('cradle-to-consumer', config);
-      expect(result).toBeCloseTo(1 / (0.9 * 0.9), 6);
+      expect(result).toBeCloseTo(1 / (0.9 * 0.9 * 0.9), 6);
     });
 
     it('cradle-to-grave: all three loss stages', () => {

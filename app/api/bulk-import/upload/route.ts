@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseImportXLSX } from '@/lib/bulk-import/xlsx-parser';
+import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
 
 export async function POST(request: NextRequest) {
   try {
+    const { user, error: authError } = await getSupabaseAPIClient();
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 

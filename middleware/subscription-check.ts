@@ -202,13 +202,27 @@ export async function enforceFeatureAccess(
 export async function checkSubscriptionActive(
   organizationId: string
 ): Promise<{ active: boolean; status: string; tier: string }> {
-  // This would query the database to check subscription status
-  // For now, returning a placeholder
-  // TODO: Implement actual database check
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('subscription_status, subscription_tier')
+    .eq('id', organizationId)
+    .single();
+
+  if (error || !data) {
+    return { active: false, status: 'unknown', tier: 'seed' };
+  }
+
+  const activeStatuses = ['active', 'trialing', 'past_due'];
   return {
-    active: true,
-    status: 'active',
-    tier: 'seed',
+    active: activeStatuses.includes(data.subscription_status || ''),
+    status: data.subscription_status || 'inactive',
+    tier: data.subscription_tier || 'seed',
   };
 }
 

@@ -7,6 +7,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import mammoth from 'mammoth';
 
 type SupabaseClient = ReturnType<typeof createClient>;
 
@@ -303,120 +304,13 @@ async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * Extract text from DOCX files using Anthropic Claude
- * Note: Claude doesn't natively support DOCX format, so we send as a generic document.
- * For production use, consider using mammoth.js for more reliable DOCX text extraction.
+ * Extract text from DOCX files using mammoth.js.
+ * Mammoth properly parses the ZIP/XML structure of DOCX files,
+ * producing reliable plain text with preserved heading structure.
  */
 async function extractTextFromDocx(docxBuffer: ArrayBuffer): Promise<string> {
-  // First, try basic XML text extraction from the DOCX (which is a ZIP of XML files)
-  // DOCX files contain text in word/document.xml within <w:t> tags
-  try {
-    const textFromXml = extractTextFromDocxXml(docxBuffer);
-    if (textFromXml && textFromXml.trim().length > 100) {
-      return textFromXml;
-    }
-  } catch {
-    // Fall through to Claude-based extraction
-  }
-
-  // Fallback: Send to Claude as a document for best-effort extraction
-  const apiKey = getAnthropicApiKey();
-  const base64 = Buffer.from(docxBuffer).toString('base64');
-
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': ANTHROPIC_VERSION,
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 8192,
-      temperature: 0,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                data: base64,
-              },
-            },
-            {
-              type: 'text',
-              text: 'Extract all text content from this Word document. Preserve section headings and structure. Output only the text content, no commentary.',
-            },
-          ],
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Claude DOCX extraction error:', errorText);
-    throw new Error(`Claude API error during DOCX extraction: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.content?.[0]?.text || '';
-}
-
-/**
- * Basic DOCX text extraction by reading XML content directly
- * DOCX files are ZIP archives containing XML. The main text is in word/document.xml
- * within <w:t> tags. This is a simplified extraction that works without external libraries.
- */
-function extractTextFromDocxXml(docxBuffer: ArrayBuffer): string {
-  // Convert buffer to string and look for XML text content
-  // This is a best-effort approach for when the DOCX content is readable as text
-  const uint8Array = new Uint8Array(docxBuffer);
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  const rawContent = decoder.decode(uint8Array);
-
-  // Look for <w:t> tags which contain the actual text in DOCX XML
-  const textMatches = rawContent.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
-  if (!textMatches || textMatches.length === 0) {
-    return '';
-  }
-
-  // Extract text from the tags
-  const extractedParts: string[] = [];
-  let lastWasParagraph = false;
-
-  for (const match of textMatches) {
-    const textMatch = match.match(/<w:t[^>]*>([^<]*)<\/w:t>/);
-    if (textMatch && textMatch[1]) {
-      extractedParts.push(textMatch[1]);
-    }
-  }
-
-  // Also detect paragraph breaks from <w:p> tags for better formatting
-  const paragraphContent = rawContent.replace(/<\/w:p>/g, '\n\n');
-  const cleanedMatches = paragraphContent.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
-
-  if (cleanedMatches && cleanedMatches.length > 0) {
-    const parts: string[] = [];
-    let currentParagraph = '';
-
-    // Walk through the content looking for text and paragraph breaks
-    const segments = paragraphContent.split(/<w:t[^>]*>|<\/w:t>/);
-    for (let i = 1; i < segments.length; i += 2) {
-      if (segments[i]) {
-        currentParagraph += segments[i];
-      }
-    }
-
-    if (currentParagraph.trim().length > 0) {
-      return currentParagraph.trim();
-    }
-  }
-
-  return extractedParts.join(' ').trim();
+  const result = await mammoth.extractRawText({ buffer: Buffer.from(docxBuffer) });
+  return result.value || '';
 }
 
 /**

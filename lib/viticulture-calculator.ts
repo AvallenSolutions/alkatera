@@ -131,6 +131,17 @@ function calculateLUC(
 export function calculateViticultureImpacts(
   input: ViticultureCalculatorInput
 ): ViticultureImpactResult {
+  // Guard against negative numeric inputs which would produce nonsensical results
+  const numericFields = [
+    'area_ha', 'fertiliser_quantity_kg', 'diesel_litres_per_year',
+    'petrol_litres_per_year', 'water_m3_per_ha', 'grape_yield_tonnes',
+  ] as const;
+  for (const field of numericFields) {
+    if ((input[field] as number) < 0) {
+      throw new Error(`Invalid input: ${field} cannot be negative`);
+    }
+  }
+
   const climateZone: VineyardClimateZone = input.climate_zone || 'temperate';
 
   // ========================================================================
@@ -156,7 +167,10 @@ export function calculateViticultureImpacts(
     } else if (input.fertiliser_type === 'organic_compost') {
       fertiliserProductionCo2e = input.fertiliser_quantity_kg * FERTILISER_PRODUCTION_EF.organic_compost;
     } else if (input.fertiliser_type === 'mixed') {
-      // Assume 50/50 synthetic/organic by N content
+      // Assume 50/50 synthetic/organic by N content.
+      // The organic portion uses manure EF (not compost), which overestimates
+      // by ~15% if the grower actually uses compost. This is a conservative
+      // simplification; for precision, growers should specify exact fertiliser types.
       const syntheticN = nAppliedKg * 0.5;
       const organicN = nAppliedKg * 0.5;
       fertiliserProductionCo2e =

@@ -274,7 +274,7 @@ export async function POST(request: NextRequest) {
 
       if (error) {
         console.error('[Gap Analysis API] Error updating existing:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
       }
 
       return NextResponse.json(data);
@@ -309,8 +309,6 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json({
         error: 'Failed to save gap analysis data',
-        details: error.message,
-        code: error.code,
       }, { status: 500 });
     }
 
@@ -354,7 +352,7 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       console.error('Error updating gap analysis:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
     return NextResponse.json(data);

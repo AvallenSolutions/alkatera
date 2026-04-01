@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAPIClient } from '@/lib/supabase/api-client';
+import { resolveUserOrganization } from '@/lib/supabase/resolve-organization';
 
 // Transform database framework to API format expected by UI
 function transformFramework(dbFramework: any) {
@@ -160,21 +161,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's current organization from metadata or first membership
-    let organizationId = user.user_metadata?.current_organization_id;
-
-    if (!organizationId) {
-      const { data: membership, error: memberError } = await supabase
-        .from('organization_members')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
-
-      if (memberError || !membership) {
-        return NextResponse.json({ error: 'No organization found' }, { status: 403 });
-      }
-      organizationId = membership.organization_id;
+    const { organizationId, error: orgError } = await resolveUserOrganization(supabase, user);
+    if (orgError || !organizationId) {
+      return NextResponse.json({ error: orgError || 'No organisation found' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -186,11 +175,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Insert record
+    // Insert record — always use verified org, never body.organization_id
     const { data, error } = await supabase
       .from('organization_certifications')
       .insert({
-        organization_id: body.organization_id || organizationId,
+        organization_id: organizationId,
         framework_id: body.framework_id,
         status: body.status || 'not_started',
         target_date: body.target_date,

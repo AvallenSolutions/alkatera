@@ -78,7 +78,7 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Error deleting organisation:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to delete organisation' },
+      { error: 'Failed to delete organisation' },
       { status: 500 }
     )
   }

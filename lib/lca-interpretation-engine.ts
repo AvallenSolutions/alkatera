@@ -101,7 +101,7 @@ function runContributionAnalysis(materials: MaterialRow[]): Record<ImpactCategor
     const contributions: MaterialContribution[] = materials
       .map((m) => {
         const absVal = getImpactValue(m, cat);
-        const pct = (absVal / totalImpact) * 100;
+        const pct = (absVal / Math.abs(totalImpact)) * 100;
         return {
           material: m.material_name,
           material_type: m.material_type || 'unknown',
@@ -395,9 +395,11 @@ function validateMassBalance(materials: MaterialRow[]): {
     .filter((m) => (m.material_type || '').toLowerCase() === 'packaging')
     .reduce((sum, m) => sum + Number(m.quantity || 0), 0);
 
-  // Simple mass balance: input materials should roughly equal output product mass
-  // For food/beverage products, expect some processing loss (5-20%)
-  const outputKg = inputKg; // In a cradle-to-gate system, output ≈ input
+  // Simple mass balance: input materials should roughly equal output product mass.
+  // For a cradle-to-gate system boundary, output = input because we don't model
+  // processing losses (fermentation, evaporation, etc.). This is a no-op check
+  // that always passes. A cradle-to-grave boundary would need actual yield data.
+  const outputKg = inputKg;
   const variancePct = inputKg > 0 ? Math.abs(inputKg - outputKg) / inputKg * 100 : 0;
 
   return {

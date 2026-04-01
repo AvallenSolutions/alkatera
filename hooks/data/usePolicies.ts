@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOrganization } from '@/lib/organizationContext';
 
 export interface PolicyVersion {
@@ -73,7 +73,7 @@ export function usePolicies(): UsePoliciesResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const calculateMetrics = (policies: Policy[]): PolicyMetrics => {
+  const metrics = useMemo((): PolicyMetrics => {
     const now = new Date();
     const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
@@ -92,7 +92,7 @@ export function usePolicies(): UsePoliciesResult {
       public_policies: policies.filter(p => p.is_public).length,
       by_type: byType,
     };
-  };
+  }, [policies]);
 
   const fetchPolicies = useCallback(async () => {
     if (!currentOrganization?.id) {
@@ -169,7 +169,7 @@ export function usePolicies(): UsePoliciesResult {
 
   return {
     policies,
-    metrics: calculateMetrics(policies),
+    metrics,
     loading,
     error,
     refetch: fetchPolicies,

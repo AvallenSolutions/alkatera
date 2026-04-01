@@ -3,6 +3,8 @@
  *
  * Tests step navigation, phase progression, state management, and progress
  * calculation for the Rosa-guided EPR data entry wizard.
+ *
+ * 5 phases, 16 steps — includes HMRC registration template data collection.
  */
 import { describe, it, expect } from 'vitest';
 
@@ -29,12 +31,12 @@ import {
 // =============================================================================
 
 describe('EPR Wizard Step Configuration', () => {
-  it('has exactly 10 steps', () => {
-    expect(EPR_WIZARD_STEPS).toHaveLength(10);
-    expect(TOTAL_EPR_WIZARD_STEPS).toBe(10);
+  it('has exactly 16 steps', () => {
+    expect(EPR_WIZARD_STEPS).toHaveLength(16);
+    expect(TOTAL_EPR_WIZARD_STEPS).toBe(16);
   });
 
-  it('has sequential indexes from 0 to 9', () => {
+  it('has sequential indexes from 0 to 15', () => {
     EPR_WIZARD_STEPS.forEach((step, i) => {
       expect(step.index).toBe(i);
     });
@@ -46,7 +48,7 @@ describe('EPR Wizard Step Configuration', () => {
   });
 
   it('assigns each step to a valid phase', () => {
-    const validPhases: EPRWizardPhase[] = ['org-setup', 'packaging-data', 'validate-generate', 'export-finish'];
+    const validPhases: EPRWizardPhase[] = ['org-setup', 'hmrc-registration', 'packaging-data', 'validate-generate', 'export-finish'];
     EPR_WIZARD_STEPS.forEach((step) => {
       expect(validPhases).toContain(step.phase);
     });
@@ -73,8 +75,8 @@ describe('EPR Wizard Step Configuration', () => {
 // =============================================================================
 
 describe('EPR Wizard Phase Configuration', () => {
-  it('has exactly 4 phases', () => {
-    expect(EPR_WIZARD_PHASES).toHaveLength(4);
+  it('has exactly 5 phases', () => {
+    expect(EPR_WIZARD_PHASES).toHaveLength(5);
   });
 
   it('has config for every phase', () => {
@@ -87,10 +89,18 @@ describe('EPR Wizard Phase Configuration', () => {
     });
   });
 
-  it('org-setup phase has 4 steps', () => {
+  it('org-setup phase has 6 steps', () => {
     const steps = getEPRWizardPhaseSteps('org-setup');
+    expect(steps).toHaveLength(6);
+    expect(steps.map((s) => s.id)).toEqual([
+      'welcome', 'registration', 'company-details', 'packaging-activities', 'obligation', 'nation-split',
+    ]);
+  });
+
+  it('hmrc-registration phase has 4 steps', () => {
+    const steps = getEPRWizardPhaseSteps('hmrc-registration');
     expect(steps).toHaveLength(4);
-    expect(steps.map((s) => s.id)).toEqual(['welcome', 'registration', 'obligation', 'nation-split']);
+    expect(steps.map((s) => s.id)).toEqual(['addresses', 'contacts', 'brands', 'partners']);
   });
 
   it('packaging-data phase has 3 steps', () => {
@@ -119,9 +129,15 @@ describe('EPR Wizard Phase Configuration', () => {
 describe('EPR Wizard Step Navigation', () => {
   it('getNextEPRWizardStep returns next step', () => {
     expect(getNextEPRWizardStep('welcome')).toBe('registration');
-    expect(getNextEPRWizardStep('registration')).toBe('obligation');
+    expect(getNextEPRWizardStep('registration')).toBe('company-details');
+    expect(getNextEPRWizardStep('company-details')).toBe('packaging-activities');
+    expect(getNextEPRWizardStep('packaging-activities')).toBe('obligation');
     expect(getNextEPRWizardStep('obligation')).toBe('nation-split');
-    expect(getNextEPRWizardStep('nation-split')).toBe('defaults');
+    expect(getNextEPRWizardStep('nation-split')).toBe('addresses');
+    expect(getNextEPRWizardStep('addresses')).toBe('contacts');
+    expect(getNextEPRWizardStep('contacts')).toBe('brands');
+    expect(getNextEPRWizardStep('brands')).toBe('partners');
+    expect(getNextEPRWizardStep('partners')).toBe('defaults');
     expect(getNextEPRWizardStep('defaults')).toBe('data-review');
     expect(getNextEPRWizardStep('data-review')).toBe('bulk-edit');
     expect(getNextEPRWizardStep('bulk-edit')).toBe('validation');
@@ -139,9 +155,15 @@ describe('EPR Wizard Step Navigation', () => {
     expect(getPreviousEPRWizardStep('validation')).toBe('bulk-edit');
     expect(getPreviousEPRWizardStep('bulk-edit')).toBe('data-review');
     expect(getPreviousEPRWizardStep('data-review')).toBe('defaults');
-    expect(getPreviousEPRWizardStep('defaults')).toBe('nation-split');
+    expect(getPreviousEPRWizardStep('defaults')).toBe('partners');
+    expect(getPreviousEPRWizardStep('partners')).toBe('brands');
+    expect(getPreviousEPRWizardStep('brands')).toBe('contacts');
+    expect(getPreviousEPRWizardStep('contacts')).toBe('addresses');
+    expect(getPreviousEPRWizardStep('addresses')).toBe('nation-split');
     expect(getPreviousEPRWizardStep('nation-split')).toBe('obligation');
-    expect(getPreviousEPRWizardStep('obligation')).toBe('registration');
+    expect(getPreviousEPRWizardStep('obligation')).toBe('packaging-activities');
+    expect(getPreviousEPRWizardStep('packaging-activities')).toBe('company-details');
+    expect(getPreviousEPRWizardStep('company-details')).toBe('registration');
     expect(getPreviousEPRWizardStep('registration')).toBe('welcome');
   });
 
@@ -153,17 +175,16 @@ describe('EPR Wizard Step Navigation', () => {
     const config = getEPRWizardStepConfig('obligation');
     expect(config.id).toBe('obligation');
     expect(config.phase).toBe('org-setup');
-    expect(config.index).toBe(2);
+    expect(config.index).toBe(4);
     expect(config.skippable).toBe(false);
   });
 
   it('navigation is bidirectional (forward then back returns to same step)', () => {
-    const steps: EPRWizardStep[] = ['welcome', 'registration', 'obligation', 'nation-split', 'defaults', 'data-review', 'bulk-edit', 'validation', 'generate'];
-    for (const step of steps) {
-      const next = getNextEPRWizardStep(step);
+    for (const step of EPR_WIZARD_STEPS) {
+      const next = getNextEPRWizardStep(step.id);
       if (next) {
         const back = getPreviousEPRWizardStep(next);
-        expect(back).toBe(step);
+        expect(back).toBe(step.id);
       }
     }
   });
@@ -182,12 +203,36 @@ describe('EPR Wizard Skippable Steps', () => {
     expect(getEPRWizardStepConfig('registration').skippable).toBe(true);
   });
 
+  it('company-details is not skippable', () => {
+    expect(getEPRWizardStepConfig('company-details').skippable).toBe(false);
+  });
+
+  it('packaging-activities is not skippable', () => {
+    expect(getEPRWizardStepConfig('packaging-activities').skippable).toBe(false);
+  });
+
   it('obligation is not skippable', () => {
     expect(getEPRWizardStepConfig('obligation').skippable).toBe(false);
   });
 
   it('nation-split is skippable', () => {
     expect(getEPRWizardStepConfig('nation-split').skippable).toBe(true);
+  });
+
+  it('addresses is not skippable', () => {
+    expect(getEPRWizardStepConfig('addresses').skippable).toBe(false);
+  });
+
+  it('contacts is not skippable', () => {
+    expect(getEPRWizardStepConfig('contacts').skippable).toBe(false);
+  });
+
+  it('brands is not skippable', () => {
+    expect(getEPRWizardStepConfig('brands').skippable).toBe(false);
+  });
+
+  it('partners is skippable', () => {
+    expect(getEPRWizardStepConfig('partners').skippable).toBe(true);
   });
 
   it('defaults is skippable', () => {
@@ -214,9 +259,10 @@ describe('EPR Wizard Skippable Steps', () => {
     expect(getEPRWizardStepConfig('export-complete').skippable).toBe(false);
   });
 
-  it('has exactly 4 skippable steps', () => {
+  it('has exactly 5 skippable steps', () => {
     const skippable = EPR_WIZARD_STEPS.filter((s) => s.skippable);
-    expect(skippable).toHaveLength(4);
+    expect(skippable).toHaveLength(5);
+    expect(skippable.map(s => s.id)).toEqual(['registration', 'nation-split', 'partners', 'defaults', 'bulk-edit']);
   });
 });
 
@@ -225,20 +271,20 @@ describe('EPR Wizard Skippable Steps', () => {
 // =============================================================================
 
 describe('EPR Wizard Progress Calculation', () => {
-  it('welcome step is 10%', () => {
-    expect(getEPRWizardProgress('welcome')).toBe(10);
+  it('welcome step is 6%', () => {
+    expect(getEPRWizardProgress('welcome')).toBe(6);
   });
 
-  it('registration step is 20%', () => {
-    expect(getEPRWizardProgress('registration')).toBe(20);
+  it('registration step is 13%', () => {
+    expect(getEPRWizardProgress('registration')).toBe(13);
   });
 
-  it('obligation step is 30%', () => {
-    expect(getEPRWizardProgress('obligation')).toBe(30);
+  it('obligation step is 31%', () => {
+    expect(getEPRWizardProgress('obligation')).toBe(31);
   });
 
-  it('data-review step is 60%', () => {
-    expect(getEPRWizardProgress('data-review')).toBe(60);
+  it('data-review step is 75%', () => {
+    expect(getEPRWizardProgress('data-review')).toBe(75);
   });
 
   it('export-complete step is 100%', () => {
@@ -274,14 +320,19 @@ describe('EPR Wizard Phase Completion', () => {
     });
   });
 
-  it('org-setup is complete when all 4 steps are done', () => {
-    const steps: EPRWizardStep[] = ['welcome', 'registration', 'obligation', 'nation-split'];
+  it('org-setup is complete when all 6 steps are done', () => {
+    const steps: EPRWizardStep[] = ['welcome', 'registration', 'company-details', 'packaging-activities', 'obligation', 'nation-split'];
     expect(isEPRWizardPhaseComplete('org-setup', steps)).toBe(true);
   });
 
-  it('org-setup is not complete with only 3 of 4 steps', () => {
-    const steps: EPRWizardStep[] = ['welcome', 'registration', 'obligation'];
+  it('org-setup is not complete with only 5 of 6 steps', () => {
+    const steps: EPRWizardStep[] = ['welcome', 'registration', 'company-details', 'packaging-activities', 'obligation'];
     expect(isEPRWizardPhaseComplete('org-setup', steps)).toBe(false);
+  });
+
+  it('hmrc-registration is complete when all 4 steps are done', () => {
+    const steps: EPRWizardStep[] = ['addresses', 'contacts', 'brands', 'partners'];
+    expect(isEPRWizardPhaseComplete('hmrc-registration', steps)).toBe(true);
   });
 
   it('packaging-data is complete when all 3 steps are done', () => {
@@ -299,7 +350,7 @@ describe('EPR Wizard Phase Completion', () => {
     expect(isEPRWizardPhaseComplete('export-finish', steps)).toBe(true);
   });
 
-  it('all phases complete when all 10 steps are done', () => {
+  it('all phases complete when all 16 steps are done', () => {
     const allSteps = EPR_WIZARD_STEPS.map((s) => s.id);
     EPR_WIZARD_PHASES.forEach((phase) => {
       expect(isEPRWizardPhaseComplete(phase, allSteps)).toBe(true);
@@ -307,7 +358,7 @@ describe('EPR Wizard Phase Completion', () => {
   });
 
   it('phases from other groups do not affect completion', () => {
-    // Only packaging-data steps completed — org-setup should still be incomplete
+    // Only packaging-data steps completed - org-setup should still be incomplete
     const steps: EPRWizardStep[] = ['defaults', 'data-review', 'bulk-edit'];
     expect(isEPRWizardPhaseComplete('org-setup', steps)).toBe(false);
     expect(isEPRWizardPhaseComplete('packaging-data', steps)).toBe(true);
@@ -428,20 +479,20 @@ describe('EPR Wizard State Transitions', () => {
     expect(result.completedSteps).toContain('welcome');
   });
 
-  it('completing all 10 steps marks wizard as completed', () => {
+  it('completing all 16 steps marks wizard as completed', () => {
     let state = { ...INITIAL_EPR_WIZARD_STATE };
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 16; i++) {
       state = simulateCompleteStep(state);
     }
     expect(state.completed).toBe(true);
     expect(state.completedAt).toBeDefined();
-    expect(state.completedSteps).toHaveLength(10);
+    expect(state.completedSteps).toHaveLength(16);
   });
 
-  it('skipping registration advances to obligation without completing registration', () => {
-    let state = simulateCompleteStep(INITIAL_EPR_WIZARD_STATE); // welcome → registration
-    state = simulateSkipStep(state); // skip registration → obligation
-    expect(state.currentStep).toBe('obligation');
+  it('skipping registration advances to company-details without completing registration', () => {
+    let state = simulateCompleteStep(INITIAL_EPR_WIZARD_STATE); // welcome -> registration
+    state = simulateSkipStep(state); // skip registration -> company-details
+    expect(state.currentStep).toBe('company-details');
     expect(state.completedSteps).not.toContain('registration');
   });
 
@@ -452,7 +503,7 @@ describe('EPR Wizard State Transitions', () => {
   });
 
   it('completing a step twice does not duplicate in completedSteps', () => {
-    let state = simulateCompleteStep(INITIAL_EPR_WIZARD_STATE); // welcome → registration
+    let state = simulateCompleteStep(INITIAL_EPR_WIZARD_STATE); // welcome -> registration
     // Go back to welcome manually
     state = { ...state, currentStep: 'welcome' as EPRWizardStep };
     // Complete welcome again
@@ -472,7 +523,8 @@ describe('EPR Wizard State Transitions', () => {
 
   it('full walkthrough: complete all steps in order', () => {
     const expectedOrder: EPRWizardStep[] = [
-      'welcome', 'registration', 'obligation', 'nation-split',
+      'welcome', 'registration', 'company-details', 'packaging-activities', 'obligation', 'nation-split',
+      'addresses', 'contacts', 'brands', 'partners',
       'defaults', 'data-review', 'bulk-edit',
       'validation', 'generate', 'export-complete',
     ];
@@ -480,7 +532,7 @@ describe('EPR Wizard State Transitions', () => {
     let state = { ...INITIAL_EPR_WIZARD_STATE };
     const visitedSteps: EPRWizardStep[] = [];
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 16; i++) {
       visitedSteps.push(state.currentStep);
       state = simulateCompleteStep(state);
     }
@@ -499,13 +551,23 @@ describe('EPR Wizard State Transitions', () => {
 
     // Skip registration
     state = simulateSkipStep(state);
-    expect(state.currentStep).toBe('obligation');
+    expect(state.currentStep).toBe('company-details');
 
-    // Complete obligation
-    state = simulateCompleteStep(state);
-    expect(state.currentStep).toBe('nation-split');
+    // Complete company-details, packaging-activities, obligation
+    state = simulateCompleteStep(state); // company-details -> packaging-activities
+    state = simulateCompleteStep(state); // packaging-activities -> obligation
+    state = simulateCompleteStep(state); // obligation -> nation-split
 
     // Skip nation-split
+    state = simulateSkipStep(state);
+    expect(state.currentStep).toBe('addresses');
+
+    // Complete addresses, contacts, brands
+    state = simulateCompleteStep(state); // addresses -> contacts
+    state = simulateCompleteStep(state); // contacts -> brands
+    state = simulateCompleteStep(state); // brands -> partners
+
+    // Skip partners
     state = simulateSkipStep(state);
     expect(state.currentStep).toBe('defaults');
 
@@ -514,16 +576,18 @@ describe('EPR Wizard State Transitions', () => {
     expect(state.currentStep).toBe('data-review');
 
     // Complete rest
-    state = simulateCompleteStep(state); // data-review → bulk-edit
-    state = simulateSkipStep(state);     // skip bulk-edit → validation
-    state = simulateCompleteStep(state); // validation → generate
-    state = simulateCompleteStep(state); // generate → export-complete
-    state = simulateCompleteStep(state); // export-complete → done
+    state = simulateCompleteStep(state); // data-review -> bulk-edit
+    state = simulateSkipStep(state);     // skip bulk-edit -> validation
+    state = simulateCompleteStep(state); // validation -> generate
+    state = simulateCompleteStep(state); // generate -> export-complete
+    state = simulateCompleteStep(state); // export-complete -> done
 
     expect(state.completed).toBe(true);
     // Only completed (not skipped) steps are in completedSteps
     expect(state.completedSteps).toContain('welcome');
+    expect(state.completedSteps).toContain('company-details');
     expect(state.completedSteps).toContain('obligation');
+    expect(state.completedSteps).toContain('addresses');
     expect(state.completedSteps).toContain('data-review');
     expect(state.completedSteps).toContain('validation');
     expect(state.completedSteps).toContain('generate');
@@ -531,6 +595,7 @@ describe('EPR Wizard State Transitions', () => {
     // Skipped steps are NOT in completedSteps
     expect(state.completedSteps).not.toContain('registration');
     expect(state.completedSteps).not.toContain('nation-split');
+    expect(state.completedSteps).not.toContain('partners');
     expect(state.completedSteps).not.toContain('defaults');
     expect(state.completedSteps).not.toContain('bulk-edit');
   });
@@ -541,9 +606,15 @@ describe('EPR Wizard State Transitions', () => {
 // =============================================================================
 
 describe('EPR Wizard Cross-Phase Navigation', () => {
-  it('nation-split (org-setup) advances to defaults (packaging-data)', () => {
-    expect(getNextEPRWizardStep('nation-split')).toBe('defaults');
+  it('nation-split (org-setup) advances to addresses (hmrc-registration)', () => {
+    expect(getNextEPRWizardStep('nation-split')).toBe('addresses');
     expect(getEPRWizardStepConfig('nation-split').phase).toBe('org-setup');
+    expect(getEPRWizardStepConfig('addresses').phase).toBe('hmrc-registration');
+  });
+
+  it('partners (hmrc-registration) advances to defaults (packaging-data)', () => {
+    expect(getNextEPRWizardStep('partners')).toBe('defaults');
+    expect(getEPRWizardStepConfig('partners').phase).toBe('hmrc-registration');
     expect(getEPRWizardStepConfig('defaults').phase).toBe('packaging-data');
   });
 

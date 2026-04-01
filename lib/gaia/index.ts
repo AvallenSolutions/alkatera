@@ -207,7 +207,8 @@ export async function getArchivedConversations(
  * Get a single conversation with all its messages
  */
 export async function getConversationWithMessages(
-  conversationId: string
+  conversationId: string,
+  organizationId?: string
 ): Promise<GaiaConversationWithMessages | null> {
   const { data: conversation, error: convError } = await supabase
     .from('gaia_conversations')
@@ -217,6 +218,11 @@ export async function getConversationWithMessages(
 
   if (convError) throw convError;
   if (!conversation) return null;
+
+  // Verify the conversation belongs to the requesting org (when provided)
+  if (organizationId && conversation.organization_id !== organizationId) {
+    return null;
+  }
 
   const { data: messages, error: msgError } = await supabase
     .from('gaia_messages')

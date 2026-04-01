@@ -335,9 +335,9 @@ export function calculateLossMultiplier(
 
   const dist = isStageIncluded(boundary, 'distribution')
     ? (config.distributionLossPercent || 0) / 100 : 0;
-  const retail = isStageIncluded(boundary, 'use_phase')
+  const retail = isStageIncluded(boundary, 'distribution')
     ? (config.retailLossPercent || 0) / 100 : 0;
-  const consumer = isStageIncluded(boundary, 'end_of_life')
+  const consumer = isStageIncluded(boundary, 'use_phase')
     ? (config.consumerWastePercent || 0) / 100 : 0;
 
   const survivalRate = (1 - dist) * (1 - retail) * (1 - consumer);

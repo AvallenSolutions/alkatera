@@ -63,10 +63,10 @@ describe('checkMissingFields', () => {
       expect(missing).toContain('Net Weight');
     });
 
-    it('reports missing weight (zero)', () => {
+    it('accepts weight of zero (valid for negligible packaging)', () => {
       const item = makePackagingItem({ net_weight_g: 0 });
       const missing = checkMissingFields(item);
-      expect(missing).toContain('Net Weight');
+      expect(missing).not.toContain('Net Weight');
     });
 
     it('reports missing household flag for container', () => {
@@ -307,7 +307,7 @@ describe('isSubmissionReady', () => {
   it('returns false when all items are incomplete', () => {
     const items = [
       makePackagingItem({ id: 1, epr_uk_nation: null }),
-      makePackagingItem({ id: 2, net_weight_g: 0 }),
+      makePackagingItem({ id: 2, net_weight_g: null }),
     ];
     expect(isSubmissionReady(items)).toBe(false);
   });
