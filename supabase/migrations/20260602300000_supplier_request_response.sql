@@ -20,7 +20,10 @@ WHERE material_id IS NULL AND status = 'accepted';
 CREATE INDEX IF NOT EXISTS idx_supplier_invitations_request_status
   ON supplier_invitations(supplier_id, request_status);
 
--- Update the RPC to return the new fields
+-- Drop existing function first (return type is changing)
+DROP FUNCTION IF EXISTS public.get_supplier_invitations(text);
+
+-- Recreate the RPC with the new return fields
 CREATE OR REPLACE FUNCTION public.get_supplier_invitations(
   p_status text DEFAULT NULL
 )
