@@ -152,8 +152,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (refreshedSession) {
         console.log('✅ AuthProvider: Session refreshed successfully')
-        // Only update session, not user - to prevent cascading refetches
         setSession(refreshedSession)
+        // Update user state too — explicit refreshSession() calls need
+        // fresh user_metadata (e.g. is_supplier flag after invite acceptance).
+        // Automatic TOKEN_REFRESHED events still skip user updates to avoid cascades.
+        setUser(refreshedSession.user)
       }
     } catch (error) {
       console.error('❌ AuthProvider: Fatal refresh error:', error)

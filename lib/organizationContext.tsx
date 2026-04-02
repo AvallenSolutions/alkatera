@@ -324,7 +324,10 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     }
   }, [fetchOrganizations]);
 
-  // Only fetch organizations when user ID changes (not on every user object reference change)
+  // Fetch organizations when user ID changes, or when is_supplier metadata appears
+  // (after invite acceptance + session refresh, the user ID stays the same but
+  // the metadata updates — we need to re-fetch to pick up the supplier role).
+  const isSupplierMeta = user?.user_metadata?.is_supplier === true
   useEffect(() => {
     if (authLoading) return
 
@@ -343,8 +346,12 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
         setUserRole(null)
         setIsLoading(false)
       }
+    } else if (isSupplierMeta && userRole !== 'supplier') {
+      // Metadata updated (e.g. after invite acceptance) but user ID unchanged
+      console.log('🔄 OrganizationContext: Supplier metadata detected, re-fetching...')
+      fetchOrganizations()
     }
-  }, [user?.id, authLoading, fetchOrganizations])
+  }, [user?.id, isSupplierMeta, authLoading, fetchOrganizations, userRole])
 
   // Note: onAuthStateChanged callback is now only triggered on actual sign-in
   // (not on token refresh), so this won't cause unnecessary refetches

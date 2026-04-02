@@ -53,7 +53,7 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  const isSupplier = userRole === 'supplier'
+  const isSupplier = userRole === 'supplier' || user?.user_metadata?.is_supplier === true
   const isSupplierRoute = pathname?.startsWith('/supplier-portal')
 
   // Single consolidated redirect effect — all routing decisions in one place
