@@ -139,7 +139,7 @@ export default function SupplierProductsPage() {
     e.preventDefault();
     if (!supplier) return;
 
-    const effectiveUnit = productType === 'packaging' ? 'unit' : unit.trim();
+    const effectiveUnit = productType === 'packaging' ? (unit.trim() || 'unit') : unit.trim();
 
     if (!productName.trim()) {
       setError('Product name is required');
@@ -426,16 +426,22 @@ export default function SupplierProductsPage() {
               /* Ingredient fields */
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="product-unit">
+                  <Label>
                     Unit <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="product-unit"
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    placeholder="e.g., kg"
-                    required
-                  />
+                  <Select value={unit} onValueChange={setUnit}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select unit..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="kg">kg (kilograms)</SelectItem>
+                      <SelectItem value="g">g (grams)</SelectItem>
+                      <SelectItem value="tonne">tonne</SelectItem>
+                      <SelectItem value="L">L (litres)</SelectItem>
+                      <SelectItem value="ml">ml (millilitres)</SelectItem>
+                      <SelectItem value="unit">unit (each)</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="product-category">Category</Label>
@@ -468,18 +474,38 @@ export default function SupplierProductsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="product-weight">Weight per Unit (g)</Label>
-                  <Input
-                    id="product-weight"
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={weightG}
-                    onChange={(e) => setWeightG(e.target.value)}
-                    placeholder="e.g., 83"
-                  />
-                  <p className="text-xs text-muted-foreground">Weight of a single packaging unit in grams</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Unit</Label>
+                    <Select value={unit || 'unit'} onValueChange={setUnit}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unit">unit (each)</SelectItem>
+                        <SelectItem value="pack">pack</SelectItem>
+                        <SelectItem value="box">box</SelectItem>
+                        <SelectItem value="case">case</SelectItem>
+                        <SelectItem value="pallet">pallet</SelectItem>
+                        <SelectItem value="roll">roll</SelectItem>
+                        <SelectItem value="sheet">sheet</SelectItem>
+                        <SelectItem value="m">m (metres)</SelectItem>
+                        <SelectItem value="m²">m² (square metres)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="product-weight">Weight per Unit (g)</Label>
+                    <Input
+                      id="product-weight"
+                      type="number"
+                      step="any"
+                      min="0"
+                      value={weightG}
+                      onChange={(e) => setWeightG(e.target.value)}
+                      placeholder="e.g., 83"
+                    />
+                  </div>
                 </div>
               </div>
             )}

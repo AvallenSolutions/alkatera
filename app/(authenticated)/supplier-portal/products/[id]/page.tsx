@@ -682,7 +682,19 @@ export default function SupplierProductDetailPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Unit <span className="text-destructive">*</span></Label>
-                    <Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g., kg" />
+                    <Select value={unit} onValueChange={setUnit}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="kg">kg (kilograms)</SelectItem>
+                        <SelectItem value="g">g (grams)</SelectItem>
+                        <SelectItem value="tonne">tonne</SelectItem>
+                        <SelectItem value="L">L (litres)</SelectItem>
+                        <SelectItem value="ml">ml (millilitres)</SelectItem>
+                        <SelectItem value="unit">unit (each)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Unit Measurement</Label>
@@ -713,7 +725,7 @@ export default function SupplierProductDetailPage() {
                 </div>
               </>
             ) : (
-              /* Packaging: weight, category, material */
+              /* Packaging: category, unit, weight, material */
               <>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -733,6 +745,26 @@ export default function SupplierProductDetailPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
+                    <Label>Unit</Label>
+                    <Select value={unit || 'unit'} onValueChange={setUnit}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select unit..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unit">unit (each)</SelectItem>
+                        <SelectItem value="pack">pack</SelectItem>
+                        <SelectItem value="box">box</SelectItem>
+                        <SelectItem value="case">case</SelectItem>
+                        <SelectItem value="pallet">pallet</SelectItem>
+                        <SelectItem value="roll">roll</SelectItem>
+                        <SelectItem value="sheet">sheet</SelectItem>
+                        <SelectItem value="m">m (metres)</SelectItem>
+                        <SelectItem value="m²">m² (square metres)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">How this packaging is counted or measured</p>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Weight per Unit (g)</Label>
                     <Input
                       type="number"
@@ -744,6 +776,8 @@ export default function SupplierProductDetailPage() {
                     />
                     <p className="text-xs text-muted-foreground">Weight of a single unit in grams</p>
                   </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Primary Material</Label>
                     <Select value={primaryMaterial} onValueChange={setPrimaryMaterial}>
@@ -757,8 +791,6 @@ export default function SupplierProductDetailPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Origin Country Code</Label>
                     <Input value={originCountryCode} onChange={(e) => setOriginCountryCode(e.target.value)} placeholder="e.g., GB" maxLength={3} />
