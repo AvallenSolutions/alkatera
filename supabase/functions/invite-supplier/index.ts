@@ -187,61 +187,22 @@ Deno.serve(async (req: Request) => {
       product = productData;
     }
 
-    // Mark any expired-but-still-pending invitations for this email so the data stays clean
-    await adminClient
-      .from("supplier_invitations")
-      .update({ status: "expired" })
-      .eq("supplier_email", supplierEmail.toLowerCase())
-      .eq("organization_id", organizationId)
-      .eq("status", "pending")
-      .lt("expires_at", new Date().toISOString());
-
-    // Check for duplicate pending invitations (only block if not yet expired)
+    // Expire any previous pending invitations for this supplier so we can send a fresh one
     if (materialId) {
-      // Material-specific: check by material_id + email
-      const { data: existingInvitation } = await adminClient
+      await adminClient
         .from("supplier_invitations")
-        .select("id, status")
+        .update({ status: "expired" })
         .eq("material_id", materialId)
         .eq("supplier_email", supplierEmail.toLowerCase())
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
-        .single();
-
-      if (existingInvitation) {
-        return new Response(
-          JSON.stringify({
-            error: "An invitation to this supplier for this material is already pending"
-          }),
-          {
-            status: 409,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
+        .eq("status", "pending");
     } else {
-      // General invite: check by org + email where material_id is null
-      const { data: existingInvitation } = await adminClient
+      await adminClient
         .from("supplier_invitations")
-        .select("id, status")
+        .update({ status: "expired" })
         .eq("organization_id", organizationId)
         .is("material_id", null)
         .eq("supplier_email", supplierEmail.toLowerCase())
-        .eq("status", "pending")
-        .gt("expires_at", new Date().toISOString())
-        .single();
-
-      if (existingInvitation) {
-        return new Response(
-          JSON.stringify({
-            error: "A general invitation to this supplier is already pending"
-          }),
-          {
-            status: 409,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
-      }
+        .eq("status", "pending");
     }
 
     const { data: invitation, error: invitationError } = await adminClient
