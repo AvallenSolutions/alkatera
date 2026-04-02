@@ -350,7 +350,7 @@ export async function GET(request: NextRequest) {
           .from('supplier_products')
           .select(`
             id, name, category, unit, carbon_intensity, product_code,
-            verified_at, recycled_content_pct, water_factor, land_factor, waste_factor,
+            verified_at, recycled_content_pct, impact_climate, impact_water, impact_land, impact_waste,
             product_type, weight_g, packaging_category, primary_material,
             epr_material_code, epr_is_drinks_container,
             suppliers!inner(name)
@@ -404,10 +404,10 @@ export async function GET(request: NextRequest) {
           unit: product.unit,
           processType: 'SUPPLIER_PRODUCT',
           location: product.suppliers?.name || 'Verified Supplier',
-          co2_factor: product.carbon_intensity,
-          water_factor: product.water_factor,
-          land_factor: product.land_factor,
-          waste_factor: product.waste_factor,
+          co2_factor: product.carbon_intensity ?? product.impact_climate,
+          water_factor: product.impact_water,
+          land_factor: product.impact_land,
+          waste_factor: product.impact_waste,
           source: 'Primary Verified',
           source_type: 'primary',
           data_quality: 'verified',

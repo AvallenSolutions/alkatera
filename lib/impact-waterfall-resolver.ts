@@ -178,15 +178,20 @@ interface SupplierProductImpacts {
 }
 
 /**
- * Checks if a supplier product has any impact data available
+ * Checks if a supplier product has any impact data available.
+ * Uses explicit null/undefined checks so that a genuine zero value (e.g. a
+ * carbon-neutral product with impact_climate = 0) is treated as valid data
+ * rather than falling through to secondary sources.
  */
 function hasSupplierProductImpactData(product: SupplierProductImpacts | null): boolean {
   if (!product) return false;
-  return !!(
-    product.impact_climate ||
-    product.impact_water ||
-    product.impact_waste ||
-    product.impact_land
+  return (
+    product.impact_climate != null ||
+    product.impact_water != null ||
+    product.impact_waste != null ||
+    product.impact_land != null ||
+    // Legacy field: older supplier products may only have carbon_intensity
+    (product as any).carbon_intensity != null
   );
 }
 
@@ -204,7 +209,8 @@ function buildSupplierProductResult(
   const waterScarcityFactor = product.water_scarcity_factor ?? awareFactor;
 
   // Calculate GHG breakdown - use product-specific values or estimate from total
-  const climateTotal = Number(product.impact_climate || 0);
+  // Fall back to legacy carbon_intensity if impact_climate is not set
+  const climateTotal = Number(product.impact_climate ?? (product as any).carbon_intensity ?? 0);
   const ghgFossil = product.ghg_fossil !== null && product.ghg_fossil !== undefined
     ? Number(product.ghg_fossil)
     : climateTotal * 0.85;
