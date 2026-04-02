@@ -81,8 +81,8 @@ function AppLayoutInner({ children, requireOrganization = true }: AppLayoutProps
       return
     }
 
-    // No organization → create one
-    if (requireOrganization && !currentOrganization) {
+    // No organization → create one (but never for suppliers — they don't need one)
+    if (requireOrganization && !currentOrganization && !isSupplier) {
       router.push('/create-organization')
       return
     }

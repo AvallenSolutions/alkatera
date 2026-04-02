@@ -137,7 +137,7 @@ export default function SupplierInvitePage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/supplier-portal');
+        window.location.href = '/supplier-portal';
       }, 2000);
     } catch (err) {
       console.error('Error accepting invitation:', err);
@@ -187,7 +187,7 @@ export default function SupplierInvitePage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/supplier-portal');
+        window.location.href = '/supplier-portal';
       }, 2000);
     } catch (err) {
       console.error('Error signing in:', err);
@@ -281,7 +281,7 @@ export default function SupplierInvitePage() {
 
       setSuccess(true);
       setTimeout(() => {
-        router.push('/supplier-portal');
+        window.location.href = '/supplier-portal';
       }, 2000);
     } catch (err) {
       console.error('Error creating account:', err);
