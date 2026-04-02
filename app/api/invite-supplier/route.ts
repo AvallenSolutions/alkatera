@@ -119,7 +119,16 @@ export async function POST(request: NextRequest) {
       product = productData;
     }
 
-    // Check for duplicate pending invitations
+    // Mark any expired-but-still-pending invitations for this email so the data stays clean
+    await adminClient
+      .from('supplier_invitations')
+      .update({ status: 'expired' })
+      .eq('supplier_email', supplierEmail.toLowerCase())
+      .eq('organization_id', organizationId)
+      .eq('status', 'pending')
+      .lt('expires_at', new Date().toISOString());
+
+    // Check for duplicate pending invitations (only block if not yet expired)
     if (materialId) {
       const { data: existingInvitation } = await adminClient
         .from('supplier_invitations')
@@ -127,6 +136,7 @@ export async function POST(request: NextRequest) {
         .eq('material_id', materialId)
         .eq('supplier_email', supplierEmail.toLowerCase())
         .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
         .single();
 
       if (existingInvitation) {
@@ -143,6 +153,7 @@ export async function POST(request: NextRequest) {
         .is('material_id', null)
         .eq('supplier_email', supplierEmail.toLowerCase())
         .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
         .single();
 
       if (existingInvitation) {
