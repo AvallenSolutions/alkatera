@@ -187,7 +187,16 @@ Deno.serve(async (req: Request) => {
       product = productData;
     }
 
-    // Check for duplicate pending invitations
+    // Mark any expired-but-still-pending invitations for this email so the data stays clean
+    await adminClient
+      .from("supplier_invitations")
+      .update({ status: "expired" })
+      .eq("supplier_email", supplierEmail.toLowerCase())
+      .eq("organization_id", organizationId)
+      .eq("status", "pending")
+      .lt("expires_at", new Date().toISOString());
+
+    // Check for duplicate pending invitations (only block if not yet expired)
     if (materialId) {
       // Material-specific: check by material_id + email
       const { data: existingInvitation } = await adminClient
@@ -196,6 +205,7 @@ Deno.serve(async (req: Request) => {
         .eq("material_id", materialId)
         .eq("supplier_email", supplierEmail.toLowerCase())
         .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
         .single();
 
       if (existingInvitation) {
@@ -218,6 +228,7 @@ Deno.serve(async (req: Request) => {
         .is("material_id", null)
         .eq("supplier_email", supplierEmail.toLowerCase())
         .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
         .single();
 
       if (existingInvitation) {
