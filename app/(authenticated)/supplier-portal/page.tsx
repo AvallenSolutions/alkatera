@@ -163,13 +163,17 @@ export default function SupplierPortalDashboard() {
       if (invError) {
         console.error('Error loading invitations:', invError);
       } else if (invitations) {
-        setPendingRequests(invitations.map((inv: any) => ({
-          id: inv.id,
-          material_name: inv.material_name,
-          material_type: inv.material_type,
-          organization_name: inv.organization_name,
-          invited_at: inv.invited_at,
-        })));
+        // Only show requests that still need a response as "pending"
+        const awaitingResponse = invitations
+          .filter((inv: any) => inv.request_status === 'pending' && inv.material_type !== 'general')
+          .map((inv: any) => ({
+            id: inv.id,
+            material_name: inv.material_name,
+            material_type: inv.material_type,
+            organization_name: inv.organization_name,
+            invited_at: inv.invited_at,
+          }));
+        setPendingRequests(awaitingResponse);
       }
 
       setLoading(false);
@@ -237,7 +241,9 @@ export default function SupplierPortalDashboard() {
             <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
           </div>
           <p className="text-2xl font-bold text-foreground">{pendingRequests.length}</p>
-          <p className="text-sm text-muted-foreground">Data Requests</p>
+          <p className="text-sm text-muted-foreground">
+            {pendingRequests.length === 1 ? 'Request Awaiting Response' : 'Requests Awaiting Response'}
+          </p>
         </Link>
 
         {/* Verified Products (replaced "Company Profile: 1") */}
