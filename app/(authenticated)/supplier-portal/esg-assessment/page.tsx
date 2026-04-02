@@ -24,6 +24,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { useSupplierEsgAssessment } from '@/hooks/data/useSupplierEsgAssessment'
+import { useSupplierEsgEvidence } from '@/hooks/data/useSupplierEsgEvidence'
 import {
   ESG_SECTIONS,
   ESG_QUESTIONS,
@@ -32,6 +33,8 @@ import {
   type EsgSection,
 } from '@/lib/supplier-esg/questions'
 import { isReadyToSubmit, getRatingLabel } from '@/lib/supplier-esg/scoring'
+import { EsgQuestionEvidenceUpload } from '@/components/suppliers/EsgQuestionEvidenceUpload'
+import type { SupplierEsgEvidence } from '@/lib/types/supplier-esg'
 
 export default function SupplierEsgAssessmentPage() {
   const [supplierId, setSupplierId] = useState<string | undefined>()
@@ -45,6 +48,13 @@ export default function SupplierEsgAssessmentPage() {
     saveAnswers,
     submitAssessment,
   } = useSupplierEsgAssessment(supplierId)
+
+  const {
+    evidenceByQuestion,
+    uploadEvidence,
+    deleteEvidence,
+    loading: evidenceLoading,
+  } = useSupplierEsgEvidence(assessment?.id)
 
   // Load supplier id
   useEffect(() => {
@@ -98,6 +108,7 @@ export default function SupplierEsgAssessmentPage() {
   const totalQuestions = ESG_QUESTIONS.length
   const answeredQuestions = ESG_QUESTIONS.filter((q) => answers[q.id] != null).length
   const completionPercent = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0
+  const totalEvidenceFiles = Object.values(evidenceByQuestion).reduce((sum, items) => sum + items.length, 0)
 
   if (loadingSupplier || loading) {
     return <PageLoader message="Loading ESG assessment..." />
@@ -154,7 +165,7 @@ export default function SupplierEsgAssessmentPage() {
       {/* Progress Header */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-4">
             <div>
               <p className="text-sm text-muted-foreground">Sections Completed</p>
               <p className="text-2xl font-bold">{completedSections} / {ESG_SECTIONS.length}</p>
@@ -165,6 +176,10 @@ export default function SupplierEsgAssessmentPage() {
                 <Progress value={completionPercent} className="flex-1" />
                 <span className="text-sm font-medium">{completionPercent}%</span>
               </div>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Evidence Files</p>
+              <p className="text-2xl font-bold">{totalEvidenceFiles}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Score</p>
@@ -213,6 +228,9 @@ export default function SupplierEsgAssessmentPage() {
                       value={answers[question.id] || null}
                       onChange={(val) => handleAnswer(question.id, val)}
                       disabled={isSubmitted}
+                      evidence={evidenceByQuestion[question.id] || []}
+                      onUploadEvidence={uploadEvidence}
+                      onDeleteEvidence={deleteEvidence}
                     />
                   ))}
                 </div>
@@ -274,12 +292,18 @@ function QuestionRow({
   value,
   onChange,
   disabled,
+  evidence,
+  onUploadEvidence,
+  onDeleteEvidence,
 }: {
   question: { id: string; text: string; guidanceNote?: string; allowNA?: boolean }
   index: number
   value: EsgResponse | null
   onChange: (val: EsgResponse) => void
   disabled: boolean
+  evidence: SupplierEsgEvidence[]
+  onUploadEvidence: (questionId: string, file: File, name: string) => Promise<any>
+  onDeleteEvidence: (id: string) => Promise<boolean>
 }) {
   const options: { label: string; value: EsgResponse }[] = [
     { label: 'Yes', value: 'yes' },
@@ -287,6 +311,8 @@ function QuestionRow({
     { label: 'No', value: 'no' },
     { label: 'N/A', value: 'na' },
   ]
+
+  const showEvidence = value === 'yes' || value === 'partial'
 
   return (
     <div className="border rounded-lg p-4">
@@ -324,6 +350,15 @@ function QuestionRow({
               </button>
             ))}
           </div>
+          {showEvidence && (
+            <EsgQuestionEvidenceUpload
+              questionId={question.id}
+              evidence={evidence}
+              onUpload={onUploadEvidence}
+              onDelete={onDeleteEvidence}
+              disabled={disabled}
+            />
+          )}
         </div>
       </div>
     </div>

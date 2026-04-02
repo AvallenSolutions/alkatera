@@ -31,8 +31,17 @@ import {
   ImageIcon,
   Wheat,
   Box,
+  Eye,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
+import ProductPreviewPanel from '@/components/suppliers/ProductPreviewPanel';
 import {
   Select,
   SelectContent,
@@ -80,6 +89,7 @@ export default function SupplierProductsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<SupplierProduct | null>(null);
 
   // Simple "Add Product" form state
   const [productType, setProductType] = useState<SupplierProductType>('ingredient');
@@ -349,7 +359,20 @@ export default function SupplierProductsPage() {
                   </div>
                 </div>
 
-                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#ccff00] transition-colors flex-shrink-0 ml-4" />
+                <div className="flex items-center gap-1 flex-shrink-0 ml-4">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPreviewProduct(product);
+                    }}
+                    className="p-1.5 rounded-md text-muted-foreground hover:text-[#ccff00] hover:bg-[#ccff00]/10 transition-colors"
+                    title="Preview product"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-[#ccff00] transition-colors" />
+                </div>
               </button>
             );
           })}
@@ -533,6 +556,24 @@ export default function SupplierProductsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Product Preview Sheet */}
+      <Sheet
+        open={previewProduct !== null}
+        onOpenChange={(open) => { if (!open) setPreviewProduct(null); }}
+      >
+        <SheetContent side="right" className="sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Product Preview</SheetTitle>
+            <SheetDescription>
+              Quick overview of product details and impact data.
+            </SheetDescription>
+          </SheetHeader>
+          {previewProduct && (
+            <ProductPreviewPanel product={previewProduct} />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -41,3 +41,18 @@ export interface SupplierEsgAssessment {
 export interface EsgAssessmentForVerification extends SupplierEsgAssessment {
   supplier: { name: string }
 }
+
+/** A single evidence file attached to an ESG assessment question. */
+export interface SupplierEsgEvidence {
+  id: string
+  assessment_id: string
+  question_id: string
+  document_name: string
+  document_url: string | null
+  storage_object_path: string | null
+  file_size_bytes: number | null
+  mime_type: string | null
+  uploaded_by: string | null
+  created_at: string
+  updated_at: string
+}
