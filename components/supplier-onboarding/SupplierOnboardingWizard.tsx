@@ -17,19 +17,17 @@ import { cn } from '@/lib/utils'
 // Step components
 import { SupplierWelcome } from './steps/SupplierWelcome'
 import { SupplierHowItWorks } from './steps/SupplierHowItWorks'
-import { SupplierCompleteProfile } from './steps/SupplierCompleteProfile'
+import { SupplierCompanyIdentity } from './steps/SupplierCompanyIdentity'
+import { SupplierCompanyDetails } from './steps/SupplierCompanyDetails'
 import { SupplierDataRequests } from './steps/SupplierDataRequests'
-import { SupplierAddProduct } from './steps/SupplierAddProduct'
-import { SupplierUploadEvidence } from './steps/SupplierUploadEvidence'
 import { SupplierAllSet } from './steps/SupplierAllSet'
 
 const STEP_COMPONENTS: Record<string, React.ComponentType> = {
   'supplier-welcome': SupplierWelcome,
   'supplier-how-it-works': SupplierHowItWorks,
-  'supplier-complete-profile': SupplierCompleteProfile,
+  'supplier-company-identity': SupplierCompanyIdentity,
+  'supplier-company-details': SupplierCompanyDetails,
   'supplier-data-requests': SupplierDataRequests,
-  'supplier-add-product': SupplierAddProduct,
-  'supplier-upload-evidence': SupplierUploadEvidence,
   'supplier-all-set': SupplierAllSet,
 }
 
@@ -118,7 +116,7 @@ export function SupplierOnboardingWizard() {
             <Progress value={progress} indicatorColor="lime" className="h-1 bg-white/10" />
             <div className="flex items-center justify-between mt-1">
               <p className="text-xs text-white/40">
-                {currentStepConfig.title} &mdash; {phaseConfig.duration}
+                {currentStepConfig.title}
               </p>
               <p className="text-xs text-white/40">{progress}%</p>
             </div>

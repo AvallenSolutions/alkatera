@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { getSupabaseBrowserClient } from '@/lib/supabase/browser-client';
+import { GoogleAddressInput } from '@/components/ui/google-address-input';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +16,7 @@ import {
   Upload,
   X,
   ImageIcon,
+  FileText,
 } from 'lucide-react';
 
 interface SupplierProfile {
@@ -28,6 +30,13 @@ interface SupplierProfile {
   notes: string | null;
   description: string | null;
   logo_url: string | null;
+  address: string | null;
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+  country_code: string | null;
+  catalogue_url: string | null;
+  phone: string | null;
 }
 
 export default function SupplierProfilePage() {
@@ -47,10 +56,20 @@ export default function SupplierProfilePage() {
   const [notes, setNotes] = useState('');
   const [description, setDescription] = useState('');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [countryCode, setCountryCode] = useState('');
+  const [catalogueUrl, setCatalogueUrl] = useState<string | null>(null);
+  const [catalogueFileName, setCatalogueFileName] = useState<string | null>(null);
+  const [phone, setPhone] = useState('');
 
-  // Logo upload state
+  // Upload state
   const [uploadingLogo, setUploadingLogo] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCatalogue, setUploadingCatalogue] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const catalogueInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function loadProfile() {
@@ -60,7 +79,7 @@ export default function SupplierProfilePage() {
 
       const { data, error: fetchError } = await supabase
         .from('suppliers')
-        .select('id, name, contact_email, contact_name, industry_sector, country, website, notes, description, logo_url')
+        .select('id, name, contact_email, contact_name, industry_sector, country, website, notes, description, logo_url, address, city, lat, lng, country_code, catalogue_url, phone')
         .eq('user_id', user.id)
         .limit(1)
         .maybeSingle();
@@ -79,6 +98,20 @@ export default function SupplierProfilePage() {
         setNotes(data.notes || '');
         setDescription(data.description || '');
         setLogoUrl(data.logo_url || null);
+        setAddress(data.address || '');
+        setCity(data.city || '');
+        setLat(data.lat || null);
+        setLng(data.lng || null);
+        setCountryCode(data.country_code || '');
+        setCatalogueUrl(data.catalogue_url || null);
+        setPhone(data.phone || '');
+        // Extract filename from catalogue URL
+        if (data.catalogue_url) {
+          const parts = data.catalogue_url.split('/');
+          const raw = parts[parts.length - 1];
+          // Strip the timestamp prefix (e.g. "catalogue-1234567890.pdf" -> "catalogue.pdf")
+          setCatalogueFileName(raw || 'catalogue');
+        }
       }
 
       setLoading(false);
@@ -99,7 +132,6 @@ export default function SupplierProfilePage() {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
 
-    // Validate file
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       setError('Please upload a JPG, PNG, or WebP image');
@@ -120,25 +152,24 @@ export default function SupplierProfilePage() {
 
       // Delete old logo if exists
       if (logoUrl) {
-        const oldPath = extractStoragePath(logoUrl, 'supplier-product-images');
+        const oldPath = extractStoragePath(logoUrl, 'supplier-logos');
         if (oldPath) {
-          await supabase.storage.from('supplier-product-images').remove([oldPath]);
+          await supabase.storage.from('supplier-logos').remove([oldPath]);
         }
       }
 
       const { error: uploadError } = await supabase.storage
-        .from('supplier-product-images')
+        .from('supplier-logos')
         .upload(path, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('supplier-product-images')
+        .from('supplier-logos')
         .getPublicUrl(path);
 
       setLogoUrl(publicUrl);
 
-      // Save logo URL to the database immediately
       await supabase
         .from('suppliers')
         .update({ logo_url: publicUrl, updated_at: new Date().toISOString() })
@@ -149,8 +180,7 @@ export default function SupplierProfilePage() {
       setError(err.message || 'Failed to upload logo');
     } finally {
       setUploadingLogo(false);
-      // Reset file input
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (logoInputRef.current) logoInputRef.current.value = '';
     }
   };
 
@@ -161,23 +191,103 @@ export default function SupplierProfilePage() {
     setError(null);
     try {
       const supabase = getSupabaseBrowserClient();
-
-      // Delete from storage
-      const oldPath = extractStoragePath(logoUrl, 'supplier-product-images');
+      const oldPath = extractStoragePath(logoUrl, 'supplier-logos');
       if (oldPath) {
-        await supabase.storage.from('supplier-product-images').remove([oldPath]);
+        await supabase.storage.from('supplier-logos').remove([oldPath]);
       }
-
-      // Clear from database
       await supabase
         .from('suppliers')
         .update({ logo_url: null, updated_at: new Date().toISOString() })
         .eq('id', profile.id);
-
       setLogoUrl(null);
     } catch (err: any) {
       console.error('Error removing logo:', err);
       setError(err.message || 'Failed to remove logo');
+    }
+  };
+
+  const handleCatalogueUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    const allowedTypes = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv',
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Please upload a PDF, Excel, or CSV file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Catalogue must be under 10MB');
+      return;
+    }
+
+    setUploadingCatalogue(true);
+    setError(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const ext = file.name.split('.').pop() || 'pdf';
+      const path = `${profile.id}/catalogue-${Date.now()}.${ext}`;
+
+      // Remove old catalogue
+      if (catalogueUrl) {
+        const oldPath = extractStoragePath(catalogueUrl, 'supplier-catalogues');
+        if (oldPath) {
+          await supabase.storage.from('supplier-catalogues').remove([oldPath]);
+        }
+      }
+
+      const { error: uploadError } = await supabase.storage
+        .from('supplier-catalogues')
+        .upload(path, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('supplier-catalogues')
+        .getPublicUrl(path);
+
+      setCatalogueUrl(publicUrl);
+      setCatalogueFileName(file.name);
+
+      await supabase
+        .from('suppliers')
+        .update({ catalogue_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', profile.id);
+
+    } catch (err: any) {
+      console.error('Error uploading catalogue:', err);
+      setError(err.message || 'Failed to upload catalogue');
+    } finally {
+      setUploadingCatalogue(false);
+      if (catalogueInputRef.current) catalogueInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveCatalogue = async () => {
+    if (!profile || !catalogueUrl) return;
+    if (!window.confirm('Remove your product catalogue?')) return;
+
+    setError(null);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const oldPath = extractStoragePath(catalogueUrl, 'supplier-catalogues');
+      if (oldPath) {
+        await supabase.storage.from('supplier-catalogues').remove([oldPath]);
+      }
+      await supabase
+        .from('suppliers')
+        .update({ catalogue_url: null, updated_at: new Date().toISOString() })
+        .eq('id', profile.id);
+      setCatalogueUrl(null);
+      setCatalogueFileName(null);
+    } catch (err: any) {
+      console.error('Error removing catalogue:', err);
+      setError(err.message || 'Failed to remove catalogue');
     }
   };
 
@@ -204,6 +314,13 @@ export default function SupplierProfilePage() {
           notes: notes.trim() || null,
           description: description.trim() || null,
           logo_url: logoUrl,
+          address: address.trim() || null,
+          city: city.trim() || null,
+          lat: lat,
+          lng: lng,
+          country_code: countryCode.trim() || null,
+          catalogue_url: catalogueUrl,
+          phone: phone.trim() || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', profile.id);
@@ -296,7 +413,6 @@ export default function SupplierProfilePage() {
           </h2>
 
           <div className="flex items-start gap-6">
-            {/* Logo preview */}
             <div className="flex-shrink-0">
               {logoUrl ? (
                 <div className="relative group">
@@ -321,13 +437,12 @@ export default function SupplierProfilePage() {
               )}
             </div>
 
-            {/* Upload controls */}
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
                 Upload your company logo. JPG, PNG, or WebP, max 2MB.
               </p>
               <input
-                ref={fileInputRef}
+                ref={logoInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 onChange={handleLogoUpload}
@@ -338,7 +453,7 @@ export default function SupplierProfilePage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => logoInputRef.current?.click()}
                 disabled={uploadingLogo}
               >
                 {uploadingLogo ? (
@@ -382,12 +497,34 @@ export default function SupplierProfilePage() {
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Tell your customers about your company — what you do, your sustainability commitments, key products..."
+              placeholder="Tell your customers about your company, what you do, your sustainability commitments, key products..."
               rows={4}
             />
             <p className="text-xs text-muted-foreground">
               This description will be visible to organisations you supply on alkatera.
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Company Address</Label>
+            <GoogleAddressInput
+              value={address}
+              onAddressSelect={(details) => {
+                setAddress(details.formatted_address);
+                setCity(details.city || '');
+                setLat(details.lat);
+                setLng(details.lng);
+                setCountryCode(details.country_code || '');
+                // Also update the plain country field from the address
+                if (details.country_code) {
+                  setCountry(details.country_code);
+                }
+              }}
+              placeholder="Start typing your address..."
+            />
+            {address && (
+              <p className="text-xs text-muted-foreground">{address}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -412,15 +549,28 @@ export default function SupplierProfilePage() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="website">Website</Label>
-            <Input
-              id="website"
-              type="url"
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              placeholder="https://www.example.com"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="website">Website</Label>
+              <Input
+                id="website"
+                type="url"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://www.example.com"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+44 1234 567890"
+              />
+            </div>
           </div>
         </div>
 
@@ -455,6 +605,70 @@ export default function SupplierProfilePage() {
               />
             </div>
           </div>
+        </div>
+
+        {/* Product Catalogue */}
+        <div className="space-y-4 rounded-xl border border-border bg-card p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Product Catalogue
+          </h2>
+
+          <p className="text-sm text-muted-foreground">
+            Upload your product catalogue so your customers can see what you offer. PDF, Excel, or CSV up to 10MB.
+          </p>
+
+          {catalogueUrl ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
+              <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground truncate">{catalogueFileName || 'Catalogue'}</p>
+                <a
+                  href={catalogueUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-[#ccff00] hover:underline"
+                >
+                  View file
+                </a>
+              </div>
+              <button
+                type="button"
+                onClick={handleRemoveCatalogue}
+                className="h-7 w-7 rounded-full hover:bg-destructive/20 flex items-center justify-center transition-colors"
+                title="Remove catalogue"
+              >
+                <X className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+              </button>
+            </div>
+          ) : null}
+
+          <input
+            ref={catalogueInputRef}
+            type="file"
+            accept=".pdf,.xlsx,.xls,.csv"
+            onChange={handleCatalogueUpload}
+            className="hidden"
+            id="catalogue-upload"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => catalogueInputRef.current?.click()}
+            disabled={uploadingCatalogue}
+          >
+            {uploadingCatalogue ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" />
+                {catalogueUrl ? 'Replace Catalogue' : 'Upload Catalogue'}
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Additional Notes */}

@@ -20,12 +20,12 @@ export function SupplierAllSet() {
     'Learnt how the platform works',
   ]
 
-  if (state.completedSteps.includes('supplier-complete-profile') || state.profileCompleted) {
-    achievements.push('Completed your company profile')
+  if (state.completedSteps.includes('supplier-company-identity') || state.profileCompleted) {
+    achievements.push('Set up your company identity')
   }
 
-  if (state.completedSteps.includes('supplier-add-product')) {
-    achievements.push('Added your first product')
+  if (state.completedSteps.includes('supplier-company-details')) {
+    achievements.push('Added your company details')
   }
 
   achievements.push('Understood data requests and evidence')

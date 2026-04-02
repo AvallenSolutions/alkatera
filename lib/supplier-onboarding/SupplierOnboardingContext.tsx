@@ -6,11 +6,15 @@ import {
   SupplierOnboardingState,
   SupplierOnboardingStep,
   INITIAL_SUPPLIER_ONBOARDING_STATE,
+  SUPPLIER_ONBOARDING_STEPS,
   getNextSupplierStep,
   getPreviousSupplierStep,
   getSupplierStepConfig,
   getSupplierProgressPercentage,
 } from './types'
+
+/** Valid step IDs — used to detect stale saved state from old step definitions */
+const VALID_STEP_IDS = new Set(SUPPLIER_ONBOARDING_STEPS.map(s => s.id))
 
 interface SupplierOnboardingContextType {
   /** Current onboarding state */
@@ -98,8 +102,13 @@ export function SupplierOnboardingProvider({ children }: { children: React.React
           const data = await res.json()
 
           if (data.state) {
-            // Replay any updates the user made while we were fetching
             let merged = data.state as SupplierOnboardingState
+            // If saved state references a step that no longer exists (old flow),
+            // reset to the beginning so the user sees the updated onboarding.
+            if (!VALID_STEP_IDS.has(merged.currentStep)) {
+              merged = { ...INITIAL_SUPPLIER_ONBOARDING_STATE }
+            }
+            // Replay any updates the user made while we were fetching
             const pending = pendingUpdatesRef.current
             pendingUpdatesRef.current = []
             for (const updater of pending) {
