@@ -132,6 +132,9 @@ export default function SupplierInvitePage() {
         throw new Error(result.error || 'Failed to accept invitation');
       }
 
+      // Refresh session to pick up is_supplier metadata set by the accept API
+      await supabase.auth.refreshSession();
+
       setSuccess(true);
       setTimeout(() => {
         router.push('/supplier-portal');
@@ -178,6 +181,9 @@ export default function SupplierInvitePage() {
       if (!response.ok) {
         throw new Error(result.error || 'Failed to accept invitation');
       }
+
+      // Refresh session to pick up is_supplier metadata set by the accept API
+      await supabase.auth.refreshSession();
 
       setSuccess(true);
       setTimeout(() => {
@@ -269,6 +275,9 @@ export default function SupplierInvitePage() {
           console.error('Error signing in after account creation:', signInError);
         }
       }
+
+      // Refresh session to pick up is_supplier metadata set by the accept API
+      await supabase.auth.refreshSession();
 
       setSuccess(true);
       setTimeout(() => {

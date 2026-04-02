@@ -86,6 +86,31 @@ export function OrganizationProvider({ children }: { children: React.ReactNode }
     isFetchingRef.current = true
     setIsLoading(true)
     try {
+      // Fast-path: if session metadata already flags this user as a supplier,
+      // resolve immediately without waiting for membership + RPC queries.
+      // This prevents the race condition where AppLayout redirects to
+      // /create-organization before the supplier context RPC completes.
+      if (user.user_metadata?.is_supplier) {
+        console.log('👤 OrganizationContext: Fast-path supplier detection from metadata')
+        // Still try to get org context for display purposes
+        const { data: supplierCtx } = await supabase.rpc('get_supplier_context')
+        if (supplierCtx && supplierCtx.length > 0 && supplierCtx[0].organization_id) {
+          const ctx = supplierCtx[0]
+          const supplierOrg: Organization = {
+            id: ctx.organization_id,
+            name: ctx.organization_name,
+            slug: ctx.organization_slug,
+            created_at: '',
+          }
+          setOrganizations([supplierOrg])
+          setCurrentOrganization(supplierOrg)
+        }
+        setUserRole('supplier')
+        setIsLoading(false)
+        isFetchingRef.current = false
+        return
+      }
+
       // ── Parallel Group 1: memberships (with role join) + advisor access ──
       const [membershipsResult, advisorResult] = await Promise.all([
         supabase

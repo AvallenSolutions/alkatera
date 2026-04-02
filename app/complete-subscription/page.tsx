@@ -88,7 +88,7 @@ const tiers = [
 function CompleteSubscriptionContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { currentOrganization, isLoading: isOrgLoading, mutate } = useOrganization()
+  const { currentOrganization, isLoading: isOrgLoading, userRole, mutate } = useOrganization()
   const [billingInterval, setBillingInterval] = useState<BillingInterval>('monthly')
   const [processingCheckout, setProcessingCheckout] = useState(false)
   const [processingTier, setProcessingTier] = useState<string | null>(null)
@@ -97,6 +97,13 @@ function CompleteSubscriptionContent() {
   const isPaymentSuccess = searchParams.get('success') === 'true'
   const isCanceled = searchParams.get('canceled') === 'true'
   const tierParam = searchParams.get('tier')
+
+  // Suppliers should never see the subscription page - redirect to their portal
+  useEffect(() => {
+    if (!isOrgLoading && userRole === 'supplier') {
+      router.push('/supplier-portal')
+    }
+  }, [isOrgLoading, userRole, router])
 
   // Poll for subscription activation after successful payment
   useEffect(() => {

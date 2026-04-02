@@ -34,6 +34,12 @@ export default function CreateOrganizationPage() {
         return
       }
 
+      // Suppliers should never create a brand organisation - redirect to their portal
+      if (user.user_metadata?.is_supplier) {
+        router.push('/supplier-portal')
+        return
+      }
+
       // If they already have an organization from context, redirect
       // But if subscription is pending, let them go to complete-subscription
       if (currentOrganization) {
