@@ -120,8 +120,43 @@ export function TransactionBrowser() {
       return
     }
 
-    toast.success('Transaction reclassified')
     setEditingId(null)
+
+    // Learn from this correction: create a supplier rule and reclassify
+    // other transactions from the same contact
+    const tx = transactions.find(t => t.id === txId)
+    if (category && tx?.xero_contact_name && currentOrganization?.id) {
+      try {
+        const res = await fetch('/api/xero/learn-rule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationId: currentOrganization.id,
+            contactName: tx.xero_contact_name,
+            emissionCategory: category,
+          }),
+        })
+        if (res.ok) {
+          const { ruleCreated, additionalClassified } = await res.json()
+          if (additionalClassified > 0) {
+            toast.success(
+              `Transaction reclassified. ${additionalClassified} other transaction${additionalClassified !== 1 ? 's' : ''} from ${tx.xero_contact_name} also updated.`
+            )
+          } else if (ruleCreated) {
+            toast.success('Transaction reclassified. Rule saved for future transactions.')
+          } else {
+            toast.success('Transaction reclassified')
+          }
+        } else {
+          toast.success('Transaction reclassified')
+        }
+      } catch {
+        toast.success('Transaction reclassified')
+      }
+    } else {
+      toast.success('Transaction reclassified')
+    }
+
     fetchTransactions()
   }
 

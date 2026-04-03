@@ -11,10 +11,10 @@ const EMISSION_CATEGORIES = [
   'grid_electricity', 'natural_gas', 'diesel_stationary', 'diesel_mobile',
   'petrol_mobile', 'lpg', 'water',
   'air_travel', 'rail_travel', 'accommodation',
-  'road_freight', 'sea_freight', 'air_freight',
+  'road_freight', 'sea_freight', 'air_freight', 'courier',
   'packaging', 'raw_materials',
   'professional_services', 'it_services', 'telecoms',
-  'waste_management', 'cleaning', 'maintenance',
+  'waste', 'other',
 ]
 
 const SYSTEM_PROMPT = `You are an emission category classifier for a sustainability platform used by drinks companies (breweries, distilleries, wineries).
@@ -34,7 +34,7 @@ Common patterns in drinks industry:
 - Grain, malt, hops, sugar, fruit suppliers → raw_materials
 - Accountants, lawyers, consultants → professional_services
 - IT, software, hosting → it_services
-- Waste collection → waste_management
+- Waste collection → waste
 
 Respond with a JSON array. Each item must have:
 - transactionId: string (the id provided)
@@ -76,7 +76,7 @@ export async function classifyWithAI(
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 4000,
       system: SYSTEM_PROMPT,
       messages: [
         {

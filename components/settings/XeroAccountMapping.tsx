@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Save, MapPin, Check } from 'lucide-react'
+import { Loader2, Save, MapPin, Check, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { useOrganization } from '@/lib/organizationContext'
 import { supabase } from '@/lib/supabaseClient'
@@ -52,6 +52,8 @@ export function XeroAccountMapping() {
   const [hasChanges, setHasChanges] = useState(false)
   const [isConnected, setIsConnected] = useState(false)
   const [suggestions, setSuggestions] = useState<Map<string, string>>(new Map())
+  const [aiSuggestions, setAiSuggestions] = useState<Map<string, { category: string; confidence: number; reasoning: string }>>(new Map())
+  const [isAiSuggesting, setIsAiSuggesting] = useState(false)
 
   const fetchMappings = useCallback(async () => {
     if (!currentOrganization?.id) return
@@ -119,6 +121,61 @@ export function XeroAccountMapping() {
     setHasChanges(true)
   }
 
+  async function handleAiSuggest() {
+    if (!currentOrganization?.id) return
+    setIsAiSuggesting(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/xero/suggest-account-mappings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ organizationId: currentOrganization.id }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to get AI suggestions')
+      }
+
+      const { suggestions: aiResults } = await res.json()
+      const newAiSuggestions = new Map<string, { category: string; confidence: number; reasoning: string }>()
+
+      // Apply AI suggestions to the mappings
+      setMappings(prev => prev.map(m => {
+        const suggestion = aiResults.find((s: { accountId: string }) => s.accountId === m.xero_account_id)
+        if (suggestion?.category && m.emission_category === null && !m.is_excluded) {
+          newAiSuggestions.set(m.xero_account_id, {
+            category: suggestion.category,
+            confidence: suggestion.confidence,
+            reasoning: suggestion.reasoning,
+          })
+          if (suggestion.category === 'exclude') {
+            return { ...m, is_excluded: true }
+          }
+          return { ...m, emission_category: suggestion.category }
+        }
+        return m
+      }))
+
+      setAiSuggestions(newAiSuggestions)
+      if (newAiSuggestions.size > 0) {
+        setHasChanges(true)
+        toast.success(`AI suggested categories for ${newAiSuggestions.size} accounts. Review and save.`)
+      } else {
+        toast.info('No additional suggestions found')
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'AI suggestion failed'
+      toast.error(message)
+    } finally {
+      setIsAiSuggesting(false)
+    }
+  }
+
   async function handleSave() {
     if (!currentOrganization?.id) return
     setIsSaving(true)
@@ -140,6 +197,7 @@ export function XeroAccountMapping() {
 
       setHasChanges(false)
       setSuggestions(new Map())
+      setAiSuggestions(new Map())
       toast.success('Account mappings saved. Reclassifying transactions...')
 
       // Reclassify existing transactions in the background
@@ -187,6 +245,7 @@ export function XeroAccountMapping() {
   if (expenseAccounts.length === 0) return null
 
   const mappedCount = expenseAccounts.filter(m => m.emission_category || m.is_excluded).length
+  const unmappedCount = expenseAccounts.length - mappedCount
 
   return (
     <Card>
@@ -212,7 +271,22 @@ export function XeroAccountMapping() {
                 Reclassifying transactions...
               </span>
             )}
-            {suggestions.size > 0 && (
+            {unmappedCount > 0 && (
+              <Button
+                onClick={handleAiSuggest}
+                disabled={isAiSuggesting || isSaving || isReclassifying}
+                size="sm"
+                variant="outline"
+              >
+                {isAiSuggesting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                {isAiSuggesting ? 'Analysing...' : 'AI Suggest Mappings'}
+              </Button>
+            )}
+            {(suggestions.size > 0 || aiSuggestions.size > 0) && (
               <Button onClick={handleSave} disabled={isSaving || isReclassifying} size="sm" variant="outline">
                 <Check className="h-4 w-4 mr-2" />
                 Accept all suggestions
@@ -277,11 +351,20 @@ export function XeroAccountMapping() {
                     ))}
                   </SelectContent>
                 </Select>
-                {suggestions.has(mapping.xero_account_id) && (
+                {aiSuggestions.has(mapping.xero_account_id) ? (
+                  <Badge
+                    variant="outline"
+                    className="text-xs shrink-0 border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                    title={aiSuggestions.get(mapping.xero_account_id)?.reasoning}
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    AI
+                  </Badge>
+                ) : suggestions.has(mapping.xero_account_id) ? (
                   <Badge variant="outline" className="text-xs shrink-0 border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400">
                     Suggested
                   </Badge>
-                )}
+                ) : null}
               </div>
 
               <div className="w-16 flex justify-center">

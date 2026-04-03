@@ -148,6 +148,29 @@ export function AIClassificationPanel() {
         next.add(txId)
         return next
       })
+
+      // Learn from this confirmation: create a supplier rule for future syncs
+      const tx = unclassified.find(t => t.id === txId)
+      if (tx?.contactName) {
+        fetch('/api/xero/learn-rule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            organizationId: currentOrganization.id,
+            contactName: tx.contactName,
+            emissionCategory: suggestion.suggestedCategory,
+          }),
+        }).then(res => {
+          if (res.ok) return res.json()
+        }).then(data => {
+          if (data?.additionalClassified > 0) {
+            toast.success(`Rule saved. ${data.additionalClassified} more transaction${data.additionalClassified !== 1 ? 's' : ''} from ${tx.contactName} also classified.`)
+          }
+        }).catch(() => {
+          // Non-critical - rule creation failure shouldn't block the confirmation
+        })
+      }
+
       toast.success('Classification confirmed')
     } catch {
       toast.error('Failed to confirm classification')
@@ -157,6 +180,117 @@ export function AIClassificationPanel() {
   const visibleTransactions = unclassified.filter(
     t => !confirmedIds.has(t.id) && !dismissedIds.has(t.id)
   )
+
+  // Group visible transactions by supplier where AI suggestions agree
+  interface SupplierGroup {
+    contactName: string
+    category: string
+    confidence: number
+    reasoning: string
+    transactions: UnclassifiedTransaction[]
+    totalAmount: number
+  }
+
+  const supplierGroups: SupplierGroup[] = []
+  const ungroupedTransactions: UnclassifiedTransaction[] = []
+
+  const bySupplier = new Map<string, UnclassifiedTransaction[]>()
+  for (const tx of visibleTransactions) {
+    if (!suggestions.has(tx.id)) continue
+    const name = tx.contactName || 'Unknown'
+    if (!bySupplier.has(name)) bySupplier.set(name, [])
+    bySupplier.get(name)!.push(tx)
+  }
+
+  const supplierEntries = Array.from(bySupplier.entries())
+  for (const [contactName, txs] of supplierEntries) {
+    if (txs.length >= 2) {
+      // Check if all suggestions agree on the same category
+      const categories = new Set(txs.map((t: UnclassifiedTransaction) => suggestions.get(t.id)?.suggestedCategory))
+      if (categories.size === 1) {
+        const firstSuggestion = suggestions.get(txs[0].id)!
+        supplierGroups.push({
+          contactName,
+          category: firstSuggestion.suggestedCategory!,
+          confidence: Math.min(...txs.map((t: UnclassifiedTransaction) => suggestions.get(t.id)?.confidence ?? 0)),
+          reasoning: firstSuggestion.reasoning,
+          transactions: txs,
+          totalAmount: txs.reduce((sum: number, t: UnclassifiedTransaction) => sum + t.amount, 0),
+        })
+        continue
+      }
+    }
+    ungroupedTransactions.push(...txs)
+  }
+
+  // Also include transactions without suggestions in the ungrouped list
+  for (const tx of visibleTransactions) {
+    if (!suggestions.has(tx.id)) ungroupedTransactions.push(tx)
+  }
+
+  async function handleConfirmGroup(group: SupplierGroup) {
+    if (!currentOrganization?.id) return
+
+    try {
+      const updates = group.transactions.map(t => {
+        const suggestion = suggestions.get(t.id)!
+        return supabase
+          .from('xero_transactions')
+          .update({
+            emission_category: suggestion.suggestedCategory,
+            classification_source: 'ai',
+            classification_confidence: suggestion.confidence,
+            upgrade_status: 'pending',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', t.id)
+      })
+
+      const results = await Promise.all(updates)
+      const failed = results.filter(r => r.error)
+      if (failed.length > 0) {
+        toast.error(`Failed to confirm ${failed.length} classifications`)
+        return
+      }
+
+      setConfirmedIds(prev => {
+        const next = new Set(prev)
+        for (const t of group.transactions) next.add(t.id)
+        return next
+      })
+
+      // Learn from this confirmation
+      fetch('/api/xero/learn-rule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId: currentOrganization.id,
+          contactName: group.contactName,
+          emissionCategory: group.category,
+        }),
+      }).catch(() => {})
+
+      toast.success(`Confirmed ${group.transactions.length} transactions from ${group.contactName}`)
+    } catch {
+      toast.error('Failed to confirm group')
+    }
+  }
+
+  async function handleDismissGroup(group: SupplierGroup) {
+    const ids = group.transactions.map(t => t.id)
+    setDismissedIds(prev => {
+      const next = new Set(prev)
+      for (const id of ids) next.add(id)
+      return next
+    })
+
+    await supabase
+      .from('xero_transactions')
+      .update({ upgrade_status: 'dismissed', updated_at: new Date().toISOString() })
+      .in('id', ids)
+
+    toast.success(`Dismissed ${ids.length} transactions from ${group.contactName}`)
+  }
 
   async function handleDismiss(txId: string) {
     setDismissedIds(prev => {
@@ -311,7 +445,70 @@ export function AIClassificationPanel() {
 
         {suggestions.size > 0 && visibleTransactions.length > 0 && (
           <div className="space-y-2 max-h-96 overflow-y-auto">
-            {visibleTransactions.map(tx => {
+            {/* Grouped supplier rows */}
+            {supplierGroups.map(group => (
+              <div
+                key={`group-${group.contactName}`}
+                className="p-3 rounded-lg border bg-violet-50/50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800/30 space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate">
+                        {group.contactName}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {group.transactions.length} transactions
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatCurrency(group.totalAmount)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className={`text-xs ${
+                        group.confidence >= 0.8
+                          ? 'border-emerald-300 text-emerald-700 dark:text-emerald-400'
+                          : group.confidence >= 0.5
+                            ? 'border-amber-300 text-amber-700 dark:text-amber-400'
+                            : 'border-red-300 text-red-700 dark:text-red-400'
+                      }`}
+                    >
+                      {CATEGORY_LABELS[group.category] || group.category}
+                      <span className="ml-1 opacity-70">{Math.round(group.confidence * 100)}%</span>
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">{group.reasoning}</span>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs text-emerald-700 dark:text-emerald-400"
+                      onClick={() => handleConfirmGroup(group)}
+                    >
+                      <Check className="h-3 w-3 mr-1" />
+                      Confirm All
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => handleDismissGroup(group)}
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Individual transaction rows */}
+            {ungroupedTransactions.map(tx => {
               const suggestion = suggestions.get(tx.id)
               if (!suggestion) return null
 

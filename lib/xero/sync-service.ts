@@ -6,6 +6,7 @@ import { classifyTransaction, type AccountMapping, type SupplierRule } from './c
 import { calculateSpendBasedEmissions } from './spend-factors'
 import { extractFromDescription, hasExtractedData } from './description-extractor'
 import { classifyWithAI } from './ai-classifier'
+import { getLabelYearForDate } from '../log-data/period-utils'
 
 /**
  * Retry a Xero API call once on 429 (rate limit), respecting the Retry-After
@@ -78,7 +79,7 @@ export async function syncStage(
       case 'classify':
         return await stageClassify(db, organizationId)
       case 'ai_classify':
-        return await stageAIClassify(db, organizationId)
+        return await stageAIClassify(db, organizationId, cursor)
       case 'complete':
         return await stageComplete(db, organizationId)
       default:
@@ -172,6 +173,15 @@ async function stageAccounts(
     if (error) throw new Error(`Failed to upsert account mappings: ${error.message}`)
   }
 
+  // Fetch fiscal year start month for correct reporting_year calculation
+  const { data: orgData } = await db
+    .from('organizations')
+    .select('report_defaults')
+    .eq('id', organizationId)
+    .single()
+
+  const fyStartMonth: number = orgData?.report_defaults?.reporting_period?.fiscal_year_start_month ?? 1
+
   // Clear any stale sync state (best effort)
   try {
     await db
@@ -185,7 +195,7 @@ async function stageAccounts(
   return {
     done: false,
     nextStage: 'invoices',
-    cursor: { page: 1, syncSince: syncSince.toISOString() },
+    cursor: { page: 1, syncSince: syncSince.toISOString(), fyStartMonth },
     progress: `Accounts synced (${expenseAccounts.length} expense accounts, ${syncType} sync)`,
     stats: { accountsFetched: expenseAccounts.length },
   }
@@ -196,9 +206,10 @@ async function stageAccounts(
 async function stageInvoices(
   db: ReturnType<typeof getServiceClient>,
   organizationId: string,
-  cursor?: { page?: number; syncSince?: string }
+  cursor?: { page?: number; syncSince?: string; fyStartMonth?: number }
 ): Promise<StageResult> {
   const page = cursor?.page || 1
+  const fyStartMonth = cursor?.fyStartMonth ?? 1
 
   const auth = await getAuthenticatedClient(organizationId)
   if (!auth) throw new Error('No Xero connection found.')
@@ -231,7 +242,7 @@ async function stageInvoices(
     .filter(inv => inv.invoiceID && !['DRAFT', 'DELETED', 'VOIDED'].includes(String(inv.status || '')))
     .flatMap(inv => {
       const txDate = inv.date ? new Date(inv.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-      const reportingYear = inv.date ? new Date(inv.date).getFullYear() : new Date().getFullYear()
+      const reportingYear = getLabelYearForDate(inv.date ? new Date(inv.date) : new Date(), fyStartMonth)
       const baseCols = {
         organization_id: organizationId,
         xero_transaction_type: 'invoice' as const,
@@ -284,8 +295,8 @@ async function stageInvoices(
     done: false,
     nextStage: hasMore ? 'invoices' : 'bank_transactions',
     cursor: hasMore
-      ? { page: page + 1, syncSince: cursor?.syncSince }
-      : { page: 1, syncSince: cursor?.syncSince },
+      ? { page: page + 1, syncSince: cursor?.syncSince, fyStartMonth }
+      : { page: 1, syncSince: cursor?.syncSince, fyStartMonth },
     progress: `Invoices page ${page}: ${inserted} imported${hasMore ? ', fetching more...' : ' (done)'}`,
     stats: { transactionsFetched: inserted },
   }
@@ -296,9 +307,10 @@ async function stageInvoices(
 async function stageBankTransactions(
   db: ReturnType<typeof getServiceClient>,
   organizationId: string,
-  cursor?: { page?: number; syncSince?: string }
+  cursor?: { page?: number; syncSince?: string; fyStartMonth?: number }
 ): Promise<StageResult> {
   const page = cursor?.page || 1
+  const fyStartMonth = cursor?.fyStartMonth ?? 1
 
   const auth = await getAuthenticatedClient(organizationId)
   if (!auth) throw new Error('No Xero connection found.')
@@ -336,7 +348,7 @@ async function stageBankTransactions(
     })
     .flatMap(tx => {
       const txDate = tx.date ? new Date(tx.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-      const reportingYear = tx.date ? new Date(tx.date).getFullYear() : new Date().getFullYear()
+      const reportingYear = getLabelYearForDate(tx.date ? new Date(tx.date) : new Date(), fyStartMonth)
       const baseCols = {
         organization_id: organizationId,
         xero_transaction_type: 'bank_transaction' as const,
@@ -489,23 +501,30 @@ async function stageClassify(
 
 async function stageAIClassify(
   db: ReturnType<typeof getServiceClient>,
-  organizationId: string
+  organizationId: string,
+  cursor?: { offset?: number }
 ): Promise<StageResult> {
-  // Fetch up to 50 unclassified transactions (those the rule-based classifier missed)
-  const { data: unclassified } = await db
+  const BATCH_SIZE = 30
+  const offset = cursor?.offset || 0
+
+  // Fetch a batch of unclassified transactions (those the rule-based classifier missed)
+  const { data: unclassified, count: totalRemaining } = await db
     .from('xero_transactions')
-    .select('id, xero_contact_name, description, amount, currency')
+    .select('id, xero_contact_name, description, amount, currency', { count: 'exact' })
     .eq('organization_id', organizationId)
     .is('emission_category', null)
     .eq('upgrade_status', 'not_applicable')
+    .is('ai_suggested_category', null)
     .order('amount', { ascending: false })
-    .limit(50)
+    .range(0, BATCH_SIZE - 1)
 
   if (!unclassified || unclassified.length === 0) {
     return {
       done: false,
       nextStage: 'complete',
-      progress: 'No unclassified transactions for AI',
+      progress: offset > 0
+        ? `AI classification complete (processed ${offset} transactions)`
+        : 'No unclassified transactions for AI',
     }
   }
 
@@ -562,10 +581,16 @@ async function stageAIClassify(
     }
   }
 
+  const processed = offset + unclassified.length
+  const moreRemaining = (totalRemaining ?? 0) > BATCH_SIZE
+
   return {
     done: false,
-    nextStage: 'complete',
-    progress: `AI classified ${autoClassified} transactions (${needsReview} need review)`,
+    nextStage: moreRemaining ? 'ai_classify' : 'complete',
+    cursor: moreRemaining ? { offset: processed } : undefined,
+    progress: moreRemaining
+      ? `AI classified ${autoClassified} transactions (batch ${Math.ceil(processed / BATCH_SIZE)}, ${needsReview} need review, more remaining...)`
+      : `AI classified ${autoClassified} transactions (${needsReview} need review)`,
     stats: { transactionsClassified: autoClassified },
   }
 }
