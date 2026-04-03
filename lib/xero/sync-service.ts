@@ -100,6 +100,13 @@ async function stageAccounts(
 ): Promise<StageResult> {
   await updateSyncStatus(organizationId, 'syncing')
 
+  // Check if we actually have any transactions stored (previous syncs may
+  // have failed silently, leaving "completed" sync logs but 0 rows)
+  const { count: existingTxCount } = await db
+    .from('xero_transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('organization_id', organizationId)
+
   // Determine if this is an incremental sync by finding last successful sync
   const { data: lastSync } = await db
     .from('xero_sync_logs')
@@ -113,12 +120,16 @@ async function stageAccounts(
   const twelveMonthsAgo = new Date()
   twelveMonthsAgo.setFullYear(twelveMonthsAgo.getFullYear() - 1)
 
-  // Use last sync time as watermark, but never older than 12 months
-  const syncSince = lastSync?.completed_at
+  // Force a full sync if we have no transactions (stale sync logs from
+  // previously broken syncs would otherwise cause an incremental that
+  // returns 0 results)
+  const hasValidHistory = lastSync?.completed_at && (existingTxCount ?? 0) > 0
+
+  const syncSince = hasValidHistory
     ? new Date(Math.max(new Date(lastSync.completed_at).getTime(), twelveMonthsAgo.getTime()))
     : twelveMonthsAgo
 
-  const syncType = lastSync?.completed_at ? 'incremental' : 'full'
+  const syncType = hasValidHistory ? 'incremental' : 'full'
 
   // Create sync log
   await db
