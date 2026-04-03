@@ -63,6 +63,7 @@ import { UpstreamTransportCard } from '@/components/reports/UpstreamTransportCar
 import { DownstreamTransportCard } from '@/components/reports/DownstreamTransportCard';
 import { UsePhaseCard } from '@/components/reports/UsePhaseCard';
 import Link from 'next/link';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip } from 'recharts';
 
 // Emission factors for auto-calculation from facility utility data
 const EMISSION_FACTORS: Record<string, { factor: number; unit: string; scope: 'Scope 1' | 'Scope 2' }> = {
@@ -1172,161 +1173,408 @@ export default function CompanyEmissionsPage() {
         </TabsList>
 
         <TabsContent value="footprint">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>{selectedYear} Company Footprint</CardTitle>
-                    <CardDescription>
-                      Overview of your organisation&apos;s greenhouse gas inventory for {selectedYear}
-                    </CardDescription>
-                  </div>
-                  <Button onClick={handleGenerateReport} disabled={isGenerating || isLoadingReport}>
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Calculating...
-                      </>
-                    ) : (
-                      <>
-                        <Calculator className="h-4 w-4 mr-2" />
-                        Calculate Footprint
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isLoadingReport ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {(() => {
-                      // CRITICAL: Always calculate LIVE total emissions from real-time data (in tonnes)
-                      // Fleet emissions split by scope for correct assignment
-                      const totalLiveEmissionsTonnes =
-                        (scope1CO2e / 1000) + fleetScope1CO2e +       // Scope 1 (utilities + fleet)
-                        (scope2CO2e / 1000) + fleetScope2CO2e +       // Scope 2 (utilities + fleet)
-                        scope3Cat1CO2e +                               // Scope 3 Cat 1 (products)
-                        (calculatedScope3OverheadsCO2e / 1000) +      // Scope 3 other categories
-                        fleetScope3CO2e;                               // Scope 3 Cat 6 (grey fleet)
+          {isLoadingReport ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {(() => {
+                // ── Compute all values once ────────────────────────
+                const s1Utilities = scope1CO2e / 1000;
+                const s1Fleet = fleetScope1CO2e;
+                const s1Xero = xeroScope1Kg / 1000;
+                const totalScope1 = s1Utilities + s1Fleet + s1Xero;
 
-                      const hasLiveData = totalLiveEmissionsTonnes > 0;
+                const s2Utilities = scope2CO2e / 1000;
+                const s2Fleet = fleetScope2CO2e;
+                const s2Xero = xeroScope2Kg / 1000;
+                const totalScope2 = s2Utilities + s2Fleet + s2Xero;
 
-                      if (hasLiveData) {
-                        return (
-                          <div className="text-center py-8 bg-slate-50 dark:bg-slate-900 rounded-lg">
-                            <div className="text-sm text-muted-foreground mb-2">Total Footprint</div>
-                            <div className="text-5xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-                              {totalLiveEmissionsTonnes.toFixed(3)} tCO2e
+                const s3Products = scope3Cat1CO2e;
+                const s3Activities = calculatedScope3OverheadsCO2e / 1000;
+                const s3Xero = xeroScope3Kg / 1000;
+                const s3Fleet = fleetScope3CO2e;
+                const totalScope3 = s3Products + s3Activities + s3Xero + s3Fleet;
+
+                const totalEmissions = totalScope1 + totalScope2 + totalScope3;
+                const hasData = totalEmissions > 0;
+
+                const pct = (v: number) => totalEmissions > 0 ? ((v / totalEmissions) * 100).toFixed(1) : '0';
+
+                const SCOPE_COLORS = {
+                  scope1: '#f97316',
+                  scope2: '#3b82f6',
+                  scope3: '#22c55e',
+                };
+
+                // Donut chart data
+                const donutData = [
+                  { name: 'Scope 1', value: totalScope1, color: SCOPE_COLORS.scope1 },
+                  { name: 'Scope 2', value: totalScope2, color: SCOPE_COLORS.scope2 },
+                  { name: 'Scope 3', value: totalScope3, color: SCOPE_COLORS.scope3 },
+                ].filter(d => d.value > 0);
+
+                // Source bar chart data
+                const sourceData = [
+                  { name: 'Facility fuels', value: s1Utilities, color: SCOPE_COLORS.scope1, scope: 'Scope 1' },
+                  { name: 'Fleet (owned)', value: s1Fleet, color: SCOPE_COLORS.scope1, scope: 'Scope 1' },
+                  { name: 'Spend data (S1)', value: s1Xero, color: SCOPE_COLORS.scope1, scope: 'Scope 1' },
+                  { name: 'Purchased electricity', value: s2Utilities, color: SCOPE_COLORS.scope2, scope: 'Scope 2' },
+                  { name: 'Fleet (electric)', value: s2Fleet, color: SCOPE_COLORS.scope2, scope: 'Scope 2' },
+                  { name: 'Spend data (S2)', value: s2Xero, color: SCOPE_COLORS.scope2, scope: 'Scope 2' },
+                  { name: 'Products (LCA)', value: s3Products, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
+                  { name: 'Activities', value: s3Activities, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
+                  { name: 'Spend data (S3)', value: s3Xero, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
+                  { name: 'Fleet (grey)', value: s3Fleet, color: SCOPE_COLORS.scope3, scope: 'Scope 3' },
+                ].filter(d => d.value > 0.001).sort((a, b) => b.value - a.value);
+
+                // Data quality tiers (in tonnes)
+                const tier1 = s3Products; // LCA supplier data
+                const tier2 = s1Utilities + s2Utilities + s3Activities; // Activity data
+                const tier4 = s1Xero + s2Xero + s3Xero; // Spend-based
+                const tierTotal = tier1 + tier2 + tier4;
+
+                if (!hasData) {
+                  return (
+                    <>
+                      {/* Header with calculate button */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-xl font-semibold">{selectedYear} Company Footprint</h2>
+                          <p className="text-sm text-muted-foreground">Overview of your organisation&apos;s greenhouse gas inventory</p>
+                        </div>
+                        <Button onClick={handleGenerateReport} disabled={isGenerating || isLoadingReport}>
+                          {isGenerating ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Calculating...
+                            </>
+                          ) : (
+                            <>
+                              <Calculator className="h-4 w-4 mr-2" />
+                              Calculate Footprint
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          No emissions data found for {selectedYear}. Add utility data at <Link href="/company/facilities" className="underline font-medium">facility level</Link> for Scope 1 & 2, and add Scope 3 data below.
+                        </AlertDescription>
+                      </Alert>
+                    </>
+                  );
+                }
+
+                return (
+                  <>
+                    {/* ── Row 1: Hero + Donut ────────────────────────── */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl font-semibold">{selectedYear} Company Footprint</h2>
+                        <p className="text-sm text-muted-foreground">Overview of your organisation&apos;s greenhouse gas inventory</p>
+                      </div>
+                      <Button onClick={handleGenerateReport} disabled={isGenerating || isLoadingReport}>
+                        {isGenerating ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Calculating...
+                          </>
+                        ) : (
+                          <>
+                            <Calculator className="h-4 w-4 mr-2" />
+                            Recalculate
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex flex-col md:flex-row items-center gap-8">
+                          {/* Left: Total number */}
+                          <div className="flex-1 text-center md:text-left">
+                            <div className="text-sm text-muted-foreground mb-1">Total Footprint</div>
+                            <div className="text-5xl font-bold tracking-tight mb-2">
+                              {totalEmissions.toFixed(2)}
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              Last calculated: {report?.updated_at ? new Date(report.updated_at).toLocaleString('en-GB') : 'Just now'}
+                            <div className="text-lg text-muted-foreground">tonnes CO₂e</div>
+                            {report?.updated_at && (
+                              <div className="text-xs text-muted-foreground mt-3">
+                                Last calculated: {new Date(report.updated_at).toLocaleString('en-GB')}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: Donut chart */}
+                          <div className="w-64 h-64 relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={donutData}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={70}
+                                  outerRadius={100}
+                                  paddingAngle={2}
+                                  dataKey="value"
+                                  stroke="none"
+                                >
+                                  {donutData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                  ))}
+                                </Pie>
+                                <RechartsTooltip
+                                  formatter={(value: number) => [`${value.toFixed(3)} t`, '']}
+                                  contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
+                                  labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                            {/* Centre label */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                              <div className="text-center">
+                                <div className="text-xs text-muted-foreground">Scopes</div>
+                                <div className="text-sm font-semibold">1 / 2 / 3</div>
+                              </div>
                             </div>
                           </div>
-                        );
-                      } else {
-                        return (
-                          <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>
-                              No emissions data found for {selectedYear}. Add utility data at <Link href="/company/facilities" className="underline font-medium">facility level</Link> for Scope 1 & 2, and add Scope 3 data below.
-                            </AlertDescription>
-                          </Alert>
-                        );
-                      }
-                    })()}
+                        </div>
 
+                        {/* Donut legend */}
+                        <div className="flex justify-center gap-6 mt-4">
+                          {donutData.map(d => (
+                            <div key={d.name} className="flex items-center gap-2 text-sm">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
+                              <span className="text-muted-foreground">{d.name}</span>
+                              <span className="font-medium">{pct(d.value)}%</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* ── Row 2: Enhanced Scope Cards ──────────────── */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Scope 1 */}
                       <Card className="border-orange-200 dark:border-orange-900">
                         <CardContent className="pt-6">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Flame className="h-5 w-5 text-orange-500" />
-                            <span className="font-medium">Scope 1</span>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Flame className="h-5 w-5 text-orange-500" />
+                              <span className="font-medium">Scope 1</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{pct(totalScope1)}%</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {(() => {
-                              // Scope 1 = facility utilities (kg) + company-owned fleet (tonnes)
-                              const totalScope1Tonnes = (scope1CO2e / 1000) + fleetScope1CO2e + (xeroScope1Kg / 1000);
-                              return totalScope1Tonnes > 0
-                                ? `${totalScope1Tonnes.toFixed(3)} tCO₂e`
-                                : 'No data';
-                            })()}
+                            {totalScope1 > 0 ? `${totalScope1.toFixed(3)} tCO₂e` : 'No data'}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Direct emissions (fuel combustion, process, fugitive, fleet)</p>
+                          <p className="text-sm text-muted-foreground mt-1">Direct emissions</p>
+                          {/* Proportion bar */}
+                          <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-orange-500 transition-all" style={{ width: `${pct(totalScope1)}%` }} />
+                          </div>
+                          {/* Sub-breakdowns */}
+                          {totalScope1 > 0 && (
+                            <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                              {s1Utilities > 0 && (
+                                <div className="flex justify-between"><span>Facility fuels</span><span className="font-mono">{s1Utilities.toFixed(3)} t</span></div>
+                              )}
+                              {s1Fleet > 0 && (
+                                <div className="flex justify-between"><span>Owned fleet</span><span className="font-mono">{s1Fleet.toFixed(3)} t</span></div>
+                              )}
+                              {s1Xero > 0 && (
+                                <div className="flex justify-between"><span>Spend estimates</span><span className="font-mono">{s1Xero.toFixed(3)} t</span></div>
+                              )}
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
 
+                      {/* Scope 2 */}
                       <Card className="border-blue-200 dark:border-blue-900">
                         <CardContent className="pt-6">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Zap className="h-5 w-5 text-blue-500" />
-                            <span className="font-medium">Scope 2</span>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-5 w-5 text-blue-500" />
+                              <span className="font-medium">Scope 2</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{pct(totalScope2)}%</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {(() => {
-                              // Scope 2 = purchased energy (kg) + electric fleet (tonnes)
-                              const totalScope2Tonnes = (scope2CO2e / 1000) + fleetScope2CO2e + (xeroScope2Kg / 1000);
-                              return totalScope2Tonnes > 0
-                                ? `${totalScope2Tonnes.toFixed(3)} tCO₂e`
-                                : 'No data';
-                            })()}
+                            {totalScope2 > 0 ? `${totalScope2.toFixed(3)} tCO₂e` : 'No data'}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Indirect emissions (purchased electricity, heat, steam, electric fleet)</p>
+                          <p className="text-sm text-muted-foreground mt-1">Purchased energy</p>
+                          {/* Proportion bar */}
+                          <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: `${pct(totalScope2)}%` }} />
+                          </div>
+                          {/* Sub-breakdowns */}
+                          {totalScope2 > 0 && (
+                            <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                              {s2Utilities > 0 && (
+                                <div className="flex justify-between"><span>Electricity & heat</span><span className="font-mono">{s2Utilities.toFixed(3)} t</span></div>
+                              )}
+                              {s2Fleet > 0 && (
+                                <div className="flex justify-between"><span>Electric fleet</span><span className="font-mono">{s2Fleet.toFixed(3)} t</span></div>
+                              )}
+                              {s2Xero > 0 && (
+                                <div className="flex justify-between"><span>Spend estimates</span><span className="font-mono">{s2Xero.toFixed(3)} t</span></div>
+                              )}
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
 
+                      {/* Scope 3 */}
                       <Card className="border-green-200 dark:border-green-900">
                         <CardContent className="pt-6">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Globe className="h-5 w-5 text-green-500" />
-                            <span className="font-medium">Scope 3</span>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Globe className="h-5 w-5 text-green-500" />
+                              <span className="font-medium">Scope 3</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{pct(totalScope3)}%</span>
                           </div>
                           <div className="text-2xl font-bold">
-                            {(() => {
-                              // Sum ALL Scope 3 categories:
-                              // - scope3Cat1CO2e (Category 1 from LCAs) is in tonnes
-                              // - calculatedScope3OverheadsCO2e (all other categories) is in kg
-                              // - xeroScope3Kg (spend-based estimates from Xero) is in kg
-                              const totalTonnes = scope3Cat1CO2e + (calculatedScope3OverheadsCO2e / 1000) + (xeroScope3Kg / 1000);
-
-                              if (totalTonnes > 0) {
-                                return `${totalTonnes.toFixed(3)} tCO₂e`;
-                              }
-
-                              return 'No data';
-                            })()}
+                            {totalScope3 > 0 ? `${totalScope3.toFixed(3)} tCO₂e` : 'No data'}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">Value chain emissions</p>
-                          {(scope3Cat1CO2e > 0 || (report?.breakdown_json?.scope3?.products && report.breakdown_json.scope3.products > 0)) && (
-                            <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Includes Cat 1 from LCAs (Tier 1 data)
+                          {/* Proportion bar */}
+                          <div className="mt-3 h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${pct(totalScope3)}%` }} />
+                          </div>
+                          {/* Sub-breakdowns */}
+                          {totalScope3 > 0 && (
+                            <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                              {s3Products > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="flex items-center gap-1">Products (LCA) <CheckCircle2 className="h-3 w-3 text-green-500" /></span>
+                                  <span className="font-mono">{s3Products.toFixed(3)} t</span>
+                                </div>
+                              )}
+                              {s3Activities > 0 && (
+                                <div className="flex justify-between"><span>Activities</span><span className="font-mono">{s3Activities.toFixed(3)} t</span></div>
+                              )}
+                              {s3Xero > 0 && (
+                                <div className="flex justify-between"><span>Spend estimates</span><span className="font-mono">{s3Xero.toFixed(3)} t</span></div>
+                              )}
+                              {s3Fleet > 0 && (
+                                <div className="flex justify-between"><span>Grey fleet</span><span className="font-mono">{s3Fleet.toFixed(3)} t</span></div>
+                              )}
                             </div>
                           )}
                         </CardContent>
                       </Card>
                     </div>
 
-                    <div className="flex items-center gap-4 pt-4 border-t">
-                      <div className="flex-1">
-                        <h4 className="font-medium mb-1">How your footprint is calculated</h4>
-                        <p className="text-sm text-muted-foreground">
-                          <strong>Scope 1 & 2:</strong> Auto-calculated from facility utility data (electricity, gas, diesel, etc.).
-                          <Link href="/company/facilities" className="underline ml-1">Add utility data at facility level</Link>.
-                          <br />
-                          <strong>Scope 3:</strong> Add value chain data (travel, services, waste) in the Scope 3 tab below.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                    {/* ── Row 3: Emissions by Source (bar chart) ───── */}
+                    {sourceData.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base">Emissions by Source</CardTitle>
+                          <CardDescription>All emission sources ranked by contribution (tonnes CO₂e)</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="h-[280px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <BarChart data={sourceData} layout="vertical" margin={{ left: 120, right: 20, top: 5, bottom: 5 }}>
+                                <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v: number) => `${v.toFixed(2)} t`} />
+                                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={110} />
+                                <RechartsTooltip
+                                  formatter={(value: number) => [`${value.toFixed(3)} tCO₂e`, '']}
+                                  labelFormatter={(label: string) => label}
+                                  contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
+                                />
+                                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                                  {sourceData.map((entry, index) => (
+                                    <Cell key={`bar-${index}`} fill={entry.color} />
+                                  ))}
+                                </Bar>
+                              </BarChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* ── Row 4: Data Quality ───────────────────────── */}
+                    {tierTotal > 0 && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base">Data Quality</CardTitle>
+                          <CardDescription>Breakdown by GHG Protocol data tier</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {/* Stacked bar */}
+                          <div className="flex h-4 rounded-full overflow-hidden mb-4">
+                            {tier1 > 0 && (
+                              <div className="bg-emerald-500 transition-all" style={{ width: `${(tier1 / tierTotal * 100)}%` }} title={`Tier 1: ${tier1.toFixed(3)} t`} />
+                            )}
+                            {tier2 > 0 && (
+                              <div className="bg-blue-500 transition-all" style={{ width: `${(tier2 / tierTotal * 100)}%` }} title={`Tier 2: ${tier2.toFixed(3)} t`} />
+                            )}
+                            {tier4 > 0 && (
+                              <div className="bg-red-400 transition-all" style={{ width: `${(tier4 / tierTotal * 100)}%` }} title={`Tier 4: ${tier4.toFixed(3)} t`} />
+                            )}
+                          </div>
+                          {/* Legend */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {tier1 > 0 && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <div className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                                <div>
+                                  <div className="font-medium">Tier 1 &middot; Supplier data</div>
+                                  <div className="text-xs text-muted-foreground">{tier1.toFixed(3)} t ({(tier1 / tierTotal * 100).toFixed(0)}%)</div>
+                                </div>
+                              </div>
+                            )}
+                            {tier2 > 0 && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <div className="w-3 h-3 rounded-full bg-blue-500 shrink-0" />
+                                <div>
+                                  <div className="font-medium">Tier 2 &middot; Activity data</div>
+                                  <div className="text-xs text-muted-foreground">{tier2.toFixed(3)} t ({(tier2 / tierTotal * 100).toFixed(0)}%)</div>
+                                </div>
+                              </div>
+                            )}
+                            {tier4 > 0 && (
+                              <div className="flex items-center gap-2 text-sm">
+                                <div className="w-3 h-3 rounded-full bg-red-400 shrink-0" />
+                                <div>
+                                  <div className="font-medium">Tier 4 &middot; Spend data</div>
+                                  <div className="text-xs text-muted-foreground">{tier4.toFixed(3)} t ({(tier4 / tierTotal * 100).toFixed(0)}%)</div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* ── Row 5: How it's calculated ────────────────── */}
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <h4 className="font-medium mb-1">How your footprint is calculated</h4>
+                            <p className="text-sm text-muted-foreground">
+                              <strong>Scope 1 & 2:</strong> Auto-calculated from facility utility data (electricity, gas, diesel, etc.).
+                              <Link href="/company/facilities" className="underline ml-1">Add utility data at facility level</Link>.
+                              <br />
+                              <strong>Scope 3:</strong> Add value chain data (travel, services, waste) in the Scope 3 tab below.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="scope1">
@@ -1747,7 +1995,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Purchased Goods (Cat 1-2)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    <div className="columns-1 md:columns-2 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                       {/* Category 1: Products (compact version) */}
                       <Card className={scope3Cat1CO2e > 0 ? 'border-green-200 dark:border-green-900' : ''}>
                         <CardHeader className="pb-2">
@@ -1817,7 +2065,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Travel & Commuting (Cat 6-7)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    <div className="columns-1 md:columns-2 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                       <BusinessTravelCard
                         reportId={report.id}
                         entries={travelEntries}
@@ -1838,7 +2086,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Purchased Services (Cat 8)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    <div className="columns-1 md:columns-2 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                       <ServicesOverheadCard
                         reportId={report.id}
                         entries={serviceEntries}
@@ -1853,7 +2101,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Logistics & Transport (Cat 4, 9)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    <div className="columns-1 md:columns-2 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                       {currentOrganization && (
                         <LogisticsDistributionCard
                           reportId={report.id}
@@ -1892,7 +2140,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Waste & Water (Cat 5)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    <div className="columns-1 md:columns-2 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                       <OperationalWasteCard
                         reportId={report.id}
                         entries={wasteEntries}
@@ -1907,7 +2155,7 @@ export default function CompanyEmissionsPage() {
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                       Product Use Phase (Cat 11)
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                    <div className="columns-1 md:columns-2 gap-4 [&>*]:mb-4 [&>*]:break-inside-avoid">
                       {currentOrganization && (
                         <UsePhaseCard
                           reportId={report.id}
